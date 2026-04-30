@@ -17,7 +17,9 @@ public sealed partial class Query
     [Authorize]
     public async Task<Player?> GetMe(
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] IMasterRankingTelemetryService rankingTelemetry,
+        [Service] IOptions<MasterServerRegistrationOptions> masterOptions)
     {
         var principal = httpContextAccessor.HttpContext!.User;
         var userId = principal.GetRequiredUserId();
@@ -26,6 +28,17 @@ public sealed partial class Query
             .Include(p => p.Companies)
                 .ThenInclude(c => c.Buildings)
             .FirstOrDefaultAsync(p => p.Id == userId);
+
+        // Fire daily login telemetry — deduplicated per UTC day per server.
+        if (player is not null)
+        {
+            var today = DateTime.UtcNow.ToString("yyyyMMdd");
+            var serverKey = masterOptions.Value.ServerKey ?? string.Empty;
+            _ = rankingTelemetry.ReportEventAsync(
+                MasterRankingBountyCodes.LoginToGame,
+                player.Email,
+                uniqueScopeKey: $"{MasterRankingBountyCodes.LoginToGame}:{player.Email}:{today}:{serverKey}");
+        }
 
         return ApplyImpersonationAccountContext(player, principal);
     }

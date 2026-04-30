@@ -131,6 +131,9 @@ onMounted(() => {
             }}</a>
             <a class="nav-btn nav-btn--gold" href="/support">{{ t('home.support') }}</a>
             <a class="nav-btn nav-btn--gold" href="/support/admin">{{ t('home.supportAdmin') }}</a>
+            <a class="nav-btn nav-btn--gold" href="/ranking">{{ t('home.ranking') }}</a>
+            <a class="nav-btn nav-btn--gold" href="/ranking/bounties">{{ t('home.bounties') }}</a>
+            <a class="nav-btn nav-btn--gold" href="/ranking/admin">{{ t('home.rankingAdmin') }}</a>
             <a class="nav-btn nav-btn--gold" href="/account">⬛ {{ t('home.myGold') }}</a>
             <a class="nav-btn nav-btn--gold" href="/gold-admin">⚙ {{ t('home.goldAdmin') }}</a>
             <button class="nav-btn nav-btn--ghost" type="button" @click="logout">

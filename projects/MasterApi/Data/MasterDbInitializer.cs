@@ -21,6 +21,8 @@ public sealed class MasterDbInitializer(MasterDbContext db)
             await db.Database.EnsureCreatedAsync(cancellationToken);
         }
 
+        await SeedRankingBountyDefinitionsAsync(cancellationToken);
+
         await ImportChangelogCsvAsync(cancellationToken);
 
         // The four entries below are kept as a startup fallback so the feed is never empty
@@ -222,6 +224,92 @@ public sealed class MasterDbInitializer(MasterDbContext db)
         }
 
         return null;
+    }
+
+    private async Task SeedRankingBountyDefinitionsAsync(CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+
+        var defaults = new List<MasterRankingBountyDefinition>
+        {
+            BuildDefaultDefinition(MasterRankingBountyCodes.GameImprover, "Game improver", "Submit a suggestion or bug report through support.", 5m, RankingCooldownMode.UtcDay, RankingProofRequirement.None, RankingVisibilityScope.PlayerHistory),
+            BuildDefaultDefinition(MasterRankingBountyCodes.RecommendFriend, "Recommend a friend", "A referred player creates a valid account.", 5m, RankingCooldownMode.UtcDay, RankingProofRequirement.None, RankingVisibilityScope.PlayerHistory),
+            BuildDefaultDefinition(MasterRankingBountyCodes.RecommendGoodFriend, "Recommend a good friend", "A referred player purchases startup pack or Pro.", 100m, RankingCooldownMode.UtcDay, RankingProofRequirement.None, RankingVisibilityScope.PlayerHistory),
+            BuildDefaultDefinition(MasterRankingBountyCodes.RetweetXPost, "Retweet a X post", "Submit a social post proof and pass moderation.", 5m, RankingCooldownMode.PerUniqueKey, RankingProofRequirement.Url, RankingVisibilityScope.AdminOnly, requiresModeration: true),
+            BuildDefaultDefinition(MasterRankingBountyCodes.DiscordPlayer, "Discord player", "Complete Discord ownership verification.", 50m, RankingCooldownMode.Once, RankingProofRequirement.DiscordHandle, RankingVisibilityScope.AdminOnly, requiresModeration: true),
+            BuildDefaultDefinition(MasterRankingBountyCodes.LoginToGame, "Log in to game", "Open dashboard on a distinct game server.", 5m, RankingCooldownMode.UtcDayPerServer, RankingProofRequirement.None, RankingVisibilityScope.PlayerHistory),
+            BuildDefaultDefinition(MasterRankingBountyCodes.Manufacturer, "Manufacturer", "Factory produces any product quantity.", 1m, RankingCooldownMode.UtcDayPerServer, RankingProofRequirement.None, RankingVisibilityScope.PlayerHistory),
+            BuildDefaultDefinition(MasterRankingBountyCodes.Wholesaler, "Wholesaler", "Sales shop sells any product quantity.", 1m, RankingCooldownMode.UtcDayPerServer, RankingProofRequirement.None, RankingVisibilityScope.PlayerHistory),
+            BuildDefaultDefinition(MasterRankingBountyCodes.Researcher, "Researcher", "Any R&D unit has active budget.", 2m, RankingCooldownMode.UtcDayPerServer, RankingProofRequirement.None, RankingVisibilityScope.PlayerHistory),
+            BuildDefaultDefinition(MasterRankingBountyCodes.RealEstateMagnate, "Real estate magnate", "Owned apartment or commercial buildings have occupancy.", 2m, RankingCooldownMode.UtcDayPerServer, RankingProofRequirement.None, RankingVisibilityScope.PlayerHistory),
+            BuildDefaultDefinition(MasterRankingBountyCodes.MediaOwner, "Media owner", "Owned media houses have active content budget.", 2m, RankingCooldownMode.UtcDayPerServer, RankingProofRequirement.None, RankingVisibilityScope.PlayerHistory),
+            BuildDefaultDefinition(MasterRankingBountyCodes.Banker, "Banker", "Another user deposits funds into your bank.", 2m, RankingCooldownMode.UtcDayPerServer, RankingProofRequirement.None, RankingVisibilityScope.PlayerHistory),
+            BuildDefaultDefinition(MasterRankingBountyCodes.Lender, "Lender", "Another user maintains an active loan in your bank.", 2m, RankingCooldownMode.UtcDayPerServer, RankingProofRequirement.None, RankingVisibilityScope.PlayerHistory),
+            BuildDefaultDefinition(MasterRankingBountyCodes.FxTrader, "FX trader", "Complete any currency swap.", 2m, RankingCooldownMode.UtcDayPerServer, RankingProofRequirement.None, RankingVisibilityScope.PlayerHistory),
+            BuildDefaultDefinition(MasterRankingBountyCodes.StockTrader, "Stock trader", "Buy any stock.", 2m, RankingCooldownMode.UtcDayPerServer, RankingProofRequirement.None, RankingVisibilityScope.PlayerHistory),
+            BuildDefaultDefinition(MasterRankingBountyCodes.EnergyTrader, "Energy trader", "Power plant ships energy to market.", 2m, RankingCooldownMode.UtcDayPerServer, RankingProofRequirement.None, RankingVisibilityScope.PlayerHistory),
+            BuildDefaultDefinition(MasterRankingBountyCodes.GoodEmployer, "Good employer", "Highest wage rate in an actively paid city.", 10m, RankingCooldownMode.UtcDayPerServer, RankingProofRequirement.None, RankingVisibilityScope.PlayerHistory),
+            BuildDefaultDefinition(MasterRankingBountyCodes.DividendsMaster, "Dividends master", "Owned company pays dividends to shareholders.", 2m, RankingCooldownMode.UtcDayPerServer, RankingProofRequirement.None, RankingVisibilityScope.PlayerHistory),
+            BuildDefaultDefinition(MasterRankingBountyCodes.TopPlayer, "Top player", "Player rank is in the top ten.", 5m, RankingCooldownMode.UtcDay, RankingProofRequirement.None, RankingVisibilityScope.PlayerHistory),
+            BuildDefaultDefinition(MasterRankingBountyCodes.GreatPlayer, "Great player", "Player rank is in the top hundred.", 2m, RankingCooldownMode.UtcDay, RankingProofRequirement.None, RankingVisibilityScope.PlayerHistory),
+            BuildDefaultDefinition(MasterRankingBountyCodes.CompanyMaster, "Company master", "Any owned company rank is in top ten.", 5m, RankingCooldownMode.UtcDayPerServer, RankingProofRequirement.None, RankingVisibilityScope.PlayerHistory),
+        };
+
+        foreach (var definition in defaults)
+        {
+            var existing = await db.MasterRankingBountyDefinitions
+                .FirstOrDefaultAsync(item => item.Code == definition.Code, cancellationToken);
+
+            if (existing is null)
+            {
+                definition.Id = Guid.NewGuid();
+                definition.CreatedAtUtc = now;
+                definition.UpdatedAtUtc = now;
+                db.MasterRankingBountyDefinitions.Add(definition);
+                continue;
+            }
+
+            existing.DisplayName = definition.DisplayName;
+            existing.Description = definition.Description;
+            existing.RewardPoints = definition.RewardPoints;
+            existing.CooldownMode = definition.CooldownMode;
+            existing.ProofRequirement = definition.ProofRequirement;
+            existing.VisibilityScope = definition.VisibilityScope;
+            existing.RequiresModeration = definition.RequiresModeration;
+            existing.SourceEventType = definition.SourceEventType;
+            existing.ValidationSettingsJson = definition.ValidationSettingsJson;
+            existing.IsVisibleToPlayers = definition.IsVisibleToPlayers;
+            existing.UpdatedAtUtc = now;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static MasterRankingBountyDefinition BuildDefaultDefinition(
+        string code,
+        string displayName,
+        string description,
+        decimal rewardPoints,
+        string cooldownMode,
+        string proofRequirement,
+        string visibilityScope,
+        bool requiresModeration = false)
+    {
+        return new MasterRankingBountyDefinition
+        {
+            Code = code,
+            DisplayName = displayName,
+            Description = description,
+            RewardPoints = rewardPoints,
+            IsEnabled = true,
+            IsVisibleToPlayers = true,
+            RequiresModeration = requiresModeration,
+            CooldownMode = cooldownMode,
+            SourceEventType = code,
+            ProofRequirement = proofRequirement,
+            VisibilityScope = visibilityScope,
+            ValidationSettingsJson = "{}",
+        };
     }
 
 }

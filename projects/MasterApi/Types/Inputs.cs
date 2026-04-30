@@ -7,6 +7,9 @@ public sealed class RegisterInput
     public string DisplayName { get; set; } = string.Empty;
 
     public string Password { get; set; } = string.Empty;
+
+    /// <summary>Optional email of the existing player who referred this registration.</summary>
+    public string? ReferralEmail { get; set; }
 }
 
 public sealed class LoginInput

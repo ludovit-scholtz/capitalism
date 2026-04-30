@@ -48,6 +48,21 @@ const router = createRouter({
       name: 'support-admin',
       component: () => import('@/views/SupportAdminView.vue'),
     },
+    {
+      path: '/ranking',
+      name: 'ranking-dashboard',
+      component: () => import('@/views/RankingDashboardView.vue'),
+    },
+    {
+      path: '/ranking/bounties',
+      name: 'ranking-history',
+      component: () => import('@/views/RankingBountyHistoryView.vue'),
+    },
+    {
+      path: '/ranking/admin',
+      name: 'ranking-admin',
+      component: () => import('@/views/RankingAdminView.vue'),
+    },
   ],
   scrollBehavior() {
     return { top: 0 }

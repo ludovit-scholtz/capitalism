@@ -4,11 +4,16 @@ using Microsoft.Extensions.Configuration;
 
 namespace Api.Tests.Infrastructure;
 
-public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>
+public class ApiWebApplicationFactory : WebApplicationFactory<Program>
 {
     private readonly string _databaseName = $"capitalism-tests-{Guid.NewGuid():N}";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        ApplyBaseConfiguration(builder);
+    }
+
+    protected void ApplyBaseConfiguration(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
 

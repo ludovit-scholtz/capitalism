@@ -4,6 +4,7 @@ using System.Text;
 using MasterApi.Configuration;
 using MasterApi.Data;
 using MasterApi.Security;
+using MasterApi.Utilities;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -90,6 +91,8 @@ public class Program
 
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddHttpClient("master-server");
+        builder.Services.AddScoped<MasterRankingService>();
+        builder.Services.AddHostedService<MasterRankingSchedulerHostedService>();
 
         builder.Services
             .AddGraphQLServer()

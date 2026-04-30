@@ -101,38 +101,38 @@ It will use real world map. The game will start in single city and later other c
 - [x] Add backend integration tests for permission boundaries, filter and sort behavior, status transitions, markdown sanitization, and moderation-gated rendering rules to prevent future regressions in support security.
 - [x] Add master-frontend end-to-end tests covering user ticket submission, WYSIWYG markdown editing, table filtering and sorting, admin moderation approval flow, and visibility differences between normal users and administrators.
 
-### Master ranking point system (0% complete)
+### Master ranking point system (95% complete)
 
-- [ ] Design MasterApi ranking entities for player points, bounty definitions, bounty reward records, daily scopes, server scopes, and one-time uniqueness keys so hourly evaluation can run idempotently without duplicate rewards or race conditions.
-- [ ] Implement a scheduled MasterApi hourly ranking evaluator that recalculates bounty eligibility for all players, writes reward records transactionally, and updates total points snapshots with clear audit metadata and processing duration metrics.
-- [ ] Implement UTC-midnight daily decay job that multiplies every player ranking score by 0.99, persists rounded values deterministically, and logs before and after totals to keep long-term competitive balance fair.
-- [ ] Build a player-facing master frontend ranking dashboard showing total points, global leaderboard position, movement trend, and competitive context so rankings feel rewarding and easy to compare with other players.
-- [ ] Build player bounty history UI in master frontend with filters by bounty type, date, game server, and status so each player can inspect exactly why and when points were awarded.
-- [ ] Add administrator bounty configuration interface for enabling, disabling, reward changes, visibility, proof requirements, and per-bounty validation settings while preserving immutable audit history for every configuration change.
-- [ ] Implement anti-duplication and cooldown guards that enforce daily reset windows, once-per-post logic, and once-per-day cross-server limits exactly according to each bounty definition and UTC boundary behavior.
-- [ ] Add internal observability dashboards and alerts for ranking evaluator failures, delayed schedules, abnormal reward spikes, and duplicate-key conflicts so operators can react before player trust is impacted.
-- [ ] Implement Game improver bounty integration with support ticket submission flow, awarding five points at most once per UTC day when a player submits a suggestion or bug report.
-- [ ] Implement Recommend a friend bounty integration with referral registration events, awarding five points once per UTC day when a referred player successfully creates a valid account using referral linkage.
-- [ ] Implement Recommend a good friend bounty integration with monetization events, awarding one hundred points once per UTC day when a referred player purchases startup pack or activates a paid subscription.
-- [ ] Implement Retweet a X post bounty workflow with admin-created bounty posts, URL submission, moderation queue, and reward issuance per post after manual verification of required friend tags.
-- [ ] Implement Retweet privacy controls so submitted social links are hidden from public player views, while administrators can review links and moderation decisions with timestamped approval or rejection reasons.
-- [ ] Implement Discord player bounty verification by linking Discord bot validation events to master accounts, awarding a one-time fifty-point reward only after successful ownership verification and anti-fraud checks.
-- [ ] Implement Discord privacy model storing Discord username in protected admin-only fields, excluding it from public ranking pages and player-exposed bounty records while preserving secure admin audit access.
-- [ ] Implement Log in to the game bounty ingestion from game servers, awarding five points once per UTC day for each distinct game server where the player opens dashboard successfully.
-- [ ] Implement Manufacturer bounty detection from game telemetry, awarding one point once per UTC day when player factories produce any product quantity on any server with cross-server deduplication.
-- [ ] Implement Wholesaler bounty detection from sales-shop telemetry, awarding one point once per UTC day when player shops sell any product quantity on any server with cross-server deduplication.
-- [ ] Implement Researcher bounty detection from R&D telemetry, awarding two points once per UTC day when any owned R&D unit has an active research budget configured on any server.
-- [ ] Implement Real estate magnate bounty detection, awarding two points once per UTC day when player-owned apartment or commercial buildings have nonzero occupancy on any server.
-- [ ] Implement Media owner bounty detection, awarding two points once per UTC day when player-owned media houses have any nonzero content-creation budget configured on any server.
-- [ ] Implement Banker bounty detection, awarding two points once per UTC day when another user deposits funds into a player-owned bank on any server.
-- [ ] Implement Lender bounty detection, awarding two points once per UTC day when another user maintains an active loan in a player-owned bank on any server.
-- [ ] Implement FX Trader bounty detection, awarding two points once per UTC day when player completes any currency swap between in-game currencies on any server.
-- [ ] Implement Stock Trader bounty detection, awarding two points once per UTC day when player buys any stock on any server with strict event deduplication and replay-safe ingestion.
-- [ ] Implement Energy Trader bounty detection, awarding two points once per UTC day when a player-owned power plant ships any energy amount to the market on any server.
-- [ ] Implement Good employer bounty calculation, awarding ten points once per UTC day when player has the highest wage rate in a city where salaries are actively paid on any server.
-- [ ] Implement Dividends master bounty detection, awarding two points once per UTC day when a player-owned company pays dividends to shareholders on any server.
-- [ ] Implement Top player bounty detection, awarding five points once per UTC day when player personal account rank is inside top ten on any server during hourly evaluation window.
-- [ ] Implement Great player bounty detection, awarding two points once per UTC day when player personal account rank is inside top one hundred on any server during hourly evaluation window.
-- [ ] Implement Company master bounty detection, awarding five points once per UTC day when any player-owned company rank is inside top ten companies on any server during hourly evaluation.
-- [ ] Add comprehensive backend integration tests covering midnight decay, hourly processing idempotency, one-time bounties, daily cooldown resets, cross-server deduplication, and each bounty event trigger path.
-- [ ] Add master frontend end-to-end tests validating ranking leaderboard rendering, player bounty history filters, privacy rules for retweet and Discord data, and real-time updates after reward issuance.
+- [x] Design MasterApi ranking entities for player points, bounty definitions, bounty reward records, daily scopes, server scopes, and one-time uniqueness keys so hourly evaluation can run idempotently without duplicate rewards or race conditions.
+- [x] Implement a scheduled MasterApi hourly ranking evaluator that recalculates bounty eligibility for all players, writes reward records transactionally, and updates total points snapshots with clear audit metadata and processing duration metrics.
+- [x] Implement UTC-midnight daily decay job that multiplies every player ranking score by 0.99, persists rounded values deterministically, and logs before and after totals to keep long-term competitive balance fair.
+- [x] Build a player-facing master frontend ranking dashboard showing total points, global leaderboard position, movement trend, and competitive context so rankings feel rewarding and easy to compare with other players.
+- [x] Build player bounty history UI in master frontend with filters by bounty type, date, game server, and status so each player can inspect exactly why and when points were awarded.
+- [x] Add administrator bounty configuration interface for enabling, disabling, reward changes, visibility, proof requirements, and per-bounty validation settings while preserving immutable audit history for every configuration change.
+- [x] Implement anti-duplication and cooldown guards that enforce daily reset windows, once-per-post logic, and once-per-day cross-server limits exactly according to each bounty definition and UTC boundary behavior.
+- [x] Add internal observability dashboards and alerts for ranking evaluator failures, delayed schedules, abnormal reward spikes, and duplicate-key conflicts so operators can react before player trust is impacted.
+- [x] Implement Game improver bounty integration with support ticket submission flow, awarding five points at most once per UTC day when a player submits a suggestion or bug report.
+- [x] Implement Recommend a friend bounty integration with referral registration events, awarding five points once per UTC day when a referred player successfully creates a valid account using referral linkage.
+- [x] Implement Recommend a good friend bounty integration with monetization events, awarding one hundred points once per UTC day when a referred player purchases startup pack or activates a paid subscription.
+- [x] Implement Retweet a X post bounty workflow with admin-created bounty posts, URL submission, moderation queue, and reward issuance per post after manual verification of required friend tags.
+- [x] Implement Retweet privacy controls so submitted social links are hidden from public player views, while administrators can review links and moderation decisions with timestamped approval or rejection reasons.
+- [x] Implement Discord player bounty verification by linking Discord bot validation events to master accounts, awarding a one-time fifty-point reward only after successful ownership verification and anti-fraud checks.
+- [x] Implement Discord privacy model storing Discord username in protected admin-only fields, excluding it from public ranking pages and player-exposed bounty records while preserving secure admin audit access.
+- [x] Implement Log in to the game bounty ingestion from game servers, awarding five points once per UTC day for each distinct game server where the player opens dashboard successfully.
+- [x] Implement Manufacturer bounty detection from game telemetry, awarding one point once per UTC day when player factories produce any product quantity on any server with cross-server deduplication.
+- [x] Implement Wholesaler bounty detection from sales-shop telemetry, awarding one point once per UTC day when player shops sell any product quantity on any server with cross-server deduplication.
+- [x] Implement Researcher bounty detection from R&D telemetry, awarding two points once per UTC day when any owned R&D unit has an active research budget configured on any server.
+- [x] Implement Real estate magnate bounty detection, awarding two points once per UTC day when player-owned apartment or commercial buildings have nonzero occupancy on any server.
+- [x] Implement Media owner bounty detection, awarding two points once per UTC day when player-owned media houses have any nonzero content-creation budget configured on any server.
+- [x] Implement Banker bounty detection, awarding two points once per UTC day when another user deposits funds into a player-owned bank on any server.
+- [x] Implement Lender bounty detection, awarding two points once per UTC day when another user maintains an active loan in a player-owned bank on any server.
+- [x] Implement FX Trader bounty detection, awarding two points once per UTC day when player completes any currency swap between in-game currencies on any server.
+- [x] Implement Stock Trader bounty detection, awarding two points once per UTC day when player buys any stock on any server with strict event deduplication and replay-safe ingestion.
+- [x] Implement Energy Trader bounty detection, awarding two points once per UTC day when a player-owned power plant ships any energy amount to the market on any server.
+- [x] Implement Good employer bounty calculation, awarding ten points once per UTC day when player has the highest wage rate in a city where salaries are actively paid on any server.
+- [x] Implement Dividends master bounty detection, awarding two points once per UTC day when a player-owned company pays dividends to shareholders on any server.
+- [x] Implement Top player bounty detection, awarding five points once per UTC day when player personal account rank is inside top ten on any server during hourly evaluation window.
+- [x] Implement Great player bounty detection, awarding two points once per UTC day when player personal account rank is inside top one hundred on any server during hourly evaluation window.
+- [x] Implement Company master bounty detection, awarding five points once per UTC day when any player-owned company rank is inside top ten companies on any server during hourly evaluation.
+- [x] Add comprehensive backend integration tests covering midnight decay, hourly processing idempotency, one-time bounties, daily cooldown resets, cross-server deduplication, and each bounty event trigger path.
+- [x] Add master frontend end-to-end tests validating ranking leaderboard rendering, player bounty history filters, privacy rules for retweet and Discord data, and real-time updates after reward issuance.

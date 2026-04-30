@@ -27,6 +27,18 @@ public sealed class MasterDbContext(DbContextOptions<MasterDbContext> options) :
 
     public DbSet<SupportTicketAuditEvent> SupportTicketAuditEvents => Set<SupportTicketAuditEvent>();
 
+    public DbSet<MasterRankingBountyDefinition> MasterRankingBountyDefinitions => Set<MasterRankingBountyDefinition>();
+
+    public DbSet<MasterRankingEvent> MasterRankingEvents => Set<MasterRankingEvent>();
+
+    public DbSet<MasterRankingRewardRecord> MasterRankingRewardRecords => Set<MasterRankingRewardRecord>();
+
+    public DbSet<MasterRankingPlayerSnapshot> MasterRankingPlayerSnapshots => Set<MasterRankingPlayerSnapshot>();
+
+    public DbSet<MasterRankingEvaluationRun> MasterRankingEvaluationRuns => Set<MasterRankingEvaluationRun>();
+
+    public DbSet<MasterRankingBountyAudit> MasterRankingBountyAudits => Set<MasterRankingBountyAudit>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         var gameServer = modelBuilder.Entity<GameServerNode>();
@@ -154,5 +166,92 @@ public sealed class MasterDbContext(DbContextOptions<MasterDbContext> options) :
         supportAudit.Property(eventItem => eventItem.ActorDisplayName).HasMaxLength(120);
         supportAudit.Property(eventItem => eventItem.Note).HasMaxLength(1000);
         supportAudit.Property(eventItem => eventItem.MetadataJson).HasMaxLength(10000);
+
+        var rankingDefinition = modelBuilder.Entity<MasterRankingBountyDefinition>();
+        rankingDefinition.HasKey(definition => definition.Id);
+        rankingDefinition.HasIndex(definition => definition.Code).IsUnique();
+        rankingDefinition.Property(definition => definition.Code).HasMaxLength(120);
+        rankingDefinition.Property(definition => definition.DisplayName).HasMaxLength(220);
+        rankingDefinition.Property(definition => definition.Description).HasMaxLength(1000);
+        rankingDefinition.Property(definition => definition.RewardPoints).HasColumnType("decimal(18,4)");
+        rankingDefinition.Property(definition => definition.CooldownMode).HasMaxLength(40);
+        rankingDefinition.Property(definition => definition.SourceEventType).HasMaxLength(120);
+        rankingDefinition.Property(definition => definition.ProofRequirement).HasMaxLength(40);
+        rankingDefinition.Property(definition => definition.VisibilityScope).HasMaxLength(40);
+        rankingDefinition.Property(definition => definition.ValidationSettingsJson).HasMaxLength(10000);
+
+        var rankingEvent = modelBuilder.Entity<MasterRankingEvent>();
+        rankingEvent.HasKey(entry => entry.Id);
+        rankingEvent.HasIndex(entry => new { entry.EventType, entry.Status, entry.CreatedAtUtc });
+        rankingEvent.HasIndex(entry => entry.ExternalEventId).IsUnique();
+        rankingEvent.Property(entry => entry.PlayerEmail).HasMaxLength(200);
+        rankingEvent.Property(entry => entry.EventType).HasMaxLength(120);
+        rankingEvent.Property(entry => entry.ServerKey).HasMaxLength(120);
+        rankingEvent.Property(entry => entry.ExternalEventId).HasMaxLength(220);
+        rankingEvent.Property(entry => entry.UniqueScopeKey).HasMaxLength(220);
+        rankingEvent.Property(entry => entry.Status).HasMaxLength(40);
+        rankingEvent.Property(entry => entry.PayloadJson).HasMaxLength(20000);
+        rankingEvent.Property(entry => entry.ProofReference).HasMaxLength(1500);
+        rankingEvent.Property(entry => entry.ModerationReason).HasMaxLength(1000);
+        rankingEvent.Property(entry => entry.ModeratedByEmail).HasMaxLength(200);
+        rankingEvent.HasOne(entry => entry.PlayerAccount)
+            .WithMany(playerAccount => playerAccount.RankingEvents)
+            .HasForeignKey(entry => entry.PlayerAccountId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        var rankingReward = modelBuilder.Entity<MasterRankingRewardRecord>();
+        rankingReward.HasKey(record => record.Id);
+        rankingReward.HasIndex(record => record.UniquenessKey).IsUnique();
+        rankingReward.HasIndex(record => new { record.PlayerAccountId, record.AwardedAtUtc });
+        rankingReward.Property(record => record.PointsAwarded).HasColumnType("decimal(18,4)");
+        rankingReward.Property(record => record.Status).HasMaxLength(40);
+        rankingReward.Property(record => record.UniquenessKey).HasMaxLength(260);
+        rankingReward.Property(record => record.ServerKey).HasMaxLength(120);
+        rankingReward.Property(record => record.AwardMetadataJson).HasMaxLength(20000);
+        rankingReward.HasOne(record => record.PlayerAccount)
+            .WithMany(playerAccount => playerAccount.RankingRewardRecords)
+            .HasForeignKey(record => record.PlayerAccountId)
+            .OnDelete(DeleteBehavior.Cascade);
+        rankingReward.HasOne(record => record.BountyDefinition)
+            .WithMany(definition => definition.RewardRecords)
+            .HasForeignKey(record => record.BountyDefinitionId)
+            .OnDelete(DeleteBehavior.Cascade);
+        rankingReward.HasOne(record => record.RankingEvent)
+            .WithMany(entry => entry.RewardRecords)
+            .HasForeignKey(record => record.RankingEventId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        var rankingSnapshot = modelBuilder.Entity<MasterRankingPlayerSnapshot>();
+        rankingSnapshot.HasKey(snapshot => snapshot.Id);
+        rankingSnapshot.HasIndex(snapshot => snapshot.PlayerAccountId).IsUnique();
+        rankingSnapshot.HasIndex(snapshot => snapshot.GlobalRank);
+        rankingSnapshot.Property(snapshot => snapshot.TotalPoints).HasColumnType("decimal(18,4)");
+        rankingSnapshot.Property(snapshot => snapshot.LastDailyDecayFactorApplied).HasColumnType("decimal(9,6)");
+        rankingSnapshot.HasOne(snapshot => snapshot.PlayerAccount)
+            .WithMany()
+            .HasForeignKey(snapshot => snapshot.PlayerAccountId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        var rankingRun = modelBuilder.Entity<MasterRankingEvaluationRun>();
+        rankingRun.HasKey(run => run.Id);
+        rankingRun.HasIndex(run => new { run.RunType, run.StartedAtUtc });
+        rankingRun.Property(run => run.RunType).HasMaxLength(40);
+        rankingRun.Property(run => run.Status).HasMaxLength(40);
+        rankingRun.Property(run => run.TotalPointsAwarded).HasColumnType("decimal(18,4)");
+        rankingRun.Property(run => run.TotalPointsBeforeDecay).HasColumnType("decimal(18,4)");
+        rankingRun.Property(run => run.TotalPointsAfterDecay).HasColumnType("decimal(18,4)");
+        rankingRun.Property(run => run.Notes).HasMaxLength(2000);
+
+        var rankingAudit = modelBuilder.Entity<MasterRankingBountyAudit>();
+        rankingAudit.HasKey(audit => audit.Id);
+        rankingAudit.HasIndex(audit => new { audit.BountyDefinitionId, audit.CreatedAtUtc });
+        rankingAudit.Property(audit => audit.ChangedByEmail).HasMaxLength(200);
+        rankingAudit.Property(audit => audit.ChangeType).HasMaxLength(80);
+        rankingAudit.Property(audit => audit.PreviousValueJson).HasMaxLength(20000);
+        rankingAudit.Property(audit => audit.NewValueJson).HasMaxLength(20000);
+        rankingAudit.HasOne(audit => audit.BountyDefinition)
+            .WithMany(definition => definition.AuditTrail)
+            .HasForeignKey(audit => audit.BountyDefinitionId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

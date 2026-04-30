@@ -98,6 +98,77 @@ export interface MockSupportTicket {
   activity: MockSupportTicketAuditEvent[]
 }
 
+export interface MockRankingSummary {
+  totalPoints: number
+  globalRank: number
+  previousGlobalRank: number
+  rankMovement: number
+  updatedAtUtc: string
+}
+
+export interface MockRankingLeaderboardEntry {
+  playerId: string
+  displayName: string
+  totalPoints: number
+  globalRank: number
+  rankMovement: number
+}
+
+export interface MockRankingRewardHistoryItem {
+  id: string
+  bountyCode: string
+  bountyDisplayName: string
+  pointsAwarded: number
+  status: string
+  serverKey: string | null
+  eventDateUtc: string
+  awardedAtUtc: string
+  metadataJson: string
+}
+
+export interface MockRankingBountyDefinition {
+  id: string
+  code: string
+  displayName: string
+  description: string
+  rewardPoints: number
+  isEnabled: boolean
+  isVisibleToPlayers: boolean
+  requiresModeration: boolean
+  cooldownMode: string
+  sourceEventType: string
+  proofRequirement: string
+  visibilityScope: string
+  validationSettingsJson: string
+  updatedAtUtc: string
+}
+
+export interface MockRankingEventModerationItem {
+  id: string
+  eventType: string
+  playerEmail: string
+  serverKey: string | null
+  proofReference: string | null
+  payloadJson: string
+  status: string
+  occurredAtUtc: string
+  createdAtUtc: string
+}
+
+export interface MockRankingRunInfo {
+  id: string
+  runType: string
+  status: string
+  startedAtUtc: string
+  finishedAtUtc: string
+  processedEvents: number
+  rewardRecordsCreated: number
+  totalPointsAwarded: number
+  totalPointsBeforeDecay: number
+  totalPointsAfterDecay: number
+  notes: string
+}
+
 export interface MockState {
   servers: MockGameServer[]
   currentToken: string | null
@@ -113,6 +184,12 @@ export interface MockState {
     recentTransactions: MockPlayerGoldTransaction[]
   } | null
   supportTickets: MockSupportTicket[]
+  rankingSummary: MockRankingSummary | null
+  rankingLeaderboard: MockRankingLeaderboardEntry[]
+  rankingHistory: MockRankingRewardHistoryItem[]
+  rankingBounties: MockRankingBountyDefinition[]
+  rankingModerationEvents: MockRankingEventModerationItem[]
+  rankingRuns: MockRankingRunInfo[]
 }
 
 export function makeSupportTicket(overrides: Partial<MockSupportTicket> = {}): MockSupportTicket {
@@ -191,6 +268,8 @@ export function makeSubscription(overrides: Partial<MockSubscription> = {}): Moc
 }
 
 export function setupMockApi(page: Page, initialState: Partial<MockState> = {}): MockState {
+  const now = new Date().toISOString()
+
   const state: MockState = {
     servers: initialState.servers ?? [],
     currentToken: initialState.currentToken ?? null,
@@ -201,6 +280,62 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
     isGlobalAdmin: initialState.isGlobalAdmin ?? false,
     playerGoldAccount: initialState.playerGoldAccount ?? null,
     supportTickets: initialState.supportTickets ?? [],
+    rankingSummary: initialState.rankingSummary ?? {
+      totalPoints: 125,
+      globalRank: 4,
+      previousGlobalRank: 6,
+      rankMovement: 2,
+      updatedAtUtc: now,
+    },
+    rankingLeaderboard: initialState.rankingLeaderboard ?? [
+      {
+        playerId: 'rank-1',
+        displayName: 'Alpha',
+        totalPoints: 320,
+        globalRank: 1,
+        rankMovement: 1,
+      },
+      {
+        playerId: 'rank-2',
+        displayName: 'Bravo',
+        totalPoints: 240,
+        globalRank: 2,
+        rankMovement: -1,
+      },
+    ],
+    rankingHistory: initialState.rankingHistory ?? [
+      {
+        id: 'reward-1',
+        bountyCode: 'GAME_IMPROVER',
+        bountyDisplayName: 'Game improver',
+        pointsAwarded: 5,
+        status: 'AWARDED',
+        serverKey: 'capitalism-eu-1',
+        eventDateUtc: now,
+        awardedAtUtc: now,
+        metadataJson: '{}',
+      },
+    ],
+    rankingBounties: initialState.rankingBounties ?? [
+      {
+        id: 'bounty-1',
+        code: 'GAME_IMPROVER',
+        displayName: 'Game improver',
+        description: 'Submit suggestion ticket',
+        rewardPoints: 5,
+        isEnabled: true,
+        isVisibleToPlayers: true,
+        requiresModeration: false,
+        cooldownMode: 'UTC_DAY',
+        sourceEventType: 'GAME_IMPROVER',
+        proofRequirement: 'NONE',
+        visibilityScope: 'PLAYER_HISTORY',
+        validationSettingsJson: '{}',
+        updatedAtUtc: now,
+      },
+    ],
+    rankingModerationEvents: initialState.rankingModerationEvents ?? [],
+    rankingRuns: initialState.rankingRuns ?? [],
   }
 
   page.route('**/graphql', async (route) => {
@@ -598,6 +733,313 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { supportTicketsAdmin: list } }),
+      })
+      return
+    }
+
+    if (query.includes('myRankingSummary')) {
+      if (!state.currentPlayer) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              { message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } },
+            ],
+          }),
+        })
+        return
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { myRankingSummary: state.rankingSummary } }),
+      })
+      return
+    }
+
+    if (query.includes('rankingLeaderboard')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { rankingLeaderboard: state.rankingLeaderboard } }),
+      })
+      return
+    }
+
+    if (query.includes('myRankingBountyHistory')) {
+      if (!state.currentPlayer) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              { message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } },
+            ],
+          }),
+        })
+        return
+      }
+
+      const vars = body.variables as {
+        input?: { bountyCode?: string; serverKey?: string; status?: string }
+      }
+      let history = [...state.rankingHistory]
+      if (vars?.input?.bountyCode) {
+        history = history.filter((entry) => entry.bountyCode === vars.input?.bountyCode)
+      }
+      if (vars?.input?.serverKey) {
+        history = history.filter((entry) => entry.serverKey === vars.input?.serverKey)
+      }
+      if (vars?.input?.status) {
+        history = history.filter((entry) => entry.status === vars.input?.status)
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { myRankingBountyHistory: history } }),
+      })
+      return
+    }
+
+    if (query.includes('rankingAdminDashboard')) {
+      if (!state.currentPlayer || !state.isGlobalAdmin) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              { message: 'Global admin required.', extensions: { code: 'GLOBAL_ADMIN_REQUIRED' } },
+            ],
+          }),
+        })
+        return
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            rankingAdminDashboard: {
+              bounties: state.rankingBounties,
+              pendingModerationEvents: state.rankingModerationEvents,
+              recentRuns: state.rankingRuns,
+            },
+          },
+        }),
+      })
+      return
+    }
+
+    if (query.includes('mutation') && query.includes('submitRankingProofEvent')) {
+      if (!state.currentPlayer) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              { message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } },
+            ],
+          }),
+        })
+        return
+      }
+
+      const vars = body.variables as {
+        bountyCode: string
+        proofReference: string
+        uniqueScopeKey?: string
+      }
+      const nowIso = new Date().toISOString()
+      const item: MockRankingEventModerationItem = {
+        id: `rank-proof-${Date.now()}`,
+        eventType: vars.bountyCode,
+        playerEmail: state.currentPlayer.email,
+        serverKey: null,
+        proofReference: vars.proofReference,
+        payloadJson: JSON.stringify({ uniqueScopeKey: vars.uniqueScopeKey ?? null }),
+        status: 'PENDING_MODERATION',
+        occurredAtUtc: nowIso,
+        createdAtUtc: nowIso,
+      }
+      state.rankingModerationEvents.unshift(item)
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { submitRankingProofEvent: item } }),
+      })
+      return
+    }
+
+    if (query.includes('mutation') && query.includes('moderateRankingEvent')) {
+      if (!state.currentPlayer || !state.isGlobalAdmin) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              { message: 'Global admin required.', extensions: { code: 'GLOBAL_ADMIN_REQUIRED' } },
+            ],
+          }),
+        })
+        return
+      }
+
+      const vars = body.variables as { input: { eventId: string; approve: boolean } }
+      const item = state.rankingModerationEvents.find(
+        (eventItem) => eventItem.id === vars.input.eventId,
+      )
+      if (!item) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              {
+                message: 'Ranking event not found.',
+                extensions: { code: 'RANKING_EVENT_NOT_FOUND' },
+              },
+            ],
+          }),
+        })
+        return
+      }
+
+      item.status = vars.input.approve ? 'APPROVED' : 'REJECTED'
+
+      if (vars.input.approve) {
+        state.rankingHistory.unshift({
+          id: `reward-${Date.now()}`,
+          bountyCode: item.eventType,
+          bountyDisplayName: item.eventType,
+          pointsAwarded: 5,
+          status: 'AWARDED',
+          serverKey: item.serverKey,
+          eventDateUtc: item.occurredAtUtc,
+          awardedAtUtc: new Date().toISOString(),
+          metadataJson: '{}',
+        })
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { moderateRankingEvent: item } }),
+      })
+      return
+    }
+
+    if (query.includes('mutation') && query.includes('upsertRankingBountyDefinition')) {
+      if (!state.currentPlayer || !state.isGlobalAdmin) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              { message: 'Global admin required.', extensions: { code: 'GLOBAL_ADMIN_REQUIRED' } },
+            ],
+          }),
+        })
+        return
+      }
+
+      const vars = body.variables as { input: MockRankingBountyDefinition }
+      const index = state.rankingBounties.findIndex((item) => item.code === vars.input.code)
+      const value = {
+        ...vars.input,
+        id: vars.input.id ?? `bounty-${Date.now()}`,
+        updatedAtUtc: new Date().toISOString(),
+      }
+      if (index >= 0) {
+        state.rankingBounties[index] = value
+      } else {
+        state.rankingBounties.push(value)
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { upsertRankingBountyDefinition: value } }),
+      })
+      return
+    }
+
+    if (query.includes('mutation') && query.includes('runRankingEvaluationNow')) {
+      if (!state.currentPlayer || !state.isGlobalAdmin) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              { message: 'Global admin required.', extensions: { code: 'GLOBAL_ADMIN_REQUIRED' } },
+            ],
+          }),
+        })
+        return
+      }
+
+      const nowIso = new Date().toISOString()
+      const run: MockRankingRunInfo = {
+        id: `run-eval-${Date.now()}`,
+        runType: 'HOURLY_EVALUATION',
+        status: 'SUCCEEDED',
+        startedAtUtc: nowIso,
+        finishedAtUtc: nowIso,
+        processedEvents: 12,
+        rewardRecordsCreated: 8,
+        totalPointsAwarded: 32,
+        totalPointsBeforeDecay: 0,
+        totalPointsAfterDecay: 0,
+        notes: 'Mock hourly run',
+      }
+      state.rankingRuns.unshift(run)
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { runRankingEvaluationNow: run } }),
+      })
+      return
+    }
+
+    if (query.includes('mutation') && query.includes('runRankingDailyDecayNow')) {
+      if (!state.currentPlayer || !state.isGlobalAdmin) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              { message: 'Global admin required.', extensions: { code: 'GLOBAL_ADMIN_REQUIRED' } },
+            ],
+          }),
+        })
+        return
+      }
+
+      const nowIso = new Date().toISOString()
+      const run: MockRankingRunInfo = {
+        id: `run-decay-${Date.now()}`,
+        runType: 'DAILY_DECAY',
+        status: 'SUCCEEDED',
+        startedAtUtc: nowIso,
+        finishedAtUtc: nowIso,
+        processedEvents: 0,
+        rewardRecordsCreated: 0,
+        totalPointsAwarded: 0,
+        totalPointsBeforeDecay: 1200,
+        totalPointsAfterDecay: 1188,
+        notes: 'Mock daily decay run',
+      }
+      state.rankingRuns.unshift(run)
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { runRankingDailyDecayNow: run } }),
       })
       return
     }
