@@ -115,9 +115,7 @@ const items = computed<GuidanceItem[]>(() => {
         <div class="guidance-content flex-1">
           <strong class="guidance-item-title mb-0.5 block text-sm font-semibold">{{ item.title }}</strong>
           <p class="guidance-item-body mb-1 text-[0.8125rem] leading-[1.45] text-muted">{{ item.body }}</p>
-          <RouterLink v-if="item.linkTo && item.linkLabel" :to="item.linkTo" class="guidance-link text-[0.8125rem] font-medium text-brand hover:underline">
-            {{ item.linkLabel }} →
-          </RouterLink>
+          <RouterLink v-if="item.linkTo && item.linkLabel" :to="item.linkTo" class="guidance-link text-[0.8125rem] font-medium text-brand hover:underline"> {{ item.linkLabel }} → </RouterLink>
         </div>
       </li>
     </ul>

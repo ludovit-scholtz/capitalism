@@ -59,12 +59,54 @@ watch(
 <template>
   <div class="editor-shell overflow-hidden rounded-md border border-divider bg-white/5">
     <div class="editor-toolbar flex flex-wrap gap-2 border-b border-divider bg-white/8 p-3">
-      <button type="button" class="editor-btn rounded-full border border-divider bg-card px-3 py-1.5 text-[0.82rem] font-bold text-body transition-colors hover:bg-card-raised" :title="t('admin.editorBold')" @click="runCommand('bold')">B</button>
-      <button type="button" class="editor-btn rounded-full border border-divider bg-card px-3 py-1.5 text-[0.82rem] font-bold text-body transition-colors hover:bg-card-raised" :title="t('admin.editorItalic')" @click="runCommand('italic')">I</button>
-      <button type="button" class="editor-btn rounded-full border border-divider bg-card px-3 py-1.5 text-[0.82rem] font-bold text-body transition-colors hover:bg-card-raised" :title="t('admin.editorHeading')" @click="runCommand('formatBlock', 'h2')">H2</button>
-      <button type="button" class="editor-btn rounded-full border border-divider bg-card px-3 py-1.5 text-[0.82rem] font-bold text-body transition-colors hover:bg-card-raised" :title="t('admin.editorParagraph')" @click="runCommand('formatBlock', 'p')">P</button>
-      <button type="button" class="editor-btn rounded-full border border-divider bg-card px-3 py-1.5 text-[0.82rem] font-bold text-body transition-colors hover:bg-card-raised" :title="t('admin.editorList')" @click="runCommand('insertUnorderedList')">• List</button>
-      <button type="button" class="editor-btn rounded-full border border-divider bg-card px-3 py-1.5 text-[0.82rem] font-bold text-body transition-colors hover:bg-card-raised" :title="t('admin.editorLink')" @click="runCommand('createLink')">Link</button>
+      <button
+        type="button"
+        class="editor-btn rounded-full border border-divider bg-card px-3 py-1.5 text-[0.82rem] font-bold text-body transition-colors hover:bg-card-raised"
+        :title="t('admin.editorBold')"
+        @click="runCommand('bold')"
+      >
+        B
+      </button>
+      <button
+        type="button"
+        class="editor-btn rounded-full border border-divider bg-card px-3 py-1.5 text-[0.82rem] font-bold text-body transition-colors hover:bg-card-raised"
+        :title="t('admin.editorItalic')"
+        @click="runCommand('italic')"
+      >
+        I
+      </button>
+      <button
+        type="button"
+        class="editor-btn rounded-full border border-divider bg-card px-3 py-1.5 text-[0.82rem] font-bold text-body transition-colors hover:bg-card-raised"
+        :title="t('admin.editorHeading')"
+        @click="runCommand('formatBlock', 'h2')"
+      >
+        H2
+      </button>
+      <button
+        type="button"
+        class="editor-btn rounded-full border border-divider bg-card px-3 py-1.5 text-[0.82rem] font-bold text-body transition-colors hover:bg-card-raised"
+        :title="t('admin.editorParagraph')"
+        @click="runCommand('formatBlock', 'p')"
+      >
+        P
+      </button>
+      <button
+        type="button"
+        class="editor-btn rounded-full border border-divider bg-card px-3 py-1.5 text-[0.82rem] font-bold text-body transition-colors hover:bg-card-raised"
+        :title="t('admin.editorList')"
+        @click="runCommand('insertUnorderedList')"
+      >
+        • List
+      </button>
+      <button
+        type="button"
+        class="editor-btn rounded-full border border-divider bg-card px-3 py-1.5 text-[0.82rem] font-bold text-body transition-colors hover:bg-card-raised"
+        :title="t('admin.editorLink')"
+        @click="runCommand('createLink')"
+      >
+        Link
+      </button>
     </div>
     <div
       ref="editor"

@@ -3,8 +3,7 @@ import { useI18n } from 'vue-i18n'
 import { useChat } from '@/composables/useChat'
 
 const { t } = useI18n()
-const { messages, loading, error, draftMessage, sendError, sending, trimmedDraft, formatSentAt, sendMessage } =
-  useChat()
+const { messages, loading, error, draftMessage, sendError, sending, trimmedDraft, formatSentAt, sendMessage } = useChat()
 </script>
 
 <template>
@@ -39,14 +38,7 @@ const { messages, loading, error, draftMessage, sendError, sending, trimmedDraft
     <form class="chat-form mt-4 flex gap-3 max-[720px]:flex-col" @submit.prevent="sendMessage">
       <label class="chat-input-wrapper flex-1">
         <span class="sr-only">{{ t('chat.inputLabel') }}</span>
-        <input
-          v-model="draftMessage"
-          class="chat-input min-w-0 w-full"
-          type="text"
-          maxlength="300"
-          :placeholder="t('chat.placeholder')"
-          :aria-label="t('chat.inputLabel')"
-        />
+        <input v-model="draftMessage" class="chat-input min-w-0 w-full" type="text" maxlength="300" :placeholder="t('chat.placeholder')" :aria-label="t('chat.inputLabel')" />
       </label>
       <button class="btn btn-primary chat-send-button" type="submit" :disabled="sending || !trimmedDraft">
         {{ sending ? t('common.saving') : t('chat.send') }}
