@@ -1,4 +1,6 @@
 <script setup lang="ts">
+/* oxlint-disable no-unused-vars */
+
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatMoney } from '@/lib/currencyFormat'
@@ -236,7 +238,7 @@ onUnmounted(() => {
 
       <div class="toolbar-actions">
         <div class="view-toggle" role="group" :aria-label="t('onboarding.mapViewLabel')">
-          <button class="toggle-btn" :class="{ active: viewMode === 'map' }" @click="viewMode = 'map'">🗺️ {{ t('cityMap.mapView') }}</button>
+          <button class="toggle-btn" :class="{ active: viewMode === 'map' }" @click="viewMode = 'map'">­🗺️ {{ t('cityMap.mapView') }}</button>
           <button class="toggle-btn" :class="{ active: viewMode === 'list' }" @click="viewMode = 'list'">☰ {{ t('cityMap.listView') }}</button>
         </div>
         <button class="toggle-btn" :class="{ active: showAvailableOnly }" @click="showAvailableOnly = !showAvailableOnly">

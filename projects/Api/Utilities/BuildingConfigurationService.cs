@@ -25,6 +25,7 @@ public static partial class BuildingConfigurationService
         long currentTick)
     {
         ValidateUnits(building.Type, submittedUnits);
+        await ValidateMiningResourceMatchesLotAsync(db, building, submittedUnits);
         await ValidateRecipeCompatibilityAsync(db, building.Type, submittedUnits);
 
         var existingPlan = await db.BuildingConfigurationPlans

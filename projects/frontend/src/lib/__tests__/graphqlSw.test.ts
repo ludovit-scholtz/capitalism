@@ -166,14 +166,14 @@ describe('makeGraphQlCacheKey', () => {
     // These three queries are identical except for consecutive whitespace
     const singleSpace = makeGraphQlCacheKey(BASE_URL, 'query { events { id name } }', {})
     const doubleSpace = makeGraphQlCacheKey(BASE_URL, 'query  {  events  {  id  name  }  }', {})
-    const withNewlines = makeGraphQlCacheKey(
+    const withlines = makeGraphQlCacheKey(
       BASE_URL,
       'query  {\n  events  {\n    id  name\n  }\n}',
       {},
     )
     // All three normalise to the same key
     expect(singleSpace).toBe(doubleSpace)
-    expect(singleSpace).toBe(withNewlines)
+    expect(singleSpace).toBe(withlines)
   })
 
   it('includes the URL in the key so different endpoints never share cache entries', () => {
@@ -344,3 +344,4 @@ describe('idbPut – bounded-storage pruning', () => {
     expect(await idbCount(db)).toBeLessThanOrEqual(GQL_MAX_ENTRIES)
   })
 })
+

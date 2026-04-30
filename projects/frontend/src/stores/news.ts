@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 import { gqlRequest } from '@/lib/graphql'
-import type { GameNewsFeed } from '@/types'
+import type { GamesFeed } from '@/types'
 
 const FEED_FIELDS = `
   unreadCount
@@ -26,8 +26,8 @@ const FEED_FIELDS = `
   }
 `
 
-export const useNewsStore = defineStore('news', () => {
-  const feed = ref<GameNewsFeed | null>(null)
+export const usesStore = defineStore('news', () => {
+  const feed = ref<GamesFeed | null>(null)
   const unreadCount = ref(0)
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -37,7 +37,7 @@ export const useNewsStore = defineStore('news', () => {
     error.value = null
 
     try {
-      const data = await gqlRequest<{ gameNewsFeed: GameNewsFeed }>(
+      const data = await gqlRequest<{ gameNewsFeed: GamesFeed }>(
         `query GameNewsFeed($includeDrafts: Boolean!) {
           gameNewsFeed(includeDrafts: $includeDrafts) {
             ${FEED_FIELDS}
@@ -46,9 +46,10 @@ export const useNewsStore = defineStore('news', () => {
         { includeDrafts },
       )
 
-      feed.value = data.gameNewsFeed
-      unreadCount.value = data.gameNewsFeed.unreadCount
-      return data.gameNewsFeed
+      const nextFeed = data.gameNewsFeed ?? { unreadCount: 0, items: [] }
+      feed.value = nextFeed
+      unreadCount.value = nextFeed.unreadCount
+      return nextFeed
     } catch (caughtError) {
       error.value = caughtError instanceof Error ? caughtError.message : 'Failed to load news feed.'
       throw caughtError
@@ -59,7 +60,7 @@ export const useNewsStore = defineStore('news', () => {
 
   async function fetchUnreadCount() {
     try {
-      const data = await gqlRequest<{ gameNewsFeed: Pick<GameNewsFeed, 'unreadCount'> }>(
+      const data = await gqlRequest<{ gameNewsFeed: Pick<GamesFeed, 'unreadCount'> | null }>(
         `query GameNewsUnreadCount($includeDrafts: Boolean!) {
           gameNewsFeed(includeDrafts: $includeDrafts) {
             unreadCount
@@ -68,7 +69,7 @@ export const useNewsStore = defineStore('news', () => {
         { includeDrafts: false },
       )
 
-      unreadCount.value = data.gameNewsFeed.unreadCount
+      unreadCount.value = data.gameNewsFeed?.unreadCount ?? 0
       return unreadCount.value
     } catch (caughtError) {
       error.value = caughtError instanceof Error ? caughtError.message : 'Failed to load unread news count.'

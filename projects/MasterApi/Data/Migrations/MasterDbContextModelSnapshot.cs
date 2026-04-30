@@ -17,7 +17,7 @@ namespace MasterApi.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.5")
+                .HasAnnotation("ProductVersion", "10.0.7")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -408,6 +408,140 @@ namespace MasterApi.Data.Migrations
                     b.ToTable("ProSubscriptions");
                 });
 
+            modelBuilder.Entity("MasterApi.Data.Entities.SupportTicket", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("ContainsUnsafeContent")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedByDisplayName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("CreatedByEmail")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("CreatedByPlayerAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ExtractedImagesJson")
+                        .IsRequired()
+                        .HasMaxLength(10000)
+                        .HasColumnType("character varying(10000)");
+
+                    b.Property<string>("ExtractedUrlsJson")
+                        .IsRequired()
+                        .HasMaxLength(10000)
+                        .HasColumnType("character varying(10000)");
+
+                    b.Property<string>("MarkdownSource")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ModeratedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ModeratedByEmail")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ModerationReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("ModerationState")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<string>("SanitizedPreviewHtml")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<DateTime>("StatusUpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TicketType")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(220)
+                        .HasColumnType("character varying(220)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByPlayerAccountId", "CreatedAtUtc");
+
+                    b.HasIndex("Status", "UpdatedAtUtc");
+
+                    b.HasIndex("TicketType", "CreatedAtUtc");
+
+                    b.ToTable("SupportTickets");
+                });
+
+            modelBuilder.Entity("MasterApi.Data.Entities.SupportTicketAuditEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActorDisplayName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("ActorEmail")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("MetadataJson")
+                        .IsRequired()
+                        .HasMaxLength(10000)
+                        .HasColumnType("character varying(10000)");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("SupportTicketId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SupportTicketId", "CreatedAtUtc");
+
+                    b.ToTable("SupportTicketAuditEvents");
+                });
+
             modelBuilder.Entity("MasterApi.Data.Entities.BuildingLayoutTemplate", b =>
                 {
                     b.HasOne("MasterApi.Data.Entities.PlayerAccount", "PlayerAccount")
@@ -463,6 +597,28 @@ namespace MasterApi.Data.Migrations
                     b.Navigation("PlayerAccount");
                 });
 
+            modelBuilder.Entity("MasterApi.Data.Entities.SupportTicket", b =>
+                {
+                    b.HasOne("MasterApi.Data.Entities.PlayerAccount", "CreatedByPlayerAccount")
+                        .WithMany()
+                        .HasForeignKey("CreatedByPlayerAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CreatedByPlayerAccount");
+                });
+
+            modelBuilder.Entity("MasterApi.Data.Entities.SupportTicketAuditEvent", b =>
+                {
+                    b.HasOne("MasterApi.Data.Entities.SupportTicket", "SupportTicket")
+                        .WithMany("AuditEvents")
+                        .HasForeignKey("SupportTicketId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SupportTicket");
+                });
+
             modelBuilder.Entity("MasterApi.Data.Entities.GameNewsEntry", b =>
                 {
                     b.Navigation("Localizations");
@@ -475,6 +631,11 @@ namespace MasterApi.Data.Migrations
                     b.Navigation("GoldTokenTransactions");
 
                     b.Navigation("Subscriptions");
+                });
+
+            modelBuilder.Entity("MasterApi.Data.Entities.SupportTicket", b =>
+                {
+                    b.Navigation("AuditEvents");
                 });
 #pragma warning restore 612, 618
         }

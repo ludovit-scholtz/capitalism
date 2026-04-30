@@ -242,16 +242,23 @@ function goToNextPage() {
       <label for="account-select" class="text-sm font-semibold text-muted whitespace-nowrap">
         {{ t('bankStatement.selectAccount') }}
       </label>
-      <select
-        id="account-select"
-        :value="selectedAccount?.id ?? ''"
-        class="selector-select bg-card border border-divider rounded-lg px-3 py-2 text-body text-sm cursor-pointer focus:outline-none focus:border-brand"
-        @change="onAccountChange"
-      >
-        <option v-for="account in contextAccounts" :key="account.id" :value="account.id">
-          {{ account.ownerDisplayName }} · {{ account.accountNumber }} · {{ account.currencyCode }} · {{ formatAmount(account.balance, account.currencyCode) }}
-        </option>
-      </select>
+      <div class="relative">
+        <select
+          id="account-select"
+          :value="selectedAccount?.id ?? ''"
+          class="bg-card border border-divider rounded-lg px-3 py-2 pr-10 text-body text-sm cursor-pointer appearance-none focus:outline-none focus:border-brand"
+          @change="onAccountChange"
+        >
+          <option v-for="account in contextAccounts" :key="account.id" :value="account.id">
+            {{ account.ownerDisplayName }} · {{ account.accountNumber }} · {{ account.currencyCode }} · {{ formatAmount(account.balance, account.currencyCode) }}
+          </option>
+        </select>
+        <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-muted" aria-hidden="true">
+          <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+          </svg>
+        </span>
+      </div>
     </div>
 
     <!-- Limit selector + tick range filter -->
@@ -260,16 +267,23 @@ function goToNextPage() {
         <label for="limit-select" class="text-sm font-semibold text-muted whitespace-nowrap">
           {{ t('bankStatement.showEntries') }}
         </label>
-        <select
-          id="limit-select"
-          v-model.number="pageSize"
-          class="selector-select bg-card border border-divider rounded-lg px-3 py-2 text-body text-sm cursor-pointer focus:outline-none focus:border-brand"
-        >
-          <option :value="20">20</option>
-          <option :value="50">50</option>
-          <option :value="100">100</option>
-          <option :value="200">200</option>
-        </select>
+        <div class="relative">
+          <select
+            id="limit-select"
+            v-model.number="pageSize"
+            class="bg-card border border-divider rounded-lg px-3 py-2 pr-10 text-body text-sm cursor-pointer appearance-none focus:outline-none focus:border-brand"
+          >
+            <option :value="20">20</option>
+            <option :value="50">50</option>
+            <option :value="100">100</option>
+            <option :value="200">200</option>
+          </select>
+          <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-muted" aria-hidden="true">
+            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+            </svg>
+          </span>
+        </div>
       </div>
       <div class="flex items-center gap-2">
         <label for="from-tick" class="text-sm font-semibold text-muted whitespace-nowrap">{{ t('bankStatement.fromTick') }}</label>
@@ -335,15 +349,3 @@ function goToNextPage() {
     </template>
   </main>
 </template>
-
-<style scoped>
-/* Custom dropdown arrow for selectors */
-.selector-select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%236b7280'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.6rem center;
-  background-size: 1.1rem;
-  padding-right: 2rem;
-  appearance: none;
-}
-</style>

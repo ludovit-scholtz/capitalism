@@ -1,10 +1,10 @@
-import type { GameNewsEntry, GameNewsLocalization } from '@/types'
+import type { GamesEntry, GamesLocalization } from '@/types'
 
 export const NEWS_EDITOR_LOCALES = ['en', 'sk', 'de'] as const
 
-export type NewsEditorLocale = (typeof NEWS_EDITOR_LOCALES)[number]
+export type sEditorLocale = (typeof NEWS_EDITOR_LOCALES)[number]
 
-export function createEmptyNewsLocalizations(): GameNewsLocalization[] {
+export function createEmptysLocalizations(): GamesLocalization[] {
   return NEWS_EDITOR_LOCALES.map((locale) => ({
     locale,
     title: '',
@@ -13,16 +13,16 @@ export function createEmptyNewsLocalizations(): GameNewsLocalization[] {
   }))
 }
 
-export function createEmptyNewsDraft(entryType: GameNewsEntry['entryType'] = 'NEWS') {
+export function createEmptysDraft(entryType: GamesEntry['entryType'] = 'NEWS') {
   return {
     entryId: null as string | null,
     entryType,
-    status: 'DRAFT' as GameNewsEntry['status'],
-    localizations: createEmptyNewsLocalizations(),
+    status: 'DRAFT' as GamesEntry['status'],
+    localizations: createEmptysLocalizations(),
   }
 }
 
-export function pickGameNewsLocalization(localizations: readonly GameNewsLocalization[], preferredLocale: string): GameNewsLocalization | null {
+export function pickGamesLocalization(localizations: readonly GamesLocalization[], preferredLocale: string): GamesLocalization | null {
   if (localizations.length === 0) {
     return null
   }
@@ -37,7 +37,7 @@ export function pickGameNewsLocalization(localizations: readonly GameNewsLocaliz
   )
 }
 
-export function upsertNewsLocalization(localizations: readonly GameNewsLocalization[], locale: string, patch: Partial<GameNewsLocalization>): GameNewsLocalization[] {
+export function upsertsLocalization(localizations: readonly GamesLocalization[], locale: string, patch: Partial<GamesLocalization>): GamesLocalization[] {
   const normalizedLocale = locale.toLowerCase()
   const existing = localizations.find((localization) => localization.locale.toLowerCase() === normalizedLocale)
 
@@ -65,3 +65,4 @@ export function upsertNewsLocalization(localizations: readonly GameNewsLocalizat
     }
   })
 }
+

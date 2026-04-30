@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { fetchMyGoldAccount, type PlayerGoldAccountInfo } from '@/lib/masterApi'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
+const { t } = useI18n()
 
 const account = ref<PlayerGoldAccountInfo | null>(null)
 const loading = ref(false)
@@ -40,7 +42,7 @@ async function loadAccount() {
   try {
     account.value = await fetchMyGoldAccount(auth.token)
   } catch (e: unknown) {
-    errorMessage.value = e instanceof Error ? e.message : 'Failed to load gold account.'
+    errorMessage.value = e instanceof Error ? e.message : t('account.loadError')
   } finally {
     loading.value = false
   }
@@ -60,14 +62,14 @@ onMounted(async () => {
     <header class="account-header">
       <div class="account-header-inner">
         <div>
-          <p class="section-kicker">My Account</p>
-          <h1>Gold Balance</h1>
+          <p class="section-kicker">{{ t('account.kicker') }}</p>
+          <h1>{{ t('account.title') }}</h1>
           <p class="account-subtitle">
-            Your tokenized gold holdings on the Capitalism Network.
+            {{ t('account.subtitle') }}
           </p>
         </div>
         <nav class="account-nav">
-          <a href="/" class="nav-back-btn">← Back to portal</a>
+          <a href="/" class="nav-back-btn">← {{ t('common.backToPortal') }}</a>
         </nav>
       </div>
     </header>
@@ -75,13 +77,15 @@ onMounted(async () => {
     <main class="account-main">
       <!-- Loading state -->
       <div v-if="loading" class="state-message" role="status" aria-live="polite">
-        Loading your gold account…
+        {{ t('account.loading') }}
       </div>
 
       <!-- Error state -->
       <div v-else-if="errorMessage" class="state-error" role="alert">
         {{ errorMessage }}
-        <button type="button" class="retry-btn" @click="loadAccount">Retry</button>
+        <button type="button" class="retry-btn" @click="loadAccount">
+          {{ t('account.retry') }}
+        </button>
       </div>
 
       <template v-else-if="account">
@@ -89,49 +93,45 @@ onMounted(async () => {
         <section class="gold-balance-card" aria-label="Gold balance">
           <div class="balance-icon" aria-hidden="true">⬛</div>
           <div class="balance-body">
-            <p class="balance-kicker">Current balance</p>
+            <p class="balance-kicker">{{ t('account.currentBalance') }}</p>
             <p class="balance-amount" aria-label="Gold balance in grams">
               <span class="balance-number">{{ formatGold(account.goldTokenBalance) }}</span>
               <span class="balance-unit">g</span>
             </p>
             <p class="balance-subtext">
-              1 gold token = 1 gram of real-world gold
+              {{ t('account.ratio') }}
             </p>
           </div>
 
           <!-- Zero-balance empty state -->
           <aside v-if="account.goldTokenBalance === 0" class="zero-state">
-            <p class="zero-state-title">You don't have any gold yet</p>
+            <p class="zero-state-title">{{ t('account.zeroTitle') }}</p>
             <p class="zero-state-copy">
-              Mine gold ore in-game, trade on the exchange, or earn it through economic activity
-              across any Capitalism server. Your cross-server balance is stored here.
+              {{ t('account.zeroCopy') }}
             </p>
           </aside>
         </section>
 
         <!-- What is gold section -->
         <section class="gold-info-card" aria-label="What is gold">
-          <h2>What is tokenized gold?</h2>
+          <h2>{{ t('account.whatIsTitle') }}</h2>
           <ul class="gold-facts">
             <li>
               <span class="fact-icon">🏅</span>
               <div>
-                <strong>1 token = 1 gram of physical gold.</strong> Each token in your account is
-                backed by real-world bullion, giving it intrinsic value beyond the game.
+                <strong>{{ t('account.fact1Title') }}</strong> {{ t('account.fact1Body') }}
               </div>
             </li>
             <li>
               <span class="fact-icon">🌐</span>
               <div>
-                <strong>Cross-server asset.</strong> Your gold balance lives on the master server,
-                not on any single game shard. It remains yours across all Capitalism worlds.
+                <strong>{{ t('account.fact2Title') }}</strong> {{ t('account.fact2Body') }}
               </div>
             </li>
             <li>
               <span class="fact-icon">📈</span>
               <div>
-                <strong>Trade on the FX exchange.</strong> Use the in-game AMM pools to swap
-                between city currencies and gold, or provide liquidity to earn fee rewards.
+                <strong>{{ t('account.fact3Title') }}</strong> {{ t('account.fact3Body') }}
               </div>
             </li>
           </ul>
@@ -140,24 +140,24 @@ onMounted(async () => {
         <!-- Recent transactions -->
         <section class="gold-section" aria-labelledby="tx-heading">
           <div class="gold-section-header">
-            <h2 id="tx-heading">Recent transactions</h2>
+            <h2 id="tx-heading">{{ t('account.txTitle') }}</h2>
             <span v-if="account.lastUpdatedAtUtc" class="last-updated">
-              Last updated {{ formatDate(account.lastUpdatedAtUtc) }}
+              {{ t('account.lastUpdated', { date: formatDate(account.lastUpdatedAtUtc) }) }}
             </span>
           </div>
 
           <p v-if="account.recentTransactions.length === 0" class="state-message">
-            No transactions yet. Transactions will appear here once your balance changes.
+            {{ t('account.noTx') }}
           </p>
 
           <div v-else class="tx-table-wrap">
             <table class="tx-table" aria-label="Recent gold transactions">
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th class="col-amount">Amount</th>
-                  <th>Balance after</th>
-                  <th>Note</th>
+                  <th>{{ t('account.date') }}</th>
+                  <th class="col-amount">{{ t('account.amount') }}</th>
+                  <th>{{ t('account.balanceAfter') }}</th>
+                  <th>{{ t('account.note') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -170,7 +170,7 @@ onMounted(async () => {
                     {{ formatTxAmount(tx.amount) }}
                   </td>
                   <td>{{ formatGold(tx.balanceAfter) }} g</td>
-                  <td class="col-note">{{ tx.note ?? '—' }}</td>
+                  <td class="col-note">{{ tx.note ?? t('account.dash') }}</td>
                 </tr>
               </tbody>
             </table>

@@ -213,7 +213,7 @@ useTickRefresh(async () => {
       </div>
 
       <div v-if="ledger.lastRecordedTick === 0" class="info-banner">
-        <span>📊</span>
+        <span>­📊</span>
         <span>{{ t('ledger.noHistoryYet') }}</span>
       </div>
       <p v-else class="tick-range-note">
@@ -227,7 +227,7 @@ useTickRefresh(async () => {
 
       <div class="year-meta-row">
         <div class="statement-card meta-card">
-          <h2 class="statement-title">🧾 {{ t('ledger.incomeTaxSchedule') }}</h2>
+          <h2 class="statement-title">­🧾 {{ t('ledger.incomeTaxSchedule') }}</h2>
           <p class="meta-copy">
             {{
               ledger.isIncomeTaxSettled
@@ -239,7 +239,7 @@ useTickRefresh(async () => {
         </div>
 
         <div class="statement-card meta-card">
-          <h2 class="statement-title">🗂️ {{ t('ledger.historyTitle') }}</h2>
+          <h2 class="statement-title">­🗂️ {{ t('ledger.historyTitle') }}</h2>
           <div class="history-buttons">
             <button
               v-for="yearItem in ledger.history"
@@ -259,13 +259,13 @@ useTickRefresh(async () => {
       </div>
 
       <div v-if="!ledger.isCurrentGameYear" class="info-banner historical-note">
-        <span>🕰️</span>
+        <span>­🕰️</span>
         <span>{{ t('ledger.historicalYearNote') }}</span>
       </div>
 
       <div class="statements-grid">
         <div class="statement-card">
-          <h2 class="statement-title">📈 {{ t('ledger.incomeStatement') }}</h2>
+          <h2 class="statement-title">­📈 {{ t('ledger.incomeStatement') }}</h2>
           <div class="statement-rows">
             <div class="statement-row">
               <span class="row-label">{{ t('ledger.revenue') }}</span>
@@ -275,7 +275,7 @@ useTickRefresh(async () => {
               </button>
             </div>
             <div v-if="(ledger.totalMediaHouseIncome ?? 0) > 0" class="statement-row media-house-income-row">
-              <span class="row-label">📺 {{ t('ledger.mediaHouseIncome') }}</span>
+              <span class="row-label">­📺 {{ t('ledger.mediaHouseIncome') }}</span>
               <span class="amount-positive">{{ formatAmount(ledger.totalMediaHouseIncome ?? 0) }}</span>
               <button
                 class="drill-btn"
@@ -394,7 +394,7 @@ useTickRefresh(async () => {
         </div>
 
         <div class="statement-card">
-          <h2 class="statement-title">📊 {{ t('ledger.balanceSheet') }}</h2>
+          <h2 class="statement-title">­📊 {{ t('ledger.balanceSheet') }}</h2>
           <div class="statement-rows">
             <div class="statement-row">
               <span class="row-label">{{ t('ledger.cash') }}</span>
@@ -460,7 +460,7 @@ useTickRefresh(async () => {
         </div>
 
         <div class="statement-card">
-          <h2 class="statement-title">💵 {{ t('ledger.cashFlow') }}</h2>
+          <h2 class="statement-title">­💵 {{ t('ledger.cashFlow') }}</h2>
           <div class="statement-rows">
             <div class="statement-row">
               <span class="row-label">{{ t('ledger.cashFromOperations') }}</span>
@@ -555,7 +555,7 @@ useTickRefresh(async () => {
       </div>
 
       <div v-if="ledger.buildingSummaries.length > 0" class="buildings-card">
-        <h2 class="statement-title">🏭 {{ t('ledger.buildingsPerformance') }}</h2>
+        <h2 class="statement-title">­🏭 {{ t('ledger.buildingsPerformance') }}</h2>
         <div class="buildings-table-wrapper">
           <table class="buildings-table">
             <thead>

@@ -418,12 +418,7 @@ watch(
         </router-link>
       </div>
 
-      <details
-        v-if="accountInfo.hasBankAccount"
-        class="bba-fund-panel"
-        :open="isFundPanelOpen"
-        @toggle="isFundPanelOpen = ($event.target as HTMLDetailsElement).open"
-      >
+      <details v-if="accountInfo.hasBankAccount" class="bba-fund-panel" :open="isFundPanelOpen" @toggle="isFundPanelOpen = ($event.target as HTMLDetailsElement).open">
         <summary class="bba-fund-summary">{{ t('buildingBankAccount.fundTitle') }}</summary>
         <div class="bba-fund-body">
           <p class="bba-fund-hint">{{ t('buildingBankAccount.fundHint', { currency: props.currencyCode }) }}</p>

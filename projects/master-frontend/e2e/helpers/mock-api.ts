@@ -65,6 +65,39 @@ export interface MockPlayerGoldTransaction {
   createdAtUtc: string
 }
 
+export interface MockSupportTicketAuditEvent {
+  id: string
+  eventType: string
+  actorEmail: string
+  actorDisplayName: string
+  note: string
+  metadataJson: string
+  createdAtUtc: string
+}
+
+export interface MockSupportTicket {
+  id: string
+  ticketType: 'SUGGESTION' | 'BUG' | 'OTHER'
+  status: 'SUBMITTED' | 'IN_PROGRESS' | 'FINISHED'
+  title: string
+  markdownSource: string
+  sanitizedPreviewHtml: string | null
+  containsUnsafeContent: boolean
+  moderationState: 'PENDING' | 'APPROVED' | 'REJECTED'
+  moderationReason: string | null
+  moderatedByEmail: string | null
+  moderatedAtUtc: string | null
+  createdByEmail: string
+  createdByDisplayName: string
+  createdByPlayerId: string
+  createdAtUtc: string
+  updatedAtUtc: string
+  statusUpdatedAtUtc: string
+  extractedUrls: string[]
+  extractedImages: string[]
+  activity: MockSupportTicketAuditEvent[]
+}
+
 export interface MockState {
   servers: MockGameServer[]
   currentToken: string | null
@@ -79,6 +112,34 @@ export interface MockState {
     lastUpdatedAtUtc: string | null
     recentTransactions: MockPlayerGoldTransaction[]
   } | null
+  supportTickets: MockSupportTicket[]
+}
+
+export function makeSupportTicket(overrides: Partial<MockSupportTicket> = {}): MockSupportTicket {
+  const now = new Date().toISOString()
+  return {
+    id: `support-${Math.random().toString(36).slice(2)}`,
+    ticketType: 'BUG',
+    status: 'SUBMITTED',
+    title: 'Sample support ticket',
+    markdownSource: 'Sample markdown body long enough to pass support ticket validation in tests.',
+    sanitizedPreviewHtml: null,
+    containsUnsafeContent: false,
+    moderationState: 'PENDING',
+    moderationReason: 'Awaiting administrator moderation.',
+    moderatedByEmail: null,
+    moderatedAtUtc: null,
+    createdByEmail: 'alice@example.com',
+    createdByDisplayName: 'Alice',
+    createdByPlayerId: 'player-001',
+    createdAtUtc: now,
+    updatedAtUtc: now,
+    statusUpdatedAtUtc: now,
+    extractedUrls: [],
+    extractedImages: [],
+    activity: [],
+    ...overrides,
+  }
 }
 
 export function makeServer(overrides: Partial<MockGameServer> = {}): MockGameServer {
@@ -139,6 +200,7 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
     goldTransactions: initialState.goldTransactions ?? [],
     isGlobalAdmin: initialState.isGlobalAdmin ?? false,
     playerGoldAccount: initialState.playerGoldAccount ?? null,
+    supportTickets: initialState.supportTickets ?? [],
   }
 
   page.route('**/graphql', async (route) => {
@@ -180,6 +242,362 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
             },
           },
         }),
+      })
+      return
+    }
+
+    if (query.includes('mutation') && query.includes('createSupportTicket')) {
+      if (!state.currentPlayer) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              { message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } },
+            ],
+          }),
+        })
+        return
+      }
+
+      const vars = body.variables as {
+        input: { ticketType: 'SUGGESTION' | 'BUG' | 'OTHER'; title: string; markdownSource: string }
+      }
+      const now = new Date().toISOString()
+      const ticket = makeSupportTicket({
+        id: `support-${Date.now()}`,
+        ticketType: vars.input.ticketType,
+        title: vars.input.title,
+        markdownSource: vars.input.markdownSource,
+        createdByEmail: state.currentPlayer.email,
+        createdByDisplayName: state.currentPlayer.displayName,
+        createdByPlayerId: state.currentPlayer.id,
+        createdAtUtc: now,
+        updatedAtUtc: now,
+        statusUpdatedAtUtc: now,
+        activity: [
+          {
+            id: `evt-${Date.now()}`,
+            eventType: 'CREATED',
+            actorEmail: state.currentPlayer.email,
+            actorDisplayName: state.currentPlayer.displayName,
+            note: 'Support ticket created.',
+            metadataJson: '{}',
+            createdAtUtc: now,
+          },
+        ],
+      })
+      state.supportTickets.unshift(ticket)
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { createSupportTicket: ticket } }),
+      })
+      return
+    }
+
+    if (query.includes('mutation') && query.includes('updateSupportTicketContent')) {
+      if (!state.currentPlayer) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              { message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } },
+            ],
+          }),
+        })
+        return
+      }
+
+      const vars = body.variables as {
+        input: { ticketId: string; title: string; markdownSource: string }
+      }
+      const ticket = state.supportTickets.find((item) => item.id === vars.input.ticketId)
+      if (!ticket) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              {
+                message: 'Support ticket not found.',
+                extensions: { code: 'SUPPORT_TICKET_NOT_FOUND' },
+              },
+            ],
+          }),
+        })
+        return
+      }
+
+      if (ticket.createdByPlayerId !== state.currentPlayer.id) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [{ message: 'Forbidden.', extensions: { code: 'SUPPORT_TICKET_FORBIDDEN' } }],
+          }),
+        })
+        return
+      }
+
+      const now = new Date().toISOString()
+      ticket.title = vars.input.title
+      ticket.markdownSource = vars.input.markdownSource
+      ticket.moderationState = 'PENDING'
+      ticket.sanitizedPreviewHtml = null
+      ticket.moderationReason = 'Content changed. Awaiting administrator moderation.'
+      ticket.moderatedAtUtc = null
+      ticket.moderatedByEmail = null
+      ticket.updatedAtUtc = now
+      ticket.activity.unshift({
+        id: `evt-${Date.now()}`,
+        eventType: 'CONTENT_UPDATED',
+        actorEmail: state.currentPlayer.email,
+        actorDisplayName: state.currentPlayer.displayName,
+        note: 'Support ticket content was updated.',
+        metadataJson: '{}',
+        createdAtUtc: now,
+      })
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { updateSupportTicketContent: ticket } }),
+      })
+      return
+    }
+
+    if (query.includes('mutation') && query.includes('updateSupportTicketStatus')) {
+      if (!state.currentPlayer || !state.isGlobalAdmin) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              { message: 'Global admin required.', extensions: { code: 'GLOBAL_ADMIN_REQUIRED' } },
+            ],
+          }),
+        })
+        return
+      }
+
+      const vars = body.variables as {
+        input: { ticketId: string; status: MockSupportTicket['status']; note?: string }
+      }
+      const ticket = state.supportTickets.find((item) => item.id === vars.input.ticketId)
+      if (!ticket) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              {
+                message: 'Support ticket not found.',
+                extensions: { code: 'SUPPORT_TICKET_NOT_FOUND' },
+              },
+            ],
+          }),
+        })
+        return
+      }
+
+      const now = new Date().toISOString()
+      ticket.status = vars.input.status
+      ticket.statusUpdatedAtUtc = now
+      ticket.updatedAtUtc = now
+      ticket.activity.unshift({
+        id: `evt-${Date.now()}`,
+        eventType: 'STATUS_UPDATED',
+        actorEmail: state.currentPlayer.email,
+        actorDisplayName: state.currentPlayer.displayName,
+        note: vars.input.note ?? `Support ticket status changed to ${vars.input.status}.`,
+        metadataJson: JSON.stringify({ status: vars.input.status }),
+        createdAtUtc: now,
+      })
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { updateSupportTicketStatus: ticket } }),
+      })
+      return
+    }
+
+    if (query.includes('mutation') && query.includes('moderateSupportTicket')) {
+      if (!state.currentPlayer || !state.isGlobalAdmin) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              { message: 'Global admin required.', extensions: { code: 'GLOBAL_ADMIN_REQUIRED' } },
+            ],
+          }),
+        })
+        return
+      }
+
+      const vars = body.variables as {
+        input: { ticketId: string; approve: boolean; note?: string }
+      }
+      const ticket = state.supportTickets.find((item) => item.id === vars.input.ticketId)
+      if (!ticket) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              {
+                message: 'Support ticket not found.',
+                extensions: { code: 'SUPPORT_TICKET_NOT_FOUND' },
+              },
+            ],
+          }),
+        })
+        return
+      }
+
+      const now = new Date().toISOString()
+      ticket.moderationState = vars.input.approve ? 'APPROVED' : 'REJECTED'
+      ticket.moderatedAtUtc = now
+      ticket.moderatedByEmail = state.currentPlayer.email
+      ticket.moderationReason =
+        vars.input.note ??
+        (vars.input.approve
+          ? 'Content approved by administrator.'
+          : 'Content rejected by administrator.')
+      ticket.updatedAtUtc = now
+      ticket.sanitizedPreviewHtml = vars.input.approve
+        ? `<p>${ticket.markdownSource.replaceAll('<', '&lt;').replaceAll('>', '&gt;')}</p>`
+        : null
+      ticket.activity.unshift({
+        id: `evt-${Date.now()}`,
+        eventType: 'MODERATION_UPDATED',
+        actorEmail: state.currentPlayer.email,
+        actorDisplayName: state.currentPlayer.displayName,
+        note: ticket.moderationReason,
+        metadataJson: JSON.stringify({ moderationState: ticket.moderationState }),
+        createdAtUtc: now,
+      })
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { moderateSupportTicket: ticket } }),
+      })
+      return
+    }
+
+    if (query.includes('mySupportTickets')) {
+      if (!state.currentPlayer) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              { message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } },
+            ],
+          }),
+        })
+        return
+      }
+
+      const vars = body.variables as
+        | {
+            input?: {
+              searchTitle?: string
+              ticketType?: string
+              status?: string
+              sortBy?: string
+              sortDirection?: string
+            }
+          }
+        | undefined
+      let list = state.supportTickets.filter(
+        (ticket) => ticket.createdByPlayerId === state.currentPlayer?.id,
+      )
+      const filter = vars?.input
+      if (filter?.ticketType)
+        list = list.filter((ticket) => ticket.ticketType === filter.ticketType)
+      if (filter?.status) list = list.filter((ticket) => ticket.status === filter.status)
+      if (filter?.searchTitle?.trim()) {
+        const q = filter.searchTitle.trim().toLowerCase()
+        list = list.filter((ticket) => ticket.title.toLowerCase().includes(q))
+      }
+
+      const direction = filter?.sortDirection === 'ASC' ? 1 : -1
+      const sortBy = filter?.sortBy ?? 'CREATED_AT'
+      list = [...list].sort((a, b) => {
+        if (sortBy === 'TITLE') {
+          return a.title.localeCompare(b.title) * direction
+        }
+        const left = sortBy === 'UPDATED_AT' ? a.updatedAtUtc : a.createdAtUtc
+        const right = sortBy === 'UPDATED_AT' ? b.updatedAtUtc : b.createdAtUtc
+        return (left < right ? -1 : left > right ? 1 : 0) * direction
+      })
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { mySupportTickets: list } }),
+      })
+      return
+    }
+
+    if (query.includes('supportTicketsAdmin')) {
+      if (!state.currentPlayer || !state.isGlobalAdmin) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              { message: 'Global admin required.', extensions: { code: 'GLOBAL_ADMIN_REQUIRED' } },
+            ],
+          }),
+        })
+        return
+      }
+
+      const vars = body.variables as
+        | {
+            input?: {
+              searchTitle?: string
+              ticketType?: string
+              status?: string
+              sortBy?: string
+              sortDirection?: string
+              unsafeOnly?: boolean
+            }
+          }
+        | undefined
+      let list = [...state.supportTickets]
+      const filter = vars?.input
+      if (filter?.ticketType)
+        list = list.filter((ticket) => ticket.ticketType === filter.ticketType)
+      if (filter?.status) list = list.filter((ticket) => ticket.status === filter.status)
+      if (filter?.unsafeOnly) list = list.filter((ticket) => ticket.containsUnsafeContent)
+      if (filter?.searchTitle?.trim()) {
+        const q = filter.searchTitle.trim().toLowerCase()
+        list = list.filter((ticket) => ticket.title.toLowerCase().includes(q))
+      }
+
+      const direction = filter?.sortDirection === 'ASC' ? 1 : -1
+      const sortBy = filter?.sortBy ?? 'CREATED_AT'
+      list = list.sort((a, b) => {
+        if (sortBy === 'TITLE') {
+          return a.title.localeCompare(b.title) * direction
+        }
+        const left = sortBy === 'UPDATED_AT' ? a.updatedAtUtc : a.createdAtUtc
+        const right = sortBy === 'UPDATED_AT' ? b.updatedAtUtc : b.createdAtUtc
+        return (left < right ? -1 : left > right ? 1 : 0) * direction
+      })
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { supportTicketsAdmin: list } }),
       })
       return
     }
@@ -303,7 +721,9 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } }],
+            errors: [
+              { message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } },
+            ],
           }),
         })
         return
@@ -355,12 +775,17 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
 
     // goldTokenBalances query
     if (query.includes('goldTokenBalances')) {
-      if (!state.currentPlayer || (!state.isGlobalAdmin)) {
+      if (!state.currentPlayer || !state.isGlobalAdmin) {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: 'Gold token administration requires global admin access.', extensions: { code: 'GLOBAL_ADMIN_REQUIRED' } }],
+            errors: [
+              {
+                message: 'Gold token administration requires global admin access.',
+                extensions: { code: 'GLOBAL_ADMIN_REQUIRED' },
+              },
+            ],
           }),
         })
       } else {
@@ -380,7 +805,12 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: 'Gold token administration requires global admin access.', extensions: { code: 'GLOBAL_ADMIN_REQUIRED' } }],
+            errors: [
+              {
+                message: 'Gold token administration requires global admin access.',
+                extensions: { code: 'GLOBAL_ADMIN_REQUIRED' },
+              },
+            ],
           }),
         })
       } else {
@@ -405,13 +835,20 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: 'Gold token administration requires global admin access.', extensions: { code: 'GLOBAL_ADMIN_REQUIRED' } }],
+            errors: [
+              {
+                message: 'Gold token administration requires global admin access.',
+                extensions: { code: 'GLOBAL_ADMIN_REQUIRED' },
+              },
+            ],
           }),
         })
         return
       }
 
-      const vars = body.variables as { input: { targetEmail: string; amount: number; note?: string } }
+      const vars = body.variables as {
+        input: { targetEmail: string; amount: number; note?: string }
+      }
       const targetEmail = vars?.input?.targetEmail?.toLowerCase()
       const amount = vars?.input?.amount ?? 0
       const note = vars?.input?.note ?? null
@@ -421,7 +858,9 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: 'Amount must be non-zero.', extensions: { code: 'INVALID_AMOUNT' } }],
+            errors: [
+              { message: 'Amount must be non-zero.', extensions: { code: 'INVALID_AMOUNT' } },
+            ],
           }),
         })
         return
@@ -433,7 +872,9 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: 'Target player not found.', extensions: { code: 'PLAYER_NOT_FOUND' } }],
+            errors: [
+              { message: 'Target player not found.', extensions: { code: 'PLAYER_NOT_FOUND' } },
+            ],
           }),
         })
         return
@@ -445,7 +886,9 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: 'Insufficient balance.', extensions: { code: 'INSUFFICIENT_BALANCE' } }],
+            errors: [
+              { message: 'Insufficient balance.', extensions: { code: 'INSUFFICIENT_BALANCE' } },
+            ],
           }),
         })
         return

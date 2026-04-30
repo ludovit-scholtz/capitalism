@@ -53,6 +53,7 @@ Update /CHANGELOG.csv with a new entry for each meaningful change. Create guid i
 - For any UI change or new UI behavior, add or update Playwright end-to-end tests that cover the user-visible flow.
 - Use `<script setup lang="ts">` in all Vue single-file components.
 - Use scoped styles (`<style scoped>`) in Vue components.
+- Keep each Vue component in a single `.vue` file. Do not split Vue `template`, `script`, or `style` blocks into separate sidecar files (for example external `.css` via `<style scoped src=...>`).
 - Use CSS custom properties (variables) defined in `main.css` for theming/colors.
 - Prefer semantic HTML elements and accessibility attributes.
 - Use `@/` path alias for imports from the `src` directory.
@@ -62,9 +63,10 @@ Update /CHANGELOG.csv with a new entry for each meaningful change. Create guid i
 - **No source file should exceed 500 lines.** When a file approaches or exceeds this limit, split it proactively.
 - **Backend C# classes**: use `partial class` to split large GraphQL Query/Mutation types by domain (e.g., `Query.Building.cs`, `Mutation.Lending.cs`). Each partial file should group related methods under a single domain.
 - **Frontend Vue components**: extract reusable logic into composables (`src/composables/`) and break large templates into child components (`src/components/<feature>/`). Keep view files focused on layout and composition, not business logic.
+- **Frontend Vue SFC format**: keep component `template`, `script`, and `style` together inside the same `.vue` file. Componentization into child `.vue` files is allowed, but sidecar template/script/style files are not.
 - **Frontend types**: split `src/types/index.ts` into domain-specific files (e.g., `types/building.ts`, `types/market.ts`) with a barrel re-export from `index.ts`.
 - **E2E mock helpers**: split large mock-api files by domain (e.g., `mock-api-building.ts`, `mock-api-exchange.ts`).
-- **CSS/styles**: extract large `<style scoped>` blocks into co-located `.css` files or shared style modules when they exceed 300 lines.
+- **CSS/styles**: keep component-scoped styles inside the owning `.vue` file (`<style scoped>`). Prefer Tailwind utilities for spacing and colors; keep scoped CSS for component-specific or complex visual rules.
 - When creating new features, plan the file structure upfront so files stay under the 500-line limit from the start.
 
 ## Multiple game servers infrastructure
@@ -270,6 +272,9 @@ CI=true npx playwright test --project=chromium e2e/encyclopedia-screenshots.spec
 - Frontend uses vue-i18n v11 in Composition API mode (`useI18n()` with `t()` and `locale.value`).
 - Locale files: `src/i18n/locales/{en,sk,de}.ts`. Detection chain: localStorage (`app_locale`) → `navigator.languages` → `'en'`.
 - All user-visible strings use `t()` calls with keys organized by feature: `common.*`, `nav.*`, `home.*`, `auth.*`, `onboarding.*`, `dashboard.*`.
+- Master-frontend uses the same `en/sk/de` locale structure under `projects/master-frontend/src/i18n/locales/{en,sk,de}.ts` and persists language selection via localStorage key `master_locale`.
+- For master-frontend changes, every new user-facing string must be added in all 3 locales (`en`, `sk`, `de`) in the same change. Do not leave fallback English literals in Vue templates or script error paths.
+- When helper functions return UI labels (for example subscription labels), pass the `t` translator callback into the helper instead of hardcoding strings outside locale files.
 - **vue-i18n v11 JIT compiler special characters**: The following characters are SPECIAL in vue-i18n message strings and must be escaped with `{'char'}` syntax when used as literal text:
   - `{` and `}` — used for interpolation; a bare `}` causes `SyntaxError: 10` (UNEXPECTED_CLOSE_BRACE / Invalid linked format)
   - `@` — begins a linked message reference (`@:key`); an email address like `user@example.com` MUST be written as `user{'@'}example.com`

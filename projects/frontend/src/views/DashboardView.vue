@@ -21,9 +21,9 @@ import DashboardTabNav from '@/components/dashboard/DashboardTabNav.vue'
 import BuildingHeaderFinancials from '@/components/buildings/BuildingHeaderFinancials.vue'
 import type { Company, GameState, ScheduledActionSummary, CityPowerBalance, CompanyLedgerSummary, City, BuildingUnitOperationalStatus } from '@/types'
 
-// Module-level cache for city names — cities are static and never change during a session.
+// Module-level cache for city names - cities are static and never change during a session.
 const _cityNamesCache: Record<string, string> = {}
-// Module-level cache for city currencies — cities are static and never change during a session.
+// Module-level cache for city currencies - cities are static and never change during a session.
 const _cityCurrenciesCache: Record<string, string> = {}
 
 const { t, locale } = useI18n()
@@ -43,9 +43,9 @@ const companyLedgers = ref<Record<string, CompanyLedgerSummary>>({})
 const ledgerLoading = ref(false)
 const cityNames = ref<Record<string, string>>({})
 const cityCurrencies = ref<Record<string, string>>({})
-/** Map from buildingId → per-unit operational statuses for supply-chain live status display. */
+/** Map from buildingId -> per-unit operational statuses for supply-chain live status display. */
 const buildingUnitStatuses = ref<Record<string, BuildingUnitOperationalStatus[]>>({})
-/** Map from buildingId → aggregated financial totals (revenue, costs, profit). */
+/** Map from buildingId -> aggregated financial totals (revenue, costs, profit). */
 const buildingFinancials = ref<Record<string, { totalSales: number; totalCosts: number; totalProfit: number }>>({})
 const buildingFinancialsLoading = ref(false)
 const createCompanyName = ref('')
@@ -102,13 +102,13 @@ function tabsForCompany(company: Company) {
 const buildingTypeIcons: Record<string, string> = {
   MINE: '⛏️',
   FACTORY: '🏭',
-  SALES_SHOP: '🏪',
-  RESEARCH_DEVELOPMENT: '🔬',
-  APARTMENT: '🏢',
-  COMMERCIAL: '🏛️',
-  MEDIA_HOUSE: '📺',
+  SALES_SHOP: '🏬',
+  RESEARCH_DEVELOPMENT: '🧪',
+  APARTMENT: '🏠',
+  COMMERCIAL: '🏢',
+  MEDIA_HOUSE: '📰',
   BANK: '🏦',
-  EXCHANGE: '📊',
+  EXCHANGE: '📈',
   POWER_PLANT: '⚡',
 }
 
@@ -256,14 +256,14 @@ async function loadPendingActions() {
       pendingActions.value = data.myPendingActions
     }
   } catch {
-    // best-effort — pending actions list is non-critical
+    // best-effort - pending actions list is non-critical
   } finally {
     pendingActionsLoading.value = false
   }
 }
 
 async function loadCityNames() {
-  // Cities are static — serve from module-level cache after first successful load.
+  // Cities are static - serve from module-level cache after first successful load.
   if (Object.keys(_cityNamesCache).length > 0) {
     if (!deepEqual(cityNames.value, _cityNamesCache)) {
       cityNames.value = { ..._cityNamesCache }
@@ -286,7 +286,7 @@ async function loadCityNames() {
     cityNames.value = nameMap
     cityCurrencies.value = currencyMap
   } catch {
-    // best-effort — city names are non-critical
+    // best-effort - city names are non-critical
   }
 }
 
@@ -316,7 +316,7 @@ async function loadLedgers(companyIds: string[], isRefresh = false) {
       }
     }
   } catch {
-    // best-effort — ledger data is non-critical
+    // best-effort - ledger data is non-critical
   } finally {
     if (!isRefresh) ledgerLoading.value = false
   }
@@ -343,7 +343,7 @@ async function loadBuildingUnitStatuses(buildingIds: string[]) {
       }
     }
   } catch {
-    // best-effort — unit status is non-critical
+    // best-effort - unit status is non-critical
   }
 }
 
@@ -369,7 +369,7 @@ async function loadBuildingFinancials(buildingIds: string[], isRefresh = false) 
       }
     }
   } catch {
-    // best-effort — financial summary is non-critical
+    // best-effort - financial summary is non-critical
   } finally {
     if (!isRefresh) buildingFinancialsLoading.value = false
   }
@@ -471,11 +471,9 @@ async function createCompany() {
         <!-- Personal-account tab navigation -->
         <DashboardTabNav :tabs="personAccountTabs" :model-value="personAccountTab" class="mt-1" @update:model-value="setPersonAccountTab" />
 
-        <!-- ── Overview tab ──────────────────────────────────────────── -->
+        <!-- ÔöÇÔöÇ Overview tab ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ -->
         <div v-show="personAccountTab === 'overview'" class="pt-5" role="tabpanel" :aria-label="t('dashboard.personTabOverview')">
-          <p class="text-muted mb-4">
-            {{ companies.length === 0 ? t('dashboard.personModeNoCompanies') : t('dashboard.personModeBody') }}
-          </p>
+          <p class="text-muted mb-4">{{ companies.length === 0 ? t('dashboard.personModeNoCompanies') : t('dashboard.personModeBody') }}</p>
 
           <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))] mb-5">
             <article class="person-metric-card flex flex-col gap-1.5 p-4 border border-divider rounded-lg bg-card-raised">
@@ -500,7 +498,7 @@ async function createCompany() {
           </div>
         </div>
 
-        <!-- ── Create company tab ─────────────────────────────────────── -->
+        <!-- ÔöÇÔöÇ Create company tab ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ -->
         <div v-show="personAccountTab === 'create-company'" class="pt-5" role="tabpanel" :aria-label="t('dashboard.personTabCreateCompany')">
           <div class="flex flex-col gap-3.5">
             <div>
@@ -520,9 +518,7 @@ async function createCompany() {
                 />
               </label>
               <div class="flex flex-wrap gap-3">
-                <button class="btn btn-primary" type="submit" :disabled="createCompanyLoading">
-                  {{ createCompanyLoading ? t('common.loading') : t('dashboard.createCompany') }}
-                </button>
+                <button class="btn btn-primary" type="submit" :disabled="createCompanyLoading">{{ createCompanyLoading ? t('common.loading') : t('dashboard.createCompany') }}</button>
                 <RouterLink to="/encyclopedia" class="btn btn-secondary">{{ t('dashboard.browseEncyclopedia') }}</RouterLink>
               </div>
             </form>
@@ -532,11 +528,9 @@ async function createCompany() {
           </div>
         </div>
 
-        <!-- ── Ledger tab ──────────────────────────────────────────────── -->
+        <!-- ÔöÇÔöÇ Ledger tab ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ -->
         <div v-show="personAccountTab === 'ledger'" class="pt-5" role="tabpanel" :aria-label="t('dashboard.personTabLedger')">
-          <p class="text-muted mb-5">
-            {{ t('dashboard.personLedgerTabBody') }}
-          </p>
+          <p class="text-muted mb-5">{{ t('dashboard.personLedgerTabBody') }}</p>
 
           <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))] mb-5">
             <article class="person-metric-card flex flex-col gap-1.5 p-4 border border-divider rounded-lg bg-card-raised">
@@ -569,14 +563,12 @@ async function createCompany() {
                 </span>
                 <span v-if="company.buildings.length > 0 && cityNames[company.buildings[0]?.cityId ?? '']" class="flex flex-col gap-0.5">
                   <span class="meta-label text-[0.6875rem] uppercase tracking-wide text-muted font-semibold">{{ t('dashboard.city') }}</span>
-                  <span class="city-name font-medium text-[0.9375rem]">📍 {{ cityNames[company.buildings[0]!.cityId] }}</span>
+                  <span class="city-name font-medium text-[0.9375rem]">📍 {{ cityNames[company.buildings[0]?.cityId ?? ''] }}</span>
                 </span>
               </div>
             </div>
             <div class="company-actions flex flex-wrap gap-2 items-start">
-              <RouterLink :to="`/buy-building/${company.id}`" class="btn btn-primary">
-                {{ t('dashboard.buyBuilding') }}
-              </RouterLink>
+              <RouterLink :to="`/buy-building/${company.id}`" class="btn btn-primary"> {{ t('dashboard.buyBuilding') }} </RouterLink>
               <RouterLink v-if="company.buildings.length > 0 && company.buildings[0]" :to="`/city/${company.buildings[0].cityId}`" class="btn btn-secondary"> 🗺️ {{ t('nav.cityMap') }} </RouterLink>
               <RouterLink :to="`/ledger/${company.id}`" class="btn btn-ghost"> 📒 {{ t('dashboard.viewLedger') }} </RouterLink>
               <RouterLink :to="`/company/${company.id}/settings`" class="btn btn-ghost"> ⚙️ {{ t('dashboard.companySettings') }} </RouterLink>
@@ -584,9 +576,9 @@ async function createCompany() {
           </div>
 
           <!-- Section tab navigation -->
-          <DashboardTabNav :tabs="tabsForCompany(company)" :model-value="activeTab" @update:model-value="setActiveTab($event as 'overview' | 'buildings' | 'activity' | 'chat' | 'pro')" />
+          <DashboardTabNav :tabs="tabsForCompany(company)" :model-value="activeTab" @update:model-value="setActiveTab($event as 'chat' | 'buildings' | 'overview' | 'activity' | 'pro')" />
 
-          <!-- ── Overview tab ──────────────────────────────────────────── -->
+          <!-- ÔöÇÔöÇ Overview tab ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ -->
           <div v-show="activeTab === 'overview'" class="tab-panel pt-5" role="tabpanel" aria-label="Overview">
             <!-- Financial summary and guidance -->
             <div class="grid grid-cols-2 max-[700px]:grid-cols-1 gap-3 mb-4">
@@ -595,14 +587,12 @@ async function createCompany() {
             </div>
           </div>
 
-          <!-- ── Buildings tab ─────────────────────────────────────────── -->
+          <!-- ÔöÇÔöÇ Buildings tab ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ -->
           <div v-show="activeTab === 'buildings'" class="tab-panel pt-5" role="tabpanel" aria-label="Buildings">
             <div v-if="filteredBuildingsByCity.length === 0" class="no-buildings text-center p-6 text-muted flex flex-col items-center gap-4">
               <p v-if="selectedCityId">{{ t('dashboard.noBuildingsInCity') }}</p>
               <p v-else>{{ t('dashboard.noBuildings') }}</p>
-              <RouterLink :to="`/buy-building/${company.id}`" class="btn btn-primary">
-                {{ t('dashboard.buyBuilding') }}
-              </RouterLink>
+              <RouterLink :to="`/buy-building/${company.id}`" class="btn btn-primary"> {{ t('dashboard.buyBuilding') }} </RouterLink>
             </div>
 
             <div v-else class="buildings-grid grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
@@ -620,8 +610,7 @@ async function createCompany() {
                     <span class="bg-brand text-white px-2 py-0.5 rounded text-[0.6875rem] font-bold">Lv.{{ building.level }}</span>
                     <span class="text-[0.6875rem] text-muted">{{ building.units.length }} units</span>
                     <span v-if="building.powerStatus && building.powerStatus !== 'POWERED'" :class="powerStatusClass(building.powerStatus)" :aria-label="getBuildingPowerLabel(building.powerStatus)">
-                      {{ building.powerStatus === 'OFFLINE' ? '🔴' : '🟡' }}
-                      {{ getBuildingPowerLabel(building.powerStatus) }}
+                      {{ building.powerStatus === 'OFFLINE' ? '❌' : '⚡' }} {{ getBuildingPowerLabel(building.powerStatus) }}
                     </span>
                   </div>
                 </RouterLink>
@@ -645,9 +634,7 @@ async function createCompany() {
                   <span v-if="cityPowerBalances[cityId].status === 'BALANCED'">
                     {{ cityPowerBalances[cityId].totalSupplyMw }} / {{ cityPowerBalances[cityId].totalDemandMw }} {{ t('powerGrid.unit') }}
                   </span>
-                  <span v-else>
-                    {{ cityPowerBalances[cityId].status === 'CRITICAL' ? t('powerGrid.criticalWarning') : t('powerGrid.shortageWarning') }}
-                  </span>
+                  <span v-else> {{ cityPowerBalances[cityId].status === 'CRITICAL' ? t('powerGrid.criticalWarning') : t('powerGrid.shortageWarning') }} </span>
                   <RouterLink :to="`/city/${cityId}`" class="underline text-xs ml-auto">{{ t('powerGrid.viewDetails') }}</RouterLink>
                 </div>
                 <div
@@ -662,17 +649,17 @@ async function createCompany() {
             </div>
           </div>
 
-          <!-- ── Activity tab ──────────────────────────────────────────── -->
+          <!-- ÔöÇÔöÇ Activity tab ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ -->
           <div v-show="activeTab === 'activity'" class="tab-panel pt-5" role="tabpanel" aria-label="Activity">
             <PendingActionsTimeline :actions="pendingActions" :loading="pendingActionsLoading" :current-tick="gameState?.currentTick ?? null" />
           </div>
 
-          <!-- ── Chat tab ──────────────────────────────────────────────── -->
+          <!-- ÔöÇÔöÇ Chat tab ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ -->
           <div v-show="activeTab === 'chat'" class="tab-panel pt-5" role="tabpanel" aria-label="Chat">
             <DashboardChatPanel />
           </div>
 
-          <!-- ── Pro tab ───────────────────────────────────────────────── -->
+          <!-- ÔöÇÔöÇ Pro tab ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ -->
           <div v-show="activeTab === 'pro'" class="tab-panel pt-5" role="tabpanel" :aria-label="t('dashboard.tabPro')">
             <section class="pro-tab-panel p-6 border border-[rgba(255,109,0,0.35)] rounded-xl bg-gradient-to-br from-[rgba(255,109,0,0.08)] to-[rgba(0,71,255,0.07)]" aria-labelledby="pro-tab-title">
               <!-- Status header -->
@@ -694,9 +681,7 @@ async function createCompany() {
                 <template v-if="auth.isProSubscriber && auth.player?.proSubscriptionEndsAtUtc">
                   {{ t('proAccess.activeBody', { date: formatDateTime(auth.player.proSubscriptionEndsAtUtc) }) }}
                 </template>
-                <template v-else>
-                  {{ t('proAccess.inactiveBody') }}
-                </template>
+                <template v-else> {{ t('proAccess.inactiveBody') }} </template>
               </p>
 
               <!-- Benefit cards -->
@@ -705,8 +690,8 @@ async function createCompany() {
                 <article
                   v-for="(benefit, i) in [
                     { icon: '🏭', title: t('dashboard.proBenefitProducts'), body: t('dashboard.proBenefitProductsBody') },
-                    { icon: '📈', title: t('dashboard.proBenefitAdvanced'), body: t('dashboard.proBenefitAdvancedBody') },
-                    { icon: '🔓', title: t('dashboard.proBenefitUnlock'), body: t('dashboard.proBenefitUnlockBody') },
+                    { icon: '📊', title: t('dashboard.proBenefitAdvanced'), body: t('dashboard.proBenefitAdvancedBody') },
+                    { icon: '🚀', title: t('dashboard.proBenefitUnlock'), body: t('dashboard.proBenefitUnlockBody') },
                     { icon: '⚡', title: t('dashboard.proBenefitPriority'), body: t('dashboard.proBenefitPriorityBody') },
                   ]"
                   :key="i"
@@ -723,9 +708,7 @@ async function createCompany() {
               <!-- Portal CTA -->
               <div class="flex items-center gap-4 flex-wrap max-sm:flex-col max-sm:items-start">
                 <p class="m-0 flex-1 text-muted text-sm">{{ t('proAccess.manageBody') }}</p>
-                <a class="btn btn-primary" :href="masterPortalUrl" target="_blank" rel="noreferrer">
-                  {{ t('proAccess.openPortal') }}
-                </a>
+                <a class="btn btn-primary" :href="masterPortalUrl" target="_blank" rel="noreferrer"> {{ t('proAccess.openPortal') }} </a>
               </div>
             </section>
           </div>

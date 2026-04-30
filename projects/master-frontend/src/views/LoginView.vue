@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
+const { t } = useI18n()
 
 const mode = ref<'login' | 'register'>('login')
 const email = ref('')
@@ -23,217 +25,125 @@ async function submit() {
     await auth.fetchSubscription()
     await router.push('/')
   } catch (e: unknown) {
-    formError.value = e instanceof Error ? e.message : 'Something went wrong. Please try again.'
+    formError.value = e instanceof Error ? e.message : t('login.genericError')
   }
 }
 </script>
 
 <template>
-  <main class="login-shell">
-    <div class="login-card">
-      <div class="login-brand">
-        <p class="eyebrow">Capitalism Network</p>
-        <h1>{{ mode === 'login' ? 'Sign in' : 'Create account' }}</h1>
-        <p class="login-sub">
-          {{
-            mode === 'login'
-              ? 'Access your Pro subscription and server directory.'
-              : 'Join the Capitalism Network to track your subscription.'
-          }}
+  <main class="login-shell flex min-h-dvh items-center justify-center px-4 py-8">
+    <div
+      class="login-card w-full max-w-[440px] rounded-[32px] border border-[var(--color-border)] bg-[rgba(255,251,243,0.92)] p-10 shadow-[var(--shadow-soft)]"
+    >
+      <div class="login-brand mb-7">
+        <p class="eyebrow text-[0.72rem] uppercase tracking-[0.14em] text-[var(--color-accent)]">
+          {{ t('home.eyebrow') }}
+        </p>
+        <h1 class="mt-1.5 text-[2rem]">
+          {{ mode === 'login' ? t('login.signIn') : t('login.createAccount') }}
+        </h1>
+        <p class="login-sub mt-2 text-[0.95rem] text-[var(--color-muted)]">
+          {{ mode === 'login' ? t('login.signInSub') : t('login.createSub') }}
         </p>
       </div>
 
-      <form class="login-form" @submit.prevent="submit">
-        <div class="field-group">
-          <label for="email">Email</label>
+      <form class="login-form flex flex-col gap-4" @submit.prevent="submit">
+        <div class="field-group flex flex-col gap-1.5">
+          <label for="email" class="text-sm font-medium text-[var(--color-ink)]">{{
+            t('login.email')
+          }}</label>
           <input
             id="email"
             v-model="email"
             type="email"
             autocomplete="email"
             placeholder="you@example.com"
+            class="rounded-[14px] border border-[var(--color-border)] bg-[var(--color-paper-strong)] px-4 py-3 text-[var(--color-ink)] outline-none transition-colors focus:border-[var(--color-accent)]"
             required
           />
         </div>
 
-        <div v-if="mode === 'register'" class="field-group">
-          <label for="displayName">Display name</label>
+        <div v-if="mode === 'register'" class="field-group flex flex-col gap-1.5">
+          <label for="displayName" class="text-sm font-medium text-[var(--color-ink)]">{{
+            t('login.displayName')
+          }}</label>
           <input
             id="displayName"
             v-model="displayName"
             type="text"
             autocomplete="name"
-            placeholder="Your name in the simulation"
+            :placeholder="t('login.displayNamePlaceholder')"
+            class="rounded-[14px] border border-[var(--color-border)] bg-[var(--color-paper-strong)] px-4 py-3 text-[var(--color-ink)] outline-none transition-colors focus:border-[var(--color-accent)]"
             required
           />
         </div>
 
-        <div class="field-group">
-          <label for="password">Password</label>
+        <div class="field-group flex flex-col gap-1.5">
+          <label for="password" class="text-sm font-medium text-[var(--color-ink)]">{{
+            t('login.password')
+          }}</label>
           <input
             id="password"
             v-model="password"
             type="password"
             autocomplete="current-password"
             placeholder="••••••••"
+            class="rounded-[14px] border border-[var(--color-border)] bg-[var(--color-paper-strong)] px-4 py-3 text-[var(--color-ink)] outline-none transition-colors focus:border-[var(--color-accent)]"
             required
           />
         </div>
 
-        <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
+        <p
+          v-if="formError"
+          class="form-error rounded-[14px] bg-[rgba(176,67,44,0.08)] px-4 py-3 text-[0.9rem] text-[#a03826]"
+          role="alert"
+        >
+          {{ formError }}
+        </p>
 
-        <button class="submit-btn" type="submit" :disabled="auth.loading">
-          {{ auth.loading ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account' }}
+        <button
+          class="submit-btn mt-1 rounded-full bg-[var(--color-ink)] px-5 py-3 text-base font-bold text-[var(--color-paper)] transition duration-150 hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
+          type="submit"
+          :disabled="auth.loading"
+        >
+          {{
+            auth.loading
+              ? t('login.wait')
+              : mode === 'login'
+                ? t('login.signIn')
+                : t('login.createAccount')
+          }}
         </button>
       </form>
 
-      <p class="toggle-mode">
+      <p class="toggle-mode mt-5 text-center text-[0.9rem] text-[var(--color-muted)]">
         <span v-if="mode === 'login'">
-          Don't have an account?
-          <button class="link-btn" type="button" @click="mode = 'register'">Register</button>
+          {{ t('login.noAccount') }}
+          <button
+            class="link-btn border-0 bg-transparent font-bold text-[var(--color-ink)] underline"
+            type="button"
+            @click="mode = 'register'"
+          >
+            {{ t('login.register') }}
+          </button>
         </span>
         <span v-else>
-          Already have an account?
-          <button class="link-btn" type="button" @click="mode = 'login'">Sign in</button>
+          {{ t('login.haveAccount') }}
+          <button
+            class="link-btn border-0 bg-transparent font-bold text-[var(--color-ink)] underline"
+            type="button"
+            @click="mode = 'login'"
+          >
+            {{ t('login.signIn') }}
+          </button>
         </span>
       </p>
 
-      <p class="back-link">
-        <a href="/">← Back to server directory</a>
+      <p class="back-link mt-3 text-center text-[0.87rem] text-[var(--color-muted)]">
+        <a class="transition-colors hover:text-[var(--color-ink)]" href="/"
+          >← {{ t('login.backToDirectory') }}</a
+        >
       </p>
     </div>
   </main>
 </template>
-
-<style scoped>
-.login-shell {
-  min-height: 100dvh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem 1rem;
-}
-
-.login-card {
-  width: min(440px, 100%);
-  padding: 2.4rem;
-  border-radius: 32px;
-  background: rgba(255, 251, 243, 0.92);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-soft);
-}
-
-.login-brand {
-  margin-bottom: 1.8rem;
-}
-
-.login-brand h1 {
-  margin-top: 0.35rem;
-  font-size: 2rem;
-}
-
-.login-sub {
-  margin-top: 0.5rem;
-  color: var(--color-muted);
-  font-size: 0.95rem;
-}
-
-.eyebrow {
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-size: 0.72rem;
-  color: var(--color-accent);
-}
-
-.login-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-}
-
-.field-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.field-group label {
-  font-size: 0.88rem;
-  font-weight: 500;
-  color: var(--color-ink);
-}
-
-.field-group input {
-  padding: 0.8rem 1rem;
-  border-radius: 14px;
-  border: 1px solid var(--color-border);
-  background: var(--color-paper-strong);
-  font: inherit;
-  color: var(--color-ink);
-  outline: none;
-  transition: border-color 0.15s;
-}
-
-.field-group input:focus {
-  border-color: var(--color-accent);
-}
-
-.form-error {
-  padding: 0.75rem 1rem;
-  border-radius: 14px;
-  background: rgba(176, 67, 44, 0.08);
-  color: #a03826;
-  font-size: 0.9rem;
-}
-
-.submit-btn {
-  margin-top: 0.4rem;
-  padding: 0.9rem 1.2rem;
-  border-radius: 999px;
-  border: none;
-  background: var(--color-ink);
-  color: var(--color-paper);
-  font: inherit;
-  font-weight: 700;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: opacity 0.15s, transform 0.15s;
-}
-
-.submit-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.submit-btn:not(:disabled):hover {
-  transform: translateY(-1px);
-}
-
-.toggle-mode {
-  margin-top: 1.2rem;
-  text-align: center;
-  color: var(--color-muted);
-  font-size: 0.9rem;
-}
-
-.link-btn {
-  background: none;
-  border: none;
-  color: var(--color-ink);
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-  text-decoration: underline;
-}
-
-.back-link {
-  margin-top: 0.8rem;
-  text-align: center;
-  font-size: 0.87rem;
-  color: var(--color-muted);
-}
-
-.back-link a:hover {
-  color: var(--color-ink);
-}
-</style>

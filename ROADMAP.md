@@ -6,6 +6,17 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
+
+### Dashboard speed
+
+- [ ] When I go to /dashboard it takes few seconds to load with few players in the game server. Make sure it is optimized well and takes less then 100ms to load.
+
+### Bots
+
+- [ ] Create NPC bot console app
+- [ ] If the bot did not setup a company yet, create an account and resolve the onboarding process
+- [ ] On npc bot console app run check the current state of the account and check if it is profitable to change the current settings
+
 ### Architecture optimization (24% complete)
 
 - [ ] Make sure to split big files into the components on frontend or better classes on backend. Make sure no file is bigger then 500 lines.
@@ -33,22 +44,6 @@ It will use real world map. The game will start in single city and later other c
 
 **Shipped (increment 2 — core gameplay views):** Migrated five high-traffic views from legacy scoped CSS to Tailwind v4 utilities: `LeaderboardView` (wealth rankings with gradient hero, tab switcher, medal cards), `NewsView` (news/changelog feed with pill badges, unread indicators, and market-report table styles), `CompanySettingsView` (company profile, overhead dashboard, salary table), `PersonalLedgerView` (personal wealth breakdown, share trade history, dividend history), and `ManufacturingEncyclopediaView` (catalog grid with search, industry filter, and resource/product cards). All E2E selector classes preserved; scoped CSS fully removed from all five files (total ~1,200 style-lines eliminated). Files reduced well below the 500-line limit.
 
-### Context switching (100% complete)
-
-- [x] When user logs in, the city should be selected according to the player most used city. However i see ?? in the navbar for the city selection.
-- [x] Remove from the new building flow the city selection. City must be selected with the context switching.
-- [x] In the city map remove the cities switcher. Use the navbar context switcher to switch between the cities.
-
-### Currencies and bank accounts (100% complete)
-
-- [x] Investigate and fix why the current balance at the bank account does not match the balance of the last item in the bank statement.
-- [x] Every operation which changes the bank account balance must be listed in the ledger entry and visible in the statement
-
-### Number formatting (100% complete)
-
-- [x] In the number formatting component define also the size of the field the frontend has to show the number. If there is enough space, show number 12376909 as 12,376,909 and if there is limitted space, show it as 12M.
-- [x] Add to the title the original number to be formatted and currency after it. When player stay with mouse over the number, he should see the original number input.
-
 ### Power plants (100% complete)
 
 - [x] When I edit powerplant building, and click the empty unit in the grid, I do not see any options to setup any of the unit. Make it to work similarily as the factory for example where every unit will have special feature.
@@ -68,13 +63,17 @@ It will use real world map. The game will start in single city and later other c
 - [ ] When media house is in the construction, allow the marketing units to configure it.
 - [ ] When media house is in the construction, do not make any caluclations for the marketing units, only charge the unit labor and energy costs.
 
-### Mining (20% complete)
+### Mining (100% complete)
 
-- [ ] Make sure every mining land property has the custom resource defined what is in that property. It must have the quality and resource amount defined. 
-- [ ] For each resource must be always available at least one property in each city
-- [ ] When user buys the mining property using the buy building flow, make sure to show the resource quality and quantity available at the property land. 
-- [ ] Make sure user can filter the land by the resource type when buying the mining property.
-- [ ] Make sure the prices for the purchase of the land is very expensive ~ $20M to $200M depending on the quality of the resource and the amount of resource there is available to be mined.
+- [x] Make sure every mining land property has the custom resource defined what is in that property. It must have the quality and resource amount defined. 
+- [x] For each resource must be always available at least one property in each city
+- [x] When user buys the mining property using the buy building flow, make sure to show the resource quality and quantity available at the property land. 
+- [x] Make sure user can filter the land by the resource type when buying the mining property.
+- [x] Make sure the prices for the purchase of the land is very expensive ~ $20M to $200M depending on the quality of the resource and the amount of resource there is available to be mined.
+
+**Shipped (increment 1):** Dynamic land generation now guarantees that every MINE lot has a mapped resource deposit (`resourceType`, `materialQuality`, `materialQuantity`), enforces per-city coverage for every resource type, and clamps mine-lot deposit premiums into the strategic $20M-$200M band. Buy-building mining UX coverage was also extended with an E2E test for resource-type lot filtering.
+
+**Shipped (increment 2):** Mine generation now enforces quality bands by city resource availability: resources native to a city are generated in the 50%-100% quality band, and fallback non-native resources are generated in the 0%-50% quality band while still guaranteeing at least one mine lot per resource in every city. The buy-building mine purchase cards and selected-lot summary now show raw-material quality and quantity directly instead of population index.
 
 ### Appartment and commercial buildings (100% complete)
 
@@ -82,16 +81,58 @@ It will use real world map. The game will start in single city and later other c
 - [x] Occupancy must be always a number. When there is no occupancy there must be 0%
 - [x] I do not see the occupancy to be changed. Make sure the occupancy rules are applied.
 
-### Encyclopedia (100% complete)
+### Newsroom
 
-- [x] Create complete walkthrough for the forex trading in encyclopedia. Create list of the topics. Please document everything from swap walkthrough, transfers, fx rates, swap history, Gold AMM swap, Gold amm positions, Gold amm liquidity, and find other related matters.. Analyze the code to provide the best documentation possible. Use full hd pictures so that users can understand the game better. For every topic also create at least 100 word description on what player is doing.
+- [ ] Add pagination to the news items. By default show last 10 items
 
-- [x] Add to the stock exchange also section for the dividends payout, how it is configured in the company and what effects it has on personal account.
+### Support system (100% complete)
 
+- [x] Design MasterApi support-ticket entities with ticket type, status, title, markdown source, sanitized preview, creator, timestamps, moderation fields, and immutable audit trail so workflow and security checks are fully traceable.
+- [x] Implement support-ticket GraphQL mutations and queries for create, list, filter, sort, and status update flows, including strict authorization so users only see their own tickets while admins can access all tickets.
+- [x] Implement ticket type validation allowing only Suggestion, Bug, and Other values, and reject malformed type inputs with consistent error codes to keep frontend filters and reporting deterministic.
+- [x] Implement ticket status lifecycle with Submitted, In Progress, and Finished states, including explicit transition rules and administrator-only status updates so progress tracking remains reliable and auditable.
+- [x] Build master-frontend user ticket page with sortable and filterable table by creation date and title, showing current state, last update, and ticket type for fast personal support tracking.
+- [x] Build master-frontend admin ticket management page listing all users' tickets with default newest-first ordering and filters for type, date, and title to support high-volume triage operations.
+- [x] Integrate a high-quality markdown WYSIWYG editor for ticket creation and editing, with image embed support, toolbar formatting controls, and client-side validation for required fields and content length.
+- [x] Implement secure attachment and link handling pipeline that stores raw markdown and extracted URLs/images, flags unsafe content, and blocks formatted rendering until administrator review is explicitly approved.
+- [x] Build admin moderation workflow that first displays raw markdown and raw link or image targets, then allows explicit safe-confirm action to unlock sanitized formatted preview for trusted content.
+- [x] Implement markdown sanitization rules for rendered previews to prevent XSS, script URLs, unsafe HTML, and malicious embeds, while preserving allowed formatting that keeps support tickets readable and user-friendly.
+- [x] Add notification and activity logging so users see status-change events and admins see moderation and workflow actions, including actor identity and timestamps for every critical support-ticket operation.
+- [x] Add backend integration tests for permission boundaries, filter and sort behavior, status transitions, markdown sanitization, and moderation-gated rendering rules to prevent future regressions in support security.
+- [x] Add master-frontend end-to-end tests covering user ticket submission, WYSIWYG markdown editing, table filtering and sorting, admin moderation approval flow, and visibility differences between normal users and administrators.
 
-### Referal program (100% complete)
+### Master ranking point system (0% complete)
 
-- [x] Create page in master frontend to setup the referal code. Allow referal code to be filled only once. Make sure the existing referal code is used.
-- [x] Create page in master frontend for any user to be a referal. If user wants to be a referal he must fill in his name, and tax domicil.
-- [x] First referal code is autogenerated - 8 alphanumerical string. User can create multiple referal codes.
-- [x] In the referal dashboard show the number of registered users under the specific referal code, number of second level referals registrations, number of active subscriptions, and number of second level active referal subscriptions
+- [ ] Design MasterApi ranking entities for player points, bounty definitions, bounty reward records, daily scopes, server scopes, and one-time uniqueness keys so hourly evaluation can run idempotently without duplicate rewards or race conditions.
+- [ ] Implement a scheduled MasterApi hourly ranking evaluator that recalculates bounty eligibility for all players, writes reward records transactionally, and updates total points snapshots with clear audit metadata and processing duration metrics.
+- [ ] Implement UTC-midnight daily decay job that multiplies every player ranking score by 0.99, persists rounded values deterministically, and logs before and after totals to keep long-term competitive balance fair.
+- [ ] Build a player-facing master frontend ranking dashboard showing total points, global leaderboard position, movement trend, and competitive context so rankings feel rewarding and easy to compare with other players.
+- [ ] Build player bounty history UI in master frontend with filters by bounty type, date, game server, and status so each player can inspect exactly why and when points were awarded.
+- [ ] Add administrator bounty configuration interface for enabling, disabling, reward changes, visibility, proof requirements, and per-bounty validation settings while preserving immutable audit history for every configuration change.
+- [ ] Implement anti-duplication and cooldown guards that enforce daily reset windows, once-per-post logic, and once-per-day cross-server limits exactly according to each bounty definition and UTC boundary behavior.
+- [ ] Add internal observability dashboards and alerts for ranking evaluator failures, delayed schedules, abnormal reward spikes, and duplicate-key conflicts so operators can react before player trust is impacted.
+- [ ] Implement Game improver bounty integration with support ticket submission flow, awarding five points at most once per UTC day when a player submits a suggestion or bug report.
+- [ ] Implement Recommend a friend bounty integration with referral registration events, awarding five points once per UTC day when a referred player successfully creates a valid account using referral linkage.
+- [ ] Implement Recommend a good friend bounty integration with monetization events, awarding one hundred points once per UTC day when a referred player purchases startup pack or activates a paid subscription.
+- [ ] Implement Retweet a X post bounty workflow with admin-created bounty posts, URL submission, moderation queue, and reward issuance per post after manual verification of required friend tags.
+- [ ] Implement Retweet privacy controls so submitted social links are hidden from public player views, while administrators can review links and moderation decisions with timestamped approval or rejection reasons.
+- [ ] Implement Discord player bounty verification by linking Discord bot validation events to master accounts, awarding a one-time fifty-point reward only after successful ownership verification and anti-fraud checks.
+- [ ] Implement Discord privacy model storing Discord username in protected admin-only fields, excluding it from public ranking pages and player-exposed bounty records while preserving secure admin audit access.
+- [ ] Implement Log in to the game bounty ingestion from game servers, awarding five points once per UTC day for each distinct game server where the player opens dashboard successfully.
+- [ ] Implement Manufacturer bounty detection from game telemetry, awarding one point once per UTC day when player factories produce any product quantity on any server with cross-server deduplication.
+- [ ] Implement Wholesaler bounty detection from sales-shop telemetry, awarding one point once per UTC day when player shops sell any product quantity on any server with cross-server deduplication.
+- [ ] Implement Researcher bounty detection from R&D telemetry, awarding two points once per UTC day when any owned R&D unit has an active research budget configured on any server.
+- [ ] Implement Real estate magnate bounty detection, awarding two points once per UTC day when player-owned apartment or commercial buildings have nonzero occupancy on any server.
+- [ ] Implement Media owner bounty detection, awarding two points once per UTC day when player-owned media houses have any nonzero content-creation budget configured on any server.
+- [ ] Implement Banker bounty detection, awarding two points once per UTC day when another user deposits funds into a player-owned bank on any server.
+- [ ] Implement Lender bounty detection, awarding two points once per UTC day when another user maintains an active loan in a player-owned bank on any server.
+- [ ] Implement FX Trader bounty detection, awarding two points once per UTC day when player completes any currency swap between in-game currencies on any server.
+- [ ] Implement Stock Trader bounty detection, awarding two points once per UTC day when player buys any stock on any server with strict event deduplication and replay-safe ingestion.
+- [ ] Implement Energy Trader bounty detection, awarding two points once per UTC day when a player-owned power plant ships any energy amount to the market on any server.
+- [ ] Implement Good employer bounty calculation, awarding ten points once per UTC day when player has the highest wage rate in a city where salaries are actively paid on any server.
+- [ ] Implement Dividends master bounty detection, awarding two points once per UTC day when a player-owned company pays dividends to shareholders on any server.
+- [ ] Implement Top player bounty detection, awarding five points once per UTC day when player personal account rank is inside top ten on any server during hourly evaluation window.
+- [ ] Implement Great player bounty detection, awarding two points once per UTC day when player personal account rank is inside top one hundred on any server during hourly evaluation window.
+- [ ] Implement Company master bounty detection, awarding five points once per UTC day when any player-owned company rank is inside top ten companies on any server during hourly evaluation.
+- [ ] Add comprehensive backend integration tests covering midnight decay, hourly processing idempotency, one-time bounties, daily cooldown resets, cross-server deduplication, and each bounty event trigger path.
+- [ ] Add master frontend end-to-end tests validating ranking leaderboard rendering, player bounty history filters, privacy rules for retweet and Discord data, and real-time updates after reward issuance.

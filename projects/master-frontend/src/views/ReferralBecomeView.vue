@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import { becomeReferral, getReferralProfile, syncReferralSubscriptionStatus } from '@/lib/referrals'
@@ -7,6 +8,7 @@ import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
+const { t } = useI18n()
 
 const fullName = ref('')
 const taxDomicile = ref('')
@@ -26,11 +28,9 @@ function submitBecomeReferral() {
     becomeReferral(auth.player.email, fullName.value, taxDomicile.value)
     const profile = getReferralProfile(auth.player.email)
     existingCode.value = profile.referralCodes[0]?.code ?? null
-    successMessage.value =
-      'Referral profile is active. Your first code was generated automatically, and you can create more in the dashboard.'
+    successMessage.value = t('referralBecome.success')
   } catch (error) {
-    errorMessage.value =
-      error instanceof Error ? error.message : 'Unable to activate referral profile.'
+    errorMessage.value = error instanceof Error ? error.message : t('referralBecome.error')
   }
 }
 
@@ -55,137 +55,66 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main class="become-shell">
-    <section class="become-card">
-      <p class="eyebrow">Referral Program</p>
-      <h1>Become a Referral Partner</h1>
-      <p class="subtitle">
-        To become a referral partner, fill in your legal name and tax domicile. After activation,
-        your first 8-character code is generated automatically.
+  <main class="become-shell grid min-h-dvh place-items-center px-4 py-8">
+    <section
+      class="become-card grid w-full max-w-[720px] gap-4 rounded-3xl border border-[var(--color-border)] bg-[var(--color-paper-strong)] p-8 shadow-[var(--shadow-soft)]"
+    >
+      <p class="eyebrow text-[0.72rem] uppercase tracking-[0.12em] text-[var(--color-accent-deep)]">
+        {{ t('home.becomeReferral') }}
+      </p>
+      <h1 class="text-[clamp(1.7rem,3vw,2.3rem)]">{{ t('referralBecome.title') }}</h1>
+      <p class="subtitle leading-[1.65] text-[var(--color-muted)]">
+        {{ t('referralBecome.subtitle') }}
       </p>
 
-      <form class="become-form" @submit.prevent="submitBecomeReferral">
-        <div class="field">
-          <label for="full-name">Name</label>
+      <form class="become-form grid gap-3.5" @submit.prevent="submitBecomeReferral">
+        <div class="field grid gap-1.5">
+          <label class="text-[0.88rem] font-bold" for="full-name">{{
+            t('referralBecome.name')
+          }}</label>
           <input
             id="full-name"
             v-model="fullName"
             type="text"
-            placeholder="Ludovit Scholtz"
+            :placeholder="t('referralBecome.namePlaceholder')"
+            class="rounded-xl border border-[var(--color-border)] bg-white px-4 py-3"
             required
           />
         </div>
 
-        <div class="field">
-          <label for="tax-domicile">Tax domicile</label>
+        <div class="field grid gap-1.5">
+          <label class="text-[0.88rem] font-bold" for="tax-domicile">{{
+            t('referralBecome.domicile')
+          }}</label>
           <input
             id="tax-domicile"
             v-model="taxDomicile"
             type="text"
-            placeholder="Slovakia"
+            :placeholder="t('referralBecome.domicilePlaceholder')"
+            class="rounded-xl border border-[var(--color-border)] bg-white px-4 py-3"
             required
           />
         </div>
 
-        <button type="submit" class="primary">Activate Referral Profile</button>
+        <button
+          type="submit"
+          class="primary w-fit rounded-full border-0 bg-[var(--color-ink)] px-5 py-3 font-bold text-[var(--color-paper)]"
+        >
+          {{ t('referralBecome.activate') }}
+        </button>
       </form>
 
-      <p v-if="existingCode" class="generated-code">Your primary code: {{ existingCode }}</p>
-      <p v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>
-      <p v-if="successMessage" class="success" role="status">{{ successMessage }}</p>
+      <p v-if="existingCode" class="generated-code font-bold tracking-[0.08em]">
+        {{ t('referralBecome.primaryCode', { code: existingCode }) }}
+      </p>
+      <p v-if="errorMessage" class="error text-[#b0432c]" role="alert">{{ errorMessage }}</p>
+      <p v-if="successMessage" class="success text-[#245f3d]" role="status">{{ successMessage }}</p>
 
-      <RouterLink class="secondary" to="/referrals/dashboard">Go to Referral Dashboard</RouterLink>
+      <RouterLink
+        class="secondary w-fit rounded-full bg-[rgba(17,41,79,0.08)] px-5 py-3 font-bold text-[var(--color-ink)] no-underline"
+        to="/referrals/dashboard"
+        >{{ t('referralBecome.goDashboard') }}</RouterLink
+      >
     </section>
   </main>
 </template>
-
-<style scoped>
-.become-shell {
-  min-height: 100dvh;
-  display: grid;
-  place-items: center;
-  padding: 2rem 1rem;
-}
-
-.become-card {
-  width: min(720px, 100%);
-  border: 1px solid var(--color-border);
-  border-radius: 24px;
-  background: var(--color-paper-strong);
-  padding: 2rem;
-  box-shadow: var(--shadow-soft);
-  display: grid;
-  gap: 1rem;
-}
-
-.eyebrow {
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 0.72rem;
-  color: var(--color-accent-deep);
-}
-
-h1 {
-  font-size: clamp(1.7rem, 3vw, 2.3rem);
-}
-
-.subtitle {
-  color: var(--color-muted);
-  line-height: 1.65;
-}
-
-.become-form {
-  display: grid;
-  gap: 0.9rem;
-}
-
-.field {
-  display: grid;
-  gap: 0.4rem;
-}
-
-label {
-  font-size: 0.88rem;
-  font-weight: 700;
-}
-
-input {
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 0.8rem 0.9rem;
-  background: #fff;
-}
-
-.primary,
-.secondary {
-  border-radius: 999px;
-  padding: 0.78rem 1.2rem;
-  text-decoration: none;
-  border: none;
-  width: fit-content;
-  font-weight: 700;
-}
-
-.primary {
-  background: var(--color-ink);
-  color: var(--color-paper);
-}
-
-.secondary {
-  background: rgba(17, 41, 79, 0.08);
-  color: var(--color-ink);
-}
-
-.generated-code {
-  font-weight: 700;
-  letter-spacing: 0.08em;
-}
-
-.error {
-  color: #b0432c;
-}
-
-.success {
-  color: #245f3d;
-}
-</style>

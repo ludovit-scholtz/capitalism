@@ -3,37 +3,26 @@ import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { computed, ref } from 'vue'
-import { formatInGameTime } from '@/lib/gameTime'
-import { useGameStateStore } from '@/stores/gameState'
-import { useNewsStore } from '@/stores/news'
+import { usesStore } from '@/stores/news'
 import { useGameAdminStore } from '@/stores/gameAdmin'
 import { useChatStore } from '@/stores/chat'
 import ContextSwitcher from '@/components/layout/ContextSwitcher.vue'
+import GameTimeChip from '@/components/layout/GameTimeChip.vue'
 import ThemeToggle from '@/components/layout/ThemeToggle.vue'
 import { useThemeStore } from '@/stores/theme'
 
 const themeStore = useThemeStore()
 themeStore.init()
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const auth = useAuthStore()
-const gameStateStore = useGameStateStore()
-const newsStore = useNewsStore()
+const newsStore = usesStore()
 const gameAdminStore = useGameAdminStore()
 const chatStore = useChatStore()
-const { gameState } = storeToRefs(gameStateStore)
 const { unreadCount } = storeToRefs(newsStore)
 const { session } = storeToRefs(gameAdminStore)
 const { isChatOpen, unreadCount: chatUnreadCount } = storeToRefs(chatStore)
 const isMenuOpen = ref(false)
-
-const formattedGameTime = computed(() => {
-  if (!gameState.value?.currentGameTimeUtc) {
-    return null
-  }
-
-  return formatInGameTime(gameState.value.currentGameTimeUtc, locale.value)
-})
 
 const showUnreadBadge = computed(() => auth.isAuthenticated && unreadCount.value > 0)
 
@@ -143,11 +132,7 @@ function handleChatToggle() {
 
       <!-- Right-side actions -->
       <div class="header-actions flex items-center gap-3 shrink-0">
-        <!-- In-game time chip (compact) -->
-        <div v-if="gameState && formattedGameTime" class="game-time-chip hidden sm:inline-flex items-center gap-1.5 px-2.5 border border-divider rounded-md h-9" :title="t('nav.gameTime')">
-          <font-awesome-icon :icon="['fas', 'clock']" class="text-muted text-[0.75rem]" />
-          <span class="text-[0.75rem] text-muted tabular-nums whitespace-nowrap">{{ formattedGameTime }}</span>
-        </div>
+        <GameTimeChip />
 
         <!-- Impersonation chip -->
         <div

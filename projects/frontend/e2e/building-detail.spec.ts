@@ -15561,6 +15561,120 @@ test.describe('Mine building edit mode', () => {
     await expect(page.locator('.picker-option').filter({ hasText: 'Purchase' })).toHaveCount(0)
     await expect(page.locator('.picker-option').filter({ hasText: 'Public Sales' })).toHaveCount(0)
   })
+
+  test('mine mining-unit selector is locked to lot resource and shows lot quality/reserve', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-mine-lock',
+      playerId: player.id,
+      name: 'Locked Mine Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-mine-lock',
+          companyId: 'company-mine-lock',
+          cityId: 'city-ba',
+          type: 'MINE',
+          name: 'Locked Mine',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          lotResourceTypeId: 'res-wood',
+          lotMaterialQuality: 0.63,
+          lotMaterialQuantity: 1200,
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'mine-lock-u1',
+              buildingId: 'building-mine-lock',
+              unitType: 'MINING',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              resourceTypeId: 'res-wood',
+              productTypeId: null,
+              minPrice: null,
+              maxPrice: null,
+              purchaseSource: null,
+              saleVisibility: null,
+              budget: null,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.resourceTypes = [
+      {
+        id: 'res-wood',
+        name: 'Wood',
+        slug: 'wood',
+        category: 'RAW_MATERIAL',
+        basePrice: 10,
+        weightPerUnit: 1,
+        unitName: 'Ton',
+        unitSymbol: 't',
+        description: 'Wood',
+        imageUrl: null,
+      },
+      {
+        id: 'res-grain',
+        name: 'Grain',
+        slug: 'grain',
+        category: 'ORGANIC',
+        basePrice: 8,
+        weightPerUnit: 1,
+        unitName: 'Ton',
+        unitSymbol: 't',
+        description: 'Grain',
+        imageUrl: null,
+      },
+    ]
+
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-mine-lock')
+    await expect(page.getByRole('heading', { name: 'Locked Mine' })).toBeVisible()
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+
+    const plannedSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
+      .first()
+    await expect(plannedSection).toBeVisible()
+
+    const miningCell = plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0)
+    await miningCell.click()
+    await expect(page.getByText('Unit Settings')).toBeVisible()
+
+    const miningResourceSelect = page.locator('.unit-config-fields select.form-input').first()
+    await expect(miningResourceSelect).toBeVisible()
+    await expect(miningResourceSelect.locator('option')).toContainText(['Wood'])
+    await expect(miningResourceSelect.locator('option', { hasText: 'Grain' })).toHaveCount(0)
+
+    await expect(page.getByText('Deposit Quality')).toBeVisible()
+    await expect(page.getByText('Estimated Reserve')).toBeVisible()
+    await expect(page.getByText(/63/)).toBeVisible()
+    await expect(page.getByText(/1.?200/)).toBeVisible()
+  })
 })
 
 // ── Power plant unit-type picker coverage ───────────────────────────────────

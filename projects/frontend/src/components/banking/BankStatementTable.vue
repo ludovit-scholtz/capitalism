@@ -134,31 +134,31 @@ function categoryIcon(cat: string): string {
             {{ t('bankStatement.noTransactions') }}
           </td>
         </tr>
-        <tr v-for="row in rows" :key="row.id" class="statement-row" :class="row.amount >= 0 ? 'row-credit' : 'row-debit'">
-          <td class="px-3 py-2.5 text-muted text-xs whitespace-nowrap align-middle hidden sm:table-cell">
+        <tr v-for="row in rows" :key="row.id" class="statement-row transition-colors hover:bg-card-raised last:[&>td]:border-b-0" :class="row.amount >= 0 ? 'bg-emerald-500/5' : 'bg-red-400/5'">
+          <td class="border-b border-divider px-3 py-2.5 text-xs text-muted whitespace-nowrap align-middle hidden sm:table-cell">
             {{ formatDate(row.recordedAtUtc) }}
           </td>
-          <td class="px-3 py-2.5 text-muted text-xs tabular-nums align-middle hidden sm:table-cell">
+          <td class="border-b border-divider px-3 py-2.5 text-xs text-muted tabular-nums align-middle hidden sm:table-cell">
             {{ row.recordedAtTick }}
           </td>
-          <td class="px-3 py-2.5 align-middle max-w-[280px]">
+          <td class="border-b border-divider px-3 py-2.5 align-middle max-w-[280px]">
             <div class="text-body font-medium">{{ row.description || '—' }}</div>
             <div v-if="row.buildingName" class="description-sub text-xs text-muted mt-0.5">🏭 {{ row.buildingName }}</div>
           </td>
-          <td class="px-3 py-2.5 align-middle">
+          <td class="border-b border-divider px-3 py-2.5 align-middle">
             <span class="inline-block text-xs font-semibold text-muted bg-card-raised border border-divider rounded px-1.5 py-0.5 whitespace-nowrap">
               {{ categoryLabel(row.category) }}
             </span>
           </td>
-          <td class="debit-cell px-3 py-2.5 text-right text-bad font-semibold align-middle">
+          <td class="debit-cell border-b border-divider px-3 py-2.5 text-right text-bad font-semibold align-middle">
             <CurrencyAmount v-if="row.amount < 0" :amount="Math.abs(row.amount)" :currency="currencyCode" />
             <span v-else class="empty-cell-dash text-muted">—</span>
           </td>
-          <td class="credit-cell px-3 py-2.5 text-right text-good font-semibold align-middle">
+          <td class="credit-cell border-b border-divider px-3 py-2.5 text-right text-good font-semibold align-middle">
             <CurrencyAmount v-if="row.amount >= 0" :amount="row.amount" :currency="currencyCode" />
             <span v-else class="empty-cell-dash text-muted">—</span>
           </td>
-          <td class="px-3 py-2.5 text-right whitespace-nowrap font-bold tabular-nums align-middle" :class="row.runningBalance >= 0 ? 'text-good' : 'text-bad'">
+          <td class="border-b border-divider px-3 py-2.5 text-right whitespace-nowrap font-bold tabular-nums align-middle" :class="row.runningBalance >= 0 ? 'text-good' : 'text-bad'">
             <CurrencyAmount :amount="row.runningBalance" :currency="currencyCode" />
             <span class="text-xs text-muted ml-0.5">{{ categoryIcon(row.category) }}</span>
           </td>
@@ -171,49 +171,20 @@ function categoryIcon(cat: string): string {
     <span>{{ t('bankStatement.showingFirst', { count: totalShown, total: totalEntries }) }}</span>
     <div class="flex items-center gap-3">
       <span>{{ t('bankStatement.pageSummary', { page: props.page, total: totalPages }) }}</span>
-      <button class="pagination-btn" :disabled="!hasPreviousPage" @click="$emit('previousPage')">
+      <button
+        class="rounded-lg border border-divider bg-card-raised px-3 py-2 font-semibold text-body transition-colors hover:border-brand/50 hover:text-brand disabled:cursor-not-allowed disabled:opacity-50"
+        :disabled="!hasPreviousPage"
+        @click="$emit('previousPage')"
+      >
         {{ t('bankStatement.previousPage') }}
       </button>
-      <button class="pagination-btn" :disabled="!hasNextPage" @click="$emit('nextPage')">
+      <button
+        class="rounded-lg border border-divider bg-card-raised px-3 py-2 font-semibold text-body transition-colors hover:border-brand/50 hover:text-brand disabled:cursor-not-allowed disabled:opacity-50"
+        :disabled="!hasNextPage"
+        @click="$emit('nextPage')"
+      >
         {{ t('bankStatement.nextPage') }}
       </button>
     </div>
   </div>
 </template>
-
-<style scoped>
-.statement-row td {
-  border-bottom: 1px solid var(--color-border-light, rgba(48, 54, 61, 0.5));
-}
-
-.statement-row:last-child td {
-  border-bottom: none;
-}
-
-.row-credit {
-  background: rgba(34, 197, 94, 0.02);
-}
-
-.row-debit {
-  background: rgba(248, 113, 113, 0.02);
-}
-
-.statement-row:hover td {
-  background: var(--color-surface-raised);
-}
-
-.pagination-btn {
-  background: var(--color-surface-raised);
-  color: var(--color-text);
-  border: 1px solid var(--color-border-light, rgba(48, 54, 61, 0.5));
-  border-radius: 0.5rem;
-  padding: 0.45rem 0.8rem;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.pagination-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-</style>

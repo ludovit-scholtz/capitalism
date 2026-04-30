@@ -23,7 +23,7 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const cities = ref<Array<{ id: string; name: string }>>([])
 
-// ── Queries ──────────────────────────────────────────────────────────────────
+// ÔöÇÔöÇ Queries ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 
 const MY_COMPANIES_QUERY = `
   {
@@ -80,7 +80,7 @@ function buildCampaignQuery(): string {
   `
 }
 
-// ── Data loading ─────────────────────────────────────────────────────────────
+// ÔöÇÔöÇ Data loading ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 
 async function loadCompanies() {
   if (!auth.isAuthenticated) return
@@ -100,7 +100,7 @@ async function loadCompanies() {
       if (first) selectedCompanyId.value = first.id
     }
   } catch {
-    // ignore — company load is best-effort
+    // ignore - company load is best-effort
   }
 }
 
@@ -122,7 +122,7 @@ async function loadAnalytics(isRefresh = false) {
   }
 }
 
-// ── Lifecycle ─────────────────────────────────────────────────────────────────
+// ÔöÇÔöÇ Lifecycle ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 
 onMounted(async () => {
   const pos = saveScrollPosition()
@@ -144,14 +144,14 @@ useTickRefresh(async () => {
   await restoreScrollPosition(pos)
 })
 
-// ── Computed helpers ──────────────────────────────────────────────────────────
+// ÔöÇÔöÇ Computed helpers ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 
 const roiLabel = computed(() => {
   if (!analytics.value) return null
   const spend = analytics.value.totalMarketingSpend
   const rev = analytics.value.totalRevenue
   if (spend <= 0) return null
-  return (rev / spend).toFixed(1) + '×'
+  return (rev / spend).toFixed(1) + 'x'
 })
 
 function balanceClass(bvp: string): string {
@@ -227,12 +227,12 @@ const filteredAnalyticsRows = computed<CampaignAnalyticsRow[]>(() => {
   return analytics.value.rows.filter((row) => typeof row.cityName === 'string' && row.cityName.toLowerCase() === selectedCityName.toLowerCase())
 })
 function formatPct(val: number | null): string {
-  if (val === null || val === undefined) return '—'
+  if (val === null || val === undefined) return '-'
   return Math.round(val * 100) + '%'
 }
 
 function formatPricePremium(val: number | null): string {
-  if (val === null || val === undefined) return '—'
+  if (val === null || val === undefined) return '-'
   const sign = val >= 0 ? '+' : ''
   return sign + val.toFixed(1) + '%'
 }
@@ -243,7 +243,7 @@ function rowTitle(row: CampaignAnalyticsRow): string {
 }
 
 function formatFactor(factor: string | null): string {
-  if (!factor) return '—'
+  if (!factor) return '-'
   const key = `campaignAnalytics.factor_${factor}`
   const val = t(key)
   return val === key ? factor : val
@@ -440,12 +440,12 @@ function formatFactor(factor: string | null): string {
           <!-- Demand driver comparison -->
           <div v-if="row.topPositiveFactor || row.topNegativeFactor" class="ca-factors">
             <div v-if="row.topPositiveFactor" class="ca-factor ca-factor-positive">
-              <span class="ca-factor-icon" aria-hidden="true">▲</span>
+              <span class="ca-factor-icon" aria-hidden="true">📈</span>
               <span class="ca-factor-label">{{ t('campaignAnalytics.topPositive') }}:</span>
               <strong>{{ formatFactor(row.topPositiveFactor) }}</strong>
             </div>
             <div v-if="row.topNegativeFactor" class="ca-factor ca-factor-negative">
-              <span class="ca-factor-icon" aria-hidden="true">▼</span>
+              <span class="ca-factor-icon" aria-hidden="true">📉</span>
               <span class="ca-factor-label">{{ t('campaignAnalytics.topNegative') }}:</span>
               <strong>{{ formatFactor(row.topNegativeFactor) }}</strong>
             </div>
@@ -453,7 +453,7 @@ function formatFactor(factor: string | null): string {
 
           <!-- Recommendation -->
           <div v-if="row.recommendation" class="ca-recommendation">
-            <span class="ca-rec-icon" aria-hidden="true">→</span>
+            <span class="ca-rec-icon" aria-hidden="true">✅</span>
             <p class="ca-rec-text">{{ row.recommendation }}</p>
           </div>
         </article>

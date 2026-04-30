@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace MasterApi.Types;
 
-public sealed class Query
+public sealed partial class Query
 {
     public async Task<List<GameServerSummary>> GetGameServers(
         [Service] MasterDbContext db,

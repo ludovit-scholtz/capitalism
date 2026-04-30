@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { NEWS_EDITOR_LOCALES, createEmptyNewsDraft, createEmptyNewsLocalizations, pickGameNewsLocalization, upsertNewsLocalization } from '../news'
+import { NEWS_EDITOR_LOCALES, createEmptysDraft, createEmptysLocalizations, pickGamesLocalization, upsertsLocalization } from '../news'
 
 describe('news helpers', () => {
   it('creates a draft with the expected locale scaffolding', () => {
-    const draft = createEmptyNewsDraft('CHANGELOG')
+    const draft = createEmptysDraft('CHANGELOG')
 
     expect(draft.entryType).toBe('CHANGELOG')
     expect(draft.status).toBe('DRAFT')
@@ -13,25 +13,25 @@ describe('news helpers', () => {
   })
 
   it('falls back to english when the preferred locale is unavailable', () => {
-    const localizations = createEmptyNewsLocalizations().map((localization) => ({
+    const localizations = createEmptysLocalizations().map((localization) => ({
       ...localization,
       title: localization.locale.toUpperCase(),
     }))
 
-    expect(pickGameNewsLocalization(localizations, 'fr')?.title).toBe('EN')
+    expect(pickGamesLocalization(localizations, 'fr')?.title).toBe('EN')
   })
 
   it('returns the preferred locale when it exists', () => {
-    const localizations = createEmptyNewsLocalizations().map((localization) => ({
+    const localizations = createEmptysLocalizations().map((localization) => ({
       ...localization,
       title: localization.locale.toUpperCase(),
     }))
 
-    expect(pickGameNewsLocalization(localizations, 'sk')?.title).toBe('SK')
+    expect(pickGamesLocalization(localizations, 'sk')?.title).toBe('SK')
   })
 
   it('updates an existing localization in place', () => {
-    const localizations = upsertNewsLocalization(createEmptyNewsLocalizations(), 'en', {
+    const localizations = upsertsLocalization(createEmptysLocalizations(), 'en', {
       title: 'Patch notes',
       htmlContent: '<p>Hello</p>',
     })
@@ -44,3 +44,4 @@ describe('news helpers', () => {
     })
   })
 })
+

@@ -2,16 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 import { gqlRequest } from '@/lib/graphql'
-import type {
-  AccountContextType,
-    AuthPayload,
-    GameAdminDashboard,
-    GameAdminPlayer,
-    GameAdminSession,
-    GameNewsEntry,
-  GameNewsLocalization,
-  GlobalGameAdminGrant,
-} from '@/types'
+import type { AccountContextType, AuthPayload, GameAdminDashboard, GameAdminPlayer, GameAdminSession, GamesEntry, GamesLocalization, GlobalGameAdminGrant } from '@/types'
 
 const PLAYER_FIELDS = `
   id
@@ -317,13 +308,8 @@ export const useGameAdminStore = defineStore('gameAdmin', () => {
     return true
   }
 
-  async function upsertGameNewsEntry(entry: {
-    entryId: string | null
-    entryType: GameNewsEntry['entryType']
-    status: GameNewsEntry['status']
-    localizations: GameNewsLocalization[]
-  }) {
-    const data = await gqlRequest<{ upsertGameNewsEntry: GameNewsEntry }>(
+  async function upsertGamesEntry(entry: { entryId: string | null; entryType: GamesEntry['entryType']; status: GamesEntry['status']; localizations: GamesLocalization[] }) {
+    const data = await gqlRequest<{ upsertGameNewsEntry: GamesEntry }>(
       `mutation UpsertGameNewsEntry($input: UpsertGameNewsEntryInput!) {
         upsertGameNewsEntry(input: $input) {
           id
@@ -393,7 +379,7 @@ export const useGameAdminStore = defineStore('gameAdmin', () => {
     setLocalGameAdminRole,
     assignGlobalGameAdminRole,
     removeGlobalGameAdminRole,
-    upsertGameNewsEntry,
+    upsertGamesEntry,
     clear,
   }
 })

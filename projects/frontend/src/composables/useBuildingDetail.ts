@@ -699,7 +699,7 @@ export function useBuildingDetail() {
       const [gx = 0, gy = 0] = pos.split(',').map(Number)
 
       if (!baseline && draft) {
-        // New unit added
+        //  unit added
         entries.push({
           changeType: 'added',
           gridX: gx,
@@ -4052,6 +4052,9 @@ export function useBuildingDetail() {
               cityReferenceRentPerSqm
               adjustedMarketRentPerSqm
               populationIndex
+              lotResourceTypeId
+              lotMaterialQuality
+              lotMaterialQuantity
               units {
                 id
                 buildingId
@@ -4839,3 +4842,4 @@ export function useBuildingDetail() {
     SUPPORTED_INDUSTRIES,
   }
 }
+

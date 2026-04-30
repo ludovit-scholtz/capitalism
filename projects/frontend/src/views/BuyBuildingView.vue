@@ -6,6 +6,8 @@ import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
 import { formatMoney } from '@/lib/currencyFormat'
+import UiStateLoading from '@/components/ui/UiStateLoading.vue'
+import UiStateError from '@/components/ui/UiStateError.vue'
 import type { City, BuildingLot, Company, PurchaseLotResult, CurrencyBalance } from '@/types'
 
 const { t, locale } = useI18n()
@@ -154,9 +156,9 @@ const availableLocalBalance = computed<number>(() => {
 
 /**
  * Funding gap type:
- *  'missing_account' – player has no balance record (or zero) for the destination currency
- *  'insufficient_funds' – player has some balance but not enough for the selected lot total
- *  null – no gap (EUR city, or player is sufficiently funded)
+ *  'missing_account' ÔÇô player has no balance record (or zero) for the destination currency
+ *  'insufficient_funds' ÔÇô player has some balance but not enough for the selected lot total
+ *  null ÔÇô no gap (EUR city, or player is sufficiently funded)
  */
 const fundingGapType = computed<'missing_account' | 'insufficient_funds' | null>(() => {
   const cc = selectedCityCurrencyCode.value
@@ -270,7 +272,16 @@ watch([selectedCityId, selectedType], async ([cityId, buildingType]) => {
 
     availableLots.value = data.cityLots.filter((lot) => {
       const supportedTypes = lot.suitableTypes.split(',').map((item) => item.trim())
-      return !lot.ownerCompanyId && supportedTypes.includes(buildingType)
+      if (lot.ownerCompanyId || !supportedTypes.includes(buildingType)) {
+        return false
+      }
+
+      // Mining lots must always expose deposit metadata in the purchase flow.
+      if (buildingType === 'MINE') {
+        return lot.resourceType != null && lot.materialQuality != null && lot.materialQuantity != null
+      }
+
+      return true
     })
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : t('cityMap.purchaseError')
@@ -317,10 +328,10 @@ function districtLabel(district: string) {
 }
 
 function buyBuildingMaterialQualityClass(quality: number): string {
-  if (quality >= 0.8) return 'quality-excellent'
-  if (quality >= 0.6) return 'quality-good'
-  if (quality >= 0.4) return 'quality-fair'
-  return 'quality-poor'
+  if (quality >= 0.8) return 'bg-emerald-500/15 text-emerald-600'
+  if (quality >= 0.6) return 'bg-blue-500/15 text-blue-600'
+  if (quality >= 0.4) return 'bg-amber-500/15 text-amber-600'
+  return 'bg-red-500/15 text-red-600'
 }
 
 function buyBuildingMaterialQualityLabel(quality: number): string {
@@ -408,17 +419,13 @@ async function buyBuilding() {
     <div class="bg-card border border-divider rounded-xl p-8">
       <h1 class="text-2xl font-bold mb-6">{{ t('buildings.title') }}</h1>
 
-      <!-- Error alert -->
-      <div v-if="error" class="flex items-start gap-3 p-3 mb-5 bg-[rgba(248,113,113,0.1)] border border-[rgba(248,113,113,0.3)] text-bad rounded-lg text-sm" role="alert">
-        {{ error }}
-      </div>
+      <UiStateError v-if="error" :message="error" :retry-label="t('common.retry')" @retry="() => router.go(0)" />
 
-      <!-- Loading -->
-      <div v-if="loading" class="text-center py-8 text-muted">{{ t('common.loading') }}</div>
+      <UiStateLoading v-if="loading" :label="t('common.loading')" />
 
       <template v-else>
         <!-- Step 1: Building type (hidden when ?type= is pre-selected in URL) -->
-        <div v-if="!route.query.type || !buildingTypes.includes(route.query.type as string)" class="mb-8">
+        <div v-if="!route.query.type || !buildingTypes.includes(String(route.query.type))" class="mb-8">
           <h2 class="text-lg font-semibold mb-3">{{ t('buildings.selectType') }}</h2>
           <div class="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]">
             <button
@@ -463,7 +470,7 @@ async function buyBuilding() {
               required
             >
               <option value="">{{ t('cityMap.selectMediaType') }}</option>
-              <option value="NEWSPAPER">📰 {{ t('cityMap.mediaTypeNewspaper') }} (×1.0)</option>
+              <option value="NEWSPAPER">📰 {{ t('cityMap.mediaTypespaper') }} (×1.0)</option>
               <option value="RADIO">📻 {{ t('cityMap.mediaTypeRadio') }} (×1.5)</option>
               <option value="TV">📺 {{ t('cityMap.mediaTypeTv') }} (×2.0)</option>
             </select>
@@ -472,8 +479,8 @@ async function buyBuilding() {
             <!-- Strategy guide cards -->
             <div class="mt-2 grid gap-2">
               <div class="rounded-lg border border-divider bg-surface p-3">
-                <p class="mb-1.5 text-xs font-bold text-foreground">📰 {{ t('cityMap.mediaTypeNewspaper') }}</p>
-                <p class="text-xs text-muted">{{ t('cityMap.mediaTypeGuideNewspaper') }}</p>
+                <p class="mb-1.5 text-xs font-bold text-foreground">📰 {{ t('cityMap.mediaTypespaper') }}</p>
+                <p class="text-xs text-muted">{{ t('cityMap.mediaTypeGuidespaper') }}</p>
               </div>
               <div class="rounded-lg border border-divider bg-surface p-3">
                 <p class="mb-1.5 text-xs font-bold text-foreground">📻 {{ t('cityMap.mediaTypeRadio') }}</p>
@@ -508,27 +515,12 @@ async function buyBuilding() {
             <span class="text-xl flex-shrink-0" aria-hidden="true">⚠️</span>
             <div class="flex-1 flex flex-col gap-1.5">
               <strong class="text-[0.95rem] font-bold text-[var(--color-warning,#ff9f43)]">
-                <template v-if="fundingGapType === 'missing_account'">
-                  {{ t('buildings.fundingGapTitleMissing', { currency: selectedCityCurrencyCode }) }}
-                </template>
-                <template v-else>
-                  {{ t('buildings.fundingGapTitleInsufficient', { currency: selectedCityCurrencyCode }) }}
-                </template>
+                <template v-if="fundingGapType === 'missing_account'"> {{ t('buildings.fundingGapTitleMissing', { currency: selectedCityCurrencyCode }) }} </template>
+                <template v-else> {{ t('buildings.fundingGapTitleInsufficient', { currency: selectedCityCurrencyCode }) }} </template>
               </strong>
               <p class="text-sm text-muted m-0">
-                <template v-if="fundingGapType === 'missing_account'">
-                  {{ t('buildings.fundingGapTextMissing', { city: selectedCityObj?.name ?? '', currency: selectedCityCurrencyCode }) }}
-                </template>
-                <template v-else>
-                  {{
-                    t('buildings.fundingGapTextInsufficient', {
-                      city: selectedCityObj?.name ?? '',
-                      currency: selectedCityCurrencyCode,
-                      available: formatCurrency(availableLocalBalance),
-                      required: formatCurrency(selectedLotTotalCost),
-                    })
-                  }}
-                </template>
+                <template v-if="fundingGapType === 'missing_account'"> {{ t('buildings.fundingGapBodyMissing', { currency: selectedCityCurrencyCode }) }} </template>
+                <template v-else> {{ t('buildings.fundingGapBodyInsufficient', { currency: selectedCityCurrencyCode }) }} </template>
               </p>
               <!-- Amount breakdown (insufficient funds only) -->
               <div v-if="fundingGapType === 'insufficient_funds'" class="flex flex-col gap-1 mt-1 p-3 bg-white/[0.04] rounded-md text-sm">
@@ -641,9 +633,7 @@ async function buyBuilding() {
           </div>
 
           <!-- Empty state -->
-          <div v-if="!lotsLoading && availableLots.length === 0" class="mt-4 p-4 border border-divider rounded-lg bg-page text-muted text-sm">
-            {{ t('buildings.noAvailableLand') }}
-          </div>
+          <div v-if="!lotsLoading && availableLots.length === 0" class="mt-4 p-4 border border-divider rounded-lg bg-page text-muted text-sm">{{ t('buildings.noAvailableLand') }}</div>
 
           <!-- Mine resource filter (only when MINE type selected and multiple resources available) -->
           <div v-if="selectedType === 'MINE' && availableMineResources.length > 1 && !lotsLoading && availableLots.length > 0" class="mine-resource-filter mb-4">
@@ -686,10 +676,21 @@ async function buyBuilding() {
                 <span class="text-sm font-bold text-good shrink-0">{{ formatCurrency(lot.price) }}</span>
               </div>
               <span class="text-[0.8125rem] text-muted">{{ districtLabel(lot.district) }}</span>
-              <span class="text-[0.8125rem] text-muted"> {{ t('buildings.populationIndex') }}: {{ formatPopulationIndex(lot.populationIndex) }} </span>
+              <span v-if="selectedType === 'MINE' && lot.materialQuality != null" class="text-[0.8125rem] text-muted">
+                {{ t('cityMap.rawMaterialQuality') }}: {{ Math.round(lot.materialQuality * 100) }}%
+              </span>
+              <span v-if="selectedType === 'MINE' && lot.materialQuantity != null" class="text-[0.8125rem] text-muted">
+                {{ t('cityMap.rawMaterialQuantity') }}: {{ lot.materialQuantity.toLocaleString(locale) }} {{ t('cityMap.rawMaterialQuantityUnit') }}
+              </span>
+              <span v-if="selectedType !== 'MINE'" class="text-[0.8125rem] text-muted"> {{ t('buildings.populationIndex') }}: {{ formatPopulationIndex(lot.populationIndex) }} </span>
               <span class="text-[0.8125rem] text-muted"> {{ t('buildings.appraisedValue') }}: {{ formatCurrency(lot.basePrice) }} </span>
               <span v-if="selectedPropertyAreaSqm != null" class="text-[0.8125rem] text-muted">{{ t('buildings.propertySize') }}: {{ formatSqm(selectedPropertyAreaSqm) }}</span>
-              <span v-if="lot.resourceType" class="buy-building-resource-badge self-start" data-testid="buy-building-resource-badge" :title="t('cityMap.resourcePremiumTooltip')">
+              <span
+                v-if="lot.resourceType"
+                class="buy-building-resource-badge inline-block self-start rounded-full border border-violet-500/25 bg-violet-500/10 px-2 py-0.5 text-[0.7rem] font-semibold text-brand cursor-help"
+                data-testid="buy-building-resource-badge"
+                :title="t('cityMap.resourcePremiumTooltip')"
+              >
                 ⛏ {{ lot.resourceType.name }}
               </span>
             </button>
@@ -705,44 +706,56 @@ async function buyBuilding() {
               <span>{{ districtLabel(selectedLot.district) }}</span>
               <span
                 >{{ t('buildings.askingPrice') }}: <strong class="text-body">{{ formatCurrency(selectedLot.price) }}</strong>
-                <span v-if="selectedLot.resourceType && selectedLot.price > selectedLot.basePrice" class="buy-building-resource-premium-badge ml-1" :title="t('cityMap.resourcePremiumTooltip')">{{
-                  t('cityMap.resourcePremium')
-                }}</span>
+                <span
+                  v-if="selectedLot.resourceType && selectedLot.price > selectedLot.basePrice"
+                  class="buy-building-resource-premium-badge ml-1 inline-block rounded px-1 py-0.5 text-[0.7rem] font-semibold text-violet-700 bg-violet-500/15 align-middle cursor-help"
+                  :title="t('cityMap.resourcePremiumTooltip')"
+                  >{{ t('cityMap.resourcePremium') }}</span
+                >
               </span>
-              <span>{{ t('buildings.populationIndex') }}: {{ formatPopulationIndex(selectedLot.populationIndex) }}</span>
+              <span v-if="selectedType === 'MINE' && selectedLot.materialQuality != null"
+                >{{ t('cityMap.rawMaterialQuality') }}: <strong class="text-body">{{ Math.round(selectedLot.materialQuality * 100) }}%</strong></span
+              >
+              <span v-if="selectedType === 'MINE' && selectedLot.materialQuantity != null"
+                >{{ t('cityMap.rawMaterialQuantity') }}: <strong class="text-body">{{ selectedLot.materialQuantity.toLocaleString(locale) }} {{ t('cityMap.rawMaterialQuantityUnit') }}</strong></span
+              >
+              <span v-if="selectedType !== 'MINE'">{{ t('buildings.populationIndex') }}: {{ formatPopulationIndex(selectedLot.populationIndex) }}</span>
               <span v-if="selectedPropertyAreaSqm != null"
                 >{{ t('buildings.propertySize') }}: <strong class="text-body">{{ formatSqm(selectedPropertyAreaSqm) }}</strong></span
               >
             </div>
             <!-- Mining deposit investment summary (shown when MINE selected and lot has resource) -->
-            <div v-if="selectedType === 'MINE' && selectedLot.resourceType" class="buy-building-mining-summary" data-testid="buy-building-mining-summary">
-              <h4 class="buy-building-mining-summary-title">⛏ {{ t('cityMap.miningDepositSummaryTitle') }}</h4>
-              <div class="buy-building-mining-summary-grid">
-                <div class="buy-building-mining-summary-item">
+            <div
+              v-if="selectedType === 'MINE' && selectedLot.resourceType"
+              class="buy-building-mining-summary mt-2 rounded-md border border-violet-500/20 bg-violet-500/10 p-3.5"
+              data-testid="buy-building-mining-summary"
+            >
+              <h4 class="buy-building-mining-summary-title m-0 mb-2.5 text-sm font-semibold text-violet-700">⛏ {{ t('cityMap.miningDepositSummaryTitle') }}</h4>
+              <div class="buy-building-mining-summary-grid mb-2.5 grid grid-cols-2 gap-x-4 gap-y-2">
+                <div class="buy-building-mining-summary-item flex flex-col gap-0.5">
                   <span class="text-[0.8125rem] text-muted">{{ t('cityMap.rawMaterialResource') }}</span>
                   <strong class="text-sm">{{ selectedLot.resourceType.name }}</strong>
                 </div>
-                <div v-if="selectedLot.materialQuality != null" class="buy-building-mining-summary-item">
+                <div v-if="selectedLot.materialQuality != null" class="buy-building-mining-summary-item flex flex-col gap-0.5">
                   <span class="text-[0.8125rem] text-muted">{{ t('cityMap.rawMaterialQuality') }}</span>
-                  <span class="buy-building-quality-badge" :class="buyBuildingMaterialQualityClass(selectedLot.materialQuality)">
-                    {{ buyBuildingMaterialQualityLabel(selectedLot.materialQuality) }}
-                    ({{ Math.round(selectedLot.materialQuality * 100) }}%)
+                  <span class="buy-building-quality-badge inline-block rounded-full px-1.5 py-0.5 text-xs font-semibold" :class="buyBuildingMaterialQualityClass(selectedLot.materialQuality)">
+                    {{ buyBuildingMaterialQualityLabel(selectedLot.materialQuality) }} ({{ Math.round(selectedLot.materialQuality * 100) }}%)
                   </span>
                 </div>
-                <div v-if="selectedLot.materialQuantity != null" class="buy-building-mining-summary-item">
+                <div v-if="selectedLot.materialQuantity != null" class="buy-building-mining-summary-item flex flex-col gap-0.5">
                   <span class="text-[0.8125rem] text-muted">{{ t('cityMap.rawMaterialQuantity') }}</span>
                   <span class="text-sm">{{ selectedLot.materialQuantity.toLocaleString(locale) }} {{ t('cityMap.rawMaterialQuantityUnit') }}</span>
                 </div>
-                <div class="buy-building-mining-summary-item">
+                <div class="buy-building-mining-summary-item flex flex-col gap-0.5">
                   <span class="text-[0.8125rem] text-muted">{{ t('buildings.appraisedValue') }}</span>
                   <span class="text-sm">{{ formatCurrency(selectedLot.basePrice) }}</span>
                 </div>
-                <div v-if="selectedLot.price > selectedLot.basePrice" class="buy-building-mining-summary-item">
+                <div v-if="selectedLot.price > selectedLot.basePrice" class="buy-building-mining-summary-item flex flex-col gap-0.5">
                   <span class="text-[0.8125rem] text-muted">{{ t('buildings.resourceDepositPremium') }}</span>
                   <span class="text-sm font-semibold text-good">+ {{ formatCurrency(selectedLot.price - selectedLot.basePrice) }}</span>
                 </div>
               </div>
-              <p class="buy-building-mining-hint">{{ t('cityMap.miningInvestmentHint') }}</p>
+              <p class="buy-building-mining-hint m-0 text-xs leading-[1.45] text-muted">{{ t('cityMap.miningInvestmentHint') }}</p>
             </div>
           </div>
 
@@ -761,92 +774,3 @@ async function buyBuilding() {
     </div>
   </div>
 </template>
-
-<style scoped>
-.buy-building-resource-badge {
-  display: inline-block;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--color-primary);
-  background: rgba(139, 92, 246, 0.1);
-  border: 1px solid rgba(139, 92, 246, 0.25);
-  border-radius: 999px;
-  padding: 0.1rem 0.45rem;
-  cursor: help;
-}
-
-.buy-building-resource-premium-badge {
-  display: inline-block;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: #7c3aed;
-  background: rgba(139, 92, 246, 0.12);
-  border-radius: var(--radius-sm, 4px);
-  padding: 0.1rem 0.3rem;
-  vertical-align: middle;
-  cursor: help;
-}
-
-.buy-building-mining-summary {
-  background: rgba(139, 92, 246, 0.06);
-  border: 1px solid rgba(139, 92, 246, 0.2);
-  border-radius: var(--radius-md, 8px);
-  padding: 0.875rem;
-  margin-top: 0.5rem;
-}
-
-.buy-building-mining-summary-title {
-  font-size: 0.875rem;
-  font-weight: 600;
-  margin: 0 0 0.625rem 0;
-  color: #7c3aed;
-}
-
-.buy-building-mining-summary-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem 1rem;
-  margin-bottom: 0.625rem;
-}
-
-.buy-building-mining-summary-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-}
-
-.buy-building-mining-hint {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-  margin: 0;
-  line-height: 1.45;
-}
-
-.buy-building-quality-badge {
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0.1rem 0.375rem;
-  border-radius: 999px;
-  display: inline-block;
-}
-
-.buy-building-quality-badge.quality-excellent {
-  background: rgba(34, 197, 94, 0.15);
-  color: #16a34a;
-}
-
-.buy-building-quality-badge.quality-good {
-  background: rgba(59, 130, 246, 0.15);
-  color: #2563eb;
-}
-
-.buy-building-quality-badge.quality-fair {
-  background: rgba(234, 179, 8, 0.15);
-  color: #ca8a04;
-}
-
-.buy-building-quality-badge.quality-poor {
-  background: rgba(239, 68, 68, 0.15);
-  color: #dc2626;
-}
-</style>

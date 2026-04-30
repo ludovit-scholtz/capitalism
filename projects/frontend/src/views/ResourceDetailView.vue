@@ -246,6 +246,15 @@ function navigateToEntry(slug: string) {
   })
 }
 
+function navigateToIngredient(recipe: ProductType['recipes'][number]) {
+  const slug = getIngredientTargetSlug(recipe)
+  if (!slug) {
+    return
+  }
+
+  navigateToEntry(slug)
+}
+
 function goBack() {
   router.push({ name: 'encyclopedia', query: showProProducts.value ? { showPro: '1' } : {} })
 }
@@ -266,9 +275,7 @@ function goBack() {
     <div v-else-if="!selectedResource && !selectedProduct" class="not-found">
       <h2>{{ t('resourceDetail.notFound') }}</h2>
       <p>{{ getNotFoundHint() }}</p>
-      <button type="button" class="btn-primary" @click="goBack">
-        {{ t('resourceDetail.backToEncyclopedia') }}
-      </button>
+      <button type="button" class="btn-primary" @click="goBack">{{ t('resourceDetail.backToEncyclopedia') }}</button>
     </div>
 
     <template v-else>
@@ -286,9 +293,7 @@ function goBack() {
           </div>
           <h1>{{ getSelectedTitle() }}</h1>
           <p class="resource-description">{{ getSelectedDescription() }}</p>
-          <p v-if="selectedProduct?.isProOnly" class="resource-description">
-            {{ getProductAccessDetail(selectedProduct) }}
-          </p>
+          <p v-if="selectedProduct?.isProOnly" class="resource-description">{{ getProductAccessDetail(selectedProduct) }}</p>
           <div class="resource-meta">
             <div class="meta-item">
               <span class="meta-label">{{ t('resourceDetail.basePrice') }}</span>
@@ -316,9 +321,7 @@ function goBack() {
             </div>
           </div>
           <div v-if="selectedResource" class="hero-cta">
-            <RouterLink to="/exchange" class="btn-exchange-link" :aria-label="t('resourceDetail.checkExchangePrices')">
-              {{ t('resourceDetail.checkExchangePrices') }}
-            </RouterLink>
+            <RouterLink to="/exchange" class="btn-exchange-link" :aria-label="t('resourceDetail.checkExchangePrices')"> {{ t('resourceDetail.checkExchangePrices') }} </RouterLink>
           </div>
         </div>
       </header>
@@ -337,9 +340,9 @@ function goBack() {
             role="link"
             tabindex="0"
             :aria-label="t('encyclopedia.viewDetail') + ': ' + getLocalizedRecipeIngredientName(recipe, locale)"
-            @click="getIngredientTargetSlug(recipe) && navigateToEntry(getIngredientTargetSlug(recipe)!)"
-            @keydown.enter="getIngredientTargetSlug(recipe) && navigateToEntry(getIngredientTargetSlug(recipe)!)"
-            @keydown.space.prevent="getIngredientTargetSlug(recipe) && navigateToEntry(getIngredientTargetSlug(recipe)!)"
+            @click="navigateToIngredient(recipe)"
+            @keydown.enter="navigateToIngredient(recipe)"
+            @keydown.space.prevent="navigateToIngredient(recipe)"
           >
             <img v-if="getIngredientImage(recipe)" :src="getIngredientImage(recipe) ?? undefined" :alt="getLocalizedRecipeIngredientName(recipe, locale)" class="composition-image" />
             <strong>{{ recipe.quantity }} {{ recipe.resourceType?.unitSymbol ?? recipe.inputProductType?.unitSymbol }}</strong>
@@ -373,9 +376,7 @@ function goBack() {
           <p>{{ t('resourceDetail.usedInProductsHelp') }}</p>
         </div>
 
-        <p v-if="relatedProducts.length === 0" class="empty-state">
-          {{ t('resourceDetail.noProductsUsingResource') }}
-        </p>
+        <p v-if="relatedProducts.length === 0" class="empty-state">{{ t('resourceDetail.noProductsUsingResource') }}</p>
 
         <div v-else class="product-grid">
           <article

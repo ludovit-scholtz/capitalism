@@ -4,22 +4,22 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
 import RichTextEditor from '@/components/admin/RichTextEditor.vue'
-import { createEmptyNewsDraft, NEWS_EDITOR_LOCALES, pickGameNewsLocalization, upsertNewsLocalization } from '@/lib/news'
+import { createEmptysDraft, NEWS_EDITOR_LOCALES, pickGamesLocalization, upsertsLocalization } from '@/lib/news'
 import { gqlRequest } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
 import { useGameAdminStore } from '@/stores/gameAdmin'
-import { useNewsStore } from '@/stores/news'
-import type { AccountContextType, GameAdminPlayer, GameNewsEntry, GameNewsFeed } from '@/types'
+import { usesStore } from '@/stores/news'
+import type { AccountContextType, GameAdminPlayer, GamesEntry, GamesFeed } from '@/types'
 
 const { t, locale } = useI18n()
 const router = useRouter()
 const auth = useAuthStore()
 const adminStore = useGameAdminStore()
-const newsStore = useNewsStore()
+const newsStore = usesStore()
 
-const newsEditor = ref(createEmptyNewsDraft())
+const newsEditor = ref(createEmptysDraft())
 const activeLocale = ref<(typeof NEWS_EDITOR_LOCALES)[number]>('en')
-const adminFeed = ref<GameNewsFeed | null>(null)
+const adminFeed = ref<GamesFeed | null>(null)
 const adminFeedLoading = ref(false)
 const adminFeedError = ref<string | null>(null)
 const globalAdminEmail = ref('')
@@ -38,7 +38,7 @@ async function loadAdminFeed() {
   adminFeedError.value = null
 
   try {
-    const data = await gqlRequest<{ gameNewsFeed: GameNewsFeed }>(
+    const data = await gqlRequest<{ gameNewsFeed: GamesFeed }>(
       `query AdminNewsFeed {
         gameNewsFeed(includeDrafts: true) {
           unreadCount
@@ -88,11 +88,11 @@ async function loadDashboard() {
 }
 
 function resetComposer() {
-  newsEditor.value = createEmptyNewsDraft()
+  newsEditor.value = createEmptysDraft()
   activeLocale.value = 'en'
 }
 
-function editEntry(entry: GameNewsEntry) {
+function editEntry(entry: GamesEntry) {
   newsEditor.value = {
     entryId: entry.id,
     entryType: entry.entryType,
@@ -105,7 +105,7 @@ function editEntry(entry: GameNewsEntry) {
 function updateLocalization<K extends 'title' | 'summary' | 'htmlContent'>(key: K, value: string) {
   newsEditor.value = {
     ...newsEditor.value,
-    localizations: upsertNewsLocalization(newsEditor.value.localizations, activeLocale.value, { [key]: value }),
+    localizations: upsertsLocalization(newsEditor.value.localizations, activeLocale.value, { [key]: value }),
   }
 }
 
@@ -128,11 +128,11 @@ function formatDate(value: string | null) {
   }).format(new Date(value))
 }
 
-function getLocalizedEntry(entry: GameNewsEntry) {
-  return pickGameNewsLocalization(entry.localizations, locale.value)
+function getLocalizedEntry(entry: GamesEntry) {
+  return pickGamesLocalization(entry.localizations, locale.value)
 }
 
-function canEditEntry(entry: GameNewsEntry) {
+function canEditEntry(entry: GamesEntry) {
   return entry.targetServerKey !== null || canManageRootFeatures.value || adminStore.session?.hasGlobalAdminRole
 }
 
@@ -141,7 +141,7 @@ async function saveEntry() {
   actionMessage.value = null
 
   try {
-    await adminStore.upsertGameNewsEntry(newsEditor.value)
+    await adminStore.upsertGamesEntry(newsEditor.value)
     await Promise.all([loadAdminFeed(), newsStore.fetchUnreadCount()])
     actionMessage.value = t('admin.newsSaved')
     resetComposer()
@@ -242,9 +242,7 @@ onMounted(async () => {
         <h1>{{ t('admin.title') }}</h1>
         <p>{{ t('admin.subtitle') }}</p>
       </div>
-      <button v-if="adminStore.session?.isImpersonating" type="button" class="btn btn-secondary" @click="stopImpersonation">
-        {{ t('admin.stopImpersonation') }}
-      </button>
+      <button v-if="adminStore.session?.isImpersonating" type="button" class="btn btn-secondary" @click="stopImpersonation">{{ t('admin.stopImpersonation') }}</button>
     </div>
 
     <div v-if="!canAccessDashboard && !adminStore.loadingSession" class="admin-locked card">
@@ -304,16 +302,10 @@ onMounted(async () => {
               <h2>{{ t('admin.shippingTitle') }}</h2>
               <p>{{ t('admin.shippingBody') }}</p>
             </div>
-            <button type="button" class="btn btn-secondary" @click="showShippingCosts = !showShippingCosts">
-              {{ showShippingCosts ? t('common.close') : t('admin.viewShippingCosts') }}
-            </button>
+            <button type="button" class="btn btn-secondary" @click="showShippingCosts = !showShippingCosts">{{ showShippingCosts ? t('common.close') : t('admin.viewShippingCosts') }}</button>
           </div>
-          <div v-if="!showShippingCosts" class="admin-empty-state">
-            {{ t('admin.shippingClosed') }}
-          </div>
-          <div v-else-if="(adminStore.dashboard?.shippingCostSummaries.length ?? 0) === 0" class="admin-empty-state">
-            {{ t('admin.shippingEmpty') }}
-          </div>
+          <div v-if="!showShippingCosts" class="admin-empty-state">{{ t('admin.shippingClosed') }}</div>
+          <div v-else-if="(adminStore.dashboard?.shippingCostSummaries.length ?? 0) === 0" class="admin-empty-state">{{ t('admin.shippingEmpty') }}</div>
           <div v-else class="admin-list">
             <div v-for="summary in adminStore.dashboard?.shippingCostSummaries ?? []" :key="summary.companyId" class="admin-list-item">
               <div>
@@ -332,9 +324,7 @@ onMounted(async () => {
               <p>{{ t('admin.alertsBody') }}</p>
             </div>
           </div>
-          <div v-if="(adminStore.dashboard?.multiAccountAlerts.length ?? 0) === 0" class="admin-empty-state">
-            {{ t('admin.alertsEmpty') }}
-          </div>
+          <div v-if="(adminStore.dashboard?.multiAccountAlerts.length ?? 0) === 0" class="admin-empty-state">{{ t('admin.alertsEmpty') }}</div>
           <div v-else class="admin-alert-list">
             <div v-for="alert in adminStore.dashboard?.multiAccountAlerts ?? []" :key="`${alert.reason}-${alert.supportingEntityName}`" class="admin-alert-card">
               <div class="admin-alert-topline">
@@ -377,9 +367,7 @@ onMounted(async () => {
                 <span>{{ t('admin.companyCash') }}: {{ formatCurrency(adminStore.dashboard.governmentPlayer.totalCompanyCash) }}</span>
               </div>
               <div class="admin-player-actions">
-                <button type="button" class="btn btn-primary" @click="startImpersonation(adminStore.dashboard.governmentPlayer.id, 'PERSON')">
-                  {{ t('admin.impersonateGovernment') }}
-                </button>
+                <button type="button" class="btn btn-primary" @click="startImpersonation(adminStore.dashboard.governmentPlayer.id, 'PERSON')">{{ t('admin.impersonateGovernment') }}</button>
                 <button
                   v-for="company in adminStore.dashboard.governmentPlayer.companies"
                   :key="company.id"
@@ -424,12 +412,8 @@ onMounted(async () => {
               </div>
 
               <div class="admin-player-actions">
-                <button type="button" class="btn btn-secondary" @click="startImpersonation(player.id, 'PERSON')">
-                  {{ t('admin.impersonatePerson') }}
-                </button>
-                <button type="button" class="btn btn-secondary" @click="toggleInvisible(player)">
-                  {{ player.isInvisibleInChat ? t('admin.makeVisible') : t('admin.makeInvisible') }}
-                </button>
+                <button type="button" class="btn btn-secondary" @click="startImpersonation(player.id, 'PERSON')">{{ t('admin.impersonatePerson') }}</button>
+                <button type="button" class="btn btn-secondary" @click="toggleInvisible(player)">{{ player.isInvisibleInChat ? t('admin.makeVisible') : t('admin.makeInvisible') }}</button>
                 <button v-if="canManageRootFeatures" type="button" class="btn btn-ghost" @click="toggleLocalAdmin(player)">
                   {{ player.role === 'ADMIN' ? t('admin.removeLocalAdmin') : t('admin.grantLocalAdmin') }}
                 </button>
@@ -459,7 +443,7 @@ onMounted(async () => {
                 <label class="form-label">
                   {{ t('admin.entryType') }}
                   <select v-model="newsEditor.entryType" class="form-select">
-                    <option value="NEWS">{{ t('news.filterNews') }}</option>
+                    <option value="NEWS">{{ t('news.filters') }}</option>
                     <option value="CHANGELOG">{{ t('news.filterChangelog') }}</option>
                   </select>
                 </label>
@@ -487,12 +471,12 @@ onMounted(async () => {
 
               <label class="form-label">
                 {{ t('admin.entryTitle') }}
-                <input class="form-input" :value="activeLocalization?.title ?? ''" @input="updateLocalization('title', ($event.target as HTMLInputElement).value)" />
+                <input class="form-input" :value="activeLocalization?.title ?? ''" @input="updateLocalization('title', ($event.target as HTMLInputElement).value ?? '')" />
               </label>
 
               <label class="form-label">
                 {{ t('admin.entrySummary') }}
-                <textarea class="form-textarea" :value="activeLocalization?.summary ?? ''" @input="updateLocalization('summary', ($event.target as HTMLTextAreaElement).value)"></textarea>
+                <textarea class="form-textarea" :value="activeLocalization?.summary ?? ''" @input="updateLocalization('summary', ($event.target as HTMLTextAreaElement).value ?? '')"></textarea>
               </label>
 
               <label class="form-label">
@@ -519,9 +503,7 @@ onMounted(async () => {
                   <span>{{ formatDate(entry.updatedAtUtc) }}</span>
                   <span>{{ entry.targetServerKey ?? t('admin.globalScope') }}</span>
                 </div>
-                <button type="button" class="btn btn-secondary" :disabled="!canEditEntry(entry)" @click="editEntry(entry)">
-                  {{ t('admin.editEntry') }}
-                </button>
+                <button type="button" class="btn btn-secondary" :disabled="!canEditEntry(entry)" @click="editEntry(entry)">{{ t('admin.editEntry') }}</button>
               </article>
             </div>
           </div>
@@ -549,9 +531,7 @@ onMounted(async () => {
                   <strong>{{ grant.email }}</strong>
                   <p>{{ grant.grantedByEmail }} · {{ formatDate(grant.updatedAtUtc) }}</p>
                 </div>
-                <button type="button" class="btn btn-ghost" @click="removeGlobalAdmin(grant.email)">
-                  {{ t('admin.removeGlobalAdmin') }}
-                </button>
+                <button type="button" class="btn btn-ghost" @click="removeGlobalAdmin(grant.email)">{{ t('admin.removeGlobalAdmin') }}</button>
               </div>
             </div>
           </div>

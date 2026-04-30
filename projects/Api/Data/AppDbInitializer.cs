@@ -67,6 +67,10 @@ public sealed partial class AppDbInitializer(
         {
             SeedResources();
         }
+        else
+        {
+            await EnsureResourceCatalogBackfillAsync();
+        }
 
         if (!await dbContext.Cities.AnyAsync())
         {
@@ -80,11 +84,8 @@ public sealed partial class AppDbInitializer(
 
         await dbContext.SaveChangesAsync();
 
-        if (!await dbContext.CityResources.AnyAsync())
-        {
-            await SeedCityResourcesAsync();
-            await dbContext.SaveChangesAsync();
-        }
+        await EnsureCityResourceCoverageBackfillAsync();
+        await dbContext.SaveChangesAsync();
 
         if (!await dbContext.ProductRecipes.AnyAsync())
         {
@@ -477,6 +478,42 @@ public sealed partial class AppDbInitializer(
         }));
     }
 
+    private async Task EnsureResourceCatalogBackfillAsync()
+    {
+        var existingSlugs = await dbContext.ResourceTypes
+            .Select(resource => resource.Slug)
+            .ToListAsync();
+
+        var existingSlugSet = existingSlugs
+            .Where(slug => !string.IsNullOrWhiteSpace(slug))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var missingSeeds = GetResourceSeeds()
+            .Where(seed => !existingSlugSet.Contains(seed.Slug))
+            .ToList();
+
+        if (missingSeeds.Count == 0)
+        {
+            return;
+        }
+
+        dbContext.ResourceTypes.AddRange(missingSeeds.Select(seed => new ResourceType
+        {
+            Id = CreateDeterministicGuid($"resource:{seed.Slug}"),
+            Name = seed.Name,
+            Slug = seed.Slug,
+            Category = seed.Category,
+            BasePrice = seed.BasePrice,
+            WeightPerUnit = seed.WeightPerUnit,
+            UnitName = seed.UnitName,
+            UnitSymbol = seed.UnitSymbol,
+            Description = seed.Description,
+            ImageUrl = CreateEmojiImageDataUrl(seed.Icon, seed.BackgroundColor, seed.AccentColor)
+        }));
+
+        await dbContext.SaveChangesAsync();
+    }
+
     private void SeedCities()
     {
         dbContext.Cities.AddRange(
@@ -492,50 +529,49 @@ public sealed partial class AppDbInitializer(
 
     private async Task SeedCityResourcesAsync()
     {
-        var cities = await dbContext.Cities.ToListAsync();
-        var resources = await dbContext.ResourceTypes.ToDictionaryAsync(r => r.Slug);
+        await EnsureCityResourceCoverageBackfillAsync();
+    }
 
-        foreach (var city in cities)
+    private async Task EnsureCityResourceCoverageBackfillAsync()
+    {
+        var cities = await dbContext.Cities.ToDictionaryAsync(city => city.Name);
+        var resources = await dbContext.ResourceTypes.ToDictionaryAsync(resource => resource.Slug);
+        var existingKeys = await dbContext.CityResources
+            .Select(cityResource => new { cityResource.CityId, cityResource.ResourceTypeId })
+            .ToListAsync();
+
+        var existingKeySet = existingKeys
+            .Select(key => $"{key.CityId:N}:{key.ResourceTypeId:N}")
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var seed in GetCityResourceSeeds())
         {
-            dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = city.Id, ResourceTypeId = resources["wood"].Id, Abundance = 0.7m });
-            dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = city.Id, ResourceTypeId = resources["grain"].Id, Abundance = 0.6m });
+            if (!cities.TryGetValue(seed.CityName, out var city))
+            {
+                continue;
+            }
+
+            if (!resources.TryGetValue(seed.ResourceSlug, out var resource))
+            {
+                continue;
+            }
+
+            var key = $"{city.Id:N}:{resource.Id:N}";
+            if (existingKeySet.Contains(key))
+            {
+                continue;
+            }
+
+            dbContext.CityResources.Add(new CityResource
+            {
+                Id = CreateDeterministicGuid($"city-resource:{seed.CityName}:{seed.ResourceSlug}"),
+                CityId = city.Id,
+                ResourceTypeId = resource.Id,
+                Abundance = seed.Abundance,
+            });
+
+            existingKeySet.Add(key);
         }
-
-        var bratislava = cities.First(c => c.Name == "Bratislava");
-        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = bratislava.Id, ResourceTypeId = resources["iron-ore"].Id, Abundance = 0.4m });
-        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = bratislava.Id, ResourceTypeId = resources["chemical-minerals"].Id, Abundance = 0.3m });
-
-        var prague = cities.First(c => c.Name == "Prague");
-        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = prague.Id, ResourceTypeId = resources["coal"].Id, Abundance = 0.6m });
-        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = prague.Id, ResourceTypeId = resources["silicon"].Id, Abundance = 0.3m });
-
-        var vienna = cities.First(c => c.Name == "Vienna");
-        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = vienna.Id, ResourceTypeId = resources["cotton"].Id, Abundance = 0.5m });
-        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = vienna.Id, ResourceTypeId = resources["gold"].Id, Abundance = 0.1m });
-
-        // New York: financial hub, tech-oriented, silicon and coal deposits
-        var newYork = cities.First(c => c.Name == "New York");
-        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = newYork.Id, ResourceTypeId = resources["silicon"].Id, Abundance = 0.5m });
-        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = newYork.Id, ResourceTypeId = resources["coal"].Id, Abundance = 0.4m });
-        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = newYork.Id, ResourceTypeId = resources["iron-ore"].Id, Abundance = 0.3m });
-
-        // London: financial hub, cotton and gold
-        var london = cities.First(c => c.Name == "London");
-        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = london.Id, ResourceTypeId = resources["cotton"].Id, Abundance = 0.4m });
-        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = london.Id, ResourceTypeId = resources["gold"].Id, Abundance = 0.2m });
-        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = london.Id, ResourceTypeId = resources["coal"].Id, Abundance = 0.5m });
-
-        // Beijing: manufacturing hub, coal and iron ore and silicon
-        var beijing = cities.First(c => c.Name == "Beijing");
-        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = beijing.Id, ResourceTypeId = resources["coal"].Id, Abundance = 0.8m });
-        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = beijing.Id, ResourceTypeId = resources["iron-ore"].Id, Abundance = 0.7m });
-        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = beijing.Id, ResourceTypeId = resources["silicon"].Id, Abundance = 0.6m });
-
-        // Delhi: agricultural and chemical minerals hub
-        var delhi = cities.First(c => c.Name == "Delhi");
-        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = delhi.Id, ResourceTypeId = resources["chemical-minerals"].Id, Abundance = 0.5m });
-        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = delhi.Id, ResourceTypeId = resources["cotton"].Id, Abundance = 0.7m });
-        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = delhi.Id, ResourceTypeId = resources["iron-ore"].Id, Abundance = 0.4m });
     }
 
     private async Task SeedRecipesAsync()
@@ -571,6 +607,51 @@ public sealed partial class AppDbInitializer(
         Resource("Silicon", "silicon", "MINERAL", 40m, 2m, "Kilogram", "kg", "High-purity mineral used for wafers, glass, and electronics manufacturing.", "💠", "#0EA5E9", "#67E8F9")
     ];
 
+    private static IReadOnlyList<CityResourceSeed> GetCityResourceSeeds() =>
+    [
+        CityResource("Bratislava", "wood", 0.7m),
+        CityResource("Bratislava", "grain", 0.6m),
+        CityResource("Bratislava", "iron-ore", 0.4m),
+        CityResource("Bratislava", "chemical-minerals", 0.3m),
+
+        CityResource("Prague", "wood", 0.7m),
+        CityResource("Prague", "grain", 0.6m),
+        CityResource("Prague", "coal", 0.6m),
+        CityResource("Prague", "silicon", 0.3m),
+
+        CityResource("Vienna", "wood", 0.7m),
+        CityResource("Vienna", "grain", 0.6m),
+        CityResource("Vienna", "cotton", 0.5m),
+        CityResource("Vienna", "gold", 0.1m),
+
+        CityResource("New York", "wood", 0.7m),
+        CityResource("New York", "grain", 0.6m),
+        CityResource("New York", "silicon", 0.5m),
+        CityResource("New York", "coal", 0.4m),
+        CityResource("New York", "iron-ore", 0.3m),
+
+        CityResource("London", "wood", 0.7m),
+        CityResource("London", "grain", 0.6m),
+        CityResource("London", "cotton", 0.4m),
+        CityResource("London", "gold", 0.2m),
+        CityResource("London", "coal", 0.5m),
+
+        CityResource("Beijing", "wood", 0.7m),
+        CityResource("Beijing", "grain", 0.6m),
+        CityResource("Beijing", "coal", 0.8m),
+        CityResource("Beijing", "iron-ore", 0.7m),
+        CityResource("Beijing", "silicon", 0.6m),
+
+        CityResource("Delhi", "wood", 0.7m),
+        CityResource("Delhi", "grain", 0.6m),
+        CityResource("Delhi", "chemical-minerals", 0.5m),
+        CityResource("Delhi", "cotton", 0.7m),
+        CityResource("Delhi", "iron-ore", 0.4m),
+    ];
+
+    private static CityResourceSeed CityResource(string cityName, string resourceSlug, decimal abundance) =>
+        new(cityName, resourceSlug, abundance);
+
 
     private sealed record ResourceSeed(
         string Name,
@@ -584,6 +665,11 @@ public sealed partial class AppDbInitializer(
         string Icon,
         string BackgroundColor,
         string AccentColor);
+
+    private sealed record CityResourceSeed(
+        string CityName,
+        string ResourceSlug,
+        decimal Abundance);
 
     private sealed record ProductSeed(
         string Name,

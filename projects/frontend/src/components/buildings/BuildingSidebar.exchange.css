@@ -1,0 +1,567 @@
+/* ── Config fields ── */
+.config-field {
+  margin-bottom: 0.75rem;
+}
+
+.config-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: 0.25rem;
+}
+
+.config-onboarding-hint {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border-left: 3px solid #60a5fa;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0 6px 6px 0;
+  margin-bottom: 0.75rem;
+  line-height: 1.4;
+}
+
+.logistics-trap-warning {
+  font-size: 0.75rem;
+  color: var(--color-warning-text, #92400e);
+  background: var(--color-warning-bg, #fef3c7);
+  border: 1px solid var(--color-warning-border, #f59e0b);
+  border-radius: var(--radius-md, 8px);
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+/* ── Exchange offers ── */
+.exchange-offers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.exchange-offer-item {
+  padding: 0.75rem;
+  border-radius: var(--radius-md, 8px);
+  background: color-mix(in srgb, var(--color-surface-raised, var(--color-surface)) 92%, white 8%);
+  border: 1px solid color-mix(in srgb, var(--color-border) 88%, transparent);
+}
+
+.exchange-offer-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.exchange-offer-metrics {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.offer-blocked {
+  opacity: 0.5;
+}
+
+.offer-blocked-reason {
+  margin-top: 0.35rem;
+  font-size: 0.7rem;
+  color: var(--color-error, #ef4444);
+}
+
+.exchange-no-valid-offers {
+  color: var(--color-error, #ef4444);
+  font-size: 0.8rem;
+}
+
+.exchange-selection-hint {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  font-style: italic;
+  margin-bottom: 0.5rem;
+}
+
+.offer-best {
+  border-color: var(--color-primary, #3b82f6);
+  background: color-mix(in srgb, var(--color-primary, #3b82f6) 8%, var(--color-surface-raised, var(--color-surface)));
+}
+
+.offer-best-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-primary, #3b82f6);
+  background: color-mix(in srgb, var(--color-primary, #3b82f6) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-primary, #3b82f6) 40%, transparent);
+  border-radius: var(--radius-sm, 4px);
+  padding: 0.1rem 0.4rem;
+  white-space: nowrap;
+}
+
+.exchange-sort-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.exchange-sort-label {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.exchange-sort-btn {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-sm, 4px);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.exchange-sort-btn.active {
+  background: color-mix(in srgb, var(--color-primary, #3b82f6) 15%, transparent);
+  border-color: var(--color-primary, #3b82f6);
+  color: var(--color-primary, #3b82f6);
+  font-weight: 600;
+}
+
+.exchange-sort-btn:hover:not(.active) {
+  background: color-mix(in srgb, var(--color-border) 30%, transparent);
+  color: var(--color-text);
+}
+
+.exchange-view-link {
+  display: inline-block;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--color-primary, #3b82f6);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.exchange-view-link:hover {
+  text-decoration: underline;
+}
+
+/* ── Procurement Mode Selector ── */
+.procurement-mode-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.procurement-mode-option {
+  display: flex;
+  flex-direction: column;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+  gap: 0.15rem;
+}
+
+.procurement-mode-option:hover {
+  border-color: var(--color-primary, #2563eb);
+  background: var(--color-bg-hover, rgba(59, 130, 246, 0.1));
+}
+
+.procurement-mode-option.selected {
+  border-color: var(--color-primary, #2563eb);
+  background: var(--color-bg-selected, rgba(59, 130, 246, 0.15));
+}
+
+.procurement-mode-radio {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.procurement-mode-label {
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--color-text);
+}
+
+.procurement-mode-desc {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  line-height: 1.35;
+}
+
+/* ── Procurement Preview Card ── */
+.procurement-preview {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  background: var(--color-surface, #f8fafc);
+}
+
+.procurement-preview-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary);
+  margin: 0 0 0.6rem;
+}
+
+.procurement-preview-loading {
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+}
+
+.procurement-preview-empty {
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+}
+
+.preview-status {
+  display: inline-block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.preview-status.ok {
+  color: #4ade80;
+}
+
+.preview-status.blocked {
+  color: #dc2626;
+}
+
+.preview-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.preview-row {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+}
+
+.preview-label {
+  color: var(--color-text-secondary);
+  min-width: 7rem;
+  flex-shrink: 0;
+}
+
+.preview-value {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.preview-delivered {
+  color: #4ade80;
+  font-weight: 700;
+}
+
+.preview-blocked-price {
+  color: #dc2626;
+}
+
+.preview-block-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.preview-block-reason {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #dc2626;
+}
+
+.preview-block-message {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  margin: 0.15rem 0 0.35rem;
+  line-height: 1.45;
+}
+
+/* ── Sourcing Comparison Panel ── */
+.sourcing-comparison {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  background: var(--color-surface, #f8fafc);
+}
+
+.sourcing-comparison-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary);
+  margin: 0 0 0.25rem;
+}
+
+.sourcing-comparison-subtitle {
+  margin: 0 0 0.75rem;
+  font-size: 0.78rem;
+}
+
+.sourcing-comparison-loading,
+.sourcing-comparison-empty {
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+}
+
+.sourcing-trap-note {
+  font-size: 0.78rem;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 4px;
+  padding: 0.35rem 0.6rem;
+  margin-bottom: 0.6rem;
+  line-height: 1.4;
+}
+
+.sourcing-table-wrapper {
+  overflow-x: auto;
+  margin: 0 -0.5rem;
+}
+
+.sourcing-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.sourcing-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  white-space: nowrap;
+}
+
+.sourcing-table td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--color-border-muted, #f0f4f8);
+  vertical-align: top;
+}
+
+.sourcing-row.recommended {
+  background: rgba(52, 211, 153, 0.08);
+}
+
+.sourcing-row.ineligible {
+  opacity: 0.65;
+}
+
+.sourcing-row.recommended td {
+  border-bottom-color: rgba(52, 211, 153, 0.2);
+}
+
+.sourcing-col-source {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 7rem;
+}
+
+.source-type-badge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+.source-name {
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.source-distance {
+  font-size: 0.68rem;
+  color: var(--color-text-secondary);
+}
+
+.sourcing-col-transit .transit-cost {
+  color: #f59e0b;
+  font-weight: 500;
+}
+
+.col-landed {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.sourcing-row.recommended .col-landed strong {
+  color: #34d399;
+}
+
+.sourcing-row.ineligible .col-landed strong {
+  color: #dc2626;
+}
+
+.sc-badge {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 3px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sc-badge--recommended {
+  background: rgba(52, 211, 153, 0.15);
+  color: #4ade80;
+}
+
+.sc-badge--eligible {
+  background: rgba(96, 165, 250, 0.12);
+  color: #60a5fa;
+}
+
+.sc-badge--blocked {
+  background: rgba(248, 113, 113, 0.15);
+  color: #f87171;
+  cursor: help;
+}
+
+.sourcing-filter-hint {
+  margin-top: 0.6rem;
+  font-size: 0.75rem;
+}
+
+/* ── B2B Competitive Price Hint ── */
+.config-price-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  margin: 0.25rem 0 0;
+}
+
+/* ── B2B No-source warning ── */
+.b2b-no-source-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background: rgba(234, 179, 8, 0.1);
+  border: 1px solid rgba(234, 179, 8, 0.4);
+  border-radius: var(--radius-md, 6px);
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.b2b-no-source-icon {
+  font-size: 1.1rem;
+  color: #eab308;
+  flex-shrink: 0;
+  line-height: 1.4;
+}
+
+.b2b-no-source-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.b2b-no-source-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #d97706;
+  margin: 0;
+}
+
+.b2b-no-source-body {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: 1.45;
+}
+
+/* ── Flush storage section ── */
+.flush-storage-section {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.flush-confirm-dialog {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: var(--radius-sm);
+}
+
+.flush-confirm-msg {
+  font-size: 0.82rem;
+  color: #fbbf24;
+  margin: 0 0 0.6rem;
+  line-height: 1.4;
+}
+
+.flush-confirm-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* ── Misc utility ── */
+.btn-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  color: var(--color-primary, #3b82f6);
+  cursor: pointer;
+  text-decoration: underline;
+  font-weight: 500;
+}
+
+.btn-link:hover {
+  opacity: 0.8;
+}
+
+.form-success {
+  font-size: 0.8rem;
+  color: #4ade80;
+  margin: 0.35rem 0 0;
+}
+
+.currency-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+  background: var(--color-surface-hover, rgba(0, 0, 0, 0.06));
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  vertical-align: middle;
+  margin-left: 0.25rem;
+}

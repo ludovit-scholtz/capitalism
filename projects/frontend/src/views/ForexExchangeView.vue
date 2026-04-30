@@ -9,6 +9,8 @@ import GoldAmmSection from '@/components/forex/GoldAmmSection.vue'
 import BankAccountTransferPanel from '@/components/banking/BankAccountTransferPanel.vue'
 import BankAccountSelector from '@/components/banking/BankAccountSelector.vue'
 import ForexBankAccountSelector from '@/components/forex/ForexBankAccountSelector.vue'
+import UiStateLoading from '@/components/ui/UiStateLoading.vue'
+import UiStateError from '@/components/ui/UiStateError.vue'
 import type { City, FxRate, ForexQuote, ForexTradeResult, ForexTradeHistoryEntry, CurrencyBalance, PlayerBankAccountSummary } from '@/types'
 
 const { t } = useI18n()
@@ -59,7 +61,7 @@ const activeTab = ref<ForexTab>(getInitialTab())
 /** Whether the player has bank accounts and should use the bank-account-native swap form. */
 const hasBankAccounts = computed(() => myBankAccounts.value.length > 0)
 
-// ── City-based FX rate board ────────────────────────────────────────────────
+// City-based FX rate board
 
 /** The city currently selected in the navbar. */
 const selectedCity = computed<City | null>(() => {
@@ -76,7 +78,7 @@ const baseCurrencySymbol = computed(() => {
   return rates.value.find((r) => r.quoteCurrencyCode === baseCurrencyCode.value)?.quoteCurrencySymbol ?? baseCurrencyCode.value
 })
 
-/** Map of currencyCode → EUR-based rate (units per 1 EUR). EUR itself = 1. */
+/** Map of currencyCode -> EUR-based rate (units per 1 EUR). EUR itself = 1. */
 const eurRatesMap = computed<Record<string, number>>(() => {
   const map: Record<string, number> = { EUR: 1 }
   rates.value.forEach((r) => {
@@ -113,8 +115,7 @@ const cityRateBoard = computed<CityRateRow[]>(() => {
     .map((code) => {
       const targetEurRate = eurRatesMap.value[code] ?? 1
       const crossRate = targetEurRate / baseEurRate
-      const symbol =
-        code === 'EUR' ? '€' : (rates.value.find((r) => r.quoteCurrencyCode === code)?.quoteCurrencySymbol ?? code)
+      const symbol = code === 'EUR' ? '€' : (rates.value.find((r) => r.quoteCurrencyCode === code)?.quoteCurrencySymbol ?? code)
       const rateEntry = rates.value.find((r) => r.quoteCurrencyCode === code)
       return {
         targetCode: code,
@@ -152,12 +153,12 @@ const toBalances = computed<CurrencyBalance[]>(() => {
   })
 })
 
-/** Helper — find a bank account in myBankAccounts by ID. */
+/** Helper - find a bank account in myBankAccounts by ID. */
 function findAccountById(id: string): PlayerBankAccountSummary | undefined {
   return myBankAccounts.value.find((a) => a.id === id)
 }
 
-/** Resolved source currency code — from bank account when available, otherwise manual picker. */
+/** Resolved source currency code - from bank account when available, otherwise manual picker. */
 const resolvedFromCurrency = computed(() => {
   if (hasBankAccounts.value && fromBankAccountId.value) {
     return findAccountById(fromBankAccountId.value)?.currencyCode ?? fromCurrency.value
@@ -518,14 +519,9 @@ watch(activeTab, async (tab) => {
         <p class="text-base text-muted">{{ t('forex.subtitle') }}</p>
       </div>
 
-      <div v-if="loading" class="text-center py-12 text-muted">
-        <span>{{ t('common.loading') }}</span>
-      </div>
+      <UiStateLoading v-if="loading" :label="t('common.loading')" />
 
-      <div v-else-if="error" class="flex flex-col items-center gap-4 py-12 text-center text-muted">
-        <p class="text-bad">{{ error }}</p>
-        <button class="btn btn-secondary" @click="loadData">{{ t('common.retry') }}</button>
-      </div>
+      <UiStateError v-else-if="error" :message="error" :retry-label="t('common.retry')" @retry="loadData" />
 
       <template v-else>
         <div class="flex flex-col gap-8">
@@ -588,7 +584,7 @@ watch(activeTab, async (tab) => {
               <div v-if="selectedCity" class="swap-city-badge flex items-center gap-1.5 rounded-lg border border-divider bg-card-raised px-3 py-1.5 text-xs text-muted">
                 <span class="font-bold text-brand">{{ baseCurrencySymbol }}</span>
                 <span class="font-semibold text-body">{{ baseCurrencyCode }}</span>
-                <span class="text-subtle">— {{ selectedCity.name }}</span>
+                <span class="text-subtle">- {{ selectedCity.name }}</span>
               </div>
             </div>
 
@@ -597,7 +593,7 @@ watch(activeTab, async (tab) => {
               <span class="text-lg">🏦</span>
               <span>{{ t('forex.bankAccountMode') }}</span>
               <RouterLink v-if="auth.player?.companies?.length" :to="`/bank-statement/${auth.player.companies[0]?.id ?? ''}`" class="ml-1 text-xs font-semibold text-brand hover:underline">
-                {{ t('forex.viewBankStatement') }} →
+                {{ t('forex.viewBankStatement') }} ->
               </RouterLink>
             </div>
 
@@ -609,7 +605,7 @@ watch(activeTab, async (tab) => {
                 :to="`/bank-statement/${auth.player.companies[0]?.id ?? ''}`"
                 class="statement-link inline-block text-xs font-semibold text-brand hover:underline"
               >
-                {{ t('forex.viewBankStatement') }} →
+                {{ t('forex.viewBankStatement') }} ->
               </RouterLink>
               <div v-if="balances.length === 0" class="text-sm italic text-muted">
                 {{ t('forex.balancesEmpty') }}
@@ -758,7 +754,7 @@ watch(activeTab, async (tab) => {
                     </span>
                     <div class="flex-1 px-3 py-2.5 text-base font-bold text-good">
                       <span v-if="quote">{{ formatAmount(quote.toAmount) }}</span>
-                      <span v-else class="text-muted font-normal">—</span>
+                      <span v-else class="text-muted font-normal">-</span>
                     </div>
                   </div>
                 </div>
@@ -847,7 +843,7 @@ watch(activeTab, async (tab) => {
                 </div>
               </div>
 
-              <!-- Cross-rate table: 1 base → X target -->
+              <!-- Cross-rate table: 1 base -> X target -->
               <div>
                 <p class="mb-3 text-sm text-muted">
                   {{ t('forex.rateTableIntro', { base: `1 ${baseCurrencySymbol} ${baseCurrencyCode}` }) }}
@@ -868,11 +864,7 @@ watch(activeTab, async (tab) => {
                       </tr>
                     </thead>
                     <tbody>
-                      <tr
-                        v-for="row in cityRateBoard"
-                        :key="row.targetCode"
-                        class="history-row border-b border-divider/40 last:border-0"
-                      >
+                      <tr v-for="row in cityRateBoard" :key="row.targetCode" class="history-row border-b border-divider/40 last:border-0">
                         <td class="px-3 py-3 align-middle">
                           <div class="flex items-center gap-2">
                             <span class="min-w-[2rem] text-base font-bold text-brand">{{ row.targetSymbol }}</span>
@@ -886,7 +878,7 @@ watch(activeTab, async (tab) => {
                         </td>
                         <td class="px-3 py-3 text-right font-mono text-muted align-middle">
                           <span class="text-sm">{{ formatRate(row.afterFeeRate) }}</span>
-                          <span class="ml-1 text-xs text-subtle">−1%</span>
+                          <span class="ml-1 text-xs text-subtle">-1%</span>
                         </td>
                       </tr>
                     </tbody>
@@ -957,7 +949,7 @@ watch(activeTab, async (tab) => {
 </template>
 
 <style scoped>
-/* Table row hover — cannot target child <td> elements with Tailwind parent-hover */
+/* Table row hover - cannot target child <td> elements with Tailwind parent-hover */
 .history-row td {
   border-bottom: 1px solid var(--color-border-light, rgba(48, 54, 61, 0.5));
 }

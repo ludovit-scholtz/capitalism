@@ -105,89 +105,19 @@ const items = computed<GuidanceItem[]>(() => {
 </script>
 
 <template>
-  <div class="starter-guidance" aria-labelledby="starter-guidance-title">
-    <h3 id="starter-guidance-title" class="starter-guidance-title">
+  <div class="starter-guidance rounded-md border border-divider bg-white/5 px-5 py-4" aria-labelledby="starter-guidance-title">
+    <h3 id="starter-guidance-title" class="starter-guidance-title mb-3 text-[0.8125rem] font-bold uppercase tracking-[0.06em] text-muted">
       {{ t('starterGuidance.title') }}
     </h3>
-    <ul class="guidance-list">
-      <li v-for="(item, i) in items" :key="i" class="guidance-item">
-        <span class="guidance-icon" aria-hidden="true">{{ item.icon }}</span>
-        <div class="guidance-content">
-          <strong class="guidance-item-title">{{ item.title }}</strong>
-          <p class="guidance-item-body">{{ item.body }}</p>
-          <RouterLink v-if="item.linkTo && item.linkLabel" :to="item.linkTo" class="guidance-link">
-            {{ item.linkLabel }} →
-          </RouterLink>
+    <ul class="guidance-list flex list-none flex-col gap-3 p-0 m-0">
+      <li v-for="(item, i) in items" :key="i" class="guidance-item flex items-start gap-3">
+        <span class="guidance-icon mt-0.5 shrink-0 text-xl" aria-hidden="true">{{ item.icon }}</span>
+        <div class="guidance-content flex-1">
+          <strong class="guidance-item-title mb-0.5 block text-sm font-semibold">{{ item.title }}</strong>
+          <p class="guidance-item-body mb-1 text-[0.8125rem] leading-[1.45] text-muted">{{ item.body }}</p>
+          <RouterLink v-if="item.linkTo && item.linkLabel" :to="item.linkTo" class="guidance-link text-[0.8125rem] font-medium text-brand hover:underline"> {{ item.linkLabel }} → </RouterLink>
         </div>
       </li>
     </ul>
   </div>
 </template>
-
-<style scoped>
-.starter-guidance {
-  padding: 1rem 1.25rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-}
-
-.starter-guidance-title {
-  margin: 0 0 0.75rem;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-secondary);
-}
-
-.guidance-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.guidance-item {
-  display: flex;
-  gap: 0.75rem;
-  align-items: flex-start;
-}
-
-.guidance-icon {
-  font-size: 1.25rem;
-  flex-shrink: 0;
-  margin-top: 0.125rem;
-}
-
-.guidance-content {
-  flex: 1;
-}
-
-.guidance-item-title {
-  display: block;
-  font-size: 0.875rem;
-  font-weight: 600;
-  margin-bottom: 0.125rem;
-}
-
-.guidance-item-body {
-  margin: 0 0 0.25rem;
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary);
-  line-height: 1.45;
-}
-
-.guidance-link {
-  font-size: 0.8125rem;
-  color: var(--color-primary);
-  text-decoration: none;
-  font-weight: 500;
-}
-
-.guidance-link:hover {
-  text-decoration: underline;
-}
-</style>

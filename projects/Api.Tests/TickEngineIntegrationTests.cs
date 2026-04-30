@@ -77,6 +77,26 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         };
         db.Buildings.Add(building);
 
+        // Mines now extract strictly from the owned lot deposit (resource + quality + reserve).
+        db.BuildingLots.Add(new BuildingLot
+        {
+            Id = Guid.NewGuid(),
+            CityId = city.Id,
+            Name = "Seeded Mine Lot",
+            Description = "Seeded lot for mine extraction tests.",
+            District = "Industrial Zone",
+            Latitude = city.Latitude + 0.01,
+            Longitude = city.Longitude + 0.01,
+            Price = 75_000m,
+            SuitableTypes = "FACTORY,MINE",
+            OwnerCompanyId = company.Id,
+            BuildingId = building.Id,
+            ResourceTypeId = resourceType.Id,
+            MaterialQuality = 0.6m,
+            MaterialQuantity = 10_000m,
+            ConcurrencyToken = Guid.NewGuid(),
+        });
+
         var miningUnit = new BuildingUnit
         {
             Id = Guid.NewGuid(),

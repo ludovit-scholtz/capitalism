@@ -133,6 +133,12 @@ export interface Building {
   adjustedMarketRentPerSqm: number | null
   /** Lot PopulationIndex (location quality score, 1.0 = baseline). APARTMENT/COMMERCIAL only. */
   populationIndex: number | null
+  /** Mine lot resource under this building's land (null for non-mine lots). */
+  lotResourceTypeId?: string | null
+  /** Mine lot deposit quality in 0..1 (null for non-mine lots). */
+  lotMaterialQuality?: number | null
+  /** Remaining extractable quantity on the mine lot (null for non-mine lots). */
+  lotMaterialQuantity?: number | null
   units: BuildingUnit[]
   pendingConfiguration: BuildingConfigurationPlan | null
 }
@@ -1235,7 +1241,7 @@ export interface CityMediaHouseInfo {
   mediaType: string | null
   ownerCompanyId: string
   ownerCompanyName: string
-  /** 1.0 = Newspaper, 1.5 = Radio, 2.0 = TV */
+  /** 1.0 = spaper, 1.5 = Radio, 2.0 = TV */
   effectivenessMultiplier: number
   /** POWERED | CONSTRAINED | OFFLINE */
   powerStatus: string
@@ -1316,6 +1322,8 @@ export interface CollateralEligibilitySummary {
   maxBorrowable: number
   existingSecuredExposure: number
   remainingBorrowingCapacity: number
+  /** Currency code for all monetary fields; equals the bank city currency when bankBuildingId was supplied. */
+  currencyCode: string
   isEligible: boolean
   ineligibilityReason: string | null
 }
@@ -1437,12 +1445,12 @@ export interface UnitUpgradeInfo {
   nextStorageCapacity: number
 }
 
-export interface GameNewsFeed {
+export interface GamesFeed {
   unreadCount: number
-  items: GameNewsEntry[]
+  items: GamesEntry[]
 }
 
-export interface GameNewsEntry {
+export interface GamesEntry {
   id: string
   entryType: 'NEWS' | 'CHANGELOG' | 'MARKET_REPORT'
   status: 'DRAFT' | 'PUBLISHED'
@@ -1453,10 +1461,10 @@ export interface GameNewsEntry {
   updatedAtUtc: string
   publishedAtUtc: string | null
   isRead: boolean
-  localizations: GameNewsLocalization[]
+  localizations: GamesLocalization[]
 }
 
-export interface GameNewsLocalization {
+export interface GamesLocalization {
   locale: string
   title: string
   summary: string

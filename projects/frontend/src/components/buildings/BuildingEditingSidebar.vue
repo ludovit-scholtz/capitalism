@@ -110,6 +110,32 @@ const publicSalesPriceTier = computed<'below' | 'at' | 'above' | null>(() => {
   if (price > avg * 1.02) return 'above'
   return 'at'
 })
+
+const mineLotResource = computed(() => {
+  const resourceTypeId = building.value?.lotResourceTypeId ?? null
+  if (!resourceTypeId) return null
+  return resourceTypes.value.find((resource) => resource.id === resourceTypeId) ?? null
+})
+
+const mineOutputResourceOptions = computed(() => {
+  if (building.value?.type !== 'MINE') {
+    return resourceTypes.value
+  }
+
+  if (!mineLotResource.value) {
+    return resourceTypes.value
+  }
+
+  return [mineLotResource.value]
+})
+
+const mineLotQuality = computed(() => {
+  return building.value?.lotMaterialQuality ?? null
+})
+
+const mineLotReserve = computed(() => {
+  return building.value?.lotMaterialQuantity ?? null
+})
 </script>
 
 <template>
@@ -290,7 +316,7 @@ const publicSalesPriceTier = computed<'below' | 'at' | 'above' | null>(() => {
           <template v-if="getDraftUnitAt(selectedCell.x, selectedCell.y)!.unitType === 'B2B_SALES'">
             <!-- No-source warning: shown when no MANUFACTURING or MINING unit has an item configured -->
             <div v-if="!b2bHasUpstreamSource" class="b2b-no-source-warning" role="alert" :aria-label="t('buildingDetail.accessibility.noUpstreamSource')">
-              <span class="b2b-no-source-icon" aria-hidden="true">⚠</span>
+              <span class="b2b-no-source-icon" aria-hidden="true">⚠️</span>
               <div class="b2b-no-source-content">
                 <p class="b2b-no-source-title">{{ t('buildingDetail.config.b2bNoSourceTitle') }}</p>
                 <p class="b2b-no-source-body">{{ t('buildingDetail.config.b2bNoSourceBody') }}</p>
@@ -538,8 +564,24 @@ const publicSalesPriceTier = computed<'below' | 'at' | 'above' | null>(() => {
                 @change="updateSelectedUnitConfig('resourceTypeId', ($event.target as HTMLSelectElement).value || null)"
               >
                 <option value="">{{ t('buildingDetail.config.none') }}</option>
-                <option v-for="rt in resourceTypes" :key="rt.id" :value="rt.id">{{ rt.name }} ({{ rt.unitSymbol }})</option>
+                <option v-for="rt in mineOutputResourceOptions" :key="rt.id" :value="rt.id">{{ rt.name }} ({{ rt.unitSymbol }})</option>
               </select>
+              <p v-if="building?.type === 'MINE' && mineLotResource" class="config-help">
+                {{ t('buildingDetail.config.mineOutputLockedToLot', { resource: mineLotResource.name }) }}
+              </p>
+              <p v-else-if="building?.type === 'MINE'" class="config-help">
+                {{ t('buildingDetail.config.mineOutputMissingLotResource') }}
+              </p>
+            </div>
+            <div v-if="building?.type === 'MINE'" class="config-field">
+              <label class="config-label">{{ t('cityMap.rawMaterialQuality') }}</label>
+              <p class="config-help">
+                {{ mineLotQuality != null ? formatPercent(mineLotQuality) : t('common.notAvailable') }}
+              </p>
+              <label class="config-label">{{ t('cityMap.rawMaterialQuantity') }}</label>
+              <p class="config-help">
+                {{ mineLotReserve != null ? `${formatUnitQuantity(mineLotReserve)} ${t('cityMap.rawMaterialQuantityUnit')}` : t('common.notAvailable') }}
+              </p>
             </div>
           </template>
         </div>
@@ -581,6 +623,18 @@ const publicSalesPriceTier = computed<'below' | 'at' | 'above' | null>(() => {
             >
               {{ t('buildingDetail.config.researchIndustryCategory') }}:
               {{ getLocalizedIndustry((getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).industryCategory!, locale) }}
+            </span>
+          </template>
+          <template v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.unitType === 'MINING' && building?.type === 'MINE'">
+            <span class="stat" v-if="mineLotResource">
+              {{ t('buildingDetail.config.resourceType') }}: {{ mineLotResource.name }}
+            </span>
+            <span class="stat" v-if="mineLotQuality != null">
+              {{ t('cityMap.rawMaterialQuality') }}: {{ formatPercent(mineLotQuality) }}
+            </span>
+            <span class="stat" v-if="mineLotReserve != null">
+              {{ t('cityMap.rawMaterialQuantity') }}:
+              {{ formatUnitQuantity(mineLotReserve) }} {{ t('cityMap.rawMaterialQuantityUnit') }}
             </span>
           </template>
         </div>
@@ -772,7 +826,7 @@ const publicSalesPriceTier = computed<'below' | 'at' | 'above' | null>(() => {
 
           <!-- Max level state -->
           <div v-else-if="selectedCellUpgradeInfo.isMaxLevel" class="unit-upgrade-max-level">
-            <span class="unit-upgrade-max-badge">★</span>
+            <span class="unit-upgrade-max-badge">✅</span>
             <span>{{ t('buildingDetail.unitUpgrade.maxLevel') }}</span>
             <p class="unit-upgrade-max-note">{{ t('buildingDetail.unitUpgrade.maxLevelNote') }}</p>
           </div>
@@ -841,7 +895,7 @@ const publicSalesPriceTier = computed<'below' | 'at' | 'above' | null>(() => {
             <p v-if="unitUpgradeError" class="form-error">{{ unitUpgradeError }}</p>
             <!-- Staged state: unit has been queued for upgrade via Store Upgrade -->
             <div v-if="isSelectedCellStaged" class="unit-upgrade-staged">
-              <span class="unit-upgrade-staged-badge">✓ {{ t('buildingDetail.unitUpgrade.stagedBadge') }}</span>
+              <span class="unit-upgrade-staged-badge">✅ {{ t('buildingDetail.unitUpgrade.stagedBadge') }}</span>
               <p class="unit-upgrade-stage-info">{{ t('buildingDetail.unitUpgrade.stageInfo') }}</p>
               <button class="btn btn-ghost btn-sm" @click="toggleStagedUpgrade(selectedCellUpgradeInfo!.unitId)">
                 {{ t('buildingDetail.unitUpgrade.removeStagedUpgrade') }}
@@ -864,3 +918,5 @@ const publicSalesPriceTier = computed<'below' | 'at' | 'above' | null>(() => {
 </template>
 
 <style scoped src="./BuildingSidebar.shared.css"></style>
+<style scoped src="./BuildingSidebar.analytics.css"></style>
+<style scoped src="./BuildingSidebar.exchange.css"></style>

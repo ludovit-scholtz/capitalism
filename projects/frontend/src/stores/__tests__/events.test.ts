@@ -15,15 +15,7 @@
 
 import { describe, expect, it } from 'vitest'
 import type { LocationQuery } from 'vue-router'
-import {
-  areEventFiltersEqual,
-  buildDiscoveryFilterInput,
-  createDefaultEventFilters,
-  eventFiltersFromQuery,
-  eventFiltersToQuery,
-  formatEventPrice,
-  savedSearchToFilters,
-} from '@/stores/events'
+import { areEventFiltersEqual, buildDiscoveryFilterInput, createDefaultEventFilters, eventFiltersFromQuery, eventFiltersToQuery, formatEventPrice, savedSearchToFilters } from '@/stores/events'
 import type { EventFilters, SavedSearch } from '@/types'
 
 // ---------------------------------------------------------------------------
@@ -104,15 +96,11 @@ describe('areEventFiltersEqual', () => {
   })
 
   it('returns false when dateFrom differs', () => {
-    expect(
-      areEventFiltersEqual(fullFilters({ dateFrom: '2026-01-01' }), fullFilters({ dateFrom: '2026-06-01' })),
-    ).toBe(false)
+    expect(areEventFiltersEqual(fullFilters({ dateFrom: '2026-01-01' }), fullFilters({ dateFrom: '2026-06-01' }))).toBe(false)
   })
 
   it('returns false when dateTo differs', () => {
-    expect(
-      areEventFiltersEqual(fullFilters({ dateTo: '2026-06-01' }), fullFilters({ dateTo: '2026-12-31' })),
-    ).toBe(false)
+    expect(areEventFiltersEqual(fullFilters({ dateTo: '2026-06-01' }), fullFilters({ dateTo: '2026-12-31' }))).toBe(false)
   })
 
   it('returns false when location differs', () => {
@@ -120,33 +108,23 @@ describe('areEventFiltersEqual', () => {
   })
 
   it('returns false when priceType differs', () => {
-    expect(
-      areEventFiltersEqual(fullFilters({ priceType: 'FREE' }), fullFilters({ priceType: 'PAID' })),
-    ).toBe(false)
+    expect(areEventFiltersEqual(fullFilters({ priceType: 'FREE' }), fullFilters({ priceType: 'PAID' }))).toBe(false)
   })
 
   it('returns false when priceMin differs', () => {
-    expect(
-      areEventFiltersEqual(fullFilters({ priceMin: '10' }), fullFilters({ priceMin: '50' })),
-    ).toBe(false)
+    expect(areEventFiltersEqual(fullFilters({ priceMin: '10' }), fullFilters({ priceMin: '50' }))).toBe(false)
   })
 
   it('returns false when priceMax differs', () => {
-    expect(
-      areEventFiltersEqual(fullFilters({ priceMax: '100' }), fullFilters({ priceMax: '200' })),
-    ).toBe(false)
+    expect(areEventFiltersEqual(fullFilters({ priceMax: '100' }), fullFilters({ priceMax: '200' }))).toBe(false)
   })
 
   it('returns false when sortBy differs', () => {
-    expect(
-      areEventFiltersEqual(fullFilters({ sortBy: 'NEWEST' }), fullFilters({ sortBy: 'UPCOMING' })),
-    ).toBe(false)
+    expect(areEventFiltersEqual(fullFilters({ sortBy: 'NEWEST' }), fullFilters({ sortBy: 'UPCOMING' }))).toBe(false)
   })
 
   it('returns false when attendanceMode differs', () => {
-    expect(
-      areEventFiltersEqual(fullFilters({ attendanceMode: 'ONLINE' }), fullFilters({ attendanceMode: 'HYBRID' })),
-    ).toBe(false)
+    expect(areEventFiltersEqual(fullFilters({ attendanceMode: 'ONLINE' }), fullFilters({ attendanceMode: 'HYBRID' }))).toBe(false)
   })
 
   it('returns false when language differs', () => {
@@ -154,12 +132,7 @@ describe('areEventFiltersEqual', () => {
   })
 
   it('returns false when timezone differs', () => {
-    expect(
-      areEventFiltersEqual(
-        fullFilters({ timezone: 'Europe/Prague' }),
-        fullFilters({ timezone: 'America/New_York' }),
-      ),
-    ).toBe(false)
+    expect(areEventFiltersEqual(fullFilters({ timezone: 'Europe/Prague' }), fullFilters({ timezone: 'America/New_York' }))).toBe(false)
   })
 
   it('returns false when a filter is active vs default', () => {
@@ -612,15 +585,11 @@ describe('savedSearchToFilters', () => {
   })
 
   it('maps startsFromUtc (ISO datetime) to dateFrom (YYYY-MM-DD)', () => {
-    expect(
-      savedSearchToFilters(makeSavedSearch({ startsFromUtc: '2026-01-01T00:00:00Z' })).dateFrom,
-    ).toBe('2026-01-01')
+    expect(savedSearchToFilters(makeSavedSearch({ startsFromUtc: '2026-01-01T00:00:00Z' })).dateFrom).toBe('2026-01-01')
   })
 
   it('maps startsToUtc (ISO datetime) to dateTo (YYYY-MM-DD)', () => {
-    expect(
-      savedSearchToFilters(makeSavedSearch({ startsToUtc: '2026-12-31T23:59:59Z' })).dateTo,
-    ).toBe('2026-12-31')
+    expect(savedSearchToFilters(makeSavedSearch({ startsToUtc: '2026-12-31T23:59:59Z' })).dateTo).toBe('2026-12-31')
   })
 
   it('maps isFree=true to priceType FREE', () => {
@@ -656,9 +625,7 @@ describe('savedSearchToFilters', () => {
   })
 
   it('maps attendanceMode IN_PERSON', () => {
-    expect(
-      savedSearchToFilters(makeSavedSearch({ attendanceMode: 'IN_PERSON' })).attendanceMode,
-    ).toBe('IN_PERSON')
+    expect(savedSearchToFilters(makeSavedSearch({ attendanceMode: 'IN_PERSON' })).attendanceMode).toBe('IN_PERSON')
   })
 
   it('maps attendanceMode null to empty string', () => {
@@ -674,9 +641,7 @@ describe('savedSearchToFilters', () => {
   })
 
   it('maps timezone', () => {
-    expect(savedSearchToFilters(makeSavedSearch({ timezone: 'Europe/Prague' })).timezone).toBe(
-      'Europe/Prague',
-    )
+    expect(savedSearchToFilters(makeSavedSearch({ timezone: 'Europe/Prague' })).timezone).toBe('Europe/Prague')
   })
 
   it('maps timezone null to empty string', () => {
@@ -685,22 +650,7 @@ describe('savedSearchToFilters', () => {
 
   it('returns an object with all EventFilters keys', () => {
     const result = savedSearchToFilters(makeSavedSearch())
-    expect(Object.keys(result).sort()).toEqual(
-      [
-        'attendanceMode',
-        'dateFrom',
-        'dateTo',
-        'domain',
-        'language',
-        'location',
-        'priceMax',
-        'priceMin',
-        'priceType',
-        'search',
-        'sortBy',
-        'timezone',
-      ],
-    )
+    expect(Object.keys(result).sort()).toEqual(['attendanceMode', 'dateFrom', 'dateTo', 'domain', 'language', 'location', 'priceMax', 'priceMin', 'priceType', 'search', 'sortBy', 'timezone'])
   })
 })
 

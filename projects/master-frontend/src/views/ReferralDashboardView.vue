@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import {
@@ -13,6 +14,7 @@ import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
+const { t } = useI18n()
 
 const rows = ref<ReferralDashboardRow[]>([])
 const codes = ref<string[]>([])
@@ -54,10 +56,11 @@ function createCode() {
 
   try {
     const created = createAdditionalReferralCode(auth.player.email)
-    notice.value = `New referral code generated: ${created.code}`
+    notice.value = t('referralDashboard.newCode', { code: created.code })
     reloadDashboard()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Failed to create referral code.'
+    errorMessage.value =
+      error instanceof Error ? error.message : t('referralDashboard.createCodeError')
   }
 }
 
@@ -78,80 +81,175 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main class="dash-shell">
-    <section class="dash-card">
-      <header class="dash-header">
+  <main class="dash-shell min-h-dvh px-4 py-8 pb-12">
+    <section
+      class="dash-card mx-auto grid w-full max-w-[1120px] gap-4 rounded-3xl border border-[var(--color-border)] bg-[var(--color-paper-strong)] p-6 shadow-[var(--shadow-soft)]"
+    >
+      <header class="dash-header flex flex-wrap justify-between gap-4">
         <div>
-          <p class="eyebrow">Referral Program</p>
-          <h1>Referral Dashboard</h1>
-          <p class="subtitle">
-            Track registrations and active subscriptions per referral code, including second-level
-            network activity.
+          <p
+            class="eyebrow text-[0.72rem] uppercase tracking-[0.12em] text-[var(--color-accent-deep)]"
+          >
+            {{ t('home.referralDashboard') }}
+          </p>
+          <h1>{{ t('referralDashboard.title') }}</h1>
+          <p class="subtitle mt-2 leading-[1.6] text-[var(--color-muted)]">
+            {{ t('referralDashboard.subtitle') }}
           </p>
         </div>
-        <div class="header-actions">
-          <RouterLink class="ghost" to="/referrals/setup">Setup Code</RouterLink>
-          <RouterLink class="ghost" to="/referrals/become">Become Referral</RouterLink>
+        <div class="header-actions flex gap-2 self-start">
+          <RouterLink
+            class="ghost rounded-full bg-[rgba(17,41,79,0.08)] px-4 py-2.5 font-bold text-[var(--color-ink)] no-underline"
+            to="/referrals/setup"
+            >{{ t('referralDashboard.setupCode') }}</RouterLink
+          >
+          <RouterLink
+            class="ghost rounded-full bg-[rgba(17,41,79,0.08)] px-4 py-2.5 font-bold text-[var(--color-ink)] no-underline"
+            to="/referrals/become"
+            >{{ t('referralDashboard.becomeReferral') }}</RouterLink
+          >
         </div>
       </header>
 
-      <section v-if="!hasReferralProfile" class="empty-state">
-        <h2>Referral profile not active</h2>
+      <section
+        v-if="!hasReferralProfile"
+        class="empty-state grid gap-3 rounded-2xl border border-dashed border-[var(--color-border)] p-4"
+      >
+        <h2>{{ t('referralDashboard.profileNotActive') }}</h2>
         <p>
-          Activate your referral profile first. You need to provide your name and tax domicile
-          before creating or tracking referral codes.
+          {{ t('referralDashboard.profileNotActiveText') }}
         </p>
-        <RouterLink class="primary" to="/referrals/become">Activate Now</RouterLink>
+        <RouterLink
+          class="primary w-fit rounded-full bg-[var(--color-ink)] px-4 py-2.5 font-bold text-[var(--color-paper)] no-underline"
+          to="/referrals/become"
+          >{{ t('referralDashboard.activateNow') }}</RouterLink
+        >
       </section>
 
       <template v-else>
-        <section class="summary-grid" aria-label="Referral summary cards">
-          <article class="summary-card">
-            <p>Direct registrations</p>
-            <strong>{{ totalStats.direct }}</strong>
+        <section
+          class="summary-grid grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3"
+          :aria-label="t('referralDashboard.metricsAria')"
+        >
+          <article
+            class="summary-card grid gap-1.5 rounded-2xl border border-[var(--color-border)] bg-white p-4"
+          >
+            <p class="text-[0.82rem] text-[var(--color-muted)]">
+              {{ t('referralDashboard.directRegistrations') }}
+            </p>
+            <strong class="text-2xl">{{ totalStats.direct }}</strong>
           </article>
-          <article class="summary-card">
-            <p>Second-level registrations</p>
-            <strong>{{ totalStats.second }}</strong>
+          <article
+            class="summary-card grid gap-1.5 rounded-2xl border border-[var(--color-border)] bg-white p-4"
+          >
+            <p class="text-[0.82rem] text-[var(--color-muted)]">
+              {{ t('referralDashboard.secondRegistrations') }}
+            </p>
+            <strong class="text-2xl">{{ totalStats.second }}</strong>
           </article>
-          <article class="summary-card">
-            <p>Active subscriptions</p>
-            <strong>{{ totalStats.active }}</strong>
+          <article
+            class="summary-card grid gap-1.5 rounded-2xl border border-[var(--color-border)] bg-white p-4"
+          >
+            <p class="text-[0.82rem] text-[var(--color-muted)]">
+              {{ t('referralDashboard.activeSubscriptions') }}
+            </p>
+            <strong class="text-2xl">{{ totalStats.active }}</strong>
           </article>
-          <article class="summary-card">
-            <p>Second-level active subs</p>
-            <strong>{{ totalStats.secondActive }}</strong>
+          <article
+            class="summary-card grid gap-1.5 rounded-2xl border border-[var(--color-border)] bg-white p-4"
+          >
+            <p class="text-[0.82rem] text-[var(--color-muted)]">
+              {{ t('referralDashboard.secondActiveSubs') }}
+            </p>
+            <strong class="text-2xl">{{ totalStats.secondActive }}</strong>
           </article>
         </section>
 
-        <div class="codes-toolbar">
-          <div class="code-list" aria-label="Owned referral codes">
-            <span v-for="code in codes" :key="code" class="code-pill">{{ code }}</span>
+        <div class="codes-toolbar flex flex-wrap justify-between gap-3">
+          <div
+            class="code-list flex flex-wrap gap-2"
+            :aria-label="t('referralDashboard.referralCode')"
+          >
+            <span
+              v-for="code in codes"
+              :key="code"
+              class="code-pill rounded-full border border-[var(--color-border)] bg-white px-3 py-1.5 font-bold tracking-[0.09em]"
+              >{{ code }}</span
+            >
           </div>
-          <button type="button" class="primary" @click="createCode">Create Another Code</button>
+          <button
+            type="button"
+            class="primary rounded-full border-0 bg-[var(--color-ink)] px-4 py-2.5 font-bold text-[var(--color-paper)]"
+            @click="createCode"
+          >
+            {{ t('referralDashboard.createAnotherCode') }}
+          </button>
         </div>
 
-        <p v-if="notice" class="success" role="status">{{ notice }}</p>
-        <p v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>
+        <p v-if="notice" class="success text-[#245f3d]" role="status">{{ notice }}</p>
+        <p v-if="errorMessage" class="error text-[#b0432c]" role="alert">{{ errorMessage }}</p>
 
-        <div class="table-wrap">
-          <table aria-label="Referral metrics">
+        <div class="table-wrap overflow-x-auto rounded-2xl border border-[var(--color-border)]">
+          <table
+            class="min-w-[780px] w-full border-collapse"
+            :aria-label="t('referralDashboard.metricsAria')"
+          >
             <thead>
               <tr>
-                <th>Referral code</th>
-                <th>Registered users</th>
-                <th>Second-level registrations</th>
-                <th>Active subscriptions</th>
-                <th>Second-level active subs</th>
+                <th
+                  class="border-b border-[var(--color-border)] bg-[rgba(17,41,79,0.06)] px-3.5 py-3 text-left text-[0.78rem] uppercase tracking-[0.08em]"
+                >
+                  {{ t('referralDashboard.referralCode') }}
+                </th>
+                <th
+                  class="border-b border-[var(--color-border)] bg-[rgba(17,41,79,0.06)] px-3.5 py-3 text-left text-[0.78rem] uppercase tracking-[0.08em]"
+                >
+                  {{ t('referralDashboard.registeredUsers') }}
+                </th>
+                <th
+                  class="border-b border-[var(--color-border)] bg-[rgba(17,41,79,0.06)] px-3.5 py-3 text-left text-[0.78rem] uppercase tracking-[0.08em]"
+                >
+                  {{ t('referralDashboard.secondRegistrations') }}
+                </th>
+                <th
+                  class="border-b border-[var(--color-border)] bg-[rgba(17,41,79,0.06)] px-3.5 py-3 text-left text-[0.78rem] uppercase tracking-[0.08em]"
+                >
+                  {{ t('referralDashboard.activeSubscriptions') }}
+                </th>
+                <th
+                  class="border-b border-[var(--color-border)] bg-[rgba(17,41,79,0.06)] px-3.5 py-3 text-left text-[0.78rem] uppercase tracking-[0.08em]"
+                >
+                  {{ t('referralDashboard.secondActiveSubs') }}
+                </th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="row in rows" :key="row.code">
-                <td class="code-col">{{ row.code }}</td>
-                <td>{{ row.directRegistrations }}</td>
-                <td>{{ row.secondLevelRegistrations }}</td>
-                <td>{{ row.activeSubscriptions }}</td>
-                <td>{{ row.secondLevelActiveSubscriptions }}</td>
+                <td
+                  class="code-col border-b border-[var(--color-border)] px-3.5 py-3 text-left text-[0.9rem] font-bold tracking-[0.08em]"
+                >
+                  {{ row.code }}
+                </td>
+                <td
+                  class="border-b border-[var(--color-border)] px-3.5 py-3 text-left text-[0.9rem]"
+                >
+                  {{ row.directRegistrations }}
+                </td>
+                <td
+                  class="border-b border-[var(--color-border)] px-3.5 py-3 text-left text-[0.9rem]"
+                >
+                  {{ row.secondLevelRegistrations }}
+                </td>
+                <td
+                  class="border-b border-[var(--color-border)] px-3.5 py-3 text-left text-[0.9rem]"
+                >
+                  {{ row.activeSubscriptions }}
+                </td>
+                <td
+                  class="border-b border-[var(--color-border)] px-3.5 py-3 text-left text-[0.9rem]"
+                >
+                  {{ row.secondLevelActiveSubscriptions }}
+                </td>
               </tr>
             </tbody>
           </table>
@@ -160,161 +258,3 @@ onMounted(async () => {
     </section>
   </main>
 </template>
-
-<style scoped>
-.dash-shell {
-  min-height: 100dvh;
-  padding: 2rem 1rem 3rem;
-}
-
-.dash-card {
-  width: min(1120px, 100%);
-  margin: 0 auto;
-  border: 1px solid var(--color-border);
-  border-radius: 24px;
-  background: var(--color-paper-strong);
-  padding: 1.5rem;
-  box-shadow: var(--shadow-soft);
-  display: grid;
-  gap: 1rem;
-}
-
-.dash-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.eyebrow {
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 0.72rem;
-  color: var(--color-accent-deep);
-}
-
-.subtitle {
-  margin-top: 0.45rem;
-  color: var(--color-muted);
-  line-height: 1.6;
-}
-
-.header-actions {
-  display: flex;
-  gap: 0.6rem;
-  align-self: start;
-}
-
-.primary,
-.ghost {
-  border-radius: 999px;
-  padding: 0.65rem 1rem;
-  text-decoration: none;
-  border: none;
-  font-weight: 700;
-}
-
-.primary {
-  background: var(--color-ink);
-  color: var(--color-paper);
-}
-
-.ghost {
-  background: rgba(17, 41, 79, 0.08);
-  color: var(--color-ink);
-}
-
-.empty-state {
-  border: 1px dashed var(--color-border);
-  border-radius: 18px;
-  padding: 1rem;
-  display: grid;
-  gap: 0.7rem;
-}
-
-.summary-grid {
-  display: grid;
-  gap: 0.7rem;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-}
-
-.summary-card {
-  border: 1px solid var(--color-border);
-  border-radius: 16px;
-  padding: 0.95rem;
-  background: #fff;
-  display: grid;
-  gap: 0.35rem;
-}
-
-.summary-card p {
-  color: var(--color-muted);
-  font-size: 0.82rem;
-}
-
-.summary-card strong {
-  font-size: 1.5rem;
-}
-
-.codes-toolbar {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.8rem;
-  flex-wrap: wrap;
-}
-
-.code-list {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.code-pill {
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  padding: 0.35rem 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  background: #fff;
-}
-
-.table-wrap {
-  overflow-x: auto;
-  border: 1px solid var(--color-border);
-  border-radius: 16px;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 780px;
-}
-
-th,
-td {
-  border-bottom: 1px solid var(--color-border);
-  text-align: left;
-  padding: 0.85rem;
-  font-size: 0.9rem;
-}
-
-thead th {
-  background: rgba(17, 41, 79, 0.06);
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.code-col {
-  font-weight: 700;
-  letter-spacing: 0.08em;
-}
-
-.error {
-  color: #b0432c;
-}
-
-.success {
-  color: #245f3d;
-}
-</style>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import {
   adjustGoldTokenBalance,
@@ -12,6 +13,7 @@ import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
+const { t } = useI18n()
 
 // ── State ──────────────────────────────────────────────────────────────────
 
@@ -67,7 +69,7 @@ async function loadBalances() {
   try {
     balances.value = await fetchGoldTokenBalances(auth.token)
   } catch (e) {
-    balancesError.value = e instanceof Error ? e.message : 'Failed to load balances.'
+    balancesError.value = e instanceof Error ? e.message : t('goldAdmin.loadBalancesError')
   } finally {
     balancesLoading.value = false
   }
@@ -80,7 +82,7 @@ async function loadTransactions(email?: string) {
   try {
     transactions.value = await fetchGoldTokenTransactions(auth.token, email, 50)
   } catch (e) {
-    txError.value = e instanceof Error ? e.message : 'Failed to load transaction history.'
+    txError.value = e instanceof Error ? e.message : t('goldAdmin.loadTxError')
   } finally {
     txLoading.value = false
   }
@@ -102,13 +104,13 @@ async function handleAdjust() {
 
   const amount = adjustAmountNumber.value
   if (amount === null || amount === 0) {
-    adjustError.value = 'Amount must be a non-zero number.'
+    adjustError.value = t('goldAdmin.amountInvalid')
     return
   }
 
   const note = adjustNote.value.trim()
   if (!note) {
-    adjustError.value = 'An audit note is required. Please explain the reason for this adjustment.'
+    adjustError.value = t('goldAdmin.noteRequired')
     return
   }
 
@@ -128,14 +130,16 @@ async function handleAdjust() {
       }
     }
 
-    adjustSuccess.value = `✓ Balance updated to ${formatGold(updated.goldTokenBalance)} g`
+    adjustSuccess.value = t('goldAdmin.updateSuccess', {
+      amount: formatGold(updated.goldTokenBalance),
+    })
     adjustAmount.value = ''
     adjustNote.value = ''
 
     // Refresh the transaction log for this user
     await loadTransactions(selectedEmail.value)
   } catch (e) {
-    adjustError.value = e instanceof Error ? e.message : 'Adjustment failed.'
+    adjustError.value = e instanceof Error ? e.message : t('goldAdmin.adjustFailed')
   } finally {
     adjustLoading.value = false
   }
@@ -181,14 +185,14 @@ onMounted(async () => {
     <header class="gold-admin-header">
       <div class="gold-admin-header-inner">
         <div>
-          <p class="section-kicker">Master Administration</p>
-          <h1>Gold Token Management</h1>
+          <p class="section-kicker">{{ t('goldAdmin.kicker') }}</p>
+          <h1>{{ t('goldAdmin.title') }}</h1>
           <p class="gold-admin-subtitle">
-            View and adjust player gold token balances. Every change is recorded in the audit log.
+            {{ t('goldAdmin.subtitle') }}
           </p>
         </div>
         <nav class="gold-admin-nav">
-          <a href="/" class="nav-back-btn">← Back to portal</a>
+          <a href="/" class="nav-back-btn">← {{ t('common.backToPortal') }}</a>
         </nav>
       </div>
     </header>
@@ -197,14 +201,14 @@ onMounted(async () => {
       <!-- Balance table -->
       <section class="gold-section" aria-labelledby="balances-heading">
         <div class="gold-section-header">
-          <h2 id="balances-heading">Player Balances</h2>
+          <h2 id="balances-heading">{{ t('goldAdmin.balancesTitle') }}</h2>
           <button
             class="refresh-btn"
             type="button"
             :disabled="balancesLoading"
             @click="loadBalances"
           >
-            {{ balancesLoading ? 'Loading…' : 'Refresh' }}
+            {{ balancesLoading ? t('common.loading') : t('common.refresh') }}
           </button>
         </div>
 
@@ -212,26 +216,28 @@ onMounted(async () => {
           <input
             v-model="searchQuery"
             type="search"
-            placeholder="Search by email or name…"
+            :placeholder="t('goldAdmin.searchPlaceholder')"
             class="search-input"
-            aria-label="Search players"
+            :aria-label="t('goldAdmin.searchAria')"
           />
         </div>
 
         <p v-if="balancesError" class="state-error" role="alert">{{ balancesError }}</p>
         <p v-else-if="balancesLoading && balances.length === 0" class="state-message">
-          Loading balances…
+          {{ t('goldAdmin.loadingBalances') }}
         </p>
-        <p v-else-if="filteredBalances.length === 0" class="state-message">No players found.</p>
+        <p v-else-if="filteredBalances.length === 0" class="state-message">
+          {{ t('goldAdmin.noPlayers') }}
+        </p>
 
         <div v-else class="balance-table-wrap">
           <table class="balance-table" aria-label="Player gold balances">
             <thead>
               <tr>
-                <th>Email</th>
-                <th>Display Name</th>
-                <th class="col-balance">Balance (g)</th>
-                <th>Actions</th>
+                <th>{{ t('goldAdmin.email') }}</th>
+                <th>{{ t('goldAdmin.displayName') }}</th>
+                <th class="col-balance">{{ t('goldAdmin.balanceG') }}</th>
+                <th>{{ t('goldAdmin.actions') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -248,7 +254,7 @@ onMounted(async () => {
                 </td>
                 <td>
                   <button class="select-btn" type="button" @click.stop="selectUser(row.email)">
-                    Manage
+                    {{ t('goldAdmin.manage') }}
                   </button>
                 </td>
               </tr>
@@ -264,24 +270,24 @@ onMounted(async () => {
         aria-labelledby="adjust-heading"
       >
         <h2 id="adjust-heading">
-          Adjust balance for <span class="adjust-target-email">{{ selectedEmail }}</span>
+          {{ t('goldAdmin.adjustFor', { email: selectedEmail }) }}
         </h2>
         <p v-if="selectedBalance" class="current-balance-label">
-          Current balance:
+          {{ t('goldAdmin.currentBalance') }}
           <strong>{{ formatGold(selectedBalance.goldTokenBalance) }} g</strong>
         </p>
 
         <form class="adjust-form" @submit.prevent="handleAdjust">
           <div class="form-row">
             <label for="adjust-amount" class="form-label">
-              Amount (g) — positive to add, negative to deduct
+              {{ t('goldAdmin.amountLabel') }}
             </label>
             <input
               id="adjust-amount"
               v-model="adjustAmount"
               type="number"
               step="0.0001"
-              placeholder="e.g. 10.5 or -5.0"
+              :placeholder="t('goldAdmin.amountPlaceholder')"
               class="form-input"
               :class="{ 'input-deduction': isDeduction }"
               required
@@ -290,14 +296,15 @@ onMounted(async () => {
 
           <div class="form-row">
             <label for="adjust-note" class="form-label">
-              Note (audit log) <span class="required-badge" aria-hidden="true">*</span>
+              {{ t('goldAdmin.noteLabel') }}
+              <span class="required-badge" aria-hidden="true">{{ t('goldAdmin.required') }}</span>
             </label>
             <input
               id="adjust-note"
               v-model="adjustNote"
               type="text"
               maxlength="500"
-              placeholder="Reason for adjustment (required)…"
+              :placeholder="t('goldAdmin.notePlaceholder')"
               class="form-input"
               required
               aria-required="true"
@@ -311,11 +318,13 @@ onMounted(async () => {
               :class="{ 'adjust-btn--deduct': isDeduction }"
               :disabled="adjustLoading || !adjustAmount || !adjustNote.trim()"
             >
-              <template v-if="adjustLoading">Processing…</template>
-              <template v-else-if="isDeduction">Deduct Gold</template>
-              <template v-else>Add Gold</template>
+              <template v-if="adjustLoading">{{ t('goldAdmin.processing') }}</template>
+              <template v-else-if="isDeduction">{{ t('goldAdmin.deductGold') }}</template>
+              <template v-else>{{ t('goldAdmin.addGold') }}</template>
             </button>
-            <button type="button" class="cancel-btn" @click="selectedEmail = null">Cancel</button>
+            <button type="button" class="cancel-btn" @click="selectedEmail = null">
+              {{ t('goldAdmin.cancel') }}
+            </button>
           </div>
 
           <p v-if="adjustError" class="form-error" role="alert">{{ adjustError }}</p>
@@ -326,19 +335,21 @@ onMounted(async () => {
       <!-- Transaction history -->
       <section class="gold-section" aria-labelledby="tx-heading">
         <div class="gold-section-header">
-          <h2 id="tx-heading">Transaction History</h2>
+          <h2 id="tx-heading">{{ t('goldAdmin.txTitle') }}</h2>
         </div>
 
         <div class="tx-filter-bar">
           <input
             v-model="txFilterEmail"
             type="email"
-            placeholder="Filter by email…"
+            :placeholder="t('goldAdmin.txFilterPlaceholder')"
             class="search-input"
-            aria-label="Filter transactions by email"
+            :aria-label="t('goldAdmin.txFilterAria')"
             @keyup.enter="handleTxFilter"
           />
-          <button type="button" class="refresh-btn" @click="handleTxFilter">Filter</button>
+          <button type="button" class="refresh-btn" @click="handleTxFilter">
+            {{ t('goldAdmin.filter') }}
+          </button>
           <button
             type="button"
             class="refresh-btn refresh-btn--ghost"
@@ -349,27 +360,27 @@ onMounted(async () => {
               }
             "
           >
-            Clear
+            {{ t('goldAdmin.clear') }}
           </button>
         </div>
 
         <p v-if="txError" class="state-error" role="alert">{{ txError }}</p>
         <p v-else-if="txLoading && transactions.length === 0" class="state-message">
-          Loading transactions…
+          {{ t('goldAdmin.loadingTx') }}
         </p>
-        <p v-else-if="transactions.length === 0" class="state-message">No transactions found.</p>
+        <p v-else-if="transactions.length === 0" class="state-message">{{ t('goldAdmin.noTx') }}</p>
 
         <div v-else class="tx-table-wrap">
           <table class="tx-table" aria-label="Gold token transaction log">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Player</th>
-                <th class="col-amount">Amount (g)</th>
-                <th>Before</th>
-                <th>After</th>
-                <th>Admin</th>
-                <th>Note</th>
+                <th>{{ t('account.date') }}</th>
+                <th>{{ t('goldAdmin.player') }}</th>
+                <th class="col-amount">{{ t('goldAdmin.balanceG') }}</th>
+                <th>{{ t('goldAdmin.before') }}</th>
+                <th>{{ t('goldAdmin.after') }}</th>
+                <th>{{ t('goldAdmin.admin') }}</th>
+                <th>{{ t('account.note') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -385,7 +396,7 @@ onMounted(async () => {
                 <td>{{ formatGold(tx.balanceBefore) }}</td>
                 <td>{{ formatGold(tx.balanceAfter) }}</td>
                 <td class="col-email">{{ tx.adminEmail }}</td>
-                <td class="col-note">{{ tx.note ?? '—' }}</td>
+                <td class="col-note">{{ tx.note ?? t('account.dash') }}</td>
               </tr>
             </tbody>
           </table>

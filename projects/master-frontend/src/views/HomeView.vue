@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import { fetchGameServers, type GameServerSummary } from '@/lib/masterApi'
@@ -14,6 +15,7 @@ import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
+const { t } = useI18n()
 
 const servers = ref<GameServerSummary[]>([])
 const loading = ref(true)
@@ -52,7 +54,7 @@ async function loadServers() {
   try {
     servers.value = await fetchGameServers()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Unable to load game servers.'
+    errorMessage.value = error instanceof Error ? error.message : t('home.unableToLoadServers')
   } finally {
     loading.value = false
   }
@@ -66,7 +68,7 @@ async function handleProlong() {
     await auth.prolong(prolongMonths.value)
     prolongSuccess.value = true
   } catch (e: unknown) {
-    prolongError.value = e instanceof Error ? e.message : 'Failed to prolong subscription.'
+    prolongError.value = e instanceof Error ? e.message : t('home.prolongError')
   } finally {
     prolongLoading.value = false
   }
@@ -80,7 +82,7 @@ async function handleStartupPackClaim() {
     await auth.claimStartupPackOffer()
     startupPackSuccess.value = true
   } catch (e: unknown) {
-    startupPackError.value = e instanceof Error ? e.message : 'Failed to claim startup pack.'
+    startupPackError.value = e instanceof Error ? e.message : t('home.startupPack.error')
   } finally {
     startupPackLoading.value = false
   }
@@ -109,32 +111,41 @@ onMounted(() => {
     <!-- Hero panel -->
     <section class="hero-panel">
       <div class="hero-copy">
-        <span class="hero-title">CAPITALISM V</span>
-        <p class="eyebrow">Capitalism Network</p>
-        <p class="hero-text">
-          Free to play, <b>play to earn</b>, market simulation game - Build your business empire,
-          compete on the global leaderboard, and discover the economic ecosystem.
-        </p>
+        <span class="hero-title">{{ t('home.title') }}</span>
+        <p class="eyebrow">{{ t('home.eyebrow') }}</p>
+        <p class="hero-text">{{ t('home.heroText') }}</p>
 
         <nav class="site-nav">
           <template v-if="auth.isAuthenticated">
-            <span class="nav-player">{{ auth.player?.displayName ?? 'Account' }}</span>
-            <a class="nav-btn nav-btn--gold" href="/referrals/setup">Referral Setup</a>
-            <a class="nav-btn nav-btn--gold" href="/referrals/become">Become Referral</a>
-            <a class="nav-btn nav-btn--gold" href="/referrals/dashboard">Referral Dashboard</a>
-            <a class="nav-btn nav-btn--gold" href="/account">⬛ My Gold</a>
-            <a class="nav-btn nav-btn--gold" href="/gold-admin">⚙ Gold Admin</a>
-            <button class="nav-btn nav-btn--ghost" type="button" @click="logout">Sign out</button>
+            <span class="nav-player">{{
+              auth.player?.displayName ?? t('home.accountFallback')
+            }}</span>
+            <a class="nav-btn nav-btn--gold" href="/referrals/setup">{{
+              t('home.referralSetup')
+            }}</a>
+            <a class="nav-btn nav-btn--gold" href="/referrals/become">{{
+              t('home.becomeReferral')
+            }}</a>
+            <a class="nav-btn nav-btn--gold" href="/referrals/dashboard">{{
+              t('home.referralDashboard')
+            }}</a>
+            <a class="nav-btn nav-btn--gold" href="/support">{{ t('home.support') }}</a>
+            <a class="nav-btn nav-btn--gold" href="/support/admin">{{ t('home.supportAdmin') }}</a>
+            <a class="nav-btn nav-btn--gold" href="/account">⬛ {{ t('home.myGold') }}</a>
+            <a class="nav-btn nav-btn--gold" href="/gold-admin">⚙ {{ t('home.goldAdmin') }}</a>
+            <button class="nav-btn nav-btn--ghost" type="button" @click="logout">
+              {{ t('home.signOut') }}
+            </button>
           </template>
           <template v-else>
-            <a class="hero-cta" href="/login">Get started free →</a>
+            <a class="hero-cta" href="/login">{{ t('home.getStarted') }}</a>
           </template>
         </nav>
       </div>
 
       <div class="hero-metrics">
         <article class="metric-card">
-          <span class="metric-label">Active Servers</span>
+          <span class="metric-label">{{ t('home.activeServers') }}</span>
           <strong>{{ onlineCount }}</strong>
         </article>
         <div></div>
@@ -150,14 +161,14 @@ onMounted(() => {
           class="subscription-panel"
           aria-label="Subscription dashboard"
         >
-          <p class="section-kicker">Your account</p>
-          <h2>Subscription</h2>
+          <p class="section-kicker">{{ t('home.yourAccount') }}</p>
+          <h2>{{ t('home.subscription') }}</h2>
 
           <section class="startup-pack-card" aria-label="Startup Pack">
             <div class="startup-pack-header">
               <div>
-                <p class="startup-pack-kicker">New account bonus</p>
-                <h3>Startup Pack</h3>
+                <p class="startup-pack-kicker">{{ t('home.startupPack.kicker') }}</p>
+                <h3>{{ t('home.startupPack.title') }}</h3>
               </div>
               <span
                 :class="[
@@ -167,19 +178,20 @@ onMounted(() => {
                     : 'startup-pack-pill--claimed',
                 ]"
               >
-                {{ auth.player?.canClaimStartupPack ? 'Available once' : 'Claimed' }}
+                {{
+                  auth.player?.canClaimStartupPack
+                    ? t('home.startupPack.available')
+                    : t('home.startupPack.claimed')
+                }}
               </span>
             </div>
 
-            <p class="startup-pack-copy">
-              Claim once on the master portal to add 3 months of Pro to your account. The game
-              clients only reflect the resulting Pro status.
-            </p>
+            <p class="startup-pack-copy">{{ t('home.startupPack.copy') }}</p>
 
             <ul class="startup-pack-benefits">
-              <li>Stacks onto any active Pro time instead of replacing it.</li>
-              <li>Unlocks the shared Pro tier used across all Capitalism worlds.</li>
-              <li>Remains tied to your master identity, not a single game shard.</li>
+              <li>{{ t('home.startupPack.benefit1') }}</li>
+              <li>{{ t('home.startupPack.benefit2') }}</li>
+              <li>{{ t('home.startupPack.benefit3') }}</li>
             </ul>
 
             <div v-if="auth.player?.canClaimStartupPack" class="startup-pack-actions">
@@ -189,23 +201,27 @@ onMounted(() => {
                 :disabled="startupPackLoading"
                 @click="handleStartupPackClaim"
               >
-                {{ startupPackLoading ? 'Claiming…' : 'Claim Startup Pack' }}
+                {{
+                  startupPackLoading
+                    ? t('home.startupPack.claiming')
+                    : t('home.startupPack.claimButton')
+                }}
               </button>
-              <p class="startup-pack-note">One claim per master account.</p>
+              <p class="startup-pack-note">{{ t('home.startupPack.oneClaim') }}</p>
             </div>
 
             <div v-else class="startup-pack-state">
               <p class="startup-pack-note">
                 <template v-if="startupPackClaimedAtLabel">
-                  Claimed on {{ startupPackClaimedAtLabel }}.
+                  {{ t('home.startupPack.claimedOn', { date: startupPackClaimedAtLabel }) }}
                 </template>
-                <template v-else> Already claimed on this account. </template>
+                <template v-else> {{ t('home.startupPack.alreadyClaimed') }} </template>
               </p>
             </div>
 
             <p v-if="startupPackError" class="prolong-error" role="alert">{{ startupPackError }}</p>
             <p v-if="startupPackSuccess" class="prolong-success" role="status">
-              ✓ Startup Pack claimed successfully!
+              ✓ {{ t('home.startupPack.success') }}
             </p>
           </section>
 
@@ -214,7 +230,7 @@ onMounted(() => {
               <span
                 :class="['tier-badge', auth.subscription.tier === 'PRO' ? 'tier-pro' : 'tier-free']"
               >
-                {{ formatTierLabel(auth.subscription.tier) }}
+                {{ formatTierLabel(auth.subscription.tier, t) }}
               </span>
               <span
                 :class="[
@@ -222,45 +238,44 @@ onMounted(() => {
                   auth.subscription.isActive ? 'status-online' : 'status-offline',
                 ]"
               >
-                {{ formatStatusLabel(auth.subscription) }}
+                {{ formatStatusLabel(auth.subscription, t) }}
               </span>
             </div>
 
             <p v-if="auth.subscription.isActive" class="renewal-note">
-              {{ formatRenewalNote(auth.subscription) }}
+              {{ formatRenewalNote(auth.subscription, t) }}
             </p>
 
             <div
               v-if="auth.subscription.isActive && auth.subscription.tier === 'PRO'"
               class="pro-perks"
             >
-              <p class="perks-label">Pro unlocks</p>
+              <p class="perks-label">{{ t('home.perksLabel') }}</p>
               <ul class="perks-list">
-                <li>Advanced market analytics</li>
-                <li>Priority access to new cities</li>
-                <li>Unlimited company creation</li>
-                <li>Extended tick history</li>
+                <li>{{ t('home.perk1') }}</li>
+                <li>{{ t('home.perk2') }}</li>
+                <li>{{ t('home.perk3') }}</li>
+                <li>{{ t('home.perk4') }}</li>
               </ul>
             </div>
 
             <div v-else-if="!auth.subscription.isActive" class="upgrade-prompt">
               <p class="upgrade-text">
-                Upgrade to <strong>Pro</strong> to unlock advanced analytics, unlimited companies,
-                and priority server access.
+                {{ t('home.upgradeText') }}
               </p>
             </div>
           </div>
 
           <div v-if="auth.subscription?.canProlong" class="prolong-section">
             <p class="prolong-label">
-              {{ auth.subscription ? formatProlongLabel(auth.subscription) : '' }}
+              {{ auth.subscription ? formatProlongLabel(auth.subscription, t) : '' }}
             </p>
             <div class="prolong-controls">
               <div class="months-picker">
-                <label for="months-select">Months</label>
+                <label for="months-select">{{ t('home.months') }}</label>
                 <select id="months-select" v-model="prolongMonths">
                   <option v-for="m in [1, 3, 6, 12]" :key="m" :value="m">
-                    {{ m }} month{{ m > 1 ? 's' : '' }}
+                    {{ m }} {{ m > 1 ? t('home.monthsPlural') : t('home.month') }}
                   </option>
                 </select>
               </div>
@@ -270,36 +285,29 @@ onMounted(() => {
                 :disabled="prolongLoading"
                 @click="handleProlong"
               >
-                {{ prolongLoading ? 'Processing…' : 'Confirm' }}
+                {{ prolongLoading ? t('home.processing') : t('home.confirm') }}
               </button>
             </div>
             <p v-if="prolongError" class="prolong-error" role="alert">{{ prolongError }}</p>
             <p v-if="prolongSuccess" class="prolong-success" role="status">
-              ✓ Subscription extended successfully!
+              ✓ {{ t('home.prolongSuccess') }}
             </p>
           </div>
         </section>
 
         <!-- How it works for unauthenticated users -->
         <article v-else class="pitch-card">
-          <p class="section-kicker">How it works</p>
-          <h2>Play to earn</h2>
+          <p class="section-kicker">{{ t('home.howItWorks') }}</p>
+          <h2>{{ t('home.playToEarn') }}</h2>
           <ul>
-            <li>Players can swap ingame dollars to real-world currency.</li>
-            <li>
-              The in game gold is the real
-              <a href="https://asa.gold" target="_blank" rel="noreferrer">tokenized gold</a>. You
-              can mine it and trade it and use it between the different game servers.
-            </li>
-            <li>
-              Start playing with the free account. If you enjoy the game, consider upgrading to Pro
-              subscription for additional product manufacturing.
-            </li>
+            <li>{{ t('home.pitch1') }}</li>
+            <li>{{ t('home.pitch2') }}</li>
+            <li>{{ t('home.pitch3') }}</li>
           </ul>
 
           <div class="pitch-cta-area">
-            <p class="pitch-cta-text">Create a free account to start mining real gold.</p>
-            <a class="pitch-cta-btn" href="/login">Register free</a>
+            <p class="pitch-cta-text">{{ t('home.ctaText') }}</p>
+            <a class="pitch-cta-btn" href="/login">{{ t('home.registerFree') }}</a>
           </div>
         </article>
       </aside>
@@ -308,17 +316,19 @@ onMounted(() => {
       <section class="servers-panel" aria-labelledby="server-list-heading">
         <div class="servers-header">
           <div>
-            <p class="section-kicker">Live registry</p>
-            <h2 id="server-list-heading">Game servers</h2>
+            <p class="section-kicker">{{ t('home.liveRegistry') }}</p>
+            <h2 id="server-list-heading">{{ t('home.gameServers') }}</h2>
           </div>
 
-          <button class="refresh-button" type="button" @click="loadServers">Refresh</button>
+          <button class="refresh-button" type="button" @click="loadServers">
+            {{ t('common.refresh') }}
+          </button>
         </div>
 
-        <p v-if="loading" class="state-message">Loading registered servers...</p>
+        <p v-if="loading" class="state-message">{{ t('home.loadingServers') }}</p>
         <p v-else-if="errorMessage" class="state-message state-error">{{ errorMessage }}</p>
         <p v-else-if="servers.length === 0" class="state-message">
-          No servers have registered yet. Start a game server and it will appear here.
+          {{ t('home.noServers') }}
         </p>
 
         <ul v-else class="server-list">
@@ -331,38 +341,36 @@ onMounted(() => {
                 </p>
               </div>
               <span :class="['status-pill', server.isOnline ? 'status-online' : 'status-offline']">
-                {{ server.isOnline ? 'Online' : 'Offline' }}
+                {{ server.isOnline ? t('home.online') : t('home.offline') }}
               </span>
             </div>
 
             <p class="server-description">
-              {{
-                server.description || 'Economic simulation shard registered with the master node.'
-              }}
+              {{ server.description || t('home.defaultDescription') }}
             </p>
 
             <dl class="server-stats">
               <div>
-                <dt>Players</dt>
+                <dt>{{ t('home.players') }}</dt>
                 <dd>{{ server.playerCount }}</dd>
               </div>
               <div>
-                <dt>Companies</dt>
+                <dt>{{ t('home.companies') }}</dt>
                 <dd>{{ server.companyCount }}</dd>
               </div>
               <div>
-                <dt>Tick</dt>
+                <dt>{{ t('home.tick') }}</dt>
                 <dd>{{ server.currentTick }}</dd>
               </div>
               <div>
-                <dt>Heartbeat</dt>
+                <dt>{{ t('home.heartbeat') }}</dt>
                 <dd>{{ heartbeatLabel(server) }}</dd>
               </div>
             </dl>
 
             <div class="server-links">
               <a class="launch-link" :href="server.frontendUrl" target="_blank" rel="noreferrer">
-                Play on server
+                {{ t('home.playOnServer') }}
               </a>
               <a class="subtle-link" :href="server.graphqlUrl" target="_blank" rel="noreferrer">
                 GraphQL

@@ -175,9 +175,7 @@ describe('getLocalizedResourceName', () => {
 
 describe('getLocalizedProductName', () => {
   it('returns English name as-is', () => {
-    expect(getLocalizedProductName(makeProduct({ name: 'Wooden Chair', slug: 'wooden-chair' }), 'en')).toBe(
-      'Wooden Chair',
-    )
+    expect(getLocalizedProductName(makeProduct({ name: 'Wooden Chair', slug: 'wooden-chair' }), 'en')).toBe('Wooden Chair')
   })
 
   it('translates product slug tokens into Slovak', () => {

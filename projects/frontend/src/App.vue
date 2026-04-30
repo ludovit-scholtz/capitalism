@@ -7,7 +7,7 @@ import ChatSidePanel from '@/components/layout/ChatSidePanel.vue'
 import { usePwa } from '@/composables/usePwa'
 import { useAuthStore } from '@/stores/auth'
 import { useGameStateStore } from '@/stores/gameState'
-import { useNewsStore } from '@/stores/news'
+import { usesStore } from '@/stores/news'
 import { useGameAdminStore } from '@/stores/gameAdmin'
 import { useChatStore } from '@/stores/chat'
 
@@ -15,7 +15,7 @@ const { t } = useI18n()
 const { isOffline, updateAvailable, acceptUpdate } = usePwa()
 const auth = useAuthStore()
 const gameStateStore = useGameStateStore()
-const newsStore = useNewsStore()
+const newsStore = usesStore()
 const gameAdminStore = useGameAdminStore()
 const chatStore = useChatStore()
 gameStateStore.start()
@@ -96,3 +96,4 @@ watch(
     <ChatSidePanel v-if="auth.isAuthenticated" />
   </div>
 </template>
+

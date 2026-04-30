@@ -8,8 +8,13 @@ import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { deepEqual } from '@/lib/utils'
 import { getActiveCompany } from '@/lib/accountContext'
-import type { LoanOfferSummary, LoanSummary, BankDepositSummary, BankInfoSummary, Company, PlayerBankAccountSummary } from '@/types'
-import { formatLoanDuration, formatCurrency, formatPercent, loanStatusClass } from '@/lib/loanHelpers'
+import UiStateLoading from '@/components/ui/UiStateLoading.vue'
+import UiStateError from '@/components/ui/UiStateError.vue'
+import UiStateEmpty from '@/components/ui/UiStateEmpty.vue'
+import type { LoanSummary, BankDepositSummary, BankInfoSummary, Company, PlayerBankAccountSummary } from '@/types'
+import { formatCurrency, formatPercent, loanStatusClass } from '@/lib/loanHelpers'
+import BankLiquidityPanel from '@/components/bank/BankLiquidityPanel.vue'
+import BankCustomerView from '@/components/bank/BankCustomerView.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -37,16 +42,6 @@ const isOwner = computed(() => {
 
 // Customer-specific state
 const myDepositsHere = ref<BankDepositSummary[]>([])
-const customerDepositLoading = ref(false)
-const customerDepositError = ref<string | null>(null)
-const customerDepositSuccess = ref(false)
-
-// Account-style deposit management (customer view)
-const showWithdrawForm = ref(false)
-const withdrawAmount = ref(0)
-const withdrawLoading = ref(false)
-const withdrawError = ref<string | null>(null)
-const withdrawSuccess = ref(false)
 // My active loans at this bank (customer view)
 const myLoansHere = ref<LoanSummary[]>([])
 // Operating bank accounts matching the bank's city currency (customer view)
@@ -237,27 +232,6 @@ const MY_LOANS_QUERY = `
   }
 `
 
-const CREATE_DEPOSIT_MUTATION = `
-  mutation OpenBankAccount($input: OpenBankAccountInput!) {
-    openBankAccount(input: $input) {
-      id
-      amount
-      depositInterestRatePercent
-      isActive
-    }
-  }
-`
-
-const WITHDRAW_DEPOSIT_MUTATION = `
-  mutation CloseBankAccount($input: CloseBankAccountInput!) {
-    closeBankAccount(input: $input) {
-      id
-      amount
-      isActive
-    }
-  }
-`
-
 const INITIATE_BASE_DEPOSIT_MUTATION = `
   mutation InitiateBaseDeposit($bankBuildingId: UUID!) {
     initiateBaseDeposit(bankBuildingId: $bankBuildingId) {
@@ -416,110 +390,8 @@ async function submitBaseDeposit() {
   }
 }
 
-// ── Customer view helpers ─────────────────────────────────────────────────────
-
 const activeCompany = computed(() => getActiveCompany(auth.player, userCompanies.value))
 const isCompanyAccountActive = computed(() => auth.player?.activeAccountType === 'COMPANY' && !!activeCompany.value)
-const directBorrowingOption = computed<LoanOfferSummary | null>(() => {
-  if (!bankInfo.value?.baseCapitalDeposited) {
-    return null
-  }
-
-  return {
-    id: bankInfo.value.bankBuildingId,
-    bankBuildingId: bankInfo.value.bankBuildingId,
-    bankBuildingName: bankInfo.value.bankBuildingName,
-    cityId: bankInfo.value.cityId,
-    cityName: bankInfo.value.cityName,
-    lenderCompanyId: bankInfo.value.lenderCompanyId,
-    lenderCompanyName: bankInfo.value.lenderCompanyName,
-    annualInterestRatePercent: bankInfo.value.lendingInterestRatePercent,
-    maxPrincipalPerLoan: Math.max(bankInfo.value.availableLendingCapacity, 0),
-    totalCapacity: bankInfo.value.lendableCapacity,
-    usedCapacity: bankInfo.value.outstandingLoanPrincipal,
-    remainingCapacity: Math.max(bankInfo.value.availableLendingCapacity, 0),
-    durationTicks: 8760,
-    isActive: bankInfo.value.availableLendingCapacity > 0,
-    createdAtTick: 0,
-    createdAtUtc: '',
-  }
-})
-
-// Account-style aggregation: treat all active non-base-capital deposits from active company as one account
-const myActiveDepositsHere = computed(() => myDepositsHere.value.filter((d) => d.isActive && !d.isBaseCapital))
-const hasCustomerAccount = computed(() => myActiveDepositsHere.value.length > 0)
-const myAccountBalance = computed(() => myActiveDepositsHere.value.reduce((sum, d) => sum + d.amount, 0))
-const myAccountInterestEarned = computed(() => myActiveDepositsHere.value.reduce((sum, d) => sum + d.totalInterestPaid, 0))
-// The oldest tranche is used first for partial withdrawals.
-const myOldestDeposit = computed<BankDepositSummary | null>(() => {
-  const sorted = [...myActiveDepositsHere.value].sort((a, b) => a.depositedAtTick - b.depositedAtTick)
-  return sorted[0] ?? null
-})
-
-function formatOpenAccountError(errorMessage: string) {
-  if (!errorMessage.includes('Insufficient company funds to open this bank account.')) {
-    return errorMessage
-  }
-
-  return `${errorMessage} ${t('bank.zeroBalanceFundingHint')}`
-}
-
-async function submitCustomerDeposit() {
-  if (!activeCompany.value || !bankBuildingId.value) return
-  customerDepositLoading.value = true
-  customerDepositError.value = null
-  customerDepositSuccess.value = false
-  try {
-    await gqlRequest(CREATE_DEPOSIT_MUTATION, {
-      input: {
-        bankBuildingId: bankBuildingId.value,
-        depositorCompanyId: activeCompany.value.id,
-        amount: 0,
-      },
-    })
-    customerDepositSuccess.value = true
-    await loadData()
-    setTimeout(() => {
-      customerDepositSuccess.value = false
-    }, 3000)
-  } catch (err) {
-    customerDepositError.value = formatOpenAccountError(err instanceof Error ? err.message : String(err))
-  } finally {
-    customerDepositLoading.value = false
-  }
-}
-
-async function submitWithdraw() {
-  const deposit = myOldestDeposit.value
-  if (!deposit || !activeCompany.value) {
-    withdrawError.value = 'No active deposit found to withdraw from.'
-    return
-  }
-  const amount = Math.min(withdrawAmount.value, deposit.amount)
-  withdrawLoading.value = true
-  withdrawError.value = null
-  withdrawSuccess.value = false
-  try {
-    await gqlRequest(WITHDRAW_DEPOSIT_MUTATION, {
-      input: { depositId: deposit.id, amount },
-    })
-    withdrawSuccess.value = true
-    showWithdrawForm.value = false
-    withdrawAmount.value = 0
-    await loadData()
-    setTimeout(() => {
-      withdrawSuccess.value = false
-    }, 3000)
-  } catch (err) {
-    withdrawError.value = err instanceof Error ? err.message : String(err)
-  } finally {
-    withdrawLoading.value = false
-  }
-}
-
-function navigateToForexTransfer() {
-  router.push('/forex?tab=transfer')
-}
 </script>
 
 <template>
@@ -536,7 +408,7 @@ function navigateToForexTransfer() {
         </div>
         <h1 class="page-title text-4xl font-black tracking-tight text-body">{{ bankInfo?.bankBuildingName ?? t('bank.customerView') }}</h1>
         <p class="page-subtitle flex flex-wrap items-center gap-2 text-sm text-muted sm:text-base">
-          {{ bankInfo?.lenderCompanyName }} · {{ bankInfo?.cityName }}
+          {{ bankInfo?.lenderCompanyName }} • {{ bankInfo?.cityName }}
           <span v-if="bankInfo?.cityCurrencyCode" class="currency-badge">{{ bankInfo.cityCurrencyCode }}</span>
         </p>
       </template>
@@ -545,15 +417,9 @@ function navigateToForexTransfer() {
       </template>
     </div>
 
-    <div v-if="loading" class="loading-state">
-      <div class="spinner" />
-      <span>{{ t('common.loading') }}</span>
-    </div>
+    <UiStateLoading v-if="loading" :label="t('common.loading')" />
 
-    <div v-else-if="error" class="error-state">
-      <p class="error-message">{{ error }}</p>
-      <button class="btn btn-secondary" @click="() => loadData()">{{ t('common.retry') }}</button>
-    </div>
+    <UiStateError v-else-if="error" :message="error" :retry-label="t('common.retry')" @retry="loadData" />
 
     <template v-else>
       <!-- ── OWNER VIEW ─────────────────────────────────────────────── -->
@@ -650,72 +516,15 @@ function navigateToForexTransfer() {
           </div>
         </div>
 
-        <!-- ── Liquidity Health Panel (owner view) ──────────────────────────── -->
-        <section v-if="bankInfo && bankInfo.baseCapitalDeposited && bankInfo.liquidityStatus" class="liquidity-section">
-          <h2 class="section-title">{{ t('bank.liquidityHealth') }}</h2>
-          <div class="liquidity-status-banner" :class="`liquidity-${bankInfo.liquidityStatus.toLowerCase()}`">
-            <span class="liquidity-status-label">{{ t(`bank.liquidityStatus.${bankInfo.liquidityStatus}`) }}</span>
-            <span class="liquidity-status-hint">{{ t(`bank.liquidityStatusHint.${bankInfo.liquidityStatus}`) }}</span>
-          </div>
-
-          <div class="liquidity-grid">
-            <div class="liquidity-stat">
-              <span class="liquidity-stat-label">{{ t('bank.availableCash') }}</span>
-              <span class="liquidity-stat-value" :class="(bankInfo.availableCash ?? 0) >= (bankInfo.reserveRequirement ?? 0) ? 'positive' : 'negative'">
-                {{ fmt(bankInfo.availableCash ?? 0) }}
-              </span>
-            </div>
-            <div class="liquidity-stat">
-              <span class="liquidity-stat-label">{{ t('bank.reserveRequirement') }}</span>
-              <span class="liquidity-stat-value">{{ fmt(bankInfo.reserveRequirement ?? 0) }}</span>
-              <span class="liquidity-stat-hint">{{ t('bank.reserveInfo') }}</span>
-            </div>
-            <div class="liquidity-stat">
-              <span class="liquidity-stat-label">{{ t('bank.reserveShortfall') }}</span>
-              <span class="liquidity-stat-value" :class="(bankInfo.reserveShortfall ?? 0) > 0 ? 'negative' : 'positive'">
-                {{ (bankInfo.reserveShortfall ?? 0) > 0 ? fmt(bankInfo.reserveShortfall) : t('bank.noReserveShortfall') }}
-              </span>
-            </div>
-            <div class="liquidity-stat" :class="{ 'liquidity-stat-warning': (bankInfo.centralBankDebt ?? 0) > 0 }">
-              <span class="liquidity-stat-label">{{ t('bank.centralBankDebt') }}</span>
-              <span class="liquidity-stat-value" :class="(bankInfo.centralBankDebt ?? 0) > 0 ? 'negative' : 'positive'">
-                {{ (bankInfo.centralBankDebt ?? 0) > 0 ? fmt(bankInfo.centralBankDebt) : fmt(0) }}
-              </span>
-              <span v-if="(bankInfo.centralBankDebt ?? 0) > 0" class="liquidity-stat-hint">
-                {{ t('bank.centralBankRate') }}: {{ formatPercent(bankInfo.centralBankInterestRatePercent ?? 2) }} p.a.
-              </span>
-            </div>
-          </div>
-
-          <!-- Central-bank debt context -->
-          <div v-if="(bankInfo.centralBankDebt ?? 0) > 0" class="central-bank-notice">
-            <div class="notice-icon">⚠</div>
-            <div class="notice-body">
-              <strong>{{ t('bank.centralBankDebt') }}</strong>
-              <p>{{ t('bank.centralBankDebtHint', { rate: (bankInfo.centralBankInterestRatePercent ?? 2).toFixed(2) }) }}</p>
-            </div>
-          </div>
-
-          <!-- Recommended actions when under pressure -->
-          <div v-if="bankInfo.liquidityStatus !== 'HEALTHY'" class="recommended-actions">
-            <h3 class="actions-title">{{ t('bank.recommendedActions') }}</h3>
-            <ul class="actions-list">
-              <li v-if="(bankInfo.reserveShortfall ?? 0) > 0">{{ t('bank.actionAddDeposits') }}</li>
-              <li v-if="bankInfo.outstandingLoanPrincipal > 0">{{ t('bank.actionReduceLending') }}</li>
-              <li v-if="(bankInfo.centralBankDebt ?? 0) > 0">{{ t('bank.actionRecapitalize') }}</li>
-            </ul>
-          </div>
-
-          <p class="capitalization-info">{{ t('bank.capitalRequirementInfo') }}</p>
-        </section>
-        <!-- ── end liquidity panel ─────────────────────────────────────────── -->
+        <!-- Liquidity Health Panel -->
+        <BankLiquidityPanel v-if="bankInfo && bankInfo.baseCapitalDeposited && bankInfo.liquidityStatus" :bank-info="bankInfo" :currency-code="cityCurrency" />
 
         <!-- Depositors section -->
         <section v-if="bankInfo?.baseCapitalDeposited" class="depositors-section">
           <h2 class="section-title">{{ t('bank.bankDepositors') }}</h2>
-          <div v-if="bankDeposits.length === 0" class="empty-state">
-            <p>{{ t('bank.noBankDepositors') }}</p>
-          </div>
+          <UiStateEmpty v-if="bankDeposits.length === 0">
+            {{ t('bank.noBankDepositors') }}
+          </UiStateEmpty>
           <div v-else class="depositors-table">
             <table>
               <thead>
@@ -766,9 +575,9 @@ function navigateToForexTransfer() {
         <!-- Issued Loans -->
         <section v-if="bankInfo?.baseCapitalDeposited" class="loans-section">
           <h2 class="section-title">{{ t('bank.issuedLoans') }}</h2>
-          <div v-if="issuedLoans.length === 0" class="empty-state">
-            <p>{{ t('bank.noIssuedLoans') }}</p>
-          </div>
+          <UiStateEmpty v-if="issuedLoans.length === 0">
+            {{ t('bank.noIssuedLoans') }}
+          </UiStateEmpty>
           <div v-else class="loans-table">
             <table>
               <thead>
@@ -794,7 +603,7 @@ function navigateToForexTransfer() {
                     </span>
                     <div v-if="loan.missedPayments > 0" class="missed-hint">{{ loan.missedPayments }} missed</div>
                     <div v-if="loan.collateralBuildingId" class="collateral-inline">
-                      <span aria-hidden="true">🏛</span> {{ loan.collateralBuildingName }}
+                      <span aria-hidden="true">🔒</span> {{ loan.collateralBuildingName }}
                       <span v-if="loan.collateralAppraisedValue" class="collateral-inline-value"> ({{ fmt(loan.collateralAppraisedValue) }}) </span>
                     </div>
                   </td>
@@ -805,204 +614,20 @@ function navigateToForexTransfer() {
         </section> </template
       ><!-- end owner view -->
 
-      <!-- ── CUSTOMER VIEW ──────────────────────────────────────────── -->
+      <!-- Customer View -->
       <template v-else>
-        <!-- Bank profile card (rates + capacity) -->
-        <div v-if="bankInfo" class="customer-bank-profile rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
-          <div class="customer-rates-grid grid gap-4 md:grid-cols-3">
-            <div class="customer-rate-card deposit rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
-              <span class="customer-rate-label">{{ t('bank.depositInterestRate') }}</span>
-              <span class="customer-rate-value">{{ formatPercent(bankInfo.depositInterestRatePercent) }}</span>
-              <span class="customer-rate-hint">{{ t('bank.perYear') }}</span>
-            </div>
-            <div class="customer-rate-card lending rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
-              <span class="customer-rate-label">{{ t('bank.lendingInterestRate') }}</span>
-              <span class="customer-rate-value">{{ formatPercent(bankInfo.lendingInterestRatePercent) }}</span>
-              <span class="customer-rate-hint">{{ t('bank.perYear') }}</span>
-            </div>
-            <div class="customer-rate-card capacity rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
-              <span class="customer-rate-label">{{ t('bank.availableLendingCapacity') }}</span>
-              <span class="customer-rate-value" :class="bankInfo.availableLendingCapacity > 0 ? 'positive' : 'muted'">
-                {{ fmt(bankInfo.availableLendingCapacity) }}
-              </span>
-              <span class="customer-rate-hint">{{ t('bank.reserveInfo') }}</span>
-            </div>
-          </div>
-        </div>
-        <div class="flex flex-row gap-4">
-          <!-- Account-style deposit relationship -->
-          <section v-if="auth.isAuthenticated && isCompanyAccountActive" class="customer-account-section rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
-            <div class="account-header flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div class="account-header-info flex flex-row gap-2">
-                <h2 class="section-title text-2xl font-bold text-body grow">{{ t('bank.myAccount') }}</h2>
-                <span
-                  class="account-company-tag inline-flex w-fit items-center rounded-full border border-divider bg-card-raised px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted"
-                >
-                  {{ activeCompany?.name }}
-                </span>
-              </div>
-              <div class="account-actions flex flex-wrap gap-3" v-if="hasCustomerAccount && myAccountBalance > 0">
-                <button class="btn btn-secondary btn-sm" @click="navigateToForexTransfer">
-                  {{ t('bank.addFundsViaForex') }}
-                </button>
-                <button class="btn btn-outline btn-sm" @click="showWithdrawForm = !showWithdrawForm">
-                  {{ showWithdrawForm ? t('common.cancel') : t('bank.withdraw') }}
-                </button>
-              </div>
-            </div>
-
-            <!-- Operating bank accounts for this company in the bank's city currency -->
-            <div v-if="myOperatingAccountsHere.length > 0" class="mt-6 flex flex-col gap-3">
-              <h3 class="text-sm font-semibold uppercase tracking-wide text-muted">{{ t('bank.operatingAccounts') }}</h3>
-              <div
-                v-for="account in myOperatingAccountsHere"
-                :key="account.id"
-                class="operating-account-row flex items-center justify-between gap-4 rounded-2xl border border-divider bg-card-raised px-5 py-4 shadow-sm"
-              >
-                <div class="flex flex-col gap-0.5">
-                  <span class="text-xs text-muted">{{ t('bank.accountNumber') }}</span>
-                  <span class="font-mono text-sm font-semibold text-body">{{ account.accountNumber }}</span>
-                </div>
-                <div class="flex flex-col items-end gap-0.5">
-                  <span class="text-xs text-muted">{{ t('bank.accountBalance') }}</span>
-                  <span class="text-base font-bold text-body">{{ formatCurrency(account.balance, account.currencyCode) }}</span>
-                </div>
-                <router-link :to="`/bank-statement/${account.companyId}`" class="btn btn-outline btn-sm shrink-0">
-                  {{ t('bankStatement.title') }}
-                </router-link>
-              </div>
-            </div>
-
-            <!-- Account balance card -->
-            <div v-if="hasCustomerAccount" class="account-balance-card mt-6 rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
-              <div class="account-balance-main flex flex-col gap-1">
-                <span class="account-balance-label">{{ t('bank.accountBalance') }}</span>
-                <span class="account-balance-value">{{ fmt(myAccountBalance) }}</span>
-              </div>
-              <div class="account-balance-meta mt-4 flex flex-wrap items-center gap-3 text-sm">
-                <span class="account-interest-label">{{ t('bank.totalInterestEarned') }}</span>
-                <span class="account-interest-value positive">+{{ fmt(myAccountInterestEarned) }}</span>
-                <span v-if="bankInfo" class="account-rate-badge"> {{ formatPercent(bankInfo.depositInterestRatePercent) }} {{ t('bank.perYear') }} </span>
-              </div>
-            </div>
-
-            <!-- Withdraw form -->
-            <div v-if="showWithdrawForm" class="account-action-form mt-6 rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
-              <h3 class="action-form-title text-lg font-semibold text-body">{{ t('bank.withdraw') }}</h3>
-              <div class="form-group mt-4 flex flex-col gap-3">
-                <label for="withdraw-amount" class="text-sm font-semibold text-body">{{ t('bank.withdrawAmount') }}</label>
-                <input
-                  id="withdraw-amount"
-                  v-model.number="withdrawAmount"
-                  type="number"
-                  :min="1"
-                  :max="myAccountBalance"
-                  step="1000"
-                  class="form-input rounded-2xl border border-divider bg-card px-4 py-3 text-base text-body"
-                />
-                <span class="form-hint text-sm text-muted">{{ t('bank.maxWithdraw') }}: {{ fmt(myAccountBalance) }}</span>
-              </div>
-              <div v-if="withdrawError" class="error-message mt-4">{{ withdrawError }}</div>
-              <button class="btn btn-primary mt-4" :disabled="withdrawLoading || withdrawAmount <= 0 || withdrawAmount > myAccountBalance" @click="submitWithdraw">
-                {{ withdrawLoading ? t('common.loading') : t('bank.confirmWithdraw') }}
-              </button>
-            </div>
-
-            <!-- Success messages -->
-            <div v-if="withdrawSuccess" class="success-message">{{ t('bank.withdrawSuccess') }}</div>
-            <div v-if="customerDepositSuccess" class="success-message">{{ t('bank.depositCreated') }}</div>
-
-            <!-- First deposit (no account yet) -->
-            <div v-if="!hasCustomerAccount && !customerDepositSuccess" class="account-empty-state mt-6 flex flex-col gap-5 rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
-              <p class="account-empty-hint text-sm text-muted sm:text-base">{{ t('bank.openAccountHint', { rate: formatPercent(bankInfo?.depositInterestRatePercent ?? 0) }) }}</p>
-              <p class="rounded-2xl border border-divider bg-card px-4 py-3 text-sm text-muted">{{ t('bank.zeroBalanceFundingHint') }}</p>
-              <div v-if="bankInfo" class="repayment-preview rounded-2xl border border-divider bg-card px-4 py-4">
-                <div class="preview-row flex items-center justify-between gap-4 text-sm">
-                  <span>{{ t('bank.depositInterestRate') }}</span>
-                  <strong>{{ formatPercent(bankInfo.depositInterestRatePercent) }} {{ t('bank.perYear') }}</strong>
-                </div>
-              </div>
-              <div v-if="customerDepositError" class="error-message">{{ customerDepositError }}</div>
-              <button class="btn btn-primary" :disabled="customerDepositLoading" @click="submitCustomerDeposit">
-                {{ customerDepositLoading ? t('common.loading') : t('bank.openAccount') }}
-              </button>
-            </div>
-          </section>
-
-          <!-- Prompt to log in or switch account if not in company mode -->
-          <section v-else class="customer-deposit-form-section rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
-            <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.makeDeposit') }}</h2>
-            <div v-if="!auth.isAuthenticated" class="auth-prompt mt-4 flex flex-col gap-4">
-              <p>{{ t('bank.loginToLendDescription') }}</p>
-              <router-link to="/login" class="btn btn-primary">{{ t('auth.login') }}</router-link>
-            </div>
-            <div v-else class="auth-prompt mt-4">
-              <p>{{ t('bank.companyAccountRequired') }}</p>
-            </div>
-          </section>
-
-          <!-- Direct loan request -->
-          <section class="customer-loans-section rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
-            <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.borrowFromThisBank') }}</h2>
-            <div v-if="!directBorrowingOption" class="empty-state">
-              <p>{{ t('bank.noOffersFromBank') }}</p>
-            </div>
-            <div v-else class="customer-offers-grid mt-6 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              <div class="customer-offer-card rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
-                <div class="customer-offer-header">
-                  <span class="offer-rate-big">{{ formatPercent(directBorrowingOption.annualInterestRatePercent) }}</span>
-                  <span class="offer-rate-hint">{{ t('bank.perYear') }}</span>
-                </div>
-                <div class="customer-offer-stats">
-                  <div class="offer-stat-row">
-                    <span>{{ t('bank.maxPrincipal') }}</span>
-                    <strong>{{ fmt(directBorrowingOption.maxPrincipalPerLoan) }}</strong>
-                  </div>
-                  <div class="offer-stat-row">
-                    <span>{{ t('bank.remainingCapacity') }}</span>
-                    <strong :class="directBorrowingOption.remainingCapacity > 0 ? 'positive' : 'muted'">
-                      {{ fmt(directBorrowingOption.remainingCapacity) }}
-                    </strong>
-                  </div>
-                  <div class="offer-stat-row">
-                    <span>{{ t('bank.duration') }}</span>
-                    <strong>{{ formatLoanDuration(directBorrowingOption.durationTicks) }}</strong>
-                  </div>
-                </div>
-                <p class="offer-context-hint">{{ t('bank.directBorrowingHint') }}</p>
-
-                <!-- Loan request: dedicated full-page form -->
-                <div v-if="auth.isAuthenticated && isCompanyAccountActive && directBorrowingOption.remainingCapacity > 0">
-                  <button class="btn btn-primary btn-sm" @click="router.push({ name: 'bank-loan-request', params: { buildingId: bankBuildingId } })">
-                    {{ t('bank.acceptLoan') }}
-                  </button>
-                </div>
-                <div v-else-if="!auth.isAuthenticated">
-                  <router-link to="/login" class="btn btn-secondary btn-sm">{{ t('auth.login') }}</router-link>
-                </div>
-                <p v-else-if="!isCompanyAccountActive" class="offer-context-hint">{{ t('bank.companyAccountRequired') }}</p>
-                <p v-else class="offer-context-hint muted">{{ t('bank.noCapacityAvailable') }}</p>
-              </div>
-            </div>
-          </section>
-        </div>
-        <!-- My Loans at This Bank -->
-        <section v-if="auth.isAuthenticated && myLoansHere.length > 0" class="my-loans-here-section mt-8 rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
-          <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.myLoans') }}</h2>
-          <div class="loans-list mt-6 grid gap-4">
-            <div v-for="loan in myLoansHere" :key="loan.id" class="loan-row rounded-2xl border border-divider bg-card-raised p-4 shadow-sm">
-              <div class="loan-row-main">
-                <span class="loan-amount">{{ fmt(loan.remainingPrincipal) }}</span>
-                <span :class="['loan-status', loanStatusClass(loan.status)]">{{ loan.status }}</span>
-              </div>
-              <div v-if="loan.collateralBuildingId" class="collateral-badge">
-                <span aria-hidden="true">🏛</span> {{ t('bank.securedLoan') }}: {{ loan.collateralBuildingName }}
-                <span v-if="loan.collateralAppraisedValue" class="collateral-badge-value"> ({{ fmt(loan.collateralAppraisedValue) }}) </span>
-              </div>
-            </div>
-          </div>
-        </section> </template
-      ><!-- end customer view -->
+        <BankCustomerView
+          :bank-info="bankInfo"
+          :bank-building-id="bankBuildingId"
+          :is-authenticated="auth.isAuthenticated"
+          :active-company="activeCompany"
+          :is-company-account-active="isCompanyAccountActive"
+          :my-operating-accounts-here="myOperatingAccountsHere"
+          :my-loans-here="myLoansHere"
+          :my-deposits-here="myDepositsHere"
+          @data-changed="loadData(true)"
+        />
+      </template>
     </template>
   </main>
 </template>
@@ -1023,17 +648,6 @@ function navigateToForexTransfer() {
 
 .page-subtitle {
   color: var(--color-text-secondary);
-}
-
-.loading-state,
-.empty-state,
-.error-state {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-xl);
-  color: var(--color-text-secondary);
-  justify-content: center;
 }
 
 .stats-row {
@@ -1087,14 +701,6 @@ function navigateToForexTransfer() {
   margin-bottom: var(--spacing-xl);
 }
 
-.publish-form {
-  background: var(--color-background, #f9fafb);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--spacing-md);
-  margin-bottom: var(--spacing-md);
-}
-
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -1121,11 +727,6 @@ function navigateToForexTransfer() {
   color: var(--color-text-primary);
 }
 
-.form-hint {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-}
-
 .offers-table,
 .loans-table {
   overflow-x: auto;
@@ -1150,39 +751,6 @@ th {
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-}
-
-.capacity-bar {
-  height: 4px;
-  background: var(--color-border);
-  border-radius: 2px;
-  margin-top: 4px;
-  overflow: hidden;
-}
-
-.capacity-fill {
-  height: 100%;
-  background: var(--color-primary, #3b82f6);
-  border-radius: 2px;
-  transition: width 0.3s;
-}
-
-.status-pill {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.status-pill.status-active {
-  background: rgba(52, 211, 153, 0.15);
-  color: #4ade80;
-}
-
-.status-pill.status-inactive {
-  background: rgba(148, 163, 184, 0.12);
-  color: #94a3b8;
 }
 
 .loan-status-badge {
@@ -1276,21 +844,6 @@ th {
   border: 1px solid var(--color-border);
 }
 
-.spinner {
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--color-border);
-  border-top-color: var(--color-primary, #3b82f6);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 /* Bank info and rate configuration */
 .bank-info-section {
   background: var(--color-surface);
@@ -1346,12 +899,15 @@ th {
 .bank-stat-value.deposit-rate {
   color: var(--color-success, #22c55e);
 }
+
 .bank-stat-value.lending-rate {
   color: var(--color-warning, #f59e0b);
 }
+
 .bank-stat-value.positive {
   color: var(--color-success, #22c55e);
 }
+
 .bank-stat-value.negative {
   color: var(--color-error, #ef4444);
 }
@@ -1437,395 +993,6 @@ th {
   color: var(--color-text-primary);
 }
 
-.customer-bank-profile {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
-}
-
-.customer-rates-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 1rem;
-}
-
-.customer-rate-card {
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 1rem 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.customer-rate-label {
-  font-size: 0.78rem;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.customer-rate-value {
-  font-size: 1.6rem;
-  font-weight: 700;
-}
-
-.customer-rate-card.deposit .customer-rate-value {
-  color: #22c55e;
-}
-.customer-rate-card.lending .customer-rate-value {
-  color: #f59e0b;
-}
-.customer-rate-card.capacity .customer-rate-value.positive {
-  color: #22c55e;
-}
-.customer-rate-card.capacity .customer-rate-value.muted {
-  color: var(--color-text-muted);
-}
-
-.customer-rate-hint {
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
-}
-
-.customer-deposits-section {
-  margin-bottom: 1.5rem;
-}
-
-.deposits-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  margin-top: 0.75rem;
-}
-
-.deposit-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 0.875rem 1rem;
-}
-
-.deposit-card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
-
-.deposit-company {
-  font-weight: 600;
-}
-
-.deposit-rate-badge {
-  font-size: 0.82rem;
-  background: rgba(34, 197, 94, 0.12);
-  color: #22c55e;
-  padding: 0.15rem 0.5rem;
-  border-radius: 999px;
-  font-weight: 600;
-}
-
-.deposit-stats {
-  display: flex;
-  gap: 1.5rem;
-}
-
-.deposit-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-}
-
-.deposit-stat-label {
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
-}
-
-.deposit-stat-value {
-  font-weight: 600;
-  font-size: 0.95rem;
-}
-
-.deposit-stat-value.positive {
-  color: #22c55e;
-}
-
-.customer-deposit-form-section,
-.customer-loans-section {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 1.25rem 1.5rem;
-  margin-bottom: 1.5rem;
-}
-
-.auth-prompt {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  align-items: flex-start;
-  padding: 0.75rem 0;
-}
-
-.customer-deposit-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  max-width: 420px;
-}
-
-.active-company-display {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.5rem 0.75rem;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  font-size: 0.9rem;
-}
-
-.repayment-preview {
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  padding: 0.75rem 1rem;
-}
-
-.preview-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.875rem;
-  padding: 0.2rem 0;
-}
-
-.preview-row.total-row {
-  border-top: 1px solid var(--color-border);
-  margin-top: 0.25rem;
-  padding-top: 0.25rem;
-  font-weight: 600;
-}
-
-.customer-offers-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1rem;
-  margin-top: 0.75rem;
-}
-
-.customer-offer-card {
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 1rem 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.customer-offer-header {
-  display: flex;
-  align-items: baseline;
-  gap: 0.4rem;
-}
-
-.offer-rate-big {
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: #f59e0b;
-}
-
-.offer-rate-hint {
-  font-size: 0.82rem;
-  color: var(--color-text-muted);
-}
-
-.customer-offer-stats {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.offer-stat-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.85rem;
-  color: var(--color-text-secondary);
-}
-
-.offer-stat-row strong.positive {
-  color: #22c55e;
-}
-.offer-stat-row strong.muted {
-  color: var(--color-text-muted);
-}
-
-.customer-loan-request {
-  border-top: 1px solid var(--color-border);
-  padding-top: 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.risk-warning {
-  font-size: 0.78rem;
-  color: #f59e0b;
-}
-
-.loan-request-actions {
-  display: flex;
-  gap: 0.5rem;
-  justify-content: flex-end;
-}
-
-.offer-context-hint {
-  font-size: 0.82rem;
-  color: var(--color-text-muted);
-}
-
-.offer-context-hint.muted {
-  font-style: italic;
-}
-
-/* ── Liquidity Health Panel ──────────────────────────────────────────── */
-.liquidity-section {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-lg);
-  margin-bottom: var(--spacing-xl);
-}
-
-.liquidity-status-banner {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-radius: var(--radius-sm);
-  margin-bottom: var(--spacing-md);
-  font-size: 0.9rem;
-}
-
-.liquidity-healthy {
-  background: rgba(34, 197, 94, 0.1);
-  border: 1px solid rgba(34, 197, 94, 0.3);
-  color: #16a34a;
-}
-
-.liquidity-pressured {
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  color: #b45309;
-}
-
-.liquidity-critical {
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #dc2626;
-}
-
-.liquidity-status-label {
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.liquidity-status-hint {
-  font-size: 0.82rem;
-}
-
-.liquidity-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-md);
-}
-
-.liquidity-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  padding: var(--spacing-sm);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-secondary, rgba(0, 0, 0, 0.03));
-}
-
-.liquidity-stat-warning {
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  background: rgba(239, 68, 68, 0.05);
-}
-
-.liquidity-stat-label {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-text-secondary);
-}
-
-.liquidity-stat-value {
-  font-size: 1.1rem;
-  font-weight: 600;
-}
-
-.liquidity-stat-hint {
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
-}
-
-.central-bank-notice {
-  display: flex;
-  gap: var(--spacing-sm);
-  background: rgba(239, 68, 68, 0.07);
-  border: 1px solid rgba(239, 68, 68, 0.25);
-  border-radius: var(--radius-sm);
-  padding: var(--spacing-md);
-  margin-bottom: var(--spacing-md);
-  font-size: 0.85rem;
-}
-
-.notice-icon {
-  font-size: 1.1rem;
-  flex-shrink: 0;
-}
-
-.notice-body p {
-  margin: 0.25rem 0 0;
-  color: var(--color-text-secondary);
-}
-
-.recommended-actions {
-  margin-top: var(--spacing-md);
-  padding: var(--spacing-md);
-  background: rgba(245, 158, 11, 0.06);
-  border: 1px solid rgba(245, 158, 11, 0.2);
-  border-radius: var(--radius-sm);
-}
-
-.actions-title {
-  font-size: 0.85rem;
-  font-weight: 600;
-  margin: 0 0 var(--spacing-xs);
-}
-
-.actions-list {
-  margin: 0;
-  padding-left: 1.25rem;
-  font-size: 0.82rem;
-  color: var(--color-text-secondary);
-  line-height: 1.7;
-}
-
-.capitalization-info {
-  margin-top: var(--spacing-md);
-  font-size: 0.78rem;
-  color: var(--color-text-muted);
-  font-style: italic;
-}
-
 /* ── Base Capital Deposit Required ───────────────────────────────────────── */
 .base-deposit-required {
   display: flex;
@@ -1871,194 +1038,6 @@ th {
 .ineligible-tag {
   font-size: 0.78rem;
   color: var(--color-danger, #ef4444);
-}
-
-.collateral-stats {
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
-  display: flex;
-  gap: var(--spacing-sm);
-}
-
-.collateral-selected-summary {
-  background: rgba(59, 130, 246, 0.07);
-  border: 1px solid rgba(59, 130, 246, 0.2);
-  border-radius: var(--radius-sm);
-  padding: var(--spacing-sm) var(--spacing-md);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-}
-
-.capacity-bar-wrap {
-  height: 8px;
-  background: var(--color-border, rgba(0, 0, 0, 0.1));
-  border-radius: 4px;
-  overflow: hidden;
-  margin-top: 4px;
-}
-
-.capacity-bar {
-  height: 100%;
-  background: var(--color-primary, #3b82f6);
-  border-radius: 4px;
-  transition: width 0.2s;
-}
-
-.muted-hint {
-  color: var(--color-text-muted);
-  font-style: italic;
-}
-
-.error-inline {
-  color: var(--color-danger, #ef4444);
-  font-size: 0.85rem;
-}
-
-.my-loans-here-section {
-  margin-top: var(--spacing-lg);
-}
-
-.loans-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-}
-
-.loan-row {
-  padding: var(--spacing-sm) var(--spacing-md);
-  border: 1px solid var(--color-border, rgba(0, 0, 0, 0.1));
-  border-radius: var(--radius-sm);
-}
-
-.loan-row-main {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.loan-amount {
-  font-weight: 600;
-}
-
-.collateral-badge {
-  margin-top: 4px;
-  font-size: 0.85rem;
-  color: var(--color-text-secondary);
-}
-
-.collateral-badge-value {
-  color: var(--color-text-muted);
-}
-
-/* ── Account-style deposit section ─────────────────────────────── */
-.customer-account-section {
-  margin-bottom: var(--spacing-xl);
-  background: var(--color-surface, #fff);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg, 12px);
-  padding: var(--spacing-lg);
-}
-
-.account-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: var(--spacing-md);
-  flex-wrap: wrap;
-  gap: var(--spacing-sm);
-}
-
-.account-company-tag {
-  font-size: 0.85rem;
-  color: var(--color-text-secondary);
-}
-
-.account-actions {
-  display: flex;
-  gap: var(--spacing-sm);
-  flex-wrap: wrap;
-}
-
-.account-balance-card {
-  background: var(--color-bg-subtle, rgba(0, 0, 0, 0.03));
-  border-radius: var(--radius-md, 8px);
-  padding: var(--spacing-md) var(--spacing-lg);
-  margin-bottom: var(--spacing-md);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-}
-
-.account-balance-main {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.account-balance-label {
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-secondary);
-}
-
-.account-balance-value {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--color-text-primary, #111);
-  line-height: 1.1;
-}
-
-.account-balance-meta {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  flex-wrap: wrap;
-  margin-top: var(--spacing-xs);
-}
-
-.account-interest-label {
-  font-size: 0.8rem;
-  color: var(--color-text-secondary);
-}
-
-.account-interest-value {
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
-.account-rate-badge {
-  font-size: 0.8rem;
-  padding: 2px 8px;
-  border-radius: 99px;
-  background: var(--color-primary-bg, rgba(59, 130, 246, 0.1));
-  color: var(--color-primary, #3b82f6);
-  font-weight: 600;
-}
-
-.account-action-form {
-  background: var(--color-surface-raised, rgba(0, 0, 0, 0.02));
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md, 8px);
-  padding: var(--spacing-md);
-  margin-bottom: var(--spacing-md);
-}
-
-.action-form-title {
-  font-size: 1rem;
-  font-weight: 600;
-  margin: 0 0 var(--spacing-md) 0;
-}
-
-.account-empty-state {
-  padding: var(--spacing-md);
-}
-
-.account-empty-hint {
-  color: var(--color-text-secondary);
-  margin-bottom: var(--spacing-md);
-  font-size: 0.95rem;
 }
 
 .currency-badge {
