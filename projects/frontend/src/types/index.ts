@@ -1921,4 +1921,3 @@ export interface MediaHouseAnalyticsResult {
   strategyRating: string
   strategyTip: string
 }
-

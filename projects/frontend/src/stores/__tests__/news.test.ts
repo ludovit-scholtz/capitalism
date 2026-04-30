@@ -26,10 +26,7 @@ describe('usesStore', () => {
     const store = usesStore()
     await store.fetchFeed(true)
 
-    expect(gqlRequestMock).toHaveBeenCalledWith(
-      expect.stringContaining('gameNewsFeed(includeDrafts: $includeDrafts)'),
-      { includeDrafts: true },
-    )
+    expect(gqlRequestMock).toHaveBeenCalledWith(expect.stringContaining('gameNewsFeed(includeDrafts: $includeDrafts)'), { includeDrafts: true })
     expect(store.unreadCount).toBe(2)
   })
 
@@ -43,10 +40,7 @@ describe('usesStore', () => {
     const store = usesStore()
     const unreadCount = await store.fetchUnreadCount()
 
-    expect(gqlRequestMock).toHaveBeenCalledWith(
-      expect.stringContaining('query GameNewsUnreadCount($includeDrafts: Boolean!)'),
-      { includeDrafts: false },
-    )
+    expect(gqlRequestMock).toHaveBeenCalledWith(expect.stringContaining('query GameNewsUnreadCount($includeDrafts: Boolean!)'), { includeDrafts: false })
     expect(unreadCount).toBe(5)
     expect(store.unreadCount).toBe(5)
   })
@@ -92,13 +86,9 @@ describe('usesStore', () => {
 
     await store.markRead(['entry-1'])
 
-    expect(gqlRequestMock).toHaveBeenCalledWith(
-      expect.stringContaining('mutation MarkGameNewsRead($input: MarkGameNewsReadInput!)'),
-      { input: { entryIds: ['entry-1'] } },
-    )
+    expect(gqlRequestMock).toHaveBeenCalledWith(expect.stringContaining('mutation MarkGameNewsRead($input: MarkGameNewsReadInput!)'), { input: { entryIds: ['entry-1'] } })
     expect(store.feed?.items[0]?.isRead).toBe(true)
     expect(store.feed?.items[1]?.isRead).toBe(false)
     expect(store.unreadCount).toBe(1)
   })
 })
-

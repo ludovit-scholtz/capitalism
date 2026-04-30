@@ -235,24 +235,17 @@ async function loadCollateralBuildingsWithSchemaFallback(): Promise<CollateralEl
   }
 
   try {
-    const result = await gqlRequest<{ myCollateralBuildings: CollateralEligibilitySummary[] }>(
-      MY_COLLATERAL_BUILDINGS_QUERY,
-      { bankBuildingId: bankBuildingId.value },
-    )
+    const result = await gqlRequest<{ myCollateralBuildings: CollateralEligibilitySummary[] }>(MY_COLLATERAL_BUILDINGS_QUERY, { bankBuildingId: bankBuildingId.value })
     return result.myCollateralBuildings ?? []
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    const missingArgument =
-      message.includes('The argument `bankBuildingId` does not exist.') ||
-      message.includes('The following variables were not used: bankBuildingId.')
+    const missingArgument = message.includes('The argument `bankBuildingId` does not exist.') || message.includes('The following variables were not used: bankBuildingId.')
 
     if (!missingArgument) {
       throw err
     }
 
-    const legacy = await gqlRequest<{ myCollateralBuildings: CollateralEligibilitySummary[] }>(
-      MY_COLLATERAL_BUILDINGS_LEGACY_QUERY,
-    )
+    const legacy = await gqlRequest<{ myCollateralBuildings: CollateralEligibilitySummary[] }>(MY_COLLATERAL_BUILDINGS_LEGACY_QUERY)
     return legacy.myCollateralBuildings ?? []
   }
 }
