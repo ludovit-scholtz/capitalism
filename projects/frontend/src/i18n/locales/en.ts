@@ -75,6 +75,10 @@ export default {
       'Weekly and monthly city market reports will appear here once enough trade activity has been recorded. Reports are generated automatically at weekly and monthly tick boundaries.',
     untitled: 'Untitled entry',
     unread: 'New',
+    previousPage: 'Previous',
+    nextPage: 'Next',
+    pageLabel: 'Page {page} of {total}',
+    paginationStatus: 'Showing {from}-{to} of {total} entries',
   },
   admin: {
     eyebrow: 'Game administration',

@@ -74,6 +74,10 @@ export default {
     marketReportEmptyBody: 'Týždenné a mesačné trhové správy pre jednotlivé mestá sa zobrazia tu, keď bude zaznamenaná dostatočná obchodná aktivita. Správy sa generujú automaticky.',
     untitled: 'Záznam bez názvu',
     unread: 'Nové',
+    previousPage: 'Predchádzajúca',
+    nextPage: 'Ďalšia',
+    pageLabel: 'Strana {page} z {total}',
+    paginationStatus: 'Zobrazené {from}-{to} z {total} záznamov',
   },
   admin: {
     eyebrow: 'Správa hry',

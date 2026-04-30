@@ -14,12 +14,14 @@ const newsStore = usesStore()
 
 const filter = ref<'ALL' | 'NEWS' | 'CHANGELOG' | 'MARKET_REPORT'>('ALL')
 const viewError = ref<string | null>(null)
+const currentPage = ref(1)
+const pageSize = 10
 
 /** IDs that were unread when the page first loaded – used to keep "" badges
  *  visible even after the background markRead call completes. */
 const initiallyUnreadIds = ref<Set<string>>(new Set())
 
-const entries = computed(() => {
+const filteredEntries = computed(() => {
   const items = newsStore.feed?.items ?? []
   if (filter.value === 'ALL') {
     return items
@@ -27,6 +29,42 @@ const entries = computed(() => {
 
   return items.filter((entry) => entry.entryType === filter.value)
 })
+
+const totalPages = computed(() => {
+  const total = filteredEntries.value.length
+  return Math.max(1, Math.ceil(total / pageSize))
+})
+
+const pagedEntries = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return filteredEntries.value.slice(start, start + pageSize)
+})
+
+const pageFrom = computed(() => {
+  if (filteredEntries.value.length === 0) return 0
+  return (currentPage.value - 1) * pageSize + 1
+})
+
+const pageTo = computed(() => Math.min(currentPage.value * pageSize, filteredEntries.value.length))
+
+const canGoPrev = computed(() => currentPage.value > 1)
+const canGoNext = computed(() => currentPage.value < totalPages.value)
+
+function goToPrevPage() {
+  if (!canGoPrev.value) {
+    return
+  }
+
+  currentPage.value -= 1
+}
+
+function goToNextPage() {
+  if (!canGoNext.value) {
+    return
+  }
+
+  currentPage.value += 1
+}
 
 function getLocalization(entry: GamesEntry) {
   return pickGamesLocalization(entry.localizations, locale.value)
@@ -84,6 +122,7 @@ function entryTypePillClass(entryType: string): string {
 
 async function loadFeed() {
   viewError.value = null
+  currentPage.value = 1
 
   try {
     const feed = await newsStore.fetchFeed(false)
@@ -136,7 +175,7 @@ onMounted(async () => {
                 ? 'bg-[rgba(255,138,0,0.18)] border-[rgba(255,138,0,0.5)] text-[#ffd7a3]'
                 : 'border-divider text-muted'
             "
-            @click="filter = 'ALL'"
+            @click="filter = 'ALL'; currentPage = 1"
           >
             {{ t('news.filterAll') }}
           </button>
@@ -148,7 +187,7 @@ onMounted(async () => {
                 ? 'bg-[rgba(255,138,0,0.18)] border-[rgba(255,138,0,0.5)] text-[#ffd7a3]'
                 : 'border-divider text-muted'
             "
-            @click="filter = 'NEWS'"
+            @click="filter = 'NEWS'; currentPage = 1"
           >
             {{ t('news.filters') }}
           </button>
@@ -160,7 +199,7 @@ onMounted(async () => {
                 ? 'bg-[rgba(255,138,0,0.18)] border-[rgba(255,138,0,0.5)] text-[#ffd7a3]'
                 : 'border-divider text-muted'
             "
-            @click="filter = 'CHANGELOG'"
+            @click="filter = 'CHANGELOG'; currentPage = 1"
           >
             {{ t('news.filterChangelog') }}
           </button>
@@ -172,7 +211,7 @@ onMounted(async () => {
                 ? 'bg-[rgba(0,200,150,0.18)] border-[rgba(0,200,150,0.5)] text-[#7af5d9]'
                 : 'border-divider text-muted'
             "
-            @click="filter = 'MARKET_REPORT'"
+            @click="filter = 'MARKET_REPORT'; currentPage = 1"
           >
             📊 {{ t('news.filterMarketReport') }}
           </button>
@@ -199,7 +238,7 @@ onMounted(async () => {
       </div>
 
       <!-- Empty -->
-      <div v-else-if="entries.length === 0" class="state-card p-6 rounded-2xl border border-divider bg-card grid gap-4">
+      <div v-else-if="filteredEntries.length === 0" class="state-card p-6 rounded-2xl border border-divider bg-card grid gap-4">
         <p class="text-lg font-bold">{{ t('news.emptyTitle') }}</p>
         <p v-if="filter === 'MARKET_REPORT'" class="text-muted">{{ t('news.marketReportEmptyBody') }}</p>
         <p v-else class="text-muted">{{ t('news.emptyBody') }}</p>
@@ -207,8 +246,38 @@ onMounted(async () => {
 
       <!-- Entry list -->
       <div v-else class="grid gap-5">
+        <div
+          v-if="totalPages > 1"
+          class="pagination-controls flex items-center justify-between gap-4 rounded-xl border border-divider bg-card px-4 py-3 max-sm:flex-col max-sm:items-stretch"
+        >
+          <p class="text-sm text-muted">
+            {{ t('news.paginationStatus', { from: pageFrom, to: pageTo, total: filteredEntries.length }) }}
+          </p>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              :disabled="!canGoPrev"
+              @click="goToPrevPage"
+            >
+              {{ t('news.previousPage') }}
+            </button>
+            <p class="text-sm text-muted min-w-30 text-center">
+              {{ t('news.pageLabel', { page: currentPage, total: totalPages }) }}
+            </p>
+            <button
+              type="button"
+              class="btn btn-secondary"
+              :disabled="!canGoNext"
+              @click="goToNextPage"
+            >
+              {{ t('news.nextPage') }}
+            </button>
+          </div>
+        </div>
+
         <article
-          v-for="entry in entries"
+          v-for="entry in pagedEntries"
           :key="entry.id"
           class="news-card p-6 rounded-2xl border shadow-sm"
           :class="{
