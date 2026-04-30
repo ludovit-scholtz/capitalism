@@ -45,37 +45,37 @@ function actionDebugTitle(action: ScheduledActionSummary): string {
 </script>
 
 <template>
-  <section class="pending-actions-timeline" aria-labelledby="pending-actions-title">
-    <h2 id="pending-actions-title" class="section-title">{{ t('pendingActions.title') }}</h2>
+  <section class="pending-actions-timeline mb-8" aria-labelledby="pending-actions-title">
+    <h2 id="pending-actions-title" class="section-title mb-4 text-lg font-bold text-body">{{ t('pendingActions.title') }}</h2>
 
-    <div v-if="loading" class="pending-loading">{{ t('common.loading') }}</div>
+    <div v-if="loading" class="pending-loading text-[0.9rem] text-muted">{{ t('common.loading') }}</div>
 
-    <div v-else-if="actions.length === 0" class="pending-empty" role="status">
-      <span class="empty-icon">✅</span>
+    <div v-else-if="actions.length === 0" class="pending-empty flex items-center gap-3 rounded-md border border-divider bg-white/5 px-5 py-4 text-[0.9rem] text-muted" role="status">
+      <span class="empty-icon text-xl">✅</span>
       <p>{{ t('pendingActions.empty') }}</p>
     </div>
 
-    <ol v-else class="actions-list">
-      <li v-for="action in actions" :key="action.id" class="action-item">
-        <span class="action-building-icon" aria-hidden="true">{{ getBuildingIcon(action.buildingType) }}</span>
-        <div class="action-body">
-          <div class="action-header-row">
-            <strong class="action-label">{{ actionLabel(action.actionType) }}</strong>
-            <span class="action-building-name">{{ action.buildingName }}</span>
+    <ol v-else class="actions-list m-0 flex list-none flex-col gap-3 p-0">
+      <li v-for="action in actions" :key="action.id" class="action-item flex items-center gap-4 rounded-md border border-divider bg-card-raised px-5 py-4 max-[640px]:flex-wrap">
+        <span class="action-building-icon shrink-0 text-2xl" aria-hidden="true">{{ getBuildingIcon(action.buildingType) }}</span>
+        <div class="action-body min-w-0 flex-1">
+          <div class="action-header-row mb-1 flex flex-wrap items-baseline gap-2">
+            <strong class="action-label text-sm font-semibold text-body">{{ actionLabel(action.actionType) }}</strong>
+            <span class="action-building-name overflow-hidden text-ellipsis whitespace-nowrap text-[0.8125rem] text-muted">{{ action.buildingName }}</span>
           </div>
-          <div class="action-meta">
+          <div class="action-meta mb-2 flex items-center gap-4">
             <span
               v-if="props.currentTick !== null"
-              class="applies-at"
+              class="applies-at text-xs text-muted"
               role="timer"
               :title="actionDebugTitle(action)"
             >
               {{ t('pendingActions.appliesAtTime', { time: formatApplyTime(action.appliesAtTick) }) }}
             </span>
           </div>
-          <div class="action-progress">
+          <div class="action-progress h-1 overflow-hidden rounded-sm bg-white/10">
             <div
-              class="progress-bar"
+              class="progress-bar h-full rounded-sm bg-brand transition-[width] duration-500 ease-in-out"
               :style="{
                 width:
                   action.totalTicksRequired > 0
@@ -99,7 +99,7 @@ function actionDebugTitle(action: ScheduledActionSummary): string {
         </div>
         <RouterLink
           :to="action.buildingType === 'BANK' ? `/bank/${action.buildingId}` : `/building/${action.buildingId}`"
-          class="btn btn-secondary action-link"
+          class="btn btn-secondary action-link shrink-0 px-3 py-1.5 text-[0.8125rem] max-[640px]:w-full max-[640px]:text-center"
           :aria-label="t('pendingActions.viewBuilding') + ': ' + action.buildingName"
         >
           {{ t('pendingActions.viewBuilding') }}
@@ -108,137 +108,3 @@ function actionDebugTitle(action: ScheduledActionSummary): string {
     </ol>
   </section>
 </template>
-
-<style scoped>
-.pending-actions-timeline {
-  margin-bottom: 2rem;
-}
-
-.section-title {
-  font-size: 1.125rem;
-  font-weight: 700;
-  margin-bottom: 1rem;
-  color: var(--color-text);
-}
-
-.pending-loading {
-  color: var(--color-text-secondary);
-  font-size: 0.9rem;
-}
-
-.pending-empty {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1rem 1.25rem;
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-secondary);
-  font-size: 0.9rem;
-}
-
-.empty-icon {
-  font-size: 1.25rem;
-}
-
-.actions-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.action-item {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem 1.25rem;
-  border-radius: var(--radius-md);
-  background: var(--color-surface-raised);
-  border: 1px solid var(--color-border);
-}
-
-.action-building-icon {
-  font-size: 1.5rem;
-  flex-shrink: 0;
-}
-
-.action-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.action-header-row {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.25rem;
-}
-
-.action-label {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.action-building-name {
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.action-meta {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 0.5rem;
-}
-
-.ticks-remaining {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--color-primary);
-}
-
-.applies-at {
-  font-size: 0.75rem;
-  color: var(--color-text-muted, var(--color-text-secondary));
-}
-
-.action-progress {
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.08);
-  overflow: hidden;
-}
-
-.progress-bar {
-  height: 100%;
-  border-radius: 2px;
-  background: var(--color-primary);
-  transition: width 0.5s ease;
-}
-
-.action-link {
-  flex-shrink: 0;
-  font-size: 0.8125rem;
-  padding: 0.375rem 0.75rem;
-}
-
-@media (max-width: 640px) {
-  .action-item {
-    flex-wrap: wrap;
-  }
-
-  .action-link {
-    width: 100%;
-    text-align: center;
-  }
-}
-</style>
