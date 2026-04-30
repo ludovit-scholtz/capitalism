@@ -67,97 +67,26 @@ function focusTab(index: number) {
 </script>
 
 <template>
-  <nav class="dashboard-tab-nav" aria-label="Dashboard sections">
-    <div ref="tabList" class="tab-list" role="tablist">
+  <nav class="dashboard-tab-nav mt-4 border-b border-divider" aria-label="Dashboard sections">
+    <div ref="tabList" class="tab-list flex gap-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist">
       <button
         v-for="(tab, index) in tabs"
         :key="tab.key"
         role="tab"
         :aria-selected="modelValue === tab.key"
         :tabindex="modelValue === tab.key ? 0 : -1"
-        :class="['tab-btn', { 'tab-btn--active': modelValue === tab.key }]"
+        :class="[
+          'tab-btn -mb-px flex whitespace-nowrap border-0 border-b-2 border-transparent bg-transparent px-4 py-2.5 text-sm font-medium text-muted transition-colors max-[480px]:px-3 max-[480px]:py-2 max-[480px]:text-[0.8125rem] hover:text-body focus-visible:rounded-t-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-page',
+          modelValue === tab.key ? 'tab-btn--active border-b-brand font-semibold text-brand' : '',
+        ]"
         @click="selectTab(tab.key)"
         @keydown="onKeyDown($event, index)"
       >
         <span class="tab-label">{{ tab.label }}</span>
-        <span v-if="tab.badge !== undefined && tab.badge > 0" class="tab-badge" aria-label="count">
+        <span v-if="tab.badge !== undefined && tab.badge > 0" class="tab-badge inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-[0.6875rem] font-bold text-white" aria-label="count">
           {{ tab.badge }}
         </span>
       </button>
     </div>
   </nav>
 </template>
-
-<style scoped>
-.dashboard-tab-nav {
-  margin: 1rem 0 0;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.tab-list {
-  display: flex;
-  gap: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.tab-list::-webkit-scrollbar {
-  display: none;
-}
-
-.tab-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.625rem 1rem;
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--color-text-secondary);
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  white-space: nowrap;
-  transition:
-    color 0.15s,
-    border-color 0.15s;
-  margin-bottom: -1px;
-}
-
-.tab-btn:hover {
-  color: var(--color-text);
-}
-
-.tab-btn:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
-  border-radius: 2px 2px 0 0;
-}
-
-.tab-btn--active {
-  color: var(--color-primary);
-  border-bottom-color: var(--color-primary);
-  font-weight: 600;
-}
-
-.tab-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.25rem;
-  height: 1.25rem;
-  padding: 0 0.3rem;
-  background: var(--color-primary);
-  color: #fff;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  border-radius: 999px;
-}
-
-@media (max-width: 480px) {
-  .tab-btn {
-    padding: 0.5rem 0.75rem;
-    font-size: 0.8125rem;
-  }
-}
-</style>

@@ -50,59 +50,14 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="city-selector">
-    <label for="city-select" class="city-selector-label"
+  <div class="city-selector flex flex-col gap-2">
+    <label for="city-select" class="city-selector-label text-sm font-medium text-muted"
       ><span>{{ $t('common.city') }}</span></label
     >
-    <select id="city-select" :value="selectedCityId || ''" @change="handleCityChange" :disabled="loading || error !== null" class="city-selector-select">
+    <select id="city-select" :value="selectedCityId || ''" @change="handleCityChange" :disabled="loading || error !== null" class="city-selector-select cursor-pointer rounded border border-divider bg-page px-3 py-2 text-sm text-body transition-colors hover:border-brand focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:cursor-not-allowed disabled:opacity-60">
       <option v-if="!selectedCityId" value="">{{ $t('common.selectCity') }}</option>
       <option v-for="city in cities" :key="city.id" :value="city.id">{{ city.name }} ({{ city.currencyCode }})</option>
     </select>
-    <div v-if="error" class="city-selector-error">{{ error }}</div>
+    <div v-if="error" class="city-selector-error text-xs text-danger">{{ error }}</div>
   </div>
 </template>
-
-<style scoped>
-.city-selector {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.city-selector-label {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--color-text-secondary, #666);
-}
-
-.city-selector-select {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--color-border, #ddd);
-  border-radius: 4px;
-  background-color: var(--color-background, white);
-  color: var(--color-text, #000);
-  font-size: 0.875rem;
-  cursor: pointer;
-  transition: border-color 0.2s;
-}
-
-.city-selector-select:hover:not(:disabled) {
-  border-color: var(--color-primary, #0066cc);
-}
-
-.city-selector-select:focus {
-  outline: none;
-  border-color: var(--color-primary, #0066cc);
-  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.1);
-}
-
-.city-selector-select:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.city-selector-error {
-  font-size: 0.75rem;
-  color: var(--color-error, #d32f2f);
-}
-</style>

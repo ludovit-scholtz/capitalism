@@ -27,157 +27,56 @@ const netProfit = computed(() => {
 const currencyCode = computed(() => props.ledger?.primaryCurrencyCode ?? 'EUR')
 
 function profitClass(value: number): string {
-  if (value > 0) return 'amount-positive'
-  if (value < 0) return 'amount-negative'
-  return 'amount-neutral'
+  if (value > 0) return 'text-secondary'
+  if (value < 0) return 'text-danger'
+  return 'text-muted'
 }
 </script>
 
 <template>
-  <div class="financial-summary-card" aria-labelledby="financial-summary-title">
-    <h3 id="financial-summary-title" class="financial-summary-title">
+  <div class="financial-summary-card rounded-md border border-divider bg-white/5 px-5 py-4" aria-labelledby="financial-summary-title">
+    <h3 id="financial-summary-title" class="financial-summary-title mb-3 text-[0.8125rem] font-bold uppercase tracking-[0.06em] text-muted">
       {{ t('financialSummary.title') }}
     </h3>
-    <div v-if="loading" class="financial-summary-metrics" aria-busy="true" aria-label="Loading financial data">
-      <div class="metric">
-        <span class="metric-label">{{ t('financialSummary.revenue') }}</span>
-        <span class="metric-value skeleton-line" aria-hidden="true"></span>
+    <div v-if="loading" class="financial-summary-metrics flex flex-wrap gap-4" aria-busy="true" aria-label="Loading financial data">
+      <div class="metric flex min-w-24 flex-col gap-1">
+        <span class="metric-label text-[0.6875rem] font-semibold uppercase tracking-[0.04em] text-muted">{{ t('financialSummary.revenue') }}</span>
+        <span class="metric-value skeleton-line inline-block h-5 w-[4.5rem] animate-pulse rounded bg-white/10" aria-hidden="true"></span>
       </div>
-      <div class="metric">
-        <span class="metric-label">{{ t('financialSummary.costs') }}</span>
-        <span class="metric-value skeleton-line" aria-hidden="true"></span>
+      <div class="metric flex min-w-24 flex-col gap-1">
+        <span class="metric-label text-[0.6875rem] font-semibold uppercase tracking-[0.04em] text-muted">{{ t('financialSummary.costs') }}</span>
+        <span class="metric-value skeleton-line inline-block h-5 w-[4.5rem] animate-pulse rounded bg-white/10" aria-hidden="true"></span>
       </div>
-      <div class="metric metric--profit">
-        <span class="metric-label">{{ t('financialSummary.netProfit') }}</span>
-        <span class="metric-value skeleton-line" aria-hidden="true"></span>
+      <div class="metric metric--profit ml-1 flex min-w-24 flex-col gap-1 border-l border-divider pl-4">
+        <span class="metric-label text-[0.6875rem] font-semibold uppercase tracking-[0.04em] text-muted">{{ t('financialSummary.netProfit') }}</span>
+        <span class="metric-value skeleton-line inline-block h-5 w-[4.5rem] animate-pulse rounded bg-white/10" aria-hidden="true"></span>
       </div>
     </div>
-    <div v-else-if="!ledger" class="financial-summary-empty">
+    <div v-else-if="!ledger" class="financial-summary-empty text-sm italic text-muted">
       {{ t('financialSummary.noData') }}
     </div>
-    <div v-else class="financial-summary-metrics">
-      <div class="metric">
-        <span class="metric-label">{{ t('financialSummary.revenue') }}</span>
-        <span class="metric-value amount-positive">
+    <div v-else class="financial-summary-metrics flex flex-wrap gap-4">
+      <div class="metric flex min-w-24 flex-col gap-1">
+        <span class="metric-label text-[0.6875rem] font-semibold uppercase tracking-[0.04em] text-muted">{{ t('financialSummary.revenue') }}</span>
+        <span class="metric-value text-[1.0625rem] font-bold tabular-nums text-secondary">
           <CurrencyAmount :amount="ledger.totalRevenue" :currency="currencyCode" :max-chars="12" />
         </span>
       </div>
-      <div class="metric">
-        <span class="metric-label">{{ t('financialSummary.costs') }}</span>
-        <span class="metric-value amount-negative">
+      <div class="metric flex min-w-24 flex-col gap-1">
+        <span class="metric-label text-[0.6875rem] font-semibold uppercase tracking-[0.04em] text-muted">{{ t('financialSummary.costs') }}</span>
+        <span class="metric-value text-[1.0625rem] font-bold tabular-nums text-danger">
           <CurrencyAmount :amount="totalCosts" :currency="currencyCode" :max-chars="12" />
         </span>
       </div>
-      <div class="metric metric--profit">
-        <span class="metric-label">{{ t('financialSummary.netProfit') }}</span>
-        <span class="metric-value" :class="profitClass(netProfit)">
+      <div class="metric metric--profit ml-1 flex min-w-24 flex-col gap-1 border-l border-divider pl-4">
+        <span class="metric-label text-[0.6875rem] font-semibold uppercase tracking-[0.04em] text-muted">{{ t('financialSummary.netProfit') }}</span>
+        <span class="metric-value text-[1.0625rem] font-bold tabular-nums" :class="profitClass(netProfit)">
           <CurrencyAmount :amount="netProfit" :currency="currencyCode" :max-chars="12" :sign="true" />
         </span>
       </div>
     </div>
-    <RouterLink v-if="ledger" :to="`/ledger/${ledger.companyId}`" class="financial-summary-link">
+    <RouterLink v-if="ledger" :to="`/ledger/${ledger.companyId}`" class="financial-summary-link mt-2.5 inline-block text-[0.8125rem] text-brand hover:underline">
       {{ t('financialSummary.viewFullLedger') }}
     </RouterLink>
   </div>
 </template>
-
-<style scoped>
-.financial-summary-card {
-  padding: 1rem 1.25rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-}
-
-.financial-summary-title {
-  margin: 0 0 0.75rem;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-secondary);
-}
-
-.financial-summary-loading,
-.financial-summary-empty {
-  font-size: 0.875rem;
-  color: var(--color-text-secondary);
-  font-style: italic;
-}
-
-.skeleton-line {
-  display: inline-block;
-  width: 4.5rem;
-  height: 1.25rem;
-  border-radius: 4px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.06) 25%, rgba(255, 255, 255, 0.12) 50%, rgba(255, 255, 255, 0.06) 75%);
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.4s ease-in-out infinite;
-}
-
-@keyframes skeleton-shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
-}
-
-.financial-summary-metrics {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.metric {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  min-width: 6rem;
-}
-
-.metric--profit {
-  border-left: 1px solid var(--color-border);
-  padding-left: 1rem;
-  margin-left: 0.25rem;
-}
-
-.metric-label {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--color-text-secondary);
-}
-
-.metric-value {
-  font-size: 1.0625rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.amount-positive {
-  color: var(--color-secondary);
-}
-
-.amount-negative {
-  color: var(--color-danger);
-}
-
-.amount-neutral {
-  color: var(--color-text-secondary);
-}
-
-.financial-summary-link {
-  display: inline-block;
-  margin-top: 0.625rem;
-  font-size: 0.8125rem;
-  color: var(--color-primary);
-  text-decoration: none;
-}
-
-.financial-summary-link:hover {
-  text-decoration: underline;
-}
-</style>

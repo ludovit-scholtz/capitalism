@@ -16,12 +16,17 @@ function setLocale(newLocale: SupportedLocale) {
 </script>
 
 <template>
-  <div class="language-switcher">
-    <div class="language-buttons" role="group" :aria-label="t('languageSwitcher.label')">
+  <div class="language-switcher flex items-center">
+    <div class="language-buttons flex gap-1 overflow-hidden rounded-sm border border-divider" role="group" :aria-label="t('languageSwitcher.label')">
       <button
         v-for="loc in SUPPORTED_LOCALES"
         :key="loc"
-        :class="['language-btn', { active: locale === loc }]"
+        :class="[
+          'language-btn min-w-8 border-0 px-2 py-1 text-center text-xs font-semibold transition-colors',
+          locale === loc
+            ? 'active bg-brand text-white hover:bg-brand-hover'
+            : 'bg-card-raised text-muted hover:bg-card hover:text-body',
+        ]"
         @click="setLocale(loc)"
         :aria-pressed="locale === loc"
       >
@@ -30,45 +35,3 @@ function setLocale(newLocale: SupportedLocale) {
     </div>
   </div>
 </template>
-
-<style scoped>
-.language-switcher {
-  display: flex;
-  align-items: center;
-}
-
-.language-buttons {
-  display: flex;
-  gap: 0.25rem;
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-}
-
-.language-btn {
-  background: var(--color-surface-raised);
-  color: var(--color-text-secondary);
-  border: none;
-  padding: 0.35rem 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s;
-  min-width: 2rem;
-  text-align: center;
-}
-
-.language-btn:hover {
-  background: var(--color-surface-hover);
-  color: var(--color-text);
-}
-
-.language-btn.active {
-  background: var(--color-primary);
-  color: white;
-}
-
-.language-btn.active:hover {
-  background: var(--color-primary-hover);
-}
-</style>

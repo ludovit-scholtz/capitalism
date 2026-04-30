@@ -746,20 +746,22 @@ useTickRefresh(async () => {
 
 <template>
   <div class="stocks-view">
-    <section class="stocks-hero">
+    <section class="stocks-hero pb-8 pt-14">
       <div class="container">
-        <p class="stocks-eyebrow">{{ t('stockExchange.eyebrow') }}</p>
-        <h1 class="stocks-title">{{ t('stockExchange.title') }}</h1>
-        <p class="stocks-subtitle">{{ t('stockExchange.subtitle') }}</p>
-        <div class="stocks-hero-meta">
-          <span class="stocks-tick-chip" :title="t('stockExchange.tickHint')"
-            ><span class="stocks-tick-label">{{ t('stockExchange.tick') }}</span
-            ><span class="stocks-tick-value">{{ currentTick !== null ? currentTick : '\u2014' }}</span></span
+        <p class="stocks-eyebrow mb-2 text-[0.8rem] font-bold uppercase tracking-[0.14em] text-brand">{{ t('stockExchange.eyebrow') }}</p>
+        <h1 class="stocks-title m-0">{{ t('stockExchange.title') }}</h1>
+        <p class="stocks-subtitle mt-3 max-w-4xl text-muted">{{ t('stockExchange.subtitle') }}</p>
+        <div class="stocks-hero-meta mt-4 flex flex-wrap gap-3">
+          <span
+            class="stocks-tick-chip inline-flex cursor-default select-none items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[0.78rem] text-muted"
+            :title="t('stockExchange.tickHint')"
+            ><span class="stocks-tick-label text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-brand">{{ t('stockExchange.tick') }}</span
+            ><span class="stocks-tick-value font-bold text-body">{{ currentTick !== null ? currentTick : '\u2014' }}</span></span
           >
         </div>
       </div>
     </section>
-    <div class="container stocks-body">
+    <div class="container stocks-body grid gap-6 pb-12">
       <div v-if="loading" class="state-box">
         <p>{{ t('common.loading') }}</p>
       </div>
@@ -768,7 +770,7 @@ useTickRefresh(async () => {
         <button class="btn btn-secondary" @click="() => void loadData()">{{ t('common.tryAgain') }}</button>
       </div>
       <template v-else
-        ><section v-if="personAccount" class="summary-grid">
+        ><section v-if="personAccount" class="summary-grid grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(160px,1fr))]">
           <article class="summary-card">
             <span class="summary-label">{{ t('stockExchange.totalNetWealth') }}</span
             ><strong>{{ formatCurrency(personAccount.totalNetWealth) }}</strong>
@@ -1247,76 +1249,6 @@ useTickRefresh(async () => {
 .stocks-view {
   min-height: 100vh;
   background: radial-gradient(circle at top, color-mix(in srgb, var(--color-primary) 10%, transparent), transparent 35%), var(--color-background);
-}
-
-.stocks-hero {
-  padding: 3.5rem 0 2rem;
-}
-
-.stocks-eyebrow {
-  margin: 0 0 0.5rem;
-  color: var(--color-primary);
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.stocks-title {
-  margin: 0;
-}
-
-.stocks-subtitle {
-  margin: 0.75rem 0 0;
-  max-width: 60rem;
-  color: var(--color-text-secondary);
-}
-
-.stocks-hero-meta {
-  display: flex;
-  margin-top: 1rem;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.stocks-tick-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 9999px;
-  padding: 0.25rem 0.75rem;
-  font-size: 0.78rem;
-  color: var(--color-text-secondary);
-  cursor: default;
-  user-select: none;
-}
-
-.stocks-tick-label {
-  font-weight: 600;
-  color: var(--color-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-size: 0.72rem;
-}
-
-.stocks-tick-value {
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  color: var(--color-text-primary);
-}
-
-.stocks-body {
-  display: grid;
-  gap: 1.5rem;
-  padding-bottom: 3rem;
-}
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 1rem;
 }
 
 .summary-card,
