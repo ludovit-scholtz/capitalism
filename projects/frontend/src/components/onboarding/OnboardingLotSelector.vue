@@ -327,4 +327,204 @@ onUnmounted(() => {
   </section>
 </template>
 
-<style scoped src="./OnboardingLotSelector.styles.css"></style>
+<style scoped>
+.lot-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.selector-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.selector-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.view-toggle {
+  display: inline-flex;
+  gap: 0.25rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.25rem;
+}
+
+.toggle-btn {
+  border: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.toggle-btn.active {
+  background: rgba(0, 71, 255, 0.12);
+  color: var(--color-text);
+}
+
+.selector-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 1rem;
+}
+
+.visual-panel,
+.detail-panel {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
+.map-panel {
+  min-height: 360px;
+}
+
+.list-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  max-height: 360px;
+  overflow: auto;
+}
+
+.lot-list-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  text-align: left;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  padding: 0.875rem;
+  cursor: pointer;
+}
+
+.lot-list-item.selected {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+.lot-list-header,
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.lot-list-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+}
+
+.lot-badges {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.badge.recommended {
+  background: rgba(0, 71, 255, 0.14);
+  color: var(--color-primary);
+}
+
+.badge.affordable {
+  background: rgba(0, 200, 83, 0.14);
+  color: var(--color-secondary);
+}
+
+.badge.muted {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text-secondary);
+}
+
+.detail-panel {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.detail-description,
+.empty-selection {
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.detail-grid dt {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  margin-bottom: 0.2rem;
+}
+
+.detail-grid dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.detail-grid dd.danger {
+  color: var(--color-danger);
+}
+
+.status-message {
+  margin: 0;
+  padding: 0.75rem;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.status-message.success {
+  color: var(--color-secondary);
+  background: rgba(0, 200, 83, 0.12);
+}
+
+.status-message.warning {
+  color: var(--color-tertiary);
+  background: rgba(255, 109, 0, 0.12);
+}
+
+@media (max-width: 900px) {
+  .selector-layout {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

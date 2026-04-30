@@ -467,4 +467,351 @@ function formatFactor(factor: string | null): string {
   </div>
 </template>
 
-<style scoped src="./MarketingAnalyticsView.styles.css"></style>
+<style scoped>
+.ca-view {
+  margin: 0 auto;
+}
+
+.ca-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+
+.ca-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-heading);
+  margin: 0 0 0.25rem;
+}
+
+.ca-subtitle {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.ca-company-label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin-bottom: 0.3rem;
+}
+
+.ca-company-select {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  padding: 0.4rem 0.75rem;
+  font-size: 0.9rem;
+}
+
+/* KPI row */
+.ca-kpi-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.ca-kpi-card {
+  flex: 1 1 160px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.ca-kpi-label {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ca-kpi-value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--color-heading);
+}
+
+.ca-kpi-roi {
+  color: var(--color-accent, #22c55e);
+}
+
+.ca-kpi-hint {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+/* Global recommendation */
+.ca-global-rec {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.ca-global-rec-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.ca-global-rec-title {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.ca-global-rec-body {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--color-text);
+}
+
+/* Rows grid */
+.ca-rows {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 1.25rem;
+}
+
+.ca-row-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ca-row-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.ca-row-identity {
+  min-width: 0;
+}
+
+.ca-row-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-heading);
+  margin: 0 0 0.15rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ca-row-building {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.ca-row-badges {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+/* Badges */
+.ca-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  border: 1px solid currentColor;
+}
+
+.ca-balance-premium-ok {
+  color: #22c55e;
+}
+.ca-balance-premium-risk {
+  color: #f87171;
+}
+.ca-balance-discount-brand {
+  color: #60a5fa;
+}
+.ca-balance-baseline {
+  color: var(--color-text-muted);
+}
+.ca-balance-building {
+  color: #a78bfa;
+}
+.ca-balance-none {
+  color: var(--color-text-muted);
+  opacity: 0.6;
+}
+
+.ca-impact-strong {
+  color: #22c55e;
+}
+.ca-impact-moderate {
+  color: #facc15;
+}
+.ca-impact-weak {
+  color: #f87171;
+}
+.ca-impact-none {
+  color: var(--color-text-muted);
+  opacity: 0.6;
+}
+
+/* Metrics grid */
+.ca-metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.ca-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.ca-metric-label {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.ca-metric-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-heading);
+}
+
+.ca-demand-strong {
+  color: #22c55e;
+}
+.ca-demand-moderate {
+  color: #facc15;
+}
+.ca-demand-weak {
+  color: #f87171;
+}
+.ca-trend-up {
+  color: #22c55e;
+}
+.ca-trend-down {
+  color: #f87171;
+}
+.ca-trend-flat {
+  color: var(--color-text-muted);
+}
+.ca-quality-high {
+  color: #22c55e;
+}
+.ca-quality-low {
+  color: #f87171;
+}
+
+.ca-price-delta {
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-left: 0.3rem;
+}
+
+.ca-price-premium {
+  color: #f87171;
+}
+.ca-price-discount {
+  color: #22c55e;
+}
+
+/* Demand factor comparison */
+.ca-factors {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.ca-factor {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-md);
+}
+
+.ca-factor-positive {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+}
+
+.ca-factor-negative {
+  background: rgba(248, 113, 113, 0.1);
+  color: #f87171;
+}
+
+.ca-factor-icon {
+  font-size: 0.65rem;
+}
+
+.ca-factor-label {
+  color: inherit;
+  opacity: 0.8;
+}
+
+/* Recommendation */
+.ca-recommendation {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  background: rgba(255, 255, 255, 0.03);
+  border-left: 3px solid var(--color-border);
+  padding: 0.6rem 0.75rem;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.ca-rec-icon {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.ca-rec-text {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+/* Loading / error / empty */
+.ca-loading,
+.ca-error,
+.ca-empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--color-text-muted);
+}
+
+.ca-error {
+  color: #f87171;
+}
+</style>

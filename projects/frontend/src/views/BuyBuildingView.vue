@@ -754,3 +754,92 @@ async function buyBuilding() {
   </div>
 </template>
 
+<style scoped>
+.buy-building-resource-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  cursor: help;
+}
+
+.buy-building-resource-premium-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #7c3aed;
+  background: rgba(139, 92, 246, 0.12);
+  border-radius: var(--radius-sm, 4px);
+  padding: 0.1rem 0.3rem;
+  vertical-align: middle;
+  cursor: help;
+}
+
+.buy-building-mining-summary {
+  background: rgba(139, 92, 246, 0.06);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: var(--radius-md, 8px);
+  padding: 0.875rem;
+  margin-top: 0.5rem;
+}
+
+.buy-building-mining-summary-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0 0 0.625rem 0;
+  color: #7c3aed;
+}
+
+.buy-building-mining-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.625rem;
+}
+
+.buy-building-mining-summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.buy-building-mining-hint {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: 1.45;
+}
+
+.buy-building-quality-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.1rem 0.375rem;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.buy-building-quality-badge.quality-excellent {
+  background: rgba(34, 197, 94, 0.15);
+  color: #16a34a;
+}
+
+.buy-building-quality-badge.quality-good {
+  background: rgba(59, 130, 246, 0.15);
+  color: #2563eb;
+}
+
+.buy-building-quality-badge.quality-fair {
+  background: rgba(234, 179, 8, 0.15);
+  color: #ca8a04;
+}
+
+.buy-building-quality-badge.quality-poor {
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+}
+</style>
+
