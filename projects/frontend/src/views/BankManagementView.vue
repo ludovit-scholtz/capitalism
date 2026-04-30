@@ -523,7 +523,7 @@ function navigateToForexTransfer() {
 </script>
 
 <template>
-<main class="bank-management-view container mx-auto px-4 pb-16 pt-6 sm:px-6 lg:px-8 lg:pb-20 lg:pt-8">
+  <main class="bank-management-view container mx-auto px-4 pb-16 pt-6 sm:px-6 lg:px-8 lg:pb-20 lg:pt-8">
     <div class="page-header mb-10 flex flex-col gap-3 lg:mb-12">
       <!-- Show different titles based on ownership -->
       <template v-if="!loading && isOwner">
@@ -532,11 +532,11 @@ function navigateToForexTransfer() {
       </template>
       <template v-else-if="!loading">
         <div class="customer-nav">
-          <button class="btn-back" @click="router.push('/banking')">├ö─ç├ë {{ t('bank.backToMarketplace') }}</button>
+          <button class="btn-back" @click="router.push('/banking')">← {{ t('bank.backToMarketplace') }}</button>
         </div>
         <h1 class="page-title text-4xl font-black tracking-tight text-body">{{ bankInfo?.bankBuildingName ?? t('bank.customerView') }}</h1>
         <p class="page-subtitle flex flex-wrap items-center gap-2 text-sm text-muted sm:text-base">
-          {{ bankInfo?.lenderCompanyName }} ÔöČ─Ü {{ bankInfo?.cityName }}
+          {{ bankInfo?.lenderCompanyName }} • {{ bankInfo?.cityName }}
           <span v-if="bankInfo?.cityCurrencyCode" class="currency-badge">{{ bankInfo.cityCurrencyCode }}</span>
         </p>
       </template>
@@ -560,7 +560,7 @@ function navigateToForexTransfer() {
       <template v-if="isOwner">
         <!-- ├ö├Â├ç├ö├Â├ç Base Capital Deposit Required ├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç -->
         <div v-if="bankInfo && !bankInfo.baseCapitalDeposited" class="base-deposit-required">
-          <div class="base-deposit-icon" aria-hidden="true">┬ş─Ź─ć┼Ż</div>
+          <div class="base-deposit-icon" aria-hidden="true">🏦</div>
           <div class="base-deposit-body">
             <h2 class="base-deposit-title">{{ t('bank.baseDepositRequired') }}</h2>
             <p class="base-deposit-description">
@@ -689,7 +689,7 @@ function navigateToForexTransfer() {
 
           <!-- Central-bank debt context -->
           <div v-if="(bankInfo.centralBankDebt ?? 0) > 0" class="central-bank-notice">
-            <div class="notice-icon">├ö├ť├í</div>
+            <div class="notice-icon">⚠</div>
             <div class="notice-body">
               <strong>{{ t('bank.centralBankDebt') }}</strong>
               <p>{{ t('bank.centralBankDebtHint', { rate: (bankInfo.centralBankInterestRatePercent ?? 2).toFixed(2) }) }}</p>
@@ -794,7 +794,7 @@ function navigateToForexTransfer() {
                     </span>
                     <div v-if="loan.missedPayments > 0" class="missed-hint">{{ loan.missedPayments }} missed</div>
                     <div v-if="loan.collateralBuildingId" class="collateral-inline">
-                      <span aria-hidden="true">┬ş─Ź─ć┼Ą</span> {{ loan.collateralBuildingName }}
+                      <span aria-hidden="true">🔒</span> {{ loan.collateralBuildingName }}
                       <span v-if="loan.collateralAppraisedValue" class="collateral-inline-value"> ({{ fmt(loan.collateralAppraisedValue) }}) </span>
                     </div>
                   </td>
@@ -1008,4 +1008,3 @@ function navigateToForexTransfer() {
 </template>
 
 <style scoped src="./BankManagementView.styles.css"></style>
-
