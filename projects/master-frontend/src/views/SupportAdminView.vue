@@ -28,8 +28,8 @@ const unsafeOnly = ref(false)
 const statusNote = ref('')
 const moderationNote = ref('')
 
-const selectedTicket = computed(() =>
-  tickets.value.find((ticket) => ticket.id === selectedTicketId.value) ?? null,
+const selectedTicket = computed(
+  () => tickets.value.find((ticket) => ticket.id === selectedTicketId.value) ?? null,
 )
 
 function formatDate(value: string): string {
@@ -69,7 +69,8 @@ async function loadTickets() {
       selectedTicketId.value = tickets.value[0]?.id ?? null
     }
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Failed to load admin support tickets.'
+    errorMessage.value =
+      error instanceof Error ? error.message : 'Failed to load admin support tickets.'
   } finally {
     loading.value = false
   }
@@ -139,7 +140,12 @@ onMounted(async () => {
 
     <section class="panel" aria-label="Support admin filters">
       <div class="filters">
-        <input v-model="searchTitle" type="search" placeholder="Filter by title" aria-label="Filter by title" />
+        <input
+          v-model="searchTitle"
+          type="search"
+          placeholder="Filter by title"
+          aria-label="Filter by title"
+        />
         <select v-model="filterType" aria-label="Filter type">
           <option value="">All types</option>
           <option value="SUGGESTION">Suggestion</option>
@@ -203,19 +209,30 @@ onMounted(async () => {
           </tbody>
         </table>
 
-        <article v-if="selectedTicket" class="ticket-detail" aria-label="Admin selected ticket detail">
+        <article
+          v-if="selectedTicket"
+          class="ticket-detail"
+          aria-label="Admin selected ticket detail"
+        >
           <h2>{{ selectedTicket.title }}</h2>
           <p class="detail-meta">
             {{ selectedTicket.ticketType }} · {{ selectedTicket.status }} · Moderation:
             {{ selectedTicket.moderationState }}
           </p>
           <p class="detail-meta">
-            Created by {{ selectedTicket.createdByDisplayName }} ({{ selectedTicket.createdByEmail }})
+            Created by {{ selectedTicket.createdByDisplayName }} ({{
+              selectedTicket.createdByEmail
+            }})
           </p>
 
           <section class="admin-actions" aria-label="Admin moderation actions">
             <h3>Lifecycle</h3>
-            <input v-model="statusNote" type="text" placeholder="Status note" aria-label="Status note" />
+            <input
+              v-model="statusNote"
+              type="text"
+              placeholder="Status note"
+              aria-label="Status note"
+            />
             <div class="action-row">
               <button type="button" @click="updateStatus('SUBMITTED')">Set Submitted</button>
               <button type="button" @click="updateStatus('IN_PROGRESS')">Set In Progress</button>

@@ -2,8 +2,14 @@ import { expect, test } from '@playwright/test'
 import { loginAs, makePlayer, makeSupportTicket, setupMockApi } from './helpers/mock-api'
 
 test.describe('Support tickets', () => {
-  test('user can submit ticket with markdown editor and see it in personal list', async ({ page }) => {
-    const player = makePlayer({ id: 'player-user-1', email: 'user1@example.com', displayName: 'User 1' })
+  test('user can submit ticket with markdown editor and see it in personal list', async ({
+    page,
+  }) => {
+    const player = makePlayer({
+      id: 'player-user-1',
+      email: 'user1@example.com',
+      displayName: 'User 1',
+    })
     const state = setupMockApi(page, {})
     await loginAs(page, state, player)
 
@@ -14,7 +20,9 @@ test.describe('Support tickets', () => {
 
     const editor = page.locator('.CodeMirror').first()
     await editor.click()
-    await page.keyboard.type('The factory layout save flow is broken when linking units in rapid sequence.')
+    await page.keyboard.type(
+      'The factory layout save flow is broken when linking units in rapid sequence.',
+    )
 
     await page.getByRole('button', { name: 'Submit ticket' }).click()
 
@@ -25,7 +33,11 @@ test.describe('Support tickets', () => {
   })
 
   test('user ticket table filtering and sorting works', async ({ page }) => {
-    const player = makePlayer({ id: 'player-user-2', email: 'user2@example.com', displayName: 'User 2' })
+    const player = makePlayer({
+      id: 'player-user-2',
+      email: 'user2@example.com',
+      displayName: 'User 2',
+    })
     const state = setupMockApi(page, {
       supportTickets: [
         makeSupportTicket({
@@ -56,8 +68,12 @@ test.describe('Support tickets', () => {
 
     await page.getByLabel('Filter type').selectOption('SUGGESTION')
     await page.getByRole('button', { name: 'Apply' }).click()
-    await expect(page.locator('table[aria-label="My support tickets table"]')).toContainText('Alpha ticket')
-    await expect(page.locator('table[aria-label="My support tickets table"]')).not.toContainText('Zeta ticket')
+    await expect(page.locator('table[aria-label="My support tickets table"]')).toContainText(
+      'Alpha ticket',
+    )
+    await expect(page.locator('table[aria-label="My support tickets table"]')).not.toContainText(
+      'Zeta ticket',
+    )
 
     await page.getByLabel('Filter type').selectOption('')
     await page.getByLabel('Sort by').selectOption('TITLE')
@@ -73,7 +89,11 @@ test.describe('Support tickets', () => {
   })
 
   test('admin moderation approval flow unlocks sanitized preview', async ({ page }) => {
-    const admin = makePlayer({ id: 'player-admin-1', email: 'root@example.com', displayName: 'Root Admin' })
+    const admin = makePlayer({
+      id: 'player-admin-1',
+      email: 'root@example.com',
+      displayName: 'Root Admin',
+    })
     const state = setupMockApi(page, {
       isGlobalAdmin: true,
       supportTickets: [
@@ -106,8 +126,16 @@ test.describe('Support tickets', () => {
   })
 
   test('visibility differs between user and admin ticket pages', async ({ page }) => {
-    const user = makePlayer({ id: 'player-user-3', email: 'user3@example.com', displayName: 'User 3' })
-    const admin = makePlayer({ id: 'player-admin-2', email: 'root@example.com', displayName: 'Root Admin' })
+    const user = makePlayer({
+      id: 'player-user-3',
+      email: 'user3@example.com',
+      displayName: 'User 3',
+    })
+    const admin = makePlayer({
+      id: 'player-admin-2',
+      email: 'root@example.com',
+      displayName: 'Root Admin',
+    })
 
     const state = setupMockApi(page, {
       supportTickets: [

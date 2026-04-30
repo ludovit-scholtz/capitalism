@@ -252,7 +252,9 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } }],
+            errors: [
+              { message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } },
+            ],
           }),
         })
         return
@@ -301,7 +303,9 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } }],
+            errors: [
+              { message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } },
+            ],
           }),
         })
         return
@@ -317,7 +321,10 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           contentType: 'application/json',
           body: JSON.stringify({
             errors: [
-              { message: 'Support ticket not found.', extensions: { code: 'SUPPORT_TICKET_NOT_FOUND' } },
+              {
+                message: 'Support ticket not found.',
+                extensions: { code: 'SUPPORT_TICKET_NOT_FOUND' },
+              },
             ],
           }),
         })
@@ -329,9 +336,7 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [
-              { message: 'Forbidden.', extensions: { code: 'SUPPORT_TICKET_FORBIDDEN' } },
-            ],
+            errors: [{ message: 'Forbidden.', extensions: { code: 'SUPPORT_TICKET_FORBIDDEN' } }],
           }),
         })
         return
@@ -370,13 +375,17 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: 'Global admin required.', extensions: { code: 'GLOBAL_ADMIN_REQUIRED' } }],
+            errors: [
+              { message: 'Global admin required.', extensions: { code: 'GLOBAL_ADMIN_REQUIRED' } },
+            ],
           }),
         })
         return
       }
 
-      const vars = body.variables as { input: { ticketId: string; status: MockSupportTicket['status']; note?: string } }
+      const vars = body.variables as {
+        input: { ticketId: string; status: MockSupportTicket['status']; note?: string }
+      }
       const ticket = state.supportTickets.find((item) => item.id === vars.input.ticketId)
       if (!ticket) {
         await route.fulfill({
@@ -384,7 +393,10 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           contentType: 'application/json',
           body: JSON.stringify({
             errors: [
-              { message: 'Support ticket not found.', extensions: { code: 'SUPPORT_TICKET_NOT_FOUND' } },
+              {
+                message: 'Support ticket not found.',
+                extensions: { code: 'SUPPORT_TICKET_NOT_FOUND' },
+              },
             ],
           }),
         })
@@ -419,13 +431,17 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: 'Global admin required.', extensions: { code: 'GLOBAL_ADMIN_REQUIRED' } }],
+            errors: [
+              { message: 'Global admin required.', extensions: { code: 'GLOBAL_ADMIN_REQUIRED' } },
+            ],
           }),
         })
         return
       }
 
-      const vars = body.variables as { input: { ticketId: string; approve: boolean; note?: string } }
+      const vars = body.variables as {
+        input: { ticketId: string; approve: boolean; note?: string }
+      }
       const ticket = state.supportTickets.find((item) => item.id === vars.input.ticketId)
       if (!ticket) {
         await route.fulfill({
@@ -433,7 +449,10 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           contentType: 'application/json',
           body: JSON.stringify({
             errors: [
-              { message: 'Support ticket not found.', extensions: { code: 'SUPPORT_TICKET_NOT_FOUND' } },
+              {
+                message: 'Support ticket not found.',
+                extensions: { code: 'SUPPORT_TICKET_NOT_FOUND' },
+              },
             ],
           }),
         })
@@ -446,7 +465,9 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
       ticket.moderatedByEmail = state.currentPlayer.email
       ticket.moderationReason =
         vars.input.note ??
-        (vars.input.approve ? 'Content approved by administrator.' : 'Content rejected by administrator.')
+        (vars.input.approve
+          ? 'Content approved by administrator.'
+          : 'Content rejected by administrator.')
       ticket.updatedAtUtc = now
       ticket.sanitizedPreviewHtml = vars.input.approve
         ? `<p>${ticket.markdownSource.replaceAll('<', '&lt;').replaceAll('>', '&gt;')}</p>`
@@ -475,16 +496,31 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } }],
+            errors: [
+              { message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } },
+            ],
           }),
         })
         return
       }
 
-      const vars = body.variables as { input?: { searchTitle?: string; ticketType?: string; status?: string; sortBy?: string; sortDirection?: string } } | undefined
-      let list = state.supportTickets.filter((ticket) => ticket.createdByPlayerId === state.currentPlayer?.id)
+      const vars = body.variables as
+        | {
+            input?: {
+              searchTitle?: string
+              ticketType?: string
+              status?: string
+              sortBy?: string
+              sortDirection?: string
+            }
+          }
+        | undefined
+      let list = state.supportTickets.filter(
+        (ticket) => ticket.createdByPlayerId === state.currentPlayer?.id,
+      )
       const filter = vars?.input
-      if (filter?.ticketType) list = list.filter((ticket) => ticket.ticketType === filter.ticketType)
+      if (filter?.ticketType)
+        list = list.filter((ticket) => ticket.ticketType === filter.ticketType)
       if (filter?.status) list = list.filter((ticket) => ticket.status === filter.status)
       if (filter?.searchTitle?.trim()) {
         const q = filter.searchTitle.trim().toLowerCase()
@@ -516,16 +552,30 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: 'Global admin required.', extensions: { code: 'GLOBAL_ADMIN_REQUIRED' } }],
+            errors: [
+              { message: 'Global admin required.', extensions: { code: 'GLOBAL_ADMIN_REQUIRED' } },
+            ],
           }),
         })
         return
       }
 
-      const vars = body.variables as { input?: { searchTitle?: string; ticketType?: string; status?: string; sortBy?: string; sortDirection?: string; unsafeOnly?: boolean } } | undefined
+      const vars = body.variables as
+        | {
+            input?: {
+              searchTitle?: string
+              ticketType?: string
+              status?: string
+              sortBy?: string
+              sortDirection?: string
+              unsafeOnly?: boolean
+            }
+          }
+        | undefined
       let list = [...state.supportTickets]
       const filter = vars?.input
-      if (filter?.ticketType) list = list.filter((ticket) => ticket.ticketType === filter.ticketType)
+      if (filter?.ticketType)
+        list = list.filter((ticket) => ticket.ticketType === filter.ticketType)
       if (filter?.status) list = list.filter((ticket) => ticket.status === filter.status)
       if (filter?.unsafeOnly) list = list.filter((ticket) => ticket.containsUnsafeContent)
       if (filter?.searchTitle?.trim()) {
@@ -671,7 +721,9 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } }],
+            errors: [
+              { message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } },
+            ],
           }),
         })
         return
@@ -723,12 +775,17 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
 
     // goldTokenBalances query
     if (query.includes('goldTokenBalances')) {
-      if (!state.currentPlayer || (!state.isGlobalAdmin)) {
+      if (!state.currentPlayer || !state.isGlobalAdmin) {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: 'Gold token administration requires global admin access.', extensions: { code: 'GLOBAL_ADMIN_REQUIRED' } }],
+            errors: [
+              {
+                message: 'Gold token administration requires global admin access.',
+                extensions: { code: 'GLOBAL_ADMIN_REQUIRED' },
+              },
+            ],
           }),
         })
       } else {
@@ -748,7 +805,12 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: 'Gold token administration requires global admin access.', extensions: { code: 'GLOBAL_ADMIN_REQUIRED' } }],
+            errors: [
+              {
+                message: 'Gold token administration requires global admin access.',
+                extensions: { code: 'GLOBAL_ADMIN_REQUIRED' },
+              },
+            ],
           }),
         })
       } else {
@@ -773,13 +835,20 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: 'Gold token administration requires global admin access.', extensions: { code: 'GLOBAL_ADMIN_REQUIRED' } }],
+            errors: [
+              {
+                message: 'Gold token administration requires global admin access.',
+                extensions: { code: 'GLOBAL_ADMIN_REQUIRED' },
+              },
+            ],
           }),
         })
         return
       }
 
-      const vars = body.variables as { input: { targetEmail: string; amount: number; note?: string } }
+      const vars = body.variables as {
+        input: { targetEmail: string; amount: number; note?: string }
+      }
       const targetEmail = vars?.input?.targetEmail?.toLowerCase()
       const amount = vars?.input?.amount ?? 0
       const note = vars?.input?.note ?? null
@@ -789,7 +858,9 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: 'Amount must be non-zero.', extensions: { code: 'INVALID_AMOUNT' } }],
+            errors: [
+              { message: 'Amount must be non-zero.', extensions: { code: 'INVALID_AMOUNT' } },
+            ],
           }),
         })
         return
@@ -801,7 +872,9 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: 'Target player not found.', extensions: { code: 'PLAYER_NOT_FOUND' } }],
+            errors: [
+              { message: 'Target player not found.', extensions: { code: 'PLAYER_NOT_FOUND' } },
+            ],
           }),
         })
         return
@@ -813,7 +886,9 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: 'Insufficient balance.', extensions: { code: 'INSUFFICIENT_BALANCE' } }],
+            errors: [
+              { message: 'Insufficient balance.', extensions: { code: 'INSUFFICIENT_BALANCE' } },
+            ],
           }),
         })
         return

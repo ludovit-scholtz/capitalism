@@ -30,8 +30,8 @@ const newTitle = ref('')
 const newMarkdown = ref('')
 const createLoading = ref(false)
 
-const selectedTicket = computed(() =>
-  tickets.value.find((ticket) => ticket.id === selectedTicketId.value) ?? null,
+const selectedTicket = computed(
+  () => tickets.value.find((ticket) => ticket.id === selectedTicketId.value) ?? null,
 )
 
 const canEditSelected = computed(
@@ -189,7 +189,12 @@ onMounted(async () => {
     <section class="support-card" aria-label="My support tickets">
       <h2>My tickets</h2>
       <div class="filters">
-        <input v-model="searchTitle" type="search" placeholder="Filter by title" aria-label="Filter by title" />
+        <input
+          v-model="searchTitle"
+          type="search"
+          placeholder="Filter by title"
+          aria-label="Filter by title"
+        />
         <select v-model="filterType" aria-label="Filter type">
           <option value="">All types</option>
           <option value="SUGGESTION">Suggestion</option>
@@ -252,7 +257,9 @@ onMounted(async () => {
           </p>
           <p class="ticket-meta">
             Moderation: {{ selectedTicket.moderationState }}
-            <span v-if="selectedTicket.moderationReason"> · {{ selectedTicket.moderationReason }}</span>
+            <span v-if="selectedTicket.moderationReason">
+              · {{ selectedTicket.moderationReason }}</span
+            >
           </p>
 
           <label>
@@ -282,7 +289,9 @@ onMounted(async () => {
               class="preview-html"
               v-html="selectedTicket.sanitizedPreviewHtml"
             ></div>
-            <p v-else class="state-message">Preview is hidden until an administrator approves moderation.</p>
+            <p v-else class="state-message">
+              Preview is hidden until an administrator approves moderation.
+            </p>
           </section>
 
           <section class="activity-panel">
