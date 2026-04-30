@@ -59,7 +59,8 @@ function createCode() {
     notice.value = t('referralDashboard.newCode', { code: created.code })
     reloadDashboard()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : t('referralDashboard.createCodeError')
+    errorMessage.value =
+      error instanceof Error ? error.message : t('referralDashboard.createCodeError')
   }
 }
 
@@ -133,39 +134,42 @@ onMounted(async () => {
           <article
             class="summary-card grid gap-1.5 rounded-2xl border border-[var(--color-border)] bg-white p-4"
           >
-            <p class="text-[0.82rem] text-[var(--color-muted)]">{{
-              t('referralDashboard.directRegistrations')
-            }}</p>
+            <p class="text-[0.82rem] text-[var(--color-muted)]">
+              {{ t('referralDashboard.directRegistrations') }}
+            </p>
             <strong class="text-2xl">{{ totalStats.direct }}</strong>
           </article>
           <article
             class="summary-card grid gap-1.5 rounded-2xl border border-[var(--color-border)] bg-white p-4"
           >
-            <p class="text-[0.82rem] text-[var(--color-muted)]">{{
-              t('referralDashboard.secondRegistrations')
-            }}</p>
+            <p class="text-[0.82rem] text-[var(--color-muted)]">
+              {{ t('referralDashboard.secondRegistrations') }}
+            </p>
             <strong class="text-2xl">{{ totalStats.second }}</strong>
           </article>
           <article
             class="summary-card grid gap-1.5 rounded-2xl border border-[var(--color-border)] bg-white p-4"
           >
-            <p class="text-[0.82rem] text-[var(--color-muted)]">{{
-              t('referralDashboard.activeSubscriptions')
-            }}</p>
+            <p class="text-[0.82rem] text-[var(--color-muted)]">
+              {{ t('referralDashboard.activeSubscriptions') }}
+            </p>
             <strong class="text-2xl">{{ totalStats.active }}</strong>
           </article>
           <article
             class="summary-card grid gap-1.5 rounded-2xl border border-[var(--color-border)] bg-white p-4"
           >
-            <p class="text-[0.82rem] text-[var(--color-muted)]">{{
-              t('referralDashboard.secondActiveSubs')
-            }}</p>
+            <p class="text-[0.82rem] text-[var(--color-muted)]">
+              {{ t('referralDashboard.secondActiveSubs') }}
+            </p>
             <strong class="text-2xl">{{ totalStats.secondActive }}</strong>
           </article>
         </section>
 
         <div class="codes-toolbar flex flex-wrap justify-between gap-3">
-          <div class="code-list flex flex-wrap gap-2" :aria-label="t('referralDashboard.referralCode')">
+          <div
+            class="code-list flex flex-wrap gap-2"
+            :aria-label="t('referralDashboard.referralCode')"
+          >
             <span
               v-for="code in codes"
               :key="code"
@@ -186,7 +190,10 @@ onMounted(async () => {
         <p v-if="errorMessage" class="error text-[#b0432c]" role="alert">{{ errorMessage }}</p>
 
         <div class="table-wrap overflow-x-auto rounded-2xl border border-[var(--color-border)]">
-          <table class="min-w-[780px] w-full border-collapse" :aria-label="t('referralDashboard.metricsAria')">
+          <table
+            class="min-w-[780px] w-full border-collapse"
+            :aria-label="t('referralDashboard.metricsAria')"
+          >
             <thead>
               <tr>
                 <th

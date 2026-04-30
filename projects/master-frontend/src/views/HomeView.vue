@@ -117,9 +117,15 @@ onMounted(() => {
 
         <nav class="site-nav">
           <template v-if="auth.isAuthenticated">
-            <span class="nav-player">{{ auth.player?.displayName ?? t('home.accountFallback') }}</span>
-            <a class="nav-btn nav-btn--gold" href="/referrals/setup">{{ t('home.referralSetup') }}</a>
-            <a class="nav-btn nav-btn--gold" href="/referrals/become">{{ t('home.becomeReferral') }}</a>
+            <span class="nav-player">{{
+              auth.player?.displayName ?? t('home.accountFallback')
+            }}</span>
+            <a class="nav-btn nav-btn--gold" href="/referrals/setup">{{
+              t('home.referralSetup')
+            }}</a>
+            <a class="nav-btn nav-btn--gold" href="/referrals/become">{{
+              t('home.becomeReferral')
+            }}</a>
             <a class="nav-btn nav-btn--gold" href="/referrals/dashboard">{{
               t('home.referralDashboard')
             }}</a>
@@ -127,9 +133,9 @@ onMounted(() => {
             <a class="nav-btn nav-btn--gold" href="/support/admin">{{ t('home.supportAdmin') }}</a>
             <a class="nav-btn nav-btn--gold" href="/account">⬛ {{ t('home.myGold') }}</a>
             <a class="nav-btn nav-btn--gold" href="/gold-admin">⚙ {{ t('home.goldAdmin') }}</a>
-            <button class="nav-btn nav-btn--ghost" type="button" @click="logout">{{
-              t('home.signOut')
-            }}</button>
+            <button class="nav-btn nav-btn--ghost" type="button" @click="logout">
+              {{ t('home.signOut') }}
+            </button>
           </template>
           <template v-else>
             <a class="hero-cta" href="/login">{{ t('home.getStarted') }}</a>
@@ -195,7 +201,11 @@ onMounted(() => {
                 :disabled="startupPackLoading"
                 @click="handleStartupPackClaim"
               >
-                {{ startupPackLoading ? t('home.startupPack.claiming') : t('home.startupPack.claimButton') }}
+                {{
+                  startupPackLoading
+                    ? t('home.startupPack.claiming')
+                    : t('home.startupPack.claimButton')
+                }}
               </button>
               <p class="startup-pack-note">{{ t('home.startupPack.oneClaim') }}</p>
             </div>
@@ -310,9 +320,9 @@ onMounted(() => {
             <h2 id="server-list-heading">{{ t('home.gameServers') }}</h2>
           </div>
 
-          <button class="refresh-button" type="button" @click="loadServers">{{
-            t('common.refresh')
-          }}</button>
+          <button class="refresh-button" type="button" @click="loadServers">
+            {{ t('common.refresh') }}
+          </button>
         </div>
 
         <p v-if="loading" class="state-message">{{ t('home.loadingServers') }}</p>

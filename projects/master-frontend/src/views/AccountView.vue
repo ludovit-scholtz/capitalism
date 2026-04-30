@@ -83,7 +83,9 @@ onMounted(async () => {
       <!-- Error state -->
       <div v-else-if="errorMessage" class="state-error" role="alert">
         {{ errorMessage }}
-        <button type="button" class="retry-btn" @click="loadAccount">{{ t('account.retry') }}</button>
+        <button type="button" class="retry-btn" @click="loadAccount">
+          {{ t('account.retry') }}
+        </button>
       </div>
 
       <template v-else-if="account">

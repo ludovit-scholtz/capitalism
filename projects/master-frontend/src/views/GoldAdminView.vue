@@ -226,9 +226,9 @@ onMounted(async () => {
         <p v-else-if="balancesLoading && balances.length === 0" class="state-message">
           {{ t('goldAdmin.loadingBalances') }}
         </p>
-        <p v-else-if="filteredBalances.length === 0" class="state-message">{{
-          t('goldAdmin.noPlayers')
-        }}</p>
+        <p v-else-if="filteredBalances.length === 0" class="state-message">
+          {{ t('goldAdmin.noPlayers') }}
+        </p>
 
         <div v-else class="balance-table-wrap">
           <table class="balance-table" aria-label="Player gold balances">
@@ -322,9 +322,9 @@ onMounted(async () => {
               <template v-else-if="isDeduction">{{ t('goldAdmin.deductGold') }}</template>
               <template v-else>{{ t('goldAdmin.addGold') }}</template>
             </button>
-            <button type="button" class="cancel-btn" @click="selectedEmail = null">{{
-              t('goldAdmin.cancel')
-            }}</button>
+            <button type="button" class="cancel-btn" @click="selectedEmail = null">
+              {{ t('goldAdmin.cancel') }}
+            </button>
           </div>
 
           <p v-if="adjustError" class="form-error" role="alert">{{ adjustError }}</p>
@@ -347,9 +347,9 @@ onMounted(async () => {
             :aria-label="t('goldAdmin.txFilterAria')"
             @keyup.enter="handleTxFilter"
           />
-          <button type="button" class="refresh-btn" @click="handleTxFilter">{{
-            t('goldAdmin.filter')
-          }}</button>
+          <button type="button" class="refresh-btn" @click="handleTxFilter">
+            {{ t('goldAdmin.filter') }}
+          </button>
           <button
             type="button"
             class="refresh-btn refresh-btn--ghost"
@@ -374,13 +374,13 @@ onMounted(async () => {
           <table class="tx-table" aria-label="Gold token transaction log">
             <thead>
               <tr>
-                  <th>{{ t('account.date') }}</th>
-                  <th>{{ t('goldAdmin.player') }}</th>
-                  <th class="col-amount">{{ t('goldAdmin.balanceG') }}</th>
-                  <th>{{ t('goldAdmin.before') }}</th>
-                  <th>{{ t('goldAdmin.after') }}</th>
-                  <th>{{ t('goldAdmin.admin') }}</th>
-                  <th>{{ t('account.note') }}</th>
+                <th>{{ t('account.date') }}</th>
+                <th>{{ t('goldAdmin.player') }}</th>
+                <th class="col-amount">{{ t('goldAdmin.balanceG') }}</th>
+                <th>{{ t('goldAdmin.before') }}</th>
+                <th>{{ t('goldAdmin.after') }}</th>
+                <th>{{ t('goldAdmin.admin') }}</th>
+                <th>{{ t('account.note') }}</th>
               </tr>
             </thead>
             <tbody>

@@ -211,7 +211,11 @@ onMounted(async () => {
           </tbody>
         </table>
 
-        <article v-if="selectedTicket" class="ticket-detail" :aria-label="t('supportAdmin.detailAria')">
+        <article
+          v-if="selectedTicket"
+          class="ticket-detail"
+          :aria-label="t('supportAdmin.detailAria')"
+        >
           <h2>{{ selectedTicket.title }}</h2>
           <p class="detail-meta">
             {{ selectedTicket.ticketType }} · {{ selectedTicket.status }} ·
@@ -235,15 +239,15 @@ onMounted(async () => {
               :aria-label="t('supportAdmin.statusNote')"
             />
             <div class="action-row">
-              <button type="button" @click="updateStatus('SUBMITTED')">{{
-                t('supportAdmin.setSubmitted')
-              }}</button>
-              <button type="button" @click="updateStatus('IN_PROGRESS')">{{
-                t('supportAdmin.setInProgress')
-              }}</button>
-              <button type="button" @click="updateStatus('FINISHED')">{{
-                t('supportAdmin.setFinished')
-              }}</button>
+              <button type="button" @click="updateStatus('SUBMITTED')">
+                {{ t('supportAdmin.setSubmitted') }}
+              </button>
+              <button type="button" @click="updateStatus('IN_PROGRESS')">
+                {{ t('supportAdmin.setInProgress') }}
+              </button>
+              <button type="button" @click="updateStatus('FINISHED')">
+                {{ t('supportAdmin.setFinished') }}
+              </button>
             </div>
 
             <h3>{{ t('supportAdmin.moderation') }}</h3>
@@ -254,12 +258,12 @@ onMounted(async () => {
               :aria-label="t('supportAdmin.moderationNote')"
             ></textarea>
             <div class="action-row">
-              <button type="button" @click="moderate(true)">{{
-                t('supportAdmin.approvePreview')
-              }}</button>
-              <button type="button" @click="moderate(false)">{{
-                t('supportAdmin.rejectPreview')
-              }}</button>
+              <button type="button" @click="moderate(true)">
+                {{ t('supportAdmin.approvePreview') }}
+              </button>
+              <button type="button" @click="moderate(false)">
+                {{ t('supportAdmin.rejectPreview') }}
+              </button>
             </div>
           </section>
 

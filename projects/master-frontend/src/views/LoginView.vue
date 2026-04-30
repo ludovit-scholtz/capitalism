@@ -43,11 +43,7 @@ async function submit() {
           {{ mode === 'login' ? t('login.signIn') : t('login.createAccount') }}
         </h1>
         <p class="login-sub mt-2 text-[0.95rem] text-[var(--color-muted)]">
-          {{
-            mode === 'login'
-              ? t('login.signInSub')
-              : t('login.createSub')
-          }}
+          {{ mode === 'login' ? t('login.signInSub') : t('login.createSub') }}
         </p>
       </div>
 
@@ -144,9 +140,9 @@ async function submit() {
       </p>
 
       <p class="back-link mt-3 text-center text-[0.87rem] text-[var(--color-muted)]">
-        <a class="transition-colors hover:text-[var(--color-ink)]" href="/">← {{
-          t('login.backToDirectory')
-        }}</a>
+        <a class="transition-colors hover:text-[var(--color-ink)]" href="/"
+          >← {{ t('login.backToDirectory') }}</a
+        >
       </p>
     </div>
   </main>

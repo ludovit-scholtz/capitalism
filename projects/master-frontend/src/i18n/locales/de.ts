@@ -86,7 +86,8 @@ export default {
     liveRegistry: 'Live Register',
     gameServers: 'Spielserver',
     loadingServers: 'Registrierte Server werden geladen...',
-    noServers: 'Es wurden noch keine Server registriert. Starte einen Server und er erscheint hier.',
+    noServers:
+      'Es wurden noch keine Server registriert. Starte einen Server und er erscheint hier.',
     online: 'Online',
     offline: 'Offline',
     defaultDescription: 'Wirtschaftssimulations-Shard im Master-Knoten registriert.',
@@ -131,7 +132,8 @@ export default {
     fact2Title: 'Serverubergreifendes Asset.',
     fact2Body: 'Dein Goldguthaben liegt auf dem Master-Server und bleibt in allen Welten erhalten.',
     fact3Title: 'Handle an der FX-Borse.',
-    fact3Body: 'Nutze AMM-Pools fur Swaps zwischen Stadtwahrungen und Gold oder stelle Liquiditat bereit.',
+    fact3Body:
+      'Nutze AMM-Pools fur Swaps zwischen Stadtwahrungen und Gold oder stelle Liquiditat bereit.',
     txTitle: 'Letzte Transaktionen',
     lastUpdated: 'Zuletzt aktualisiert {date}',
     noTx: 'Noch keine Transaktionen. Nach einer Guthabenanderung erscheinen sie hier.',
@@ -144,7 +146,8 @@ export default {
   goldAdmin: {
     kicker: 'Master Administration',
     title: 'Gold-Token Verwaltung',
-    subtitle: 'Zeige und passe Goldguthaben von Spielern an. Jede Anderung wird im Audit-Log gespeichert.',
+    subtitle:
+      'Zeige und passe Goldguthaben von Spielern an. Jede Anderung wird im Audit-Log gespeichert.',
     balancesTitle: 'Spielerguthaben',
     searchPlaceholder: 'Nach E-Mail oder Namen suchen...',
     searchAria: 'Spieler suchen',
@@ -186,7 +189,8 @@ export default {
   },
   referralSetup: {
     title: 'Referral Code einrichten',
-    subtitle: 'Gib den Referral-Code ein, der dich eingeladen hat. Diese Auswahl ist nur einmal moglich.',
+    subtitle:
+      'Gib den Referral-Code ein, der dich eingeladen hat. Diese Auswahl ist nur einmal moglich.',
     codeLabel: 'Referral Code',
     codePlaceholder: 'AB12CD34',
     savedCode: 'Gespeicherter Code: {code}',

@@ -79,8 +79,7 @@ export default {
     pitch1: 'Hraci mozu menit herne dolare na realnu menu.',
     pitch2:
       'Herne zlato je realne tokenizovane zlato. Mozes ho tazit, obchodovat a pouzivat medzi roznymi hernymi servermi.',
-    pitch3:
-      'Zacni zdarma. Ak ta hra bavi, zvaz Pro predplatne pre dalsie moznosti vyroby.',
+    pitch3: 'Zacni zdarma. Ak ta hra bavi, zvaz Pro predplatne pre dalsie moznosti vyroby.',
     ctaText: 'Vytvor si bezplatny ucet a zacni tazit realne zlato.',
     registerFree: 'Registrovat zdarma',
     liveRegistry: 'Zivy register',
@@ -197,7 +196,8 @@ export default {
   },
   referralBecome: {
     title: 'Stante sa referral partnerom',
-    subtitle: 'Vypln pravne meno a danovy domicil. Po aktivacii sa automaticky vytvori prvy 8-znakovy kod.',
+    subtitle:
+      'Vypln pravne meno a danovy domicil. Po aktivacii sa automaticky vytvori prvy 8-znakovy kod.',
     name: 'Meno',
     namePlaceholder: 'Ludovit Scholtz',
     domicile: 'Danovy domicil',
@@ -211,7 +211,8 @@ export default {
   },
   referralDashboard: {
     title: 'Referral dashboard',
-    subtitle: 'Sleduj registracie a aktivne predplatne pre kazdy referral kod vratane druhej urovne siete.',
+    subtitle:
+      'Sleduj registracie a aktivne predplatne pre kazdy referral kod vratane druhej urovne siete.',
     setupCode: 'Nastavit kod',
     becomeReferral: 'Stat sa referral partnerom',
     profileNotActive: 'Referral profil nie je aktivny',

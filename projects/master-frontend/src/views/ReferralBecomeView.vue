@@ -28,11 +28,9 @@ function submitBecomeReferral() {
     becomeReferral(auth.player.email, fullName.value, taxDomicile.value)
     const profile = getReferralProfile(auth.player.email)
     existingCode.value = profile.referralCodes[0]?.code ?? null
-    successMessage.value =
-      t('referralBecome.success')
+    successMessage.value = t('referralBecome.success')
   } catch (error) {
-    errorMessage.value =
-      error instanceof Error ? error.message : t('referralBecome.error')
+    errorMessage.value = error instanceof Error ? error.message : t('referralBecome.error')
   }
 }
 
@@ -71,7 +69,9 @@ onMounted(async () => {
 
       <form class="become-form grid gap-3.5" @submit.prevent="submitBecomeReferral">
         <div class="field grid gap-1.5">
-          <label class="text-[0.88rem] font-bold" for="full-name">{{ t('referralBecome.name') }}</label>
+          <label class="text-[0.88rem] font-bold" for="full-name">{{
+            t('referralBecome.name')
+          }}</label>
           <input
             id="full-name"
             v-model="fullName"
