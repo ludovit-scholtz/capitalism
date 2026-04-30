@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import {
@@ -11,6 +12,7 @@ import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
+const { t } = useI18n()
 
 const referralCode = ref('')
 const errorMessage = ref('')
@@ -46,9 +48,9 @@ function submitCode() {
   try {
     const result = applyReferralCode(auth.player.email, referralCode.value)
     appliedCode.value = result.appliedReferralCode
-    successMessage.value = 'Referral code saved. This selection is now locked for your account.'
+    successMessage.value = t('referralSetup.success')
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Unable to save referral code.'
+    errorMessage.value = error instanceof Error ? error.message : t('referralSetup.saveError')
   }
 }
 
@@ -74,30 +76,31 @@ onMounted(async () => {
       class="ref-card flex w-full max-w-[680px] flex-col gap-4 rounded-3xl border border-[var(--color-border)] bg-[var(--color-paper-strong)] p-8 shadow-[var(--shadow-soft)]"
     >
       <p class="eyebrow text-[0.72rem] uppercase tracking-[0.12em] text-[var(--color-accent-deep)]">
-        Referral Program
+        {{ t('home.referralSetup') }}
       </p>
-      <h1 class="text-[clamp(1.6rem,3vw,2.2rem)]">Setup Referral Code</h1>
+      <h1 class="text-[clamp(1.6rem,3vw,2.2rem)]">{{ t('referralSetup.title') }}</h1>
       <p class="subtitle leading-[1.6] text-[var(--color-muted)]">
-        Enter the referral code that invited you. You can set this only once and it cannot be
-        changed later.
+        {{ t('referralSetup.subtitle') }}
       </p>
 
       <div
         class="setup-block grid gap-2 rounded-[18px] border border-dashed border-[var(--color-border)] p-4"
       >
-        <label class="text-[0.9rem] font-semibold" for="referral-code">Referral code</label>
+        <label class="text-[0.9rem] font-semibold" for="referral-code">{{
+          t('referralSetup.codeLabel')
+        }}</label>
         <input
           id="referral-code"
           v-model="referralCode"
           type="text"
           maxlength="8"
-          placeholder="AB12CD34"
+          :placeholder="t('referralSetup.codePlaceholder')"
           :disabled="!!appliedCode"
           class="rounded-xl border border-[var(--color-border)] bg-white px-4 py-3 font-bold uppercase tracking-[0.12em]"
           @input="normalizeCodeInput"
         />
         <p v-if="appliedCode" class="locked-note text-[0.85rem] text-[#245f3d]">
-          Saved code: {{ appliedCode }}
+          {{ t('referralSetup.savedCode', { code: appliedCode }) }}
         </p>
       </div>
 
@@ -111,12 +114,12 @@ onMounted(async () => {
           :disabled="!canSubmit"
           @click="submitCode"
         >
-          Save Referral Code
+          {{ t('referralSetup.saveButton') }}
         </button>
         <RouterLink
           class="secondary rounded-full bg-[rgba(17,41,79,0.08)] px-4 py-3 font-bold text-[var(--color-ink)] no-underline"
           to="/referrals/dashboard"
-          >Open Referral Dashboard</RouterLink
+          >{{ t('referralSetup.openDashboard') }}</RouterLink
         >
       </div>
     </section>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import {
   fetchSupportTicketsAdmin,
@@ -11,6 +12,7 @@ import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
 const auth = useAuthStore()
+const { t } = useI18n()
 
 const loading = ref(false)
 const errorMessage = ref('')
@@ -69,8 +71,7 @@ async function loadTickets() {
       selectedTicketId.value = tickets.value[0]?.id ?? null
     }
   } catch (error) {
-    errorMessage.value =
-      error instanceof Error ? error.message : 'Failed to load admin support tickets.'
+    errorMessage.value = error instanceof Error ? error.message : t('supportAdmin.loadError')
   } finally {
     loading.value = false
   }
@@ -88,10 +89,11 @@ async function updateStatus(status: 'SUBMITTED' | 'IN_PROGRESS' | 'FINISHED') {
       note: statusNote.value.trim() || undefined,
     })
     replaceTicket(updated)
-    successMessage.value = `Status changed to ${status}.`
+    successMessage.value = t('supportAdmin.statusChanged', { status })
     statusNote.value = ''
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Failed to update status.'
+    errorMessage.value =
+      error instanceof Error ? error.message : t('supportAdmin.updateStatusError')
   }
 }
 
@@ -107,10 +109,10 @@ async function moderate(approve: boolean) {
       note: moderationNote.value.trim() || undefined,
     })
     replaceTicket(updated)
-    successMessage.value = approve ? 'Ticket moderation approved.' : 'Ticket moderation rejected.'
+    successMessage.value = approve ? t('supportAdmin.approved') : t('supportAdmin.rejected')
     moderationNote.value = ''
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Failed to moderate ticket.'
+    errorMessage.value = error instanceof Error ? error.message : t('supportAdmin.moderateError')
   }
 }
 
@@ -133,63 +135,63 @@ onMounted(async () => {
 <template>
   <main class="support-admin-shell">
     <header class="support-admin-header">
-      <h1>Support Admin</h1>
-      <p>Moderate markdown, review attachments, and manage support ticket lifecycle.</p>
-      <a href="/" class="nav-link">← Back to portal</a>
+      <h1>{{ t('supportAdmin.title') }}</h1>
+      <p>{{ t('supportAdmin.subtitle') }}</p>
+      <a href="/" class="nav-link">← {{ t('common.backToPortal') }}</a>
     </header>
 
-    <section class="panel" aria-label="Support admin filters">
+    <section class="panel" :aria-label="t('supportAdmin.filtersAria')">
       <div class="filters">
         <input
           v-model="searchTitle"
           type="search"
-          placeholder="Filter by title"
-          aria-label="Filter by title"
+          :placeholder="t('common.filterByTitle')"
+          :aria-label="t('common.filterByTitle')"
         />
-        <select v-model="filterType" aria-label="Filter type">
-          <option value="">All types</option>
-          <option value="SUGGESTION">Suggestion</option>
-          <option value="BUG">Bug</option>
-          <option value="OTHER">Other</option>
+        <select v-model="filterType" :aria-label="t('common.filterType')">
+          <option value="">{{ t('common.allTypes') }}</option>
+          <option value="SUGGESTION">{{ t('common.suggestion') }}</option>
+          <option value="BUG">{{ t('common.bug') }}</option>
+          <option value="OTHER">{{ t('common.other') }}</option>
         </select>
-        <select v-model="filterStatus" aria-label="Filter status">
-          <option value="">All statuses</option>
-          <option value="SUBMITTED">Submitted</option>
-          <option value="IN_PROGRESS">In Progress</option>
-          <option value="FINISHED">Finished</option>
+        <select v-model="filterStatus" :aria-label="t('common.filterStatus')">
+          <option value="">{{ t('common.allStatuses') }}</option>
+          <option value="SUBMITTED">{{ t('common.submitted') }}</option>
+          <option value="IN_PROGRESS">{{ t('common.inProgress') }}</option>
+          <option value="FINISHED">{{ t('common.finished') }}</option>
         </select>
-        <select v-model="sortBy" aria-label="Sort by">
-          <option value="CREATED_AT">Created date</option>
-          <option value="UPDATED_AT">Updated date</option>
-          <option value="TITLE">Title</option>
+        <select v-model="sortBy" :aria-label="t('common.sortBy')">
+          <option value="CREATED_AT">{{ t('common.createdDate') }}</option>
+          <option value="UPDATED_AT">{{ t('common.updatedDate') }}</option>
+          <option value="TITLE">{{ t('common.title') }}</option>
         </select>
-        <select v-model="sortDirection" aria-label="Sort direction">
-          <option value="DESC">Newest first</option>
-          <option value="ASC">Oldest first</option>
+        <select v-model="sortDirection" :aria-label="t('common.sortDirection')">
+          <option value="DESC">{{ t('common.newestFirst') }}</option>
+          <option value="ASC">{{ t('common.oldestFirst') }}</option>
         </select>
         <label class="unsafe-only-filter">
           <input v-model="unsafeOnly" type="checkbox" />
-          Unsafe only
+          {{ t('supportAdmin.unsafeOnly') }}
         </label>
-        <button type="button" @click="loadTickets">Apply</button>
+        <button type="button" @click="loadTickets">{{ t('common.apply') }}</button>
       </div>
 
       <p v-if="errorMessage" class="state-error" role="alert">{{ errorMessage }}</p>
       <p v-if="successMessage" class="state-success" role="status">{{ successMessage }}</p>
     </section>
 
-    <section class="panel" aria-label="Support admin ticket list">
-      <p v-if="loading" class="state-message">Loading tickets…</p>
+    <section class="panel" :aria-label="t('supportAdmin.listAria')">
+      <p v-if="loading" class="state-message">{{ t('supportAdmin.loading') }}</p>
       <div v-else class="layout">
-        <table class="tickets-table" aria-label="Admin support tickets table">
+        <table class="tickets-table" :aria-label="t('supportAdmin.adminTableAria')">
           <thead>
             <tr>
-              <th>Created</th>
-              <th>Title</th>
-              <th>Type</th>
-              <th>Status</th>
-              <th>Moderation</th>
-              <th>Updated</th>
+              <th>{{ t('support.created') }}</th>
+              <th>{{ t('common.title') }}</th>
+              <th>{{ t('support.type') }}</th>
+              <th>{{ t('support.status') }}</th>
+              <th>{{ t('supportAdmin.moderationState') }}</th>
+              <th>{{ t('support.updated') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -209,77 +211,86 @@ onMounted(async () => {
           </tbody>
         </table>
 
-        <article
-          v-if="selectedTicket"
-          class="ticket-detail"
-          aria-label="Admin selected ticket detail"
-        >
+        <article v-if="selectedTicket" class="ticket-detail" :aria-label="t('supportAdmin.detailAria')">
           <h2>{{ selectedTicket.title }}</h2>
           <p class="detail-meta">
-            {{ selectedTicket.ticketType }} · {{ selectedTicket.status }} · Moderation:
-            {{ selectedTicket.moderationState }}
+            {{ selectedTicket.ticketType }} · {{ selectedTicket.status }} ·
+            {{ t('supportAdmin.moderationState') }}: {{ selectedTicket.moderationState }}
           </p>
           <p class="detail-meta">
-            Created by {{ selectedTicket.createdByDisplayName }} ({{
-              selectedTicket.createdByEmail
-            }})
+            {{
+              t('supportAdmin.createdBy', {
+                name: selectedTicket.createdByDisplayName,
+                email: selectedTicket.createdByEmail,
+              })
+            }}
           </p>
 
-          <section class="admin-actions" aria-label="Admin moderation actions">
-            <h3>Lifecycle</h3>
+          <section class="admin-actions" :aria-label="t('supportAdmin.moderation')">
+            <h3>{{ t('supportAdmin.lifecycle') }}</h3>
             <input
               v-model="statusNote"
               type="text"
-              placeholder="Status note"
-              aria-label="Status note"
+              :placeholder="t('supportAdmin.statusNote')"
+              :aria-label="t('supportAdmin.statusNote')"
             />
             <div class="action-row">
-              <button type="button" @click="updateStatus('SUBMITTED')">Set Submitted</button>
-              <button type="button" @click="updateStatus('IN_PROGRESS')">Set In Progress</button>
-              <button type="button" @click="updateStatus('FINISHED')">Set Finished</button>
+              <button type="button" @click="updateStatus('SUBMITTED')">{{
+                t('supportAdmin.setSubmitted')
+              }}</button>
+              <button type="button" @click="updateStatus('IN_PROGRESS')">{{
+                t('supportAdmin.setInProgress')
+              }}</button>
+              <button type="button" @click="updateStatus('FINISHED')">{{
+                t('supportAdmin.setFinished')
+              }}</button>
             </div>
 
-            <h3>Moderation</h3>
+            <h3>{{ t('supportAdmin.moderation') }}</h3>
             <textarea
               v-model="moderationNote"
               rows="3"
-              placeholder="Moderation note"
-              aria-label="Moderation note"
+              :placeholder="t('supportAdmin.moderationNote')"
+              :aria-label="t('supportAdmin.moderationNote')"
             ></textarea>
             <div class="action-row">
-              <button type="button" @click="moderate(true)">Approve preview</button>
-              <button type="button" @click="moderate(false)">Reject preview</button>
+              <button type="button" @click="moderate(true)">{{
+                t('supportAdmin.approvePreview')
+              }}</button>
+              <button type="button" @click="moderate(false)">{{
+                t('supportAdmin.rejectPreview')
+              }}</button>
             </div>
           </section>
 
           <section class="raw-panel">
-            <h3>Raw markdown</h3>
+            <h3>{{ t('supportAdmin.rawMarkdown') }}</h3>
             <pre>{{ selectedTicket.markdownSource }}</pre>
           </section>
 
           <section class="raw-panel" aria-label="Extracted links and images">
-            <h3>Extracted links</h3>
+            <h3>{{ t('supportAdmin.extractedLinks') }}</h3>
             <ul>
               <li v-for="url in selectedTicket.extractedUrls" :key="url">{{ url }}</li>
             </ul>
-            <h3>Extracted images</h3>
+            <h3>{{ t('supportAdmin.extractedImages') }}</h3>
             <ul>
               <li v-for="url in selectedTicket.extractedImages" :key="url">{{ url }}</li>
             </ul>
           </section>
 
           <section class="preview-panel">
-            <h3>Sanitized preview</h3>
+            <h3>{{ t('supportAdmin.sanitizedPreview') }}</h3>
             <div
               v-if="selectedTicket.sanitizedPreviewHtml"
               class="preview-html"
               v-html="selectedTicket.sanitizedPreviewHtml"
             ></div>
-            <p v-else class="state-message">Preview is currently moderation-gated.</p>
+            <p v-else class="state-message">{{ t('supportAdmin.moderationGated') }}</p>
           </section>
 
           <section class="activity-panel">
-            <h3>Audit activity</h3>
+            <h3>{{ t('supportAdmin.auditActivity') }}</h3>
             <ul>
               <li v-for="eventItem in selectedTicket.activity" :key="eventItem.id">
                 <strong>{{ eventItem.eventType }}</strong> · {{ eventItem.actorEmail }} ·

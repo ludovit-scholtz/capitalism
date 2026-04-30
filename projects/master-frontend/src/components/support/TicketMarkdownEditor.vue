@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import EasyMDE from 'easymde'
 import 'easymde/dist/easymde.min.css'
 
@@ -14,6 +15,7 @@ const emit = defineEmits<{
 
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 let editor: EasyMDE | null = null
+const { t } = useI18n()
 
 onMounted(() => {
   if (!textareaRef.value) return
@@ -39,14 +41,14 @@ onMounted(() => {
         name: 'image-link',
         action: () => {
           if (!editor) return
-          const imageUrl = window.prompt('Image URL (http or https):')
+          const imageUrl = window.prompt(t('editor.promptImageUrl'))
           if (!imageUrl) return
           const cm = editor.codemirror
-          const selection = cm.getSelection() || 'screenshot'
+          const selection = cm.getSelection() || t('editor.screenshotFallback')
           cm.replaceSelection(`![${selection}](${imageUrl})`)
         },
         className: 'fa fa-image',
-        title: 'Insert image URL',
+        title: t('editor.imageTitle'),
       },
       '|',
       'preview',

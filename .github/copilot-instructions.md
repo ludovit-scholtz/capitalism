@@ -272,6 +272,9 @@ CI=true npx playwright test --project=chromium e2e/encyclopedia-screenshots.spec
 - Frontend uses vue-i18n v11 in Composition API mode (`useI18n()` with `t()` and `locale.value`).
 - Locale files: `src/i18n/locales/{en,sk,de}.ts`. Detection chain: localStorage (`app_locale`) → `navigator.languages` → `'en'`.
 - All user-visible strings use `t()` calls with keys organized by feature: `common.*`, `nav.*`, `home.*`, `auth.*`, `onboarding.*`, `dashboard.*`.
+- Master-frontend uses the same `en/sk/de` locale structure under `projects/master-frontend/src/i18n/locales/{en,sk,de}.ts` and persists language selection via localStorage key `master_locale`.
+- For master-frontend changes, every new user-facing string must be added in all 3 locales (`en`, `sk`, `de`) in the same change. Do not leave fallback English literals in Vue templates or script error paths.
+- When helper functions return UI labels (for example subscription labels), pass the `t` translator callback into the helper instead of hardcoding strings outside locale files.
 - **vue-i18n v11 JIT compiler special characters**: The following characters are SPECIAL in vue-i18n message strings and must be escaped with `{'char'}` syntax when used as literal text:
   - `{` and `}` — used for interpolation; a bare `}` causes `SyntaxError: 10` (UNEXPECTED_CLOSE_BRACE / Invalid linked format)
   - `@` — begins a linked message reference (`@:key`); an email address like `user@example.com` MUST be written as `user{'@'}example.com`

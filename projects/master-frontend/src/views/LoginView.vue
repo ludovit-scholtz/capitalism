@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
+const { t } = useI18n()
 
 const mode = ref<'login' | 'register'>('login')
 const email = ref('')
@@ -23,7 +25,7 @@ async function submit() {
     await auth.fetchSubscription()
     await router.push('/')
   } catch (e: unknown) {
-    formError.value = e instanceof Error ? e.message : 'Something went wrong. Please try again.'
+    formError.value = e instanceof Error ? e.message : t('login.genericError')
   }
 }
 </script>
@@ -35,21 +37,25 @@ async function submit() {
     >
       <div class="login-brand mb-7">
         <p class="eyebrow text-[0.72rem] uppercase tracking-[0.14em] text-[var(--color-accent)]">
-          Capitalism Network
+          {{ t('home.eyebrow') }}
         </p>
-        <h1 class="mt-1.5 text-[2rem]">{{ mode === 'login' ? 'Sign in' : 'Create account' }}</h1>
+        <h1 class="mt-1.5 text-[2rem]">
+          {{ mode === 'login' ? t('login.signIn') : t('login.createAccount') }}
+        </h1>
         <p class="login-sub mt-2 text-[0.95rem] text-[var(--color-muted)]">
           {{
             mode === 'login'
-              ? 'Access your Pro subscription and server directory.'
-              : 'Join the Capitalism Network to track your subscription.'
+              ? t('login.signInSub')
+              : t('login.createSub')
           }}
         </p>
       </div>
 
       <form class="login-form flex flex-col gap-4" @submit.prevent="submit">
         <div class="field-group flex flex-col gap-1.5">
-          <label for="email" class="text-sm font-medium text-[var(--color-ink)]">Email</label>
+          <label for="email" class="text-sm font-medium text-[var(--color-ink)]">{{
+            t('login.email')
+          }}</label>
           <input
             id="email"
             v-model="email"
@@ -62,22 +68,24 @@ async function submit() {
         </div>
 
         <div v-if="mode === 'register'" class="field-group flex flex-col gap-1.5">
-          <label for="displayName" class="text-sm font-medium text-[var(--color-ink)]"
-            >Display name</label
-          >
+          <label for="displayName" class="text-sm font-medium text-[var(--color-ink)]">{{
+            t('login.displayName')
+          }}</label>
           <input
             id="displayName"
             v-model="displayName"
             type="text"
             autocomplete="name"
-            placeholder="Your name in the simulation"
+            :placeholder="t('login.displayNamePlaceholder')"
             class="rounded-[14px] border border-[var(--color-border)] bg-[var(--color-paper-strong)] px-4 py-3 text-[var(--color-ink)] outline-none transition-colors focus:border-[var(--color-accent)]"
             required
           />
         </div>
 
         <div class="field-group flex flex-col gap-1.5">
-          <label for="password" class="text-sm font-medium text-[var(--color-ink)]">Password</label>
+          <label for="password" class="text-sm font-medium text-[var(--color-ink)]">{{
+            t('login.password')
+          }}</label>
           <input
             id="password"
             v-model="password"
@@ -102,37 +110,43 @@ async function submit() {
           type="submit"
           :disabled="auth.loading"
         >
-          {{ auth.loading ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account' }}
+          {{
+            auth.loading
+              ? t('login.wait')
+              : mode === 'login'
+                ? t('login.signIn')
+                : t('login.createAccount')
+          }}
         </button>
       </form>
 
       <p class="toggle-mode mt-5 text-center text-[0.9rem] text-[var(--color-muted)]">
         <span v-if="mode === 'login'">
-          Don't have an account?
+          {{ t('login.noAccount') }}
           <button
             class="link-btn border-0 bg-transparent font-bold text-[var(--color-ink)] underline"
             type="button"
             @click="mode = 'register'"
           >
-            Register
+            {{ t('login.register') }}
           </button>
         </span>
         <span v-else>
-          Already have an account?
+          {{ t('login.haveAccount') }}
           <button
             class="link-btn border-0 bg-transparent font-bold text-[var(--color-ink)] underline"
             type="button"
             @click="mode = 'login'"
           >
-            Sign in
+            {{ t('login.signIn') }}
           </button>
         </span>
       </p>
 
       <p class="back-link mt-3 text-center text-[0.87rem] text-[var(--color-muted)]">
-        <a class="transition-colors hover:text-[var(--color-ink)]" href="/"
-          >← Back to server directory</a
-        >
+        <a class="transition-colors hover:text-[var(--color-ink)]" href="/">← {{
+          t('login.backToDirectory')
+        }}</a>
       </p>
     </div>
   </main>
