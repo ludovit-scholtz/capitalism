@@ -86,58 +86,6 @@ onMounted(() => {
               </RouterLink>
             </div>
           </div>
-
-          <section
-            class="rounded-2xl border border-divider/70 bg-card/85 p-5 shadow-[var(--shadow-lg)] lg:p-6"
-            aria-labelledby="landing-ranking-heading"
-          >
-            <div class="flex items-center justify-between gap-3">
-              <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-                  {{ t('home.ranking') }}
-                </p>
-                <h2 id="landing-ranking-heading" class="mt-2 text-xl font-semibold text-body">
-                  {{ t('rankingDashboard.topCompetitors') }}
-                </h2>
-              </div>
-              <button class="btn btn-secondary" type="button" @click="loadRanking">
-                {{ t('common.refresh') }}
-              </button>
-            </div>
-
-            <p v-if="rankingLoading" class="state-message mt-4">{{ t('common.loading') }}</p>
-            <p v-else-if="rankingError" class="state-error mt-4" role="alert">{{ rankingError }}</p>
-
-            <div v-else class="mt-4 grid gap-3">
-              <article
-                v-for="entry in rankingPreview"
-                :key="entry.playerId"
-                class="rounded-xl border border-divider bg-card-raised p-4"
-              >
-                <div class="flex items-start justify-between gap-3">
-                  <div>
-                    <p class="text-xs uppercase tracking-[0.08em] text-muted">
-                      #{{ entry.globalRank }}
-                    </p>
-                    <h3 class="mt-1 text-base font-semibold text-body">{{ entry.displayName }}</h3>
-                  </div>
-                  <span
-                    class="text-sm font-semibold"
-                    :class="
-                      entry.rankMovement > 0
-                        ? 'text-good'
-                        : entry.rankMovement < 0
-                          ? 'text-bad'
-                          : 'text-muted'
-                    "
-                  >
-                    {{ entry.rankMovement > 0 ? `+${entry.rankMovement}` : entry.rankMovement }}
-                  </span>
-                </div>
-                <p class="mt-2 text-sm text-muted">{{ formatPoints(entry.totalPoints) }} pts</p>
-              </article>
-            </div>
-          </section>
         </div>
       </div>
     </section>

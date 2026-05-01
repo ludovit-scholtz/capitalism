@@ -89,7 +89,7 @@ onMounted(async () => {
               v-model="fullName"
               type="text"
               :placeholder="t('referralBecome.namePlaceholder')"
-              class="rounded-xl border border-[var(--color-border)] bg-white px-4 py-3"
+              class="rounded-xl border border-[var(--color-border)] bg-white text-black px-4 py-3"
               required
             />
           </div>
@@ -103,7 +103,7 @@ onMounted(async () => {
               v-model="taxDomicile"
               type="text"
               :placeholder="t('referralBecome.domicilePlaceholder')"
-              class="rounded-xl border border-[var(--color-border)] bg-white px-4 py-3"
+              class="rounded-xl border border-[var(--color-border)] bg-white text-black px-4 py-3"
               required
             />
           </div>

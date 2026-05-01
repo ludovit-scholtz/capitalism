@@ -126,14 +126,6 @@ onMounted(() => {
               >
                 {{ t('home.playOnServer') }}
               </a>
-              <a
-                class="text-sm font-semibold text-brand hover:text-brand-hover"
-                :href="server.graphqlUrl"
-                target="_blank"
-                rel="noreferrer"
-              >
-                GraphQL
-              </a>
             </div>
           </li>
         </ul>

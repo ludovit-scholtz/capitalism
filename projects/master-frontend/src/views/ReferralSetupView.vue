@@ -98,7 +98,9 @@ onMounted(async () => {
       <section
         class="ref-card flex w-full max-w-[720px] flex-col gap-5 rounded-3xl border border-[var(--color-border)] bg-[var(--color-paper-strong)] p-8 shadow-[var(--shadow-soft)]"
       >
-        <section class="grid gap-2 rounded-2xl border border-[var(--color-border)] bg-white/50 p-4">
+        <section
+          class="grid gap-2 rounded-2xl border border-[var(--color-border)] bg-white text-black p-4"
+        >
           <h2 class="text-lg font-semibold">{{ t('referralSetup.infoTitle') }}</h2>
           <p class="text-sm text-[var(--color-muted)]">{{ t('referralSetup.infoOneTime') }}</p>
           <p class="text-sm text-[var(--color-muted)]">
@@ -119,7 +121,7 @@ onMounted(async () => {
             maxlength="8"
             :placeholder="t('referralSetup.codePlaceholder')"
             :disabled="!!appliedCode"
-            class="rounded-xl border border-[var(--color-border)] bg-white px-4 py-3 font-bold uppercase tracking-[0.12em]"
+            class="rounded-xl border border-[var(--color-border)] bg-white text-black px-4 py-3 font-bold uppercase tracking-[0.12em]"
             @input="normalizeCodeInput"
           />
           <p v-if="appliedCode" class="locked-note text-[0.85rem] text-[#245f3d]">
