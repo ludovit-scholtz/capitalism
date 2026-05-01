@@ -126,8 +126,8 @@ function operationalStatusBadgeClass(status: string): string {
   <div class="sidebar">
     <div class="unit-config">
       <div class="unit-config-header">
-        <h3>{{ t('buildingDetail.unitDetails') }}</h3>
-        <button class="btn btn-ghost" @click="setReadOnlySelectedCell(null)">{{ t('common.close') }}</button>
+        <h3>{{ selectedCell ? t('buildingDetail.unitDetails') : t('buildingDetail.buildingDetails') }}</h3>
+        <button v-if="selectedCell" class="btn btn-ghost" @click="setReadOnlySelectedCell(null)">{{ t('common.close') }}</button>
       </div>
       <!-- Unit detail tab navigation -->
       <nav

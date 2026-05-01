@@ -52,13 +52,7 @@ function getUnitCoords(gridX: number, gridY: number) {
 
 <template>
   <div class="supply-chain-diagram flex flex-col items-center gap-4">
-    <svg
-      :width="svgWidth"
-      :height="svgHeight"
-      viewBox="0 0 180 180"
-      class="border border-gray-300 rounded bg-white"
-      xmlns="http://www.w3.org/2000/svg"
-    >
+    <svg :width="svgWidth" :height="svgHeight" viewBox="0 0 180 180" class="border border-gray-300 rounded bg-white" xmlns="http://www.w3.org/2000/svg">
       <!-- Draw links (arrows between units) -->
       <g class="links">
         <template v-for="link in diagram.links" :key="`link-${link.fromUnitId}-${link.toUnitId}`">
@@ -80,17 +74,8 @@ function getUnitCoords(gridX: number, gridY: number) {
                     <!-- Transit cost label -->
                     <text
                       v-if="link.estimatedTransitCost"
-                      :x="
-                        (getUnitCoords(unit.gridX, unit.gridY).x +
-                          getUnitCoords(targetUnit.gridX, targetUnit.gridY).x) /
-                        2
-                      "
-                      :y="
-                        (getUnitCoords(unit.gridX, unit.gridY).y +
-                          getUnitCoords(targetUnit.gridX, targetUnit.gridY).y) /
-                        2 -
-                        5
-                      "
+                      :x="(getUnitCoords(unit.gridX, unit.gridY).x + getUnitCoords(targetUnit.gridX, targetUnit.gridY).x) / 2"
+                      :y="(getUnitCoords(unit.gridX, unit.gridY).y + getUnitCoords(targetUnit.gridX, targetUnit.gridY).y) / 2 - 5"
                       class="text-xs fill-gray-600"
                       text-anchor="middle"
                     >
@@ -106,14 +91,7 @@ function getUnitCoords(gridX: number, gridY: number) {
 
       <!-- Define arrow marker -->
       <defs>
-        <marker
-          id="arrowhead"
-          markerWidth="10"
-          markerHeight="10"
-          refX="9"
-          refY="3"
-          orient="auto"
-        >
+        <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
           <polygon points="0 0, 10 3, 0 6" fill="#6b7280" />
         </marker>
       </defs>
@@ -146,22 +124,12 @@ function getUnitCoords(gridX: number, gridY: number) {
             />
 
             <!-- Unit type label -->
-            <text
-              :x="getUnitCoords(unit.gridX, unit.gridY).x + CELL_SIZE / 2"
-              :y="getUnitCoords(unit.gridX, unit.gridY).y + 20"
-              class="text-xs font-semibold fill-gray-800"
-              text-anchor="middle"
-            >
+            <text :x="getUnitCoords(unit.gridX, unit.gridY).x + CELL_SIZE / 2" :y="getUnitCoords(unit.gridX, unit.gridY).y + 20" class="text-xs font-semibold fill-gray-800" text-anchor="middle">
               {{ unit.unitType.substring(0, 4) }}
             </text>
 
             <!-- Fill percentage -->
-            <text
-              :x="getUnitCoords(unit.gridX, unit.gridY).x + CELL_SIZE / 2"
-              :y="getUnitCoords(unit.gridX, unit.gridY).y + 36"
-              class="text-xs font-bold fill-gray-800"
-              text-anchor="middle"
-            >
+            <text :x="getUnitCoords(unit.gridX, unit.gridY).x + CELL_SIZE / 2" :y="getUnitCoords(unit.gridX, unit.gridY).y + 36" class="text-xs font-bold fill-gray-800" text-anchor="middle">
               {{ unit.fillPercent.toFixed(0) }}%
             </text>
 

@@ -1153,6 +1153,7 @@ export default {
     allowedUnits: 'Allowed units for this building',
     unitConfiguration: 'Unit Configuration',
     unitDetails: 'Unit Details',
+    buildingDetails: 'Building Details',
     sidebarPlaceholderTitle: 'Select a unit',
     sidebarPlaceholderBody: 'Choose a live unit in the grid to inspect its configured item, stored quantity, and value.',
     sidebarPlaceholderBodyEditing: 'Choose an existing unit or empty slot in the planned grid to configure the layout and review build costs.',
@@ -2400,6 +2401,12 @@ export default {
   supplyChain: {
     title: 'Supply Chain',
     empty: 'No units configured yet.',
+    healthStatus: 'Supply Chain Health',
+    health: {
+      GREEN: 'Healthy',
+      YELLOW: 'Warning',
+      RED: 'Critical',
+    },
     unitTypes: {
       PURCHASE: 'Purchase',
       MINING: 'Mining',

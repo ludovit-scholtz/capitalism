@@ -46,9 +46,13 @@ const {
 
 const showEditingSidebar = computed(() => Boolean(bd.selectedCell.value && bd.isEditing.value))
 const showReadonlySidebar = computed(() => {
+  if (bd.isEditing.value) return false
+
   const selectedCell = bd.selectedCell.value
-  if (!selectedCell || bd.isEditing.value) {
-    return false
+
+  // Building-level tabs (e.g. supply chain for FACTORY with no cell selected)
+  if (!selectedCell) {
+    return bd.unitDetailTabs.value.length > 0
   }
 
   return Boolean(bd.getUnitAtFrom(bd.activeUnits.value, selectedCell.x, selectedCell.y))

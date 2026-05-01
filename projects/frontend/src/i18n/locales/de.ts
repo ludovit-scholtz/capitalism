@@ -1154,6 +1154,7 @@ export default {
     allowedUnits: 'Erlaubte Einheiten für dieses Gebäude',
     unitConfiguration: 'Einheitenkonfiguration',
     unitDetails: 'Einheitendetails',
+    buildingDetails: 'Gebäudedetails',
     sidebarPlaceholderTitle: 'Einheit auswählen',
     sidebarPlaceholderBody: 'Wählen Sie eine aktive Einheit im Raster aus, um konfigurierten Artikel, Lagerbestand und Wert anzuzeigen.',
     sidebarPlaceholderBodyEditing: 'Wählen Sie im geplanten Raster eine bestehende Einheit oder einen freien Slot aus, um Layout und Baukosten zu prüfen.',
@@ -2403,6 +2404,12 @@ export default {
   supplyChain: {
     title: 'Lieferkette',
     empty: 'Noch keine Einheiten konfiguriert.',
+    healthStatus: 'Lieferkettengesundheit',
+    health: {
+      GREEN: 'Gesund',
+      YELLOW: 'Warnung',
+      RED: 'Kritisch',
+    },
     unitTypes: {
       PURCHASE: 'Einkauf',
       MINING: 'Bergbau',

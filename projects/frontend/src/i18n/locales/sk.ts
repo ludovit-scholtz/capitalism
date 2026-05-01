@@ -1152,6 +1152,7 @@ export default {
     allowedUnits: 'Povolené jednotky pre túto budovu',
     unitConfiguration: 'Konfigurácia jednotky',
     unitDetails: 'Detaily jednotky',
+    buildingDetails: 'Detaily budovy',
     sidebarPlaceholderTitle: 'Vyberte jednotku',
     sidebarPlaceholderBody: 'Vyberte aktívnu jednotku v mriežke a zobrazte si nastavený tovar, uložené množstvo a hodnotu.',
     sidebarPlaceholderBodyEditing: 'Vyberte existujúcu jednotku alebo prázdne pole v plánovanej mriežke a nastavte rozloženie aj cenu výstavby.',
@@ -2393,6 +2394,12 @@ export default {
   supplyChain: {
     title: 'Dodávateľský reťazec',
     empty: 'Zatiaľ nie sú nakonfigurované žiadne jednotky.',
+    healthStatus: 'Zdravie dodávateľského reťazca',
+    health: {
+      GREEN: 'Zdravý',
+      YELLOW: 'Varovanie',
+      RED: 'Kritický',
+    },
     unitTypes: {
       PURCHASE: 'Nákup',
       MINING: 'Ťažba',

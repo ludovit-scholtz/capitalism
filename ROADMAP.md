@@ -21,11 +21,11 @@ It will use real world map. The game will start in single city and later other c
 - [ ] Add 3 new seeded product types per new industry to the database initializer and ensure recipe data is correct and resolvable via the manufacturing encyclopedia.
 - [ ] Update encyclopedia and resource detail views to surface Electronics and Construction product chains with their own industry filter chips.
 
-### Supply chain visualization (0% complete)
+### Supply chain visualization (100% complete)
 
-- [ ] Add a "Supply Chain" tab to the building detail view for factories that renders an interactive flow diagram showing the connected purchase → manufacturing → storage → B2B sales / public sales unit chain, with arrows indicating resource direction and color-coded resource fill levels per unit so players can diagnose bottlenecks at a glance.
-- [ ] Show transit cost estimates as tooltip labels on each inter-unit arrow in the supply chain diagram so players understand the running shipping cost of each resource hop without opening individual unit panels.
-- [ ] Persist a supply chain "health score" per building visible in the dashboard company card: green when all linked units have stock moving, yellow when any unit stalled for more than 5 ticks, red when a unit has been empty for more than 20 ticks consecutively.
+- [x] Add a "Supply Chain" tab to the building detail view for factories that renders an interactive flow diagram showing the connected purchase → manufacturing → storage → B2B sales / public sales unit chain, with arrows indicating resource direction and color-coded resource fill levels per unit so players can diagnose bottlenecks at a glance.
+- [x] Show transit cost estimates as tooltip labels on each inter-unit arrow in the supply chain diagram so players understand the running shipping cost of each resource hop without opening individual unit panels.
+- [x] Persist a supply chain "health score" per building visible in the dashboard company card: green when all linked units have stock moving, yellow when any unit stalled for more than 5 ticks, red when a unit has been empty for more than 20 ticks consecutively.
 
 ### Competitive market intelligence (0% complete)
 

@@ -52,7 +52,6 @@ public sealed partial class Query
 
         var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync();
         var currentTick = gameState?.CurrentTick ?? 0L;
-        var windowStart = Math.Max(0L, currentTick - 4L);
 
         // Load inventory status for each unit
         var inventoryByUnit = await db.Inventories
@@ -61,16 +60,17 @@ public sealed partial class Query
             .Select(g => new { UnitId = g.Key, Total = g.Sum(i => i.Quantity) })
             .ToDictionaryAsync(x => x.UnitId, x => x.Total);
 
-        // Load recent history to determine operational status
-        var recentHistoryByUnit = await db.BuildingUnitResourceHistories
-            .Where(h => h.BuildingId == buildingId && h.Tick >= windowStart)
+        // Load all-time last active tick per unit to correctly compute idleTicks for stalled units.
+        // Using the full history (no window) ensures idle ticks > 5 and > 20 are detected correctly.
+        var lastActiveTickByUnit = await db.BuildingUnitResourceHistories
+            .Where(h => h.BuildingId == buildingId)
             .GroupBy(h => h.BuildingUnitId)
             .Select(g => new
             {
                 UnitId = g.Key,
                 LastActiveTick = g.Max(h => h.Tick),
-                TotalInflow = g.Sum(h => h.InflowQuantity),
-                TotalOutflow = g.Sum(h => h.OutflowQuantity),
+                TotalRecentInflow = g.Where(h => h.Tick >= currentTick - 4).Sum(h => h.InflowQuantity),
+                TotalRecentOutflow = g.Where(h => h.Tick >= currentTick - 4).Sum(h => h.OutflowQuantity),
             })
             .ToDictionaryAsync(x => x.UnitId, x => x);
 
@@ -88,7 +88,7 @@ public sealed partial class Query
         foreach (var unit in units)
         {
             inventoryByUnit.TryGetValue(unit.Id, out var inventoryTotal);
-            recentHistoryByUnit.TryGetValue(unit.Id, out var history);
+            lastActiveTickByUnit.TryGetValue(unit.Id, out var history);
 
             var capacity = GetUnitInventoryCapacity(unit);
             var fillPercent = capacity > 0m ? (inventoryTotal / capacity) * 100m : 0m;
@@ -100,7 +100,8 @@ public sealed partial class Query
             }
             else if (currentTick > 0)
             {
-                idleTicks = (int)Math.Min(currentTick, 5L);
+                // No history at all: unit has never processed anything
+                idleTicks = (int)Math.Min(currentTick, 999L);
             }
 
             // Determine status based on operational logic
@@ -117,7 +118,7 @@ public sealed partial class Query
             {
                 status = "IDLE";
             }
-            else if (history is not null && (history.TotalInflow > 0 || history.TotalOutflow > 0))
+            else if (history is not null && (history.TotalRecentInflow > 0 || history.TotalRecentOutflow > 0))
             {
                 status = "ACTIVE";
             }

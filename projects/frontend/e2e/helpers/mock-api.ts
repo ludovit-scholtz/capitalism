@@ -926,6 +926,42 @@ export type MockState = {
       sellerCount: number
     }>
   }>
+  /**
+   * Supply chain diagram data keyed by buildingId.
+   * When set, buildingSupplyChain query returns this data instead of auto-generated data.
+   */
+  supplyChainData: Record<
+    string,
+    {
+      buildingId: string
+      buildingName: string
+      buildingType: string
+      units: Array<{
+        buildingUnitId: string
+        unitType: string
+        gridX: number
+        gridY: number
+        level: number
+        status: string
+        idleTicks: number
+        fillPercent: number
+        resourceTypeId: string | null
+        productTypeId: string | null
+        resourceOrProductName: string | null
+        estimatedTransitCost: number | null
+      }>
+      links: Array<{
+        fromUnitId: string
+        toUnitId: string
+        direction: string
+        estimatedTransitCost: number
+      }>
+      healthScore: 'GREEN' | 'YELLOW' | 'RED'
+      healthReason: string
+      criticalUnitIds: string[]
+      warningUnitIds: string[]
+    }
+  >
 }
 
 const mockStateByPage = new WeakMap<Page, MockState>()
@@ -2175,6 +2211,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     goldAmmPools: [],
     goldBalance: { balance: 0, blockedInPools: 0, availableBalance: 0 },
     marketReports: [],
+    supplyChainData: {},
     ...initial,
   }
 
@@ -4617,6 +4654,73 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { buildingFinancialTimeline } }),
+      })
+    }
+
+    if (query.includes('buildingSupplyChain')) {
+      if (!state.currentUserId) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Not authenticated.' }] }),
+        })
+      }
+      const buildingId = body.variables?.buildingId
+
+      // Return override data if present
+      if (buildingId && state.supplyChainData[buildingId]) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { buildingSupplyChain: state.supplyChainData[buildingId] } }),
+        })
+      }
+
+      // Auto-generate from building units
+      const building = state.players
+        .flatMap((player) => player.companies)
+        .flatMap((company) => company.buildings)
+        .find((candidate) => candidate.id === buildingId)
+
+      if (!building) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Building not found.', extensions: { code: 'BUILDING_NOT_FOUND' } }] }),
+        })
+      }
+
+      const units = (building.units ?? []).map((unit) => ({
+        buildingUnitId: unit.id,
+        unitType: unit.unitType,
+        gridX: unit.gridX,
+        gridY: unit.gridY,
+        level: unit.level ?? 1,
+        status: unit.unitType ? 'ACTIVE' : 'UNCONFIGURED',
+        idleTicks: 0,
+        fillPercent: 45,
+        resourceTypeId: unit.resourceTypeId ?? null,
+        productTypeId: unit.productTypeId ?? null,
+        resourceOrProductName: null,
+        estimatedTransitCost: null,
+      }))
+
+      const buildingSupplyChain = {
+        buildingId: building.id,
+        buildingName: building.name,
+        buildingType: building.buildingType ?? 'FACTORY',
+        units,
+        links: [],
+        healthScore: 'GREEN',
+        healthReason: 'All units operating normally',
+        criticalUnitIds: [],
+        warningUnitIds: [],
+      }
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { buildingSupplyChain } }),
       })
     }
 

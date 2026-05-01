@@ -220,26 +220,32 @@ export function useBuildingDetail() {
   }
 
   function syncSelectedCellQuery(cell: GridCellSelection | null) {
+    const currentQuery = router.currentRoute.value.query
     const nextUnit = cell ? `${cell.x},${cell.y}` : undefined
-    const currentUnit = typeof route.query.unit === 'string' ? route.query.unit : undefined
+    const currentUnit = typeof currentQuery.unit === 'string' ? currentQuery.unit : undefined
     if (currentUnit === nextUnit) return
 
     void router.replace({
       query: {
-        ...route.query,
+        ...currentQuery,
         unit: nextUnit,
       },
     })
   }
 
   function syncSelectedUnitTabQuery(tab: string | null) {
+    const currentQuery = router.currentRoute.value.query
     const nextTab = tab ?? undefined
-    const currentTab = typeof route.query.unitTab === 'string' ? route.query.unitTab : undefined
+    const currentTab = typeof currentQuery.unitTab === 'string' ? currentQuery.unitTab : undefined
     if (currentTab === nextTab) return
+
+    const selectedUnit = selectedCell.value ? `${selectedCell.value.x},${selectedCell.value.y}` : undefined
+    const currentUnit = typeof currentQuery.unit === 'string' ? currentQuery.unit : undefined
 
     void router.replace({
       query: {
-        ...route.query,
+        ...currentQuery,
+        unit: selectedUnit ?? currentUnit,
         unitTab: nextTab,
       },
     })
@@ -863,15 +869,19 @@ export function useBuildingDetail() {
   /** Ordered list of tabs available for the currently selected unit type. */
   const unitDetailTabs = computed<Array<{ key: string }>>(() => {
     if (isEditing.value) return []
-    
+
     // Building-level supply chain tab for FACTORY buildings
     if (!selectedDisplayUnit.value && building.value?.type === 'FACTORY') {
-      return [{ key: 'supplyChain' }]
+      const hasLoadedSupplyChain = (supplyChain.value?.units.length ?? 0) > 0
+      const hasUnitsWhileLoading = supplyChainLoading.value && activeUnits.value.length > 0
+      if (hasLoadedSupplyChain || hasUnitsWhileLoading) {
+        return [{ key: 'supplyChain' }]
+      }
     }
 
     const unitType = selectedDisplayUnit.value?.unitType
     if (!unitType) return []
-    
+
     const tabs: Array<{ key: string }> = [{ key: 'basicInfo' }]
     if (unitType === 'PUBLIC_SALES') tabs.push({ key: 'quickActions' })
     tabs.push({ key: 'inventory' })
@@ -901,7 +911,7 @@ export function useBuildingDetail() {
     }
 
     if (!availableKeys.has(selectedUnitTab.value)) {
-      selectedUnitTab.value = 'basicInfo'
+      selectedUnitTab.value = unitDetailTabs.value[0]?.key ?? 'basicInfo'
     }
 
     syncSelectedUnitTabQuery(selectedUnitTab.value)
@@ -4903,4 +4913,3 @@ export function useBuildingDetail() {
     SUPPORTED_INDUSTRIES,
   }
 }
-
