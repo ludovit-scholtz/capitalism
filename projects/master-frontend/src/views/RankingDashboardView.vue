@@ -81,6 +81,8 @@ onMounted(async () => {
       <p>{{ t('rankingDashboard.subtitle') }}</p>
       <div class="ranking-nav-links">
         <a href="/ranking/bounties" class="nav-link">{{ t('rankingDashboard.historyLink') }}</a>
+        <a href="/ranking/admin" class="nav-link">{{ t('home.rankingAdmin') }}</a>
+        <a href="/referrals/dashboard" class="nav-link">{{ t('home.referralDashboard') }}</a>
         <a href="/" class="nav-link">← {{ t('common.backToPortal') }}</a>
       </div>
     </header>

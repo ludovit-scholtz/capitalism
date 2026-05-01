@@ -109,6 +109,35 @@ onMounted(async () => {
             >{{ t('referralDashboard.becomeReferral') }}</RouterLink
           >
         </div>
+      <nav
+        class="flex flex-wrap gap-2 rounded-2xl border border-[var(--color-border)] bg-[var(--color-paper)] p-3"
+        aria-label="Referral dashboard quick navigation"
+      >
+        <RouterLink
+          class="rounded-full bg-[rgba(17,41,79,0.08)] px-3 py-1.5 text-sm font-semibold text-[var(--color-ink)] no-underline"
+          to="/support"
+        >
+          {{ t('home.support') }}
+        </RouterLink>
+        <RouterLink
+          class="rounded-full bg-[rgba(17,41,79,0.08)] px-3 py-1.5 text-sm font-semibold text-[var(--color-ink)] no-underline"
+          to="/support/admin"
+        >
+          {{ t('home.supportAdmin') }}
+        </RouterLink>
+        <RouterLink
+          class="rounded-full bg-[rgba(17,41,79,0.08)] px-3 py-1.5 text-sm font-semibold text-[var(--color-ink)] no-underline"
+          to="/ranking/admin"
+        >
+          {{ t('home.rankingAdmin') }}
+        </RouterLink>
+        <RouterLink
+          class="rounded-full bg-[rgba(17,41,79,0.08)] px-3 py-1.5 text-sm font-semibold text-[var(--color-ink)] no-underline"
+          to="/gold-admin"
+        >
+          {{ t('home.goldAdmin') }}
+        </RouterLink>
+      </nav>
       </header>
 
       <section

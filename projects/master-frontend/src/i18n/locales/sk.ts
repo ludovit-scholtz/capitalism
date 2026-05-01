@@ -24,7 +24,22 @@ export default {
     other: 'Ine',
     language: 'Jazyk',
   },
-  app: { languageLabel: 'Jazyk' },
+  app: {
+    languageLabel: 'Jazyk',
+    toggleNavigation: 'Prepnut navigacne menu',
+  },
+  nav: {
+    home: 'Domov',
+    gameServers: 'Herni servery',
+    ranking: 'Rebricek',
+    bounties: 'Odmeny',
+    referralDashboard: 'Referal dashboard',
+    tokenizedGold: 'Tokenizovane zlato',
+  },
+  themeSwitcher: {
+    switchToLight: 'Prepnut na svetly rezim',
+    switchToDark: 'Prepnut na tmavy rezim',
+  },
   home: {
     title: 'CAPITALISM V',
     eyebrow: 'Capitalism Network',

@@ -64,7 +64,15 @@ const router = createRouter({
       component: () => import('@/views/RankingAdminView.vue'),
     },
   ],
-  scrollBehavior() {
+  scrollBehavior(to) {
+    if (to.hash) {
+      return {
+        el: to.hash,
+        top: 88,
+        behavior: 'smooth',
+      }
+    }
+
     return { top: 0 }
   },
 })

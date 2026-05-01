@@ -26,6 +26,19 @@ export default {
   },
   app: {
     languageLabel: 'Language',
+    toggleNavigation: 'Toggle navigation menu',
+  },
+  nav: {
+    home: 'Home',
+    gameServers: 'Game servers',
+    ranking: 'Ranking',
+    bounties: 'Bounties',
+    referralDashboard: 'Referal dashboard',
+    tokenizedGold: 'Tokenized gold',
+  },
+  themeSwitcher: {
+    switchToLight: 'Switch to light mode',
+    switchToDark: 'Switch to dark mode',
   },
   home: {
     title: 'CAPITALISM V',

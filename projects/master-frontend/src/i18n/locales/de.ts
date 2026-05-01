@@ -24,7 +24,22 @@ export default {
     other: 'Sonstiges',
     language: 'Sprache',
   },
-  app: { languageLabel: 'Sprache' },
+  app: {
+    languageLabel: 'Sprache',
+    toggleNavigation: 'Navigationsmenu umschalten',
+  },
+  nav: {
+    home: 'Startseite',
+    gameServers: 'Spielserver',
+    ranking: 'Ranking',
+    bounties: 'Bounties',
+    referralDashboard: 'Referal Dashboard',
+    tokenizedGold: 'Tokenisiertes Gold',
+  },
+  themeSwitcher: {
+    switchToLight: 'Zum hellen Modus wechseln',
+    switchToDark: 'Zum dunklen Modus wechseln',
+  },
   home: {
     title: 'CAPITALISM V',
     eyebrow: 'Capitalism Network',
