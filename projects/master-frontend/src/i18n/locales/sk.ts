@@ -1,4 +1,4 @@
-export default {
+﻿export default {
   common: {
     backToPortal: 'Späť na portál',
     allRightsReserved: '© {year} Capitalism HQ. Všetky práva vyhradené.',
@@ -293,8 +293,7 @@ export default {
   },
   supportAdmin: {
     title: 'Admin podpory',
-    subtitle:
-      'Moderuj markdown, kontroluj prílohy a spravuj životný cyklus tiketov podpory.',
+    subtitle: 'Moderuj markdown, kontroluj prílohy a spravuj životný cyklus tiketov podpory.',
     filtersAria: 'Filtre admina podpory',
     listAria: 'Zoznam tiketov admina podpory',
     adminTableAria: 'Admin tabuľka tiketov podpory',
@@ -381,12 +380,12 @@ export default {
   },
   rankingHistory: {
     title: 'História odmien',
-    subtitle: 'Skontroluj všetky udelené ranking odmeny a odošli sociálne alebo verifikačné dôkazy.',
+    subtitle:
+      'Skontroluj všetky udelené ranking odmeny a odošli sociálne alebo verifikačné dôkazy.',
     bountiesLink: 'Späť na dashboard odmien',
     dashboardLink: 'Späť na dashboard rebríčka',
     submitProofTitle: 'Odoslať dôkaz udalosti',
-    submitProofHint:
-      'Použi pre odmeny, ktoré vyžadujú dôkaz (retweet alebo overenie Discordu).',
+    submitProofHint: 'Použi pre odmeny, ktoré vyžadujú dôkaz (retweet alebo overenie Discordu).',
     bountyCode: 'Kód odmeny',
     proofReference: 'Referencia dôkazu',
     uniqueScopeKey: 'Unikátny scope kľúč',

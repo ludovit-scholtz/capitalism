@@ -1,4 +1,4 @@
-export default {
+﻿export default {
   common: {
     backToPortal: 'Zurück zum Portal',
     allRightsReserved: '© {year} Capitalism HQ. Alle Rechte vorbehalten.',
@@ -296,7 +296,8 @@ export default {
   },
   supportAdmin: {
     title: 'Support-Admin',
-    subtitle: 'Moderiere Markdown, prüfe Anhänge und verwalte den Lebenszyklus von Support-Tickets.',
+    subtitle:
+      'Moderiere Markdown, prüfe Anhänge und verwalte den Lebenszyklus von Support-Tickets.',
     filtersAria: 'Support-Admin-Filter',
     listAria: 'Support-Admin-Ticketliste',
     adminTableAria: 'Admin-Tabelle für Support-Tickets',
@@ -378,7 +379,8 @@ export default {
     subtitle:
       'Zentrale Steuerung für Support-Moderation, Ranking-Operationen und Anpassungen von tokenisierten Goldkonten.',
     supportCopy: 'Prüfe und moderiere eingehende Support-Tickets von Spielern.',
-    rankingCopy: 'Verwalte Regeln für Ranking-Belohnungen, Moderationsereignisse und Evaluator-Läufe.',
+    rankingCopy:
+      'Verwalte Regeln für Ranking-Belohnungen, Moderationsereignisse und Evaluator-Läufe.',
     goldCopy: 'Passe tokenisierte Goldguthaben mit vollständiger Audit-Spur an.',
   },
   rankingHistory: {
