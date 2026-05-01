@@ -6,6 +6,86 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
+### Stock exchange completion (25% remaining)
+
+- [ ] Implement takeover mechanics: when a player's combined person-account and controlled-company ownership in another company reaches 50%, show a "Initiate Takeover" action that replaces the target company's CEO with the acquiring player, transferring operational control including building configuration and company settings.
+- [ ] Implement company merge: when combined ownership reaches 90%, expose a "Merge into Company" action that transfers all assets, bank accounts, buildings, inventory, and loans of the absorbed company to a chosen surviving company, settles the absorbed company's tax in the merge tick, and closes the absorbed company.
+- [ ] Implement share buyback: when a company purchases its own shares on the stock exchange, reduce the total issued share count by the purchased amount and remove those shares from public float, updating share price accordingly.
+- [ ] Add E2E and backend integration tests for takeover trigger at exactly 50%, merge at exactly 90%, and buyback share-count reduction so these mechanics are regression-proof.
+
+### More industries and products (0% complete)
+
+- [ ] Add Electronics industry with Silicon as raw input: define product types for Basic Electronics (smartphone components), LED Screen, and Circuit Board with manufacturing recipes linking Silicon resource to each product via factory purchase → manufacturing → public sales chain.
+- [ ] Add Construction industry with Iron Ore as raw input: define product types for Steel Beam, Reinforced Concrete Panel, and Prefab Window Unit, ensuring construction products have higher base price and weight for shipping cost differentiation.
+- [ ] Expose Electronics and Construction industries as Pro-subscription-only starter choices in the onboarding industry selection step, gating them behind `Player.IsProSubscriber` on the backend so free players see Furniture, Food Processing, and Healthcare while Pro players see all five.
+- [ ] Add 3 new seeded product types per new industry to the database initializer and ensure recipe data is correct and resolvable via the manufacturing encyclopedia.
+- [ ] Update encyclopedia and resource detail views to surface Electronics and Construction product chains with their own industry filter chips.
+
+### Supply chain visualization (0% complete)
+
+- [ ] Add a "Supply Chain" tab to the building detail view for factories that renders an interactive flow diagram showing the connected purchase → manufacturing → storage → B2B sales / public sales unit chain, with arrows indicating resource direction and color-coded resource fill levels per unit so players can diagnose bottlenecks at a glance.
+- [ ] Show transit cost estimates as tooltip labels on each inter-unit arrow in the supply chain diagram so players understand the running shipping cost of each resource hop without opening individual unit panels.
+- [ ] Persist a supply chain "health score" per building visible in the dashboard company card: green when all linked units have stock moving, yellow when any unit stalled for more than 5 ticks, red when a unit has been empty for more than 20 ticks consecutively.
+
+### Competitive market intelligence (0% complete)
+
+- [ ] Add a `/market-intelligence` view accessible from the player dashboard that shows, per product type, a ranked table of all sellers currently offering that product in the selected city: display name, asking price, brand quality percentage, and estimated weekly sales volume derived from public sales records, so players can benchmark pricing strategy against competitors.
+- [ ] In the public sales unit detail panel, add a "Competition" section showing a pie chart of market share by player (anonymized to "Player A/B/C" outside top 3) and a mini price-history chart for the product in that city over the last 100 ticks, so the current PRODUCT-DEFINITION.md market-share pie is fully implemented and visible.
+- [ ] Surface resource price trends on the global exchange view as a sparkline chart per resource showing the last 50 ticks of ask prices so players can time their mine or factory purchases relative to market cycles.
+
+### Player notifications and alerts (0% complete)
+
+- [ ] Design and implement a notification entity on the game backend that stores per-player events: building construction complete, pending upgrade applied, loan repayment due within 10 ticks, bank account balance below configurable threshold, and B2B sale order fulfilled by another player.
+- [ ] Add a notification bell icon to the navigation bar showing unread notification count as a badge, opening a slide-over panel listing the last 20 notifications with timestamp and a direct link to the relevant building, bank account, or loan contract.
+- [ ] Allow players to configure alert thresholds per bank account (minimum balance trigger) and per public sales unit (notify when inventory drops below X units) through the building detail and bank account settings panels.
+
+### City expansion (0% complete)
+
+- [ ] Add at least two additional cities to the seeded city list: Berlin (EUR, Germany) and Warsaw (PLN, Poland) with their own resource abundance profiles, starting lot inventory, weather patterns, and per-city salary base rates consistent with real-world data.
+- [ ] Implement inter-city trade routes: allow a player to configure a B2B sales unit in one city to fulfill purchase orders from a factory purchase unit in a different city, with transit costs calculated from real GPS distance and product weight constants defined in `GameConstants`.
+- [ ] Add a city selection map overview page (`/cities`) that shows all available game cities on a world map with key metrics (population, active players, dominant industry, average resource prices) so new players can make an informed city choice during onboarding.
+
+### Building secondary market (0% complete)
+
+- [ ] Allow a company owner to mark any building for sale via the building detail page, setting an asking price and a "negotiate" flag. Other players browsing the buy-building page can see for-sale listings alongside new lots and make an offer. The original owner accepts or rejects via a notification.
+- [ ] Implement building transfer: when a sale is accepted, atomically debit the buyer's bank account, credit the seller's bank account, transfer building ownership, and write LedgerEntry records for both parties under a new `BuildingAcquisition` category.
+- [ ] Show "For Sale" badge on city map lot markers and in the buy-building grid so players can discover available buildings at a glance.
+
+### Resource depletion and scarcity feedback (0% complete)
+
+- [ ] Show a depletion progress bar in the mining unit detail panel: current remaining quantity vs. original deposit quantity, estimated ticks until depletion at current extraction rate, and a warning badge on the dashboard building card when remaining stock falls below 20%.
+- [ ] When a mine's raw material is fully depleted, stop the mining unit output and emit a player notification; display a "Depleted" badge on the building card and a recommended action to purchase a new mining lot.
+- [ ] Seed per-city resource replenishment events: every 8760 ticks (one game year), game engine randomly restores 10–30% of a subset of depleted mine deposits across all cities to simulate geological discovery, with a news event announcing the replenishment so players have opportunity to react.
+
+### Seasonal demand (0% complete)
+
+- [ ] Define a `DemandSeasonality` table seeded with per-product seasonal multipliers across the four game-year quarters (Q1 Jan–Mar, Q2 Apr–Jun, Q3 Jul–Sep, Q4 Oct–Dec) so that, for example, heating fuel has higher demand in Q4 and furniture has higher demand in Q2 spring/move season.
+- [ ] Apply the seasonal multiplier as an additional factor in `PublicSalesPhase` demand calculation alongside salary signal, brand quality, and price index so sales volumes fluctuate naturally during the year without requiring player action.
+- [ ] Expose the current season and seasonal demand outlook (next-quarter multiplier) in the public sales unit detail panel so players can plan inventory and pricing strategy ahead of demand peaks.
+
+### In-game tutorials and interactive help (0% complete)
+
+- [ ] Add a `TutorialProgress` entity tracking per-player completion of guided tutorial milestones: first resource sold, first B2B trade, first loan taken, first competitor observed in market intelligence, first brand established.
+- [ ] Render contextual tooltip overlays on the dashboard and building detail views the first time a player encounters a new UI area (e.g., the first time they open a factory's grid editor) with a "Got it" dismiss button that marks that milestone complete and never shows again.
+- [ ] Add a `/tutorial` view accessible from the help menu that lists all tutorial milestones with completion status, points earned per milestone (tied to the master ranking bounty system), and a "Resume" deep-link to the relevant page for incomplete steps.
+
+### Player profile and statistics page (0% complete)
+
+- [ ] Add a `/player/:id` public profile page showing: player display name, join date (game year), total company equity, current leaderboard rank, industries active in, number of cities with buildings, and total products sold across all ticks.
+- [ ] Include a "Hall of Fame" panel on the profile page listing the player's highest single-tick revenue, largest single acquisition, highest brand quality ever achieved, and longest consecutive days active.
+- [ ] Allow players to add a short bio (max 160 chars) and a custom profile badge unlocked by specific master-ranking bounty completions, visible on their profile page and on the leaderboard table.
+
+### Company growth and second IPO path (0% complete)
+
+- [ ] Implement a "New Company IPO" flow accessible from the personal account dashboard after the player's first company has been operational for at least 1 game year (8760 ticks): player configures a new company name, selects raise amount and ownership split (same 25/33/50% tiers as onboarding), and funds the new company bank account via the stock exchange.
+- [ ] Enforce a maximum of 5 player-controlled companies per person account to prevent monopolistic lockout of all available land lots while still enabling meaningful business diversification.
+- [ ] Show the "Start New Company" CTA on the personal account dashboard only when prerequisites are met (first company profitable for ≥ 365 ticks, player balance ≥ $200k), with a tooltip explaining the requirement when the button is locked.
+
+### City economic health indicators (0% complete)
+
+- [ ] Add a `CityEconomicReport` that is computed each tax cycle and stores: total salaries paid in the city that cycle, total public sales revenue, number of active companies, total power consumption vs. supply, and average product quality index across all public sales units.
+- [ ] Show a "City Health" mini-dashboard card on the city map page (`/city/:id`) with an overall economic index score (0–100) derived from the latest report, a traffic-light colour (green/yellow/red), and sparkline trends for the last 10 tax cycles.
+- [ ] Surface the city economic health index as an input to the `PopulationIndex` recalculation so thriving cities see slight population growth over game years and declining cities (few salaries, low power) see slow population erosion, creating genuine city competition dynamics.
 
 ### Dashboard speed
 
