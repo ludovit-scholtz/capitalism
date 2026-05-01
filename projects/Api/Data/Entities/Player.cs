@@ -90,6 +90,9 @@ public sealed class Player
 
     /// <summary>Dividend payments received directly into the player's personal account.</summary>
     public ICollection<DividendPayment> DividendPayments { get; set; } = new List<DividendPayment>();
+
+    /// <summary>In-game notifications for this player.</summary>
+    public ICollection<PlayerNotification> Notifications { get; set; } = new List<PlayerNotification>();
 }
 
 /// <summary>Defines the available player roles.</summary>

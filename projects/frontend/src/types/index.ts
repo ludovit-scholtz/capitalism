@@ -229,6 +229,7 @@ export interface BuildingUnit {
   vendorLockCompanyId: string | null
   lockedCityId: string | null
   industryCategory: string | null
+  lowInventoryAlertThreshold?: number | null
 }
 
 export interface BuildingUnitInventorySummary {
@@ -1857,6 +1858,7 @@ export interface BuildingBankAccountInfo {
   bankAccountId: string | null
   accountNumber: string | null
   balance: number | null
+  alertMinBalanceThreshold: number | null
   isSuspendedForFunds: boolean
   /** null | 'MISSING_BANK_ACCOUNT' | 'INSUFFICIENT_FUNDS:<amount>' */
   suspendedReason: string | null
@@ -1868,6 +1870,7 @@ export interface CompanyBankAccountSummary {
   accountNumber: string
   currencyCode: string
   balance: number
+  alertMinBalanceThreshold: number | null
 }
 
 /** A bank account owned by the player or one of the player's companies. Returned by the `myBankAccounts` query. */
@@ -1877,6 +1880,7 @@ export interface PlayerBankAccountSummary {
   currencyCode: string
   currencySymbol: string
   balance: number
+  alertMinBalanceThreshold: number | null
   companyId: string | null
   companyName: string | null
   ownerType: 'PERSON' | 'COMPANY'
@@ -1908,6 +1912,26 @@ export interface TransferFundsResult {
   currencyCode: string
   fromAccount: PlayerBankAccountSummary
   toAccount: PlayerBankAccountSummary
+}
+
+export interface PlayerNotificationItem {
+  id: string
+  type: string
+  title: string
+  message: string
+  isRead: boolean
+  createdAtTick: number
+  createdAtUtc: string
+  companyId: string | null
+  buildingId: string | null
+  buildingUnitId: string | null
+  bankAccountId: string | null
+  loanId: string | null
+}
+
+export interface PlayerNotificationInbox {
+  unreadCount: number
+  items: PlayerNotificationItem[]
 }
 
 /** Advertising income entry for a media house */

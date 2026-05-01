@@ -41,6 +41,10 @@ const fundAmount = ref<string | number>('')
 const fundLoading = ref(false)
 const fundError = ref<string | null>(null)
 const fundSuccess = ref<string | null>(null)
+const thresholdInput = ref<string | number>('')
+const thresholdSaving = ref(false)
+const thresholdError = ref<string | null>(null)
+const thresholdSuccess = ref<string | null>(null)
 
 const suspensionLabel = computed(() => {
   const reason = accountInfo.value?.suspendedReason ?? null
@@ -99,6 +103,7 @@ function buildAssignedAccountInfo(bankAccountId: string): BuildingBankAccountInf
     bankAccountId: companyAccount.id,
     accountNumber: companyAccount.accountNumber,
     balance: companyAccount.balance,
+    alertMinBalanceThreshold: companyAccount.alertMinBalanceThreshold,
     isSuspendedForFunds: false,
     suspendedReason: null,
   }
@@ -130,6 +135,7 @@ async function fetchAccountInfo() {
           bankAccountId
           accountNumber
           balance
+          alertMinBalanceThreshold
           isSuspendedForFunds
           suspendedReason
         }
@@ -173,6 +179,7 @@ async function fetchCompanyAccounts() {
           accountNumber
           currencyCode
           balance
+          alertMinBalanceThreshold
         }
       }`,
       { companyId: props.companyId },
@@ -209,6 +216,7 @@ async function assignBankAccount(bankAccountId: string, successMessage: string) 
             bankAccountId
             accountNumber
             balance
+            alertMinBalanceThreshold
             isSuspendedForFunds
             suspendedReason
           }
@@ -263,6 +271,7 @@ async function createAndAssignCompanyAccount() {
             accountNumber
             currencyCode
             balance
+            alertMinBalanceThreshold
           }
         }
       }`,
@@ -318,6 +327,7 @@ async function fundBuildingAccount() {
             bankAccountId
             accountNumber
             balance
+            alertMinBalanceThreshold
             isSuspendedForFunds
             suspendedReason
           }
@@ -346,10 +356,66 @@ async function fundBuildingAccount() {
   }
 }
 
+async function saveLowBalanceThreshold() {
+  if (!accountInfo.value?.bankAccountId) {
+    return
+  }
+
+  const rawThreshold = thresholdInput.value
+  const normalized = typeof rawThreshold === 'number' ? String(rawThreshold) : rawThreshold.trim()
+  const threshold = normalized.length === 0 ? null : Number(normalized)
+  if (threshold !== null && (!Number.isFinite(threshold) || threshold < 0)) {
+    thresholdError.value = t('buildingBankAccount.thresholdInvalid')
+    thresholdSuccess.value = null
+    return
+  }
+
+  thresholdSaving.value = true
+  thresholdError.value = null
+  thresholdSuccess.value = null
+
+  try {
+    const result = await gqlRequest<{ setBankAccountAlertThreshold: { bankAccountId: string; alertMinBalanceThreshold: number | null } }>(
+      `mutation SetBankAccountAlertThreshold($input: SetBankAccountAlertThresholdInput!) {
+        setBankAccountAlertThreshold(input: $input) {
+          bankAccountId
+          alertMinBalanceThreshold
+        }
+      }`,
+      {
+        input: {
+          bankAccountId: accountInfo.value.bankAccountId,
+          minBalanceThreshold: threshold,
+        },
+      },
+    )
+
+    const updatedThreshold = result.setBankAccountAlertThreshold.alertMinBalanceThreshold
+    accountInfo.value = {
+      ...accountInfo.value,
+      alertMinBalanceThreshold: updatedThreshold,
+    }
+    thresholdInput.value = updatedThreshold === null ? '' : String(updatedThreshold)
+    thresholdSuccess.value = t('buildingBankAccount.thresholdSaved')
+  } catch (error: unknown) {
+    thresholdError.value = error instanceof Error ? error.message : t('common.unknownError')
+  } finally {
+    thresholdSaving.value = false
+  }
+}
+
 watch(
   () => [props.buildingId, props.companyId, props.currencyCode],
   () => {
     void refreshPanel()
+  },
+  { immediate: true },
+)
+
+watch(
+  () => accountInfo.value?.alertMinBalanceThreshold,
+  (value) => {
+    thresholdInput.value = value === null || value === undefined ? '' : String(value)
   },
   { immediate: true },
 )
@@ -380,6 +446,27 @@ watch(
         <span v-if="accountInfo.hasBankAccount" class="bba-balance" :class="{ 'bba-balance-low': (accountInfo.balance ?? 0) < 100 }">
           {{ formatCurrency(accountInfo.balance ?? 0) }}
         </span>
+      </div>
+
+      <div v-if="accountInfo.hasBankAccount" class="bba-threshold-panel">
+        <label class="bba-manage-label" :for="`bba-threshold-${props.buildingId}`">{{ t('buildingBankAccount.thresholdLabel', { currency: accountInfo.currencyCode }) }}</label>
+        <div class="bba-threshold-controls">
+          <input
+            :id="`bba-threshold-${props.buildingId}`"
+            v-model="thresholdInput"
+            type="number"
+            min="0"
+            step="0.01"
+            class="bba-threshold-input"
+            :placeholder="t('buildingBankAccount.thresholdPlaceholder')"
+          />
+          <button class="btn btn-secondary btn-sm" :disabled="thresholdSaving" @click="saveLowBalanceThreshold">
+            {{ thresholdSaving ? t('common.loading') : t('buildingBankAccount.thresholdSave') }}
+          </button>
+        </div>
+        <p class="bba-threshold-hint">{{ t('buildingBankAccount.thresholdHint') }}</p>
+        <p v-if="thresholdError" class="bba-manage-error" role="alert">{{ thresholdError }}</p>
+        <p v-if="thresholdSuccess" class="bba-manage-success" role="status">{{ thresholdSuccess }}</p>
       </div>
 
       <div v-if="props.showAssignmentControls" class="bba-manage-panel">
@@ -554,6 +641,34 @@ watch(
 
 .bba-balance.bba-balance-low {
   color: #f59e0b;
+}
+
+.bba-threshold-panel {
+  margin-top: 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.bba-threshold-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.bba-threshold-input {
+  width: 100%;
+  max-width: 220px;
+  background: var(--color-surface-3, #2a3040);
+  border: 1px solid var(--color-border, #2d3447);
+  border-radius: 6px;
+  padding: 7px 9px;
+  color: var(--color-text-secondary, #c8d0e0);
+}
+
+.bba-threshold-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #8b95a8);
 }
 
 .bba-manage-panel {

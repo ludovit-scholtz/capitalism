@@ -1,3 +1,5 @@
+using Api.Data.Entities;
+using Api.Utilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Api.Engine.Phases;
@@ -20,20 +22,8 @@ public sealed class ConstructionPhase : ITickPhase
 
     public async Task ProcessAsync(TickContext context)
     {
-        // Prefer set-based update on relational providers, with an InMemory-safe fallback.
-        if (context.Db.Database.IsRelational())
-        {
-            await context.Db.Buildings
-                .Where(b => b.IsUnderConstruction
-                            && b.ConstructionCompletesAtTick.HasValue
-                            && b.ConstructionCompletesAtTick.Value <= context.CurrentTick)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(b => b.IsUnderConstruction, false)
-                    .SetProperty(b => b.ConstructionCompletesAtTick, (long?)null));
-            return;
-        }
-
         var completingBuildings = await context.Db.Buildings
+            .Include(building => building.Company)
             .Where(b => b.IsUnderConstruction
                         && b.ConstructionCompletesAtTick.HasValue
                         && b.ConstructionCompletesAtTick.Value <= context.CurrentTick)
@@ -43,6 +33,17 @@ public sealed class ConstructionPhase : ITickPhase
         {
             building.IsUnderConstruction = false;
             building.ConstructionCompletesAtTick = null;
+
+            PlayerNotificationService.Add(
+                context.Db,
+                building.Company.PlayerId,
+                PlayerNotificationType.BuildingConstructionCompleted,
+                "Construction completed",
+                $"{building.Name} is now operational.",
+                context.CurrentTick,
+                building.CompanyId,
+                building.Id,
+                bankAccountId: building.BankAccountId);
         }
     }
 }

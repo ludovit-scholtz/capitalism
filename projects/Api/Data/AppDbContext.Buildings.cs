@@ -40,6 +40,7 @@ public sealed partial class AppDbContext
             e.Property(a => a.AccountNumber).HasMaxLength(16);
             e.Property(a => a.CurrencyCode).HasMaxLength(3);
             e.Property(a => a.Balance).HasPrecision(18, 2);
+            e.Property(a => a.AlertMinBalanceThreshold).HasPrecision(18, 2);
             e.Property(a => a.DepositInterestRatePercent).HasPrecision(8, 4);
             e.Property(a => a.TotalInterestPaid).HasPrecision(18, 4);
             e.HasIndex(a => a.AccountNumber).IsUnique();
@@ -63,6 +64,7 @@ public sealed partial class AppDbContext
             e.Property(u => u.MinPrice).HasPrecision(18, 2);
             e.Property(u => u.MaxPrice).HasPrecision(18, 2);
             e.Property(u => u.Budget).HasPrecision(18, 2);
+            e.Property(u => u.LowInventoryAlertThreshold).HasPrecision(18, 4);
             e.Property(u => u.MinQuality).HasPrecision(5, 4);
             e.HasOne(u => u.Building).WithMany(b => b.Units).HasForeignKey(u => u.BuildingId);
             e.HasIndex(u => u.BuildingId);

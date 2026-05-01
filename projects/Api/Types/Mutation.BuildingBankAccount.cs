@@ -264,6 +264,7 @@ public sealed partial class Mutation
                 AccountNumber = newAccount.AccountNumber,
                 CurrencyCode = newAccount.CurrencyCode,
                 Balance = newAccount.Balance,
+                AlertMinBalanceThreshold = newAccount.AlertMinBalanceThreshold,
             },
         };
     }
@@ -402,6 +403,7 @@ public sealed partial class Mutation
             BankAccountId = account?.Id,
             AccountNumber = account?.AccountNumber,
             Balance = account?.Balance,
+            AlertMinBalanceThreshold = account?.AlertMinBalanceThreshold,
             IsSuspendedForFunds = building.IsSuspendedForFunds,
             SuspendedReason = building.SuspendedReason,
         };

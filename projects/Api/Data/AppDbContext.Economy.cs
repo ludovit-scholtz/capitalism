@@ -192,6 +192,7 @@ public sealed partial class AppDbContext
             e.HasIndex(l => new { l.LenderCompanyId, l.Status });
             e.HasIndex(l => l.BorrowerBankAccountId);
             e.HasIndex(l => l.NextPaymentTick);
+            e.HasIndex(l => l.DueSoonAlertForPaymentTick);
         });
 
         modelBuilder.Entity<FxRate>(e =>

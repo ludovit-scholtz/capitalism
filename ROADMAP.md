@@ -33,11 +33,11 @@ It will use real world map. The game will start in single city and later other c
 - [x] In the public sales unit detail panel, add a "Competition" section showing a pie chart of market share by player (anonymized to "Player A/B/C" outside top 3) and a mini price-history chart for the product in that city over the last 100 ticks, so the current PRODUCT-DEFINITION.md market-share pie is fully implemented and visible.
 - [x] Surface resource price trends on the global exchange view as a sparkline chart per resource showing the last 50 ticks of ask prices so players can time their mine or factory purchases relative to market cycles.
 
-### Player notifications and alerts (0% complete)
+### Player notifications and alerts (100% complete)
 
-- [ ] Design and implement a notification entity on the game backend that stores per-player events: building construction complete, pending upgrade applied, loan repayment due within 10 ticks, bank account balance below configurable threshold, and B2B sale order fulfilled by another player.
-- [ ] Add a notification bell icon to the navigation bar showing unread notification count as a badge, opening a slide-over panel listing the last 20 notifications with timestamp and a direct link to the relevant building, bank account, or loan contract.
-- [ ] Allow players to configure alert thresholds per bank account (minimum balance trigger) and per public sales unit (notify when inventory drops below X units) through the building detail and bank account settings panels.
+- [x] Design and implement a notification entity on the game backend that stores per-player events: building construction complete, pending upgrade applied, loan repayment due within 10 ticks, bank account balance below configurable threshold, and B2B sale order fulfilled by another player.
+- [x] Add a notification bell icon to the navigation bar showing unread notification count as a badge, opening a slide-over panel listing the last 20 notifications with timestamp and a direct link to the relevant building, bank account, or loan contract.
+- [x] Allow players to configure alert thresholds per bank account (minimum balance trigger) and per public sales unit (notify when inventory drops below X units) through the building detail and bank account settings panels.
 
 ### City expansion (0% complete)
 

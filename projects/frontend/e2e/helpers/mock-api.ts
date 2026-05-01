@@ -907,11 +907,27 @@ export type MockState = {
       bankAccountId: string | null
       accountNumber: string | null
       balance: number | null
+      alertMinBalanceThreshold?: number | null
       isSuspendedForFunds: boolean
       suspendedReason: string | null
       currencyCode: string
     }
   >
+  /** Player notifications shown in the navbar bell panel. */
+  playerNotifications: Array<{
+    id: string
+    type: string
+    title: string
+    message: string
+    isRead: boolean
+    createdAtTick: number
+    createdAtUtc: string
+    companyId?: string | null
+    buildingId?: string | null
+    buildingUnitId?: string | null
+    bankAccountId?: string | null
+    loanId?: string | null
+  }>
   /** Player's company bank accounts returned by the myBankAccounts query. */
   myBankAccounts: Array<{
     id: string
@@ -2264,6 +2280,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     bankStatementRows: {},
     cityMediaHouses: {},
     buildingBankAccounts: {},
+    playerNotifications: [],
     myBankAccounts: [],
     goldAmmPools: [],
     goldBalance: { balance: 0, blockedInPools: 0, availableBalance: 0 },
@@ -6093,6 +6110,55 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    if (query.includes('playerNotificationInbox')) {
+      if (!state.currentUserId) {
+        return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      }
+
+      const limit = Math.max(1, Math.min(200, Number(body.variables?.limit ?? 20)))
+      const sorted = [...state.playerNotifications].sort((left, right) => right.createdAtUtc.localeCompare(left.createdAtUtc))
+      const items = sorted.slice(0, limit)
+      const unreadCount = sorted.filter((item) => !item.isRead).length
+      return routeJson({
+        playerNotificationInbox: {
+          unreadCount,
+          items,
+        },
+      })
+    }
+
+    if (query.includes('playerNotificationUnreadCount')) {
+      if (!state.currentUserId) {
+        return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      }
+
+      return routeJson({ playerNotificationUnreadCount: state.playerNotifications.filter((item) => !item.isRead).length })
+    }
+
+    if (query.includes('markPlayerNotificationsRead')) {
+      if (!state.currentUserId) {
+        return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      }
+
+      const notificationIds: string[] = body.variables?.input?.notificationIds ?? []
+      if (notificationIds.length > 0) {
+        state.playerNotifications = state.playerNotifications.map((item) => (notificationIds.includes(item.id) ? { ...item, isRead: true } : item))
+      }
+      return routeJson({ markPlayerNotificationsRead: true })
+    }
+
+    if (query.includes('markAllPlayerNotificationsRead')) {
+      if (!state.currentUserId) {
+        return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      }
+
+      const changed = state.playerNotifications.filter((item) => !item.isRead).length
+      if (changed > 0) {
+        state.playerNotifications = state.playerNotifications.map((item) => ({ ...item, isRead: true }))
+      }
+      return routeJson({ markAllPlayerNotificationsRead: changed })
+    }
+
     if (query.includes('markGameNewsRead')) {
       if (!state.currentUserId) {
         return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
@@ -7363,6 +7429,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           accountNumber: account.accountNumber!,
           currencyCode: account.currencyCode,
           balance: account.balance ?? 0,
+          alertMinBalanceThreshold: account.alertMinBalanceThreshold ?? null,
         }))
 
       const playerAccounts = state.myBankAccounts
@@ -7372,6 +7439,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           accountNumber: account.accountNumber,
           currencyCode: account.currencyCode,
           balance: account.balance,
+          alertMinBalanceThreshold: null,
         }))
 
       const companyBankAccounts = [...playerAccounts, ...explicitAccounts].filter((account, index, accounts) => accounts.findIndex((candidate) => candidate.id === account.id) === index)
@@ -7402,6 +7470,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         bankAccountId: null,
         accountNumber: null,
         balance: null,
+        alertMinBalanceThreshold: null,
         isSuspendedForFunds: building.isSuspendedForFunds ?? false,
         suspendedReason: building.suspendedReason ?? null,
         currencyCode,
@@ -7421,6 +7490,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               bankAccountId: info.bankAccountId,
               accountNumber: info.accountNumber,
               balance: info.balance,
+              alertMinBalanceThreshold: info.alertMinBalanceThreshold ?? null,
               isSuspendedForFunds: info.isSuspendedForFunds,
               suspendedReason: info.suspendedReason,
             },
@@ -7491,7 +7561,16 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const city = state.cities.find((c) => c.id === building.cityId)
       const currencyCode = city?.currencyCode ?? 'EUR'
       const existing = state.buildingBankAccounts[buildingId]
-      const prev = existing ?? { hasBankAccount: false, bankAccountId: null, accountNumber: null, balance: 0, isSuspendedForFunds: false, suspendedReason: null, currencyCode }
+      const prev = existing ?? {
+        hasBankAccount: false,
+        bankAccountId: null,
+        accountNumber: null,
+        balance: 0,
+        alertMinBalanceThreshold: null,
+        isSuspendedForFunds: false,
+        suspendedReason: null,
+        currencyCode,
+      }
       const newBalance = (prev.balance ?? 0) + amount
       const accountNumber = prev.accountNumber ?? String(Math.floor(Math.random() * 1e16)).padStart(16, '0')
       const accountId = prev.bankAccountId ?? crypto.randomUUID()
@@ -7501,6 +7580,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         bankAccountId: accountId,
         accountNumber,
         balance: newBalance,
+        alertMinBalanceThreshold: prev.alertMinBalanceThreshold ?? null,
         isSuspendedForFunds: false,
         suspendedReason: null,
         currencyCode,
@@ -7521,6 +7601,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
                 bankAccountId: accountId,
                 accountNumber,
                 balance: newBalance,
+                alertMinBalanceThreshold: prev.alertMinBalanceThreshold ?? null,
                 isSuspendedForFunds: false,
                 suspendedReason: null,
               },
@@ -7551,6 +7632,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             bankAccountId: playerAccount.id,
             accountNumber: playerAccount.accountNumber,
             balance: playerAccount.balance,
+            alertMinBalanceThreshold: null,
             isSuspendedForFunds: false,
             suspendedReason: null,
             currencyCode: playerAccount.currencyCode,
@@ -7581,6 +7663,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
                 bankAccountId,
                 accountNumber: acctInfo.accountNumber,
                 balance: acctInfo.balance,
+                alertMinBalanceThreshold: acctInfo.alertMinBalanceThreshold ?? null,
                 isSuspendedForFunds: acctInfo.isSuspendedForFunds,
                 suspendedReason: acctInfo.suspendedReason,
               },
@@ -7623,10 +7706,65 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
                 accountNumber,
                 currencyCode,
                 balance: 0,
+                alertMinBalanceThreshold: null,
               },
             },
           },
         }),
+      })
+    }
+
+    if (query.includes('setBankAccountAlertThreshold')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const vars = body.variables as { input?: { bankAccountId?: string; minBalanceThreshold?: number | null } } | undefined
+      const bankAccountId = vars?.input?.bankAccountId ?? ''
+      const minBalanceThreshold = vars?.input?.minBalanceThreshold ?? null
+      if (minBalanceThreshold !== null && minBalanceThreshold < 0) {
+        return routeJsonError('Minimum balance threshold must be zero or positive.', 'INVALID_THRESHOLD')
+      }
+
+      const explicitEntry = Object.entries(state.buildingBankAccounts).find(([, info]) => info.bankAccountId === bankAccountId)
+      if (!explicitEntry) {
+        return routeJsonError('Bank account not found.', 'BANK_ACCOUNT_NOT_FOUND')
+      }
+
+      const [buildingId, info] = explicitEntry
+      state.buildingBankAccounts[buildingId] = {
+        ...info,
+        alertMinBalanceThreshold: minBalanceThreshold,
+      }
+
+      return routeJson({
+        setBankAccountAlertThreshold: {
+          bankAccountId,
+          alertMinBalanceThreshold: minBalanceThreshold,
+        },
+      })
+    }
+
+    if (query.includes('setPublicSalesInventoryAlertThreshold')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const vars = body.variables as { input?: { buildingUnitId?: string; minInventoryThreshold?: number | null } } | undefined
+      const buildingUnitId = vars?.input?.buildingUnitId ?? ''
+      const minInventoryThreshold = vars?.input?.minInventoryThreshold ?? null
+      if (minInventoryThreshold !== null && minInventoryThreshold < 0) {
+        return routeJsonError('Minimum inventory threshold must be zero or positive.', 'INVALID_THRESHOLD')
+      }
+
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      if (!player) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const ownedUnits = player.companies.flatMap((company) => company.buildings).flatMap((building) => building.units)
+      const unit = ownedUnits.find((candidate) => candidate.id === buildingUnitId && candidate.unitType === 'PUBLIC_SALES')
+      if (!unit) {
+        return routeJsonError('Public sales unit not found.', 'PUBLIC_SALES_UNIT_NOT_FOUND')
+      }
+
+      unit.lowInventoryAlertThreshold = minInventoryThreshold
+      return routeJson({
+        setPublicSalesInventoryAlertThreshold: {
+          buildingUnitId,
+          lowInventoryAlertThreshold: minInventoryThreshold,
+        },
       })
     }
 

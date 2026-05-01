@@ -8,6 +8,7 @@ import { usePwa } from '@/composables/usePwa'
 import { useAuthStore } from '@/stores/auth'
 import { useGameStateStore } from '@/stores/gameState'
 import { usesStore } from '@/stores/news'
+import { useNotificationsStore } from '@/stores/notifications'
 import { useGameAdminStore } from '@/stores/gameAdmin'
 import { useChatStore } from '@/stores/chat'
 
@@ -16,6 +17,7 @@ const { isOffline, updateAvailable, acceptUpdate } = usePwa()
 const auth = useAuthStore()
 const gameStateStore = useGameStateStore()
 const newsStore = usesStore()
+const notificationsStore = useNotificationsStore()
 const gameAdminStore = useGameAdminStore()
 const chatStore = useChatStore()
 gameStateStore.start()
@@ -25,6 +27,7 @@ onMounted(() => {
   if (auth.token) {
     void auth.fetchMe()
     void newsStore.fetchUnreadCount()
+    void notificationsStore.fetchUnreadCount()
     void gameAdminStore.fetchSession()
   }
 })
@@ -34,12 +37,14 @@ watch(
   (token, previousToken) => {
     if (!token) {
       newsStore.clear()
+      notificationsStore.clear()
       gameAdminStore.clear()
       return
     }
 
     if (token !== previousToken) {
       void newsStore.fetchUnreadCount()
+      void notificationsStore.fetchUnreadCount()
       void gameAdminStore.fetchSession()
     }
   },
@@ -61,12 +66,7 @@ watch(
     <AppHeader />
 
     <!-- Offline banner: shown when the browser loses connectivity -->
-    <div
-      v-if="isOffline"
-      role="status"
-      aria-live="polite"
-      class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium sticky top-0 z-90 bg-card-raised text-caution border-b border-divider"
-    >
+    <div v-if="isOffline" role="status" aria-live="polite" class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium sticky top-0 z-90 bg-card-raised text-caution border-b border-divider">
       <span aria-hidden="true" class="text-base">📡</span>
       {{ t('banners.offline') }}
     </div>
@@ -79,11 +79,7 @@ watch(
       class="flex items-center justify-between gap-3 px-4 py-2.5 text-sm font-medium sticky top-0 z-90 bg-brand-subtle text-brand border-b border-brand"
     >
       <span>{{ t('banners.updateAvailable') }}</span>
-      <button
-        class="btn btn-primary shrink-0"
-        style="padding: 0.35rem 0.9rem; font-size: 0.8rem"
-        @click="acceptUpdate"
-      >
+      <button class="btn btn-primary shrink-0" style="padding: 0.35rem 0.9rem; font-size: 0.8rem" @click="acceptUpdate">
         {{ t('banners.refreshToUpdate') }}
       </button>
     </div>
@@ -96,4 +92,3 @@ watch(
     <ChatSidePanel v-if="auth.isAuthenticated" />
   </div>
 </template>
-

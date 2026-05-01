@@ -374,4 +374,49 @@ test.describe('Building bank account panel', () => {
     // Step 4: The danger alert must be gone — the building has recovered.
     await expect(page.locator('.bba-alert-danger')).toBeHidden()
   })
+
+  test('saves low-balance alert threshold for a building bank account', async ({ page }) => {
+    const player = makePlayer()
+    const companyId = 'company-bba-threshold'
+    const buildingId = 'building-bba-threshold'
+
+    player.companies.push(makeTestCompanyWithBuilding(player.id, companyId, buildingId))
+
+    const state = setupMockApi(page, {
+      players: [player],
+      cities: makeDefaultCities(),
+      resourceTypes: makeDefaultResources(),
+      productTypes: makeDefaultProducts(),
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.buildingBankAccounts[buildingId] = {
+      hasBankAccount: true,
+      bankAccountId: 'acc-bba-threshold',
+      accountNumber: '3333444455556666',
+      balance: 12500,
+      alertMinBalanceThreshold: null,
+      isSuspendedForFunds: false,
+      suspendedReason: null,
+      currencyCode: 'EUR',
+    }
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/building/${buildingId}`)
+    await expect(page.getByRole('heading', { name: 'Building Overview' })).toBeVisible({ timeout: 10000 })
+
+    const panel = page.locator('.building-bank-account-panel')
+    const thresholdInput = panel.locator('.bba-threshold-input')
+
+    await expect(thresholdInput).toBeVisible()
+    await thresholdInput.fill('5000')
+    await panel.getByRole('button', { name: /save threshold/i }).click()
+
+    await expect.poll(() => state.buildingBankAccounts[buildingId]?.alertMinBalanceThreshold ?? null).toBe(5000)
+    await expect(thresholdInput).toHaveValue('5000')
+  })
 })

@@ -151,6 +151,7 @@ export type EditableGridUnit = {
   vendorLockCompanyId: string | null
   lockedCityId: string | null
   industryCategory: string | null
+  lowInventoryAlertThreshold?: number | null
   isReverting?: boolean
 }
 
@@ -345,6 +346,10 @@ export function useBuildingDetail() {
   const quickPriceSaving = ref(false)
   const quickPriceSuccess = ref(false)
   const quickPriceError = ref<string | null>(null)
+  const quickInventoryThresholdInput = ref<string | number>('')
+  const quickInventoryThresholdSaving = ref(false)
+  const quickInventoryThresholdSuccess = ref(false)
+  const quickInventoryThresholdError = ref<string | null>(null)
   const showSaleDialog = ref(false)
   const salePrice = ref<number | null>(null)
   const savingSale = ref(false)
@@ -1112,6 +1117,7 @@ export function useBuildingDetail() {
       vendorLockCompanyId: ('vendorLockCompanyId' in unit ? unit.vendorLockCompanyId : null) ?? null,
       lockedCityId: ('lockedCityId' in unit ? unit.lockedCityId : null) ?? null,
       industryCategory: ('industryCategory' in unit ? unit.industryCategory : null) ?? null,
+      lowInventoryAlertThreshold: ('lowInventoryAlertThreshold' in unit ? unit.lowInventoryAlertThreshold : null) ?? null,
       isReverting: ('isReverting' in unit ? unit.isReverting : undefined) ?? undefined,
     }
   }
@@ -3646,6 +3652,53 @@ export function useBuildingDetail() {
     }
   }
 
+  async function submitPublicSalesInventoryAlertThreshold() {
+    const unit = selectedPublicSalesUnit.value
+    if (!unit || !auth.token) return
+    const unitId = getResolvedLiveUnitId(unit)
+    if (!unitId) return
+
+    const rawThreshold = quickInventoryThresholdInput.value
+    const normalized = typeof rawThreshold === 'number' ? String(rawThreshold) : rawThreshold.trim()
+    const threshold = normalized.length === 0 ? null : Number(normalized)
+    if (threshold !== null && (!Number.isFinite(threshold) || threshold < 0)) {
+      quickInventoryThresholdError.value = t('buildingDetail.marketIntelligence.inventoryAlert.invalid')
+      quickInventoryThresholdSuccess.value = false
+      return
+    }
+
+    quickInventoryThresholdSaving.value = true
+    quickInventoryThresholdSuccess.value = false
+    quickInventoryThresholdError.value = null
+    try {
+      const data = await gqlRequest<{ setPublicSalesInventoryAlertThreshold: { buildingUnitId: string; lowInventoryAlertThreshold: number | null } }>(
+        `mutation SetPublicSalesInventoryAlertThreshold($input: SetPublicSalesInventoryAlertThresholdInput!) {
+          setPublicSalesInventoryAlertThreshold(input: $input) {
+            buildingUnitId
+            lowInventoryAlertThreshold
+          }
+        }`,
+        { input: { buildingUnitId: unitId, minInventoryThreshold: threshold } },
+      )
+
+      if (building.value?.units) {
+        const liveUnit = building.value.units.find((u) => u.id === data.setPublicSalesInventoryAlertThreshold.buildingUnitId)
+        if (liveUnit) {
+          liveUnit.lowInventoryAlertThreshold = data.setPublicSalesInventoryAlertThreshold.lowInventoryAlertThreshold
+        }
+      }
+
+      quickInventoryThresholdInput.value =
+        data.setPublicSalesInventoryAlertThreshold.lowInventoryAlertThreshold == null ? '' : String(data.setPublicSalesInventoryAlertThreshold.lowInventoryAlertThreshold)
+      quickInventoryThresholdSuccess.value = true
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      quickInventoryThresholdError.value = msg || t('buildingDetail.marketIntelligence.inventoryAlert.saveFailed')
+    } finally {
+      quickInventoryThresholdSaving.value = false
+    }
+  }
+
   async function submitFlushStorage(unitId: string) {
     if (!auth.token) return
     flushingStorage.value = true
@@ -4145,6 +4198,7 @@ export function useBuildingDetail() {
                 vendorLockCompanyId
                 lockedCityId
                 industryCategory
+                lowInventoryAlertThreshold
               }
               pendingConfiguration {
                 id
@@ -4194,6 +4248,7 @@ export function useBuildingDetail() {
                   vendorLockCompanyId
                   lockedCityId
                   industryCategory
+                  lowInventoryAlertThreshold
                 }
               }
             }
@@ -4552,6 +4607,10 @@ export function useBuildingDetail() {
     () => selectedPublicSalesUnit.value?.id,
     () => {
       quickPriceInput.value = selectedPublicSalesUnit.value?.minPrice ?? null
+      const threshold = selectedPublicSalesUnit.value && 'lowInventoryAlertThreshold' in selectedPublicSalesUnit.value ? selectedPublicSalesUnit.value.lowInventoryAlertThreshold : null
+      quickInventoryThresholdInput.value = threshold == null ? '' : String(threshold)
+      quickInventoryThresholdSuccess.value = false
+      quickInventoryThresholdError.value = null
     },
     { immediate: true },
   )
@@ -4628,6 +4687,10 @@ export function useBuildingDetail() {
     quickPriceSaving,
     quickPriceSuccess,
     quickPriceError,
+    quickInventoryThresholdInput,
+    quickInventoryThresholdSaving,
+    quickInventoryThresholdSuccess,
+    quickInventoryThresholdError,
     showSaleDialog,
     salePrice,
     savingSale,
@@ -4891,6 +4954,7 @@ export function useBuildingDetail() {
     upgradeMediaHouse,
     loadUnitProductAnalytics,
     submitQuickPriceUpdate,
+    submitPublicSalesInventoryAlertThreshold,
     submitFlushStorage,
     fetchUpgradeInfo,
     submitUnitUpgrade,

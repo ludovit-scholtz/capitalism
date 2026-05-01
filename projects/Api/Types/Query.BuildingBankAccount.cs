@@ -63,6 +63,7 @@ public sealed partial class Query
             BankAccountId = building.BankAccount.Id,
             AccountNumber = building.BankAccount.AccountNumber,
             Balance = building.BankAccount.Balance,
+            AlertMinBalanceThreshold = building.BankAccount.AlertMinBalanceThreshold,
             IsSuspendedForFunds = building.IsSuspendedForFunds,
             SuspendedReason = building.SuspendedReason,
             HasBankAccount = true,
@@ -100,6 +101,7 @@ public sealed partial class Query
             AccountNumber = a.AccountNumber,
             CurrencyCode = a.CurrencyCode,
             Balance = a.Balance,
+            AlertMinBalanceThreshold = a.AlertMinBalanceThreshold,
         }).ToList();
     }
 
@@ -197,6 +199,7 @@ public sealed partial class Query
             AccountNumber = a.AccountNumber,
             CurrencyCode = a.CurrencyCode,
             Balance = a.Balance,
+            AlertMinBalanceThreshold = a.AlertMinBalanceThreshold,
             CompanyId = a.CompanyId,
             CompanyName = a.Company?.Name,
             OwnerType = a.CompanyId.HasValue ? "COMPANY" : "PERSON",

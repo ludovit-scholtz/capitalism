@@ -31,6 +31,10 @@ const {
   quickPriceSaving,
   quickPriceSuccess,
   quickPriceError,
+  quickInventoryThresholdInput,
+  quickInventoryThresholdSaving,
+  quickInventoryThresholdSuccess,
+  quickInventoryThresholdError,
   selectedHistoryItemKey,
   showFlushConfirmDialog,
   flushingStorage,
@@ -81,6 +85,7 @@ const {
   getUnitInventoryCostLabel,
   getLocalizedIndustry,
   submitQuickPriceUpdate,
+  submitPublicSalesInventoryAlertThreshold,
   submitFlushStorage,
 } = bd
 
@@ -339,6 +344,39 @@ function buildCompetitionPieGradient(entries: CompetitionLegendEntry[]): string 
                   {{ t('buildingDetail.marketIntelligence.priceUpdate.success') }}
                 </p>
                 <p v-if="quickPriceError" class="mi-price-error mt-2 rounded-md border border-red-300/50 bg-red-500/10 px-2.5 py-2 text-xs text-red-700 dark:text-red-300">{{ quickPriceError }}</p>
+              </div>
+
+              <div class="mt-4 rounded-lg border border-divider bg-card px-3 py-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <span class="text-xs font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.inventoryAlert.title') }}</span>
+                  <span class="currency-badge rounded-full border border-divider bg-bg px-2 py-0.5 text-[0.65rem] text-foreground">{{
+                    t('buildingDetail.marketIntelligence.inventoryAlert.unitHint')
+                  }}</span>
+                </div>
+                <p class="mt-2 text-xs text-muted">{{ t('buildingDetail.marketIntelligence.inventoryAlert.help') }}</p>
+                <div class="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                  <input
+                    id="quick-inventory-threshold-input"
+                    v-model="quickInventoryThresholdInput"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    class="mi-price-input form-input"
+                    :placeholder="t('buildingDetail.marketIntelligence.inventoryAlert.placeholder')"
+                  />
+                  <button class="btn btn-secondary" :disabled="quickInventoryThresholdSaving" @click="submitPublicSalesInventoryAlertThreshold">
+                    {{ quickInventoryThresholdSaving ? t('common.loading') : t('buildingDetail.marketIntelligence.inventoryAlert.save') }}
+                  </button>
+                </div>
+                <p
+                  v-if="quickInventoryThresholdSuccess"
+                  class="mi-price-success mt-2 rounded-md border border-emerald-300/50 bg-emerald-500/10 px-2.5 py-2 text-xs text-emerald-800 dark:text-emerald-300"
+                >
+                  {{ t('buildingDetail.marketIntelligence.inventoryAlert.saved') }}
+                </p>
+                <p v-if="quickInventoryThresholdError" class="mi-price-error mt-2 rounded-md border border-red-300/50 bg-red-500/10 px-2.5 py-2 text-xs text-red-700 dark:text-red-300">
+                  {{ quickInventoryThresholdError }}
+                </p>
               </div>
             </div>
           </div></template

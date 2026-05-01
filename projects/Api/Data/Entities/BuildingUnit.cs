@@ -116,6 +116,18 @@ public sealed class BuildingUnit
     /// </summary>
     [MaxLength(50)]
     public string? IndustryCategory { get; set; }
+
+    /// <summary>
+    /// Optional minimum inventory threshold used for PUBLIC_SALES low-stock alerts.
+    /// When set, the player receives an alert once current inventory drops below this value.
+    /// </summary>
+    public decimal? LowInventoryAlertThreshold { get; set; }
+
+    /// <summary>
+    /// Internal latch to suppress duplicate low-stock alerts while inventory remains below
+    /// <see cref="LowInventoryAlertThreshold"/>.
+    /// </summary>
+    public bool IsLowInventoryAlertActive { get; set; }
 }
 
 /// <summary>Defines valid unit types for each building type.</summary>

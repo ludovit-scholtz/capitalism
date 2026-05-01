@@ -158,6 +158,8 @@ public static partial class BuildingConfigurationService
         {
             var cityCurrencyCode = plan.Building.City?.CurrencyCode ?? "EUR";
             var fxRate = FxRateHelper.GetEurRate(fxRatesLookup, cityCurrencyCode);
+            var appliedRemovalCount = 0;
+            var appliedUnitCount = 0;
 
             var liveUnitsByPosition = plan.Building.Units.DistinctBy(unit => (unit.GridX, unit.GridY)).ToDictionary(unit => (unit.GridX, unit.GridY));
 
@@ -168,6 +170,7 @@ public static partial class BuildingConfigurationService
                     db.BuildingUnits.Remove(liveUnit);
                     plan.Building.Units.Remove(liveUnit);
                     liveUnitsByPosition.Remove((removal.GridX, removal.GridY));
+                    appliedRemovalCount++;
                 }
 
                 plan.Removals.Remove(removal);
@@ -275,6 +278,22 @@ public static partial class BuildingConfigurationService
                 pendingUnit.TicksRequired = 0;
                 pendingUnit.IsChanged = false;
                 pendingUnit.IsReverting = false;
+                appliedUnitCount++;
+            }
+
+            var totalAppliedChanges = appliedUnitCount + appliedRemovalCount;
+            if (totalAppliedChanges > 0)
+            {
+                PlayerNotificationService.Add(
+                    db,
+                    plan.Building.Company.PlayerId,
+                    PlayerNotificationType.BuildingUpgradeApplied,
+                    "Building upgrade applied",
+                    $"{plan.Building.Name} applied {totalAppliedChanges} pending layout change(s).",
+                    currentTick,
+                    plan.Building.CompanyId,
+                    plan.BuildingId,
+                    bankAccountId: plan.Building.BankAccountId);
             }
 
             if (!plan.Units.Any(unit => unit.IsChanged) && plan.Removals.Count == 0)
