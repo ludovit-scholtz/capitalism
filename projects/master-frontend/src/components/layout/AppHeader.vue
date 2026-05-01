@@ -33,7 +33,9 @@ function logout() {
 </script>
 
 <template>
-  <header class="app-header sticky top-0 z-[100] border-b border-divider bg-card/95 backdrop-blur-sm">
+  <header
+    class="app-header sticky top-0 z-[100] border-b border-divider bg-card/95 backdrop-blur-sm"
+  >
     <div class="container flex h-16 items-center gap-6">
       <RouterLink to="/" class="logo-link shrink-0" @click="closeMenu">
         <span class="logo-text">CAPITALISM HQ</span>
@@ -67,7 +69,9 @@ function logout() {
         <RouterLink :to="{ path: '/', hash: '#game-servers' }" class="nav-link" @click="closeMenu">
           {{ t('nav.gameServers') }}
         </RouterLink>
-        <RouterLink to="/ranking" class="nav-link" @click="closeMenu">{{ t('nav.ranking') }}</RouterLink>
+        <RouterLink to="/ranking" class="nav-link" @click="closeMenu">{{
+          t('nav.ranking')
+        }}</RouterLink>
         <RouterLink to="/ranking/bounties" class="nav-link" @click="closeMenu">
           {{ t('nav.bounties') }}
         </RouterLink>
@@ -93,7 +97,9 @@ function logout() {
         </select>
 
         <template v-if="auth.isAuthenticated">
-          <span class="hidden max-w-36 truncate text-sm text-muted lg:inline">{{ auth.player?.displayName }}</span>
+          <span class="hidden max-w-36 truncate text-sm text-muted lg:inline">{{
+            auth.player?.displayName
+          }}</span>
           <button class="btn btn-secondary h-9 px-3" type="button" @click="logout">
             {{ t('home.signOut') }}
           </button>

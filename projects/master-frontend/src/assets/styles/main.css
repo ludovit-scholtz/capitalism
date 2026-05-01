@@ -95,8 +95,7 @@ body {
   font-family: var(--font-sans);
   background:
     radial-gradient(circle at 15% -5%, rgba(0, 71, 255, 0.18), transparent 30%),
-    radial-gradient(circle at 95% 10%, rgba(255, 140, 0, 0.14), transparent 35%),
-    var(--color-bg);
+    radial-gradient(circle at 95% 10%, rgba(255, 140, 0, 0.14), transparent 35%), var(--color-bg);
   color: var(--color-text);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
