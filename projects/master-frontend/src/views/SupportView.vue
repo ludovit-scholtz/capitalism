@@ -167,7 +167,13 @@ onMounted(async () => {
     <header class="support-header">
       <h1>{{ t('support.title') }}</h1>
       <p>{{ t('support.subtitle') }}</p>
-      <a href="/" class="nav-link">← {{ t('common.backToPortal') }}</a>
+      <nav class="support-nav" aria-label="Support dashboard navigation">
+        <RouterLink class="nav-link" to="/support/admin">{{ t('home.supportAdmin') }}</RouterLink>
+        <RouterLink class="nav-link" to="/referrals/dashboard">{{
+          t('home.referralDashboard')
+        }}</RouterLink>
+        <RouterLink class="nav-link" to="/">← {{ t('common.backToPortal') }}</RouterLink>
+      </nav>
     </header>
 
     <section class="support-card" aria-label="Create support ticket">
@@ -332,8 +338,17 @@ onMounted(async () => {
   margin: 0;
 }
 
+.support-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-top: 0.9rem;
+}
+
 .nav-link {
   color: #a7b6ff;
+  text-decoration: none;
+  font-weight: 600;
 }
 
 .support-card {

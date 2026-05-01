@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
 import {
   fetchMyRankingSummary,
   fetchRankingLeaderboard,
@@ -11,20 +10,37 @@ import {
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
-const router = useRouter()
 const { t } = useI18n()
 
 const loading = ref(false)
 const errorMessage = ref('')
 const summary = ref<RankingSummaryInfo | null>(null)
 const leaderboard = ref<RankingLeaderboardEntryInfo[]>([])
+const currentPage = ref(1)
+const pageSize = ref(25)
+const nameFilter = ref('')
 
-const topThree = computed(() => leaderboard.value.slice(0, 3))
+const pageSizeOptions = [10, 25, 50]
+
+const hasPreviousPage = computed(() => currentPage.value > 1)
+const hasNextPage = computed(() => leaderboard.value.length === pageSize.value)
+const currentOffset = computed(() => (currentPage.value - 1) * pageSize.value)
+
+const filteredLeaderboard = computed(() => {
+  const filter = nameFilter.value.trim().toLowerCase()
+  if (!filter) {
+    return leaderboard.value
+  }
+
+  return leaderboard.value.filter((entry) => entry.displayName.toLowerCase().includes(filter))
+})
+
+const topThree = computed(() => filteredLeaderboard.value.slice(0, 3))
 
 function movementClass(movement: number) {
-  if (movement > 0) return 'movement-up'
-  if (movement < 0) return 'movement-down'
-  return 'movement-flat'
+  if (movement > 0) return 'text-good'
+  if (movement < 0) return 'text-bad'
+  return 'text-muted'
 }
 
 function movementLabel(movement: number) {
@@ -51,7 +67,7 @@ async function loadData() {
   errorMessage.value = ''
 
   try {
-    leaderboard.value = await fetchRankingLeaderboard(100, 0)
+    leaderboard.value = await fetchRankingLeaderboard(pageSize.value, currentOffset.value)
     if (auth.token) {
       summary.value = await fetchMyRankingSummary(auth.token)
     } else {
@@ -64,60 +80,80 @@ async function loadData() {
   }
 }
 
-onMounted(async () => {
-  if (!auth.isAuthenticated) {
-    void router.push('/login')
+async function changePage(page: number) {
+  if (page < 1 || page === currentPage.value) {
     return
   }
 
+  currentPage.value = page
+  await loadData()
+}
+
+async function handlePageSizeChange() {
+  currentPage.value = 1
+  await loadData()
+}
+
+onMounted(async () => {
   await loadData()
 })
 </script>
 
 <template>
-  <main class="ranking-shell">
-    <header class="ranking-header">
-      <h1>{{ t('rankingDashboard.title') }}</h1>
-      <p>{{ t('rankingDashboard.subtitle') }}</p>
-      <div class="ranking-nav-links">
-        <a href="/ranking/bounties" class="nav-link">{{ t('rankingDashboard.historyLink') }}</a>
-        <a href="/ranking/admin" class="nav-link">{{ t('home.rankingAdmin') }}</a>
-        <a href="/referrals/dashboard" class="nav-link">{{ t('home.referralDashboard') }}</a>
-        <a href="/" class="nav-link">← {{ t('common.backToPortal') }}</a>
+  <main class="container pb-16 pt-6 lg:pb-20 lg:pt-8">
+    <header class="card p-6 lg:p-8">
+      <h1 class="text-3xl font-semibold lg:text-4xl">{{ t('rankingDashboard.title') }}</h1>
+      <p class="mt-3 text-sm text-muted lg:text-base">{{ t('rankingDashboard.subtitle') }}</p>
+      <div class="mt-5 flex flex-wrap gap-3">
+        <RouterLink to="/ranking/bounties" class="btn btn-secondary">{{
+          t('rankingDashboard.historyLink')
+        }}</RouterLink>
+        <RouterLink to="/ranking/admin" class="btn btn-secondary">{{
+          t('home.rankingAdmin')
+        }}</RouterLink>
+        <RouterLink to="/" class="btn btn-secondary">{{ t('common.backToPortal') }}</RouterLink>
       </div>
     </header>
 
-    <p v-if="errorMessage" class="state-error" role="alert">{{ errorMessage }}</p>
+    <p v-if="errorMessage" class="state-error mt-5" role="alert">{{ errorMessage }}</p>
 
-    <section v-if="summary" class="summary-grid" aria-label="Ranking summary cards">
-      <article class="summary-card">
-        <p>{{ t('rankingDashboard.totalPoints') }}</p>
-        <strong>{{ formatPoints(summary.totalPoints) }}</strong>
+    <section
+      v-if="summary"
+      class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4"
+      aria-label="Ranking summary cards"
+    >
+      <article class="card p-5">
+        <p class="text-sm text-muted">{{ t('rankingDashboard.totalPoints') }}</p>
+        <strong class="mt-2 block text-2xl">{{ formatPoints(summary.totalPoints) }}</strong>
       </article>
-      <article class="summary-card">
-        <p>{{ t('rankingDashboard.globalRank') }}</p>
-        <strong>#{{ summary.globalRank || '-' }}</strong>
+      <article class="card p-5">
+        <p class="text-sm text-muted">{{ t('rankingDashboard.globalRank') }}</p>
+        <strong class="mt-2 block text-2xl">#{{ summary.globalRank || '-' }}</strong>
       </article>
-      <article class="summary-card">
-        <p>{{ t('rankingDashboard.movement') }}</p>
-        <strong :class="movementClass(summary.rankMovement)">
+      <article class="card p-5">
+        <p class="text-sm text-muted">{{ t('rankingDashboard.movement') }}</p>
+        <strong class="mt-2 block text-2xl" :class="movementClass(summary.rankMovement)">
           {{ movementLabel(summary.rankMovement) }}
         </strong>
       </article>
-      <article class="summary-card">
-        <p>{{ t('rankingDashboard.updatedAt') }}</p>
-        <strong>{{ formatDate(summary.updatedAtUtc) }}</strong>
+      <article class="card p-5">
+        <p class="text-sm text-muted">{{ t('rankingDashboard.updatedAt') }}</p>
+        <strong class="mt-2 block text-lg">{{ formatDate(summary.updatedAtUtc) }}</strong>
       </article>
     </section>
 
-    <section class="panel" aria-label="Top competitors">
-      <h2>{{ t('rankingDashboard.topCompetitors') }}</h2>
-      <p v-if="loading" class="state-message">{{ t('common.loading') }}</p>
-      <div v-else class="podium-grid">
-        <article v-for="entry in topThree" :key="entry.playerId" class="podium-card">
-          <p class="podium-rank">#{{ entry.globalRank }}</p>
-          <h3>{{ entry.displayName }}</h3>
-          <p>{{ formatPoints(entry.totalPoints) }} pts</p>
+    <section class="card mt-5 p-6" aria-label="Top competitors">
+      <h2 class="text-2xl font-semibold">{{ t('rankingDashboard.topCompetitors') }}</h2>
+      <p v-if="loading" class="state-message mt-3">{{ t('common.loading') }}</p>
+      <div v-else class="mt-4 grid gap-4 md:grid-cols-3">
+        <article
+          v-for="entry in topThree"
+          :key="entry.playerId"
+          class="rounded-xl border border-divider bg-card-raised p-4"
+        >
+          <p class="text-sm font-semibold text-brand">#{{ entry.globalRank }}</p>
+          <h3 class="mt-1 text-lg font-semibold">{{ entry.displayName }}</h3>
+          <p class="mt-2 text-sm text-muted">{{ formatPoints(entry.totalPoints) }} pts</p>
           <p :class="movementClass(entry.rankMovement)">
             {{ t('rankingDashboard.delta') }} {{ movementLabel(entry.rankMovement) }}
           </p>
@@ -125,141 +161,98 @@ onMounted(async () => {
       </div>
     </section>
 
-    <section class="panel" aria-label="Leaderboard table">
-      <div class="panel-row">
-        <h2>{{ t('rankingDashboard.leaderboard') }}</h2>
-        <button type="button" @click="loadData">{{ t('common.refresh') }}</button>
+    <section class="card mt-5 p-6" aria-label="Leaderboard table">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="text-2xl font-semibold">{{ t('rankingDashboard.leaderboard') }}</h2>
+        <button type="button" class="btn btn-secondary" @click="loadData">
+          {{ t('common.refresh') }}
+        </button>
       </div>
 
-      <p v-if="loading" class="state-message">{{ t('common.loading') }}</p>
-      <table v-else class="leaderboard-table" aria-label="Master ranking leaderboard table">
-        <thead>
-          <tr>
-            <th>{{ t('rankingDashboard.rank') }}</th>
-            <th>{{ t('rankingDashboard.player') }}</th>
-            <th>{{ t('rankingDashboard.points') }}</th>
-            <th>{{ t('rankingDashboard.movement') }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="entry in leaderboard" :key="entry.playerId">
-            <td>#{{ entry.globalRank }}</td>
-            <td>{{ entry.displayName }}</td>
-            <td>{{ formatPoints(entry.totalPoints) }}</td>
-            <td :class="movementClass(entry.rankMovement)">
-              {{ movementLabel(entry.rankMovement) }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="mt-4 flex flex-wrap items-end gap-3">
+        <label class="grid gap-1 text-sm text-muted" for="ranking-filter">
+          {{ t('rankingDashboard.playerFilter') }}
+          <input
+            id="ranking-filter"
+            v-model="nameFilter"
+            type="text"
+            class="form-input min-w-[220px]"
+            :placeholder="t('rankingDashboard.playerFilterPlaceholder')"
+          />
+        </label>
+
+        <label class="grid gap-1 text-sm text-muted" for="ranking-page-size">
+          {{ t('rankingDashboard.pageSize') }}
+          <select
+            id="ranking-page-size"
+            v-model.number="pageSize"
+            class="form-input min-w-[120px]"
+            @change="handlePageSizeChange"
+          >
+            <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
+          </select>
+        </label>
+      </div>
+
+      <p v-if="loading" class="state-message mt-4">{{ t('common.loading') }}</p>
+      <div v-else class="mt-4 overflow-x-auto rounded-xl border border-divider">
+        <table
+          class="min-w-full border-collapse text-sm"
+          aria-label="Master ranking leaderboard table"
+        >
+          <thead>
+            <tr class="bg-overlay/40 text-left text-xs uppercase tracking-[0.08em] text-muted">
+              <th class="px-5 py-3">{{ t('rankingDashboard.rank') }}</th>
+              <th class="px-5 py-3">{{ t('rankingDashboard.player') }}</th>
+              <th class="px-5 py-3">{{ t('rankingDashboard.points') }}</th>
+              <th class="px-5 py-3">{{ t('rankingDashboard.movement') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="entry in filteredLeaderboard"
+              :key="entry.playerId"
+              class="border-t border-divider/70"
+            >
+              <td class="px-5 py-3 font-semibold">#{{ entry.globalRank }}</td>
+              <td class="px-5 py-3">{{ entry.displayName }}</td>
+              <td class="px-5 py-3">{{ formatPoints(entry.totalPoints) }}</td>
+              <td class="px-5 py-3" :class="movementClass(entry.rankMovement)">
+                {{ movementLabel(entry.rankMovement) }}
+              </td>
+            </tr>
+            <tr v-if="filteredLeaderboard.length === 0">
+              <td colspan="4" class="px-5 py-4 text-sm text-muted">
+                {{ t('rankingDashboard.noRows') }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <p class="text-sm text-muted">
+          {{ t('rankingDashboard.pageLabel', { page: currentPage }) }}
+        </p>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            :disabled="!hasPreviousPage || loading"
+            @click="changePage(currentPage - 1)"
+          >
+            {{ t('rankingDashboard.previousPage') }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-secondary"
+            :disabled="!hasNextPage || loading"
+            @click="changePage(currentPage + 1)"
+          >
+            {{ t('rankingDashboard.nextPage') }}
+          </button>
+        </div>
+      </div>
     </section>
   </main>
 </template>
-
-<style scoped>
-.ranking-shell {
-  max-width: 1200px;
-  margin: 2rem auto;
-  padding: 0 1rem 2.5rem;
-  color: #efeef6;
-}
-
-.ranking-header {
-  margin-bottom: 1.5rem;
-}
-
-.ranking-header h1 {
-  margin: 0;
-  font-size: 2rem;
-}
-
-.ranking-nav-links {
-  display: flex;
-  gap: 0.8rem;
-  margin-top: 0.75rem;
-}
-
-.nav-link {
-  color: #ffd479;
-  text-decoration: none;
-}
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 0.8rem;
-  margin-bottom: 1rem;
-}
-
-.summary-card,
-.panel,
-.podium-card {
-  background: rgba(10, 11, 21, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 14px;
-}
-
-.summary-card {
-  padding: 0.9rem;
-}
-
-.summary-card strong {
-  font-size: 1.2rem;
-}
-
-.panel {
-  padding: 1rem;
-  margin-bottom: 1rem;
-}
-
-.panel-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-}
-
-.podium-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0.8rem;
-}
-
-.podium-card {
-  padding: 0.75rem;
-}
-
-.podium-rank {
-  margin: 0;
-  color: #ffd479;
-  font-weight: 700;
-}
-
-.leaderboard-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.leaderboard-table th,
-.leaderboard-table td {
-  padding: 0.55rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-  text-align: left;
-}
-
-.movement-up {
-  color: #67efac;
-}
-
-.movement-down {
-  color: #ff8f8f;
-}
-
-.movement-flat {
-  color: #b7b7cb;
-}
-
-.state-error {
-  color: #ff9e9e;
-}
-</style>

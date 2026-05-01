@@ -115,18 +115,6 @@ onMounted(async () => {
         >
           <RouterLink
             class="rounded-full bg-[rgba(17,41,79,0.08)] px-3 py-1.5 text-sm font-semibold text-[var(--color-ink)] no-underline"
-            to="/support"
-          >
-            {{ t('home.support') }}
-          </RouterLink>
-          <RouterLink
-            class="rounded-full bg-[rgba(17,41,79,0.08)] px-3 py-1.5 text-sm font-semibold text-[var(--color-ink)] no-underline"
-            to="/support/admin"
-          >
-            {{ t('home.supportAdmin') }}
-          </RouterLink>
-          <RouterLink
-            class="rounded-full bg-[rgba(17,41,79,0.08)] px-3 py-1.5 text-sm font-semibold text-[var(--color-ink)] no-underline"
             to="/ranking/admin"
           >
             {{ t('home.rankingAdmin') }}

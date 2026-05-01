@@ -83,7 +83,7 @@ function logout() {
         </RouterLink>
 
         <RouterLink
-          :to="{ path: '/', hash: '#game-servers' }"
+          to="/game-servers"
           :title="t('nav.gameServers')"
           :aria-label="t('nav.gameServers')"
           class="nav-link"
@@ -163,6 +163,34 @@ function logout() {
             <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" />
           </svg>
           <span class="inline-block md:hidden">{{ t('nav.bounties') }}</span>
+        </RouterLink>
+
+        <RouterLink
+          to="/support"
+          :title="t('nav.supportDashboard')"
+          :aria-label="t('nav.supportDashboard')"
+          class="nav-link"
+          @click="closeMenu"
+        >
+          <svg
+            class="nav-icon"
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+            />
+          </svg>
+          <span class="inline-block md:hidden">{{ t('nav.supportDashboard') }}</span>
         </RouterLink>
 
         <RouterLink
@@ -255,7 +283,7 @@ function logout() {
         <RouterLink
           v-else
           to="/login"
-          class="btn btn-primary h-9 w-9 p-0 justify-center"
+          class="btn btn-primary h-9 px-3 gap-2 text-white"
           :title="t('login.signIn')"
           :aria-label="t('login.signIn')"
           @click="closeMenu"
@@ -276,6 +304,7 @@ function logout() {
             <path d="M10 17l5-5-5-5" />
             <path d="M15 12H3" />
           </svg>
+          <span class="hidden md:inline">{{ t('login.signIn') }}</span>
         </RouterLink>
 
         <ThemeToggle />

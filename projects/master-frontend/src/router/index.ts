@@ -14,6 +14,11 @@ const router = createRouter({
       component: () => import('@/views/LoginView.vue'),
     },
     {
+      path: '/game-servers',
+      name: 'game-servers',
+      component: () => import('@/views/GameServersView.vue'),
+    },
+    {
       path: '/account',
       name: 'account',
       component: () => import('@/views/AccountView.vue'),
@@ -68,7 +73,7 @@ const router = createRouter({
     if (to.hash) {
       return {
         el: to.hash,
-        top: 88,
+        top: 96,
         behavior: 'smooth',
       }
     }
