@@ -1295,3 +1295,33 @@ Root-cause of a CI failure (April 2026, PR #weekly-reports):
    ```
 3. **Every time CHANGELOG.csv grows beyond the previously assumed row count, check whether any test uses a hardcoded `limit` smaller than the current row count.** Keep the limit at 500 to future-proof against further growth.
 4. **xUnit analyzer warning `xUnit2002: Do not use Assert.NotNull() on value type`** is a real bug signal, not just a style warning. Treat it as a required fix.
+
+## Mock type completeness — always include all GraphQL-returned fields in mock types
+
+Root-cause of E2E test failures (May 2026, PR #192 / collateral currency format):
+- `MockCollateralBuilding` in `e2e/helpers/mock-api.ts` was missing the `currencyCode` field.
+- The backend `myCollateralBuildings` GraphQL query returns `currencyCode` on each building.
+- `BankLoanRequestView.vue` uses `formatCurrency(b.appraisedValue, b.currencyCode)` to display amounts.
+- Without `currencyCode` in the mock, `b.currencyCode` was `undefined` → `formatCurrency` defaulted to USD (`$`) instead of the city's currency (EUR = `€`).
+- The E2E test correctly asserted `€400,000` but the actual UI showed `$400,000`.
+
+**Rules to prevent recurrence:**
+1. **When a GraphQL query returns a new field, add it to the corresponding `Mock*` type in `e2e/helpers/mock-api.ts` in the same commit.** Do not add a field to the GraphQL query without updating the mock.
+2. **Currency-displaying components that accept `currencyCode` as a prop or field must always have that field populated in E2E fixtures.** Missing `currencyCode` silently falls back to USD which causes `$` vs `€` failures.
+3. **When adding or updating a `Mock*` type, scan the corresponding GraphQL query for all returned fields and verify each one is present in the type.** Add optional (`?`) fields for newly-added GraphQL fields to maintain backward compatibility with existing fixture objects.
+4. **After adding a currency-rendering component to a view, search for all existing E2E tests that render that view and verify their mock fixtures include `currencyCode`.** A missing currency code will always produce `$` (USD fallback) which will fail any test that asserts a non-USD currency symbol.
+
+## E2E text selectors — match the exact i18n translation, not a simplified version
+
+Root-cause of an E2E test failure (May 2026, PR #192 / marketing-analytics unauthenticated state):
+- `marketing-analytics.spec.ts` used `page.getByText(/login/i)` expecting to match the login-required message.
+- The i18n key `auth.loginRequired` translates to "Please log in to continue." which contains "log in" (two words with a space) — NOT "login" (single word).
+- JavaScript regex `/login/i` matches the literal 5-character sequence "login" and does NOT match "log in" (which has 6 characters: l-o-g-space-i-n).
+- The navigation header's login button is "Sign In" (also no match for `/login/i`).
+- The test always failed: "element(s) not found" on every run.
+
+**Rules to prevent recurrence:**
+1. **Before writing `page.getByText(/pattern/i)`, look up the exact i18n translation in `src/i18n/locales/en.ts` and use a pattern that actually matches the translation.** Do not guess from memory.
+2. **"Log in" (two words) and "login" (one word) are different strings.** `auth.loginRequired` = "Please log in to continue." which requires `/log in/i` or `/please log in/i`, not `/login/i`.
+3. **When testing unauthenticated state, prefer asserting the page-level empty-state message** (e.g. `page.locator('.ca-empty-state')` visible, or `page.getByText(/please log in/i)`). Do not rely on navigation header elements whose text depends on the header implementation.
+4. **Immediately before pushing any new E2E test, run it in isolation** with `CI=true npx playwright test --project=chromium e2e/<spec>.ts --grep "test name"` to verify the selector actually resolves to a visible element.
