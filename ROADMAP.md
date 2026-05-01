@@ -11,6 +11,8 @@ It will use real world map. The game will start in single city and later other c
 
 - [ ] When I go to /dashboard it takes few seconds to load with few players in the game server. Make sure it is optimized well and takes less then 100ms to load.
 
+**Shipped (increment 1):** Dashboard initial load now batches critical startup data (`myCompanies`, `gameState`, `myPendingActions`, and `cities`) into one GraphQL request and renders immediately, while non-critical derived analytics (city power, ledgers, unit status, building financial summaries) hydrate asynchronously in the background and only for the active company context.
+
 ### Bots
 
 - [ ] Create NPC bot console app
