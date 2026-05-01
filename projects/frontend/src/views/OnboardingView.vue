@@ -1249,7 +1249,10 @@ useTickRefresh(async () => {
             v-for="option in ipoOptions"
             :key="option.raiseTarget"
             class="ipo-card flex flex-col gap-2 rounded-md border-2 border-divider bg-page px-4 py-4 text-left text-body transition-all duration-200 hover:-translate-y-0.5 hover:border-brand"
-            :class="{ 'border-brand bg-brand/10 shadow-[0_0_0_1px_var(--color-primary),0_4px_16px_rgba(0,71,255,0.15)]': selectedIpoRaiseTarget === option.raiseTarget, 'pick-hint': selectedIpoRaiseTarget === null }"
+            :class="{
+              'border-brand bg-brand/10 shadow-[0_0_0_1px_var(--color-primary),0_4px_16px_rgba(0,71,255,0.15)]': selectedIpoRaiseTarget === option.raiseTarget,
+              'pick-hint': selectedIpoRaiseTarget === null,
+            }"
             @click="selectIpoPlan(option.raiseTarget)"
           >
             <span class="font-bold text-sm">{{ t(option.titleKey) }}</span
