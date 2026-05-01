@@ -293,6 +293,13 @@ export interface GlobalExchangeOffer {
   distanceKm: number
   /** Destination city fuel price index (1.0 = EUR baseline). */
   fuelPriceIndex?: number
+  /** Last 50 ticks of ask-price history for sparkline rendering. */
+  askPriceHistory?: ResourceAskPricePoint[]
+}
+
+export interface ResourceAskPricePoint {
+  tick: number
+  askPricePerUnit: number
 }
 
 /** A product marketplace listing from a player-placed SELL exchange order. */
@@ -1772,6 +1779,35 @@ export interface CampaignAnalyticsResult {
   bestPerformingProduct: string | null
   globalRecommendation: string
   rows: CampaignAnalyticsRow[]
+}
+
+/** Seller row for one product in the city-level market intelligence dashboard. */
+export interface MarketIntelligenceSellerRow {
+  rank: number
+  companyId: string
+  displayName: string
+  askingPricePerUnit: number
+  brandQuality: number | null
+  estimatedWeeklySalesVolume: number
+  marketShare: number
+}
+
+/** Per-product city market intelligence summary. */
+export interface MarketIntelligenceProductRow {
+  productTypeId: string
+  productName: string
+  productSlug: string
+  totalWeeklySalesVolume: number
+  sellers: MarketIntelligenceSellerRow[]
+}
+
+/** City-level competitive market intelligence for the last in-game week. */
+export interface MarketIntelligenceResult {
+  cityId: string
+  cityName: string
+  dataFromTick: number
+  dataToTick: number
+  products: MarketIntelligenceProductRow[]
 }
 
 /**

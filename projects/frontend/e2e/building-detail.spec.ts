@@ -12753,8 +12753,8 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await expect(panel.locator('.mi-bar-revenue')).not.toHaveCount(0)
     await expect(panel.locator('.mi-bar-revenue').first()).toHaveAttribute('title', /T\d+:/)
 
-    // Market share section should show the company
-    await expect(panel.getByText('Market Share (latest tick)')).toBeVisible()
+    // Competition section should show the company share row
+    await expect(panel.getByText('Competition')).toBeVisible()
     await expect(panel.locator('.mi-share-row')).toHaveCount(1)
     await expect(panel.locator('.mi-share-pct')).toContainText('100.0%')
 
@@ -13137,10 +13137,10 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
-    // Price chart should be visible with rendered bar data
-    await expect(panel.getByText('Realized Price per Tick')).toBeVisible()
-    await expect(panel.locator('.mi-bar-price')).not.toHaveCount(0)
-    await expect(panel.locator('.mi-bar-price').first()).toHaveAttribute('title', /T\d+:/)
+    // Competition price trend chart should be visible with rendered bar data
+    await expect(panel.getByText('Price Trend (last 100 ticks)')).toBeVisible()
+    await expect(panel.locator('.mi-competition-price-bar')).not.toHaveCount(0)
+    await expect(panel.locator('.mi-competition-price-bar').first()).toHaveAttribute('title', /T\d+:/)
   })
 
   test('shows MODERATE demand signal with monitor hint', async ({ page }) => {
@@ -13302,7 +13302,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
       // 40% sold by this company; 60% unmet demand
       marketShare: [
         { label: 'Market Intel Corp', companyId: 'company-shop-mi', share: 0.4, isUnmet: false },
-        { label: 'Unmet Demand', companyId: null, share: 0.6, isUnmet: true },
+        { label: 'Unmet demand', companyId: null, share: 0.6, isUnmet: true },
       ],
       elasticityIndex: -1.0,
       unmetDemandShare: 0.6,
@@ -13331,7 +13331,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await expect(panel.locator('.mi-share-row')).toHaveCount(2)
     const unmetRow = panel.locator('.mi-share-row-unmet')
     await expect(unmetRow).toBeVisible()
-    await expect(unmetRow.locator('.mi-share-label')).toContainText('Unmet Demand')
+    await expect(unmetRow.locator('.mi-share-label')).toContainText('Unmet demand')
     await expect(unmetRow.locator('.mi-share-pct')).toContainText('60.0%')
   })
 
@@ -15204,8 +15204,8 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await expect(panel.locator('.mi-bar-revenue')).toHaveCount(100)
     // All 100 quantity bars should be present
     await expect(panel.locator('.mi-bar-quantity')).toHaveCount(100)
-    // All 100 price bars should be present
-    await expect(panel.locator('.mi-bar-price')).toHaveCount(100)
+    // All 100 competition price bars should be present
+    await expect(panel.locator('.mi-competition-price-bar')).toHaveCount(100)
 
     // Tick window badge should show readable dates (not raw T1/T100)
     await expect(panel.locator('.mi-tick-window')).toContainText('2000')

@@ -98,7 +98,7 @@ function handleChatToggle() {
           <font-awesome-icon :icon="['fas', 'file-invoice-dollar']" class="mr-2" />
           <span class="inline-block md:hidden">{{ t('nav.bankStatement') }}</span>
         </RouterLink>
-        <RouterLink v-if="auth.isAuthenticated" to="/marketing-analytics" :title="t('nav.campaignAnalytics')" class="nav-link" @click="closeMenu">
+        <RouterLink v-if="auth.isAuthenticated" to="/market-intelligence" :title="t('nav.campaignAnalytics')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'bullhorn']" class="mr-2" />
           <span class="inline-block md:hidden">{{ t('nav.campaignAnalytics') }}</span>
         </RouterLink>

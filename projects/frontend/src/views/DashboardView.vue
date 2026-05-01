@@ -615,6 +615,11 @@ async function createCompany() {
               <FinancialSummaryCard :ledger="companyLedgers[company.id] ?? null" :loading="ledgerLoading" />
               <StarterGuidance :company="company" :revenue="companyLedgers[company.id]?.totalRevenue ?? 0" :net-income="companyLedgers[company.id]?.netIncome ?? 0" />
             </div>
+            <div class="flex flex-wrap gap-2">
+              <RouterLink :to="selectedCityId ? { name: 'market-intelligence', query: { city: selectedCityId } } : { name: 'market-intelligence' }" class="btn btn-secondary">
+                📊 {{ t('dashboard.openMarketIntelligence') }}
+              </RouterLink>
+            </div>
           </div>
 
           <!-- ÔöÇÔöÇ Buildings tab ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ -->

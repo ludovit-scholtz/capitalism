@@ -27,11 +27,11 @@ It will use real world map. The game will start in single city and later other c
 - [x] Show transit cost estimates as tooltip labels on each inter-unit arrow in the supply chain diagram so players understand the running shipping cost of each resource hop without opening individual unit panels.
 - [x] Persist a supply chain "health score" per building visible in the dashboard company card: green when all linked units have stock moving, yellow when any unit stalled for more than 5 ticks, red when a unit has been empty for more than 20 ticks consecutively.
 
-### Competitive market intelligence (0% complete)
+### Competitive market intelligence (100% complete)
 
-- [ ] Add a `/market-intelligence` view accessible from the player dashboard that shows, per product type, a ranked table of all sellers currently offering that product in the selected city: display name, asking price, brand quality percentage, and estimated weekly sales volume derived from public sales records, so players can benchmark pricing strategy against competitors.
-- [ ] In the public sales unit detail panel, add a "Competition" section showing a pie chart of market share by player (anonymized to "Player A/B/C" outside top 3) and a mini price-history chart for the product in that city over the last 100 ticks, so the current PRODUCT-DEFINITION.md market-share pie is fully implemented and visible.
-- [ ] Surface resource price trends on the global exchange view as a sparkline chart per resource showing the last 50 ticks of ask prices so players can time their mine or factory purchases relative to market cycles.
+- [x] Add a `/market-intelligence` view accessible from the player dashboard that shows, per product type, a ranked table of all sellers currently offering that product in the selected city: display name, asking price, brand quality percentage, and estimated weekly sales volume derived from public sales records, so players can benchmark pricing strategy against competitors.
+- [x] In the public sales unit detail panel, add a "Competition" section showing a pie chart of market share by player (anonymized to "Player A/B/C" outside top 3) and a mini price-history chart for the product in that city over the last 100 ticks, so the current PRODUCT-DEFINITION.md market-share pie is fully implemented and visible.
+- [x] Surface resource price trends on the global exchange view as a sparkline chart per resource showing the last 50 ticks of ask prices so players can time their mine or factory purchases relative to market cycles.
 
 ### Player notifications and alerts (0% complete)
 

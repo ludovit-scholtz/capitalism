@@ -513,6 +513,32 @@ export type MockPublicSalesAnalytics = {
   cityAveragePrice?: number | null
 }
 
+export type MockMarketIntelligenceSeller = {
+  rank: number
+  companyId: string
+  displayName: string
+  askingPricePerUnit: number
+  brandQuality: number | null
+  estimatedWeeklySalesVolume: number
+  marketShare: number
+}
+
+export type MockMarketIntelligenceProduct = {
+  productTypeId: string
+  productName: string
+  productSlug: string
+  totalWeeklySalesVolume: number
+  sellers: MockMarketIntelligenceSeller[]
+}
+
+export type MockMarketIntelligenceResult = {
+  cityId: string
+  cityName: string
+  dataFromTick: number
+  dataToTick: number
+  products: MockMarketIntelligenceProduct[]
+}
+
 export type MockUnitProductAnalytics = {
   buildingUnitId: string
   unitType: string
@@ -792,6 +818,8 @@ export type MockState = {
   unitProductAnalytics: Record<string, MockUnitProductAnalytics>
   /** Campaign analytics result keyed by companyId */
   campaignAnalytics: Record<string, object | null>
+  /** Competitive market intelligence keyed by cityId. */
+  marketIntelligenceByCity: Record<string, MockMarketIntelligenceResult | null>
   /** Building financial history keyed by building ID */
   buildingFinancialTimelines: Record<string, MockBuildingFinancialTimeline>
   /** Loan offers available in the marketplace */
@@ -1403,6 +1431,34 @@ function computeMockTransitCost(weightPerUnit: number, distanceKm: number, fxRat
   const rawCost = distanceKm * Math.max(weightPerUnit, 0.1) * 0.0025
   const eurCost = Math.max(rawCost, 0.05)
   return Number(Math.max(eurCost * fxRate, 0.01).toFixed(2))
+}
+
+function buildMockAskPriceHistory(currentTick: number, exchangePricePerUnit: number, seed: string) {
+  const history: Array<{ tick: number; askPricePerUnit: number }> = []
+  const seedValue = [...seed].reduce((sum, char) => sum + char.charCodeAt(0), 0)
+  const window = 50
+
+  for (let offset = window - 1; offset >= 0; offset--) {
+    const tick = currentTick - offset
+    if (tick < 0) continue
+
+    const waveA = Math.sin((tick + seedValue) * 0.17)
+    const waveB = Math.cos((tick + seedValue * 0.5) * 0.07)
+    const factor = 1 + waveA * 0.025 + waveB * 0.015
+    history.push({
+      tick,
+      askPricePerUnit: Number((exchangePricePerUnit * Math.max(0.7, factor)).toFixed(2)),
+    })
+  }
+
+  if (history.length > 0) {
+    const last = history[history.length - 1]
+    if (last) {
+      last.askPricePerUnit = Number(exchangePricePerUnit.toFixed(2))
+    }
+  }
+
+  return history
 }
 
 function getMockUnitCapacity(unit: MockBuildingUnit) {
@@ -2176,6 +2232,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     publicSalesAnalytics: {},
     unitProductAnalytics: {},
     campaignAnalytics: {},
+    marketIntelligenceByCity: {},
     buildingFinancialTimelines: {},
     loanOffers: [],
     myLoans: [],
@@ -4827,6 +4884,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
                   transitCostPerUnit,
                   deliveredPricePerUnit: Number((exchangePricePerUnit + transitCostPerUnit).toFixed(2)),
                   distanceKm: Number(distanceKm.toFixed(1)),
+                  askPriceHistory: buildMockAskPriceHistory(state.gameState.currentTick, exchangePricePerUnit, `${city.id}-${resource.id}`),
                 }
               }),
             )
@@ -6556,6 +6614,24 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { campaignAnalytics: result } }),
+      })
+    }
+
+    if (query.includes('marketIntelligence')) {
+      const cityId: string = body.variables?.cityId ?? ''
+      const city = state.cities.find((entry) => entry.id === cityId)
+      const result = state.marketIntelligenceByCity[cityId] ?? {
+        cityId,
+        cityName: city?.name ?? 'Unknown City',
+        dataFromTick: Math.max(0, state.gameState.currentTick - 167),
+        dataToTick: state.gameState.currentTick,
+        products: [],
+      }
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { marketIntelligence: result } }),
       })
     }
 

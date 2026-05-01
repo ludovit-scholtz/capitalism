@@ -31,9 +31,14 @@ const router = createRouter({
     { path: '/bank/:buildingId/request-loan', name: 'bank-loan-request', component: () => import('@/views/BankLoanRequestView.vue') },
     { path: '/personal-ledger', name: 'personal-ledger', component: () => import('@/views/PersonalLedgerView.vue') },
     {
+      path: '/market-intelligence',
+      name: 'market-intelligence',
+      component: () => import('@/views/MarketIntelligenceView.vue'),
+    },
+    {
       path: '/marketing-analytics',
       name: 'marketing-analytics',
-      component: () => import('@/views/MarketingAnalyticsView.vue'),
+      component: () => import('@/views/MarketIntelligenceView.vue'),
     },
     {
       path: '/bank-statement/:companyId',

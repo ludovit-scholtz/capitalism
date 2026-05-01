@@ -135,6 +135,10 @@ const EXCHANGE_QUERY = `
       deliveredPricePerUnit
       distanceKm
       fuelPriceIndex
+      askPriceHistory {
+        tick
+        askPricePerUnit
+      }
     }
   }
 `

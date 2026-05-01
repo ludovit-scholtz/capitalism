@@ -119,6 +119,82 @@ function operationalStatusBadgeClass(status: string): string {
 
   return 'border-sky-300/60 bg-sky-500/15 text-sky-700 dark:text-sky-300'
 }
+
+type ShareEntry = {
+  label: string
+  companyId: string | null
+  share: number
+  isUnmet: boolean
+}
+
+type CompetitionLegendEntry = {
+  label: string
+  share: number
+  color: string
+  isSelf: boolean
+  isUnmet: boolean
+}
+
+function buildCompetitionLegend(entries: ShareEntry[] | null | undefined, ownCompanyId: string | null | undefined): CompetitionLegendEntry[] {
+  if (!entries || entries.length === 0) {
+    return []
+  }
+
+  const palette = ['#2563eb', '#0ea5e9', '#10b981', '#f59e0b', '#f97316', '#ec4899', '#8b5cf6', '#22c55e']
+  const sellers = entries.filter((entry) => !entry.isUnmet).sort((left, right) => right.share - left.share)
+  const unmet = entries.find((entry) => entry.isUnmet)
+  let anonymizedIndex = 0
+
+  const ranked = sellers.map((entry, index) => {
+    const isSelf = !!ownCompanyId && entry.companyId === ownCompanyId
+    const label = !isSelf && index >= 3 ? t('buildingDetail.marketIntelligence.competition.anonymousPlayer', { code: String.fromCharCode(65 + anonymizedIndex++) }) : entry.label
+    return {
+      label,
+      share: Math.max(0, entry.share),
+      color: palette[index % palette.length] ?? '#6b7280',
+      isSelf,
+      isUnmet: false,
+    }
+  })
+
+  if (unmet) {
+    ranked.push({
+      label: t('buildingDetail.marketIntelligence.competition.unmetDemand'),
+      share: Math.max(0, unmet.share),
+      color: '#94a3b8',
+      isSelf: false,
+      isUnmet: true,
+    })
+  }
+
+  return ranked
+}
+
+function buildCompetitionPieGradient(entries: CompetitionLegendEntry[]): string {
+  if (entries.length === 0) {
+    return 'conic-gradient(#cbd5e1 0deg 360deg)'
+  }
+
+  const total = entries.reduce((sum, entry) => sum + entry.share, 0)
+  if (total <= 0) {
+    return 'conic-gradient(#cbd5e1 0deg 360deg)'
+  }
+
+  let cursor = 0
+  const segments = entries.map((entry) => {
+    const degrees = (entry.share / total) * 360
+    const start = cursor
+    const end = cursor + degrees
+    cursor = end
+    return `${entry.color} ${start.toFixed(2)}deg ${end.toFixed(2)}deg`
+  })
+
+  if (cursor < 360) {
+    segments.push(`var(--color-divider) ${cursor.toFixed(2)}deg 360deg`)
+  }
+
+  return `conic-gradient(${segments.join(', ')})`
+}
 </script>
 
 <template>
@@ -695,23 +771,6 @@ function operationalStatusBadgeClass(status: string): string {
                     ></div>
                   </div>
                 </div>
-                <!-- Price history chart -->
-                <div v-if="publicSalesAnalytics.priceHistory.length > 0" class="mt-4">
-                  <span class="text-xs font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.priceChart') }}</span>
-                  <div
-                    class="mi-bar-chart flex items-end justify-center gap-0.5 mt-2 h-16 p-1 rounded-md border border-divider bg-surface"
-                    role="img"
-                    :aria-label="t('buildingDetail.marketIntelligence.priceChart')"
-                  >
-                    <div
-                      v-for="snap in publicSalesAnalytics.priceHistory"
-                      :key="snap.tick"
-                      class="mi-bar-price flex-1 bg-purple-500 rounded-sm transition-all duration-300"
-                      :style="{ height: `${Math.max(4, miMaxPricePerUnit > 0 ? (snap.pricePerUnit / miMaxPricePerUnit) * 100 : 0).toFixed(1)}%` }"
-                      :title="`T${snap.tick}: ${formatCurrency(snap.pricePerUnit)}`"
-                    ></div>
-                  </div>
-                </div>
                 <!-- Profit history chart -->
                 <div v-if="publicSalesAnalytics.profitHistory && publicSalesAnalytics.profitHistory.length > 0" class="mt-4">
                   <span class="text-xs font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.profitChart') }}</span>
@@ -729,24 +788,47 @@ function operationalStatusBadgeClass(status: string): string {
                       :title="`T${snap.tick}: ${formatCurrency(snap.profit)}${snap.grossMarginPct !== null ? ` (${snap.grossMarginPct.toFixed(1)}% margin)` : ''}`"
                     ></div>
                   </div></div></template
-              ><!-- Market share -->
-              <div class="mt-4">
-                <span class="text-xs font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.marketShare') }}</span>
+              ><!-- Competition section -->
+              <div class="mt-4 mi-competition-section">
+                <span class="text-xs font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.competition.title') }}</span>
                 <p v-if="publicSalesAnalytics.marketShare.length === 0" class="text-xs text-muted mt-2">{{ t('buildingDetail.marketIntelligence.noMarketShare') }}</p>
-                <div v-else class="flex flex-col gap-2 mt-2">
+                <div v-else class="mt-2 grid gap-3 md:grid-cols-[140px_minmax(0,1fr)] md:items-start">
                   <div
-                    v-for="entry in publicSalesAnalytics.marketShare"
-                    :key="entry.label"
-                    class="mi-share-row flex items-center gap-2"
-                    :class="{ 'opacity-60 mi-share-row-unmet': entry.isUnmet, 'mi-share-row-you': entry.companyId === building?.companyId && !entry.isUnmet }"
-                  >
-                    <span class="mi-share-label text-[0.7rem] font-semibold flex-shrink-0 w-24 truncate">
-                      {{ entry.label }}{{ entry.companyId === building?.companyId ? ' ★' : '' }}{{ entry.isUnmet ? ' ⚠' : '' }}
-                    </span>
-                    <div class="flex-1 h-2 rounded-full bg-surface border border-divider overflow-hidden">
-                      <div class="h-full bg-primary transition-all duration-300" :style="{ width: `${(entry.share * 100).toFixed(1)}%` }"></div>
+                    class="mi-competition-pie mx-auto h-28 w-28 rounded-full border border-divider"
+                    role="img"
+                    :aria-label="t('buildingDetail.marketIntelligence.competition.pieAria')"
+                    :style="{ background: buildCompetitionPieGradient(buildCompetitionLegend(publicSalesAnalytics.marketShare, building?.companyId)) }"
+                  ></div>
+                  <div class="flex flex-col gap-2">
+                    <div
+                      v-for="entry in buildCompetitionLegend(publicSalesAnalytics.marketShare, building?.companyId)"
+                      :key="`${entry.label}-${entry.isUnmet ? 'unmet' : 'seller'}`"
+                      class="mi-share-row flex items-center gap-2"
+                      :class="{ 'opacity-70 mi-share-row-unmet': entry.isUnmet, 'mi-share-row-you': entry.isSelf }"
+                    >
+                      <span class="h-2.5 w-2.5 shrink-0 rounded-full" :style="{ backgroundColor: entry.color }"></span>
+                      <span class="mi-share-label text-[0.7rem] font-semibold flex-shrink-0 w-32 truncate">{{ entry.label }}{{ entry.isSelf ? ' ★' : '' }}</span>
+                      <div class="flex-1 h-2 rounded-full bg-surface border border-divider overflow-hidden">
+                        <div class="h-full transition-all duration-300" :style="{ width: `${(entry.share * 100).toFixed(1)}%`, backgroundColor: entry.color }"></div>
+                      </div>
+                      <span class="mi-share-pct text-[0.7rem] text-muted flex-shrink-0 w-10 text-right">{{ (entry.share * 100).toFixed(1) }}%</span>
                     </div>
-                    <span class="mi-share-pct text-[0.7rem] text-muted flex-shrink-0 w-10 text-right">{{ (entry.share * 100).toFixed(1) }}%</span>
+                  </div>
+                </div>
+                <div v-if="publicSalesAnalytics.priceHistory.length > 0" class="mt-3">
+                  <span class="text-[0.68rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.competition.priceTrend') }}</span>
+                  <div
+                    class="mi-competition-price-chart mt-2 flex items-end justify-center gap-[1px] h-14 p-1 rounded-md border border-divider bg-surface"
+                    role="img"
+                    :aria-label="t('buildingDetail.marketIntelligence.priceChart')"
+                  >
+                    <div
+                      v-for="snap in publicSalesAnalytics.priceHistory"
+                      :key="snap.tick"
+                      class="mi-competition-price-bar flex-1 rounded-sm bg-violet-500/80"
+                      :style="{ height: `${Math.max(3, miMaxPricePerUnit > 0 ? (snap.pricePerUnit / miMaxPricePerUnit) * 100 : 0).toFixed(1)}%` }"
+                      :title="`T${snap.tick}: ${formatCurrency(snap.pricePerUnit)}`"
+                    ></div>
                   </div>
                 </div>
               </div>
