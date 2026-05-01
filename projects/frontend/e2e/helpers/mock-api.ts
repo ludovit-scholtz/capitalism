@@ -605,6 +605,7 @@ export type MockCollateralBuilding = {
   maxBorrowable: number
   existingSecuredExposure: number
   remainingBorrowingCapacity: number
+  currencyCode?: string
   isEligible: boolean
   ineligibilityReason: string | null
 }
