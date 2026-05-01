@@ -65,6 +65,11 @@ const router = createRouter({
     },
     {
       path: '/ranking/bounties',
+      name: 'ranking-bounties',
+      component: () => import('@/views/RankingBountiesView.vue'),
+    },
+    {
+      path: '/ranking/bounties/history',
       name: 'ranking-history',
       component: () => import('@/views/RankingBountyHistoryView.vue'),
     },

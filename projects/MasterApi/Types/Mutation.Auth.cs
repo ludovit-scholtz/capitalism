@@ -47,7 +47,9 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        if (await db.PlayerAccounts.AnyAsync(p => p.Email == email))
+        var existingPlayer = await db.PlayerAccounts.FirstOrDefaultAsync(p => p.Email == email);
+        if (existingPlayer is not null
+            && !MasterRankingService.IsShadowProvisionedPasswordHash(existingPlayer.PasswordHash))
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -69,23 +71,43 @@ public sealed partial class Mutation
         }
 
         var now = DateTime.UtcNow;
-        var player = new PlayerAccount
-        {
-            Id = Guid.NewGuid(),
-            Email = email,
-            DisplayName = input.DisplayName.Trim(),
-            CreatedAtUtc = now,
-            ReferredByEmail = referredByEmail,
-        };
-
         var hasher = new PasswordHasher<PlayerAccount>();
-        player.PasswordHash = hasher.HashPassword(player, input.Password);
+        var shouldAwardReferralBounty = false;
+        PlayerAccount player;
 
-        db.PlayerAccounts.Add(player);
+        if (existingPlayer is not null)
+        {
+            existingPlayer.DisplayName = input.DisplayName.Trim();
+            existingPlayer.PasswordHash = hasher.HashPassword(existingPlayer, input.Password);
+
+            if (existingPlayer.ReferredByEmail is null && referredByEmail is not null)
+            {
+                existingPlayer.ReferredByEmail = referredByEmail;
+                shouldAwardReferralBounty = true;
+            }
+
+            player = existingPlayer;
+        }
+        else
+        {
+            player = new PlayerAccount
+            {
+                Id = Guid.NewGuid(),
+                Email = email,
+                DisplayName = input.DisplayName.Trim(),
+                CreatedAtUtc = now,
+                ReferredByEmail = referredByEmail,
+            };
+
+            player.PasswordHash = hasher.HashPassword(player, input.Password);
+            db.PlayerAccounts.Add(player);
+            shouldAwardReferralBounty = referredByEmail is not null;
+        }
+
         await db.SaveChangesAsync();
 
         // Award RECOMMEND_FRIEND bounty to the referrer if applicable.
-        if (referredByEmail is not null)
+        if (shouldAwardReferralBounty && referredByEmail is not null)
         {
             try
             {

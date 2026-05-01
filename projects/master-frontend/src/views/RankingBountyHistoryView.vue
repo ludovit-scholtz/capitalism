@@ -102,6 +102,7 @@ onMounted(async () => {
   }
 
   navItems.value = [
+    { label: t('rankingHistory.bountiesLink'), to: '/ranking/bounties' },
     { label: t('rankingHistory.dashboardLink'), to: '/ranking' },
     { label: t('common.backToPortal'), to: '/' },
   ]

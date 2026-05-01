@@ -136,6 +136,69 @@ public sealed partial class Query
     }
 
     [HotChocolate.Authorization.Authorize]
+    public async Task<List<RankingBountyDashboardItemInfo>> GetMyRankingBountyDashboard(
+        ClaimsPrincipal claimsPrincipal,
+        [Service] MasterDbContext db)
+    {
+        var player = await GetCurrentUserAsync(claimsPrincipal, db)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Player not found.")
+                    .SetCode("PLAYER_NOT_FOUND")
+                    .Build());
+
+        var definitions = await db.MasterRankingBountyDefinitions
+            .AsNoTracking()
+            .Where(definition => definition.IsEnabled && definition.IsVisibleToPlayers)
+            .OrderBy(definition => definition.DisplayName)
+            .ToListAsync();
+
+        var rewards = await db.MasterRankingRewardRecords
+            .AsNoTracking()
+            .Where(record => record.PlayerAccountId == player.Id && record.Status == RankingRewardStatus.Awarded)
+            .ToListAsync();
+
+        var rewardsByDefinitionId = rewards
+            .GroupBy(record => record.BountyDefinitionId)
+            .ToDictionary(group => group.Key, group => group.ToList());
+
+        var todayUtc = DateTime.UtcNow.Date;
+
+        return definitions
+            .Select(definition =>
+            {
+                var definitionRewards = rewardsByDefinitionId.TryGetValue(definition.Id, out var items)
+                    ? items
+                    : [];
+
+                var lastAward = definitionRewards
+                    .OrderByDescending(item => item.AwardedAtUtc)
+                    .FirstOrDefault();
+                var awardedToday = definitionRewards.Any(item => item.EventDateUtc.Date == todayUtc);
+
+                var (isAvailableNow, nextAvailableAtUtc) = ComputeAvailability(definition.CooldownMode, awardedToday, definitionRewards.Count);
+
+                return new RankingBountyDashboardItemInfo
+                {
+                    Id = definition.Id,
+                    Code = definition.Code,
+                    DisplayName = definition.DisplayName,
+                    Description = definition.Description,
+                    RewardPoints = definition.RewardPoints,
+                    CooldownMode = definition.CooldownMode,
+                    ProofRequirement = definition.ProofRequirement,
+                    RequiresModeration = definition.RequiresModeration,
+                    AwardedToday = awardedToday,
+                    IsAvailableNow = isAvailableNow,
+                    NextAvailableAtUtc = nextAvailableAtUtc,
+                    LastAwardedAtUtc = lastAward?.AwardedAtUtc,
+                    TotalAwards = definitionRewards.Count,
+                };
+            })
+            .ToList();
+    }
+
+    [HotChocolate.Authorization.Authorize]
     public async Task<RankingAdminDashboardInfo> GetRankingAdminDashboard(
         ClaimsPrincipal claimsPrincipal,
         [Service] MasterDbContext db,
@@ -218,6 +281,22 @@ public sealed partial class Query
             Bounties = definitions,
             PendingModerationEvents = moderationQueue,
             RecentRuns = runs,
+        };
+    }
+
+    private static (bool isAvailableNow, DateTime? nextAvailableAtUtc) ComputeAvailability(
+        string cooldownMode,
+        bool awardedToday,
+        int totalAwards)
+    {
+        var todayUtc = DateTime.UtcNow.Date;
+        return cooldownMode switch
+        {
+            RankingCooldownMode.Once => (totalAwards == 0, null),
+            RankingCooldownMode.UtcDay => (!awardedToday, awardedToday ? todayUtc.AddDays(1) : null),
+            RankingCooldownMode.UtcDayPerServer => (!awardedToday, awardedToday ? todayUtc.AddDays(1) : null),
+            RankingCooldownMode.PerUniqueKey => (true, null),
+            _ => (true, null),
         };
     }
 }

@@ -579,6 +579,22 @@ export interface RankingRewardHistoryItem {
   metadataJson: string
 }
 
+export interface RankingBountyDashboardItemInfo {
+  id: string
+  code: string
+  displayName: string
+  description: string
+  rewardPoints: number
+  cooldownMode: string
+  proofRequirement: string
+  requiresModeration: boolean
+  awardedToday: boolean
+  isAvailableNow: boolean
+  nextAvailableAtUtc: string | null
+  lastAwardedAtUtc: string | null
+  totalAwards: number
+}
+
 export interface RankingBountyDefinitionInfo {
   id: string
   code: string
@@ -674,6 +690,26 @@ const MY_RANKING_BOUNTY_HISTORY_QUERY = `
       eventDateUtc
       awardedAtUtc
       metadataJson
+    }
+  }
+`
+
+const MY_RANKING_BOUNTY_DASHBOARD_QUERY = `
+  query MyRankingBountyDashboard {
+    myRankingBountyDashboard {
+      id
+      code
+      displayName
+      description
+      rewardPoints
+      cooldownMode
+      proofRequirement
+      requiresModeration
+      awardedToday
+      isAvailableNow
+      nextAvailableAtUtc
+      lastAwardedAtUtc
+      totalAwards
     }
   }
 `
@@ -817,7 +853,9 @@ const RUN_RANKING_DAILY_DECAY_NOW_MUTATION = `
 const PROBE_GAME_ADMIN_ACCESS_QUERY = `
   query ProbeGameAdminAccess {
     rankingAdminDashboard {
-      pendingModerationCount
+      bounties {
+        id
+      }
     }
   }
 `
@@ -852,6 +890,17 @@ export async function fetchMyRankingBountyHistory(
     token,
   )
   return data.myRankingBountyHistory
+}
+
+export async function fetchMyRankingBountyDashboard(
+  token: string,
+): Promise<RankingBountyDashboardItemInfo[]> {
+  const data = await gqlRequest<{ myRankingBountyDashboard: RankingBountyDashboardItemInfo[] }>(
+    MY_RANKING_BOUNTY_DASHBOARD_QUERY,
+    undefined,
+    token,
+  )
+  return data.myRankingBountyDashboard
 }
 
 export async function fetchRankingAdminDashboard(

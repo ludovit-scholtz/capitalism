@@ -155,6 +155,10 @@ onMounted(async () => {
     return
   }
 
+  if (!auth.gameAdminChecked) {
+    await auth.refreshGameAdminAccess()
+  }
+
   if (!auth.isGameAdmin) {
     void router.push('/')
     return

@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import {
   loginAs,
+  type MockRankingBountyDashboardItem,
   makePlayer,
   setupMockApi,
   type MockRankingBountyDefinition,
@@ -31,6 +32,23 @@ test.describe('Ranking pages', () => {
           rankMovement: -1,
         },
       ],
+      rankingBountyDashboard: [
+        {
+          id: 'bounty-dashboard-improver',
+          code: 'GAME_IMPROVER',
+          displayName: 'Game improver',
+          description: 'Submit a suggestion or bug report through support.',
+          rewardPoints: 5,
+          cooldownMode: 'UTC_DAY',
+          proofRequirement: 'NONE',
+          requiresModeration: false,
+          awardedToday: true,
+          isAvailableNow: false,
+          nextAvailableAtUtc: '2026-05-01T00:00:00.000Z',
+          lastAwardedAtUtc: '2026-04-30T10:00:00.000Z',
+          totalAwards: 4,
+        } satisfies MockRankingBountyDashboardItem,
+      ],
       rankingHistory: [
         {
           id: 'reward-100',
@@ -55,6 +73,15 @@ test.describe('Ranking pages', () => {
     ).toContainText('Rank Two')
 
     await page.goto('/ranking/bounties')
+    await expect(page.getByRole('heading', { name: 'Bounty Dashboard' })).toBeVisible()
+    await expect(
+      page.locator('table[aria-label="Ranking bounties dashboard table"]'),
+    ).toContainText('Game improver')
+    await expect(
+      page.locator('table[aria-label="Ranking bounties dashboard table"]'),
+    ).toContainText('Granted today')
+
+    await page.goto('/ranking/bounties/history')
     await expect(page.getByRole('heading', { name: 'Bounty History' })).toBeVisible()
     await expect(page.locator('table[aria-label="Ranking bounty history table"]')).toContainText(
       'Game improver',
@@ -135,7 +162,7 @@ test.describe('Ranking pages', () => {
     const state = setupMockApi(page, { rankingHistory: [] })
     await loginAs(page, state, player)
 
-    await page.goto('/ranking/bounties')
+    await page.goto('/ranking/bounties/history')
     await expect(page.getByRole('heading', { name: 'Bounty History' })).toBeVisible()
 
     // Select DISCORD_PLAYER from bounty code dropdown (scoped to proof submission panel).

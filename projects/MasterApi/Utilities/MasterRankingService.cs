@@ -8,6 +8,18 @@ namespace MasterApi.Utilities;
 public sealed class MasterRankingService(MasterDbContext db, ILogger<MasterRankingService> logger)
 {
     private const decimal DailyDecayFactor = 0.99m;
+    private const string ShadowPasswordHashPrefix = "__SHADOW__:";
+
+    internal static bool IsShadowProvisionedPasswordHash(string? passwordHash)
+    {
+        return !string.IsNullOrWhiteSpace(passwordHash)
+            && passwordHash.StartsWith(ShadowPasswordHashPrefix, StringComparison.Ordinal);
+    }
+
+    internal static string BuildShadowPasswordHash(string normalizedEmail)
+    {
+        return $"{ShadowPasswordHashPrefix}{normalizedEmail}";
+    }
 
     public async Task<MasterRankingEvaluationRun> EvaluateHourlyAsync(CancellationToken cancellationToken = default)
     {
@@ -65,7 +77,7 @@ public sealed class MasterRankingService(MasterDbContext db, ILogger<MasterRanki
 
                 if (rankingEvent.PlayerAccountId is null)
                 {
-                    var playerId = await ResolvePlayerIdAsync(rankingEvent.PlayerEmail, cancellationToken);
+                    var playerId = await EnsureTelemetryPlayerAccountAsync(rankingEvent.PlayerEmail, cancellationToken);
                     if (playerId is null)
                     {
                         rankingEvent.Status = RankingEventStatus.Rejected;
@@ -232,14 +244,12 @@ public sealed class MasterRankingService(MasterDbContext db, ILogger<MasterRanki
         CancellationToken cancellationToken = default)
     {
         var normalizedEmail = playerEmail.Trim().ToLowerInvariant();
-        var player = await db.PlayerAccounts
-            .AsNoTracking()
-            .FirstOrDefaultAsync(candidate => candidate.Email == normalizedEmail, cancellationToken);
+        var playerId = await EnsureTelemetryPlayerAccountAsync(normalizedEmail, cancellationToken);
 
         var rankingEvent = new MasterRankingEvent
         {
             Id = Guid.NewGuid(),
-            PlayerAccountId = player?.Id,
+            PlayerAccountId = playerId,
             PlayerEmail = normalizedEmail,
             EventType = eventType,
             ServerKey = string.IsNullOrWhiteSpace(serverKey) ? null : serverKey.Trim(),
@@ -369,11 +379,46 @@ public sealed class MasterRankingService(MasterDbContext db, ILogger<MasterRanki
         };
     }
 
-    private async Task<Guid?> ResolvePlayerIdAsync(string normalizedEmail, CancellationToken cancellationToken)
+    private async Task<Guid?> EnsureTelemetryPlayerAccountAsync(string normalizedEmail, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(normalizedEmail))
         {
             return null;
+        }
+
+        var existingPlayerId = await db.PlayerAccounts
+            .AsNoTracking()
+            .Where(player => player.Email == normalizedEmail)
+            .Select(player => (Guid?)player.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (existingPlayerId.HasValue)
+        {
+            return existingPlayerId.Value;
+        }
+
+        var now = DateTime.UtcNow;
+        var localPart = normalizedEmail.Split('@', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+        var fallbackDisplayName = string.IsNullOrWhiteSpace(localPart) ? "Player" : localPart;
+
+        var shadowAccount = new PlayerAccount
+        {
+            Id = Guid.NewGuid(),
+            Email = normalizedEmail,
+            DisplayName = fallbackDisplayName,
+            PasswordHash = BuildShadowPasswordHash(normalizedEmail),
+            CreatedAtUtc = now,
+        };
+
+        db.PlayerAccounts.Add(shadowAccount);
+
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            return shadowAccount.Id;
+        }
+        catch (DbUpdateException)
+        {
+            db.Entry(shadowAccount).State = EntityState.Detached;
         }
 
         return await db.PlayerAccounts

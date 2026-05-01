@@ -456,14 +456,19 @@ public sealed class RankingIntegrationTests
             client,
             """
             mutation($input: ModerateRankingEventInput!) {
-              moderateRankingEvent(input: $input)
+              moderateRankingEvent(input: $input) {
+                id
+                status
+              }
             }
             """,
             new { input = new { eventId = Guid.Parse(eventId), approve = true, reason = "Valid retweet." } },
             rootToken);
 
         Assert.False(moderateResult.TryGetProperty("errors", out _));
-        Assert.True(moderateResult.GetProperty("data").GetProperty("moderateRankingEvent").GetBoolean());
+        Assert.Equal(
+            "APPROVED",
+            moderateResult.GetProperty("data").GetProperty("moderateRankingEvent").GetProperty("status").GetString());
 
         // Run evaluation — should now award points.
         await GraphQlAsync(client, "mutation { runRankingEvaluationNow { id } }", token: rootToken);
@@ -506,13 +511,19 @@ public sealed class RankingIntegrationTests
             client,
             """
             mutation($input: ModerateRankingEventInput!) {
-              moderateRankingEvent(input: $input)
+              moderateRankingEvent(input: $input) {
+                id
+                status
+              }
             }
             """,
             new { input = new { eventId = Guid.Parse(eventId), approve = false, reason = "Fake proof." } },
             rootToken);
 
         Assert.False(moderateResult.TryGetProperty("errors", out _));
+        Assert.Equal(
+            "REJECTED",
+            moderateResult.GetProperty("data").GetProperty("moderateRankingEvent").GetProperty("status").GetString());
 
         // Run evaluation — should NOT award any points.
         await GraphQlAsync(client, "mutation { runRankingEvaluationNow { id } }", token: rootToken);
@@ -564,7 +575,10 @@ public sealed class RankingIntegrationTests
             client,
             """
             mutation($input: ModerateRankingEventInput!) {
-              moderateRankingEvent(input: $input)
+              moderateRankingEvent(input: $input) {
+                id
+                status
+              }
             }
             """,
             new { input = new { eventId = Guid.Parse(firstEventId), approve = true, reason = "Valid Discord." } },
@@ -609,7 +623,10 @@ public sealed class RankingIntegrationTests
             client,
             """
             mutation($input: ModerateRankingEventInput!) {
-              moderateRankingEvent(input: $input)
+              moderateRankingEvent(input: $input) {
+                id
+                status
+              }
             }
             """,
             new { input = new { eventId = Guid.Parse(secondEventId), approve = true, reason = "Second approval." } },
@@ -620,7 +637,28 @@ public sealed class RankingIntegrationTests
 
         var summaryAfterSecond = await GraphQlAsync(client, "query { myRankingSummary { totalPoints } }", token: userToken);
         var pointsAfterSecond = summaryAfterSecond.GetProperty("data").GetProperty("myRankingSummary").GetProperty("totalPoints").GetDecimal();
-        Assert.Equal(pointsAfterFirst, pointsAfterSecond);
+        Assert.True(pointsAfterSecond >= pointsAfterFirst);
+
+        var historyAfterSecond = await GraphQlAsync(
+            client,
+            """
+            query {
+              myRankingBountyHistory {
+                bountyCode
+              }
+            }
+            """,
+            token: userToken);
+
+        Assert.False(historyAfterSecond.TryGetProperty("errors", out _));
+        var historyItems = historyAfterSecond
+            .GetProperty("data")
+            .GetProperty("myRankingBountyHistory")
+            .EnumerateArray()
+            .ToList();
+        var discordAwards = historyItems
+            .Count(item => item.GetProperty("bountyCode").GetString() == "DISCORD_PLAYER");
+        Assert.Equal(1, discordAwards);
     }
 
     [Fact]
@@ -755,6 +793,140 @@ public sealed class RankingIntegrationTests
         var retweetEvent = pendingEvents.FirstOrDefault(e => e.GetProperty("playerEmail").GetString() == userEmail);
         Assert.Equal(JsonValueKind.Object, retweetEvent.ValueKind);
         Assert.Equal(proofUrl, retweetEvent.GetProperty("proofReference").GetString());
+    }
+
+    [Fact]
+    public async Task IngestRankingEvent_UnknownEmail_AutoCreatesMasterAccountAndPreservesRewardsAfterRegister()
+    {
+        await using var factory = new MasterApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var userEmail = $"rank-shadow-{Guid.NewGuid():N}@example.com";
+        var rootToken = CreateRootAdminToken();
+
+        var ingestResult = await GraphQlAsync(
+            client,
+            """
+            mutation Ingest($input: IngestRankingEventInput!) {
+              ingestRankingEvent(input: $input) {
+                id
+                status
+              }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey = "capitalism-eu-1",
+                    eventType = "FX_TRADER",
+                    playerEmail = userEmail,
+                    occurredAtUtc = DateTime.UtcNow,
+                    externalEventId = $"fx-shadow-{Guid.NewGuid():N}",
+                    uniqueScopeKey = "swap-shadow-1",
+                    payloadJson = "{}",
+                }
+            });
+
+        Assert.False(ingestResult.TryGetProperty("errors", out _));
+
+        await GraphQlAsync(client, "mutation { runRankingEvaluationNow { id } }", token: rootToken);
+
+        var registerResult = await GraphQlAsync(
+            client,
+            """
+            mutation Register($input: RegisterInput!) {
+              register(input: $input) {
+                token
+              }
+            }
+            """,
+            new { input = new { email = userEmail, displayName = "Shadow Converted", password = "password123" } });
+
+        Assert.False(registerResult.TryGetProperty("errors", out _));
+        var userToken = registerResult.GetProperty("data").GetProperty("register").GetProperty("token").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(userToken));
+
+        var history = await GraphQlAsync(
+            client,
+            """
+            query {
+              myRankingBountyHistory {
+                bountyCode
+              }
+            }
+            """,
+            token: userToken);
+
+        Assert.False(history.TryGetProperty("errors", out _));
+        var historyItems = history.GetProperty("data").GetProperty("myRankingBountyHistory").EnumerateArray().ToList();
+        Assert.Contains(historyItems, item => item.GetProperty("bountyCode").GetString() == "FX_TRADER");
+    }
+
+    [Fact]
+    public async Task MyRankingBountyDashboard_WhenAwardedToday_ShowsNextAvailabilityUtc()
+    {
+        await using var factory = new MasterApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var userEmail = $"rank-dashboard-{Guid.NewGuid():N}@example.com";
+        var (userToken, _) = await RegisterAsync(client, userEmail, "Dashboard User");
+        var rootToken = CreateRootAdminToken();
+
+        var ingestResult = await GraphQlAsync(
+            client,
+            """
+            mutation Ingest($input: IngestRankingEventInput!) {
+              ingestRankingEvent(input: $input) {
+                id
+              }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey = "capitalism-eu-1",
+                    eventType = "GAME_IMPROVER",
+                    playerEmail = userEmail,
+                    occurredAtUtc = DateTime.UtcNow,
+                    externalEventId = $"improver-{Guid.NewGuid():N}",
+                    uniqueScopeKey = $"support-{Guid.NewGuid():N}",
+                    payloadJson = "{}",
+                }
+            });
+
+        Assert.False(ingestResult.TryGetProperty("errors", out _));
+
+        await GraphQlAsync(client, "mutation { runRankingEvaluationNow { id } }", token: rootToken);
+
+        var dashboard = await GraphQlAsync(
+            client,
+            """
+            query {
+              myRankingBountyDashboard {
+                code
+                awardedToday
+                isAvailableNow
+                nextAvailableAtUtc
+                totalAwards
+              }
+            }
+            """,
+            token: userToken);
+
+        Assert.False(dashboard.TryGetProperty("errors", out _));
+
+        var items = dashboard.GetProperty("data").GetProperty("myRankingBountyDashboard").EnumerateArray().ToList();
+        var gameImprover = items.FirstOrDefault(item => item.GetProperty("code").GetString() == "GAME_IMPROVER");
+
+        Assert.Equal(JsonValueKind.Object, gameImprover.ValueKind);
+        Assert.True(gameImprover.GetProperty("awardedToday").GetBoolean());
+        Assert.False(gameImprover.GetProperty("isAvailableNow").GetBoolean());
+        Assert.Equal(JsonValueKind.String, gameImprover.GetProperty("nextAvailableAtUtc").ValueKind);
+        Assert.True(gameImprover.GetProperty("totalAwards").GetInt32() >= 1);
     }
 
     private async Task<(string Token, string PlayerId)> RegisterAsync(HttpClient client, string email, string displayName)

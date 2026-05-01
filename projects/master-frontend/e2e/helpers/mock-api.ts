@@ -126,6 +126,22 @@ export interface MockRankingRewardHistoryItem {
   metadataJson: string
 }
 
+export interface MockRankingBountyDashboardItem {
+  id: string
+  code: string
+  displayName: string
+  description: string
+  rewardPoints: number
+  cooldownMode: string
+  proofRequirement: string
+  requiresModeration: boolean
+  awardedToday: boolean
+  isAvailableNow: boolean
+  nextAvailableAtUtc: string | null
+  lastAwardedAtUtc: string | null
+  totalAwards: number
+}
+
 export interface MockRankingBountyDefinition {
   id: string
   code: string
@@ -186,6 +202,7 @@ export interface MockState {
   supportTickets: MockSupportTicket[]
   rankingSummary: MockRankingSummary | null
   rankingLeaderboard: MockRankingLeaderboardEntry[]
+  rankingBountyDashboard: MockRankingBountyDashboardItem[]
   rankingHistory: MockRankingRewardHistoryItem[]
   rankingBounties: MockRankingBountyDefinition[]
   rankingModerationEvents: MockRankingEventModerationItem[]
@@ -301,6 +318,23 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
         totalPoints: 240,
         globalRank: 2,
         rankMovement: -1,
+      },
+    ],
+    rankingBountyDashboard: initialState.rankingBountyDashboard ?? [
+      {
+        id: 'bounty-dashboard-1',
+        code: 'GAME_IMPROVER',
+        displayName: 'Game improver',
+        description: 'Submit suggestion ticket',
+        rewardPoints: 5,
+        cooldownMode: 'UTC_DAY',
+        proofRequirement: 'NONE',
+        requiresModeration: false,
+        awardedToday: false,
+        isAvailableNow: true,
+        nextAvailableAtUtc: null,
+        lastAwardedAtUtc: null,
+        totalAwards: 0,
       },
     ],
     rankingHistory: initialState.rankingHistory ?? [
@@ -804,6 +838,28 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
       return
     }
 
+    if (query.includes('myRankingBountyDashboard')) {
+      if (!state.currentPlayer) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              { message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } },
+            ],
+          }),
+        })
+        return
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { myRankingBountyDashboard: state.rankingBountyDashboard } }),
+      })
+      return
+    }
+
     if (query.includes('rankingAdminDashboard')) {
       if (!state.currentPlayer || !state.isGlobalAdmin) {
         await route.fulfill({
@@ -1125,9 +1181,9 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
       return
     }
 
-    // Me query — must not match gameServers, mySubscription, prolongSubscription, or gold token queries
-    if (
-      query.includes('me') &&
+    // Me query must match only the standalone `me { ... }` field selection.
+    const isStandaloneMeQuery =
+      /\bme\s*\{/.test(query) &&
       !query.includes('gameServers') &&
       !query.includes('mySubscription') &&
       !query.includes('prolongSubscription') &&
@@ -1135,7 +1191,8 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
       !query.includes('goldTokenTransactions') &&
       !query.includes('adjustGoldTokenBalance') &&
       !query.includes('myGoldAccount')
-    ) {
+
+    if (isStandaloneMeQuery) {
       if (state.currentPlayer) {
         await route.fulfill({
           status: 200,

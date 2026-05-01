@@ -66,6 +66,35 @@ public sealed class RankingRewardHistoryItem
     public string MetadataJson { get; set; } = "{}";
 }
 
+public sealed class RankingBountyDashboardItemInfo
+{
+    public Guid Id { get; set; }
+
+    public string Code { get; set; } = string.Empty;
+
+    public string DisplayName { get; set; } = string.Empty;
+
+    public string Description { get; set; } = string.Empty;
+
+    public decimal RewardPoints { get; set; }
+
+    public string CooldownMode { get; set; } = string.Empty;
+
+    public string ProofRequirement { get; set; } = string.Empty;
+
+    public bool RequiresModeration { get; set; }
+
+    public bool AwardedToday { get; set; }
+
+    public bool IsAvailableNow { get; set; }
+
+    public DateTime? NextAvailableAtUtc { get; set; }
+
+    public DateTime? LastAwardedAtUtc { get; set; }
+
+    public int TotalAwards { get; set; }
+}
+
 public sealed class RankingBountyDefinitionInfo
 {
     public Guid Id { get; set; }
