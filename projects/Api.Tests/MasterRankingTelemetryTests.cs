@@ -487,5 +487,27 @@ public sealed class MasterRankingTelemetryTests
         Assert.Equal(1, handler.CallCount);
     }
 
+    [Fact]
+    public async Task MasterRankingTelemetryService_WithRegistrationDisabledAndTelemetryEnabled_StillPostsEvents()
+    {
+        var handler = new RecordingHttpMessageHandler();
+        using var client = new HttpClient(handler);
+        var telemetry = new MasterRankingTelemetryService(
+            new FixedHttpClientFactory(client),
+            Options.Create(new MasterServerRegistrationOptions
+            {
+                RegistrationEnabled = false,
+                TelemetryEnabled = true,
+                ApiUrl = "https://master.example.com/graphql",
+                RegistrationKey = "test-key",
+                ServerKey = "game-1",
+            }),
+            NullLogger<MasterRankingTelemetryService>.Instance);
+
+        await telemetry.ReportEventAsync(MasterRankingBountyCodes.Manufacturer, "player@example.com");
+
+        Assert.Equal(1, handler.CallCount);
+    }
+
     #endregion
 }

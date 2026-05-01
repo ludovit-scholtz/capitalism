@@ -6,6 +6,8 @@ public sealed class MasterServerRegistrationOptions
 
     public bool RegistrationEnabled { get; set; } = true;
 
+    public bool TelemetryEnabled { get; set; } = true;
+
     public string ApiUrl { get; set; } = string.Empty;
 
     public string RegistrationKey { get; set; } = string.Empty;
@@ -41,7 +43,7 @@ public sealed class MasterServerRegistrationOptions
 
     public bool IsTelemetryConfigured()
     {
-        return RegistrationEnabled
+        return TelemetryEnabled
             && !string.IsNullOrWhiteSpace(ApiUrl)
             && !string.IsNullOrWhiteSpace(RegistrationKey)
             && !string.IsNullOrWhiteSpace(ServerKey);

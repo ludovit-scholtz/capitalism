@@ -939,6 +939,101 @@ public sealed class RankingIntegrationTests
     }
 
     [Fact]
+    public async Task IngestRankingEvent_UnknownEmail_ManufacturerAndWholesaler_AutoCreatesAccountAndAwardsBoth()
+    {
+        await using var factory = new MasterApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var userEmail = $"rank-active-{Guid.NewGuid():N}@example.com";
+        var rootToken = CreateRootAdminToken();
+
+        var manufacturerResult = await GraphQlAsync(
+            client,
+            """
+            mutation Ingest($input: IngestRankingEventInput!) {
+              ingestRankingEvent(input: $input) {
+                id
+              }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey = "capitalism-eu-1",
+                    eventType = "MANUFACTURER",
+                    playerEmail = userEmail,
+                    occurredAtUtc = DateTime.UtcNow,
+                    externalEventId = $"manufacturer-{Guid.NewGuid():N}",
+                    uniqueScopeKey = $"manufacturer:{Guid.NewGuid():N}",
+                    payloadJson = "{}",
+                }
+            });
+
+        Assert.False(manufacturerResult.TryGetProperty("errors", out _));
+
+        var wholesalerResult = await GraphQlAsync(
+            client,
+            """
+            mutation Ingest($input: IngestRankingEventInput!) {
+              ingestRankingEvent(input: $input) {
+                id
+              }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey = "capitalism-eu-1",
+                    eventType = "WHOLESALER",
+                    playerEmail = userEmail,
+                    occurredAtUtc = DateTime.UtcNow,
+                    externalEventId = $"wholesaler-{Guid.NewGuid():N}",
+                    uniqueScopeKey = $"wholesaler:{Guid.NewGuid():N}",
+                    payloadJson = "{}",
+                }
+            });
+
+        Assert.False(wholesalerResult.TryGetProperty("errors", out _));
+
+        await GraphQlAsync(client, "mutation { runRankingEvaluationNow { id } }", token: rootToken);
+
+        var registerResult = await GraphQlAsync(
+            client,
+            """
+            mutation Register($input: RegisterInput!) {
+              register(input: $input) {
+                token
+              }
+            }
+            """,
+            new { input = new { email = userEmail, displayName = "Active User", password = "password123" } });
+
+        Assert.False(registerResult.TryGetProperty("errors", out _));
+        var userToken = registerResult.GetProperty("data").GetProperty("register").GetProperty("token").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(userToken));
+
+        var history = await GraphQlAsync(
+            client,
+            """
+            query {
+              myRankingBountyHistory {
+                bountyCode
+              }
+            }
+            """,
+            token: userToken);
+
+        Assert.False(history.TryGetProperty("errors", out _));
+        var historyItems = history.GetProperty("data").GetProperty("myRankingBountyHistory").EnumerateArray().ToList();
+        Assert.Contains(historyItems, item => item.GetProperty("bountyCode").GetString() == "MANUFACTURER");
+        Assert.Contains(historyItems, item => item.GetProperty("bountyCode").GetString() == "WHOLESALER");
+    }
+
+    [Fact]
     public async Task MyRankingBountyDashboard_WhenAwardedToday_ShowsNextAvailabilityUtc()
     {
         await using var factory = new MasterApiWebApplicationFactory();
