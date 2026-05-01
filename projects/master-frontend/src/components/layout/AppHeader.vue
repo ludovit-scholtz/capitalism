@@ -1,22 +1,12 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
-import { setLocale } from '@/i18n'
 import ThemeToggle from '@/components/layout/ThemeToggle.vue'
 
 const auth = useAuthStore()
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const isMenuOpen = ref(false)
-
-const selectedLocale = computed({
-  get: () => locale.value,
-  set: (value: string) => {
-    if (value === 'en' || value === 'sk' || value === 'de') {
-      setLocale(value)
-    }
-  },
-})
 
 function closeMenu() {
   isMenuOpen.value = false
@@ -33,9 +23,7 @@ function logout() {
 </script>
 
 <template>
-  <header
-    class="app-header sticky top-0 z-[100] border-b border-divider bg-card/95 backdrop-blur-sm"
-  >
+  <header class="app-header sticky top-0 z-[100] border-b border-divider bg-card/95 backdrop-blur-sm">
     <div class="container flex h-16 items-center gap-6">
       <RouterLink to="/" class="logo-link shrink-0" @click="closeMenu">
         <span class="logo-text">CAPITALISM HQ</span>
@@ -57,6 +45,7 @@ function logout() {
           stroke-width="2"
           stroke-linecap="round"
           stroke-linejoin="round"
+          aria-hidden="true"
         >
           <line x1="3" y1="12" x2="21" y2="12" />
           <line x1="3" y1="6" x2="21" y2="6" />
@@ -65,47 +54,93 @@ function logout() {
       </button>
 
       <nav class="nav-links" :class="{ 'nav-open': isMenuOpen }">
-        <RouterLink to="/" class="nav-link" @click="closeMenu">{{ t('nav.home') }}</RouterLink>
-        <RouterLink :to="{ path: '/', hash: '#game-servers' }" class="nav-link" @click="closeMenu">
-          {{ t('nav.gameServers') }}
+        <RouterLink to="/" :title="t('nav.home')" :aria-label="t('nav.home')" class="nav-link" @click="closeMenu">
+          <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 10.5 12 3l9 7.5" />
+            <path d="M5 9.5V21h14V9.5" />
+          </svg>
+          <span class="inline-block md:hidden">{{ t('nav.home') }}</span>
         </RouterLink>
-        <RouterLink to="/ranking" class="nav-link" @click="closeMenu">{{
-          t('nav.ranking')
-        }}</RouterLink>
-        <RouterLink to="/ranking/bounties" class="nav-link" @click="closeMenu">
-          {{ t('nav.bounties') }}
+
+        <RouterLink
+          :to="{ path: '/', hash: '#game-servers' }"
+          :title="t('nav.gameServers')"
+          :aria-label="t('nav.gameServers')"
+          class="nav-link"
+          @click="closeMenu"
+        >
+          <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="6" rx="1.5" />
+            <rect x="3" y="14" width="18" height="6" rx="1.5" />
+            <path d="M7 7h.01M7 17h.01M11 7h6M11 17h6" />
+          </svg>
+          <span class="inline-block md:hidden">{{ t('nav.gameServers') }}</span>
         </RouterLink>
-        <RouterLink to="/referrals/dashboard" class="nav-link" @click="closeMenu">
-          {{ t('nav.referralDashboard') }}
+
+        <RouterLink to="/ranking" :title="t('nav.ranking')" :aria-label="t('nav.ranking')" class="nav-link" @click="closeMenu">
+          <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M8 21h8" />
+            <path d="M12 17v4" />
+            <path d="M7 4h10v3a5 5 0 0 1-10 0V4Z" />
+            <path d="M7 6H5a2 2 0 0 0 2 2" />
+            <path d="M17 6h2a2 2 0 0 1-2 2" />
+          </svg>
+          <span class="inline-block md:hidden">{{ t('nav.ranking') }}</span>
         </RouterLink>
-        <RouterLink to="/account" class="nav-link" @click="closeMenu">
-          {{ t('nav.tokenizedGold') }}
+
+        <RouterLink to="/ranking/bounties" :title="t('nav.bounties')" :aria-label="t('nav.bounties')" class="nav-link" @click="closeMenu">
+          <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="8" />
+            <circle cx="12" cy="12" r="4" />
+            <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" />
+          </svg>
+          <span class="inline-block md:hidden">{{ t('nav.bounties') }}</span>
+        </RouterLink>
+
+        <RouterLink
+          to="/referrals/dashboard"
+          :title="t('nav.referralDashboard')"
+          :aria-label="t('nav.referralDashboard')"
+          class="nav-link"
+          @click="closeMenu"
+        >
+          <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="6" cy="12" r="2" />
+            <circle cx="18" cy="6" r="2" />
+            <circle cx="18" cy="18" r="2" />
+            <path d="m8 12 8-6" />
+            <path d="m8 12 8 6" />
+          </svg>
+          <span class="inline-block md:hidden">{{ t('nav.referralDashboard') }}</span>
+        </RouterLink>
+
+        <RouterLink to="/account" :title="t('nav.tokenizedGold')" :aria-label="t('nav.tokenizedGold')" class="nav-link" @click="closeMenu">
+          <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <ellipse cx="12" cy="7" rx="6" ry="3" />
+            <path d="M6 7v5c0 1.66 2.69 3 6 3s6-1.34 6-3V7" />
+            <path d="M6 12v5c0 1.66 2.69 3 6 3s6-1.34 6-3v-5" />
+          </svg>
+          <span class="inline-block md:hidden">{{ t('nav.tokenizedGold') }}</span>
         </RouterLink>
       </nav>
 
       <div class="header-actions flex items-center gap-2">
-        <label class="sr-only" for="master-language">{{ t('app.languageLabel') }}</label>
-        <select
-          id="master-language"
-          v-model="selectedLocale"
-          class="h-9 rounded-md border border-divider bg-card px-2 text-sm text-body"
-          aria-label="Language"
-        >
-          <option value="en">EN</option>
-          <option value="sk">SK</option>
-          <option value="de">DE</option>
-        </select>
-
         <template v-if="auth.isAuthenticated">
-          <span class="hidden max-w-36 truncate text-sm text-muted lg:inline">{{
-            auth.player?.displayName
-          }}</span>
-          <button class="btn btn-secondary h-9 px-3" type="button" @click="logout">
-            {{ t('home.signOut') }}
+          <span class="hidden max-w-36 truncate text-sm text-muted lg:inline">{{ auth.player?.displayName }}</span>
+          <button class="btn btn-secondary h-9 w-9 p-0 justify-center" type="button" :title="t('home.signOut')" :aria-label="t('home.signOut')" @click="logout">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <path d="M16 17l5-5-5-5" />
+              <path d="M21 12H9" />
+            </svg>
           </button>
         </template>
-        <RouterLink v-else to="/login" class="btn btn-primary h-9 px-3" @click="closeMenu">
-          {{ t('login.signIn') }}
+        <RouterLink v-else to="/login" class="btn btn-primary h-9 w-9 p-0 justify-center" :title="t('login.signIn')" :aria-label="t('login.signIn')" @click="closeMenu">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+            <path d="M10 17l5-5-5-5" />
+            <path d="M15 12H3" />
+          </svg>
         </RouterLink>
 
         <ThemeToggle />
@@ -144,11 +179,17 @@ function logout() {
   position: relative;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
   color: var(--color-text-secondary);
   font-size: 0.875rem;
   font-weight: 500;
   text-decoration: none;
   transition: color 0.15s;
+}
+
+.nav-icon {
+  flex: 0 0 auto;
 }
 
 .nav-link::after {
@@ -201,6 +242,7 @@ function logout() {
 
   .nav-link {
     width: 100%;
+    justify-content: flex-start;
     padding: 0.9rem 1.5rem;
   }
 

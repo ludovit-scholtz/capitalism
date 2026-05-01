@@ -39,6 +39,7 @@ const startupPackSuccess = ref(false)
 
 const onlineCount = computed(() => servers.value.filter((server) => server.isOnline).length)
 const rankingTop = computed(() => ranking.value.slice(0, 10))
+const rankingPreview = computed(() => ranking.value.slice(0, 3))
 
 const startupPackClaimedAtLabel = computed(() => {
   const claimedAt = auth.player?.startupPackClaimedAtUtc
@@ -132,28 +133,60 @@ onMounted(() => {
       <div class="hero-video-overlay"></div>
 
       <div class="container relative z-10 flex min-h-[62vh] items-end py-14 lg:min-h-[70vh]">
-        <div
-          class="max-w-3xl rounded-2xl border border-divider/70 bg-card/85 p-6 shadow-[var(--shadow-lg)] lg:p-10"
-        >
-          <p class="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
-            {{ t('home.eyebrow') }}
-          </p>
-          <h1 class="hero-title mt-3 text-4xl font-bold leading-tight md:text-5xl">
-            {{ t('home.title') }}
-          </h1>
-          <p class="mt-4 max-w-2xl text-sm text-muted md:text-base">{{ t('home.heroText') }}</p>
+        <div class="grid w-full items-end gap-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.75fr)]">
+          <div
+            class="max-w-3xl rounded-2xl border border-divider/70 bg-card/85 p-6 shadow-[var(--shadow-lg)] lg:p-10"
+          >
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+              {{ t('home.eyebrow') }}
+            </p>
+            <h1 class="hero-title mt-3 text-4xl font-bold leading-tight md:text-5xl">
+              {{ t('home.title') }}
+            </h1>
+            <p class="mt-4 max-w-2xl text-sm text-muted md:text-base">{{ t('home.heroText') }}</p>
 
-          <div class="mt-6 flex flex-wrap items-center gap-3">
-            <RouterLink v-if="!auth.isAuthenticated" class="hero-cta btn btn-primary" to="/login">
-              {{ t('home.getStarted') }}
-            </RouterLink>
-            <RouterLink class="btn btn-secondary" :to="{ path: '/', hash: '#game-servers' }">
-              {{ t('home.gameServers') }}
-            </RouterLink>
-            <RouterLink class="btn btn-secondary" to="/ranking">
-              {{ t('home.ranking') }}
-            </RouterLink>
+            <div class="mt-6 flex flex-wrap items-center gap-3">
+              <RouterLink v-if="!auth.isAuthenticated" class="hero-cta btn btn-primary" to="/login">
+                {{ t('home.getStarted') }}
+              </RouterLink>
+              <RouterLink class="btn btn-secondary" :to="{ path: '/', hash: '#game-servers' }">
+                {{ t('home.gameServers') }}
+              </RouterLink>
+              <RouterLink class="btn btn-secondary" :to="{ path: '/', hash: '#ranking' }">
+                {{ t('home.ranking') }}
+              </RouterLink>
+            </div>
           </div>
+
+          <section class="rounded-2xl border border-divider/70 bg-card/85 p-5 shadow-[var(--shadow-lg)] lg:p-6" aria-labelledby="landing-ranking-heading">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.14em] text-muted">{{ t('home.ranking') }}</p>
+                <h2 id="landing-ranking-heading" class="mt-2 text-xl font-semibold text-body">{{ t('rankingDashboard.topCompetitors') }}</h2>
+              </div>
+              <RouterLink class="text-sm font-semibold text-brand hover:text-brand-hover" to="/ranking">
+                {{ t('rankingDashboard.leaderboard') }}
+              </RouterLink>
+            </div>
+
+            <p v-if="rankingLoading" class="state-message mt-4">{{ t('common.loading') }}</p>
+            <p v-else-if="rankingError" class="state-error mt-4" role="alert">{{ rankingError }}</p>
+
+            <div v-else class="mt-4 grid gap-3">
+              <article v-for="entry in rankingPreview" :key="entry.playerId" class="rounded-xl border border-divider bg-card-raised p-4">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <p class="text-xs uppercase tracking-[0.08em] text-muted">#{{ entry.globalRank }}</p>
+                    <h3 class="mt-1 text-base font-semibold text-body">{{ entry.displayName }}</h3>
+                  </div>
+                  <span class="text-sm font-semibold" :class="entry.rankMovement > 0 ? 'text-good' : entry.rankMovement < 0 ? 'text-bad' : 'text-muted'">
+                    {{ entry.rankMovement > 0 ? `+${entry.rankMovement}` : entry.rankMovement }}
+                  </span>
+                </div>
+                <p class="mt-2 text-sm text-muted">{{ formatPoints(entry.totalPoints) }} pts</p>
+              </article>
+            </div>
+          </section>
         </div>
       </div>
     </section>

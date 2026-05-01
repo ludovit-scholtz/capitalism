@@ -1,6 +1,7 @@
 export default {
   common: {
     backToPortal: 'Spat na portal',
+    allRightsReserved: '© {year} Capitalism HQ. Vsetky prava vyhradene.',
     loading: 'Nacitavanie...',
     refresh: 'Obnovit',
     apply: 'Pouzit',
@@ -39,6 +40,14 @@ export default {
   themeSwitcher: {
     switchToLight: 'Prepnut na svetly rezim',
     switchToDark: 'Prepnut na tmavy rezim',
+  },
+  languageSwitcher: {
+    label: 'Prepnut jazyk',
+  },
+  languages: {
+    en: 'EN',
+    sk: 'SK',
+    de: 'DE',
   },
   home: {
     title: 'CAPITALISM V',

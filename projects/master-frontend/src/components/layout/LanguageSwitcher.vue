@@ -1,0 +1,36 @@
+<script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+import { setLocale } from '@/i18n'
+
+const { locale, t } = useI18n()
+const supportedLocales = ['en', 'sk', 'de'] as const
+
+function handleLocaleChange(nextLocale: (typeof supportedLocales)[number]) {
+  setLocale(nextLocale)
+}
+</script>
+
+<template>
+  <div class="language-switcher flex items-center">
+    <div
+      class="language-buttons flex gap-1 overflow-hidden rounded-sm border border-divider"
+      role="group"
+      :aria-label="t('languageSwitcher.label')"
+    >
+      <button
+        v-for="localeCode in supportedLocales"
+        :key="localeCode"
+        :class="[
+          'language-btn min-w-8 border-0 px-2 py-1 text-center text-xs font-semibold transition-colors',
+          locale === localeCode
+            ? 'active bg-brand text-white hover:bg-brand-hover'
+            : 'bg-card-raised text-muted hover:bg-card hover:text-body',
+        ]"
+        :aria-pressed="locale === localeCode"
+        @click="handleLocaleChange(localeCode)"
+      >
+        {{ t(`languages.${localeCode}`) }}
+      </button>
+    </div>
+  </div>
+</template>

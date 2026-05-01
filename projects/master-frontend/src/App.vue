@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import AppFooter from '@/components/layout/AppFooter.vue'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
@@ -26,5 +27,6 @@ onMounted(() => {
     <main class="flex-1">
       <RouterView />
     </main>
+    <AppFooter />
   </div>
 </template>

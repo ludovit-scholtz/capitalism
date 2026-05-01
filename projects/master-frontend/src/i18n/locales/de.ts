@@ -1,6 +1,7 @@
 export default {
   common: {
     backToPortal: 'Zuruck zum Portal',
+    allRightsReserved: '© {year} Capitalism HQ. Alle Rechte vorbehalten.',
     loading: 'Laden...',
     refresh: 'Aktualisieren',
     apply: 'Anwenden',
@@ -39,6 +40,14 @@ export default {
   themeSwitcher: {
     switchToLight: 'Zum hellen Modus wechseln',
     switchToDark: 'Zum dunklen Modus wechseln',
+  },
+  languageSwitcher: {
+    label: 'Sprache wechseln',
+  },
+  languages: {
+    en: 'EN',
+    sk: 'SK',
+    de: 'DE',
   },
   home: {
     title: 'CAPITALISM V',
