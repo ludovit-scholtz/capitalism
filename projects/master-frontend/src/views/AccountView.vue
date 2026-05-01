@@ -3,6 +3,8 @@ import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { fetchMyGoldAccount, type PlayerGoldAccountInfo } from '@/lib/masterApi'
+import ViewJumbotron from '@/components/layout/ViewJumbotron.vue'
+import ViewSubnav from '@/components/layout/ViewSubnav.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -55,24 +57,26 @@ onMounted(async () => {
   }
   await loadAccount()
 })
+
+const navItems = ref<Array<{ label: string; to: string }>>([])
+
+onMounted(() => {
+  navItems.value = [{ label: t('common.backToPortal'), to: '/' }]
+  if (auth.isGameAdmin) {
+    navItems.value.unshift({ label: t('home.goldAdmin'), to: '/gold-admin' })
+  }
+})
 </script>
 
 <template>
   <div class="account-shell">
-    <header class="account-header">
-      <div class="account-header-inner">
-        <div>
-          <p class="section-kicker">{{ t('account.kicker') }}</p>
-          <h1>{{ t('account.title') }}</h1>
-          <p class="account-subtitle">
-            {{ t('account.subtitle') }}
-          </p>
-        </div>
-        <nav class="account-nav">
-          <a href="/" class="nav-back-btn">← {{ t('common.backToPortal') }}</a>
-        </nav>
-      </div>
-    </header>
+    <ViewJumbotron
+      :kicker="t('account.kicker')"
+      :title="t('account.title')"
+      :subtitle="t('account.subtitle')"
+      variant="gold"
+    />
+    <ViewSubnav :items="navItems" aria-label="Account navigation" />
 
     <main class="account-main">
       <!-- Loading state -->

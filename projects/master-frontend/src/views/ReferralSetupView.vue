@@ -2,6 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import ViewJumbotron from '@/components/layout/ViewJumbotron.vue'
+import ViewSubnav from '@/components/layout/ViewSubnav.vue'
 
 import {
   applyReferralCode,
@@ -20,6 +22,11 @@ const successMessage = ref('')
 const appliedCode = ref<string | null>(null)
 
 const canSubmit = computed(() => !!referralCode.value.trim() && !appliedCode.value)
+const navItems = computed(() => [
+  { label: t('home.referralDashboard'), to: '/referrals/dashboard' },
+  { label: t('home.becomeReferral'), to: '/referrals/become' },
+  { label: t('common.backToPortal'), to: '/' },
+])
 
 function loadProfile() {
   if (!auth.player?.email) {
@@ -71,57 +78,61 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main class="ref-shell grid min-h-dvh place-items-center px-4 py-8">
-    <section
-      class="ref-card flex w-full max-w-[680px] flex-col gap-4 rounded-3xl border border-[var(--color-border)] bg-[var(--color-paper-strong)] p-8 shadow-[var(--shadow-soft)]"
-    >
-      <p class="eyebrow text-[0.72rem] uppercase tracking-[0.12em] text-[var(--color-accent-deep)]">
-        {{ t('home.referralSetup') }}
-      </p>
-      <h1 class="text-[clamp(1.6rem,3vw,2.2rem)]">{{ t('referralSetup.title') }}</h1>
-      <p class="subtitle leading-[1.6] text-[var(--color-muted)]">
-        {{ t('referralSetup.subtitle') }}
-      </p>
+  <main>
+    <ViewJumbotron
+      :kicker="t('home.referralSetup')"
+      :title="t('referralSetup.title')"
+      :subtitle="t('referralSetup.subtitle')"
+      variant="referral"
+    />
+    <ViewSubnav :items="navItems" aria-label="Referral setup navigation" />
 
-      <div
-        class="setup-block grid gap-2 rounded-[18px] border border-dashed border-[var(--color-border)] p-4"
+    <section class="ref-shell grid min-h-dvh place-items-center px-4 py-4">
+      <section
+        class="ref-card flex w-full max-w-[680px] flex-col gap-4 rounded-3xl border border-[var(--color-border)] bg-[var(--color-paper-strong)] p-8 shadow-[var(--shadow-soft)]"
       >
-        <label class="text-[0.9rem] font-semibold" for="referral-code">{{
-          t('referralSetup.codeLabel')
-        }}</label>
-        <input
-          id="referral-code"
-          v-model="referralCode"
-          type="text"
-          maxlength="8"
-          :placeholder="t('referralSetup.codePlaceholder')"
-          :disabled="!!appliedCode"
-          class="rounded-xl border border-[var(--color-border)] bg-white px-4 py-3 font-bold uppercase tracking-[0.12em]"
-          @input="normalizeCodeInput"
-        />
-        <p v-if="appliedCode" class="locked-note text-[0.85rem] text-[#245f3d]">
-          {{ t('referralSetup.savedCode', { code: appliedCode }) }}
+        <div
+          class="setup-block grid gap-2 rounded-[18px] border border-dashed border-[var(--color-border)] p-4"
+        >
+          <label class="text-[0.9rem] font-semibold" for="referral-code">{{
+            t('referralSetup.codeLabel')
+          }}</label>
+          <input
+            id="referral-code"
+            v-model="referralCode"
+            type="text"
+            maxlength="8"
+            :placeholder="t('referralSetup.codePlaceholder')"
+            :disabled="!!appliedCode"
+            class="rounded-xl border border-[var(--color-border)] bg-white px-4 py-3 font-bold uppercase tracking-[0.12em]"
+            @input="normalizeCodeInput"
+          />
+          <p v-if="appliedCode" class="locked-note text-[0.85rem] text-[#245f3d]">
+            {{ t('referralSetup.savedCode', { code: appliedCode }) }}
+          </p>
+        </div>
+
+        <p v-if="errorMessage" class="error text-[#b0432c]" role="alert">{{ errorMessage }}</p>
+        <p v-if="successMessage" class="success text-[#245f3d]" role="status">
+          {{ successMessage }}
         </p>
-      </div>
 
-      <p v-if="errorMessage" class="error text-[#b0432c]" role="alert">{{ errorMessage }}</p>
-      <p v-if="successMessage" class="success text-[#245f3d]" role="status">{{ successMessage }}</p>
-
-      <div class="actions flex flex-wrap gap-3">
-        <button
-          type="button"
-          class="primary rounded-full border-0 bg-[var(--color-ink)] px-4 py-3 font-bold text-[var(--color-paper)] disabled:cursor-not-allowed disabled:opacity-55"
-          :disabled="!canSubmit"
-          @click="submitCode"
-        >
-          {{ t('referralSetup.saveButton') }}
-        </button>
-        <RouterLink
-          class="secondary rounded-full bg-[rgba(17,41,79,0.08)] px-4 py-3 font-bold text-[var(--color-ink)] no-underline"
-          to="/referrals/dashboard"
-          >{{ t('referralSetup.openDashboard') }}</RouterLink
-        >
-      </div>
+        <div class="actions flex flex-wrap gap-3">
+          <button
+            type="button"
+            class="primary rounded-full border-0 bg-[var(--color-ink)] px-4 py-3 font-bold text-[var(--color-paper)] disabled:cursor-not-allowed disabled:opacity-55"
+            :disabled="!canSubmit"
+            @click="submitCode"
+          >
+            {{ t('referralSetup.saveButton') }}
+          </button>
+          <RouterLink
+            class="secondary rounded-full bg-[rgba(17,41,79,0.08)] px-4 py-3 font-bold text-[var(--color-ink)] no-underline"
+            to="/referrals/dashboard"
+            >{{ t('referralSetup.openDashboard') }}</RouterLink
+          >
+        </div>
+      </section>
     </section>
   </main>
 </template>

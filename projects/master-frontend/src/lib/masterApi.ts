@@ -814,6 +814,14 @@ const RUN_RANKING_DAILY_DECAY_NOW_MUTATION = `
   }
 `
 
+const PROBE_GAME_ADMIN_ACCESS_QUERY = `
+  query ProbeGameAdminAccess {
+    rankingAdminDashboard {
+      pendingModerationCount
+    }
+  }
+`
+
 export async function fetchMyRankingSummary(token: string): Promise<RankingSummaryInfo> {
   const data = await gqlRequest<{ myRankingSummary: RankingSummaryInfo }>(
     MY_RANKING_SUMMARY_QUERY,
@@ -924,4 +932,13 @@ export async function runRankingDailyDecayNow(token: string): Promise<RankingRun
     token,
   )
   return data.runRankingDailyDecayNow
+}
+
+export async function probeGameAdminAccess(token: string): Promise<boolean> {
+  try {
+    await gqlRequest(PROBE_GAME_ADMIN_ACCESS_QUERY, undefined, token)
+    return true
+  } catch {
+    return false
+  }
 }

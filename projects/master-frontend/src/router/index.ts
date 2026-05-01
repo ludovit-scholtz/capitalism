@@ -54,6 +54,11 @@ const router = createRouter({
       component: () => import('@/views/SupportAdminView.vue'),
     },
     {
+      path: '/game-admin',
+      name: 'game-admin',
+      component: () => import('@/views/GameAdminDashboardView.vue'),
+    },
+    {
       path: '/ranking',
       name: 'ranking-dashboard',
       component: () => import('@/views/RankingDashboardView.vue'),

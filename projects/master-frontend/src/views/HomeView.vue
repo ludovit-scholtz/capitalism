@@ -4,8 +4,11 @@ import { useI18n } from 'vue-i18n'
 
 import { fetchRankingLeaderboard, type RankingLeaderboardEntryInfo } from '@/lib/masterApi'
 import heroVideo from '@/assets/hero-video.webm'
+import ViewSubnav from '@/components/layout/ViewSubnav.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const { t } = useI18n()
+const auth = useAuthStore()
 
 const ranking = ref<RankingLeaderboardEntryInfo[]>([])
 const rankingLoading = ref(true)
@@ -13,6 +16,19 @@ const rankingError = ref('')
 
 const rankingTop = computed(() => ranking.value.slice(0, 10))
 const rankingPreview = computed(() => ranking.value.slice(0, 3))
+const navItems = computed(() => {
+  const items = [
+    { label: t('nav.gameServers'), to: '/game-servers' },
+    { label: t('nav.ranking'), to: '/ranking' },
+    { label: t('nav.supportDashboard'), to: '/support' },
+  ]
+
+  if (auth.isGameAdmin) {
+    items.push({ label: t('nav.gameAdminDashboard'), to: '/game-admin' })
+  }
+
+  return items
+})
 
 function formatPoints(value: number) {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value)
@@ -126,7 +142,9 @@ onMounted(() => {
       </div>
     </section>
 
-    <main class="container pt-8 lg:pt-10">
+    <ViewSubnav :items="navItems" aria-label="Home section navigation" />
+
+    <main class="container pt-2 lg:pt-2">
       <section id="ranking" class="card p-6" aria-labelledby="ranking-heading">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -145,7 +163,7 @@ onMounted(() => {
         <p v-if="rankingLoading" class="state-message mt-4">{{ t('common.loading') }}</p>
         <p v-else-if="rankingError" class="state-error mt-4" role="alert">{{ rankingError }}</p>
         <p v-else-if="rankingTop.length === 0" class="state-message mt-4">
-          {{ t('common.loading') }}
+          {{ t('common.noData') }}
         </p>
 
         <div v-else class="mt-5 overflow-x-auto rounded-xl border border-divider">

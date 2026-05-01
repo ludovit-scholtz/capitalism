@@ -194,6 +194,33 @@ function logout() {
         </RouterLink>
 
         <RouterLink
+          v-if="auth.isGameAdmin"
+          to="/game-admin"
+          :title="t('nav.gameAdminDashboard')"
+          :aria-label="t('nav.gameAdminDashboard')"
+          class="nav-link"
+          @click="closeMenu"
+        >
+          <svg
+            class="nav-icon"
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 3l8 4v6c0 5-3.5 7.8-8 9-4.5-1.2-8-4-8-9V7l8-4z" />
+            <path d="M9 12l2 2 4-4" />
+          </svg>
+          <span class="inline-block md:hidden">{{ t('nav.gameAdminDashboard') }}</span>
+        </RouterLink>
+
+        <RouterLink
           to="/referrals/dashboard"
           :title="t('nav.referralDashboard')"
           :aria-label="t('nav.referralDashboard')"
@@ -256,7 +283,7 @@ function logout() {
             auth.player?.displayName
           }}</span>
           <button
-            class="btn btn-secondary h-9 w-9 p-0 justify-center"
+            class="btn btn-secondary h-9 px-3 gap-2 justify-center text-body"
             type="button"
             :title="t('home.signOut')"
             :aria-label="t('home.signOut')"
@@ -278,6 +305,7 @@ function logout() {
               <path d="M16 17l5-5-5-5" />
               <path d="M21 12H9" />
             </svg>
+            <span class="hidden lg:inline">{{ t('home.signOut') }}</span>
           </button>
         </template>
         <RouterLink

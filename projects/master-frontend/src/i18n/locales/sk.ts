@@ -7,6 +7,7 @@ export default {
     apply: 'Pouzit',
     allTypes: 'Vsetky typy',
     allStatuses: 'Vsetky stavy',
+    noData: 'Nie su dostupne ziadne data.',
     filterByTitle: 'Filtrovat podla nazvu',
     filterType: 'Filter typu',
     filterStatus: 'Filter stavu',
@@ -34,6 +35,7 @@ export default {
     gameServers: 'Herni servery',
     ranking: 'Rebricek',
     supportDashboard: 'Podpora dashboard',
+    gameAdminDashboard: 'Game admin dashboard',
     bounties: 'Odmeny',
     referralDashboard: 'Referal dashboard',
     tokenizedGold: 'Tokenizovane zlato',
@@ -341,6 +343,15 @@ export default {
     nextPage: 'Dalsia',
     noRows: 'Filtru nevyhovuju ziadne riadky rebricka.',
     loadError: 'Nepodarilo sa nacitat data rebricka.',
+  },
+  gameAdmin: {
+    kicker: 'Administratorske nastroje',
+    title: 'Dashboard herneho administratora',
+    subtitle:
+      'Centralizovane riadenie moderacie podpory, ranking operacii a uprav zostatkov tokenizovaneho zlata.',
+    supportCopy: 'Kontroluj a moderuj prichadzajuce support tikety od hracov.',
+    rankingCopy: 'Spravuj ranking bounty pravidla, moderacne udalosti a evaluator behy.',
+    goldCopy: 'Upravuj zostatky tokenizovaneho zlata s kompletnou auditnou stopou.',
   },
   rankingHistory: {
     title: 'Historia odmien',

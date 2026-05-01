@@ -2,6 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import ViewJumbotron from '@/components/layout/ViewJumbotron.vue'
+import ViewSubnav from '@/components/layout/ViewSubnav.vue'
 import TicketMarkdownEditor from '@/components/support/TicketMarkdownEditor.vue'
 import {
   createSupportTicket,
@@ -35,6 +37,19 @@ const createLoading = ref(false)
 const selectedTicket = computed(
   () => tickets.value.find((ticket) => ticket.id === selectedTicketId.value) ?? null,
 )
+
+const navItems = computed(() => {
+  const items = [
+    { label: t('home.referralDashboard'), to: '/referrals/dashboard' },
+    { label: t('common.backToPortal'), to: '/' },
+  ]
+
+  if (auth.isGameAdmin) {
+    items.unshift({ label: t('home.supportAdmin'), to: '/support/admin' })
+  }
+
+  return items
+})
 
 const canEditSelected = computed(
   () => selectedTicket.value !== null && selectedTicket.value.status !== 'FINISHED',
@@ -163,165 +178,165 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main class="support-shell">
-    <header class="support-header">
-      <h1>{{ t('support.title') }}</h1>
-      <p>{{ t('support.subtitle') }}</p>
-      <nav class="support-nav" aria-label="Support dashboard navigation">
-        <RouterLink class="nav-link" to="/support/admin">{{ t('home.supportAdmin') }}</RouterLink>
-        <RouterLink class="nav-link" to="/referrals/dashboard">{{
-          t('home.referralDashboard')
-        }}</RouterLink>
-        <RouterLink class="nav-link" to="/">← {{ t('common.backToPortal') }}</RouterLink>
-      </nav>
-    </header>
+  <main>
+    <ViewJumbotron
+      :kicker="t('home.support')"
+      :title="t('support.title')"
+      :subtitle="t('support.subtitle')"
+      variant="support"
+    />
+    <ViewSubnav :items="navItems" aria-label="Support navigation" />
 
-    <section class="support-card" aria-label="Create support ticket">
-      <h2>{{ t('support.createSection') }}</h2>
-      <div class="form-grid">
-        <label>
-          {{ t('support.ticketType') }}
-          <select v-model="newType" aria-label="Ticket type">
+    <section class="support-shell">
+      <section class="support-card" aria-label="Create support ticket">
+        <h2>{{ t('support.createSection') }}</h2>
+        <div class="form-grid">
+          <label>
+            {{ t('support.ticketType') }}
+            <select v-model="newType" aria-label="Ticket type">
+              <option value="SUGGESTION">{{ t('common.suggestion') }}</option>
+              <option value="BUG">{{ t('common.bug') }}</option>
+              <option value="OTHER">{{ t('common.other') }}</option>
+            </select>
+          </label>
+          <label>
+            {{ t('support.ticketTitle') }}
+            <input v-model="newTitle" type="text" aria-label="Ticket title" />
+          </label>
+        </div>
+
+        <TicketMarkdownEditor v-model="newMarkdown" />
+
+        <div class="form-actions">
+          <button type="button" :disabled="createLoading" @click="submitTicket">
+            {{ createLoading ? t('support.submitting') : t('support.submit') }}
+          </button>
+        </div>
+      </section>
+
+      <section class="support-card" aria-label="My support tickets">
+        <h2>{{ t('support.myTickets') }}</h2>
+        <div class="filters">
+          <input
+            v-model="searchTitle"
+            type="search"
+            :placeholder="t('common.filterByTitle')"
+            :aria-label="t('common.filterByTitle')"
+          />
+          <select v-model="filterType" :aria-label="t('common.filterType')">
+            <option value="">{{ t('common.allTypes') }}</option>
             <option value="SUGGESTION">{{ t('common.suggestion') }}</option>
             <option value="BUG">{{ t('common.bug') }}</option>
             <option value="OTHER">{{ t('common.other') }}</option>
           </select>
-        </label>
-        <label>
-          {{ t('support.ticketTitle') }}
-          <input v-model="newTitle" type="text" aria-label="Ticket title" />
-        </label>
-      </div>
+          <select v-model="filterStatus" :aria-label="t('common.filterStatus')">
+            <option value="">{{ t('common.allStatuses') }}</option>
+            <option value="SUBMITTED">{{ t('common.submitted') }}</option>
+            <option value="IN_PROGRESS">{{ t('common.inProgress') }}</option>
+            <option value="FINISHED">{{ t('common.finished') }}</option>
+          </select>
+          <select v-model="sortBy" :aria-label="t('common.sortBy')">
+            <option value="CREATED_AT">{{ t('common.createdDate') }}</option>
+            <option value="UPDATED_AT">{{ t('common.updatedDate') }}</option>
+            <option value="TITLE">{{ t('common.title') }}</option>
+          </select>
+          <select v-model="sortDirection" :aria-label="t('common.sortDirection')">
+            <option value="DESC">{{ t('common.newestFirst') }}</option>
+            <option value="ASC">{{ t('common.oldestFirst') }}</option>
+          </select>
+          <button type="button" @click="loadTickets">{{ t('common.apply') }}</button>
+        </div>
 
-      <TicketMarkdownEditor v-model="newMarkdown" />
+        <p v-if="errorMessage" class="state-error" role="alert">{{ errorMessage }}</p>
+        <p v-if="successMessage" class="state-success" role="status">{{ successMessage }}</p>
+        <p v-if="loading" class="state-message">{{ t('support.loading') }}</p>
 
-      <div class="form-actions">
-        <button type="button" :disabled="createLoading" @click="submitTicket">
-          {{ createLoading ? t('support.submitting') : t('support.submit') }}
-        </button>
-      </div>
-    </section>
+        <p v-else-if="tickets.length === 0" class="state-message">{{ t('common.noData') }}</p>
 
-    <section class="support-card" aria-label="My support tickets">
-      <h2>{{ t('support.myTickets') }}</h2>
-      <div class="filters">
-        <input
-          v-model="searchTitle"
-          type="search"
-          :placeholder="t('common.filterByTitle')"
-          :aria-label="t('common.filterByTitle')"
-        />
-        <select v-model="filterType" :aria-label="t('common.filterType')">
-          <option value="">{{ t('common.allTypes') }}</option>
-          <option value="SUGGESTION">{{ t('common.suggestion') }}</option>
-          <option value="BUG">{{ t('common.bug') }}</option>
-          <option value="OTHER">{{ t('common.other') }}</option>
-        </select>
-        <select v-model="filterStatus" :aria-label="t('common.filterStatus')">
-          <option value="">{{ t('common.allStatuses') }}</option>
-          <option value="SUBMITTED">{{ t('common.submitted') }}</option>
-          <option value="IN_PROGRESS">{{ t('common.inProgress') }}</option>
-          <option value="FINISHED">{{ t('common.finished') }}</option>
-        </select>
-        <select v-model="sortBy" :aria-label="t('common.sortBy')">
-          <option value="CREATED_AT">{{ t('common.createdDate') }}</option>
-          <option value="UPDATED_AT">{{ t('common.updatedDate') }}</option>
-          <option value="TITLE">{{ t('common.title') }}</option>
-        </select>
-        <select v-model="sortDirection" :aria-label="t('common.sortDirection')">
-          <option value="DESC">{{ t('common.newestFirst') }}</option>
-          <option value="ASC">{{ t('common.oldestFirst') }}</option>
-        </select>
-        <button type="button" @click="loadTickets">{{ t('common.apply') }}</button>
-      </div>
+        <div v-else class="ticket-layout">
+          <table class="tickets-table" aria-label="My support tickets table">
+            <thead>
+              <tr>
+                <th>{{ t('support.created') }}</th>
+                <th>{{ t('common.title') }}</th>
+                <th>{{ t('support.type') }}</th>
+                <th>{{ t('support.status') }}</th>
+                <th>{{ t('support.updated') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="ticket in tickets"
+                :key="ticket.id"
+                :class="{ selected: ticket.id === selectedTicketId }"
+                @click="selectedTicketId = ticket.id"
+              >
+                <td>{{ formatDate(ticket.createdAtUtc) }}</td>
+                <td>{{ ticket.title }}</td>
+                <td>{{ typeLabel(ticket.ticketType) }}</td>
+                <td>{{ statusLabel(ticket.status) }}</td>
+                <td>{{ formatDate(ticket.updatedAtUtc) }}</td>
+              </tr>
+            </tbody>
+          </table>
 
-      <p v-if="errorMessage" class="state-error" role="alert">{{ errorMessage }}</p>
-      <p v-if="successMessage" class="state-success" role="status">{{ successMessage }}</p>
-      <p v-if="loading" class="state-message">{{ t('support.loading') }}</p>
-
-      <div v-else class="ticket-layout">
-        <table class="tickets-table" aria-label="My support tickets table">
-          <thead>
-            <tr>
-              <th>{{ t('support.created') }}</th>
-              <th>{{ t('common.title') }}</th>
-              <th>{{ t('support.type') }}</th>
-              <th>{{ t('support.status') }}</th>
-              <th>{{ t('support.updated') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="ticket in tickets"
-              :key="ticket.id"
-              :class="{ selected: ticket.id === selectedTicketId }"
-              @click="selectedTicketId = ticket.id"
-            >
-              <td>{{ formatDate(ticket.createdAtUtc) }}</td>
-              <td>{{ ticket.title }}</td>
-              <td>{{ typeLabel(ticket.ticketType) }}</td>
-              <td>{{ statusLabel(ticket.status) }}</td>
-              <td>{{ formatDate(ticket.updatedAtUtc) }}</td>
-            </tr>
-          </tbody>
-        </table>
-
-        <article v-if="selectedTicket" class="ticket-detail" aria-label="Selected ticket detail">
-          <h3>{{ selectedTicket.title }}</h3>
-          <p class="ticket-meta">
-            {{ typeLabel(selectedTicket.ticketType) }} · {{ statusLabel(selectedTicket.status) }}
-          </p>
-          <p class="ticket-meta">
-            {{ t('support.moderation') }}: {{ selectedTicket.moderationState }}
-            <span v-if="selectedTicket.moderationReason">
-              · {{ selectedTicket.moderationReason }}</span
-            >
-          </p>
-
-          <label>
-            {{ t('common.title') }}
-            <input
-              v-model="selectedTicket.title"
-              type="text"
-              :disabled="!canEditSelected"
-              aria-label="Edit ticket title"
-            />
-          </label>
-          <TicketMarkdownEditor
-            v-model="selectedTicket.markdownSource"
-            :disabled="!canEditSelected"
-          />
-
-          <div class="form-actions">
-            <button type="button" :disabled="!canEditSelected" @click="saveTicketEdits">
-              {{ t('support.saveEdits') }}
-            </button>
-          </div>
-
-          <section class="preview-panel">
-            <h4>{{ t('support.moderatedPreview') }}</h4>
-            <div
-              v-if="selectedTicket.sanitizedPreviewHtml"
-              class="preview-html"
-              v-html="selectedTicket.sanitizedPreviewHtml"
-            ></div>
-            <p v-else class="state-message">
-              {{ t('support.previewHidden') }}
+          <article v-if="selectedTicket" class="ticket-detail" aria-label="Selected ticket detail">
+            <h3>{{ selectedTicket.title }}</h3>
+            <p class="ticket-meta">
+              {{ typeLabel(selectedTicket.ticketType) }} · {{ statusLabel(selectedTicket.status) }}
             </p>
-          </section>
+            <p class="ticket-meta">
+              {{ t('support.moderation') }}: {{ selectedTicket.moderationState }}
+              <span v-if="selectedTicket.moderationReason">
+                · {{ selectedTicket.moderationReason }}</span
+              >
+            </p>
 
-          <section class="activity-panel">
-            <h4>{{ t('support.activityLog') }}</h4>
-            <ul>
-              <li v-for="eventItem in selectedTicket.activity" :key="eventItem.id">
-                <strong>{{ eventItem.eventType }}</strong> · {{ eventItem.actorEmail }} ·
-                {{ formatDate(eventItem.createdAtUtc) }}
-                <div>{{ eventItem.note }}</div>
-              </li>
-            </ul>
-          </section>
-        </article>
-      </div>
+            <label>
+              {{ t('common.title') }}
+              <input
+                v-model="selectedTicket.title"
+                type="text"
+                :disabled="!canEditSelected"
+                aria-label="Edit ticket title"
+              />
+            </label>
+            <TicketMarkdownEditor
+              v-model="selectedTicket.markdownSource"
+              :disabled="!canEditSelected"
+            />
+
+            <div class="form-actions">
+              <button type="button" :disabled="!canEditSelected" @click="saveTicketEdits">
+                {{ t('support.saveEdits') }}
+              </button>
+            </div>
+
+            <section class="preview-panel">
+              <h4>{{ t('support.moderatedPreview') }}</h4>
+              <div
+                v-if="selectedTicket.sanitizedPreviewHtml"
+                class="preview-html"
+                v-html="selectedTicket.sanitizedPreviewHtml"
+              ></div>
+              <p v-else class="state-message">
+                {{ t('support.previewHidden') }}
+              </p>
+            </section>
+
+            <section class="activity-panel">
+              <h4>{{ t('support.activityLog') }}</h4>
+              <ul>
+                <li v-for="eventItem in selectedTicket.activity" :key="eventItem.id">
+                  <strong>{{ eventItem.eventType }}</strong> · {{ eventItem.actorEmail }} ·
+                  {{ formatDate(eventItem.createdAtUtc) }}
+                  <div>{{ eventItem.note }}</div>
+                </li>
+              </ul>
+            </section>
+          </article>
+        </div>
+      </section>
     </section>
   </main>
 </template>
@@ -332,23 +347,6 @@ onMounted(async () => {
   margin: 0 auto;
   padding: 2rem 1rem 5rem;
   color: #ececff;
-}
-
-.support-header h1 {
-  margin: 0;
-}
-
-.support-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.7rem;
-  margin-top: 0.9rem;
-}
-
-.nav-link {
-  color: #a7b6ff;
-  text-decoration: none;
-  font-weight: 600;
 }
 
 .support-card {

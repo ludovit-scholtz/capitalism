@@ -14,7 +14,7 @@ test.describe('Gold token admin — unauthenticated', () => {
 })
 
 test.describe('Gold token admin — authenticated non-admin', () => {
-  test('shows global admin required error when regular player visits', async ({ page }) => {
+  test('redirects regular player to home when visiting admin route', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, {
       currentPlayer: player,
@@ -26,9 +26,7 @@ test.describe('Gold token admin — authenticated non-admin', () => {
     await loginAs(page, state, player)
     await page.goto('/gold-admin')
 
-    // The page loads but shows an error when fetching balances
-    await expect(page.getByRole('heading', { name: 'Gold Token Management' })).toBeVisible()
-    await expect(page.getByRole('alert').first()).toContainText('global admin')
+    await expect(page).toHaveURL('/')
   })
 })
 
@@ -59,7 +57,12 @@ test.describe('Gold token admin — global admin', () => {
       currentPlayer: admin,
       isGlobalAdmin: true,
       goldBalances: [
-        { playerId: 'p1', email: 'alice@example.com', displayName: 'Alice', goldTokenBalance: 10.5 },
+        {
+          playerId: 'p1',
+          email: 'alice@example.com',
+          displayName: 'Alice',
+          goldTokenBalance: 10.5,
+        },
         { playerId: 'p2', email: 'bob@example.com', displayName: 'Bob', goldTokenBalance: 0 },
       ],
       goldTransactions: [],
@@ -115,10 +118,8 @@ test.describe('Gold token admin — global admin', () => {
 
     await page.getByRole('button', { name: 'Manage' }).first().click()
 
-    await expect(
-      page.getByRole('heading', { name: /Adjust balance for/ }),
-    ).toBeVisible()
-    await expect(page.locator('.adjust-target-email')).toContainText('alice@example.com')
+    await expect(page.getByRole('heading', { name: /Adjust balance for/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /alice@example.com/i })).toBeVisible()
   })
 
   test('admin can add gold to a player', async ({ page }) => {
@@ -261,14 +262,18 @@ test.describe('Gold token admin — global admin', () => {
     await expect(txTable.getByText('+50.0000')).toBeVisible()
   })
 
-  test('home page shows Gold Admin link for authenticated users', async ({ page }) => {
-    const player = makePlayer()
-    const state = setupMockApi(page, { currentPlayer: player, servers: [] })
-    state.currentToken = 'token-player'
+  test('home page shows Game Admin Dashboard link for global admins', async ({ page }) => {
+    const admin = makePlayer({ id: 'admin-001', email: 'admin@example.com', displayName: 'Admin' })
+    const state = setupMockApi(page, {
+      currentPlayer: admin,
+      servers: [],
+      isGlobalAdmin: true,
+    })
+    state.currentToken = 'token-admin'
 
-    await loginAs(page, state, player)
+    await loginAs(page, state, admin, 'token-admin')
     await page.goto('/')
 
-    await expect(page.getByRole('link', { name: /Gold Admin/ })).toBeVisible()
+    await expect(page.getByRole('link', { name: /Game admin dashboard/i })).toBeVisible()
   })
 })

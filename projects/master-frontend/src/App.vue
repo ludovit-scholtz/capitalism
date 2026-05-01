@@ -17,6 +17,7 @@ onMounted(() => {
   if (auth.isAuthenticated) {
     void auth.fetchProfile()
     void auth.fetchSubscription()
+    void auth.refreshGameAdminAccess()
   }
 })
 </script>

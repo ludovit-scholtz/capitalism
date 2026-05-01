@@ -7,6 +7,7 @@ export default {
     apply: 'Apply',
     allTypes: 'All types',
     allStatuses: 'All statuses',
+    noData: 'No data available.',
     filterByTitle: 'Filter by title',
     filterType: 'Filter type',
     filterStatus: 'Filter status',
@@ -34,6 +35,7 @@ export default {
     gameServers: 'Game servers',
     ranking: 'Ranking',
     supportDashboard: 'Support dashboard',
+    gameAdminDashboard: 'Game admin dashboard',
     bounties: 'Bounties',
     referralDashboard: 'Referal dashboard',
     tokenizedGold: 'Tokenized gold',
@@ -347,6 +349,15 @@ export default {
     nextPage: 'Next',
     noRows: 'No leaderboard rows match your filter.',
     loadError: 'Failed to load ranking data.',
+  },
+  gameAdmin: {
+    kicker: 'Administrator tools',
+    title: 'Game Administrator Dashboard',
+    subtitle:
+      'Centralized control for support moderation, ranking operations, and gold-account adjustments.',
+    supportCopy: 'Review and moderate incoming support tickets from players.',
+    rankingCopy: 'Manage ranking bounty rules, moderation events, and evaluator runs.',
+    goldCopy: 'Adjust tokenized gold balances with a complete audit trail.',
   },
   rankingHistory: {
     title: 'Bounty History',

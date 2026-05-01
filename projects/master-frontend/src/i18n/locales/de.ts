@@ -7,6 +7,7 @@ export default {
     apply: 'Anwenden',
     allTypes: 'Alle Typen',
     allStatuses: 'Alle Status',
+    noData: 'Keine Daten verfugbar.',
     filterByTitle: 'Nach Titel filtern',
     filterType: 'Typ filtern',
     filterStatus: 'Status filtern',
@@ -34,6 +35,7 @@ export default {
     gameServers: 'Spielserver',
     ranking: 'Ranking',
     supportDashboard: 'Support Dashboard',
+    gameAdminDashboard: 'Game-Admin-Dashboard',
     bounties: 'Bounties',
     referralDashboard: 'Referal Dashboard',
     tokenizedGold: 'Tokenisiertes Gold',
@@ -346,6 +348,15 @@ export default {
     nextPage: 'Weiter',
     noRows: 'Keine Ranglistenzeilen passen zum Filter.',
     loadError: 'Ranking Daten konnten nicht geladen werden.',
+  },
+  gameAdmin: {
+    kicker: 'Administrator Werkzeuge',
+    title: 'Spieladministrator Dashboard',
+    subtitle:
+      'Zentrale Steuerung fur Support Moderation, Ranking Ablaufe und Anpassungen der tokenisierten Goldkonten.',
+    supportCopy: 'Prufe und moderiere eingehende Support Tickets von Spielern.',
+    rankingCopy: 'Verwalte Ranking Bounty Regeln, Moderationsereignisse und Evaluator Laufe.',
+    goldCopy: 'Passe tokenisierte Goldguthaben mit vollstandiger Auditspur an.',
   },
   rankingHistory: {
     title: 'Bounty Verlauf',
