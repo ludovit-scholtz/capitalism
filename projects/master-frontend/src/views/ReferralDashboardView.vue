@@ -6,6 +6,7 @@ import ViewJumbotron from '@/components/layout/ViewJumbotron.vue'
 import ViewSubnav from '@/components/layout/ViewSubnav.vue'
 
 import {
+  calculateReferralGoldTokens,
   createAdditionalReferralCode,
   getReferralDashboard,
   getReferralProfile,
@@ -21,6 +22,7 @@ const { t } = useI18n()
 const rows = ref<ReferralDashboardRow[]>([])
 const codes = ref<string[]>([])
 const hasReferralProfile = ref(false)
+const hasAppliedCode = ref(false)
 const notice = ref('')
 const errorMessage = ref('')
 
@@ -38,18 +40,22 @@ const totalStats = computed(() => {
 })
 
 const navItems = computed(() => {
-  const items = [
-    { label: t('referralDashboard.setupCode'), to: '/referrals/setup' },
-    { label: t('referralDashboard.becomeReferral'), to: '/referrals/become' },
-    { label: t('common.backToPortal'), to: '/' },
-  ]
+  const items = [{ label: t('referralDashboard.becomeReferral'), to: '/referrals/become' }]
+
+  if (!hasAppliedCode.value) {
+    items.unshift({ label: t('referralDashboard.setupCode'), to: '/referrals/setup' })
+  }
+
+  items.unshift({ label: t('home.referralDashboard'), to: '/referrals/dashboard' })
 
   if (auth.isGameAdmin) {
-    items.unshift({ label: t('nav.gameAdminDashboard'), to: '/game-admin' })
+    items.push({ label: t('nav.gameAdminDashboard'), to: '/game-admin' })
   }
 
   return items
 })
+
+const earnedGoldTokens = computed(() => calculateReferralGoldTokens(rows.value))
 
 function reloadDashboard() {
   if (!auth.player?.email) {
@@ -58,6 +64,7 @@ function reloadDashboard() {
 
   const profile = getReferralProfile(auth.player.email)
   hasReferralProfile.value = !!profile.referralIdentity
+  hasAppliedCode.value = !!profile.appliedReferralCode
   codes.value = profile.referralCodes.map((entry) => entry.code)
   rows.value = getReferralDashboard(auth.player.email)
 }
@@ -110,37 +117,10 @@ onMounted(async () => {
       <section
         class="dash-card mx-auto grid w-full gap-4 rounded-3xl border border-[var(--color-border)] bg-[var(--color-paper-strong)] p-6 shadow-[var(--shadow-soft)]"
       >
-        <header class="dash-header flex flex-wrap justify-between gap-4">
-          <div class="header-actions flex gap-2 self-start">
-            <RouterLink
-              class="ghost rounded-full bg-[rgba(17,41,79,0.08)] px-4 py-2.5 font-bold text-[var(--color-ink)] no-underline"
-              to="/referrals/setup"
-              >{{ t('referralDashboard.setupCode') }}</RouterLink
-            >
-            <RouterLink
-              class="ghost rounded-full bg-[rgba(17,41,79,0.08)] px-4 py-2.5 font-bold text-[var(--color-ink)] no-underline"
-              to="/referrals/become"
-              >{{ t('referralDashboard.becomeReferral') }}</RouterLink
-            >
-          </div>
-          <nav
-            v-if="auth.isGameAdmin"
-            class="flex flex-wrap gap-2 rounded-2xl border border-[var(--color-border)] bg-[var(--color-paper)] p-3"
-            aria-label="Referral dashboard quick navigation"
-          >
-            <RouterLink
-              class="rounded-full bg-[rgba(17,41,79,0.08)] px-3 py-1.5 text-sm font-semibold text-[var(--color-ink)] no-underline"
-              to="/ranking/admin"
-            >
-              {{ t('home.rankingAdmin') }}
-            </RouterLink>
-            <RouterLink
-              class="rounded-full bg-[rgba(17,41,79,0.08)] px-3 py-1.5 text-sm font-semibold text-[var(--color-ink)] no-underline"
-              to="/gold-admin"
-            >
-              {{ t('home.goldAdmin') }}
-            </RouterLink>
-          </nav>
+        <header class="dash-header grid gap-2">
+          <h2 class="text-xl font-semibold">{{ t('referralDashboard.whyTitle') }}</h2>
+          <p class="text-sm text-[var(--color-muted)]">{{ t('referralDashboard.whyDiscount') }}</p>
+          <p class="text-sm text-[var(--color-muted)]">{{ t('referralDashboard.whyShare') }}</p>
         </header>
 
         <section
@@ -186,6 +166,14 @@ onMounted(async () => {
                 {{ t('referralDashboard.activeSubscriptions') }}
               </p>
               <strong class="text-2xl">{{ totalStats.active }}</strong>
+            </article>
+            <article
+              class="summary-card grid gap-1.5 rounded-2xl border border-[var(--color-border)] bg-white p-4"
+            >
+              <p class="text-[0.82rem] text-[var(--color-muted)]">
+                {{ t('referralDashboard.earnedGoldTokens') }}
+              </p>
+              <strong class="text-2xl">{{ earnedGoldTokens }}</strong>
             </article>
             <article
               class="summary-card grid gap-1.5 rounded-2xl border border-[var(--color-border)] bg-white p-4"

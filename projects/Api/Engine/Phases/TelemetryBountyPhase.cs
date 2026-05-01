@@ -1,6 +1,7 @@
 using Api.Configuration;
 using Api.Data.Entities;
 using Api.Utilities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace Api.Engine.Phases;
@@ -37,9 +38,27 @@ public sealed class TelemetryBountyPhase(
         // ── MANUFACTURER ────────────────────────────────────────────────────────
         // Companies that had any manufacturing output this tick.
         var manufacturerCompanyIds = context.NewUnitResourceHistories
-            .Where(h => h.ProducedQuantity > 0 && context.BuildingsById.ContainsKey(h.BuildingId))
-            .Select(h => context.BuildingsById[h.BuildingId].CompanyId)
+            .Where(h => h.ProducedQuantity > 0)
+            .Select(h => context.BuildingsById.TryGetValue(h.BuildingId, out var building) ? building : null)
+            .Where(building => building is not null && building.Type == BuildingType.Factory)
+            .Select(building => building!.CompanyId)
             .ToHashSet();
+
+        // Include tracked-but-not-yet-saved history entries from this tick.
+        foreach (var entry in context.Db.ChangeTracker.Entries<BuildingUnitResourceHistory>())
+        {
+            var history = entry.Entity;
+            if (history.ProducedQuantity <= 0 || history.Tick != context.CurrentTick)
+            {
+                continue;
+            }
+
+            if (context.BuildingsById.TryGetValue(history.BuildingId, out var building)
+                && building.Type == BuildingType.Factory)
+            {
+                manufacturerCompanyIds.Add(building.CompanyId);
+            }
+        }
 
         foreach (var companyId in manufacturerCompanyIds)
         {
@@ -58,7 +77,23 @@ public sealed class TelemetryBountyPhase(
             .Where(r => r.Tick == context.CurrentTick && r.QuantitySold > 0)
             .Select(r => r.CompanyId)
             .Distinct()
-            .ToList();
+            .ToHashSet();
+
+        // PublicSalesPhase writes records in this tick before SaveChanges.
+        // Include added/modified tracked entries so wholesaler bounty can trigger immediately.
+        foreach (var entry in context.Db.ChangeTracker.Entries<PublicSalesRecord>())
+        {
+            if (entry.State is not (EntityState.Added or EntityState.Modified))
+            {
+                continue;
+            }
+
+            var record = entry.Entity;
+            if (record.Tick == context.CurrentTick && record.QuantitySold > 0)
+            {
+                wholesalerCompanyIds.Add(record.CompanyId);
+            }
+        }
 
         foreach (var companyId in wholesalerCompanyIds)
         {

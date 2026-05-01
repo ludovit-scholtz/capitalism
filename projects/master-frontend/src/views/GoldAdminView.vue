@@ -62,10 +62,7 @@ const selectedBalance = computed(() =>
     : null,
 )
 
-const navItems = computed(() => [
-  { label: t('nav.gameAdminDashboard'), to: '/game-admin' },
-  { label: t('common.backToPortal'), to: '/' },
-])
+const navItems = computed(() => [{ label: t('nav.gameAdminDashboard'), to: '/game-admin' }])
 
 // ── Data loading ───────────────────────────────────────────────────────────
 
@@ -182,6 +179,10 @@ onMounted(async () => {
   if (!auth.isAuthenticated) {
     void router.push('/login')
     return
+  }
+
+  if (!auth.gameAdminChecked) {
+    await auth.refreshGameAdminAccess()
   }
 
   if (!auth.isGameAdmin) {

@@ -199,6 +199,17 @@ public sealed partial class Query
     }
 
     [HotChocolate.Authorization.Authorize]
+    public async Task<bool> GetCanAccessRankingAdminDashboard(
+        ClaimsPrincipal claimsPrincipal,
+        [Service] MasterDbContext db,
+        [Service] IOptions<GameAdministrationOptions> gameAdministrationOptions)
+    {
+        var callerEmail = GetEmailFromClaims(claimsPrincipal);
+        var access = await BuildGameAdministrationAccessAsync(db, gameAdministrationOptions.Value, callerEmail);
+        return access.CanAccessEveryGameDashboard;
+    }
+
+    [HotChocolate.Authorization.Authorize]
     public async Task<RankingAdminDashboardInfo> GetRankingAdminDashboard(
         ClaimsPrincipal claimsPrincipal,
         [Service] MasterDbContext db,

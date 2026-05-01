@@ -27,7 +27,6 @@ const dashboard = ref<RankingAdminDashboardInfo | null>(null)
 const navItems = computed(() => [
   { label: t('rankingAdmin.dashboardLink'), to: '/ranking' },
   { label: t('home.supportAdmin'), to: '/support/admin' },
-  { label: t('common.backToPortal'), to: '/' },
 ])
 
 function parseJsonOrEmpty(value: string) {

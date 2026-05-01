@@ -860,6 +860,15 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
       return
     }
 
+    if (query.includes('canAccessRankingAdminDashboard')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { canAccessRankingAdminDashboard: !!state.isGlobalAdmin } }),
+      })
+      return
+    }
+
     if (query.includes('rankingAdminDashboard')) {
       if (!state.currentPlayer || !state.isGlobalAdmin) {
         await route.fulfill({

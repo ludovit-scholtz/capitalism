@@ -16,9 +16,8 @@ const errorMessage = ref('')
 const bounties = ref<RankingBountyDashboardItemInfo[]>([])
 
 const navItems = computed(() => [
-  { label: t('rankingBounties.historyLink'), to: '/ranking/bounties/history' },
-  { label: t('rankingBounties.dashboardLink'), to: '/ranking' },
-  { label: t('common.backToPortal'), to: '/' },
+  { label: t('rankingBounties.title'), to: '/ranking/bounties' },
+  { label: t('rankingHistory.title'), to: '/ranking/bounties/history' },
 ])
 
 const sortedBounties = computed(() => {
@@ -95,7 +94,7 @@ onMounted(async () => {
       :kicker="t('home.bounties')"
       :title="t('rankingBounties.title')"
       :subtitle="t('rankingBounties.subtitle')"
-      variant="ranking"
+      variant="gold"
     />
     <ViewSubnav :items="navItems" aria-label="Ranking bounties navigation" />
 

@@ -61,7 +61,7 @@ onMounted(async () => {
 const navItems = ref<Array<{ label: string; to: string }>>([])
 
 onMounted(() => {
-  navItems.value = [{ label: t('common.backToPortal'), to: '/' }]
+  navItems.value = [{ label: t('nav.account'), to: '/account' }]
   if (auth.isGameAdmin) {
     navItems.value.unshift({ label: t('home.goldAdmin'), to: '/gold-admin' })
   }

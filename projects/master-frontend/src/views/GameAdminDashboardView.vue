@@ -9,10 +9,14 @@ const auth = useAuthStore()
 const router = useRouter()
 const { t } = useI18n()
 
-onMounted(() => {
+onMounted(async () => {
   if (!auth.isAuthenticated) {
     void router.push('/login')
     return
+  }
+
+  if (!auth.gameAdminChecked) {
+    await auth.refreshGameAdminAccess()
   }
 
   if (!auth.isGameAdmin) {
@@ -24,7 +28,6 @@ const navItems = computed(() => [
   { label: t('home.supportAdmin'), to: '/support/admin' },
   { label: t('home.rankingAdmin'), to: '/ranking/admin' },
   { label: t('home.goldAdmin'), to: '/gold-admin' },
-  { label: t('common.backToPortal'), to: '/' },
 ])
 </script>
 

@@ -374,6 +374,75 @@ public sealed class MasterRankingTelemetryTests
               && c.PlayerEmail == "wholesaler@example.com");
     }
 
+    [Fact]
+    public async Task TelemetryBountyPhase_WholesalerTrackedUnsavedRecord_FiresWholesalerEvent()
+    {
+        var capturing = new CapturingTelemetryService();
+        await using var isolatedFactory = new TelemetryAwareFactory(capturing);
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+        var gameState = await db.GameStates.FirstAsync();
+
+        var player = new Player
+        {
+            Id = Guid.NewGuid(), Email = "tracked-wholesaler@example.com",
+            DisplayName = "Tracked Wholesaler", PasswordHash = "hashed", Role = PlayerRole.Player
+        };
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Tracked Wholesaler Co" };
+        var building = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.SalesShop, Name = "Tracked Shop", Level = 1
+        };
+        var unit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(), BuildingId = building.Id, UnitType = UnitType.PublicSales,
+            GridX = 0, GridY = 0, Level = 1
+        };
+
+        db.Players.Add(player);
+        db.Companies.Add(company);
+        db.Buildings.Add(building);
+        db.BuildingUnits.Add(unit);
+        await db.SaveChangesAsync();
+
+        var productType = await db.ProductTypes.FirstAsync();
+        db.PublicSalesRecords.Add(new PublicSalesRecord
+        {
+            Id = Guid.NewGuid(),
+            BuildingUnitId = unit.Id,
+            BuildingId = building.Id,
+            CompanyId = company.Id,
+            CityId = city.Id,
+            ProductTypeId = productType.Id,
+            Tick = gameState.CurrentTick,
+            QuantitySold = 7m,
+            PricePerUnit = 22m,
+            Revenue = 154m,
+        });
+
+        var context = new TickContext
+        {
+            Db = db,
+            GameState = gameState,
+            BuildingsById = new Dictionary<Guid, Building> { [building.Id] = building },
+            BuildingsByType = new Dictionary<string, List<Building>> { [BuildingType.SalesShop] = [building] },
+            CompaniesById = new Dictionary<Guid, Company> { [company.Id] = company },
+        };
+
+        var phase = new TelemetryBountyPhase(
+            capturing,
+            scope.ServiceProvider.GetRequiredService<IOptions<Api.Configuration.MasterServerRegistrationOptions>>());
+        await phase.ProcessAsync(context);
+
+        Assert.Contains(capturing.Calls,
+            c => c.EventType == MasterRankingBountyCodes.Wholesaler
+              && c.PlayerEmail == "tracked-wholesaler@example.com");
+    }
+
     #endregion
 
     #region NoOpTelemetryService (unconfigured master server)

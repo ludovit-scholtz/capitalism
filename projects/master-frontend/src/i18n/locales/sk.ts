@@ -220,6 +220,11 @@
     title: 'Nastavenie odporúčacieho kódu',
     subtitle:
       'Zadaj odporúčací kód, ktorý ťa pozval. Tento výber môžeš nastaviť iba raz a neskôr ho už nemožno zmeniť.',
+    infoTitle: 'Pred uložením odporúčacieho kódu',
+    infoOneTime:
+      'Toto je jednorazová akcia pre tvoj účet. Po uložení sa kód natrvalo uzamkne a nebude ho možné zmeniť.',
+    infoPromoDiscount:
+      'Použitie platného odporúčacieho kódu môže odomknúť promo cenu predplatného a pripojiť účet k odmeňovaciemu referral reťazcu.',
     codeLabel: 'Odporúčací kód',
     codePlaceholder: 'AB12CD34',
     savedCode: 'Uložený kód: {code}',
@@ -260,6 +265,11 @@
     createAnotherCode: 'Vytvoriť ďalší kód',
     newCode: 'Nový odporúčací kód bol vygenerovaný: {code}',
     createCodeError: 'Nepodarilo sa vytvoriť odporúčací kód.',
+    earnedGoldTokens: 'Zarobené zlaté tokeny',
+    whyTitle: 'Prečo sa oplatí odporúčať',
+    whyDiscount: 'Pozvaní hráči môžu po použití tvojho kódu získať zvýhodnené ponuky predplatného.',
+    whyShare:
+      'Keď ich predplatné zostáva aktívne, získavaš opakovaný podiel vyplácaný v zlatých tokenoch referral programu.',
     metricsAria: 'Metriky odporúčaní',
     referralCode: 'Odporúčací kód',
     registeredUsers: 'Registrovaní používatelia',
@@ -267,6 +277,16 @@
   support: {
     title: 'Tikety podpory',
     subtitle: 'Vytváraj návrhy, hlásenia chýb alebo iné požiadavky na podporu.',
+    dashboardNav: 'Dashboard podpory',
+    createSubtitle: 'Vytvor nový tiket a odošli markdown obsah do moderácie.',
+    listSubtitle:
+      'Prezeraj, filtruj a upravuj svoje tikety podpory. Predvolene sa zobrazujú aktívne stavy.',
+    createTeaser: 'Otvor nový tiket podpory s podrobným markdown popisom a prílohami.',
+    listTeaser: 'Skontroluj aktívne tikety, sleduj moderáciu a aktualizuj nedokončené požiadavky.',
+    activeTickets: 'Aktívne tikety',
+    finishedTickets: 'Dokončené tikety',
+    totalTickets: 'Všetky tikety',
+    showFinishedTickets: 'Zobraziť dokončené tikety',
     createSection: 'Vytvoriť tiket',
     myTickets: 'Moje tikety',
     ticketType: 'Typ',

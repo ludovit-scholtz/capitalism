@@ -852,11 +852,7 @@ const RUN_RANKING_DAILY_DECAY_NOW_MUTATION = `
 
 const PROBE_GAME_ADMIN_ACCESS_QUERY = `
   query ProbeGameAdminAccess {
-    rankingAdminDashboard {
-      bounties {
-        id
-      }
-    }
+    canAccessRankingAdminDashboard
   }
 `
 
@@ -985,8 +981,12 @@ export async function runRankingDailyDecayNow(token: string): Promise<RankingRun
 
 export async function probeGameAdminAccess(token: string): Promise<boolean> {
   try {
-    await gqlRequest(PROBE_GAME_ADMIN_ACCESS_QUERY, undefined, token)
-    return true
+    const data = await gqlRequest<{ canAccessRankingAdminDashboard: boolean }>(
+      PROBE_GAME_ADMIN_ACCESS_QUERY,
+      undefined,
+      token,
+    )
+    return data.canAccessRankingAdminDashboard
   } catch {
     return false
   }

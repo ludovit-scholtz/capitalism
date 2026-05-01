@@ -18,7 +18,6 @@ const formError = ref<string | null>(null)
 const navItems = [
   { label: t('nav.home'), to: '/' },
   { label: t('nav.gameServers'), to: '/game-servers' },
-  { label: t('common.backToPortal'), to: '/' },
 ]
 
 async function handleSubmit() {

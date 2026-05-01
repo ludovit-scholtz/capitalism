@@ -37,9 +37,10 @@ const selectedTicket = computed(
 )
 
 const navItems = computed(() => [
-  { label: t('home.support'), to: '/support' },
+  { label: t('support.dashboardNav'), to: '/support' },
+  { label: t('support.createSection'), to: '/support/new' },
+  { label: t('support.myTickets'), to: '/support/tickets' },
   { label: t('home.rankingAdmin'), to: '/ranking/admin' },
-  { label: t('common.backToPortal'), to: '/' },
 ])
 
 function formatDate(value: string): string {
@@ -135,6 +136,10 @@ onMounted(async () => {
   if (!auth.isAuthenticated) {
     void router.push('/login')
     return
+  }
+
+  if (!auth.gameAdminChecked) {
+    await auth.refreshGameAdminAccess()
   }
 
   if (!auth.isGameAdmin) {

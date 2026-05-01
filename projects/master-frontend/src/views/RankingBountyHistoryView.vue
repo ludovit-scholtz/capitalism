@@ -102,9 +102,8 @@ onMounted(async () => {
   }
 
   navItems.value = [
-    { label: t('rankingHistory.bountiesLink'), to: '/ranking/bounties' },
-    { label: t('rankingHistory.dashboardLink'), to: '/ranking' },
-    { label: t('common.backToPortal'), to: '/' },
+    { label: t('rankingBounties.title'), to: '/ranking/bounties' },
+    { label: t('rankingHistory.title'), to: '/ranking/bounties/history' },
   ]
 
   await loadHistory()
@@ -117,7 +116,7 @@ onMounted(async () => {
       :kicker="t('home.bounties')"
       :title="t('rankingHistory.title')"
       :subtitle="t('rankingHistory.subtitle')"
-      variant="ranking"
+      variant="gold"
     />
     <ViewSubnav :items="navItems" aria-label="Ranking history navigation" />
 

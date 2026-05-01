@@ -15,6 +15,7 @@ const { t } = useI18n()
 const fullName = ref('')
 const taxDomicile = ref('')
 const existingCode = ref<string | null>(null)
+const hasAppliedCode = ref(false)
 const successMessage = ref('')
 const errorMessage = ref('')
 const navItems = ref<Array<{ label: string; to: string }>>([])
@@ -48,6 +49,7 @@ onMounted(async () => {
   if (auth.player?.email) {
     syncReferralSubscriptionStatus(auth.player.email, !!auth.subscription?.isActive)
     const profile = getReferralProfile(auth.player.email)
+    hasAppliedCode.value = !!profile.appliedReferralCode
     if (profile.referralIdentity) {
       fullName.value = profile.referralIdentity.fullName
       taxDomicile.value = profile.referralIdentity.taxDomicile
@@ -55,11 +57,11 @@ onMounted(async () => {
     }
   }
 
-  navItems.value = [
-    { label: t('home.referralDashboard'), to: '/referrals/dashboard' },
-    { label: t('home.referralSetup'), to: '/referrals/setup' },
-    { label: t('common.backToPortal'), to: '/' },
-  ]
+  navItems.value = [{ label: t('home.referralDashboard'), to: '/referrals/dashboard' }]
+  if (!hasAppliedCode.value) {
+    navItems.value.push({ label: t('home.referralSetup'), to: '/referrals/setup' })
+  }
+  navItems.value.push({ label: t('home.becomeReferral'), to: '/referrals/become' })
 })
 </script>
 

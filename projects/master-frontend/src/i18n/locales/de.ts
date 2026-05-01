@@ -223,6 +223,11 @@
     title: 'Empfehlungscode einrichten',
     subtitle:
       'Gib den Empfehlungscode ein, der dich eingeladen hat. Du kannst diese Auswahl nur einmal festlegen und später nicht mehr ändern.',
+    infoTitle: 'Bevor du deinen Empfehlungscode speicherst',
+    infoOneTime:
+      'Das ist eine einmalige Aktion für dein Konto. Nach dem Speichern ist der Code dauerhaft gesperrt und kann nicht geändert werden.',
+    infoPromoDiscount:
+      'Ein gültiger Empfehlungscode kann vergünstigte Abo-Angebote freischalten und dein Konto mit der Empfehlungs-Belohnungskette verbinden.',
     codeLabel: 'Empfehlungscode',
     codePlaceholder: 'AB12CD34',
     savedCode: 'Gespeicherter Code: {code}',
@@ -263,6 +268,11 @@
     createAnotherCode: 'Weiteren Code erstellen',
     newCode: 'Neuer Empfehlungscode erstellt: {code}',
     createCodeError: 'Empfehlungscode konnte nicht erstellt werden.',
+    earnedGoldTokens: 'Verdiente Gold-Token',
+    whyTitle: 'Warum sich Empfehlungen lohnen',
+    whyDiscount: 'Eingeladene Spieler können mit deinem Code rabattierte Abo-Angebote erhalten.',
+    whyShare:
+      'Bleiben ihre Abos aktiv, erhältst du einen wiederkehrenden Anteil als Gold-Token im Empfehlungsprogramm.',
     metricsAria: 'Empfehlungsmetriken',
     referralCode: 'Empfehlungscode',
     registeredUsers: 'Registrierte Nutzer',
@@ -270,6 +280,17 @@
   support: {
     title: 'Support-Tickets',
     subtitle: 'Erstelle Vorschläge, Bug-Reports oder andere Support-Anfragen.',
+    dashboardNav: 'Support-Dashboard',
+    createSubtitle:
+      'Erstelle ein neues Ticket und sende Markdown-Details in die Moderationswarteschlange.',
+    listSubtitle:
+      'Prüfe, filtere und bearbeite deine Support-Tickets. Aktive Status werden standardmäßig angezeigt.',
+    createTeaser: 'Erstelle ein neues Support-Ticket mit detailliertem Markdown und Anhängen.',
+    listTeaser: 'Sieh aktive Tickets ein, verfolge Moderation und bearbeite offene Anfragen.',
+    activeTickets: 'Aktive Tickets',
+    finishedTickets: 'Abgeschlossene Tickets',
+    totalTickets: 'Alle Tickets',
+    showFinishedTickets: 'Abgeschlossene Tickets anzeigen',
     createSection: 'Ticket erstellen',
     myTickets: 'Meine Tickets',
     ticketType: 'Typ',

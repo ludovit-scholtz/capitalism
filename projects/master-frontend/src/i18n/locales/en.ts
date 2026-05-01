@@ -1,4 +1,4 @@
-export default {
+﻿export default {
   common: {
     backToPortal: 'Back to portal',
     allRightsReserved: '© {year} Capitalism HQ. All rights reserved.',
@@ -222,6 +222,11 @@ export default {
     title: 'Setup Referral Code',
     subtitle:
       'Enter the referral code that invited you. You can set this only once and it cannot be changed later.',
+    infoTitle: 'Before you save your referral code',
+    infoOneTime:
+      'This is a one-time action for your account. After saving, this referral code is permanently locked and cannot be changed.',
+    infoPromoDiscount:
+      'Using a valid referral code can unlock promo subscription pricing and connect your account to the referral reward chain.',
     codeLabel: 'Referral code',
     codePlaceholder: 'AB12CD34',
     savedCode: 'Saved code: {code}',
@@ -262,6 +267,12 @@ export default {
     createAnotherCode: 'Create Another Code',
     newCode: 'New referral code generated: {code}',
     createCodeError: 'Failed to create referral code.',
+    earnedGoldTokens: 'Gold tokens earned',
+    whyTitle: 'Why referrals matter',
+    whyDiscount:
+      'Your invited players can receive discount-ready subscription offers when they use your referral code.',
+    whyShare:
+      'As their subscriptions stay active, you earn a recurring share paid as gold tokens in the referral program.',
     metricsAria: 'Referral metrics',
     referralCode: 'Referral code',
     registeredUsers: 'Registered users',
@@ -269,6 +280,16 @@ export default {
   support: {
     title: 'Support Tickets',
     subtitle: 'Create suggestions, bug reports, or other support requests.',
+    dashboardNav: 'Support dashboard',
+    createSubtitle: 'Open a new ticket and send markdown details to the moderation queue.',
+    listSubtitle:
+      'Review, filter, and edit your support tickets. Active states are shown by default.',
+    createTeaser: 'Open a fresh support ticket with detailed markdown and attachments.',
+    listTeaser: 'Inspect active tickets, track moderation, and update unfinished requests.',
+    activeTickets: 'Active tickets',
+    finishedTickets: 'Finished tickets',
+    totalTickets: 'All tickets',
+    showFinishedTickets: 'Show finished tickets',
     createSection: 'Create ticket',
     myTickets: 'My tickets',
     ticketType: 'Type',

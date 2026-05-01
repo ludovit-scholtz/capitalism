@@ -22,11 +22,18 @@ const successMessage = ref('')
 const appliedCode = ref<string | null>(null)
 
 const canSubmit = computed(() => !!referralCode.value.trim() && !appliedCode.value)
-const navItems = computed(() => [
-  { label: t('home.referralDashboard'), to: '/referrals/dashboard' },
-  { label: t('home.becomeReferral'), to: '/referrals/become' },
-  { label: t('common.backToPortal'), to: '/' },
-])
+const navItems = computed(() => {
+  const items = [
+    { label: t('home.referralDashboard'), to: '/referrals/dashboard' },
+    { label: t('home.becomeReferral'), to: '/referrals/become' },
+  ]
+
+  if (!appliedCode.value) {
+    items.unshift({ label: t('home.referralSetup'), to: '/referrals/setup' })
+  }
+
+  return items
+})
 
 function loadProfile() {
   if (!auth.player?.email) {
@@ -87,10 +94,18 @@ onMounted(async () => {
     />
     <ViewSubnav :items="navItems" aria-label="Referral setup navigation" />
 
-    <section class="ref-shell grid min-h-dvh place-items-center px-4 py-4">
+    <section class="ref-shell grid min-h-dvh place-items-center px-4 py-8">
       <section
-        class="ref-card flex w-full max-w-[680px] flex-col gap-4 rounded-3xl border border-[var(--color-border)] bg-[var(--color-paper-strong)] p-8 shadow-[var(--shadow-soft)]"
+        class="ref-card flex w-full max-w-[720px] flex-col gap-5 rounded-3xl border border-[var(--color-border)] bg-[var(--color-paper-strong)] p-8 shadow-[var(--shadow-soft)]"
       >
+        <section class="grid gap-2 rounded-2xl border border-[var(--color-border)] bg-white/50 p-4">
+          <h2 class="text-lg font-semibold">{{ t('referralSetup.infoTitle') }}</h2>
+          <p class="text-sm text-[var(--color-muted)]">{{ t('referralSetup.infoOneTime') }}</p>
+          <p class="text-sm text-[var(--color-muted)]">
+            {{ t('referralSetup.infoPromoDiscount') }}
+          </p>
+        </section>
+
         <div
           class="setup-block grid gap-2 rounded-[18px] border border-dashed border-[var(--color-border)] p-4"
         >

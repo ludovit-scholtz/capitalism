@@ -49,6 +49,16 @@ const router = createRouter({
       component: () => import('@/views/SupportView.vue'),
     },
     {
+      path: '/support/new',
+      name: 'support-new',
+      component: () => import('@/views/SupportNewTicketView.vue'),
+    },
+    {
+      path: '/support/tickets',
+      name: 'support-tickets',
+      component: () => import('@/views/SupportTicketsView.vue'),
+    },
+    {
       path: '/support/admin',
       name: 'support-admin',
       component: () => import('@/views/SupportAdminView.vue'),

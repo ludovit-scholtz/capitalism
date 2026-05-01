@@ -13,7 +13,7 @@ test.describe('Support tickets', () => {
     const state = setupMockApi(page, {})
     await loginAs(page, state, player)
 
-    await page.goto('/support')
+    await page.goto('/support/new')
 
     await page.getByLabel('Ticket type').selectOption('BUG')
     await page.getByLabel('Ticket title').fill('Factory layout issue')
@@ -26,6 +26,7 @@ test.describe('Support tickets', () => {
 
     await page.getByRole('button', { name: 'Submit ticket' }).click()
 
+    await expect(page).toHaveURL(/\/support\/tickets/)
     await expect(page.getByRole('status')).toContainText('Support ticket submitted.')
     await expect(page.locator('table[aria-label="My support tickets table"]')).toContainText(
       'Factory layout issue',
@@ -64,7 +65,7 @@ test.describe('Support tickets', () => {
     })
     await loginAs(page, state, player)
 
-    await page.goto('/support')
+    await page.goto('/support/tickets')
 
     await page.getByLabel('Filter type').selectOption('SUGGESTION')
     await page.getByRole('button', { name: 'Apply' }).click()
@@ -157,7 +158,7 @@ test.describe('Support tickets', () => {
     })
 
     await loginAs(page, state, user)
-    await page.goto('/support')
+    await page.goto('/support/tickets')
     await expect(page.locator('table[aria-label="My support tickets table"]')).toContainText(
       'User visible ticket',
     )

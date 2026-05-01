@@ -24,10 +24,7 @@ const nameFilter = ref('')
 
 const pageSizeOptions = [10, 25, 50]
 const navItems = computed(() => {
-  const items = [
-    { label: t('rankingDashboard.historyLink'), to: '/ranking/bounties' },
-    { label: t('common.backToPortal'), to: '/' },
-  ]
+  const items = [{ label: t('rankingDashboard.historyLink'), to: '/ranking/bounties' }]
 
   if (auth.isGameAdmin) {
     items.unshift({ label: t('home.rankingAdmin'), to: '/ranking/admin' })
