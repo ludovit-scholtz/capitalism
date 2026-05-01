@@ -284,6 +284,11 @@
     createSubtitle: 'Open a new ticket and send markdown details to the moderation queue.',
     listSubtitle:
       'Review, filter, and edit your support tickets. Active states are shown by default.',
+    listOnlySubtitle:
+      'Review and filter your support tickets. Open any row to view and edit the full ticket page.',
+    ticketDetailTitle: 'Ticket Detail',
+    ticketDetailSubtitle:
+      'View the full ticket record, moderation state, and activity timeline in one page.',
     createTeaser: 'Open a fresh support ticket with detailed markdown and attachments.',
     listTeaser: 'Inspect active tickets, track moderation, and update unfinished requests.',
     activeTickets: 'Active tickets',
@@ -292,6 +297,8 @@
     showFinishedTickets: 'Show finished tickets',
     createSection: 'Create ticket',
     myTickets: 'My tickets',
+    backToTickets: 'Back to my tickets',
+    openTicket: 'Open ticket',
     ticketType: 'Type',
     ticketTitle: 'Title',
     submit: 'Submit ticket',
@@ -313,6 +320,8 @@
     submitError: 'Failed to submit support ticket.',
     updateError: 'Failed to update support ticket.',
     updateSuccess: 'Ticket updated. Moderation review is now pending.',
+    savingEdits: 'Saving edits...',
+    ticketNotFound: 'Support ticket not found or unavailable for your account.',
   },
   supportAdmin: {
     title: 'Support Admin',

@@ -281,6 +281,11 @@
     createSubtitle: 'Vytvor nový tiket a odošli markdown obsah do moderácie.',
     listSubtitle:
       'Prezeraj, filtruj a upravuj svoje tikety podpory. Predvolene sa zobrazujú aktívne stavy.',
+    listOnlySubtitle:
+      'Prezeraj a filtruj svoje tikety podpory. Akýkoľvek riadok otvor do samostatnej stránky s plným detailom a úpravami.',
+    ticketDetailTitle: 'Detail tiketu',
+    ticketDetailSubtitle:
+      'Zobraz plný záznam tiketu, stav moderácie a časovú os aktivít na jednej stránke.',
     createTeaser: 'Otvor nový tiket podpory s podrobným markdown popisom a prílohami.',
     listTeaser: 'Skontroluj aktívne tikety, sleduj moderáciu a aktualizuj nedokončené požiadavky.',
     activeTickets: 'Aktívne tikety',
@@ -289,6 +294,8 @@
     showFinishedTickets: 'Zobraziť dokončené tikety',
     createSection: 'Vytvoriť tiket',
     myTickets: 'Moje tikety',
+    backToTickets: 'Späť na moje tikety',
+    openTicket: 'Otvoriť tiket',
     ticketType: 'Typ',
     ticketTitle: 'Názov',
     submit: 'Odoslať tiket',
@@ -310,6 +317,8 @@
     submitError: 'Nepodarilo sa odoslať tiket podpory.',
     updateError: 'Nepodarilo sa aktualizovať tiket podpory.',
     updateSuccess: 'Tiket bol aktualizovaný. Kontrola moderácie je opäť čakajúca.',
+    savingEdits: 'Ukladám úpravy...',
+    ticketNotFound: 'Tiket podpory sa nenašiel alebo nie je dostupný pre tvoj účet.',
   },
   supportAdmin: {
     title: 'Admin podpory',

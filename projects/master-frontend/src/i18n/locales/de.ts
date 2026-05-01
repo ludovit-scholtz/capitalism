@@ -285,6 +285,11 @@
       'Erstelle ein neues Ticket und sende Markdown-Details in die Moderationswarteschlange.',
     listSubtitle:
       'Prüfe, filtere und bearbeite deine Support-Tickets. Aktive Status werden standardmäßig angezeigt.',
+    listOnlySubtitle:
+      'Prüfe und filtere deine Support-Tickets. Öffne jede Zeile, um die vollständige Ticketseite mit Details und Bearbeitung anzuzeigen.',
+    ticketDetailTitle: 'Ticket-Detail',
+    ticketDetailSubtitle:
+      'Sieh den vollständigen Ticketverlauf, Moderationsstatus und die Aktivitätszeitleiste auf einer Seite.',
     createTeaser: 'Erstelle ein neues Support-Ticket mit detailliertem Markdown und Anhängen.',
     listTeaser: 'Sieh aktive Tickets ein, verfolge Moderation und bearbeite offene Anfragen.',
     activeTickets: 'Aktive Tickets',
@@ -293,6 +298,8 @@
     showFinishedTickets: 'Abgeschlossene Tickets anzeigen',
     createSection: 'Ticket erstellen',
     myTickets: 'Meine Tickets',
+    backToTickets: 'Zurück zu meinen Tickets',
+    openTicket: 'Ticket öffnen',
     ticketType: 'Typ',
     ticketTitle: 'Titel',
     submit: 'Ticket senden',
@@ -314,6 +321,8 @@
     submitError: 'Support-Ticket konnte nicht gesendet werden.',
     updateError: 'Support-Ticket konnte nicht aktualisiert werden.',
     updateSuccess: 'Ticket aktualisiert. Die Moderationsprüfung ist nun wieder ausstehend.',
+    savingEdits: 'Änderungen werden gespeichert...',
+    ticketNotFound: 'Support-Ticket nicht gefunden oder für dein Konto nicht verfügbar.',
   },
   supportAdmin: {
     title: 'Support-Admin',

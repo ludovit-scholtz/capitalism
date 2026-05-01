@@ -4,12 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import ViewJumbotron from '@/components/layout/ViewJumbotron.vue'
 import ViewSubnav from '@/components/layout/ViewSubnav.vue'
-import TicketMarkdownEditor from '@/components/support/TicketMarkdownEditor.vue'
-import {
-  fetchMySupportTickets,
-  updateSupportTicketContent,
-  type SupportTicketInfo,
-} from '@/lib/masterApi'
+import { fetchMySupportTickets, type SupportTicketInfo } from '@/lib/masterApi'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -21,7 +16,6 @@ const loading = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
 const tickets = ref<SupportTicketInfo[]>([])
-const selectedTicketId = ref<string | null>(null)
 
 const filterType = ref('')
 const filterStatus = ref('')
@@ -52,14 +46,6 @@ const visibleTickets = computed(() => {
   return tickets.value.filter((ticket) => ticket.status !== 'FINISHED')
 })
 
-const selectedTicket = computed(
-  () => visibleTickets.value.find((ticket) => ticket.id === selectedTicketId.value) ?? null,
-)
-
-const canEditSelected = computed(
-  () => selectedTicket.value !== null && selectedTicket.value.status !== 'FINISHED',
-)
-
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat(undefined, {
     year: 'numeric',
@@ -86,17 +72,8 @@ function typeLabel(type: string): string {
       : t('common.other')
 }
 
-function ensureSelectedTicket() {
-  if (!selectedTicketId.value && visibleTickets.value.length > 0) {
-    selectedTicketId.value = visibleTickets.value[0]?.id ?? null
-  }
-
-  if (
-    selectedTicketId.value &&
-    visibleTickets.value.every((ticket) => ticket.id !== selectedTicketId.value)
-  ) {
-    selectedTicketId.value = visibleTickets.value[0]?.id ?? null
-  }
+function openTicket(ticketId: string) {
+  void router.push(`/support/tickets/${ticketId}`)
 }
 
 async function loadTickets() {
@@ -114,40 +91,10 @@ async function loadTickets() {
       limit: 100,
       offset: 0,
     })
-
-    if (typeof route.query.ticket === 'string') {
-      selectedTicketId.value = route.query.ticket
-    }
-
-    ensureSelectedTicket()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : t('support.loadError')
   } finally {
     loading.value = false
-  }
-}
-
-async function saveTicketEdits() {
-  if (!auth.token || !selectedTicket.value) return
-
-  errorMessage.value = ''
-  successMessage.value = ''
-
-  try {
-    const updated = await updateSupportTicketContent(auth.token, {
-      ticketId: selectedTicket.value.id,
-      title: selectedTicket.value.title,
-      markdownSource: selectedTicket.value.markdownSource,
-    })
-
-    successMessage.value = t('support.updateSuccess')
-    const index = tickets.value.findIndex((ticket) => ticket.id === updated.id)
-    if (index >= 0) {
-      tickets.value[index] = updated
-    }
-    ensureSelectedTicket()
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : t('support.updateError')
   }
 }
 
@@ -170,7 +117,7 @@ onMounted(async () => {
     <ViewJumbotron
       :kicker="t('home.support')"
       :title="t('support.myTickets')"
-      :subtitle="t('support.listSubtitle')"
+      :subtitle="t('support.listOnlySubtitle')"
       variant="support"
     />
     <ViewSubnav :items="navItems" aria-label="Support navigation" />
@@ -228,7 +175,7 @@ onMounted(async () => {
           {{ t('common.noData') }}
         </p>
 
-        <div v-else class="grid gap-4 lg:grid-cols-[1.25fr_1fr]">
+        <div v-else class="grid gap-4">
           <table class="tickets-table" aria-label="My support tickets table">
             <thead>
               <tr>
@@ -237,86 +184,28 @@ onMounted(async () => {
                 <th>{{ t('support.type') }}</th>
                 <th>{{ t('support.status') }}</th>
                 <th>{{ t('support.updated') }}</th>
+                <th>{{ t('common.actions') }}</th>
               </tr>
             </thead>
             <tbody>
-              <tr
-                v-for="ticket in visibleTickets"
-                :key="ticket.id"
-                :class="{ selected: ticket.id === selectedTicketId }"
-                @click="selectedTicketId = ticket.id"
-              >
+              <tr v-for="ticket in visibleTickets" :key="ticket.id">
                 <td>{{ formatDate(ticket.createdAtUtc) }}</td>
-                <td>{{ ticket.title }}</td>
+                <td>
+                  <button type="button" class="ticket-link" @click="openTicket(ticket.id)">
+                    {{ ticket.title }}
+                  </button>
+                </td>
                 <td>{{ typeLabel(ticket.ticketType) }}</td>
                 <td>{{ statusLabel(ticket.status) }}</td>
                 <td>{{ formatDate(ticket.updatedAtUtc) }}</td>
+                <td>
+                  <button type="button" class="btn btn-secondary" @click="openTicket(ticket.id)">
+                    {{ t('support.openTicket') }}
+                  </button>
+                </td>
               </tr>
             </tbody>
           </table>
-
-          <article v-if="selectedTicket" class="ticket-detail" aria-label="Selected ticket detail">
-            <h3>{{ selectedTicket.title }}</h3>
-            <p class="ticket-meta">
-              {{ typeLabel(selectedTicket.ticketType) }} · {{ statusLabel(selectedTicket.status) }}
-            </p>
-            <p class="ticket-meta">
-              {{ t('support.moderation') }}: {{ selectedTicket.moderationState }}
-              <span v-if="selectedTicket.moderationReason">
-                · {{ selectedTicket.moderationReason }}</span
-              >
-            </p>
-
-            <label class="mt-3 grid gap-1.5">
-              <span class="text-sm text-muted">{{ t('common.title') }}</span>
-              <input
-                v-model="selectedTicket.title"
-                type="text"
-                :disabled="!canEditSelected"
-                aria-label="Edit ticket title"
-                class="form-input"
-              />
-            </label>
-
-            <div class="mt-3">
-              <TicketMarkdownEditor
-                v-model="selectedTicket.markdownSource"
-                :disabled="!canEditSelected"
-              />
-            </div>
-
-            <div class="mt-3 flex justify-end">
-              <button
-                type="button"
-                class="btn btn-primary"
-                :disabled="!canEditSelected"
-                @click="saveTicketEdits"
-              >
-                {{ t('support.saveEdits') }}
-              </button>
-            </div>
-
-            <section class="mt-4 border-t border-divider pt-3">
-              <h4>{{ t('support.moderatedPreview') }}</h4>
-              <div
-                v-if="selectedTicket.sanitizedPreviewHtml"
-                class="preview-html mt-2"
-                v-html="selectedTicket.sanitizedPreviewHtml"
-              ></div>
-              <p v-else class="state-message mt-2">{{ t('support.previewHidden') }}</p>
-            </section>
-
-            <section class="mt-4 border-t border-divider pt-3">
-              <h4>{{ t('support.activityLog') }}</h4>
-              <ul class="mt-2 grid gap-2">
-                <li v-for="eventItem in selectedTicket.activity" :key="eventItem.id">
-                  <strong>{{ eventItem.eventType }}</strong> · {{ eventItem.actorEmail }} ·
-                  {{ formatDate(eventItem.createdAtUtc) }}
-                  <div>{{ eventItem.note }}</div>
-                </li>
-              </ul>
-            </section>
-          </article>
         </div>
       </section>
     </section>
@@ -337,28 +226,14 @@ onMounted(async () => {
   text-align: left;
 }
 
-.tickets-table tr {
-  cursor: pointer;
-}
-
-.tickets-table tr.selected {
-  background: color-mix(in srgb, var(--color-primary-light) 22%, transparent);
-}
-
-.ticket-detail {
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 0.85rem;
-  background: color-mix(in srgb, var(--color-surface) 86%, #000 14%);
-}
-
-.ticket-meta {
-  margin: 0.2rem 0;
-  color: var(--color-text-secondary);
-}
-
-.preview-html :deep(a) {
+.ticket-link {
   color: var(--color-primary);
+  text-decoration: underline;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
 }
 
 .state-error {

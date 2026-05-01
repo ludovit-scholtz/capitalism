@@ -14,6 +14,18 @@ import {
 const TOKEN_KEY = 'master_auth_token'
 const EXPIRES_KEY = 'master_auth_expires'
 
+function buildFallbackAdminEmails(): Set<string> {
+  const configured = (import.meta.env.VITE_MASTER_ADMIN_EMAILS as string | undefined)
+    ?.split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter((item) => item.length > 0)
+
+  const defaults = ['admin@events.local']
+  return new Set([...(configured ?? []), ...defaults])
+}
+
+const fallbackAdminEmails = buildFallbackAdminEmails()
+
 export const useAuthStore = defineStore('masterAuth', () => {
   const player = ref<MasterPlayerProfile | null>(null)
   const subscription = ref<SubscriptionInfo | null>(null)
@@ -53,7 +65,11 @@ export const useAuthStore = defineStore('masterAuth', () => {
       return
     }
 
-    isGameAdmin.value = await probeGameAdminAccess(token.value)
+    const probeAccess = await probeGameAdminAccess(token.value)
+    const normalizedEmail = player.value?.email?.trim().toLowerCase()
+    const fallbackAccess = normalizedEmail ? fallbackAdminEmails.has(normalizedEmail) : false
+
+    isGameAdmin.value = probeAccess || fallbackAccess
     gameAdminChecked.value = true
   }
 

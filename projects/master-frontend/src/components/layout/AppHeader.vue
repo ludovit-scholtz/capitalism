@@ -221,6 +221,63 @@ function logout() {
         </RouterLink>
 
         <RouterLink
+          v-if="auth.isGameAdmin"
+          to="/support/admin"
+          :title="t('home.supportAdmin')"
+          :aria-label="t('home.supportAdmin')"
+          class="nav-link"
+          @click="closeMenu"
+        >
+          <svg
+            class="nav-icon"
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            <path d="M8 9h8" />
+            <path d="M8 13h5" />
+          </svg>
+          <span class="inline-block md:hidden">{{ t('home.supportAdmin') }}</span>
+        </RouterLink>
+
+        <RouterLink
+          v-if="auth.isGameAdmin"
+          to="/ranking/admin"
+          :title="t('home.rankingAdmin')"
+          :aria-label="t('home.rankingAdmin')"
+          class="nav-link"
+          @click="closeMenu"
+        >
+          <svg
+            class="nav-icon"
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M3 3h18v6H3z" />
+            <path d="M3 15h12v6H3z" />
+            <path d="M18 14v7" />
+            <path d="M15 18h6" />
+          </svg>
+          <span class="inline-block md:hidden">{{ t('home.rankingAdmin') }}</span>
+        </RouterLink>
+
+        <RouterLink
           to="/referrals/dashboard"
           :title="t('nav.referralDashboard')"
           :aria-label="t('nav.referralDashboard')"

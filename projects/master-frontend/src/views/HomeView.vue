@@ -15,7 +15,6 @@ const rankingLoading = ref(true)
 const rankingError = ref('')
 
 const rankingTop = computed(() => ranking.value.slice(0, 10))
-const rankingPreview = computed(() => ranking.value.slice(0, 3))
 const navItems = computed(() => {
   const items = [
     { label: t('nav.gameServers'), to: '/game-servers' },

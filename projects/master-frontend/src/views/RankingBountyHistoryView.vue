@@ -120,102 +120,101 @@ onMounted(async () => {
     />
     <ViewSubnav :items="navItems" aria-label="Ranking history navigation" />
 
-    <section class="ranking-history-shell">
-      <section class="panel" aria-label="Proof submission panel">
+    <section class="container pb-16 pt-4 lg:pb-20 lg:pt-6">
+      <section class="card p-6" aria-label="Proof submission panel">
         <h2>{{ t('rankingHistory.submitProofTitle') }}</h2>
         <p>{{ t('rankingHistory.submitProofHint') }}</p>
-        <div class="proof-grid">
+        <div class="proof-grid mt-4">
           <label>
             {{ t('rankingHistory.bountyCode') }}
-            <select v-model="proofBountyCode">
+            <select v-model="proofBountyCode" class="form-input mt-1">
               <option value="RETWEET_X_POST">RETWEET_X_POST</option>
               <option value="DISCORD_PLAYER">DISCORD_PLAYER</option>
             </select>
           </label>
           <label>
             {{ t('rankingHistory.proofReference') }}
-            <input v-model="proofReference" type="text" />
+            <input v-model="proofReference" type="text" class="form-input mt-1" />
           </label>
           <label>
             {{ t('rankingHistory.uniqueScopeKey') }}
-            <input v-model="proofUniqueScopeKey" type="text" />
+            <input v-model="proofUniqueScopeKey" type="text" class="form-input mt-1" />
           </label>
         </div>
-        <button type="button" :disabled="proofLoading" @click="submitProof">
+        <button
+          type="button"
+          class="btn btn-primary mt-4"
+          :disabled="proofLoading"
+          @click="submitProof"
+        >
           {{ proofLoading ? t('rankingHistory.submittingProof') : t('rankingHistory.submitProof') }}
         </button>
       </section>
 
-      <section class="panel" aria-label="Bounty history filters">
+      <section class="card mt-5 p-6" aria-label="Bounty history filters">
         <div class="filters">
           <input
             v-model="filterBountyCode"
             type="text"
             :placeholder="t('rankingHistory.filterBountyCode')"
+            class="form-input"
           />
           <input
             v-model="filterServerKey"
             type="text"
             :placeholder="t('rankingHistory.filterServerKey')"
+            class="form-input"
           />
-          <select v-model="filterStatus">
+          <select v-model="filterStatus" class="form-input">
             <option value="">{{ t('common.allStatuses') }}</option>
             <option value="AWARDED">AWARDED</option>
             <option value="REJECTED">REJECTED</option>
           </select>
-          <button type="button" @click="loadHistory">{{ t('common.apply') }}</button>
+          <button type="button" class="btn btn-secondary" @click="loadHistory">
+            {{ t('common.apply') }}
+          </button>
         </div>
         <p v-if="errorMessage" class="state-error" role="alert">{{ errorMessage }}</p>
         <p v-if="successMessage" class="state-success" role="status">{{ successMessage }}</p>
       </section>
 
-      <section class="panel" aria-label="Bounty history table">
+      <section class="card mt-5 p-6" aria-label="Bounty history table">
         <h2>{{ t('rankingHistory.historyTableTitle') }}</h2>
         <p v-if="loading">{{ t('common.loading') }}</p>
         <p v-else-if="items.length === 0" class="state-message">{{ t('common.noData') }}</p>
-        <table v-else class="history-table" aria-label="Ranking bounty history table">
-          <thead>
-            <tr>
-              <th>{{ t('rankingHistory.awardedAt') }}</th>
-              <th>{{ t('rankingHistory.bounty') }}</th>
-              <th>{{ t('rankingHistory.points') }}</th>
-              <th>{{ t('rankingHistory.status') }}</th>
-              <th>{{ t('rankingHistory.server') }}</th>
-              <th>{{ t('rankingHistory.eventDate') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="item in items" :key="item.id">
-              <td>{{ formatDate(item.awardedAtUtc) }}</td>
-              <td>{{ item.bountyDisplayName }}</td>
-              <td>{{ formatPoints(item.pointsAwarded) }}</td>
-              <td>{{ item.status }}</td>
-              <td>{{ item.serverKey ?? '-' }}</td>
-              <td>{{ formatDate(item.eventDateUtc) }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div v-else class="overflow-auto">
+          <table
+            class="min-w-full border-collapse text-sm"
+            aria-label="Ranking bounty history table"
+          >
+            <thead>
+              <tr class="border-b border-divider text-left text-muted">
+                <th class="px-4 py-3">{{ t('rankingHistory.awardedAt') }}</th>
+                <th class="px-4 py-3">{{ t('rankingHistory.bounty') }}</th>
+                <th class="px-4 py-3">{{ t('rankingHistory.points') }}</th>
+                <th class="px-4 py-3">{{ t('rankingHistory.status') }}</th>
+                <th class="px-4 py-3">{{ t('rankingHistory.server') }}</th>
+                <th class="px-4 py-3">{{ t('rankingHistory.eventDate') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in items" :key="item.id" class="border-b border-divider/70">
+                <td class="px-4 py-3">{{ formatDate(item.awardedAtUtc) }}</td>
+                <td class="px-4 py-3">{{ item.bountyDisplayName }}</td>
+                <td class="px-4 py-3">{{ formatPoints(item.pointsAwarded) }}</td>
+                <td class="px-4 py-3">{{ item.status }}</td>
+                <td class="px-4 py-3">{{ item.serverKey ?? '-' }}</td>
+                <td class="px-4 py-3">{{ formatDate(item.eventDateUtc) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
     </section>
   </main>
 </template>
 
 <style scoped>
-.ranking-history-shell {
-  max-width: 1200px;
-  margin: 2rem auto;
-  padding: 0 1rem 2.5rem;
-  color: #efeef6;
-}
-
-.panel {
-  background: rgba(10, 11, 21, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 14px;
-  padding: 1rem;
-  margin-bottom: 1rem;
-}
-
 .filters,
 .proof-grid {
   display: grid;
@@ -224,23 +223,11 @@ onMounted(async () => {
   margin-bottom: 0.6rem;
 }
 
-.history-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.history-table th,
-.history-table td {
-  padding: 0.55rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-  text-align: left;
-}
-
 .state-error {
-  color: #ff9e9e;
+  color: var(--color-danger);
 }
 
 .state-success {
-  color: #8bffb5;
+  color: var(--color-success);
 }
 </style>

@@ -59,6 +59,11 @@ const router = createRouter({
       component: () => import('@/views/SupportTicketsView.vue'),
     },
     {
+      path: '/support/tickets/:ticketId',
+      name: 'support-ticket-detail',
+      component: () => import('@/views/SupportTicketDetailView.vue'),
+    },
+    {
       path: '/support/admin',
       name: 'support-admin',
       component: () => import('@/views/SupportAdminView.vue'),

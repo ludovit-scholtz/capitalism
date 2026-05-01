@@ -61,7 +61,7 @@ async function submitTicket() {
     successMessage.value = t('support.submitted')
     newTitle.value = ''
     newMarkdown.value = ''
-    await router.push(`/support/tickets?ticket=${created.id}&created=1`)
+    await router.push(`/support/tickets/${created.id}?created=1`)
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : t('support.submitError')
   } finally {
