@@ -23,7 +23,9 @@ function logout() {
 </script>
 
 <template>
-  <header class="app-header sticky top-0 z-[100] border-b border-divider bg-card/95 backdrop-blur-sm">
+  <header
+    class="app-header sticky top-0 z-[100] border-b border-divider bg-card/95 backdrop-blur-sm"
+  >
     <div class="container flex h-16 items-center gap-6">
       <RouterLink to="/" class="logo-link shrink-0" @click="closeMenu">
         <span class="logo-text">CAPITALISM HQ</span>
@@ -54,8 +56,26 @@ function logout() {
       </button>
 
       <nav class="nav-links" :class="{ 'nav-open': isMenuOpen }">
-        <RouterLink to="/" :title="t('nav.home')" :aria-label="t('nav.home')" class="nav-link" @click="closeMenu">
-          <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <RouterLink
+          to="/"
+          :title="t('nav.home')"
+          :aria-label="t('nav.home')"
+          class="nav-link"
+          @click="closeMenu"
+        >
+          <svg
+            class="nav-icon"
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
             <path d="M3 10.5 12 3l9 7.5" />
             <path d="M5 9.5V21h14V9.5" />
           </svg>
@@ -69,7 +89,19 @@ function logout() {
           class="nav-link"
           @click="closeMenu"
         >
-          <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg
+            class="nav-icon"
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
             <rect x="3" y="4" width="18" height="6" rx="1.5" />
             <rect x="3" y="14" width="18" height="6" rx="1.5" />
             <path d="M7 7h.01M7 17h.01M11 7h6M11 17h6" />
@@ -77,8 +109,26 @@ function logout() {
           <span class="inline-block md:hidden">{{ t('nav.gameServers') }}</span>
         </RouterLink>
 
-        <RouterLink to="/ranking" :title="t('nav.ranking')" :aria-label="t('nav.ranking')" class="nav-link" @click="closeMenu">
-          <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <RouterLink
+          to="/ranking"
+          :title="t('nav.ranking')"
+          :aria-label="t('nav.ranking')"
+          class="nav-link"
+          @click="closeMenu"
+        >
+          <svg
+            class="nav-icon"
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
             <path d="M8 21h8" />
             <path d="M12 17v4" />
             <path d="M7 4h10v3a5 5 0 0 1-10 0V4Z" />
@@ -88,8 +138,26 @@ function logout() {
           <span class="inline-block md:hidden">{{ t('nav.ranking') }}</span>
         </RouterLink>
 
-        <RouterLink to="/ranking/bounties" :title="t('nav.bounties')" :aria-label="t('nav.bounties')" class="nav-link" @click="closeMenu">
-          <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <RouterLink
+          to="/ranking/bounties"
+          :title="t('nav.bounties')"
+          :aria-label="t('nav.bounties')"
+          class="nav-link"
+          @click="closeMenu"
+        >
+          <svg
+            class="nav-icon"
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
             <circle cx="12" cy="12" r="8" />
             <circle cx="12" cy="12" r="4" />
             <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" />
@@ -104,7 +172,19 @@ function logout() {
           class="nav-link"
           @click="closeMenu"
         >
-          <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg
+            class="nav-icon"
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
             <circle cx="6" cy="12" r="2" />
             <circle cx="18" cy="6" r="2" />
             <circle cx="18" cy="18" r="2" />
@@ -114,8 +194,26 @@ function logout() {
           <span class="inline-block md:hidden">{{ t('nav.referralDashboard') }}</span>
         </RouterLink>
 
-        <RouterLink to="/account" :title="t('nav.tokenizedGold')" :aria-label="t('nav.tokenizedGold')" class="nav-link" @click="closeMenu">
-          <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <RouterLink
+          to="/account"
+          :title="t('nav.tokenizedGold')"
+          :aria-label="t('nav.tokenizedGold')"
+          class="nav-link"
+          @click="closeMenu"
+        >
+          <svg
+            class="nav-icon"
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
             <ellipse cx="12" cy="7" rx="6" ry="3" />
             <path d="M6 7v5c0 1.66 2.69 3 6 3s6-1.34 6-3V7" />
             <path d="M6 12v5c0 1.66 2.69 3 6 3s6-1.34 6-3v-5" />
@@ -126,17 +224,54 @@ function logout() {
 
       <div class="header-actions flex items-center gap-2">
         <template v-if="auth.isAuthenticated">
-          <span class="hidden max-w-36 truncate text-sm text-muted lg:inline">{{ auth.player?.displayName }}</span>
-          <button class="btn btn-secondary h-9 w-9 p-0 justify-center" type="button" :title="t('home.signOut')" :aria-label="t('home.signOut')" @click="logout">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <span class="hidden max-w-36 truncate text-sm text-muted lg:inline">{{
+            auth.player?.displayName
+          }}</span>
+          <button
+            class="btn btn-secondary h-9 w-9 p-0 justify-center"
+            type="button"
+            :title="t('home.signOut')"
+            :aria-label="t('home.signOut')"
+            @click="logout"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
               <path d="M16 17l5-5-5-5" />
               <path d="M21 12H9" />
             </svg>
           </button>
         </template>
-        <RouterLink v-else to="/login" class="btn btn-primary h-9 w-9 p-0 justify-center" :title="t('login.signIn')" :aria-label="t('login.signIn')" @click="closeMenu">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <RouterLink
+          v-else
+          to="/login"
+          class="btn btn-primary h-9 w-9 p-0 justify-center"
+          :title="t('login.signIn')"
+          :aria-label="t('login.signIn')"
+          @click="closeMenu"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
             <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
             <path d="M10 17l5-5-5-5" />
             <path d="M15 12H3" />
