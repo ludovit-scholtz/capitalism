@@ -6,12 +6,12 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
-### Stock exchange completion (25% remaining)
+### Stock exchange completion (100% complete)
 
-- [ ] Implement takeover mechanics: when a player's combined person-account and controlled-company ownership in another company reaches 50%, show a "Initiate Takeover" action that replaces the target company's CEO with the acquiring player, transferring operational control including building configuration and company settings.
-- [ ] Implement company merge: when combined ownership reaches 90%, expose a "Merge into Company" action that transfers all assets, bank accounts, buildings, inventory, and loans of the absorbed company to a chosen surviving company, settles the absorbed company's tax in the merge tick, and closes the absorbed company.
-- [ ] Implement share buyback: when a company purchases its own shares on the stock exchange, reduce the total issued share count by the purchased amount and remove those shares from public float, updating share price accordingly.
-- [ ] Add E2E and backend integration tests for takeover trigger at exactly 50%, merge at exactly 90%, and buyback share-count reduction so these mechanics are regression-proof.
+- [x] Implement takeover mechanics: when a player's combined person-account and controlled-company ownership in another company reaches 50%, show a "Initiate Takeover" action that replaces the target company's CEO with the acquiring player, transferring operational control including building configuration and company settings.
+- [x] Implement company merge: when combined ownership reaches 90%, expose a "Merge into Company" action that transfers all assets, bank accounts, buildings, inventory, and loans of the absorbed company to a chosen surviving company, settles the absorbed company's tax in the merge tick, and closes the absorbed company.
+- [x] Implement share buyback: when a company purchases its own shares on the stock exchange, reduce the total issued share count by the purchased amount and remove those shares from public float, updating share price accordingly.
+- [x] Add E2E and backend integration tests for takeover trigger at exactly 50%, merge at exactly 90%, and buyback share-count reduction so these mechanics are regression-proof.
 
 ### More industries and products (0% complete)
 

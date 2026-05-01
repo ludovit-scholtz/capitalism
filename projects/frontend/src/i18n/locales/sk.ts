@@ -1,4 +1,4 @@
-﻿export default {
+export default {
   common: {
     appName: 'Capitalism V',
     loading: 'Na\u010d\u00edtavam...',
