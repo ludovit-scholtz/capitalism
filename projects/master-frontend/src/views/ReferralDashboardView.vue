@@ -83,7 +83,7 @@ onMounted(async () => {
 <template>
   <main class="dash-shell min-h-dvh px-4 py-8 pb-12">
     <section
-      class="dash-card mx-auto grid w-full max-w-[1120px] gap-4 rounded-3xl border border-[var(--color-border)] bg-[var(--color-paper-strong)] p-6 shadow-[var(--shadow-soft)]"
+      class="dash-card mx-auto grid w-full gap-4 rounded-3xl border border-[var(--color-border)] bg-[var(--color-paper-strong)] p-6 shadow-[var(--shadow-soft)]"
     >
       <header class="dash-header flex flex-wrap justify-between gap-4">
         <div>

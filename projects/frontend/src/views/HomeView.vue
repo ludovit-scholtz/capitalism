@@ -91,20 +91,6 @@ useTickRefresh(() => loadHomeData(true))
   </div>
   <div class="container flex flex-col gap-12 pb-20 pt-6 lg:gap-14 lg:pb-24 lg:pt-8">
     <!-- Game Status Cards -->
-    <section v-if="gameState" class="grid grid-cols-1 gap-5 sm:grid-cols-3 lg:gap-6">
-      <div class="rounded-2xl border border-divider bg-card px-6 py-6 text-center shadow-sm" :title="t('home.currentTick', { tick: gameState.currentTick })">
-        <span class="mb-2 block text-xs uppercase tracking-wide text-muted">{{ t('home.currentTime') }}</span>
-        <span class="text-2xl font-bold text-body">{{ formattedGameTime }}</span>
-      </div>
-      <div class="rounded-2xl border border-divider bg-card px-6 py-6 text-center shadow-sm">
-        <span class="mb-2 block text-xs uppercase tracking-wide text-muted">{{ t('home.taxRate') }}</span>
-        <span class="text-2xl font-bold text-body">{{ gameState.taxRate }}%</span>
-      </div>
-      <div class="rounded-2xl border border-divider bg-card px-6 py-6 text-center shadow-sm">
-        <span class="mb-2 block text-xs uppercase tracking-wide text-muted">{{ t('home.activePlayers') }}</span>
-        <span class="text-2xl font-bold text-body">{{ rankings.length }}</span>
-      </div>
-    </section>
 
     <!-- Leaderboard -->
     <section class="overflow-hidden rounded-2xl border border-divider bg-card shadow-sm">

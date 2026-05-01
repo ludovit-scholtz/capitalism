@@ -394,7 +394,7 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
 <template>
   <div class="exchange-view min-h-screen bg-page text-body">
     <div class="exchange-hero border-b border-divider bg-gradient-to-br from-card to-card-raised px-4 py-10 md:py-12">
-      <div class="container mx-auto max-w-[1120px]">
+      <div class="container mx-auto">
         <p class="exchange-eyebrow mb-2 text-xs font-bold uppercase tracking-[0.1em] text-brand">{{ t('globalExchange.eyebrow') }}</p>
         <h1 class="exchange-title mb-2 text-3xl font-bold md:text-4xl">{{ t('globalExchange.title') }}</h1>
         <p class="exchange-subtitle mb-4 max-w-[640px] text-sm text-muted">{{ t('globalExchange.subtitle') }}</p>
@@ -416,7 +416,7 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
       </div>
     </div>
 
-    <div class="container exchange-body mx-auto max-w-[1120px] px-4 py-8 md:py-10">
+    <div class="container exchange-body mx-auto px-4 py-8 md:py-10">
       <div class="market-mode-tabs mb-6 flex gap-2 border-b-2 border-divider" role="tablist" :aria-label="'Market type'">
         <button
           role="tab"

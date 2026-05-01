@@ -144,6 +144,23 @@ async function loadFeed() {
 onMounted(async () => {
   await loadFeed()
 })
+
+const onClickFilterAll = () => {
+  filter.value = 'ALL'
+  currentPage.value = 1
+}
+const onClickFilterNews = () => {
+  filter.value = 'NEWS'
+  currentPage.value = 1
+}
+const onClickFilterChangelog = () => {
+  filter.value = 'CHANGELOG'
+  currentPage.value = 1
+}
+const onClickFilterMarketReport = () => {
+  filter.value = 'MARKET_REPORT'
+  currentPage.value = 1
+}
 </script>
 
 <template>
@@ -167,10 +184,7 @@ onMounted(async () => {
             type="button"
             class="px-4 py-2.5 rounded-full border transition-colors cursor-pointer"
             :class="filter === 'ALL' ? 'bg-[rgba(255,138,0,0.18)] border-[rgba(255,138,0,0.5)] text-[#ffd7a3]' : 'border-divider text-muted'"
-            @click="
-              filter = 'ALL'
-              currentPage = 1
-            "
+            @click="onClickFilterAll"
           >
             {{ t('news.filterAll') }}
           </button>
@@ -178,10 +192,7 @@ onMounted(async () => {
             type="button"
             class="px-4 py-2.5 rounded-full border transition-colors cursor-pointer"
             :class="filter === 'NEWS' ? 'bg-[rgba(255,138,0,0.18)] border-[rgba(255,138,0,0.5)] text-[#ffd7a3]' : 'border-divider text-muted'"
-            @click="
-              filter = 'NEWS'
-              currentPage = 1
-            "
+            @click="onClickFilterNews"
           >
             {{ t('news.filters') }}
           </button>
@@ -189,10 +200,7 @@ onMounted(async () => {
             type="button"
             class="px-4 py-2.5 rounded-full border transition-colors cursor-pointer"
             :class="filter === 'CHANGELOG' ? 'bg-[rgba(255,138,0,0.18)] border-[rgba(255,138,0,0.5)] text-[#ffd7a3]' : 'border-divider text-muted'"
-            @click="
-              filter = 'CHANGELOG'
-              currentPage = 1
-            "
+            @click="onClickFilterChangelog"
           >
             {{ t('news.filterChangelog') }}
           </button>
@@ -200,10 +208,7 @@ onMounted(async () => {
             type="button"
             class="px-4 py-2.5 rounded-full border transition-colors cursor-pointer"
             :class="filter === 'MARKET_REPORT' ? 'bg-[rgba(0,200,150,0.18)] border-[rgba(0,200,150,0.5)] text-[#7af5d9]' : 'border-divider text-muted'"
-            @click="
-              filter = 'MARKET_REPORT'
-              currentPage = 1
-            "
+            @click="onClickFilterMarketReport"
           >
             📊 {{ t('news.filterMarketReport') }}
           </button>

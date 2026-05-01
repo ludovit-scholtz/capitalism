@@ -1135,7 +1135,7 @@ useTickRefresh(async () => {
 
 <template>
   <div class="min-h-[calc(100vh-112px)] bg-gradient-to-b from-page to-[rgba(0,71,255,0.04)] py-8 px-4">
-    <div class="container max-w-[1120px]">
+    <div class="container">
       <div v-if="step < 7" class="text-center mb-8">
         <h1 class="text-3xl font-bold mb-2 bg-gradient-to-br from-brand to-[var(--color-secondary)] bg-clip-text text-transparent">{{ t('onboarding.title') }}</h1>
         <p class="text-muted text-sm">{{ t('onboarding.subtitle') }}</p>
