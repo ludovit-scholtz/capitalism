@@ -83,7 +83,7 @@ It will use real world map. The game will start in single city and later other c
 
 ### Newsroom
 
-- [ ] Add pagination to the news items. By default show last 10 items
+- [x] Add pagination to the news items. By default show last 10 items
 
 ### Support system (100% complete)
 

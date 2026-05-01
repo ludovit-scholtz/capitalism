@@ -268,6 +268,41 @@ test.describe('Game news and administration', () => {
     await expect(page.getByText('The tax rate now applies to net profit rather than gross revenue.')).toBeVisible()
   })
 
+  test('newsroom paginates entries and shows 10 items by default', async ({ page }) => {
+    const pagedEntries = Array.from({ length: 12 }, (_, index) => {
+      const number = index + 1
+      return makeChangelogEntry({
+        id: `paged-cl-${number}`,
+        publishedAtUtc: `2026-03-${String(number).padStart(2, '0')}T10:00:00Z`,
+        localizations: [
+          {
+            locale: 'en',
+            title: `Paginated Entry ${number}`,
+            summary: `Summary ${number}`,
+            htmlContent: `<p>Body ${number}</p>`,
+          },
+        ],
+      })
+    })
+
+    setupMockApi(page, {
+      players: [],
+      gameNewsEntries: pagedEntries,
+    })
+
+    await page.goto('/news')
+
+    await expect(page.locator('.news-card')).toHaveCount(10)
+    await expect(page.getByRole('heading', { name: 'Paginated Entry 12' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Paginated Entry 2' })).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Next' }).click()
+
+    await expect(page.locator('.news-card')).toHaveCount(2)
+    await expect(page.getByRole('heading', { name: 'Paginated Entry 2' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Paginated Entry 12' })).toHaveCount(0)
+  })
+
   test('global news entries are visible on all servers (null targetServerKey)', async ({ page }) => {
     setupMockApi(page, {
       players: [],

@@ -74,6 +74,10 @@ export default {
     marketReportEmptyBody: 'Wöchentliche und monatliche Stadtmarktberichte erscheinen hier, sobald genügend Handelsaktivität aufgezeichnet wurde. Berichte werden automatisch generiert.',
     untitled: 'Eintrag ohne Titel',
     unread: 'Neu',
+    previousPage: 'Zurück',
+    nextPage: 'Weiter',
+    pageLabel: 'Seite {page} von {total}',
+    paginationStatus: 'Einträge {from}-{to} von {total}',
   },
   admin: {
     eyebrow: 'Spieladministration',
