@@ -59,7 +59,7 @@ public sealed class MasterRankingTelemetryService(
         string? externalEventId = null,
         CancellationToken cancellationToken = default)
     {
-        if (!options.Value.IsConfigured())
+        if (!options.Value.IsTelemetryConfigured())
         {
             return;
         }

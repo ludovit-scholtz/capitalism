@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Api.Configuration;
 using Api.Data;
 using Api.Data.Entities;
 using Api.Engine;
@@ -7,6 +8,7 @@ using Api.Engine.Phases;
 using Api.Tests.Infrastructure;
 using Api.Utilities;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -20,6 +22,25 @@ namespace Api.Tests;
 /// </summary>
 public sealed class MasterRankingTelemetryTests
 {
+    private sealed class RecordingHttpMessageHandler : HttpMessageHandler
+    {
+        public int CallCount { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            CallCount += 1;
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"data\":{\"ingestRankingEvent\":{\"id\":\"evt-1\",\"status\":\"PENDING\"}}}", Encoding.UTF8, "application/json")
+            });
+        }
+    }
+
+    private sealed class FixedHttpClientFactory(HttpClient client) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => client;
+    }
+
     #region Mock telemetry service
 
     /// <summary>Captures telemetry calls for assertions.</summary>
@@ -142,7 +163,7 @@ public sealed class MasterRankingTelemetryTests
         // Act: call me without auth — HotChocolate returns an auth error, telemetry should NOT fire.
         await ExecuteGraphQlAsync(client, "{ me { id } }");
 
-        Assert.Empty(capturing.Calls.Where(c => c.EventType == MasterRankingBountyCodes.LoginToGame));
+        Assert.DoesNotContain(capturing.Calls, c => c.EventType == MasterRankingBountyCodes.LoginToGame);
     }
 
     [Fact]
@@ -371,6 +392,30 @@ public sealed class MasterRankingTelemetryTests
         var me = result.GetProperty("data").GetProperty("me");
 
         Assert.Equal("noop-test@example.com", me.GetProperty("email").GetString());
+    }
+
+    [Fact]
+    public async Task MasterRankingTelemetryService_WithTelemetryOnlyConfig_StillPostsEvents()
+    {
+        var handler = new RecordingHttpMessageHandler();
+        using var client = new HttpClient(handler);
+        var telemetry = new MasterRankingTelemetryService(
+            new FixedHttpClientFactory(client),
+            Options.Create(new MasterServerRegistrationOptions
+            {
+                RegistrationEnabled = true,
+                ApiUrl = "https://master.example.com/graphql",
+                RegistrationKey = "test-key",
+                ServerKey = "game-1",
+                DisplayName = string.Empty,
+                BackendUrl = string.Empty,
+                FrontendUrl = string.Empty,
+            }),
+            NullLogger<MasterRankingTelemetryService>.Instance);
+
+        await telemetry.ReportEventAsync(MasterRankingBountyCodes.LoginToGame, "player@example.com");
+
+        Assert.Equal(1, handler.CallCount);
     }
 
     #endregion

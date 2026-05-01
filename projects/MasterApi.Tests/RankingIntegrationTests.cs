@@ -662,7 +662,7 @@ public sealed class RankingIntegrationTests
     }
 
     [Fact]
-    public async Task IngestRankingEvent_UtcDayPerServer_SamePlayerDifferentServers_BothAwarded()
+    public async Task IngestRankingEvent_UtcDay_SamePlayerDifferentServers_AwardsOnlyOnceForGameplayBounty()
     {
         await using var factory = new MasterApiWebApplicationFactory();
         using var client = factory.CreateClient();
@@ -716,7 +716,7 @@ public sealed class RankingIntegrationTests
                 }
             });
 
-        // Run evaluation — MANUFACTURER is UtcDayPerServer, so player gets two awards (one per server).
+        // Run evaluation — gameplay bounties are UTC-day scoped across all servers, so only one award is allowed.
         await GraphQlAsync(client, "mutation { runRankingEvaluationNow { id } }", token: rootToken);
 
         var history = await GraphQlAsync(
@@ -734,8 +734,82 @@ public sealed class RankingIntegrationTests
         Assert.False(history.TryGetProperty("errors", out _));
         var items = history.GetProperty("data").GetProperty("myRankingBountyHistory").EnumerateArray().ToList();
         var manufacturerItems = items.Where(item => item.GetProperty("bountyCode").GetString() == "MANUFACTURER").ToList();
-        Assert.Equal(2, manufacturerItems.Count);
-        var serverKeys = manufacturerItems.Select(item => item.GetProperty("serverKey").GetString()).ToHashSet();
+        Assert.Single(manufacturerItems);
+      }
+
+      [Fact]
+      public async Task IngestRankingEvent_LoginToGame_SamePlayerDifferentServers_AwardsPerServer()
+      {
+        await using var factory = new MasterApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var userEmail = $"rank-login-cross-server-{Guid.NewGuid():N}@example.com";
+        var (userToken, _) = await RegisterAsync(client, userEmail, "Cross Server Login User");
+        var rootToken = CreateRootAdminToken();
+
+        await GraphQlAsync(
+          client,
+          """
+          mutation Ingest($input: IngestRankingEventInput!) {
+            ingestRankingEvent(input: $input) { id }
+          }
+          """,
+          new
+          {
+            input = new
+            {
+              registrationKey = "test-registration-key",
+              serverKey = "server-eu",
+              eventType = "LOGIN_TO_GAME",
+              playerEmail = userEmail,
+              occurredAtUtc = DateTime.UtcNow,
+              externalEventId = $"login-eu-{Guid.NewGuid():N}",
+              uniqueScopeKey = "login-eu-day",
+              payloadJson = "{}",
+            }
+          });
+
+        await GraphQlAsync(
+          client,
+          """
+          mutation Ingest($input: IngestRankingEventInput!) {
+            ingestRankingEvent(input: $input) { id }
+          }
+          """,
+          new
+          {
+            input = new
+            {
+              registrationKey = "test-registration-key",
+              serverKey = "server-us",
+              eventType = "LOGIN_TO_GAME",
+              playerEmail = userEmail,
+              occurredAtUtc = DateTime.UtcNow,
+              externalEventId = $"login-us-{Guid.NewGuid():N}",
+              uniqueScopeKey = "login-us-day",
+              payloadJson = "{}",
+            }
+          });
+
+        await GraphQlAsync(client, "mutation { runRankingEvaluationNow { id } }", token: rootToken);
+
+        var history = await GraphQlAsync(
+          client,
+          """
+          query {
+            myRankingBountyHistory {
+            bountyCode
+            serverKey
+            }
+          }
+          """,
+          token: userToken);
+
+        Assert.False(history.TryGetProperty("errors", out _));
+        var items = history.GetProperty("data").GetProperty("myRankingBountyHistory").EnumerateArray().ToList();
+        var loginItems = items.Where(item => item.GetProperty("bountyCode").GetString() == "LOGIN_TO_GAME").ToList();
+        Assert.Equal(2, loginItems.Count);
+        var serverKeys = loginItems.Select(item => item.GetProperty("serverKey").GetString()).ToHashSet();
         Assert.Contains("server-eu", serverKeys);
         Assert.Contains("server-us", serverKeys);
     }

@@ -62,6 +62,7 @@ public sealed class MasterRankingService(MasterDbContext db, ILogger<MasterRanki
             var playerSnapshots = await db.MasterRankingPlayerSnapshots
                 .Where(snapshot => playerIds.Contains(snapshot.PlayerAccountId))
                 .ToDictionaryAsync(snapshot => snapshot.PlayerAccountId, cancellationToken);
+            var awardedUniquenessKeysInRun = new HashSet<string>(StringComparer.Ordinal);
 
             var now = DateTime.UtcNow;
 
@@ -98,6 +99,11 @@ public sealed class MasterRankingService(MasterDbContext db, ILogger<MasterRanki
                     }
 
                     var uniquenessKey = BuildUniquenessKey(definition, rankingEvent);
+                    if (awardedUniquenessKeysInRun.Contains(uniquenessKey))
+                    {
+                        continue;
+                    }
+
                     var alreadyExists = await db.MasterRankingRewardRecords
                         .AsNoTracking()
                         .AnyAsync(record => record.UniquenessKey == uniquenessKey, cancellationToken);
@@ -122,6 +128,7 @@ public sealed class MasterRankingService(MasterDbContext db, ILogger<MasterRanki
                     };
 
                     db.MasterRankingRewardRecords.Add(reward);
+                    awardedUniquenessKeysInRun.Add(uniquenessKey);
                     run.RewardRecordsCreated += 1;
                     run.TotalPointsAwarded += definition.RewardPoints;
 

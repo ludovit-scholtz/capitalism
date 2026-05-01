@@ -38,4 +38,12 @@ public sealed class MasterServerRegistrationOptions
             && !string.IsNullOrWhiteSpace(BackendUrl)
             && !string.IsNullOrWhiteSpace(FrontendUrl);
     }
+
+    public bool IsTelemetryConfigured()
+    {
+        return RegistrationEnabled
+            && !string.IsNullOrWhiteSpace(ApiUrl)
+            && !string.IsNullOrWhiteSpace(RegistrationKey)
+            && !string.IsNullOrWhiteSpace(ServerKey);
+    }
 }
