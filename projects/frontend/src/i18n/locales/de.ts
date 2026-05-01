@@ -1164,9 +1164,21 @@ export default {
       history: 'Verlauf',
       marketIntelligence: 'Markt',
       recentActivity: 'Aktivität',
+      supplyChain: 'Lieferkette',
       quickActionsHeading: 'Schnelle Preisanpassung',
       quickActionsDesc: 'Passen Sie den Verkaufspreis dieser Einheit sofort an, ohne in den Bearbeitungsmodus zu wechseln.',
       noHistory: 'Es wurde noch keine Ressourcenbewegungshistorie aufgezeichnet.',
+    },
+    supplyChain: {
+      healthStatus: 'Lieferkettengesundheit',
+      health: {
+        GREEN: 'Gesund',
+        YELLOW: 'Warnung',
+        RED: 'Kritisch',
+      },
+      units: 'Einheiten',
+      unitDetails: 'Einheitendetails',
+      fill: 'Füllung',
     },
     overview: {
       title: 'Gebäudeübersicht',

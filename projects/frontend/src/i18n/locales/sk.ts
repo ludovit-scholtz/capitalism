@@ -1162,9 +1162,21 @@ export default {
       history: 'História',
       marketIntelligence: 'Trh',
       recentActivity: 'Aktivita',
+      supplyChain: 'Dodávateľský reťazec',
       quickActionsHeading: 'Rýchla zmena ceny',
       quickActionsDesc: 'Upravte predajnú cenu tejto jednotky okamžite bez vstupu do režimu úprav.',
       noHistory: 'Zatiaľ nebola zaznamenaná žiadna história pohybu zdrojov.',
+    },
+    supplyChain: {
+      healthStatus: 'Zdravie dodávateľského reťazca',
+      health: {
+        GREEN: 'Zdravý',
+        YELLOW: 'Varovanie',
+        RED: 'Kritický',
+      },
+      units: 'Jednotky',
+      unitDetails: 'Detaily jednotky',
+      fill: 'Naplnenie',
     },
     overview: {
       title: 'Prehľad budovy',

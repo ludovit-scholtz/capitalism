@@ -3,6 +3,7 @@ import { inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
 import UnitResourceHistoryPanel from '@/components/buildings/UnitResourceHistoryPanel.vue'
+import SupplyChainTab from '@/components/buildings/SupplyChainTab.vue'
 import type { BuildingUnit } from '@/types'
 import type { ExchangeSortBy } from '@/lib/globalExchange'
 
@@ -24,6 +25,8 @@ const {
   publicSalesAnalyticsLoading,
   unitProductAnalytics,
   unitProductAnalyticsLoading,
+  supplyChain,
+  supplyChainLoading,
   quickPriceInput,
   quickPriceSaving,
   quickPriceSuccess,
@@ -944,6 +947,8 @@ function operationalStatusBadgeClass(status: string): string {
               ><p class="config-help">{{ t('buildingDetail.unitProductAnalytics.noProduct') }}</p></template
             >
           </div></template
+        ><!-- ── Supply Chain tab ─────────────────────────────── --><template v-else-if="selectedUnitTab === 'supplyChain'"
+          ><SupplyChainTab :supply-chain="supplyChain" :loading="supplyChainLoading" /></template
         ><!-- ── Recent Activity tab ─────────────────────────────── --><template v-else-if="selectedUnitTab === 'recentActivity'"
           ><div class="unit-insight-card recent-activity-panel" :aria-label="t('buildingDetail.accessibility.recentActivity')">
             <h5 class="mb-2">{{ t('buildingDetail.recentActivity.title') }}</h5>

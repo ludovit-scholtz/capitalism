@@ -53,6 +53,7 @@ import type {
   BuildingConfigurationPlanRemoval,
   BuildingConfigurationPlanUnit,
   BuildingFinancialTimeline,
+  BuildingSupplyChainDiagram,
   BuildingUnit,
   BuildingUnitInventory,
   BuildingUnitInventorySummary,
@@ -330,6 +331,9 @@ export function useBuildingDetail() {
   // Manufacturing unit product analytics
   const unitProductAnalytics = ref<UnitProductAnalytics | null>(null)
   const unitProductAnalyticsLoading = ref(false)
+  // Building supply chain diagram
+  const supplyChain = ref<BuildingSupplyChainDiagram | null>(null)
+  const supplyChainLoading = ref(false)
   // Quick price update (instant, no tick delay)
   const quickPriceInput = ref<number | null>(null)
   const quickPriceSaving = ref(false)
@@ -858,8 +862,16 @@ export function useBuildingDetail() {
 
   /** Ordered list of tabs available for the currently selected unit type. */
   const unitDetailTabs = computed<Array<{ key: string }>>(() => {
+    if (isEditing.value) return []
+    
+    // Building-level supply chain tab for FACTORY buildings
+    if (!selectedDisplayUnit.value && building.value?.type === 'FACTORY') {
+      return [{ key: 'supplyChain' }]
+    }
+
     const unitType = selectedDisplayUnit.value?.unitType
-    if (!unitType || isEditing.value) return []
+    if (!unitType) return []
+    
     const tabs: Array<{ key: string }> = [{ key: 'basicInfo' }]
     if (unitType === 'PUBLIC_SALES') tabs.push({ key: 'quickActions' })
     tabs.push({ key: 'inventory' })
@@ -3828,6 +3840,49 @@ export function useBuildingDetail() {
     }
   }
 
+  async function loadSupplyChain(buildingId: string) {
+    if (!auth.token) return
+    supplyChainLoading.value = true
+    try {
+      const data = await gqlRequest<{ buildingSupplyChain: BuildingSupplyChainDiagram }>(
+        `query BuildingSupplyChain($buildingId: UUID!) {
+          buildingSupplyChain(buildingId: $buildingId) {
+            units {
+              id
+              unitType
+              gridX
+              gridY
+              level
+              status
+              idleTicks
+              fillPercent
+              resourceTypeId
+              productTypeId
+              resourceOrProductName
+              estimatedTransitCost
+            }
+            links {
+              fromUnitId
+              toUnitId
+              direction
+              estimatedTransitCost
+            }
+            healthScore
+            healthReason
+            criticalUnitIds
+            warningUnitIds
+          }
+        }`,
+        { buildingId },
+      )
+      supplyChain.value = data.buildingSupplyChain ?? null
+    } catch {
+      supplyChain.value = null
+    } finally {
+      supplyChainLoading.value = false
+    }
+  }
+
   async function loadBuildingFinancialTimeline(buildingId: string, isRefresh = false) {
     if (!auth.token) {
       buildingFinancialTimeline.value = null
@@ -4261,6 +4316,9 @@ export function useBuildingDetail() {
       if (building.value?.type === 'MEDIA_HOUSE') {
         void loadMediaHouseAnalytics()
       }
+      if (building.value?.type === 'FACTORY') {
+        void loadSupplyChain(buildingId.value)
+      }
     } catch (reason: unknown) {
       if (requestId !== activeBuildingLoadRequest) {
         return
@@ -4353,6 +4411,9 @@ export function useBuildingDetail() {
     void loadBuildingFinancialTimeline(buildingId.value, true)
     if (building.value?.type === 'POWER_PLANT') {
       void loadPowerPlantAnalytics(buildingId.value, true)
+    }
+    if (building.value?.type === 'FACTORY') {
+      void loadSupplyChain(buildingId.value)
     }
   })
 
@@ -4551,6 +4612,8 @@ export function useBuildingDetail() {
     publicSalesAnalyticsLoading,
     unitProductAnalytics,
     unitProductAnalyticsLoading,
+    supplyChain,
+    supplyChainLoading,
     quickPriceInput,
     quickPriceSaving,
     quickPriceSuccess,
@@ -4823,6 +4886,7 @@ export function useBuildingDetail() {
     submitUnitUpgrade,
     loadUnitOperationalStatuses,
     loadRecentActivity,
+    loadSupplyChain,
     loadBuildingFinancialTimeline,
     loadPowerPlantAnalytics,
     loadCityPowerBalance,

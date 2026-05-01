@@ -1163,9 +1163,21 @@ export default {
       history: 'History',
       marketIntelligence: 'Market',
       recentActivity: 'Activity',
+      supplyChain: 'Supply Chain',
       quickActionsHeading: 'Quick Price Update',
       quickActionsDesc: 'Adjust the selling price for this unit immediately without entering edit mode.',
       noHistory: 'No resource movement history recorded yet.',
+    },
+    supplyChain: {
+      healthStatus: 'Supply Chain Health',
+      health: {
+        GREEN: 'Healthy',
+        YELLOW: 'Warning',
+        RED: 'Critical',
+      },
+      units: 'Units',
+      unitDetails: 'Unit Details',
+      fill: 'Fill',
     },
     overview: {
       title: 'Building Overview',

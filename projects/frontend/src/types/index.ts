@@ -1921,3 +1921,45 @@ export interface MediaHouseAnalyticsResult {
   strategyRating: string
   strategyTip: string
 }
+
+/** Health status for supply chain visualization */
+export type SupplyChainHealth = 'GREEN' | 'YELLOW' | 'RED'
+
+/** Unit summary in supply chain diagram */
+export interface SupplyChainUnitSummary {
+  buildingUnitId: string
+  unitType: string
+  gridX: number
+  gridY: number
+  level: number
+  /** ACTIVE | IDLE | BLOCKED | FULL | UNCONFIGURED */
+  status: string
+  idleTicks: number
+  fillPercent: number
+  resourceTypeId: string | null
+  productTypeId: string | null
+  resourceOrProductName: string | null
+  estimatedTransitCost: number | null
+}
+
+/** Link between two units in supply chain */
+export interface SupplyChainLink {
+  fromUnitId: string
+  toUnitId: string
+  /** RIGHT | DOWN | DIAGONAL_DR | etc. */
+  direction: string
+  estimatedTransitCost: number
+}
+
+/** Complete supply chain diagram for a factory */
+export interface BuildingSupplyChainDiagram {
+  buildingId: string
+  buildingName: string
+  buildingType: string
+  units: SupplyChainUnitSummary[]
+  links: SupplyChainLink[]
+  healthScore: SupplyChainHealth
+  healthReason: string
+  criticalUnitIds: string[]
+  warningUnitIds: string[]
+}
