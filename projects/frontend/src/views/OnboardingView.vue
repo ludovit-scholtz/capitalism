@@ -590,6 +590,7 @@ onMounted(async () => {
       const shopBuilding = auth.player?.companies.flatMap((company) => company.buildings).find((building) => building.id === auth.player?.onboardingShopBuildingId)
       if (shopBuilding?.cityId) {
         selectedCityId.value = shopBuilding.cityId
+        auth.switchCity(shopBuilding.cityId)
       }
 
       step.value = 7
@@ -620,6 +621,7 @@ onMounted(async () => {
     }
 
     if (selectedCityId.value) {
+      auth.switchCity(selectedCityId.value)
       await loadLots()
       if (!cityLots.value.some((lot) => lot.id === selectedFactoryLotId.value)) {
         selectedFactoryLotId.value = ''
@@ -646,39 +648,36 @@ async function selectIndustry(industry: string) {
   error.value = null
   selectedIndustry.value = industry
   selectedProductId.value = ''
-  selectedCityId.value = ''
   selectedIpoRaiseTarget.value = null
   selectedFactoryLotId.value = ''
   selectedShopLotId.value = ''
   onboardingCompanyCash.value = null
-  cityLots.value = []
   await loadProducts()
-  step.value = 2
+  step.value = 3
   trackOnboardingEvent('industry_selected', { industry })
 }
 
 function selectProduct(productId: string) {
   error.value = null
   selectedProductId.value = productId
-  selectedCityId.value = ''
   selectedIpoRaiseTarget.value = null
   selectedFactoryLotId.value = ''
   selectedShopLotId.value = ''
   onboardingCompanyCash.value = null
-  cityLots.value = []
-  step.value = 3
+  step.value = 4
   trackOnboardingEvent('product_selected', { productId, industry: selectedIndustry.value })
 }
 
 async function selectCity(cityId: string) {
   error.value = null
   selectedCityId.value = cityId
+  auth.switchCity(cityId)
   selectedIpoRaiseTarget.value = null
   selectedFactoryLotId.value = ''
   selectedShopLotId.value = ''
   onboardingCompanyCash.value = null
   await loadLots()
-  step.value = 4
+  step.value = 2
   trackOnboardingEvent('city_selected', { cityId })
 }
 
@@ -980,14 +979,8 @@ function getProductLocalPrice(product: Pick<ProductType, 'basePrice'>, currencyC
 }
 
 function getProductPriceSummary(product: ProductType): string {
-  if (selectedCity.value) {
-    return formatCurrency(getProductLocalPrice(product, selectedCity.value.currencyCode), selectedCity.value.currencyCode)
-  }
-
-  return cities.value
-    .slice(0, 3)
-    .map((city) => `${city.name}: ${formatCurrency(getProductLocalPrice(product, city.currencyCode), city.currencyCode)}`)
-    .join(' · ')
+  if (!selectedCity.value) return ''
+  return formatCurrency(getProductLocalPrice(product, selectedCity.value.currencyCode), selectedCity.value.currencyCode)
 }
 
 function getProductName(product: ProductType): string {
@@ -1134,8 +1127,8 @@ useTickRefresh(async () => {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-112px)] bg-gradient-to-b from-page to-[rgba(0,71,255,0.04)] py-8 px-4">
-    <div class="container">
+  <div class="min-h-[calc(100vh-112px)] bg-gradient-to-b from-page to-[rgba(0,71,255,0.04)] py-8 px-4 flex items-center">
+    <div class="container w-full max-w-[1280px] mx-auto">
       <div v-if="step < 7" class="text-center mb-8">
         <h1 class="text-3xl font-bold mb-2 bg-gradient-to-br from-brand to-[var(--color-secondary)] bg-clip-text text-transparent">{{ t('onboarding.title') }}</h1>
         <p class="text-muted text-sm">{{ t('onboarding.subtitle') }}</p>
@@ -1146,56 +1139,6 @@ useTickRefresh(async () => {
         <div class="mb-4">
           <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step1Title') }}</h2>
           <p class="text-muted text-sm">{{ t('onboarding.step1Desc') }}</p>
-        </div>
-        <div class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4 mb-6">
-          <button
-            v-for="ind in industries"
-            :key="ind"
-            class="industry-card flex flex-col gap-2 rounded-md border-2 border-divider bg-page p-6 text-center text-body transition-all duration-200 hover:-translate-y-0.5 hover:border-brand hover:shadow-[0_4px_16px_rgba(0,71,255,0.1)]"
-            :class="{ 'border-brand bg-brand/10 shadow-[0_0_0_1px_var(--color-primary),0_4px_16px_rgba(0,71,255,0.15)]': selectedIndustry === ind, 'pick-hint': !selectedIndustry }"
-            @click="selectIndustry(ind)"
-          >
-            <span class="text-[2.5rem] leading-none">{{ industryIcons[ind] || '🏭' }}</span
-            ><span class="font-bold text-base">{{ formatIndustry(ind) }}</span
-            ><span class="card-first-product inline-block rounded bg-brand/10 px-2 py-0.5 text-xs font-semibold text-brand">{{ t(industryFirstProductKeys[ind] || '') }}</span
-            ><span class="card-desc text-[0.8125rem] text-muted leading-snug">{{ t(industryDescKeys[ind] || '') }}</span
-            ><span class="card-why text-[0.6875rem] text-subtle italic leading-snug">{{ t(industryWhyKeys[ind] || '') }}</span>
-          </button>
-        </div>
-      </div>
-      <div v-if="step === 2" class="step-content step-content-wide bg-card border border-divider rounded-xl p-8 flex flex-col gap-6">
-        <div>
-          <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step2Title') }}</h2>
-          <p class="text-muted text-sm">{{ t('onboarding.step2Desc') }}</p>
-        </div>
-        <div class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
-          <button
-            v-for="prod in sortedProducts"
-            :key="prod.id"
-            class="product-card flex flex-col gap-2 rounded-md border-2 border-divider bg-page p-6 text-center text-body transition-all duration-200 hover:-translate-y-0.5 hover:border-brand hover:shadow-[0_4px_16px_rgba(0,71,255,0.1)]"
-            :class="{ 'border-brand bg-brand/10 shadow-[0_0_0_1px_var(--color-primary),0_4px_16px_rgba(0,71,255,0.15)]': selectedProductId === prod.id, 'pick-hint': !selectedProductId }"
-            @click="selectProduct(prod.id)"
-          >
-            <img :src="getProductImage(prod)" :alt="getProductName(prod)" class="w-full aspect-video object-cover rounded bg-card-raised" /><span class="font-bold text-base">{{
-              getProductName(prod)
-            }}</span
-            ><span class="text-[1rem] font-bold text-[var(--color-secondary)]">{{ getProductPriceSummary(prod) }}</span
-            ><span class="text-xs text-muted">{{ t('onboarding.craftTime', { ticks: prod.baseCraftTicks }) }}</span
-            ><span class="text-[0.8125rem] text-muted leading-snug">{{ getProductDescription(prod) }}</span>
-            <div class="flex flex-col gap-1 text-xs text-muted">
-              <span class="font-medium">{{ t('onboarding.requires') }}:</span
-              ><span v-for="(recipe, index) in prod.recipes" :key="index" class="text-[var(--color-tertiary)] font-medium"> {{ getRecipeIngredientLabel(prod, index) }} </span>
-            </div>
-          </button>
-        </div>
-        <div class="step-actions flex gap-3 justify-end mt-2">
-          <button class="btn btn-secondary" @click="prevStep">← {{ t('common.back') }}</button>
-        </div>
-      </div>
-      <div v-if="step === 3" class="step-content bg-card border border-divider rounded-xl p-8">
-        <div class="mb-4">
-          <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step3Title') }}</h2>
-          <p class="text-muted text-sm">{{ t('onboarding.step3Desc') }}</p>
         </div>
         <div class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4 mb-6">
           <button
@@ -1218,6 +1161,56 @@ useTickRefresh(async () => {
               ><span v-for="(resource, index) in city.resources" :key="index" class="bg-[rgba(0,200,83,0.1)] text-[var(--color-secondary)] px-2 py-0.5 rounded-full text-[0.6875rem] font-medium">
                 {{ getCityResourceName(city, index) }}
               </span>
+            </div>
+          </button>
+        </div>
+      </div>
+      <div v-if="step === 2" class="step-content step-content-wide bg-card border border-divider rounded-xl p-8 flex flex-col gap-6">
+        <div>
+          <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step2Title') }}</h2>
+          <p class="text-muted text-sm">{{ t('onboarding.step2Desc') }}</p>
+        </div>
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4 mb-6">
+          <button
+            v-for="ind in industries"
+            :key="ind"
+            class="industry-card flex flex-col gap-2 rounded-md border-2 border-divider bg-page p-6 text-center text-body transition-all duration-200 hover:-translate-y-0.5 hover:border-brand hover:shadow-[0_4px_16px_rgba(0,71,255,0.1)]"
+            :class="{ 'border-brand bg-brand/10 shadow-[0_0_0_1px_var(--color-primary),0_4px_16px_rgba(0,71,255,0.15)]': selectedIndustry === ind, 'pick-hint': !selectedIndustry }"
+            @click="selectIndustry(ind)"
+          >
+            <span class="text-[2.5rem] leading-none">{{ industryIcons[ind] || '🏭' }}</span
+            ><span class="font-bold text-base">{{ formatIndustry(ind) }}</span
+            ><span class="card-first-product inline-block rounded bg-brand/10 px-2 py-0.5 text-xs font-semibold text-brand">{{ t(industryFirstProductKeys[ind] || '') }}</span
+            ><span class="card-desc text-[0.8125rem] text-muted leading-snug">{{ t(industryDescKeys[ind] || '') }}</span
+            ><span class="card-why text-[0.6875rem] text-subtle italic leading-snug">{{ t(industryWhyKeys[ind] || '') }}</span>
+          </button>
+        </div>
+        <div class="step-actions flex gap-3 justify-end mt-2">
+          <button class="btn btn-secondary" @click="prevStep">← {{ t('common.back') }}</button>
+        </div>
+      </div>
+      <div v-if="step === 3" class="step-content bg-card border border-divider rounded-xl p-8">
+        <div class="mb-4">
+          <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step3Title') }}</h2>
+          <p class="text-muted text-sm">{{ t('onboarding.step3Desc') }}</p>
+        </div>
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
+          <button
+            v-for="prod in sortedProducts"
+            :key="prod.id"
+            class="product-card flex flex-col gap-2 rounded-md border-2 border-divider bg-page p-6 text-center text-body transition-all duration-200 hover:-translate-y-0.5 hover:border-brand hover:shadow-[0_4px_16px_rgba(0,71,255,0.1)]"
+            :class="{ 'border-brand bg-brand/10 shadow-[0_0_0_1px_var(--color-primary),0_4px_16px_rgba(0,71,255,0.15)]': selectedProductId === prod.id, 'pick-hint': !selectedProductId }"
+            @click="selectProduct(prod.id)"
+          >
+            <img :src="getProductImage(prod)" :alt="getProductName(prod)" class="w-full aspect-video object-cover rounded bg-card-raised" /><span class="font-bold text-base">{{
+              getProductName(prod)
+            }}</span
+            ><span class="text-[1rem] font-bold text-[var(--color-secondary)]">{{ getProductPriceSummary(prod) }}</span
+            ><span class="text-xs text-muted">{{ t('onboarding.craftTime', { ticks: prod.baseCraftTicks }) }}</span
+            ><span class="text-[0.8125rem] text-muted leading-snug">{{ getProductDescription(prod) }}</span>
+            <div class="flex flex-col gap-1 text-xs text-muted">
+              <span class="font-medium">{{ t('onboarding.requires') }}:</span
+              ><span v-for="(recipe, index) in prod.recipes" :key="index" class="text-[var(--color-tertiary)] font-medium"> {{ getRecipeIngredientLabel(prod, index) }} </span>
             </div>
           </button>
         </div>
@@ -1850,5 +1843,19 @@ useTickRefresh(async () => {
 
 .pick-hint:hover {
   animation: none;
+}
+
+.step-content {
+  width: 100%;
+  max-width: 920px;
+  margin-inline: auto;
+}
+
+.step-content.step-content-wide {
+  max-width: 1160px;
+}
+
+.step-content.completion-step {
+  max-width: 1080px;
 }
 </style>

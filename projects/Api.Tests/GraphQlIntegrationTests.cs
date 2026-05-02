@@ -6736,6 +6736,13 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var finishResult = await FinishOnboardingAsync(token, productId, shopLotId);
         Assert.False(finishResult.TryGetProperty("errors", out _), "FinishOnboarding must succeed");
 
+        var companyId = finishResult
+            .GetProperty("data")
+            .GetProperty("finishOnboarding")
+            .GetProperty("company")
+            .GetProperty("id")
+            .GetString()!;
+
         // After onboarding personal cash must be exactly $0 — all $200k was contributed to the company
         var afterResult = await ExecuteGraphQlAsync("{ personAccount { personalCash } }", token: token);
         Assert.Equal(0m, afterResult.GetProperty("data").GetProperty("personAccount").GetProperty("personalCash").GetDecimal());
@@ -6750,6 +6757,36 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             .ToList();
         Assert.NotEmpty(personalAccounts);
         Assert.All(personalAccounts, account => Assert.Equal(0m, account.GetProperty("balance").GetDecimal()));
+
+                // Company ledger visibility: onboarding must record both incoming founder and public IPO capital.
+                var statementResult = await ExecuteGraphQlAsync(
+                        """
+                        query BankStatement($companyId: UUID!) {
+                            bankStatement(companyId: $companyId, limit: 50) {
+                                rows {
+                                    category
+                                    description
+                                    amount
+                                }
+                            }
+                        }
+                        """,
+                        new { companyId },
+                        token);
+
+                Assert.False(statementResult.TryGetProperty("errors", out _), "bankStatement must succeed");
+                var rows = statementResult.GetProperty("data").GetProperty("bankStatement").GetProperty("rows").EnumerateArray().ToList();
+
+                var founderRow = rows.FirstOrDefault(row => row.GetProperty("category").GetString() == "FOUNDER_CONTRIBUTION");
+                var ipoRow = rows.FirstOrDefault(row => row.GetProperty("category").GetString() == "IPO_RAISE");
+
+                Assert.True(founderRow.ValueKind != JsonValueKind.Undefined, "Company ledger must contain founder incoming capital");
+                Assert.True(ipoRow.ValueKind != JsonValueKind.Undefined, "Company ledger must contain IPO incoming capital");
+
+                Assert.True(founderRow.GetProperty("amount").GetDecimal() > 0m, "Founder contribution must be a positive incoming amount");
+                Assert.True(ipoRow.GetProperty("amount").GetDecimal() > 0m, "IPO raise must be a positive incoming amount");
+                Assert.Contains("Founder contribution", founderRow.GetProperty("description").GetString());
+                Assert.Contains("public shareholder investment", ipoRow.GetProperty("description").GetString());
     }
 
     [Fact]

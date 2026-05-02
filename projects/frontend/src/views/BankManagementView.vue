@@ -313,11 +313,21 @@ async function loadData(isRefresh = false) {
       if (!deepEqual(myLoansHere.value, loansHere)) {
         myLoansHere.value = loansHere
       }
-      // Operating accounts for the active company matching this bank's city currency
+      // Operating accounts for the active context (company/person) matching this bank's city currency
       const bankCurrency = bankInfo.value?.cityCurrencyCode
       const activeComp = getActiveCompany(auth.player, userCompanies.value)
       const operatingAccounts = (accountsResult.myBankAccounts ?? []).filter(
-        (a) => a.ownerType === 'COMPANY' && a.companyId === activeComp?.id && bankCurrency && a.currencyCode.toUpperCase() === bankCurrency.toUpperCase() && a.bankBuildingId === bankBuildingId.value,
+        (a) => {
+          if (!bankCurrency || a.currencyCode.toUpperCase() !== bankCurrency.toUpperCase() || a.bankBuildingId !== bankBuildingId.value) {
+            return false
+          }
+
+          if (auth.player?.activeAccountType === 'COMPANY') {
+            return a.ownerType === 'COMPANY' && a.companyId === activeComp?.id
+          }
+
+          return a.ownerType === 'PERSON'
+        },
       )
       if (!deepEqual(myOperatingAccountsHere.value, operatingAccounts)) {
         myOperatingAccountsHere.value = operatingAccounts
@@ -392,6 +402,7 @@ async function submitBaseDeposit() {
 
 const activeCompany = computed(() => getActiveCompany(auth.player, userCompanies.value))
 const isCompanyAccountActive = computed(() => auth.player?.activeAccountType === 'COMPANY' && !!activeCompany.value)
+const isPersonalAccountActive = computed(() => auth.player?.activeAccountType === 'PERSON')
 </script>
 
 <template>
@@ -622,6 +633,7 @@ const isCompanyAccountActive = computed(() => auth.player?.activeAccountType ===
           :is-authenticated="auth.isAuthenticated"
           :active-company="activeCompany"
           :is-company-account-active="isCompanyAccountActive"
+          :is-personal-account-active="isPersonalAccountActive"
           :my-operating-accounts-here="myOperatingAccountsHere"
           :my-loans-here="myLoansHere"
           :my-deposits-here="myDepositsHere"

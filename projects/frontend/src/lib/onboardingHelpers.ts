@@ -11,17 +11,17 @@ import type { BuildingLot } from '@/types'
 
 /**
  * Maps a numeric step value (1-7) to the URL query-param key used for that step.
- * Step 1 → 'industry', Step 2 → 'product', Step 3 → 'city', Step 4 → 'ipo',
+ * Step 1 → 'city', Step 2 → 'industry', Step 3 → 'product', Step 4 → 'ipo',
  * Step 5 → 'factory', Step 6 → 'shop', Step 7 → 'complete'.
  */
 export function stepToKey(value: number): string {
-  if (value === 2) return 'product'
-  if (value === 3) return 'city'
+  if (value === 2) return 'industry'
+  if (value === 3) return 'product'
   if (value === 4) return 'ipo'
   if (value === 5) return 'factory'
   if (value === 6) return 'shop'
   if (value === 7) return 'complete'
-  return 'industry'
+  return 'city'
 }
 
 /**
@@ -29,8 +29,10 @@ export function stepToKey(value: number): string {
  * Falls back to step 1 for any unknown value (including null/undefined).
  */
 export function keyToStep(value: unknown): number {
-  if (value === 'product') return 2
-  if (value === 'city') return 3
+  // Backward compatibility: old onboarding links may still use historical keys.
+  if (value === 'city') return 1
+  if (value === 'industry') return 2
+  if (value === 'product') return 3
   if (value === 'ipo') return 4
   if (value === 'factory') return 5
   if (value === 'shop') return 6
@@ -65,9 +67,9 @@ export function getMaxReachableStep(state: OnboardingStepState): number {
   if (state.onboardingCurrentStep === 'SHOP_SELECTION') return 6
   if (state.hasLocalFactoryProgress) return 6
   if (state.hasSelectedIpoPlan) return 5
-  if (state.selectedCityId) return 4
-  if (state.selectedProductId) return 3
-  if (state.selectedIndustry) return 2
+  if (state.selectedProductId) return 4
+  if (state.selectedIndustry) return 3
+  if (state.selectedCityId) return 2
   return 1
 }
 
