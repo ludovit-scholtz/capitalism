@@ -265,6 +265,10 @@ CI=true npx playwright test --project=chromium e2e/encyclopedia-screenshots.spec
 - Test factory in `Api.Tests/Infrastructure/ApiWebApplicationFactory.cs`.
 - Tests cover: health check, auth (register, login, duplicate email, wrong password), game data queries, company management, building placement, onboarding flow, rankings.
 - Run with: `dotnet test projects/Api.Tests`
+- `Api.Tests` now has archived backend tests that are excluded from default runs to keep the suite fast.
+- Archived tests run only when `RUN_ARCHIVE_TEST=true` is provided (for example `dotnet test projects/Api.Tests /p:RUN_ARCHIVE_TEST=true`).
+- Visual Studio archived profile: select `projects/Api.Tests/Api.Tests.Archive.runsettings` in Test > Configure Run Settings to include archived tests in the run.
+- Keep core functionality tests in non-archived files so default backend validation remains fast and stable.
 
 ## Backend documentation
 - `Api/docs/game-data-model.md` — Entity relationship diagram, field descriptions, seed data.

@@ -5,7 +5,24 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <RunArchiveTests>false</RunArchiveTests>
+    <RunArchiveTests Condition="'$(RUN_ARCHIVE_TEST)' == 'true' or '$(RUN_ARCHIVE_TEST)' == 'True' or '$(RUN_ARCHIVE_TEST)' == '1'">true</RunArchiveTests>
+    <DefineConstants Condition="'$(RunArchiveTests)' == 'true'">$(DefineConstants);RUN_ARCHIVE_TEST</DefineConstants>
   </PropertyGroup>
+
+  <ItemGroup Condition="'$(RunArchiveTests)' != 'true'">
+    <Compile Remove="GraphQlIntegrationTests.cs" />
+    <Compile Remove="TickEngineIntegrationTests.cs" />
+    <Compile Remove="PowerGridIntegrationTests.cs" />
+    <Compile Remove="GlobalCitiesAndFxRatesTests.cs" />
+    <Compile Remove="GoldAmmTests.cs" />
+    <Compile Remove="CityMarketReportTests.cs" />
+    <Compile Remove="PublicSalesPricingModelTests.cs" />
+    <Compile Remove="MasterRankingTelemetryTests.cs" />
+    <Compile Remove="SupplyChainTests.cs" />
+    <Compile Remove="MarketIntelligenceTests.cs" />
+    <Compile Remove="PlayerNotificationAndAlertThresholdTests.cs" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="10.0.0">
