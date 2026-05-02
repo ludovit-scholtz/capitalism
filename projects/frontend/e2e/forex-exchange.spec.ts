@@ -307,6 +307,9 @@ test.describe('Forex Exchange page', () => {
   test('shows bank account selectors when player has company bank accounts', async ({ page }) => {
     const player = makePlayer()
     player.personalCash = 0
+    const activeCompanyId = player.companies[0]?.id ?? 'comp-1'
+    player.activeAccountType = 'COMPANY'
+    player.activeCompanyId = activeCompanyId
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
@@ -317,8 +320,10 @@ test.describe('Forex Exchange page', () => {
         currencyCode: 'EUR',
         currencySymbol: '€',
         balance: 5000,
-        companyId: player.companies[0]?.id ?? 'comp-1',
+        companyId: activeCompanyId,
         companyName: 'My Corp',
+        ownerType: 'COMPANY',
+        ownerDisplayName: 'My Corp',
       },
       {
         id: 'ba-czk-001',
@@ -326,8 +331,10 @@ test.describe('Forex Exchange page', () => {
         currencyCode: 'CZK',
         currencySymbol: 'Kč',
         balance: 80000,
-        companyId: player.companies[0]?.id ?? 'comp-1',
+        companyId: activeCompanyId,
         companyName: 'My Corp',
+        ownerType: 'COMPANY',
+        ownerDisplayName: 'My Corp',
       },
     ]
     await page.addInitScript((token) => {
@@ -347,13 +354,161 @@ test.describe('Forex Exchange page', () => {
     await expect(page.getByText('Your Currency Balances')).toBeHidden()
   })
 
-  test('successfully completes a bank account swap and shows result', async ({ page }) => {
+  test('company context shows only active company accounts in swap and transfer selectors', async ({ page }) => {
     const player = makePlayer()
-    player.personalCash = 0
+    const activeCompany = {
+      id: 'company-active',
+      name: 'Active Holdings',
+      cash: 0,
+      foundedAtUtc: new Date().toISOString(),
+      foundedAtTick: 1,
+      buildings: [],
+    }
+    const otherCompany = {
+      id: 'company-other',
+      name: 'Other Holdings',
+      cash: 0,
+      foundedAtUtc: new Date().toISOString(),
+      foundedAtTick: 1,
+      buildings: [],
+    }
+    player.companies = [activeCompany, otherCompany]
+    const activeCompanyId = activeCompany.id
+    player.activeAccountType = 'COMPANY'
+    player.activeCompanyId = activeCompanyId
+
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
+    state.myBankAccounts = [
+      {
+        id: 'personal-usd',
+        accountNumber: '1000000000000001',
+        currencyCode: 'USD',
+        currencySymbol: '$',
+        balance: 2000,
+        companyId: null,
+        ownerType: 'PERSON',
+        ownerDisplayName: player.displayName,
+      },
+      {
+        id: 'active-eur',
+        accountNumber: '1000000000000002',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        balance: 5000,
+        companyId: activeCompanyId,
+        companyName: activeCompany.name,
+        ownerType: 'COMPANY',
+        ownerDisplayName: activeCompany.name,
+      },
+      {
+        id: 'active-czk',
+        accountNumber: '1000000000000003',
+        currencyCode: 'CZK',
+        currencySymbol: 'Kč',
+        balance: 10000,
+        companyId: activeCompanyId,
+        companyName: activeCompany.name,
+        ownerType: 'COMPANY',
+        ownerDisplayName: activeCompany.name,
+      },
+      {
+        id: 'other-eur',
+        accountNumber: '1000000000000004',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        balance: 9000,
+        companyId: 'company-other',
+        companyName: 'Other Holdings',
+        ownerType: 'COMPANY',
+        ownerDisplayName: 'Other Holdings',
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/forex')
+
+    await expect(page.locator('#from-bank-account option', { hasText: activeCompany.name })).toHaveCount(2)
+    await expect(page.locator('#from-bank-account option', { hasText: player.displayName })).toHaveCount(0)
+    await expect(page.locator('#from-bank-account option', { hasText: 'Other Holdings' })).toHaveCount(0)
+
+    await page.getByRole('tab', { name: 'Transfer' }).click()
+    await expect(page.locator('#bank-transfer-from option', { hasText: activeCompany.name })).toHaveCount(2)
+    await expect(page.locator('#bank-transfer-from option', { hasText: player.displayName })).toHaveCount(0)
+    await expect(page.locator('#bank-transfer-from option', { hasText: 'Other Holdings' })).toHaveCount(0)
+  })
+
+  test('person context shows only personal accounts in swap and transfer selectors', async ({ page }) => {
+    const player = makePlayer()
+    player.activeAccountType = 'PERSON'
+    player.activeCompanyId = null
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.myBankAccounts = [
+      {
+        id: 'personal-usd',
+        accountNumber: '2000000000000001',
+        currencyCode: 'USD',
+        currencySymbol: '$',
+        balance: 2000,
+        companyId: null,
+        ownerType: 'PERSON',
+        ownerDisplayName: player.displayName,
+      },
+      {
+        id: 'personal-eur',
+        accountNumber: '2000000000000002',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        balance: 500,
+        companyId: null,
+        ownerType: 'PERSON',
+        ownerDisplayName: player.displayName,
+      },
+      {
+        id: 'company-eur',
+        accountNumber: '2000000000000003',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        balance: 12000,
+        companyId: player.companies[0]?.id ?? 'company-1',
+        companyName: player.companies[0]?.name ?? 'My Company',
+        ownerType: 'COMPANY',
+        ownerDisplayName: player.companies[0]?.name ?? 'My Company',
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/forex')
+
+    await expect(page.locator('#from-bank-account option', { hasText: player.displayName })).toHaveCount(2)
+    await expect(page.locator('#from-bank-account option', { hasText: player.companies[0]?.name ?? 'My Company' })).toHaveCount(0)
+
+    await page.getByRole('tab', { name: 'Transfer' }).click()
+    await expect(page.locator('#bank-transfer-from option', { hasText: player.displayName })).toHaveCount(2)
+    await expect(page.locator('#bank-transfer-from option', { hasText: player.companies[0]?.name ?? 'My Company' })).toHaveCount(0)
+  })
+
+  test('successfully completes a bank account swap and shows result', async ({ page }) => {
+    const player = makePlayer()
+    player.personalCash = 0
     const companyId = player.companies[0]?.id ?? 'comp-1'
+    player.activeAccountType = 'COMPANY'
+    player.activeCompanyId = companyId
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
     state.myBankAccounts = [
       {
         id: 'ba-eur-swap',
@@ -363,6 +518,8 @@ test.describe('Forex Exchange page', () => {
         balance: 10000,
         companyId,
         companyName: 'Swap Corp',
+        ownerType: 'COMPANY',
+        ownerDisplayName: 'Swap Corp',
       },
       {
         id: 'ba-czk-swap',
@@ -372,6 +529,8 @@ test.describe('Forex Exchange page', () => {
         balance: 0,
         companyId,
         companyName: 'Swap Corp',
+        ownerType: 'COMPANY',
+        ownerDisplayName: 'Swap Corp',
       },
     ]
     await page.addInitScript((token) => {
@@ -406,10 +565,12 @@ test.describe('Forex Exchange page', () => {
   test('blocks swap when source bank account has insufficient funds', async ({ page }) => {
     const player = makePlayer()
     player.personalCash = 0
+    const companyId = player.companies[0]?.id ?? 'comp-1'
+    player.activeAccountType = 'COMPANY'
+    player.activeCompanyId = companyId
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
-    const companyId = player.companies[0]?.id ?? 'comp-1'
     state.myBankAccounts = [
       {
         id: 'ba-low-eur',
@@ -419,6 +580,8 @@ test.describe('Forex Exchange page', () => {
         balance: 50,
         companyId,
         companyName: 'Low Corp',
+        ownerType: 'COMPANY',
+        ownerDisplayName: 'Low Corp',
       },
       {
         id: 'ba-czk-low',
@@ -428,6 +591,8 @@ test.describe('Forex Exchange page', () => {
         balance: 0,
         companyId,
         companyName: 'Low Corp',
+        ownerType: 'COMPANY',
+        ownerDisplayName: 'Low Corp',
       },
     ]
     await page.addInitScript((token) => {
@@ -451,19 +616,23 @@ test.describe('Forex Exchange page', () => {
   test('shows balance of selected source bank account below selector', async ({ page }) => {
     const player = makePlayer()
     player.personalCash = 0
+    const companyId = player.companies[0]?.id ?? 'comp-1'
+    player.activeAccountType = 'COMPANY'
+    player.activeCompanyId = companyId
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
-    const companyId = player.companies[0]?.id ?? 'comp-1'
     state.myBankAccounts = [
       {
         id: 'ba-bal-test',
         accountNumber: '7777777777777777',
         currencyCode: 'EUR',
         currencySymbol: '€',
-        balance: 3750.50,
+        balance: 3750.5,
         companyId,
         companyName: 'Balance Corp',
+        ownerType: 'COMPANY',
+        ownerDisplayName: 'Balance Corp',
       },
     ]
     await page.addInitScript((token) => {
@@ -490,11 +659,14 @@ test.describe('Forex Exchange page', () => {
       { baseCurrencyCode: 'EUR', quoteCurrencyCode: 'CZK', rate: 25.2, rateDate: '2026-04-27', source: 'FALLBACK', quoteCurrencySymbol: 'Kč' },
       { baseCurrencyCode: 'EUR', quoteCurrencyCode: 'USD', rate: 1.08, rateDate: '2026-04-27', source: 'FALLBACK', quoteCurrencySymbol: '$' },
     ]
-    await page.addInitScript(({ token, cityId }) => {
-      localStorage.setItem('auth_token', token)
-      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
-      localStorage.setItem('selected_city_id', cityId)
-    }, { token: `token-${player.id}`, cityId: 'city-pr' })
+    await page.addInitScript(
+      ({ token, cityId }) => {
+        localStorage.setItem('auth_token', token)
+        localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+        localStorage.setItem('selected_city_id', cityId)
+      },
+      { token: `token-${player.id}`, cityId: 'city-pr' },
+    )
     await page.goto('/forex')
 
     await page.getByRole('tab', { name: 'Rate List' }).click()
@@ -521,11 +693,14 @@ test.describe('Forex Exchange page', () => {
       { baseCurrencyCode: 'EUR', quoteCurrencyCode: 'CZK', rate: 25.2, rateDate: '2026-04-27', source: 'FALLBACK', quoteCurrencySymbol: 'Kč' },
       { baseCurrencyCode: 'EUR', quoteCurrencyCode: 'USD', rate: 1.08, rateDate: '2026-04-27', source: 'FALLBACK', quoteCurrencySymbol: '$' },
     ]
-    await page.addInitScript(({ token, cityId }) => {
-      localStorage.setItem('auth_token', token)
-      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
-      localStorage.setItem('selected_city_id', cityId)
-    }, { token: `token-${player.id}`, cityId: 'city-ba' })
+    await page.addInitScript(
+      ({ token, cityId }) => {
+        localStorage.setItem('auth_token', token)
+        localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+        localStorage.setItem('selected_city_id', cityId)
+      },
+      { token: `token-${player.id}`, cityId: 'city-ba' },
+    )
     await page.goto('/forex')
 
     await page.getByRole('tab', { name: 'Rate List' }).click()
@@ -550,11 +725,14 @@ test.describe('Forex Exchange page', () => {
       { baseCurrencyCode: 'EUR', quoteCurrencyCode: 'CZK', rate: 25, rateDate: '2026-04-27', source: 'FALLBACK', quoteCurrencySymbol: 'Kč' },
       { baseCurrencyCode: 'EUR', quoteCurrencyCode: 'USD', rate: 1.0, rateDate: '2026-04-27', source: 'FALLBACK', quoteCurrencySymbol: '$' },
     ]
-    await page.addInitScript(({ token, cityId }) => {
-      localStorage.setItem('auth_token', token)
-      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
-      localStorage.setItem('selected_city_id', cityId)
-    }, { token: `token-${player.id}`, cityId: 'city-pr' })
+    await page.addInitScript(
+      ({ token, cityId }) => {
+        localStorage.setItem('auth_token', token)
+        localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+        localStorage.setItem('selected_city_id', cityId)
+      },
+      { token: `token-${player.id}`, cityId: 'city-pr' },
+    )
     await page.goto('/forex')
 
     await page.getByRole('tab', { name: 'Rate List' }).click()
@@ -573,11 +751,14 @@ test.describe('Forex Exchange page', () => {
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
-    await page.addInitScript(({ token, cityId }) => {
-      localStorage.setItem('auth_token', token)
-      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
-      localStorage.setItem('selected_city_id', cityId)
-    }, { token: `token-${player.id}`, cityId: 'city-ba' })
+    await page.addInitScript(
+      ({ token, cityId }) => {
+        localStorage.setItem('auth_token', token)
+        localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+        localStorage.setItem('selected_city_id', cityId)
+      },
+      { token: `token-${player.id}`, cityId: 'city-ba' },
+    )
     await page.goto('/forex')
 
     // Swap tab is active by default — check city badge is visible
@@ -631,9 +812,14 @@ test.describe('Forex Exchange page', () => {
     state.goldBalance = { balance: 2.5, blockedInPools: 0, availableBalance: 2.5 }
     state.goldAmmPools = [
       {
-        id: 'pool-eur', currencyCode: 'EUR', currencySymbol: '€',
-        fiatReserve: 10000, goldReserve: 5.0, totalLiquidityShares: 1000,
-        impliedGoldPrice: 2000, myPosition: null,
+        id: 'pool-eur',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        fiatReserve: 10000,
+        goldReserve: 5.0,
+        totalLiquidityShares: 1000,
+        impliedGoldPrice: 2000,
+        myPosition: null,
       } satisfies MockGoldAmmPool,
     ]
     await page.addInitScript((token) => {
@@ -677,14 +863,23 @@ test.describe('Forex Exchange page', () => {
     state.goldBalance = { balance: 3.0, blockedInPools: 1.0, availableBalance: 2.0 }
     state.goldAmmPools = [
       {
-        id: 'pool-czk', currencyCode: 'CZK', currencySymbol: 'Kč',
-        fiatReserve: 50000, goldReserve: 2.0, totalLiquidityShares: 500,
+        id: 'pool-czk',
+        currencyCode: 'CZK',
+        currencySymbol: 'Kč',
+        fiatReserve: 50000,
+        goldReserve: 2.0,
+        totalLiquidityShares: 500,
         impliedGoldPrice: 25000,
         myPosition: {
-          id: 'pos-czk-1', poolId: 'pool-czk', currencyCode: 'CZK',
-          liquidityShares: 250, sharePercent: 50,
-          claimableFiat: 12.5, claimableGold: 0.0005,
-          fiatProvided: 25000, goldProvided: 1.0,
+          id: 'pos-czk-1',
+          poolId: 'pool-czk',
+          currencyCode: 'CZK',
+          liquidityShares: 250,
+          sharePercent: 50,
+          claimableFiat: 12.5,
+          claimableGold: 0.0005,
+          fiatProvided: 25000,
+          goldProvided: 1.0,
         },
       } satisfies MockGoldAmmPool,
     ]
@@ -732,9 +927,14 @@ test.describe('Forex Exchange page', () => {
     state.goldBalance = { balance: 10.0, blockedInPools: 0, availableBalance: 10.0 }
     state.goldAmmPools = [
       {
-        id: 'pool-eur-add', currencyCode: 'EUR', currencySymbol: '€',
-        fiatReserve: 20000, goldReserve: 10.0, totalLiquidityShares: 1000,
-        impliedGoldPrice: 2000, myPosition: null,
+        id: 'pool-eur-add',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        fiatReserve: 20000,
+        goldReserve: 10.0,
+        totalLiquidityShares: 1000,
+        impliedGoldPrice: 2000,
+        myPosition: null,
       } satisfies MockGoldAmmPool,
     ]
     await page.addInitScript((token) => {
@@ -758,15 +958,18 @@ test.describe('Forex Exchange page', () => {
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
-    state.playerCurrencyBalances = [
-      { currencyCode: 'EUR', currencySymbol: '€', balance: 50000 },
-    ]
+    state.playerCurrencyBalances = [{ currencyCode: 'EUR', currencySymbol: '€', balance: 50000 }]
     state.goldBalance = { balance: 10.0, blockedInPools: 0, availableBalance: 10.0 }
     state.goldAmmPools = [
       {
-        id: 'pool-eur-liq', currencyCode: 'EUR', currencySymbol: '€',
-        fiatReserve: 40000, goldReserve: 20.0, totalLiquidityShares: 2000,
-        impliedGoldPrice: 2000, myPosition: null,
+        id: 'pool-eur-liq',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        fiatReserve: 40000,
+        goldReserve: 20.0,
+        totalLiquidityShares: 2000,
+        impliedGoldPrice: 2000,
+        myPosition: null,
       } satisfies MockGoldAmmPool,
     ]
     await page.addInitScript((token) => {
@@ -800,9 +1003,14 @@ test.describe('Forex Exchange page', () => {
     state.goldBalance = { balance: 5.0, blockedInPools: 5.0, availableBalance: 0 }
     state.goldAmmPools = [
       {
-        id: 'pool-eur-blocked', currencyCode: 'EUR', currencySymbol: '€',
-        fiatReserve: 10000, goldReserve: 5.0, totalLiquidityShares: 1000,
-        impliedGoldPrice: 2000, myPosition: null,
+        id: 'pool-eur-blocked',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        fiatReserve: 10000,
+        goldReserve: 5.0,
+        totalLiquidityShares: 1000,
+        impliedGoldPrice: 2000,
+        myPosition: null,
       } satisfies MockGoldAmmPool,
     ]
     await page.addInitScript((token) => {

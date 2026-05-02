@@ -1,4 +1,5 @@
 using Api.Data;
+using Api.Data.Entities;
 using Api.Security;
 using Api.Utilities;
 using HotChocolate.Authorization;
@@ -22,6 +23,8 @@ public sealed partial class Query
         [Service] AppDbContext db)
     {
         var playerId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+        var player = await db.Players.AsNoTracking().FirstOrDefaultAsync(candidate => candidate.Id == playerId)
+            ?? throw new GraphQLException(new Error("Player not found.", "PLAYER_NOT_FOUND"));
         ValidateForexInput(input.FromCurrencyCode, input.ToCurrencyCode, input.Amount);
 
         var fromCode = input.FromCurrencyCode.ToUpperInvariant();
@@ -32,14 +35,22 @@ public sealed partial class Query
         var feeAmount = Math.Round(input.Amount * (ForexFeePercent / 100m), 4);
         var netFromAmount = input.Amount - feeAmount;
         var toAmount = Math.Round(netFromAmount * rate, 4);
+        var isCompanyContext = player.ActiveAccountType == AccountContextType.Company && player.ActiveCompanyId.HasValue;
+
+        if (isCompanyContext && (!input.FromBankAccountId.HasValue || !input.ToBankAccountId.HasValue))
+        {
+            throw new GraphQLException(new Error(
+                "In company context, both source and destination bank accounts must be selected.",
+                "ACCOUNT_CONTEXT_REQUIRED"));
+        }
 
         // Determine available balance: prefer bank account when an ID is provided.
         decimal availableBalance;
         if (input.FromBankAccountId.HasValue)
         {
-            var account = await GetOwnedBankAccountAsync(db, input.FromBankAccountId.Value, playerId);
+            var account = await GetOwnedBankAccountAsync(db, input.FromBankAccountId.Value, player);
             if (account is null)
-                throw new GraphQLException(new Error("Source bank account not found or you do not own it.", "ACCOUNT_NOT_FOUND"));
+                throw new GraphQLException(new Error("Source bank account not found in the active account context.", "ACCOUNT_NOT_FOUND"));
             if (!string.Equals(account.CurrencyCode, fromCode, StringComparison.OrdinalIgnoreCase))
                 throw new GraphQLException(new Error(
                     $"Source bank account currency ({account.CurrencyCode}) does not match the requested from-currency ({fromCode}).",
@@ -48,15 +59,22 @@ public sealed partial class Query
         }
         else
         {
+            if (isCompanyContext)
+            {
+                throw new GraphQLException(new Error(
+                    "In company context, quotes must use selected company bank accounts.",
+                    "ACCOUNT_CONTEXT_REQUIRED"));
+            }
+
             availableBalance = await GetPersonalBalanceAsync(db, playerId, fromCode);
         }
 
         // Validate destination account currency when provided.
         if (input.ToBankAccountId.HasValue)
         {
-            var toAccount = await GetOwnedBankAccountAsync(db, input.ToBankAccountId.Value, playerId);
+            var toAccount = await GetOwnedBankAccountAsync(db, input.ToBankAccountId.Value, player);
             if (toAccount is null)
-                throw new GraphQLException(new Error("Destination bank account not found or you do not own it.", "ACCOUNT_NOT_FOUND"));
+                throw new GraphQLException(new Error("Destination bank account not found in the active account context.", "ACCOUNT_NOT_FOUND"));
             if (!string.Equals(toAccount.CurrencyCode, toCode, StringComparison.OrdinalIgnoreCase))
                 throw new GraphQLException(new Error(
                     $"Destination bank account currency ({toAccount.CurrencyCode}) does not match the requested to-currency ({toCode}).",
@@ -247,15 +265,20 @@ public sealed partial class Query
     }
 
     /// <summary>
-    /// Returns a bank account owned by one of the player's companies, or null if not found / not owned.
+    /// Returns a bank account available in the player's currently selected account context.
     /// </summary>
     internal static async Task<Api.Data.Entities.BankAccount?> GetOwnedBankAccountAsync(
         AppDbContext db,
         Guid bankAccountId,
-        Guid playerId)
+        Player player)
     {
+        if (player.ActiveAccountType == AccountContextType.Company && player.ActiveCompanyId.HasValue)
+        {
+            return await db.BankAccounts
+                .FirstOrDefaultAsync(account => account.Id == bankAccountId && account.CompanyId == player.ActiveCompanyId.Value);
+        }
+
         return await db.BankAccounts
-            .Include(a => a.Company)
-            .FirstOrDefaultAsync(a => a.Id == bankAccountId && a.Company != null && a.Company.PlayerId == playerId);
+            .FirstOrDefaultAsync(account => account.Id == bankAccountId && account.PlayerId == player.Id && account.CompanyId == null);
     }
 }

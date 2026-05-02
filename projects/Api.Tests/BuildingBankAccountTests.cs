@@ -483,6 +483,61 @@ public sealed class BuildingBankAccountTests
     }
 
     [Fact]
+    public async Task CreatePersonalBankAccount_WithValidCurrency_CreatesPersonalAccount()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, $"bba-personal-create-{Guid.NewGuid():N}@test.com");
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            mutation CreatePersonal($input: CreatePersonalBankAccountInput!) {
+                createPersonalBankAccount(input: $input) {
+                    account {
+                        id
+                        accountNumber
+                        currencyCode
+                        balance
+                    }
+                }
+            }
+            """,
+            new { input = new { currencyCode = "CZK" } },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _));
+        var account = result.GetProperty("data").GetProperty("createPersonalBankAccount").GetProperty("account");
+        Assert.Equal("CZK", account.GetProperty("currencyCode").GetString());
+        Assert.Equal(0m, account.GetProperty("balance").GetDecimal());
+        Assert.Equal(16, account.GetProperty("accountNumber").GetString()!.Length);
+    }
+
+    [Fact]
+    public async Task CreatePersonalBankAccount_DuplicateCurrency_ReturnsError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, $"bba-personal-dup-{Guid.NewGuid():N}@test.com");
+
+        const string mutation = """
+            mutation CreatePersonal($input: CreatePersonalBankAccountInput!) {
+                createPersonalBankAccount(input: $input) {
+                    account { id }
+                }
+            }
+            """;
+        var vars = new { input = new { currencyCode = "USD" } };
+
+        await ExecuteGraphQlAsync(client, mutation, vars, token);
+
+        var result = await ExecuteGraphQlAsync(client, mutation, vars, token);
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("DUPLICATE_BANK_ACCOUNT", code);
+    }
+
+    [Fact]
     public async Task PlaceBuilding_AssignsCompanyCurrencyBankAccount()
     {
         await using var factory = new ApiWebApplicationFactory();

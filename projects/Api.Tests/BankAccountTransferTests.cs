@@ -112,8 +112,23 @@ public sealed class BankAccountTransferTests
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var (fromCompany, fromAccount) = await SeedAccountAsync(db, playerId, "Source Co", "EUR", 5_000m);
-        var (toCompany, toAccount) = await SeedAccountAsync(db, playerId, "Dest Co", "EUR", 1_000m);
+        var (company, fromAccount) = await SeedAccountAsync(db, playerId, "Source Co", "EUR", 5_000m);
+        var toAccount = new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = Random.Shared.NextInt64(1_000_000_000_000_000L, 9_999_999_999_999_999L).ToString("D16"),
+            CurrencyCode = "EUR",
+            Balance = 1_000m,
+            CompanyId = company.Id,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.BankAccounts.Add(toAccount);
+
+        var player = await db.Players.FirstAsync(candidate => candidate.Id == playerId);
+        player.ActiveAccountType = AccountContextType.Company;
+        player.ActiveCompanyId = company.Id;
+        await db.SaveChangesAsync();
 
         var result = await ExecuteGraphQlAsync(
             client,
@@ -151,14 +166,14 @@ public sealed class BankAccountTransferTests
         // Verify ledger entries on both companies.
         var fromEntry = await verifyDb.LedgerEntries
             .AsNoTracking()
-            .Where(e => e.CompanyId == fromCompany.Id && e.Category == LedgerCategory.BankAccountTransferOut)
+            .Where(e => e.CompanyId == company.Id && e.Category == LedgerCategory.BankAccountTransferOut)
             .SingleAsync();
         Assert.Equal(-1_500m, fromEntry.Amount);
         Assert.Contains("Operating cash sweep", fromEntry.Description);
 
         var toEntry = await verifyDb.LedgerEntries
             .AsNoTracking()
-            .Where(e => e.CompanyId == toCompany.Id && e.Category == LedgerCategory.BankAccountTransferIn)
+            .Where(e => e.CompanyId == company.Id && e.Category == LedgerCategory.BankAccountTransferIn)
             .SingleAsync();
         Assert.Equal(1_500m, toEntry.Amount);
         Assert.Contains("Operating cash sweep", toEntry.Description);
@@ -175,8 +190,23 @@ public sealed class BankAccountTransferTests
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var (_, fromAccount) = await SeedAccountAsync(db, playerId, "Tiny Co", "EUR", 100m);
-        var (_, toAccount) = await SeedAccountAsync(db, playerId, "Other Co", "EUR", 0m);
+        var (company, fromAccount) = await SeedAccountAsync(db, playerId, "Tiny Co", "EUR", 100m);
+        var toAccount = new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = Random.Shared.NextInt64(1_000_000_000_000_000L, 9_999_999_999_999_999L).ToString("D16"),
+            CurrencyCode = "EUR",
+            Balance = 0m,
+            CompanyId = company.Id,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.BankAccounts.Add(toAccount);
+
+        var player = await db.Players.FirstAsync(candidate => candidate.Id == playerId);
+        player.ActiveAccountType = AccountContextType.Company;
+        player.ActiveCompanyId = company.Id;
+        await db.SaveChangesAsync();
 
         var result = await ExecuteGraphQlAsync(
             client,
@@ -208,8 +238,23 @@ public sealed class BankAccountTransferTests
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var (_, eurAccount) = await SeedAccountAsync(db, playerId, "EUR Co", "EUR", 10_000m);
-        var (_, czkAccount) = await SeedAccountAsync(db, playerId, "CZK Co", "CZK", 0m);
+        var (company, eurAccount) = await SeedAccountAsync(db, playerId, "EUR Co", "EUR", 10_000m);
+        var czkAccount = new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = Random.Shared.NextInt64(1_000_000_000_000_000L, 9_999_999_999_999_999L).ToString("D16"),
+            CurrencyCode = "CZK",
+            Balance = 0m,
+            CompanyId = company.Id,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.BankAccounts.Add(czkAccount);
+
+        var player = await db.Players.FirstAsync(candidate => candidate.Id == playerId);
+        player.ActiveAccountType = AccountContextType.Company;
+        player.ActiveCompanyId = company.Id;
+        await db.SaveChangesAsync();
 
         var result = await ExecuteGraphQlAsync(
             client,
@@ -245,8 +290,13 @@ public sealed class BankAccountTransferTests
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var (_, ownerAccount) = await SeedAccountAsync(db, ownerId, "Owner Co", "EUR", 5_000m);
+        var (ownerCompany, ownerAccount) = await SeedAccountAsync(db, ownerId, "Owner Co", "EUR", 5_000m);
         var (_, strangerAccount) = await SeedAccountAsync(db, strangerId, "Stranger Co", "EUR", 0m);
+
+        var ownerPlayer = await db.Players.FirstAsync(candidate => candidate.Id == ownerId);
+        ownerPlayer.ActiveAccountType = AccountContextType.Company;
+        ownerPlayer.ActiveCompanyId = ownerCompany.Id;
+        await db.SaveChangesAsync();
 
         var result = await ExecuteGraphQlAsync(
             client,
@@ -336,6 +386,77 @@ public sealed class BankAccountTransferTests
 
         var error = result.GetProperty("errors")[0];
         Assert.Equal("INVALID_AMOUNT", error.GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task TransferFunds_PersonContext_CompanyAccounts_ReturnsContextMismatch()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, $"xfer-person-context-{Guid.NewGuid():N}@test.com");
+        var playerId = await GetPlayerIdAsync(client, token);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var (_, fromAccount) = await SeedAccountAsync(db, playerId, "Company A", "EUR", 1_000m);
+        var (_, toAccount) = await SeedAccountAsync(db, playerId, "Company B", "EUR", 1_000m);
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            TransferFundsMutation,
+            new
+            {
+                input = new
+                {
+                    fromBankAccountId = fromAccount.Id,
+                    toBankAccountId = toAccount.Id,
+                    amount = 100m,
+                    description = "Invalid cross-context transfer",
+                },
+            },
+            token);
+
+        var error = result.GetProperty("errors")[0];
+        Assert.Equal("ACCOUNT_CONTEXT_MISMATCH", error.GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task TransferFunds_CompanyContext_DifferentCompanyAccounts_ReturnsContextMismatch()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, $"xfer-company-context-{Guid.NewGuid():N}@test.com");
+        var playerId = await GetPlayerIdAsync(client, token);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var (activeCompany, activeAccount) = await SeedAccountAsync(db, playerId, "Active Co", "EUR", 1_000m);
+        var (_, otherAccount) = await SeedAccountAsync(db, playerId, "Other Co", "EUR", 1_000m);
+
+        var player = await db.Players.FirstAsync(candidate => candidate.Id == playerId);
+        player.ActiveAccountType = AccountContextType.Company;
+        player.ActiveCompanyId = activeCompany.Id;
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            TransferFundsMutation,
+            new
+            {
+                input = new
+                {
+                    fromBankAccountId = activeAccount.Id,
+                    toBankAccountId = otherAccount.Id,
+                    amount = 100m,
+                    description = "Cross-company transfer should fail",
+                },
+            },
+            token);
+
+        var error = result.GetProperty("errors")[0];
+        Assert.Equal("ACCOUNT_CONTEXT_MISMATCH", error.GetProperty("extensions").GetProperty("code").GetString());
     }
 
     [Fact]

@@ -52,6 +52,7 @@ Update /CHANGELOG.csv with a new entry for each meaningful change. Create guid i
   - `printWidth: 100`
 - Follow the same formatting conventions for `projects/master-frontend/.prettierrc.json`.
 - Keep changes minimal and scoped to the issue being solved.
+- When adding a new Font Awesome icon in frontend components, always import and register it in `projects/frontend/src/main.ts` (`library.add(...)`) in the same change so the icon renders in runtime and E2E.
 - For any UI change or new UI behavior, add or update Playwright end-to-end tests that cover the user-visible flow.
 - Use `<script setup lang="ts">` in all Vue single-file components.
 - Use scoped styles (`<style scoped>`) in Vue components.

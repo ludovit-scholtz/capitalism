@@ -1316,6 +1316,92 @@ public sealed class GlobalCitiesAndFxRatesTests
     }
 
     [Fact]
+    public async Task ExecuteForexSwap_CompanyContext_WithoutBankAccountIds_ReturnsAccountContextRequired()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndLoginAsync(client, $"ba-company-required-{Guid.NewGuid():N}@example.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var meResult = await ExecuteGraphQlAsync(client, "{ me { id } }", token: token);
+        var playerId = Guid.Parse(meResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = playerId, Name = "Company Context Co", Cash = 0m, FoundedAtUtc = DateTime.UtcNow, FoundedAtTick = 1 };
+        db.Companies.Add(company);
+
+        var player = await db.Players.FirstAsync(candidate => candidate.Id == playerId);
+        player.ActiveAccountType = AccountContextType.Company;
+        player.ActiveCompanyId = company.Id;
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(client,
+            """
+            mutation ExecuteForexSwap($input: ExecuteForexSwapInput!) {
+                executeForexSwap(input: $input) { tradeId }
+            }
+            """,
+            new { input = new { fromCurrencyCode = "EUR", toCurrencyCode = "CZK", amount = 100m } },
+            token);
+
+        var errors = result.GetProperty("errors");
+        Assert.Equal(JsonValueKind.Array, errors.ValueKind);
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("ACCOUNT_CONTEXT_REQUIRED", code);
+    }
+
+    [Fact]
+    public async Task ExecuteForexSwap_PersonContext_WithCompanyBankAccountId_ReturnsAccountNotFound()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndLoginAsync(client, $"ba-person-context-{Guid.NewGuid():N}@example.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var meResult = await ExecuteGraphQlAsync(client, "{ me { id } }", token: token);
+        var playerId = Guid.Parse(meResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = playerId, Name = "Not Active Co", Cash = 0m, FoundedAtUtc = DateTime.UtcNow, FoundedAtTick = 1 };
+        db.Companies.Add(company);
+        var companyEurAccount = new BankAccount { Id = Guid.NewGuid(), CompanyId = company.Id, AccountNumber = "1010101010101010", CurrencyCode = "EUR", Balance = 2_000m };
+        var companyCzkAccount = new BankAccount { Id = Guid.NewGuid(), CompanyId = company.Id, AccountNumber = "2020202020202020", CurrencyCode = "CZK", Balance = 0m };
+        db.BankAccounts.AddRange(companyEurAccount, companyCzkAccount);
+        await SetPersonalSettlementBalanceAsync(db, playerId, 1_000m);
+
+        var player = await db.Players.FirstAsync(candidate => candidate.Id == playerId);
+        player.ActiveAccountType = AccountContextType.Person;
+        player.ActiveCompanyId = null;
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(client,
+            """
+            mutation ExecuteForexSwap($input: ExecuteForexSwapInput!) {
+                executeForexSwap(input: $input) { tradeId }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    fromCurrencyCode = "EUR",
+                    toCurrencyCode = "CZK",
+                    amount = 100m,
+                    fromBankAccountId = companyEurAccount.Id,
+                    toBankAccountId = companyCzkAccount.Id,
+                },
+            },
+            token);
+
+        var errors = result.GetProperty("errors");
+        Assert.Equal(JsonValueKind.Array, errors.ValueKind);
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("ACCOUNT_NOT_FOUND", code);
+    }
+
+    [Fact]
     public async Task GetForexQuote_WithFromBankAccountId_UsesAccountBalance()
     {
         await using var factory = new ApiWebApplicationFactory();

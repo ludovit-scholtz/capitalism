@@ -46,7 +46,7 @@ public sealed partial class Mutation
         player.PasswordHash = hasher.HashPassword(player, input.Password);
 
         db.Players.Add(player);
-        await PersonalBankAccountService.EnsureTrackedSettlementAccountAsync(db, player, 200_000m);
+        await PersonalBankAccountService.EnsureTrackedAccountAsync(db, player.Id, "USD", 200_000m);
         await db.SaveChangesAsync();
 
         var session = GenerateToken(player, jwtOptions.Value);

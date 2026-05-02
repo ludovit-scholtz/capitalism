@@ -110,7 +110,7 @@ public sealed partial class Mutation
         }
 
         // Create company
-        if (await PersonalBankAccountService.GetGrossCashAsync(db, player, httpContextAccessor.HttpContext!.RequestAborted) < StarterFounderContribution)
+        if (await PersonalBankAccountService.GetTrackedBalanceAsync(db, player.Id, "USD", httpContextAccessor.HttpContext!.RequestAborted) < StarterFounderContribution)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -121,8 +121,8 @@ public sealed partial class Mutation
 
         var ipoSelection = ResolveStarterIpoSelection(null);
 
-        // Scale founder contribution and IPO raise to local city currency.
-        var fxRate = await Query.ComputeForexRateAsync(db, "EUR", city.CurrencyCode);
+        // Scale founder contribution and IPO raise from USD to local city currency.
+        var fxRate = await Query.ComputeForexRateAsync(db, "USD", city.CurrencyCode);
         var founderContributionLocal = Math.Round(StarterFounderContribution * fxRate, 2);
         var ipoRaiseLocal = Math.Round(ipoSelection.RaiseTarget * fxRate, 2);
 
@@ -143,7 +143,7 @@ public sealed partial class Mutation
             city.CurrencyCode,
             httpContextAccessor.HttpContext!.RequestAborted);
         fundingAccount.Balance += founderContributionLocal + ipoRaiseLocal;
-        await PersonalBankAccountService.DebitTrackedGrossCashAsync(db, player, StarterFounderContribution, httpContextAccessor.HttpContext!.RequestAborted);
+        await PersonalBankAccountService.DebitTrackedBalanceAsync(db, player.Id, "USD", StarterFounderContribution, httpContextAccessor.HttpContext!.RequestAborted);
 
         // Record the two opening capital events in the company ledger so the bank statement
         // shows a clear audit trail: government starter deposit and IPO public investment.
@@ -153,9 +153,9 @@ public sealed partial class Mutation
             CompanyId = company.Id,
             BankAccountId = fundingAccount.Id,
             Category = LedgerCategory.FounderContribution,
-            Description = city.CurrencyCode == "EUR"
-                ? $"Founder contribution: {StarterFounderContribution:N0} EUR government starter deposit"
-                : $"Founder contribution: {StarterFounderContribution:N0} EUR → {founderContributionLocal:N0} {city.CurrencyCode} (FX {fxRate:F4})",
+            Description = city.CurrencyCode == "USD"
+                ? $"Founder contribution: {StarterFounderContribution:N0} USD government starter deposit"
+                : $"Founder contribution: {StarterFounderContribution:N0} USD → {founderContributionLocal:N0} {city.CurrencyCode} (FX {fxRate:F4})",
             Amount = founderContributionLocal,
             RecordedAtTick = company.FoundedAtTick,
             RecordedAtUtc = nowUtc,
@@ -166,9 +166,9 @@ public sealed partial class Mutation
             CompanyId = company.Id,
             BankAccountId = fundingAccount.Id,
             Category = LedgerCategory.IpoRaise,
-            Description = city.CurrencyCode == "EUR"
-                ? $"IPO public shareholder investment: {ipoSelection.RaiseTarget:N0} EUR raised ({ipoSelection.FounderOwnershipRatio:P0} founder equity)"
-                : $"IPO public shareholder investment: {ipoSelection.RaiseTarget:N0} EUR → {ipoRaiseLocal:N0} {city.CurrencyCode} ({ipoSelection.FounderOwnershipRatio:P0} founder equity, FX {fxRate:F4})",
+            Description = city.CurrencyCode == "USD"
+                ? $"IPO public shareholder investment: {ipoSelection.RaiseTarget:N0} USD raised ({ipoSelection.FounderOwnershipRatio:P0} founder equity)"
+                : $"IPO public shareholder investment: {ipoSelection.RaiseTarget:N0} USD → {ipoRaiseLocal:N0} {city.CurrencyCode} ({ipoSelection.FounderOwnershipRatio:P0} founder equity, FX {fxRate:F4})",
             Amount = ipoRaiseLocal,
             RecordedAtTick = company.FoundedAtTick,
             RecordedAtUtc = nowUtc,
@@ -301,7 +301,7 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        if (await PersonalBankAccountService.GetGrossCashAsync(db, player, httpContextAccessor.HttpContext!.RequestAborted) < StarterFounderContribution)
+        if (await PersonalBankAccountService.GetTrackedBalanceAsync(db, player.Id, "USD", httpContextAccessor.HttpContext!.RequestAborted) < StarterFounderContribution)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -312,8 +312,8 @@ public sealed partial class Mutation
 
         var ipoSelection = ResolveStarterIpoSelection(input.IpoRaiseTarget);
 
-        // Scale founder contribution and IPO raise to local city currency.
-        var fxRate = await Query.ComputeForexRateAsync(db, "EUR", city.CurrencyCode);
+        // Scale founder contribution and IPO raise from USD to local city currency.
+        var fxRate = await Query.ComputeForexRateAsync(db, "USD", city.CurrencyCode);
         var founderContributionLocal = Math.Round(StarterFounderContribution * fxRate, 2);
         var ipoRaiseLocal = Math.Round(ipoSelection.RaiseTarget * fxRate, 2);
 
@@ -334,7 +334,7 @@ public sealed partial class Mutation
             city.CurrencyCode,
             httpContextAccessor.HttpContext!.RequestAborted);
         fundingAccount.Balance += founderContributionLocal + ipoRaiseLocal;
-        await PersonalBankAccountService.DebitTrackedGrossCashAsync(db, player, StarterFounderContribution, httpContextAccessor.HttpContext!.RequestAborted);
+        await PersonalBankAccountService.DebitTrackedBalanceAsync(db, player.Id, "USD", StarterFounderContribution, httpContextAccessor.HttpContext!.RequestAborted);
 
         // Record the two opening capital events in the company ledger so the bank statement
         // shows a clear audit trail: government starter deposit and IPO public investment.
@@ -344,9 +344,9 @@ public sealed partial class Mutation
             CompanyId = company.Id,
             BankAccountId = fundingAccount.Id,
             Category = LedgerCategory.FounderContribution,
-            Description = city.CurrencyCode == "EUR"
-                ? $"Founder contribution: {StarterFounderContribution:N0} EUR government starter deposit"
-                : $"Founder contribution: {StarterFounderContribution:N0} EUR → {founderContributionLocal:N0} {city.CurrencyCode} (FX {fxRate:F4})",
+            Description = city.CurrencyCode == "USD"
+                ? $"Founder contribution: {StarterFounderContribution:N0} USD government starter deposit"
+                : $"Founder contribution: {StarterFounderContribution:N0} USD → {founderContributionLocal:N0} {city.CurrencyCode} (FX {fxRate:F4})",
             Amount = founderContributionLocal,
             RecordedAtTick = company.FoundedAtTick,
             RecordedAtUtc = nowUtc,
@@ -357,9 +357,9 @@ public sealed partial class Mutation
             CompanyId = company.Id,
             BankAccountId = fundingAccount.Id,
             Category = LedgerCategory.IpoRaise,
-            Description = city.CurrencyCode == "EUR"
-                ? $"IPO public shareholder investment: {ipoSelection.RaiseTarget:N0} EUR raised ({ipoSelection.FounderOwnershipRatio:P0} founder equity)"
-                : $"IPO public shareholder investment: {ipoSelection.RaiseTarget:N0} EUR → {ipoRaiseLocal:N0} {city.CurrencyCode} ({ipoSelection.FounderOwnershipRatio:P0} founder equity, FX {fxRate:F4})",
+            Description = city.CurrencyCode == "USD"
+                ? $"IPO public shareholder investment: {ipoSelection.RaiseTarget:N0} USD raised ({ipoSelection.FounderOwnershipRatio:P0} founder equity)"
+                : $"IPO public shareholder investment: {ipoSelection.RaiseTarget:N0} USD → {ipoRaiseLocal:N0} {city.CurrencyCode} ({ipoSelection.FounderOwnershipRatio:P0} founder equity, FX {fxRate:F4})",
             Amount = ipoRaiseLocal,
             RecordedAtTick = company.FoundedAtTick,
             RecordedAtUtc = nowUtc,

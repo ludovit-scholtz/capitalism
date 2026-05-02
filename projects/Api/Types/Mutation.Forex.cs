@@ -54,6 +54,14 @@ public sealed partial class Mutation
 
             var player = await db.Players.FirstOrDefaultAsync(p => p.Id == playerId)
                 ?? throw new GraphQLException(new Error("Player not found.", "PLAYER_NOT_FOUND"));
+            var isCompanyContext = player.ActiveAccountType == AccountContextType.Company && player.ActiveCompanyId.HasValue;
+
+            if (isCompanyContext && (!input.FromBankAccountId.HasValue || !input.ToBankAccountId.HasValue))
+            {
+                throw new GraphQLException(new Error(
+                    "In company context, both source and destination bank accounts must be selected.",
+                    "ACCOUNT_CONTEXT_REQUIRED"));
+            }
 
             var rate = await Query.ComputeForexRateAsync(db, fromCode, toCode);
             var feeAmount = Math.Round(input.Amount * (1m / 100m), 4);
@@ -65,10 +73,8 @@ public sealed partial class Mutation
             if (input.FromBankAccountId.HasValue)
             {
                 // ── Bank-account path (source) ─────────────────────────────
-                var fromAccount = await db.BankAccounts
-                    .Include(a => a.Company)
-                    .FirstOrDefaultAsync(a => a.Id == input.FromBankAccountId.Value && a.Company != null && a.Company.PlayerId == playerId)
-                    ?? throw new GraphQLException(new Error("Source bank account not found or you do not own it.", "ACCOUNT_NOT_FOUND"));
+                var fromAccount = await GetAccountInActiveContextAsync(db, input.FromBankAccountId.Value, player)
+                    ?? throw new GraphQLException(new Error("Source bank account not found in the active account context.", "ACCOUNT_NOT_FOUND"));
 
                 if (!string.Equals(fromAccount.CurrencyCode, fromCode, StringComparison.OrdinalIgnoreCase))
                     throw new GraphQLException(new Error(
@@ -87,6 +93,13 @@ public sealed partial class Mutation
             }
             else
             {
+                if (isCompanyContext)
+                {
+                    throw new GraphQLException(new Error(
+                        "In company context, swaps must use selected company bank accounts.",
+                        "ACCOUNT_CONTEXT_REQUIRED"));
+                }
+
                 // ── Personal wallet path (source) ──────────────────────────
                 var currentBalance = await Query.GetPersonalBalanceAsync(db, playerId, fromCode);
 
@@ -97,7 +110,7 @@ public sealed partial class Mutation
                             currentBalance, fromCode, input.Amount),
                         "INSUFFICIENT_FUNDS"));
 
-                if (fromCode == "EUR")
+                if (fromCode == PersonalBankAccountService.SettlementCurrencyCode)
                 {
                     await PersonalBankAccountService.DebitTrackedGrossCashAsync(db, player, input.Amount);
                 }
@@ -113,10 +126,8 @@ public sealed partial class Mutation
             if (input.ToBankAccountId.HasValue)
             {
                 // ── Bank-account path (destination) ───────────────────────
-                var toAccount = await db.BankAccounts
-                    .Include(a => a.Company)
-                    .FirstOrDefaultAsync(a => a.Id == input.ToBankAccountId.Value && a.Company != null && a.Company.PlayerId == playerId)
-                    ?? throw new GraphQLException(new Error("Destination bank account not found or you do not own it.", "ACCOUNT_NOT_FOUND"));
+                var toAccount = await GetAccountInActiveContextAsync(db, input.ToBankAccountId.Value, player)
+                    ?? throw new GraphQLException(new Error("Destination bank account not found in the active account context.", "ACCOUNT_NOT_FOUND"));
 
                 if (!string.Equals(toAccount.CurrencyCode, toCode, StringComparison.OrdinalIgnoreCase))
                     throw new GraphQLException(new Error(
@@ -128,8 +139,15 @@ public sealed partial class Mutation
             }
             else
             {
+                if (isCompanyContext)
+                {
+                    throw new GraphQLException(new Error(
+                        "In company context, swaps must use selected company bank accounts.",
+                        "ACCOUNT_CONTEXT_REQUIRED"));
+                }
+
                 // ── Personal wallet path (destination) ────────────────────
-                if (toCode == "EUR")
+                if (toCode == PersonalBankAccountService.SettlementCurrencyCode)
                 {
                     await PersonalBankAccountService.CreditTrackedGrossCashAsync(db, player, toAmount);
                 }
@@ -260,5 +278,18 @@ public sealed partial class Mutation
             NewFromBalance = newFromBalance,
             NewToBalance = newToBalance
         };
+    }
+
+    private static async Task<BankAccount?> GetAccountInActiveContextAsync(AppDbContext db, Guid bankAccountId, Player player)
+    {
+        if (player.ActiveAccountType == AccountContextType.Company && player.ActiveCompanyId.HasValue)
+        {
+            return await db.BankAccounts
+                .Include(account => account.Company)
+                .FirstOrDefaultAsync(account => account.Id == bankAccountId && account.CompanyId == player.ActiveCompanyId.Value);
+        }
+
+        return await db.BankAccounts
+            .FirstOrDefaultAsync(account => account.Id == bankAccountId && account.PlayerId == player.Id && account.CompanyId == null);
     }
 }

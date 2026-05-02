@@ -93,6 +93,13 @@ public sealed class CreateCompanyBankAccountResult
     public CompanyBankAccountSummary Account { get; set; } = new();
 }
 
+/// <summary>Result of the <c>createPersonalBankAccount</c> mutation.</summary>
+public sealed class CreatePersonalBankAccountResult
+{
+    /// <summary>The newly created personal bank account.</summary>
+    public CompanyBankAccountSummary Account { get; set; } = new();
+}
+
 /// <summary>Result of the <c>closeCompanyBankAccount</c> mutation.</summary>
 public sealed class CloseCompanyBankAccountResult
 {

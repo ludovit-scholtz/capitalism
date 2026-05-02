@@ -24,6 +24,14 @@ public sealed partial class Mutation
         [Service] IHttpContextAccessor httpContextAccessor)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+        var player = await db.Players
+            .AsNoTracking()
+            .FirstOrDefaultAsync(candidate => candidate.Id == userId)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Player not found.")
+                    .SetCode("PLAYER_NOT_FOUND")
+                    .Build());
 
         if (input.FromBankAccountId == input.ToBankAccountId)
         {
@@ -73,6 +81,30 @@ public sealed partial class Mutation
                     .SetMessage("Destination bank account not found or you do not own it.")
                     .SetCode("TO_ACCOUNT_NOT_FOUND")
                     .Build());
+        }
+
+        var companyContext = player.ActiveAccountType == AccountContextType.Company && player.ActiveCompanyId.HasValue;
+        if (companyContext)
+        {
+            if (fromAccount.CompanyId != player.ActiveCompanyId || toAccount.CompanyId != player.ActiveCompanyId)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("Transfers in company context are allowed only between accounts of the active company.")
+                        .SetCode("ACCOUNT_CONTEXT_MISMATCH")
+                        .Build());
+            }
+        }
+        else
+        {
+            if (fromAccount.PlayerId != userId || fromAccount.CompanyId is not null || toAccount.PlayerId != userId || toAccount.CompanyId is not null)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("Transfers in personal context are allowed only between personal accounts.")
+                        .SetCode("ACCOUNT_CONTEXT_MISMATCH")
+                        .Build());
+            }
         }
 
         if (!string.Equals(fromAccount.CurrencyCode, toAccount.CurrencyCode, StringComparison.OrdinalIgnoreCase))

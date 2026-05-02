@@ -24,6 +24,7 @@ import {
   faWallet,
   faComments,
   faBullhorn,
+  faBell,
   faFileInvoiceDollar,
 } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
@@ -44,6 +45,7 @@ library.add(
   faShieldHalved,
   faComments,
   faBullhorn,
+  faBell,
   faFileInvoiceDollar,
 )
 
