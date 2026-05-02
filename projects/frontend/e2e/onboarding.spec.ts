@@ -575,6 +575,8 @@ test.describe('Onboarding wizard', () => {
     await expect(page.locator('.industry-card', { hasText: 'Furniture' }).locator('.card-first-product')).toContainText('Wooden Chair')
     await expect(page.locator('.industry-card', { hasText: 'Food Processing' }).locator('.card-first-product')).toContainText('Bread')
     await expect(page.locator('.industry-card', { hasText: 'Healthcare' }).locator('.card-first-product')).toContainText('Basic Medicine')
+    // Electronics card always visible (Pro-locked but discoverable).
+    await expect(page.locator('.industry-card', { hasText: 'Electronics' }).locator('.card-first-product')).toContainText('Basic Electronics')
   })
 
   test('industry cards show why-choose tagline for each starter industry', async ({ page }) => {
@@ -585,6 +587,8 @@ test.describe('Onboarding wizard', () => {
     await expect(page.locator('.industry-card', { hasText: 'Furniture' }).locator('.card-why')).toContainText('Low entry cost')
     await expect(page.locator('.industry-card', { hasText: 'Food Processing' }).locator('.card-why')).toContainText('High volume')
     await expect(page.locator('.industry-card', { hasText: 'Healthcare' }).locator('.card-why')).toContainText('Premium margin')
+    // Electronics tagline proves the Pro-exclusive positioning copy.
+    await expect(page.locator('.industry-card', { hasText: 'Electronics' }).locator('.card-why')).toContainText('High margin')
   })
 
   test('industry card descriptions explain the business fantasy', async ({ page }) => {
@@ -598,6 +602,8 @@ test.describe('Onboarding wizard', () => {
     await expect(page.locator('.industry-card', { hasText: 'Food Processing' }).locator('.card-desc')).toContainText('volume')
     // Healthcare description explains premium pricing
     await expect(page.locator('.industry-card', { hasText: 'Healthcare' }).locator('.card-desc')).toContainText('premium')
+    // Electronics description explains the silicon supply-chain complexity
+    await expect(page.locator('.industry-card', { hasText: 'Electronics' }).locator('.card-desc')).toContainText('silicon')
   })
 
   test('can complete onboarding with Food Processing industry', async ({ page }) => {

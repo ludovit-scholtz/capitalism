@@ -1105,6 +1105,212 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task FinishOnboarding_Electronics_BratislavaCity_SupplyChainFeedsShopAndMakesFirstSale()
+    {
+        // Verifies that the Electronics (Silicon → Basic Electronics) starter supply chain works
+        // end-to-end in Bratislava through tick processing.  This is the canonical Pro-only
+        // parallel of the Furniture/FoodProcessing/Healthcare supply chain tests.
+        // Note: Bratislava has no seeded silicon deposits, so silicon is sourced from other
+        // cities through the global exchange (infinite counterparty) — this proves that the
+        // global exchange correctly supplies Pro-only industries even when the player's home
+        // city does not have the required resource locally.
+        var email = $"elec-brat-supply-{Guid.NewGuid():N}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "ElecBrat");
+
+        await using (var proScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = proScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddDays(30);
+            await db.SaveChangesAsync();
+        }
+
+        var bratislavaId = await GetCityIdByNameAsync("Bratislava");
+        var factoryLotId = await CreateTestLotAsync(bratislavaId, "FACTORY,MINE", "Bratislava Silicon Plant");
+
+        await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { nextStep company { id } }
+            }
+            """,
+            new { input = new { industry = "ELECTRONICS", cityId = bratislavaId, companyName = "Bratislava Chips Co", factoryLotId } },
+            token);
+
+        var basicElectronicsId = await GetStarterProductIdAsync("ELECTRONICS", "basic-electronics");
+        var shopLotId = await CreateTestLotAsync(bratislavaId, "SALES_SHOP,COMMERCIAL", "Bratislava Electronics Shop");
+
+        var result = await FinishOnboardingAsync(token, basicElectronicsId, shopLotId);
+        Assert.False(result.TryGetProperty("errors", out _), $"FinishOnboarding failed for ELECTRONICS in Bratislava: {result}");
+
+        var payload = result.GetProperty("data").GetProperty("finishOnboarding");
+        var shopId = Guid.Parse(payload.GetProperty("salesShop").GetProperty("id").GetString()!);
+        var productGuid = Guid.Parse(basicElectronicsId);
+
+        await ProcessTicksAsync(4);
+
+        await using (var verificationScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var shopPurchaseUnit = await db.BuildingUnits
+                .SingleAsync(unit => unit.BuildingId == shopId && unit.UnitType == UnitType.Purchase);
+            var purchasedInventory = await db.Inventories
+                .Where(entry => entry.BuildingUnitId == shopPurchaseUnit.Id && entry.ProductTypeId == productGuid)
+                .ToListAsync();
+
+            Assert.True(
+                purchasedInventory.Sum(entry => entry.Quantity) > 0m,
+                "ELECTRONICS Bratislava starter shop purchase unit should fill from factory after 4 ticks.");
+        }
+
+        await ProcessTicksAsync(2);
+
+        await using (var verificationScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var salesRecords = await db.PublicSalesRecords
+                .Where(record => record.BuildingId == shopId && record.ProductTypeId == productGuid && record.QuantitySold > 0m)
+                .ToListAsync();
+
+            Assert.NotEmpty(salesRecords);
+        }
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_Electronics_PragueCity_SupplyChainFeedsShopAndMakesFirstSale()
+    {
+        // Verifies that the Electronics (Silicon → Basic Electronics) starter supply chain works
+        // end-to-end in Prague (CZK currency) through tick processing.
+        var email = $"elec-prague-supply-{Guid.NewGuid():N}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "ElecPragueSupply");
+
+        await using (var proScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = proScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddDays(30);
+            await db.SaveChangesAsync();
+        }
+
+        var pragueId = await GetCityIdByNameAsync("Prague");
+        var factoryLotId = await CreateTestLotAsync(pragueId, "FACTORY,MINE", "Prague Silicon Plant");
+
+        await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { nextStep company { id } }
+            }
+            """,
+            new { input = new { industry = "ELECTRONICS", cityId = pragueId, companyName = "Prague Chips Co", factoryLotId } },
+            token);
+
+        var basicElectronicsId = await GetStarterProductIdAsync("ELECTRONICS", "basic-electronics");
+        var shopLotId = await CreateTestLotAsync(pragueId, "SALES_SHOP,COMMERCIAL", "Prague Electronics Shop", 90_000m);
+
+        var result = await FinishOnboardingAsync(token, basicElectronicsId, shopLotId);
+        Assert.False(result.TryGetProperty("errors", out _), $"FinishOnboarding failed for ELECTRONICS in Prague: {result}");
+
+        var payload = result.GetProperty("data").GetProperty("finishOnboarding");
+        var shopId = Guid.Parse(payload.GetProperty("salesShop").GetProperty("id").GetString()!);
+        var productGuid = Guid.Parse(basicElectronicsId);
+
+        await ProcessTicksAsync(4);
+
+        await using (var verificationScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var shopPurchaseUnit = await db.BuildingUnits
+                .SingleAsync(unit => unit.BuildingId == shopId && unit.UnitType == UnitType.Purchase);
+            var purchasedInventory = await db.Inventories
+                .Where(entry => entry.BuildingUnitId == shopPurchaseUnit.Id && entry.ProductTypeId == productGuid)
+                .ToListAsync();
+
+            Assert.True(
+                purchasedInventory.Sum(entry => entry.Quantity) > 0m,
+                "ELECTRONICS Prague starter shop should fill from factory after 4 ticks.");
+        }
+
+        await ProcessTicksAsync(2);
+
+        await using (var verificationScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var salesRecords = await db.PublicSalesRecords
+                .Where(record => record.BuildingId == shopId && record.ProductTypeId == productGuid && record.QuantitySold > 0m)
+                .ToListAsync();
+
+            Assert.NotEmpty(salesRecords);
+        }
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_Electronics_ViennaCity_SupplyChainFeedsShopAndMakesFirstSale()
+    {
+        // Verifies that the Electronics (Silicon → Basic Electronics) starter supply chain works
+        // end-to-end in Vienna (EUR, third city) through tick processing.
+        var email = $"elec-vienna-supply-{Guid.NewGuid():N}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "ElecViennaSupply");
+
+        await using (var proScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = proScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddDays(30);
+            await db.SaveChangesAsync();
+        }
+
+        var viennaId = await GetCityIdByNameAsync("Vienna");
+        var factoryLotId = await CreateTestLotAsync(viennaId, "FACTORY,MINE", "Vienna Silicon Plant");
+
+        await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { nextStep company { id } }
+            }
+            """,
+            new { input = new { industry = "ELECTRONICS", cityId = viennaId, companyName = "Vienna Chips Co", factoryLotId } },
+            token);
+
+        var basicElectronicsId = await GetStarterProductIdAsync("ELECTRONICS", "basic-electronics");
+        var shopLotId = await CreateTestLotAsync(viennaId, "SALES_SHOP,COMMERCIAL", "Vienna Electronics Shop", 90_000m);
+
+        var result = await FinishOnboardingAsync(token, basicElectronicsId, shopLotId);
+        Assert.False(result.TryGetProperty("errors", out _), $"FinishOnboarding failed for ELECTRONICS in Vienna: {result}");
+
+        var payload = result.GetProperty("data").GetProperty("finishOnboarding");
+        var shopId = Guid.Parse(payload.GetProperty("salesShop").GetProperty("id").GetString()!);
+        var productGuid = Guid.Parse(basicElectronicsId);
+
+        await ProcessTicksAsync(4);
+
+        await using (var verificationScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var shopPurchaseUnit = await db.BuildingUnits
+                .SingleAsync(unit => unit.BuildingId == shopId && unit.UnitType == UnitType.Purchase);
+            var purchasedInventory = await db.Inventories
+                .Where(entry => entry.BuildingUnitId == shopPurchaseUnit.Id && entry.ProductTypeId == productGuid)
+                .ToListAsync();
+
+            Assert.True(
+                purchasedInventory.Sum(entry => entry.Quantity) > 0m,
+                "ELECTRONICS Vienna starter shop should fill from factory after 4 ticks.");
+        }
+
+        await ProcessTicksAsync(2);
+
+        await using (var verificationScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var salesRecords = await db.PublicSalesRecords
+                .Where(record => record.BuildingId == shopId && record.ProductTypeId == productGuid && record.QuantitySold > 0m)
+                .ToListAsync();
+
+            Assert.NotEmpty(salesRecords);
+        }
+    }
+
+    [Fact]
     public async Task FinishOnboarding_PragueCity_ReturnsCzkCurrencyCodeAndFxAdjustedValues()
     {
         // This test verifies that the onboarding FX-pricing is end-to-end correct for a non-EUR city.
@@ -9966,17 +10172,29 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         // The configure-guide in the frontend depends on selectedProduct.basePrice from the
         // FinishOnboarding result to show the player the market benchmark selling price.
         // If this field is ever dropped from the GraphQL response, the guide silently shows
-        // generic text instead of the concrete price ($45 Furniture, $3 Bread, $50 Medicine).
+        // generic text instead of the concrete price ($45 Furniture, $3 Bread, $50 Medicine, $45 Electronics).
         var industries = new[]
         {
-            ("FURNITURE", "wooden-chair", 45m),
-            ("FOOD_PROCESSING", "bread", 3m),
-            ("HEALTHCARE", "basic-medicine", 50m),
+            ("FURNITURE", "wooden-chair", 45m, false),
+            ("FOOD_PROCESSING", "bread", 3m, false),
+            ("HEALTHCARE", "basic-medicine", 50m, false),
+            ("ELECTRONICS", "basic-electronics", 45m, true),
         };
 
-        foreach (var (industry, slug, expectedBasePrice) in industries)
+        foreach (var (industry, slug, expectedBasePrice, requiresPro) in industries)
         {
-            var token = await RegisterAndGetTokenAsync($"guide-price-{industry.ToLower()}-{Guid.NewGuid()}@test.com", $"Guide Price {industry}");
+            var email = $"guide-price-{industry.ToLower()}-{Guid.NewGuid():N}@test.com";
+            var token = await RegisterAndGetTokenAsync(email, $"Guide Price {industry}");
+
+            // Electronics is Pro-only — set up subscription before starting onboarding.
+            if (requiresPro)
+            {
+                await using var proScope = _factory.Services.CreateAsyncScope();
+                var db = proScope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var player = await db.Players.SingleAsync(p => p.Email == email);
+                player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddDays(30);
+                await db.SaveChangesAsync();
+            }
 
             // Start with the correct industry
             var cityId = await GetCityIdByNameAsync();
