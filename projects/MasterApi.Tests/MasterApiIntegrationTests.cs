@@ -585,7 +585,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
                                                 registrationKey = "test-registration-key",
                                                 serverKey = "capitalism-local",
                                                 includeDrafts = false,
-                                                limit = 200,
+                                                limit = 500,
                                         }
                                 });
 
@@ -621,7 +621,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
                         registrationKey = "test-registration-key",
                         serverKey = "capitalism-local",
                         includeDrafts = false,
-                        limit = 200,
+                        limit = 500,
                     }
                 });
 
@@ -658,7 +658,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
                         registrationKey = "test-registration-key",
                         serverKey = "capitalism-local",
                         includeDrafts = false,
-                        limit = 200,
+                        limit = 500,
                     }
                 });
 
@@ -695,7 +695,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
                         registrationKey = "test-registration-key",
                         serverKey = "capitalism-local",
                         includeDrafts = false,
-                        limit = 200,
+                        limit = 500,
                     }
                 });
 
@@ -731,7 +731,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
                         registrationKey = "test-registration-key",
                         serverKey = "capitalism-local",
                         includeDrafts = false,
-                        limit = 200,
+                        limit = 500,
                     }
                 });
 
