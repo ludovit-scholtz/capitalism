@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <Using Include="Api.Utilities" />
+    <Using Include="Capitalism.Shared.Ranking" />
     <Using Include="Xunit" />
   </ItemGroup>
 

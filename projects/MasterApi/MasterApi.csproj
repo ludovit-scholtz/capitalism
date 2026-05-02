@@ -19,6 +19,11 @@
 
 	<ItemGroup Condition="'$(ImplicitUsings)' == 'enable'">
 		<Using Include="MasterApi" />
+		<Using Include="Capitalism.Shared.Ranking" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Shared\Shared.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

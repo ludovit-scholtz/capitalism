@@ -41,7 +41,7 @@ public sealed class RankingIntegrationTests
                 {
                     registrationKey = "test-registration-key",
                     serverKey = "capitalism-eu-1",
-                    eventType = "FX_TRADER",
+                    eventType = MasterRankingBountyCodes.FxTrader,
                     playerEmail = userEmail,
                     occurredAtUtc = DateTime.UtcNow,
                     externalEventId = $"fx-{Guid.NewGuid():N}",
@@ -110,7 +110,7 @@ public sealed class RankingIntegrationTests
 
         Assert.False(history.TryGetProperty("errors", out _));
         var historyItems = history.GetProperty("data").GetProperty("myRankingBountyHistory").EnumerateArray().ToList();
-        Assert.Single(historyItems, item => item.GetProperty("bountyCode").GetString() == "FX_TRADER");
+        Assert.Single(historyItems, item => item.GetProperty("bountyCode").GetString() == MasterRankingBountyCodes.FxTrader);
     }
 
     [Fact]
@@ -136,7 +136,7 @@ public sealed class RankingIntegrationTests
                 {
                     registrationKey = "test-registration-key",
                   serverKey = "capitalism-eu-1",
-                    eventType = "FX_TRADER",
+                    eventType = MasterRankingBountyCodes.FxTrader,
                     playerEmail = userEmail,
                     occurredAtUtc = DateTime.UtcNow,
                     externalEventId = $"fx-decay-{Guid.NewGuid():N}",
@@ -220,7 +220,7 @@ public sealed class RankingIntegrationTests
 
         Assert.False(history.TryGetProperty("errors", out _));
         var items = history.GetProperty("data").GetProperty("myRankingBountyHistory").EnumerateArray().ToList();
-        var gameImprover = items.FirstOrDefault(item => item.GetProperty("bountyCode").GetString() == "GAME_IMPROVER");
+        var gameImprover = items.FirstOrDefault(item => item.GetProperty("bountyCode").GetString() == MasterRankingBountyCodes.GameImprover);
         Assert.Equal(JsonValueKind.Object, gameImprover.ValueKind);
         Assert.Equal(5m, gameImprover.GetProperty("pointsAwarded").GetDecimal());
     }
@@ -282,7 +282,7 @@ public sealed class RankingIntegrationTests
 
         Assert.False(history.TryGetProperty("errors", out _));
         var items = history.GetProperty("data").GetProperty("myRankingBountyHistory").EnumerateArray().ToList();
-        var recommendFriend = items.FirstOrDefault(item => item.GetProperty("bountyCode").GetString() == "RECOMMEND_FRIEND");
+        var recommendFriend = items.FirstOrDefault(item => item.GetProperty("bountyCode").GetString() == MasterRankingBountyCodes.RecommendFriend);
         Assert.Equal(JsonValueKind.Object, recommendFriend.ValueKind);
         Assert.Equal(5m, recommendFriend.GetProperty("pointsAwarded").GetDecimal());
     }
@@ -380,7 +380,7 @@ public sealed class RankingIntegrationTests
 
         Assert.False(history.TryGetProperty("errors", out _));
         var items = history.GetProperty("data").GetProperty("myRankingBountyHistory").EnumerateArray().ToList();
-        var recommendGoodFriend = items.FirstOrDefault(item => item.GetProperty("bountyCode").GetString() == "RECOMMEND_GOOD_FRIEND");
+        var recommendGoodFriend = items.FirstOrDefault(item => item.GetProperty("bountyCode").GetString() == MasterRankingBountyCodes.RecommendGoodFriend);
         Assert.Equal(JsonValueKind.Object, recommendGoodFriend.ValueKind);
         Assert.Equal(100m, recommendGoodFriend.GetProperty("pointsAwarded").GetDecimal());
     }
@@ -407,7 +407,7 @@ public sealed class RankingIntegrationTests
               }
             }
             """,
-            new { bountyCode = "RETWEET_X_POST", proofReference = "https://x.com/player/status/12345", uniqueScopeKey = (string?)null },
+            new { bountyCode = MasterRankingBountyCodes.RetweetXPost, proofReference = "https://x.com/player/status/12345", uniqueScopeKey = (string?)null },
             userToken);
 
         Assert.False(submitResult.TryGetProperty("errors", out _));
@@ -445,7 +445,7 @@ public sealed class RankingIntegrationTests
               }
             }
             """,
-            new { bountyCode = "RETWEET_X_POST", proofReference = "https://x.com/player/status/approve-test", uniqueScopeKey = (string?)null },
+            new { bountyCode = MasterRankingBountyCodes.RetweetXPost, proofReference = "https://x.com/player/status/approve-test", uniqueScopeKey = (string?)null },
             userToken);
 
         Assert.False(submitResult.TryGetProperty("errors", out _));
@@ -500,7 +500,7 @@ public sealed class RankingIntegrationTests
               }
             }
             """,
-            new { bountyCode = "RETWEET_X_POST", proofReference = "https://x.com/player/status/reject-test", uniqueScopeKey = (string?)null },
+            new { bountyCode = MasterRankingBountyCodes.RetweetXPost, proofReference = "https://x.com/player/status/reject-test", uniqueScopeKey = (string?)null },
             userToken);
 
         Assert.False(submitResult.TryGetProperty("errors", out _));
@@ -557,7 +557,7 @@ public sealed class RankingIntegrationTests
                 {
                     registrationKey = "test-registration-key",
                     serverKey = "capitalism-eu-1",
-                    eventType = "DISCORD_PLAYER",
+                    eventType = MasterRankingBountyCodes.DiscordPlayer,
                     playerEmail = userEmail,
                     occurredAtUtc = DateTime.UtcNow,
                     externalEventId = $"discord-{Guid.NewGuid():N}",
@@ -605,7 +605,7 @@ public sealed class RankingIntegrationTests
                 {
                     registrationKey = "test-registration-key",
                     serverKey = "capitalism-eu-1",
-                    eventType = "DISCORD_PLAYER",
+                    eventType = MasterRankingBountyCodes.DiscordPlayer,
                     playerEmail = userEmail,
                     occurredAtUtc = DateTime.UtcNow.AddMinutes(5),
                     externalEventId = $"discord-{Guid.NewGuid():N}",
@@ -657,7 +657,7 @@ public sealed class RankingIntegrationTests
             .EnumerateArray()
             .ToList();
         var discordAwards = historyItems
-            .Count(item => item.GetProperty("bountyCode").GetString() == "DISCORD_PLAYER");
+            .Count(item => item.GetProperty("bountyCode").GetString() == MasterRankingBountyCodes.DiscordPlayer);
         Assert.Equal(1, discordAwards);
     }
 
@@ -685,7 +685,7 @@ public sealed class RankingIntegrationTests
                 {
                     registrationKey = "test-registration-key",
                     serverKey = "server-eu",
-                    eventType = "MANUFACTURER",
+                    eventType = MasterRankingBountyCodes.Manufacturer,
                     playerEmail = userEmail,
                     occurredAtUtc = DateTime.UtcNow,
                     externalEventId = $"mfr-eu-{Guid.NewGuid():N}",
@@ -707,7 +707,7 @@ public sealed class RankingIntegrationTests
                 {
                     registrationKey = "test-registration-key",
                     serverKey = "server-us",
-                    eventType = "MANUFACTURER",
+                    eventType = MasterRankingBountyCodes.Manufacturer,
                     playerEmail = userEmail,
                     occurredAtUtc = DateTime.UtcNow,
                     externalEventId = $"mfr-us-{Guid.NewGuid():N}",
@@ -733,7 +733,7 @@ public sealed class RankingIntegrationTests
 
         Assert.False(history.TryGetProperty("errors", out _));
         var items = history.GetProperty("data").GetProperty("myRankingBountyHistory").EnumerateArray().ToList();
-        var manufacturerItems = items.Where(item => item.GetProperty("bountyCode").GetString() == "MANUFACTURER").ToList();
+        var manufacturerItems = items.Where(item => item.GetProperty("bountyCode").GetString() == MasterRankingBountyCodes.Manufacturer).ToList();
         Assert.Single(manufacturerItems);
       }
 
@@ -760,7 +760,7 @@ public sealed class RankingIntegrationTests
             {
               registrationKey = "test-registration-key",
               serverKey = "server-eu",
-              eventType = "LOGIN_TO_GAME",
+              eventType = MasterRankingBountyCodes.LoginToGame,
               playerEmail = userEmail,
               occurredAtUtc = DateTime.UtcNow,
               externalEventId = $"login-eu-{Guid.NewGuid():N}",
@@ -782,7 +782,7 @@ public sealed class RankingIntegrationTests
             {
               registrationKey = "test-registration-key",
               serverKey = "server-us",
-              eventType = "LOGIN_TO_GAME",
+              eventType = MasterRankingBountyCodes.LoginToGame,
               playerEmail = userEmail,
               occurredAtUtc = DateTime.UtcNow,
               externalEventId = $"login-us-{Guid.NewGuid():N}",
@@ -807,7 +807,7 @@ public sealed class RankingIntegrationTests
 
         Assert.False(history.TryGetProperty("errors", out _));
         var items = history.GetProperty("data").GetProperty("myRankingBountyHistory").EnumerateArray().ToList();
-        var loginItems = items.Where(item => item.GetProperty("bountyCode").GetString() == "LOGIN_TO_GAME").ToList();
+        var loginItems = items.Where(item => item.GetProperty("bountyCode").GetString() == MasterRankingBountyCodes.LoginToGame).ToList();
         Assert.Equal(2, loginItems.Count);
         var serverKeys = loginItems.Select(item => item.GetProperty("serverKey").GetString()).ToHashSet();
         Assert.Contains("server-eu", serverKeys);
@@ -838,7 +838,7 @@ public sealed class RankingIntegrationTests
               }
             }
             """,
-            new { bountyCode = "RETWEET_X_POST", proofReference = proofUrl, uniqueScopeKey = (string?)null },
+            new { bountyCode = MasterRankingBountyCodes.RetweetXPost, proofReference = proofUrl, uniqueScopeKey = (string?)null },
             userToken);
 
         Assert.False(submitResult.TryGetProperty("errors", out _));
@@ -894,7 +894,7 @@ public sealed class RankingIntegrationTests
                 {
                     registrationKey = "test-registration-key",
                     serverKey = "capitalism-eu-1",
-                    eventType = "FX_TRADER",
+                    eventType = MasterRankingBountyCodes.FxTrader,
                     playerEmail = userEmail,
                     occurredAtUtc = DateTime.UtcNow,
                     externalEventId = $"fx-shadow-{Guid.NewGuid():N}",
@@ -935,7 +935,7 @@ public sealed class RankingIntegrationTests
 
         Assert.False(history.TryGetProperty("errors", out _));
         var historyItems = history.GetProperty("data").GetProperty("myRankingBountyHistory").EnumerateArray().ToList();
-        Assert.Contains(historyItems, item => item.GetProperty("bountyCode").GetString() == "FX_TRADER");
+        Assert.Contains(historyItems, item => item.GetProperty("bountyCode").GetString() == MasterRankingBountyCodes.FxTrader);
     }
 
     [Fact]
@@ -962,7 +962,7 @@ public sealed class RankingIntegrationTests
                 {
                     registrationKey = "test-registration-key",
                     serverKey = "capitalism-eu-1",
-                    eventType = "MANUFACTURER",
+                    eventType = MasterRankingBountyCodes.Manufacturer,
                     playerEmail = userEmail,
                     occurredAtUtc = DateTime.UtcNow,
                     externalEventId = $"manufacturer-{Guid.NewGuid():N}",
@@ -988,7 +988,7 @@ public sealed class RankingIntegrationTests
                 {
                     registrationKey = "test-registration-key",
                     serverKey = "capitalism-eu-1",
-                    eventType = "WHOLESALER",
+                    eventType = MasterRankingBountyCodes.Wholesaler,
                     playerEmail = userEmail,
                     occurredAtUtc = DateTime.UtcNow,
                     externalEventId = $"wholesaler-{Guid.NewGuid():N}",
@@ -1029,8 +1029,8 @@ public sealed class RankingIntegrationTests
 
         Assert.False(history.TryGetProperty("errors", out _));
         var historyItems = history.GetProperty("data").GetProperty("myRankingBountyHistory").EnumerateArray().ToList();
-        Assert.Contains(historyItems, item => item.GetProperty("bountyCode").GetString() == "MANUFACTURER");
-        Assert.Contains(historyItems, item => item.GetProperty("bountyCode").GetString() == "WHOLESALER");
+        Assert.Contains(historyItems, item => item.GetProperty("bountyCode").GetString() == MasterRankingBountyCodes.Manufacturer);
+        Assert.Contains(historyItems, item => item.GetProperty("bountyCode").GetString() == MasterRankingBountyCodes.Wholesaler);
     }
 
     [Fact]
@@ -1058,7 +1058,7 @@ public sealed class RankingIntegrationTests
                 {
                     registrationKey = "test-registration-key",
                     serverKey = "capitalism-eu-1",
-                    eventType = "GAME_IMPROVER",
+                    eventType = MasterRankingBountyCodes.GameImprover,
                     playerEmail = userEmail,
                     occurredAtUtc = DateTime.UtcNow,
                     externalEventId = $"improver-{Guid.NewGuid():N}",
@@ -1089,7 +1089,7 @@ public sealed class RankingIntegrationTests
         Assert.False(dashboard.TryGetProperty("errors", out _));
 
         var items = dashboard.GetProperty("data").GetProperty("myRankingBountyDashboard").EnumerateArray().ToList();
-        var gameImprover = items.FirstOrDefault(item => item.GetProperty("code").GetString() == "GAME_IMPROVER");
+        var gameImprover = items.FirstOrDefault(item => item.GetProperty("code").GetString() == MasterRankingBountyCodes.GameImprover);
 
         Assert.Equal(JsonValueKind.Object, gameImprover.ValueKind);
         Assert.True(gameImprover.GetProperty("awardedToday").GetBoolean());
@@ -1156,3 +1156,4 @@ public sealed class RankingIntegrationTests
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 }
+

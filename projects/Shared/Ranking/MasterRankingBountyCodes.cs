@@ -1,8 +1,7 @@
-namespace Api.Utilities;
+namespace Capitalism.Shared.Ranking;
 
 /// <summary>
-/// String constants for master ranking bounty event types.
-/// Must stay in sync with <c>MasterRankingBountyCodes</c> in the MasterApi project.
+/// Shared master ranking bounty event type codes used by game and master APIs.
 /// </summary>
 public static class MasterRankingBountyCodes
 {
@@ -27,4 +26,29 @@ public static class MasterRankingBountyCodes
     public const string TopPlayer = "TOP_PLAYER";
     public const string GreatPlayer = "GREAT_PLAYER";
     public const string CompanyMaster = "COMPANY_MASTER";
+
+    public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal)
+    {
+        GameImprover,
+        RecommendFriend,
+        RecommendGoodFriend,
+        RetweetXPost,
+        DiscordPlayer,
+        LoginToGame,
+        Manufacturer,
+        Wholesaler,
+        Researcher,
+        RealEstateMagnate,
+        MediaOwner,
+        Banker,
+        Lender,
+        FxTrader,
+        StockTrader,
+        EnergyTrader,
+        GoodEmployer,
+        DividendsMaster,
+        TopPlayer,
+        GreatPlayer,
+        CompanyMaster,
+    };
 }

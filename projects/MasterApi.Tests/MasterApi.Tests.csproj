@@ -23,6 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Using Include="Capitalism.Shared.Ranking" />
     <Using Include="Xunit" />
   </ItemGroup>
 

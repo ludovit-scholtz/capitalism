@@ -4,6 +4,7 @@
 - Root repository contains both frontend and backend.
 - Game backend API lives at `projects/Api` (ASP.NET Core).
 - Master backend API lives at `projects/MasterApi` (ASP.NET Core).
+- Shared backend declarations/calculations live at `projects/Shared` (class library referenced by both APIs).
 - Backend tests live at `projects/Api.Tests`.
 - Game frontend Vue app lives at `projects/frontend`.
 - Master frontend Vue app lives at `projects/master-frontend`.
@@ -29,6 +30,7 @@ Update /CHANGELOG.csv with a new entry for each meaningful change. Create guid i
 - Master backend uses ASP.NET Core 10, Hot Chocolate GraphQL, and Entity Framework Core to store the live game-server registry.
 - `projects/Api` runs on PostgreSQL in normal runtime. Design-time EF migrations for the game API must be scaffolded against PostgreSQL via `projects/Api/Data/AppDbContextFactory.cs` and the `GameCatalog` connection string.
 - **Code-first is the required backend workflow.** Define schema changes in the C# entity/model/DbContext configuration first, then scaffold the PostgreSQL migration from that model. Do not treat PostgreSQL as the source of truth.
+- **Put cross-API backend constants and pure calculation helpers into `projects/Shared`** so `Api`, `MasterApi`, and their tests consume one source of truth (for example `MasterRankingBountyCodes`).
 - **Use the repository migration scripts for game API model changes.** From `projects/Api`, create a migration with `pwsh ./scripts/New-AppMigration.ps1 -Name <MigrationName>` and remove the last un-applied scaffold with `pwsh ./scripts/Remove-AppMigration.ps1`.
 - **Never create EF migration `.cs` files by hand.** If a migration needs custom SQL, scaffold it first so EF generates the `.Designer.cs`, `[Migration]`, `[DbContext]`, and snapshot metadata, then edit the generated `Up()`/`Down()` methods.
 - **Never hand-edit migration snapshots as a substitute for model changes.** `Data/Migrations/AppDbContextModelSnapshot.cs` must stay generated output from the C# model.

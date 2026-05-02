@@ -14,6 +14,11 @@
 	<ItemGroup Condition="'$(ImplicitUsings)' == 'enable'">
 		<Using Include="Api" />
 		<Using Include="Api.Utilities" />
+		<Using Include="Capitalism.Shared.Ranking" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Shared\Shared.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
