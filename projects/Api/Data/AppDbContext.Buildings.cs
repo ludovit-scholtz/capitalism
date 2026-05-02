@@ -89,6 +89,7 @@ public sealed partial class AppDbContext
             e.Property(unit => unit.MaxPrice).HasPrecision(18, 2);
             e.Property(unit => unit.Budget).HasPrecision(18, 2);
             e.Property(unit => unit.MinQuality).HasPrecision(5, 4);
+            e.Property(unit => unit.LowInventoryAlertThreshold).HasPrecision(18, 4);
             e.HasOne(unit => unit.BuildingConfigurationPlan)
                 .WithMany(plan => plan.Units)
                 .HasForeignKey(unit => unit.BuildingConfigurationPlanId)

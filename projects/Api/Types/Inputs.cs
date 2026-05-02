@@ -781,17 +781,29 @@ public sealed class CreateCompanyBankAccountInput
     public string CurrencyCode { get; set; } = string.Empty;
 }
 
+/// <summary>Input for creating a new personal bank account in a supported currency.</summary>
+public sealed class CreatePersonalBankAccountInput
+{
+    /// <summary>
+    /// ISO 4217 currency code for the account (e.g. "USD", "EUR").
+    /// Must match a city currency available in this game server.
+    /// </summary>
+    [Required, MaxLength(3)]
+    public string CurrencyCode { get; set; } = string.Empty;
+}
+
 /// <summary>
 /// Input for transferring funds between two of the authenticated player's bank accounts.
-/// Both accounts must be owned by companies the player owns and must use the same currency.
+/// Both accounts must belong to the active account context (PERSON or the selected COMPANY)
+/// and must use the same currency.
 /// Cross-currency transfers must go through the Forex Exchange swap flow.
 /// </summary>
 public sealed class TransferFundsInput
 {
-    /// <summary>Source bank account ID. Must be owned by a company the caller owns.</summary>
+    /// <summary>Source bank account ID. Must belong to the active account context.</summary>
     public Guid FromBankAccountId { get; set; }
 
-    /// <summary>Destination bank account ID. Must be owned by a company the caller owns.</summary>
+    /// <summary>Destination bank account ID. Must belong to the active account context.</summary>
     public Guid ToBankAccountId { get; set; }
 
     /// <summary>

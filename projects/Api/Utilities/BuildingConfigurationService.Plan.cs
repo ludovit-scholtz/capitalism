@@ -20,7 +20,7 @@ public static partial class BuildingConfigurationService
                 return CloneUnit(existingTargetUnit);
             }
 
-            return CreateUnitSnapshot(planId, desiredUnit, activeUnit?.Level ?? existingTargetUnit.Level, currentTick, 0, false, false);
+            return CreateUnitSnapshot(planId, desiredUnit, activeUnit?.Level ?? existingTargetUnit.Level, currentTick, 0, false, false, activeUnit?.LowInventoryAlertThreshold);
         }
 
         if (existingRemoval is not null
@@ -35,7 +35,8 @@ public static partial class BuildingConfigurationService
                 currentTick,
                 CalculateCancelTicks(existingRemoval.TicksRequired),
                 true,
-                true);
+                true,
+                activeUnit.LowInventoryAlertThreshold);
         }
 
         if (existingTargetUnit is not null
@@ -50,7 +51,8 @@ public static partial class BuildingConfigurationService
                 currentTick,
                 CalculateCancelTicks(existingTargetUnit.TicksRequired),
                 true,
-                true);
+                true,
+                activeUnit.LowInventoryAlertThreshold);
         }
 
         return CreateUnitSnapshot(
@@ -60,7 +62,8 @@ public static partial class BuildingConfigurationService
             currentTick,
             CalculateTicksRequired(activeUnit, desiredUnit),
             false,
-            !AreEquivalent(activeUnit, desiredUnit));
+            !AreEquivalent(activeUnit, desiredUnit),
+            activeUnit?.LowInventoryAlertThreshold);
     }
 
     private static BuildingConfigurationPlanRemoval? CreateNextRemovalPlan(
@@ -97,7 +100,8 @@ public static partial class BuildingConfigurationService
         long currentTick,
         int ticksRequired,
         bool isReverting,
-        bool isChanged)
+        bool isChanged,
+        decimal? lowInventoryAlertThreshold = null)
     {
         return new BuildingConfigurationPlanUnit
         {
@@ -133,6 +137,7 @@ public static partial class BuildingConfigurationService
             VendorLockCompanyId = input.VendorLockCompanyId,
             LockedCityId = (input.PurchaseSource == "EXCHANGE") ? input.LockedCityId : null,
             IndustryCategory = input.IndustryCategory,
+            LowInventoryAlertThreshold = lowInventoryAlertThreshold,
         };
     }
 
@@ -171,8 +176,7 @@ public static partial class BuildingConfigurationService
             BrandScope = unit.BrandScope,
             VendorLockCompanyId = unit.VendorLockCompanyId,
             LockedCityId = unit.LockedCityId,
-            IndustryCategory = unit.IndustryCategory,
-        };
+            IndustryCategory = unit.IndustryCategory,            LowInventoryAlertThreshold = unit.LowInventoryAlertThreshold,        };
     }
 
     private static BuildingConfigurationPlanRemoval CreateRemoval(

@@ -6740,13 +6740,25 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         // After onboarding personal cash must be exactly $0 — all $200k was contributed to the company
         var afterResult = await ExecuteGraphQlAsync("{ personAccount { personalCash } }", token: token);
         Assert.Equal(0m, afterResult.GetProperty("data").GetProperty("personAccount").GetProperty("personalCash").GetDecimal());
+
+        // Personal account balances across all personal bank accounts must be zero after onboarding.
+        var personalAccountsResult = await ExecuteGraphQlAsync(
+            "{ myBankAccounts { ownerType balance currencyCode } }",
+            token: token);
+        var personalAccounts = personalAccountsResult.GetProperty("data").GetProperty("myBankAccounts")
+            .EnumerateArray()
+            .Where(account => account.GetProperty("ownerType").GetString() == "PERSON")
+            .ToList();
+        Assert.NotEmpty(personalAccounts);
+        Assert.All(personalAccounts, account => Assert.Equal(0m, account.GetProperty("balance").GetDecimal()));
     }
 
     [Fact]
     public async Task StartOnboardingCompany_CreatesFounderContributionAndIpoRaiseLedgerEntries_EurCity()
     {
         // ROADMAP "Currencies and bank accounts": opening capital events must be visible in the bank statement
-        // for a EUR city (Bratislava), both FOUNDER_CONTRIBUTION and IPO_RAISE ledger entries must exist.
+        // for a EUR city (Bratislava), both FOUNDER_CONTRIBUTION and IPO_RAISE ledger entries must exist
+        // and must be converted from the USD founder/IPO source currency.
         var token = await RegisterAndGetTokenAsync($"onboard-ledger-eur-{Guid.NewGuid():N}@test.com", "Ledger EUR");
         var (companyId, _, _, _) = await StartOnboardingCompanyAsync(token, "Ledger EUR Co");
 
@@ -6765,15 +6777,17 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.NotNull(founderEntry);
         Assert.NotNull(ipoEntry);
 
-        // EUR city: founder contribution must equal exactly 200,000 (no FX conversion).
-        Assert.Equal(200_000m, founderEntry.Amount);
-        Assert.Contains("200000", NormalizeAmountSeparators(founderEntry.Description));
-        Assert.Contains("EUR", founderEntry.Description);
+        var usdToEurRate = await Query.ComputeForexRateAsync(db, "USD", "EUR");
+        var expectedFounderAmount = Math.Round(200_000m * usdToEurRate, 2);
+        var expectedIpoAmount = Math.Round(400_000m * usdToEurRate, 2);
 
-        // Default IPO raise target is 400,000 EUR, no FX conversion in EUR city.
-        Assert.Equal(400_000m, ipoEntry.Amount);
+        Assert.Equal(expectedFounderAmount, founderEntry.Amount);
+        Assert.Contains("200000", NormalizeAmountSeparators(founderEntry.Description));
+        Assert.Contains("USD", founderEntry.Description);
+
+        Assert.Equal(expectedIpoAmount, ipoEntry.Amount);
         Assert.Contains("400000", NormalizeAmountSeparators(ipoEntry.Description));
-        Assert.Contains("EUR", ipoEntry.Description);
+        Assert.Contains("USD", ipoEntry.Description);
 
         // Both entries must be linked to the company's bank account.
         Assert.NotNull(founderEntry.BankAccountId);
@@ -6824,14 +6838,14 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.True(ipoEntry.Amount > 400_000m,
             $"IPO raise in CZK ({ipoEntry.Amount}) should exceed 400,000 EUR after FX conversion");
 
-        // Descriptions must mention CZK and the EUR source amounts.
+        // Descriptions must mention CZK and the USD source amounts.
         Assert.Contains("CZK", founderEntry.Description);
-        Assert.Contains("EUR", founderEntry.Description);
+        Assert.Contains("USD", founderEntry.Description);
         Assert.Contains("200000", NormalizeAmountSeparators(founderEntry.Description));
         Assert.Contains("FX", founderEntry.Description);
 
         Assert.Contains("CZK", ipoEntry.Description);
-        Assert.Contains("EUR", ipoEntry.Description);
+        Assert.Contains("USD", ipoEntry.Description);
         Assert.Contains("400000", NormalizeAmountSeparators(ipoEntry.Description));
         Assert.Contains("FX", ipoEntry.Description);
 

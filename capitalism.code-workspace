@@ -23,6 +23,10 @@
 		{
 			"name": "Api.Tests",
 			"path": "./projects/Api.Tests"
+		},
+		{
+			"name": "MasterApi.Tests",
+			"path": "./projects/MasterApi.Tests"
 		}
 	],
 	"settings": {}

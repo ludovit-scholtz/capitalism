@@ -270,6 +270,67 @@ public sealed partial class Mutation
     }
 
     /// <summary>
+    /// Creates a new personal bank account for the authenticated player in the specified currency.
+    /// The currency must match a city currency available in this game server.
+    /// </summary>
+    [Authorize]
+    public async Task<CreatePersonalBankAccountResult> CreatePersonalBankAccount(
+        CreatePersonalBankAccountInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+        var currencyCode = input.CurrencyCode.ToUpperInvariant();
+
+        var validCurrency = await db.Cities.AnyAsync(city => city.CurrencyCode == currencyCode);
+        if (!validCurrency)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage($"Currency '{currencyCode}' is not used by any city in this game server.")
+                    .SetCode("INVALID_CURRENCY")
+                    .Build());
+        }
+
+        var existing = await db.BankAccounts
+            .AnyAsync(account => account.PlayerId == userId && account.CompanyId == null && account.CurrencyCode == currencyCode && account.ClosedAtUtc == null);
+        if (existing)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage($"A personal bank account in {currencyCode} already exists.")
+                    .SetCode("DUPLICATE_BANK_ACCOUNT")
+                    .Build());
+        }
+
+        var account = new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = GenerateRandomAccountNumber(),
+            CurrencyCode = currencyCode,
+            Balance = 0m,
+            PlayerId = userId,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+
+        db.BankAccounts.Add(account);
+        await db.SaveChangesAsync();
+
+        return new CreatePersonalBankAccountResult
+        {
+            Account = new CompanyBankAccountSummary
+            {
+                Id = account.Id,
+                AccountNumber = account.AccountNumber,
+                CurrencyCode = account.CurrencyCode,
+                Balance = account.Balance,
+                AlertMinBalanceThreshold = account.AlertMinBalanceThreshold,
+            },
+        };
+    }
+
+    /// <summary>
     /// Permanently closes a company bank account whose balance is exactly zero.
     /// This mutation handles regular (non-deposit) company treasury accounts only.
     /// Deposit accounts held at a bank building must be closed via <c>closeBankAccount</c>.

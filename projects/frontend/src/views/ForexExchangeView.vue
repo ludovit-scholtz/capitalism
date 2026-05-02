@@ -59,7 +59,15 @@ function getInitialTab(): ForexTab {
 const activeTab = ref<ForexTab>(getInitialTab())
 
 /** Whether the player has bank accounts and should use the bank-account-native swap form. */
-const hasBankAccounts = computed(() => myBankAccounts.value.length > 0)
+const isCompanyContext = computed(() => auth.player?.activeAccountType === 'COMPANY' && !!auth.player?.activeCompanyId)
+const contextScopedBankAccounts = computed(() => {
+  if (isCompanyContext.value) {
+    const activeCompanyId = auth.player?.activeCompanyId
+    return myBankAccounts.value.filter((account) => account.ownerType === 'COMPANY' && account.companyId === activeCompanyId)
+  }
+  return myBankAccounts.value.filter((account) => account.ownerType === 'PERSON')
+})
+const hasBankAccounts = computed(() => isCompanyContext.value || contextScopedBankAccounts.value.length > 0)
 
 // City-based FX rate board
 
@@ -155,7 +163,22 @@ const toBalances = computed<CurrencyBalance[]>(() => {
 
 /** Helper - find a bank account in myBankAccounts by ID. */
 function findAccountById(id: string): PlayerBankAccountSummary | undefined {
-  return myBankAccounts.value.find((a) => a.id === id)
+  return contextScopedBankAccounts.value.find((a) => a.id === id)
+}
+
+function ensureScopedAccountSelections() {
+  const accounts = contextScopedBankAccounts.value
+
+  if (!accounts.some((account) => account.id === fromBankAccountId.value)) {
+    const firstEur = accounts.find((account) => account.currencyCode === 'EUR')
+    fromBankAccountId.value = firstEur?.id ?? accounts[0]?.id ?? ''
+  }
+
+  if (!accounts.some((account) => account.id === toBankAccountId.value) || toBankAccountId.value === fromBankAccountId.value) {
+    const firstCzk = accounts.find((account) => account.currencyCode === 'CZK' && account.id !== fromBankAccountId.value)
+    const firstDifferent = accounts.find((account) => account.id !== fromBankAccountId.value)
+    toBankAccountId.value = firstCzk?.id ?? firstDifferent?.id ?? ''
+  }
 }
 
 /** Resolved source currency code - from bank account when available, otherwise manual picker. */
@@ -287,17 +310,7 @@ async function loadData() {
       balances.value = balancesResult.playerCurrencyBalances ?? []
       history.value = historyResult.forexTradeHistory ?? []
       myBankAccounts.value = bankAccountsResult.myBankAccounts ?? []
-
-      // Pre-select default bank accounts when available.
-      if (myBankAccounts.value.length > 0 && !fromBankAccountId.value) {
-        const firstEur = myBankAccounts.value.find((a) => a.currencyCode === 'EUR')
-        fromBankAccountId.value = firstEur?.id ?? myBankAccounts.value[0]?.id ?? ''
-      }
-      if (myBankAccounts.value.length > 1 && !toBankAccountId.value) {
-        const firstCzk = myBankAccounts.value.find((a) => a.currencyCode === 'CZK')
-        const firstDifferent = myBankAccounts.value.find((a) => a.id !== fromBankAccountId.value)
-        toBankAccountId.value = firstCzk?.id ?? firstDifferent?.id ?? ''
-      }
+      ensureScopedAccountSelections()
     }
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : String(e)
@@ -330,6 +343,7 @@ async function reloadBankAccountsSilent() {
       }
     `)
     myBankAccounts.value = result.myBankAccounts ?? []
+    ensureScopedAccountSelections()
   } catch {
     // Best-effort refresh; on failure the panel keeps stale balances until the
     // next full reload.
@@ -508,6 +522,10 @@ watch(activeTab, async (tab) => {
   }
   await router.replace({ query: nextQuery })
 })
+
+watch(contextScopedBankAccounts, () => {
+  ensureScopedAccountSelections()
+})
 </script>
 
 <template>
@@ -648,7 +666,7 @@ watch(activeTab, async (tab) => {
                   <template v-if="hasBankAccounts">
                     <ForexBankAccountSelector
                       v-model="fromBankAccountId"
-                      :accounts="myBankAccounts"
+                      :accounts="contextScopedBankAccounts"
                       :label="t('forex.sourceAccount')"
                       id="from-bank-account"
                       @update:model-value="
@@ -716,7 +734,7 @@ watch(activeTab, async (tab) => {
                   <template v-if="hasBankAccounts">
                     <ForexBankAccountSelector
                       v-model="toBankAccountId"
-                      :accounts="myBankAccounts"
+                      :accounts="contextScopedBankAccounts"
                       :label="t('forex.destAccount')"
                       id="to-bank-account"
                       @update:model-value="
@@ -812,7 +830,7 @@ watch(activeTab, async (tab) => {
           </section>
 
           <!-- Transfer Tab -->
-          <BankAccountTransferPanel v-else-if="activeTab === 'transfer'" :accounts="myBankAccounts" @transferred="reloadBankAccountsSilent" />
+          <BankAccountTransferPanel v-else-if="activeTab === 'transfer'" :accounts="contextScopedBankAccounts" @transferred="reloadBankAccountsSilent" />
 
           <!-- Rates Tab -->
           <section v-else-if="activeTab === 'rates'" class="space-y-6 rounded-2xl border border-divider bg-card p-6 shadow-sm sm:p-8" aria-label="Rate List">
