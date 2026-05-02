@@ -859,6 +859,29 @@ Root-cause of a CI failure (April 2026, PR #261 flicker prevention):
 2. **When verifying "edit mode is active", prefer the always-visible indicator.** For BuildingDetailView's planning section: the `getByRole('button', { name: 'Cancel Editing' })` and `getByRole('heading', { name: 'Planned Upgrade' })` are always visible when `isEditing = true`, whereas "Store Upgrade" is disabled when there are no draft changes (though still visible).
 3. **Run `CI=true npx playwright test --project=chromium e2e/<spec>.ts` with the production build** to catch selector mismatches before `report_progress`. Running without `CI=true` uses the dev server which may behave differently.
 
+## Mock-API combined query handler — always return all requested fields
+
+Root-cause of mass dashboard test failures (May 2026, PR #192 / bank-account reconciliation):
+- The mock-api `myCompanies` handler returned only `{ myCompanies: [...] }` even when the incoming GraphQL query was a combined dashboard query containing `myCompanies`, `gameState`, `myPendingActions`, and `cities` in one request body.
+- `DashboardView.vue` sends all four fields in a single combined query via `gqlRequest<{ myCompanies, gameState, myPendingActions, cities }>(...)`.
+- The mock handler matched `query.includes('myCompanies')` first and returned only `myCompanies`, leaving `initialData.gameState === undefined`.
+- Line 224 `gameState.value = initialData.gameState` set the Pinia `useGameStateStore` ref to `undefined`, hiding the `v-if="gameState"` tick-clock widget and all other game-state-dependent UI.
+- This caused 55 dashboard tests, 8 onboarding tests, and 9 more tests across other specs to fail — all because the dashboard's combined query was not fully handled by the mock.
+
+**Rules to prevent recurrence:**
+1. **When a mock handler for a specific field (e.g., `myCompanies`) fires, check whether the query string also includes other top-level fields** that the component requests in the same combined query. Return ALL requested fields in the response.
+2. **The correct pattern for a combined-query handler:** build a `responseData` object and conditionally add each requested top-level field:
+   ```ts
+   const responseData: Record<string, unknown> = { myCompanies: player?.companies ?? [] }
+   if (query.includes('gameState')) responseData.gameState = buildMockGameStatePayload(state.gameState)
+   if (query.includes('myPendingActions')) responseData.myPendingActions = computePendingActions(state, player)
+   if (query.includes('cities')) responseData.cities = state.cities
+   return route.fulfill({ body: JSON.stringify({ data: responseData }) })
+   ```
+3. **A component that sets a Pinia store ref from a combined query result (e.g., `gameState.value = initialData.gameState`) will zero out the store if the mock does not return that field.** This silently hides all `v-if="gameState"` UI elements in the entire app for the duration of the test.
+4. **When a mass test failure appears (many tests suddenly failing across many spec files), check if the root cause is a missing field in a combined mock response** before blaming individual test logic.
+5. **After changing any mock handler, run the full spec file that uses the combined query** (e.g., `dashboard.spec.ts`) to catch regressions immediately.
+
 ## Mock-API `rankings` vs `companyRankings` substring collision
 
 Root-cause of a latent mock bug (April 2026, PR #261):
