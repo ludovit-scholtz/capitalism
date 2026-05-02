@@ -631,6 +631,7 @@ export type MockCollateralBuilding = {
   maxBorrowable: number
   existingSecuredExposure: number
   remainingBorrowingCapacity: number
+  currencyCode?: string
   isEligible: boolean
   ineligibilityReason: string | null
 }
@@ -5012,10 +5013,46 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     if (query.includes('myCompanies')) {
       applyDueBuildingUpgrades(state)
       const player = state.players.find((p) => p.id === state.currentUserId)
+      const responseData: Record<string, unknown> = { myCompanies: player?.companies ?? [] }
+
+      // Combined dashboard query — also return other requested top-level fields so the
+      // dashboard's combined query does not nullify the game-state store.
+      if (query.includes('gameState')) {
+        responseData.gameState = buildMockGameStatePayload(state.gameState)
+      }
+      if (query.includes('myPendingActions')) {
+        const currentTick = state.gameState.currentTick
+        responseData.myPendingActions = (player?.companies ?? [])
+          .flatMap((company) =>
+            company.buildings
+              .filter(
+                (building) =>
+                  building.pendingConfiguration != null &&
+                  building.pendingConfiguration.appliesAtTick > currentTick,
+              )
+              .map((building) => ({
+                id: building.pendingConfiguration!.id,
+                actionType: 'BUILDING_UPGRADE',
+                buildingId: building.id,
+                buildingName: building.name,
+                buildingType: building.type,
+                submittedAtUtc: building.pendingConfiguration!.submittedAtUtc,
+                submittedAtTick: building.pendingConfiguration!.submittedAtTick,
+                appliesAtTick: building.pendingConfiguration!.appliesAtTick,
+                ticksRemaining: building.pendingConfiguration!.appliesAtTick - currentTick,
+                totalTicksRequired: building.pendingConfiguration!.totalTicksRequired,
+              })),
+          )
+          .sort((a, b) => a.appliesAtTick - b.appliesAtTick)
+      }
+      if (query.includes('cities')) {
+        responseData.cities = state.cities ?? []
+      }
+
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { myCompanies: player?.companies ?? [] } }),
+        body: JSON.stringify({ data: responseData }),
       })
     }
 

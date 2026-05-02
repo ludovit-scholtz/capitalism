@@ -1255,6 +1255,7 @@ test.describe('Loan collateral selection', () => {
     maxBorrowable: 280000,
     existingSecuredExposure: 0,
     remainingBorrowingCapacity: 280000,
+    currencyCode: 'EUR',
     isEligible: true,
     ineligibilityReason: null,
   }
@@ -1268,6 +1269,7 @@ test.describe('Loan collateral selection', () => {
     maxBorrowable: 84000,
     existingSecuredExposure: 84000,
     remainingBorrowingCapacity: 0,
+    currencyCode: 'EUR',
     isEligible: false,
     ineligibilityReason: 'Building is already pledged',
   }

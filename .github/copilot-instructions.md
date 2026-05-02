@@ -861,6 +861,29 @@ Root-cause of a CI failure (April 2026, PR #261 flicker prevention):
 2. **When verifying "edit mode is active", prefer the always-visible indicator.** For BuildingDetailView's planning section: the `getByRole('button', { name: 'Cancel Editing' })` and `getByRole('heading', { name: 'Planned Upgrade' })` are always visible when `isEditing = true`, whereas "Store Upgrade" is disabled when there are no draft changes (though still visible).
 3. **Run `CI=true npx playwright test --project=chromium e2e/<spec>.ts` with the production build** to catch selector mismatches before `report_progress`. Running without `CI=true` uses the dev server which may behave differently.
 
+## Mock-API combined query handler — always return all requested fields
+
+Root-cause of mass dashboard test failures (May 2026, PR #192 / bank-account reconciliation):
+- The mock-api `myCompanies` handler returned only `{ myCompanies: [...] }` even when the incoming GraphQL query was a combined dashboard query containing `myCompanies`, `gameState`, `myPendingActions`, and `cities` in one request body.
+- `DashboardView.vue` sends all four fields in a single combined query via `gqlRequest<{ myCompanies, gameState, myPendingActions, cities }>(...)`.
+- The mock handler matched `query.includes('myCompanies')` first and returned only `myCompanies`, leaving `initialData.gameState === undefined`.
+- Line 224 `gameState.value = initialData.gameState` set the Pinia `useGameStateStore` ref to `undefined`, hiding the `v-if="gameState"` tick-clock widget and all other game-state-dependent UI.
+- This caused 55 dashboard tests, 8 onboarding tests, and 9 more tests across other specs to fail — all because the dashboard's combined query was not fully handled by the mock.
+
+**Rules to prevent recurrence:**
+1. **When a mock handler for a specific field (e.g., `myCompanies`) fires, check whether the query string also includes other top-level fields** that the component requests in the same combined query. Return ALL requested fields in the response.
+2. **The correct pattern for a combined-query handler:** build a `responseData` object and conditionally add each requested top-level field:
+   ```ts
+   const responseData: Record<string, unknown> = { myCompanies: player?.companies ?? [] }
+   if (query.includes('gameState')) responseData.gameState = buildMockGameStatePayload(state.gameState)
+   if (query.includes('myPendingActions')) responseData.myPendingActions = computePendingActions(state, player)
+   if (query.includes('cities')) responseData.cities = state.cities
+   return route.fulfill({ body: JSON.stringify({ data: responseData }) })
+   ```
+3. **A component that sets a Pinia store ref from a combined query result (e.g., `gameState.value = initialData.gameState`) will zero out the store if the mock does not return that field.** This silently hides all `v-if="gameState"` UI elements in the entire app for the duration of the test.
+4. **When a mass test failure appears (many tests suddenly failing across many spec files), check if the root cause is a missing field in a combined mock response** before blaming individual test logic.
+5. **After changing any mock handler, run the full spec file that uses the combined query** (e.g., `dashboard.spec.ts`) to catch regressions immediately.
+
 ## Mock-API `rankings` vs `companyRankings` substring collision
 
 Root-cause of a latent mock bug (April 2026, PR #261):
@@ -1297,3 +1320,33 @@ Root-cause of a CI failure (April 2026, PR #weekly-reports):
    ```
 3. **Every time CHANGELOG.csv grows beyond the previously assumed row count, check whether any test uses a hardcoded `limit` smaller than the current row count.** Keep the limit at 500 to future-proof against further growth.
 4. **xUnit analyzer warning `xUnit2002: Do not use Assert.NotNull() on value type`** is a real bug signal, not just a style warning. Treat it as a required fix.
+
+## Mock type completeness — always include all GraphQL-returned fields in mock types
+
+Root-cause of E2E test failures (May 2026, PR #192 / collateral currency format):
+- `MockCollateralBuilding` in `e2e/helpers/mock-api.ts` was missing the `currencyCode` field.
+- The backend `myCollateralBuildings` GraphQL query returns `currencyCode` on each building.
+- `BankLoanRequestView.vue` uses `formatCurrency(b.appraisedValue, b.currencyCode)` to display amounts.
+- Without `currencyCode` in the mock, `b.currencyCode` was `undefined` → `formatCurrency` defaulted to USD (`$`) instead of the city's currency (EUR = `€`).
+- The E2E test correctly asserted `€400,000` but the actual UI showed `$400,000`.
+
+**Rules to prevent recurrence:**
+1. **When a GraphQL query returns a new field, add it to the corresponding `Mock*` type in `e2e/helpers/mock-api.ts` in the same commit.** Do not add a field to the GraphQL query without updating the mock.
+2. **Currency-displaying components that accept `currencyCode` as a prop or field must always have that field populated in E2E fixtures.** Missing `currencyCode` silently falls back to USD which causes `$` vs `€` failures.
+3. **When adding or updating a `Mock*` type, scan the corresponding GraphQL query for all returned fields and verify each one is present in the type.** Add optional (`?`) fields for newly-added GraphQL fields to maintain backward compatibility with existing fixture objects.
+4. **After adding a currency-rendering component to a view, search for all existing E2E tests that render that view and verify their mock fixtures include `currencyCode`.** A missing currency code will always produce `$` (USD fallback) which will fail any test that asserts a non-USD currency symbol.
+
+## E2E text selectors — match the exact i18n translation, not a simplified version
+
+Root-cause of an E2E test failure (May 2026, PR #192 / marketing-analytics unauthenticated state):
+- `marketing-analytics.spec.ts` used `page.getByText(/login/i)` expecting to match the login-required message.
+- The i18n key `auth.loginRequired` translates to "Please log in to continue." which contains "log in" (two words with a space) — NOT "login" (single word).
+- JavaScript regex `/login/i` matches the literal 5-character sequence "login" and does NOT match "log in" (which has 6 characters: l-o-g-space-i-n).
+- The navigation header's login button is "Sign In" (also no match for `/login/i`).
+- The test always failed: "element(s) not found" on every run.
+
+**Rules to prevent recurrence:**
+1. **Before writing `page.getByText(/pattern/i)`, look up the exact i18n translation in `src/i18n/locales/en.ts` and use a pattern that actually matches the translation.** Do not guess from memory.
+2. **"Log in" (two words) and "login" (one word) are different strings.** `auth.loginRequired` = "Please log in to continue." which requires `/log in/i` or `/please log in/i`, not `/login/i`.
+3. **When testing unauthenticated state, prefer asserting the page-level empty-state message** (e.g. `page.locator('.ca-empty-state')` visible, or `page.getByText(/please log in/i)`). Do not rely on navigation header elements whose text depends on the header implementation.
+4. **Immediately before pushing any new E2E test, run it in isolation** with `CI=true npx playwright test --project=chromium e2e/<spec>.ts --grep "test name"` to verify the selector actually resolves to a visible element.

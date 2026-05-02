@@ -57,7 +57,7 @@ test.describe('Marketing Analytics Dashboard', () => {
   test('shows login-required message when not authenticated', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/marketing-analytics')
-    await expect(page.getByText(/login/i).first()).toBeVisible()
+    await expect(page.getByText(/please log in/i).first()).toBeVisible()
   })
 
   test('shows page title when authenticated', async ({ page }) => {
