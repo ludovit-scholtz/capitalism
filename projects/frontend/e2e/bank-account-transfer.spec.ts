@@ -16,8 +16,8 @@ test.describe('Bank Account Transfer panel', () => {
         currencyCode: 'EUR',
         currencySymbol: '€',
         balance: 1000,
-        companyId: 'company-a',
-        companyName: 'Acme Operations',
+        ownerType: 'PERSON',
+        ownerDisplayName: 'Acme Operations',
       },
       {
         id: 'acc-eur-2',
@@ -25,8 +25,8 @@ test.describe('Bank Account Transfer panel', () => {
         currencyCode: 'EUR',
         currencySymbol: '€',
         balance: 250,
-        companyId: 'company-b',
-        companyName: 'Acme Holdings',
+        ownerType: 'PERSON',
+        ownerDisplayName: 'Acme Holdings',
       },
       {
         id: 'acc-czk-1',
@@ -34,8 +34,8 @@ test.describe('Bank Account Transfer panel', () => {
         currencyCode: 'CZK',
         currencySymbol: 'Kč',
         balance: 75000,
-        companyId: 'company-a',
-        companyName: 'Acme Operations',
+        ownerType: 'PERSON',
+        ownerDisplayName: 'Acme Operations',
       },
     ]
     await page.addInitScript((token) => {

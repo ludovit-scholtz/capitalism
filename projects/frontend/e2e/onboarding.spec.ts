@@ -5017,7 +5017,7 @@ test.describe('Electronics industry — Pro-gated starter path', () => {
     await expect(page.getByRole('alert')).toBeVisible()
     await expect(page.getByRole('alert')).toContainText('Pro subscription')
     await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).not.toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).toBeHidden()
   })
 
   test('Pro subscriber can select Electronics and advance to product step', async ({ page }) => {
