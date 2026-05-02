@@ -265,7 +265,7 @@ export default {
     industryWhyElectronics: 'Vysoká marža · prémiové postavenie · len pre Pro',
     proBadge: 'PRO',
     proRequiredError: 'Toto odvetvie vyžaduje aktívne predplatné Pro.',
-    proRequiredTooltip: 'Inovácia na Pro na odomknutie elektroniky',
+    proRequiredTooltip: 'Inovujte na Pro a odomknite elektroniku',
     companyName: 'Názov firmy',
     companyNamePlaceholder: 'Zadajte názov firmy',
     generatedCompanyName: 'Vygenerovaný názov firmy',

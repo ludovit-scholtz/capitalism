@@ -1173,6 +1173,7 @@ useTickRefresh(async () => {
               'pick-hint': !selectedIndustry,
               'opacity-60 cursor-not-allowed': proOnlyIndustries.includes(ind) && !auth.isProSubscriber && hasAuthenticatedSession,
             }"
+            :aria-disabled="proOnlyIndustries.includes(ind) && !auth.isProSubscriber && hasAuthenticatedSession ? 'true' : undefined"
             :title="proOnlyIndustries.includes(ind) && !auth.isProSubscriber && hasAuthenticatedSession ? t('onboarding.proRequiredTooltip') : undefined"
             @click="selectIndustry(ind)"
           >

@@ -5007,7 +5007,11 @@ test.describe('Electronics industry — Pro-gated starter path', () => {
     await page.goto('/onboarding')
     await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
 
-    await page.locator('.industry-card', { hasText: 'Electronics' }).click()
+    // Wait for the PRO badge to confirm proOnlyIndustries has been loaded before clicking
+    const electronicsCard = page.locator('.industry-card', { hasText: 'Electronics' })
+    await expect(electronicsCard.locator('.industry-pro-badge')).toBeVisible()
+    // The card is aria-disabled for non-Pro users; use force:true to test the guard handler fires
+    await electronicsCard.click({ force: true })
 
     // Should show error and NOT advance to product step
     await expect(page.getByRole('alert')).toBeVisible()
