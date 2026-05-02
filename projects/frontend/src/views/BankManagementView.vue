@@ -338,7 +338,18 @@ async function loadData(isRefresh = false) {
   }
 }
 
-onMounted(loadData)
+onMounted(async () => {
+  auth.initFromStorage()
+  if (auth.isAuthenticated && !auth.player) {
+    try {
+      await auth.fetchMe()
+    } catch {
+      // loadData will surface any user-visible auth/data errors.
+    }
+  }
+
+  await loadData()
+})
 
 useTickRefresh(async () => {
   const scrollPos = saveScrollPosition()

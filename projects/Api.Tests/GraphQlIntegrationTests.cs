@@ -1209,6 +1209,21 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task Register_DuplicateEmail_CaseInsensitive_ReturnsError()
+    {
+        await ExecuteGraphQlAsync(
+            "mutation Register($input: RegisterInput!) { register(input: $input) { token } }",
+            new { input = new { email = "Case.Dupe@Test.com", displayName = "First", password = "Password1!" } });
+
+        var result = await ExecuteGraphQlAsync(
+            "mutation Register($input: RegisterInput!) { register(input: $input) { token } }",
+            new { input = new { email = "case.dupe@test.com", displayName = "Second", password = "Password1!" } });
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Contains("already exists", errors[0].GetProperty("message").GetString());
+    }
+
+    [Fact]
     public async Task Login_ValidCredentials_ReturnsToken()
     {
         // Register first
@@ -1231,6 +1246,23 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var data = result.GetProperty("data").GetProperty("login");
         Assert.NotEmpty(data.GetProperty("token").GetString()!);
         Assert.Equal("LoginUser", data.GetProperty("player").GetProperty("displayName").GetString());
+    }
+
+    [Fact]
+    public async Task Login_EmailCaseInsensitive_ReturnsToken()
+    {
+        await ExecuteGraphQlAsync(
+            "mutation Register($input: RegisterInput!) { register(input: $input) { token } }",
+            new { input = new { email = "Case.Login@Test.com", displayName = "LoginCaseUser", password = "Password1!" } });
+
+        var result = await ExecuteGraphQlAsync(
+            "mutation Login($input: LoginInput!) { login(input: $input) { token player { displayName email } } }",
+            new { input = new { email = "case.login@test.com", password = "Password1!" } });
+
+        var data = result.GetProperty("data").GetProperty("login");
+        Assert.NotEmpty(data.GetProperty("token").GetString()!);
+        Assert.Equal("LoginCaseUser", data.GetProperty("player").GetProperty("displayName").GetString());
+        Assert.Equal("case.login@test.com", data.GetProperty("player").GetProperty("email").GetString());
     }
 
     [Fact]
@@ -1285,6 +1317,28 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var storedPlayer = await db.Players.SingleAsync(player => player.Email == email);
         Assert.Equal("Shared Auth User", storedPlayer.DisplayName);
+    }
+
+    [Fact]
+    public async Task Me_MasterStyleToken_ExistingEmailDifferentCase_ReusesSinglePlayer()
+    {
+        var registeredToken = await RegisterAndGetTokenAsync("Case.Shared@Test.com", "Case Shared User");
+        _ = await ExecuteGraphQlAsync("{ me { id } }", token: registeredToken);
+
+        var sharedToken = CreateSharedToken(Guid.NewGuid().ToString(), "case.shared@test.com", "Case Shared User");
+        var meResult = await ExecuteGraphQlAsync("{ me { id email displayName } }", token: sharedToken);
+
+        Assert.False(meResult.TryGetProperty("errors", out _));
+        var me = meResult.GetProperty("data").GetProperty("me");
+        Assert.Equal("case.shared@test.com", me.GetProperty("email").GetString());
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var matchingPlayers = await db.Players
+            .Where(player => player.Email.ToLower() == "case.shared@test.com")
+            .ToListAsync();
+
+        Assert.Single(matchingPlayers);
     }
 
     [Fact]

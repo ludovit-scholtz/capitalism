@@ -213,6 +213,18 @@ const cityFxRate = computed<number>(() => {
   return rate?.rate ?? 1
 })
 
+/** FX rate for USD conversion: units of city currency per 1 USD. */
+const cityUsdFxRate = computed<number>(() => {
+  const targetCode = selectedCity.value?.currencyCode ?? 'USD'
+  if (targetCode === 'USD') return 1
+
+  const eurToTarget = getFxRateForCurrency(targetCode)
+  const eurToUsd = getFxRateForCurrency('USD')
+  if (!eurToUsd || eurToUsd <= 0) return 1
+
+  return eurToTarget / eurToUsd
+})
+
 const selectedIndustry = ref('')
 const selectedCityId = ref('')
 const selectedProductId = ref('')
@@ -242,8 +254,8 @@ const starterCompany = computed(() => {
   return auth.player?.companies.find((company) => company.id === companyId) ?? null
 })
 const selectedIpoOption = computed(() => ipoOptions.find((option) => option.raiseTarget === selectedIpoRaiseTarget.value) ?? ipoOptions[0])
-/** Company starting cash in the selected city's local currency. */
-const companyStartingCash = computed(() => Math.round((FOUNDER_CONTRIBUTION + selectedIpoOption.value.raiseTarget) * cityFxRate.value))
+/** Company starting cash in the selected city's local currency (USD founder + USD IPO raise). */
+const companyStartingCash = computed(() => Math.round((FOUNDER_CONTRIBUTION + selectedIpoOption.value.raiseTarget) * cityUsdFxRate.value))
 const remainingPersonalCash = computed(() => PERSONAL_STARTING_CASH - FOUNDER_CONTRIBUTION)
 const hasGuestFactoryPurchaseInRoute = computed(() => isGuestMode.value && (route.query.step === 'shop' || route.query.step === 'complete'))
 const effectiveOnboardingCompanyCash = computed(() => {
@@ -1230,11 +1242,11 @@ useTickRefresh(async () => {
           </article>
           <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
             <span class="text-muted text-xs">{{ t('onboarding.founderContribution') }}</span
-            ><strong>{{ formatCurrency(FOUNDER_CONTRIBUTION * cityFxRate) }}</strong>
+            ><strong>{{ formatCurrency(FOUNDER_CONTRIBUTION * cityUsdFxRate) }}</strong>
           </article>
           <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
             <span class="text-muted text-xs">{{ t('onboarding.personalCash') }}</span
-            ><strong>{{ formatCurrency(remainingPersonalCash, 'EUR') }}</strong>
+            ><strong>{{ formatCurrency(remainingPersonalCash, 'USD') }}</strong>
           </article>
         </div>
         <div class="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
@@ -1249,7 +1261,7 @@ useTickRefresh(async () => {
             @click="selectIpoPlan(option.raiseTarget)"
           >
             <span class="font-bold text-sm">{{ t(option.titleKey) }}</span
-            ><span class="text-muted text-xs">{{ t('onboarding.ipoRaise') }}: {{ formatCurrency(option.raiseTarget * cityFxRate) }}</span
+            ><span class="text-muted text-xs">{{ t('onboarding.ipoRaise') }}: {{ formatCurrency(option.raiseTarget * cityUsdFxRate) }}</span
             ><span class="text-muted text-xs">{{ t('onboarding.ipoFounderOwnership') }}: {{ formatPercent(option.founderOwnershipRatio) }}</span
             ><span class="text-muted text-xs">{{ t('onboarding.ipoPublicFloat') }}: {{ formatPercent(1 - option.founderOwnershipRatio) }}</span
             ><span class="text-muted text-[0.8125rem] leading-snug">{{ t(option.descriptionKey) }}</span>

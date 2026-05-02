@@ -344,18 +344,18 @@ test.describe('Onboarding wizard', () => {
     await page.locator('.industry-card', { hasText: 'Furniture' }).click()
     await page.locator('.product-card').first().click()
     await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
-    await expect(page.locator('.budget-card', { hasText: 'Personal cash after contribution' })).toContainText('€0')
+    await expect(page.locator('.budget-card', { hasText: 'Personal cash after contribution' })).toContainText('$0')
 
     const growthIpoCard = page.locator('.ipo-card', { hasText: 'Growth IPO' })
-    await expect(growthIpoCard).toContainText('€600,000')
+    await expect(growthIpoCard).toContainText('€555,555.56')
     await expect(growthIpoCard).toContainText('33.3%')
     await growthIpoCard.click()
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
-    await expect(page.locator('.budget-card', { hasText: 'Starting cash' })).toContainText('€800,000')
+    await expect(page.locator('.budget-card', { hasText: 'Starting cash' })).toContainText('€740,741')
 
     await page.getByRole('button', { name: 'List View' }).click()
     await chooseStarterFactoryLot(page)
-    await expect(page.locator('.budget-card', { hasText: 'Cash after purchase' })).toContainText('€710,000')
+    await expect(page.locator('.budget-card', { hasText: 'Cash after purchase' })).toContainText('€650,741')
   })
 
   test('renders mixed resource and intermediate-product recipes without runtime errors', async ({ page }) => {
@@ -4692,14 +4692,14 @@ test.describe('IPO plan — Expansion option ($800k raise, 25% founder)', () => 
     const expansionIpoCard = page.locator('.ipo-card', { hasText: 'Expansion IPO' })
     await expect(expansionIpoCard).toBeVisible()
     // Verify the Expansion IPO card shows the correct raise amount and 25% founder ownership
-    await expect(expansionIpoCard).toContainText('€800,000')
+    await expect(expansionIpoCard).toContainText('€740,740.74')
     await expect(expansionIpoCard).toContainText('25.0%')
 
     await expansionIpoCard.click()
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
 
-    // Starting cash must update to €1,000,000 = €200k founder + €800k raise
-    await expect(page.locator('.budget-card', { hasText: 'Starting cash' })).toContainText('€1,000,000')
+    // USD-based founder+raise is converted to local city currency for display.
+    await expect(page.locator('.budget-card', { hasText: 'Starting cash' })).toContainText('€925,926')
   })
 
   test('Expansion IPO updates Cash after purchase when factory lot is selected', async ({ page }) => {
@@ -4725,8 +4725,9 @@ test.describe('IPO plan — Expansion option ($800k raise, 25% founder)', () => 
     await page.getByRole('button', { name: 'List View' }).click()
     await chooseStarterFactoryLot(page)
 
-    // €1,000,000 - €90,000 = €910,000
-    await expect(page.locator('.budget-card', { hasText: 'Cash after purchase' })).toContainText('€910,000')
+    // USD-based raise/founder are converted to local currency in the selected city.
+    // Bratislava (EUR): €925,926 - €90,000 = €835,926
+    await expect(page.locator('.budget-card', { hasText: 'Cash after purchase' })).toContainText('€835,926')
   })
 })
 
@@ -4746,8 +4747,8 @@ test.describe('Guest onboarding — Expansion IPO selection', () => {
     // Step 3: factory — Expansion IPO already selected
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
 
-    // €200k founder + €800k raise = €1,000k company starting cash
-    await expect(page.locator('.budget-card', { hasText: 'Starting cash' })).toContainText('€1,000,000')
+    // USD-based founder+raise is converted to the selected city currency (EUR in Bratislava).
+    await expect(page.locator('.budget-card', { hasText: 'Starting cash' })).toContainText('€925,926')
   })
 
   test('guest Expansion IPO selection is preserved after refresh', async ({ page }) => {
@@ -4762,14 +4763,14 @@ test.describe('Guest onboarding — Expansion IPO selection', () => {
       ipoPlan: 'Expansion IPO',
     })
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
-    await expect(page.locator('.budget-card', { hasText: 'Starting cash' })).toContainText('€1,000,000')
+    await expect(page.locator('.budget-card', { hasText: 'Starting cash' })).toContainText('€925,926')
 
     // Reload the page — progress is restored from route URL
     await page.reload()
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
 
-    // The Expansion IPO card must still be selected and starting cash still €1,000k
-    await expect(page.locator('.budget-card', { hasText: 'Starting cash' })).toContainText('€1,000,000')
+    // The Expansion IPO card must still be selected and the converted starting cash preserved.
+    await expect(page.locator('.budget-card', { hasText: 'Starting cash' })).toContainText('€925,926')
   })
 })
 
