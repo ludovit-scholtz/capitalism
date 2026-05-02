@@ -99,6 +99,9 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Shared in-game chat messages authored by players.</summary>
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
 
+    /// <summary>Player-facing in-game notifications shown in the navbar bell.</summary>
+    public DbSet<PlayerNotification> PlayerNotifications => Set<PlayerNotification>();
+
     /// <summary>Records stock-exchange buy/sell executions from the player's personal account.</summary>
     public DbSet<PersonTradeRecord> PersonTradeRecords => Set<PersonTradeRecord>();
 

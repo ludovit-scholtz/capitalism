@@ -104,6 +104,10 @@ namespace Api.Data.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
 
+                    b.Property<decimal?>("AlertMinBalanceThreshold")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<decimal>("Balance")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
@@ -143,6 +147,9 @@ namespace Api.Data.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<bool>("IsGovernmentAccount")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsLowBalanceAlertActive")
                         .HasColumnType("boolean");
 
                     b.Property<Guid?>("PlayerId")
@@ -655,6 +662,9 @@ namespace Api.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<bool>("IsLowInventoryAlertActive")
+                        .HasColumnType("boolean");
+
                     b.Property<int>("Level")
                         .HasColumnType("integer");
 
@@ -684,6 +694,10 @@ namespace Api.Data.Migrations
 
                     b.Property<Guid?>("LockedCityId")
                         .HasColumnType("uuid");
+
+                    b.Property<decimal?>("LowInventoryAlertThreshold")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
 
                     b.Property<decimal?>("MaxPrice")
                         .HasPrecision(18, 2)
@@ -1496,6 +1510,9 @@ namespace Api.Data.Migrations
                     b.Property<Guid?>("CollateralBuildingId")
                         .HasColumnType("uuid");
 
+                    b.Property<long?>("DueSoonAlertForPaymentTick")
+                        .HasColumnType("bigint");
+
                     b.Property<long>("DueTick")
                         .HasColumnType("bigint");
 
@@ -1547,6 +1564,8 @@ namespace Api.Data.Migrations
                     b.HasIndex("BorrowerBankAccountId");
 
                     b.HasIndex("CollateralBuildingId");
+
+                    b.HasIndex("DueSoonAlertForPaymentTick");
 
                     b.HasIndex("LoanOfferId");
 
@@ -1795,6 +1814,66 @@ namespace Api.Data.Migrations
                         {
                             t.HasCheckConstraint("CK_PlayerGoldBalances_Balance_NonNegative", "\"Balance\" >= 0");
                         });
+                });
+
+            modelBuilder.Entity("Api.Data.Entities.PlayerNotification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("BankAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("BuildingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("BuildingUnitId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("CreatedAtTick")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid?>("LoanId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("PlayerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ReadAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("PlayerId", "IsRead", "CreatedAtTick");
+
+                    b.ToTable("PlayerNotifications");
                 });
 
             modelBuilder.Entity("Api.Data.Entities.ProductRecipe", b =>
@@ -2625,6 +2704,17 @@ namespace Api.Data.Migrations
                     b.Navigation("Player");
                 });
 
+            modelBuilder.Entity("Api.Data.Entities.PlayerNotification", b =>
+                {
+                    b.HasOne("Api.Data.Entities.Player", "Player")
+                        .WithMany("Notifications")
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Player");
+                });
+
             modelBuilder.Entity("Api.Data.Entities.ProductRecipe", b =>
                 {
                     b.HasOne("Api.Data.Entities.ProductType", "InputProductType")
@@ -2805,6 +2895,8 @@ namespace Api.Data.Migrations
                     b.Navigation("Companies");
 
                     b.Navigation("DividendPayments");
+
+                    b.Navigation("Notifications");
 
                     b.Navigation("Shareholdings");
                 });

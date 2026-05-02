@@ -362,6 +362,28 @@ public sealed partial class PurchasingPhase : ITickPhase
                         });
                     }
 
+                    if (context.CompaniesById.TryGetValue(supply.Building.CompanyId, out var sellerCompany)
+                        && sellerCompany.PlayerId != company.PlayerId)
+                    {
+                        var itemName = resourceId.HasValue && context.ResourceTypesById.TryGetValue(resourceId.Value, out var resource)
+                            ? resource.Name
+                            : (productId.HasValue && context.ProductTypesById.TryGetValue(productId.Value, out var product)
+                                ? product.Name
+                                : "item");
+
+                        PlayerNotificationService.Add(
+                            context.Db,
+                            sellerCompany.PlayerId,
+                            PlayerNotificationType.B2BSaleFulfilled,
+                            "B2B sale fulfilled",
+                            $"{company.Name} bought {withdrawn.Quantity:0.####} {itemName} from {supply.Building.Name}.",
+                            context.CurrentTick,
+                            sellerCompany.Id,
+                            supply.Building.Id,
+                            supply.Unit.Id,
+                            bankAccountId: sellerAccount?.Id);
+                    }
+
                     totalSourcingCost += deliveredCost;
                 }
 

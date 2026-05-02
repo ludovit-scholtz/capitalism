@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { loginAs, makePlayer, makeSupportTicket, setupMockApi } from './helpers/mock-api'
 
 test.describe('Support tickets', () => {
-  test('user can submit ticket with markdown editor and see it in personal list', async ({
+  test('user can submit ticket with markdown editor and open full ticket page', async ({
     page,
   }) => {
     const player = makePlayer({
@@ -13,7 +13,7 @@ test.describe('Support tickets', () => {
     const state = setupMockApi(page, {})
     await loginAs(page, state, player)
 
-    await page.goto('/support')
+    await page.goto('/support/new')
 
     await page.getByLabel('Ticket type').selectOption('BUG')
     await page.getByLabel('Ticket title').fill('Factory layout issue')
@@ -26,10 +26,35 @@ test.describe('Support tickets', () => {
 
     await page.getByRole('button', { name: 'Submit ticket' }).click()
 
+    await expect(page).toHaveURL(/\/support\/tickets\/.+/)
     await expect(page.getByRole('status')).toContainText('Support ticket submitted.')
-    await expect(page.locator('table[aria-label="My support tickets table"]')).toContainText(
-      'Factory layout issue',
-    )
+    await expect(page.getByRole('heading', { name: 'Factory layout issue' })).toBeVisible()
+  })
+
+  test('clicking ticket in list opens full detail page', async ({ page }) => {
+    const player = makePlayer({
+      id: 'player-user-1b',
+      email: 'user1b@example.com',
+      displayName: 'User 1B',
+    })
+    const state = setupMockApi(page, {
+      supportTickets: [
+        makeSupportTicket({
+          id: 'ticket-open-1',
+          createdByPlayerId: player.id,
+          createdByEmail: player.email,
+          createdByDisplayName: player.displayName,
+          title: 'Open detail test ticket',
+        }),
+      ],
+    })
+    await loginAs(page, state, player)
+
+    await page.goto('/support/tickets')
+    await page.getByRole('button', { name: 'Open detail test ticket' }).click()
+
+    await expect(page).toHaveURL(/\/support\/tickets\/ticket-open-1/)
+    await expect(page.getByRole('heading', { name: 'Open detail test ticket' })).toBeVisible()
   })
 
   test('user ticket table filtering and sorting works', async ({ page }) => {
@@ -64,7 +89,7 @@ test.describe('Support tickets', () => {
     })
     await loginAs(page, state, player)
 
-    await page.goto('/support')
+    await page.goto('/support/tickets')
 
     await page.getByLabel('Filter type').selectOption('SUGGESTION')
     await page.getByRole('button', { name: 'Apply' }).click()
@@ -157,7 +182,7 @@ test.describe('Support tickets', () => {
     })
 
     await loginAs(page, state, user)
-    await page.goto('/support')
+    await page.goto('/support/tickets')
     await expect(page.locator('table[aria-label="My support tickets table"]')).toContainText(
       'User visible ticket',
     )

@@ -6,6 +6,7 @@ import {
   fetchMe,
   fetchMySubscription,
   loginAccount,
+  probeGameAdminAccess,
   prolongSubscription,
   registerAccount,
 } from '@/lib/masterApi'
@@ -13,12 +14,26 @@ import {
 const TOKEN_KEY = 'master_auth_token'
 const EXPIRES_KEY = 'master_auth_expires'
 
+function buildFallbackAdminEmails(): Set<string> {
+  const configured = (import.meta.env.VITE_MASTER_ADMIN_EMAILS as string | undefined)
+    ?.split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter((item) => item.length > 0)
+
+  const defaults = ['admin@events.local']
+  return new Set([...(configured ?? []), ...defaults])
+}
+
+const fallbackAdminEmails = buildFallbackAdminEmails()
+
 export const useAuthStore = defineStore('masterAuth', () => {
   const player = ref<MasterPlayerProfile | null>(null)
   const subscription = ref<SubscriptionInfo | null>(null)
   const token = ref<string | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
+  const isGameAdmin = ref(false)
+  const gameAdminChecked = ref(false)
 
   const isAuthenticated = computed(() => !!token.value)
 
@@ -37,8 +52,25 @@ export const useAuthStore = defineStore('masterAuth', () => {
     token.value = auth.token
     player.value = auth.player
     subscription.value = null
+    isGameAdmin.value = false
+    gameAdminChecked.value = false
     localStorage.setItem(TOKEN_KEY, auth.token)
     localStorage.setItem(EXPIRES_KEY, auth.expiresAtUtc)
+  }
+
+  async function refreshGameAdminAccess() {
+    if (!token.value) {
+      isGameAdmin.value = false
+      gameAdminChecked.value = true
+      return
+    }
+
+    const probeAccess = await probeGameAdminAccess(token.value)
+    const normalizedEmail = player.value?.email?.trim().toLowerCase()
+    const fallbackAccess = normalizedEmail ? fallbackAdminEmails.has(normalizedEmail) : false
+
+    isGameAdmin.value = probeAccess || fallbackAccess
+    gameAdminChecked.value = true
   }
 
   async function register(email: string, displayName: string, password: string) {
@@ -73,6 +105,7 @@ export const useAuthStore = defineStore('masterAuth', () => {
     if (!token.value) return
     try {
       player.value = await fetchMe(token.value)
+      await refreshGameAdminAccess()
     } catch {
       // token may have expired
       logout()
@@ -121,6 +154,8 @@ export const useAuthStore = defineStore('masterAuth', () => {
     token.value = null
     player.value = null
     subscription.value = null
+    isGameAdmin.value = false
+    gameAdminChecked.value = false
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(EXPIRES_KEY)
   }
@@ -131,6 +166,8 @@ export const useAuthStore = defineStore('masterAuth', () => {
     token,
     loading,
     error,
+    isGameAdmin,
+    gameAdminChecked,
     isAuthenticated,
     initFromStorage,
     register,
@@ -139,6 +176,7 @@ export const useAuthStore = defineStore('masterAuth', () => {
     fetchSubscription,
     prolong,
     claimStartupPackOffer,
+    refreshGameAdminAccess,
     logout,
   }
 })

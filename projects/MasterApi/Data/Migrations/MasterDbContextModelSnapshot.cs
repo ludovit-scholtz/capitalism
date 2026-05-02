@@ -325,6 +325,334 @@ namespace MasterApi.Data.Migrations
                     b.ToTable("GoldTokenTransactions");
                 });
 
+            modelBuilder.Entity("MasterApi.Data.Entities.MasterRankingBountyAudit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BountyDefinitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ChangeType")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("ChangedByEmail")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("NewValueJson")
+                        .IsRequired()
+                        .HasMaxLength(20000)
+                        .HasColumnType("character varying(20000)");
+
+                    b.Property<string>("PreviousValueJson")
+                        .IsRequired()
+                        .HasMaxLength(20000)
+                        .HasColumnType("character varying(20000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BountyDefinitionId", "CreatedAtUtc");
+
+                    b.ToTable("MasterRankingBountyAudits");
+                });
+
+            modelBuilder.Entity("MasterApi.Data.Entities.MasterRankingBountyDefinition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("CooldownMode")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(220)
+                        .HasColumnType("character varying(220)");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsVisibleToPlayers")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ProofRequirement")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<bool>("RequiresModeration")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal>("RewardPoints")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<string>("SourceEventType")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ValidationSettingsJson")
+                        .IsRequired()
+                        .HasMaxLength(10000)
+                        .HasColumnType("character varying(10000)");
+
+                    b.Property<string>("VisibilityScope")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("MasterRankingBountyDefinitions");
+                });
+
+            modelBuilder.Entity("MasterApi.Data.Entities.MasterRankingEvaluationRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("FinishedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int>("ProcessedEvents")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RewardRecordsCreated")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RunType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<decimal>("TotalPointsAfterDecay")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal>("TotalPointsAwarded")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal>("TotalPointsBeforeDecay")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RunType", "StartedAtUtc");
+
+                    b.ToTable("MasterRankingEvaluationRuns");
+                });
+
+            modelBuilder.Entity("MasterApi.Data.Entities.MasterRankingEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("ExternalEventId")
+                        .HasMaxLength(220)
+                        .HasColumnType("character varying(220)");
+
+                    b.Property<DateTime?>("ModeratedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ModeratedByEmail")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ModerationReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasMaxLength(20000)
+                        .HasColumnType("character varying(20000)");
+
+                    b.Property<Guid?>("PlayerAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PlayerEmail")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("ProcessedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ProofReference")
+                        .HasMaxLength(1500)
+                        .HasColumnType("character varying(1500)");
+
+                    b.Property<string>("ServerKey")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("UniqueScopeKey")
+                        .HasMaxLength(220)
+                        .HasColumnType("character varying(220)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExternalEventId")
+                        .IsUnique();
+
+                    b.HasIndex("PlayerAccountId");
+
+                    b.HasIndex("EventType", "Status", "CreatedAtUtc");
+
+                    b.ToTable("MasterRankingEvents");
+                });
+
+            modelBuilder.Entity("MasterApi.Data.Entities.MasterRankingPlayerSnapshot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("GlobalRank")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("LastDailyDecayFactorApplied")
+                        .HasColumnType("decimal(9,6)");
+
+                    b.Property<Guid>("PlayerAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("PreviousGlobalRank")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("TotalPoints")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GlobalRank");
+
+                    b.HasIndex("PlayerAccountId")
+                        .IsUnique();
+
+                    b.ToTable("MasterRankingPlayerSnapshots");
+                });
+
+            modelBuilder.Entity("MasterApi.Data.Entities.MasterRankingRewardRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AwardMetadataJson")
+                        .IsRequired()
+                        .HasMaxLength(20000)
+                        .HasColumnType("character varying(20000)");
+
+                    b.Property<DateTime>("AwardedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("BountyDefinitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("EventDateUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PlayerAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("PointsAwarded")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<Guid?>("RankingEventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ServerKey")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("UniquenessKey")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BountyDefinitionId");
+
+                    b.HasIndex("RankingEventId");
+
+                    b.HasIndex("UniquenessKey")
+                        .IsUnique();
+
+                    b.HasIndex("PlayerAccountId", "AwardedAtUtc");
+
+                    b.ToTable("MasterRankingRewardRecords");
+                });
+
             modelBuilder.Entity("MasterApi.Data.Entities.PlayerAccount", b =>
                 {
                     b.Property<Guid>("Id")
@@ -362,6 +690,9 @@ namespace MasterApi.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
+
+                    b.Property<string>("ReferredByEmail")
+                        .HasColumnType("text");
 
                     b.Property<DateTime?>("StartupPackClaimedAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -586,6 +917,64 @@ namespace MasterApi.Data.Migrations
                     b.Navigation("PlayerAccount");
                 });
 
+            modelBuilder.Entity("MasterApi.Data.Entities.MasterRankingBountyAudit", b =>
+                {
+                    b.HasOne("MasterApi.Data.Entities.MasterRankingBountyDefinition", "BountyDefinition")
+                        .WithMany("AuditTrail")
+                        .HasForeignKey("BountyDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("BountyDefinition");
+                });
+
+            modelBuilder.Entity("MasterApi.Data.Entities.MasterRankingEvent", b =>
+                {
+                    b.HasOne("MasterApi.Data.Entities.PlayerAccount", "PlayerAccount")
+                        .WithMany("RankingEvents")
+                        .HasForeignKey("PlayerAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("PlayerAccount");
+                });
+
+            modelBuilder.Entity("MasterApi.Data.Entities.MasterRankingPlayerSnapshot", b =>
+                {
+                    b.HasOne("MasterApi.Data.Entities.PlayerAccount", "PlayerAccount")
+                        .WithMany()
+                        .HasForeignKey("PlayerAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("PlayerAccount");
+                });
+
+            modelBuilder.Entity("MasterApi.Data.Entities.MasterRankingRewardRecord", b =>
+                {
+                    b.HasOne("MasterApi.Data.Entities.MasterRankingBountyDefinition", "BountyDefinition")
+                        .WithMany("RewardRecords")
+                        .HasForeignKey("BountyDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MasterApi.Data.Entities.PlayerAccount", "PlayerAccount")
+                        .WithMany("RankingRewardRecords")
+                        .HasForeignKey("PlayerAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MasterApi.Data.Entities.MasterRankingEvent", "RankingEvent")
+                        .WithMany("RewardRecords")
+                        .HasForeignKey("RankingEventId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("BountyDefinition");
+
+                    b.Navigation("PlayerAccount");
+
+                    b.Navigation("RankingEvent");
+                });
+
             modelBuilder.Entity("MasterApi.Data.Entities.ProSubscription", b =>
                 {
                     b.HasOne("MasterApi.Data.Entities.PlayerAccount", "PlayerAccount")
@@ -626,9 +1015,25 @@ namespace MasterApi.Data.Migrations
                     b.Navigation("ReadReceipts");
                 });
 
+            modelBuilder.Entity("MasterApi.Data.Entities.MasterRankingBountyDefinition", b =>
+                {
+                    b.Navigation("AuditTrail");
+
+                    b.Navigation("RewardRecords");
+                });
+
+            modelBuilder.Entity("MasterApi.Data.Entities.MasterRankingEvent", b =>
+                {
+                    b.Navigation("RewardRecords");
+                });
+
             modelBuilder.Entity("MasterApi.Data.Entities.PlayerAccount", b =>
                 {
                     b.Navigation("GoldTokenTransactions");
+
+                    b.Navigation("RankingEvents");
+
+                    b.Navigation("RankingRewardRecords");
 
                     b.Navigation("Subscriptions");
                 });

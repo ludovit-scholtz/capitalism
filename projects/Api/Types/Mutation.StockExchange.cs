@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Security.Claims;
+using Api.Configuration;
 using Api.Data;
 using Api.Data.Entities;
 using Api.Engine;
@@ -7,6 +8,7 @@ using Api.Security;
 using Api.Utilities;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Api.Types;
 
@@ -21,7 +23,9 @@ public sealed partial class Mutation
     public async Task<ShareTradeResult> BuyShares(
         BuySharesInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] IMasterRankingTelemetryService rankingTelemetry,
+        [Service] IOptions<MasterServerRegistrationOptions> masterOptions)
     {
         if (input.ShareCount <= 0m)
         {
@@ -161,6 +165,16 @@ public sealed partial class Mutation
         await RecordSharePriceHistoryAsync(db, targetCompany.Id, askPrice, currentTick);
         await db.SaveChangesAsync();
 
+        // Fire STOCK_TRADER telemetry (fire-and-forget).
+        {
+            var today = DateTime.UtcNow.ToString("yyyyMMdd");
+            var serverKey = masterOptions.Value.ServerKey ?? string.Empty;
+            _ = rankingTelemetry.ReportEventAsync(
+                MasterRankingBountyCodes.StockTrader,
+                player.Email,
+                uniqueScopeKey: $"{MasterRankingBountyCodes.StockTrader}:{player.Email}:{today}:{serverKey}");
+        }
+
         return new ShareTradeResult
         {
             CompanyId = targetCompany.Id,
@@ -184,7 +198,9 @@ public sealed partial class Mutation
     public async Task<ShareTradeResult> SellShares(
         SellSharesInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] IMasterRankingTelemetryService rankingTelemetry,
+        [Service] IOptions<MasterServerRegistrationOptions> masterOptions)
     {
         if (input.ShareCount <= 0m)
         {
@@ -288,6 +304,16 @@ public sealed partial class Mutation
 
         await RecordSharePriceHistoryAsync(db, targetCompany.Id, bidPrice, currentTick);
         await db.SaveChangesAsync();
+
+        // Fire STOCK_TRADER telemetry (fire-and-forget).
+        {
+            var today = DateTime.UtcNow.ToString("yyyyMMdd");
+            var serverKey = masterOptions.Value.ServerKey ?? string.Empty;
+            _ = rankingTelemetry.ReportEventAsync(
+                MasterRankingBountyCodes.StockTrader,
+                player.Email,
+                uniqueScopeKey: $"{MasterRankingBountyCodes.StockTrader}:{player.Email}:{today}:{serverKey}");
+        }
 
         return new ShareTradeResult
         {

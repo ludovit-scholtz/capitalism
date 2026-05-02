@@ -3,6 +3,7 @@ using MasterApi.Configuration;
 using MasterApi.Data;
 using MasterApi.Data.Entities;
 using MasterApi.Security;
+using MasterApi.Utilities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -15,7 +16,8 @@ public sealed partial class Mutation
     public async Task<MasterAuthPayload> Register(
         RegisterInput input,
         [Service] MasterDbContext db,
-        [Service] IOptions<JwtOptions> jwtOptions)
+        [Service] IOptions<JwtOptions> jwtOptions,
+        [Service] MasterRankingService rankingService)
     {
         var email = input.Email.Trim().ToLowerInvariant();
         if (string.IsNullOrWhiteSpace(email) || !IsValidEmail(email))
@@ -45,7 +47,9 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        if (await db.PlayerAccounts.AnyAsync(p => p.Email == email))
+        var existingPlayer = await db.PlayerAccounts.FirstOrDefaultAsync(p => p.Email == email);
+        if (existingPlayer is not null
+            && !MasterRankingService.IsShadowProvisionedPasswordHash(existingPlayer.PasswordHash))
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -54,20 +58,75 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        var now = DateTime.UtcNow;
-        var player = new PlayerAccount
+        // Validate referral email if provided (referrer must be an existing account).
+        string? referredByEmail = null;
+        if (!string.IsNullOrWhiteSpace(input.ReferralEmail))
         {
-            Id = Guid.NewGuid(),
-            Email = email,
-            DisplayName = input.DisplayName.Trim(),
-            CreatedAtUtc = now,
-        };
+            var normalizedReferral = input.ReferralEmail.Trim().ToLowerInvariant();
+            var referrerExists = await db.PlayerAccounts.AnyAsync(p => p.Email == normalizedReferral);
+            if (referrerExists)
+            {
+                referredByEmail = normalizedReferral;
+            }
+        }
 
+        var now = DateTime.UtcNow;
         var hasher = new PasswordHasher<PlayerAccount>();
-        player.PasswordHash = hasher.HashPassword(player, input.Password);
+        var shouldAwardReferralBounty = false;
+        PlayerAccount player;
 
-        db.PlayerAccounts.Add(player);
+        if (existingPlayer is not null)
+        {
+            existingPlayer.DisplayName = input.DisplayName.Trim();
+            existingPlayer.PasswordHash = hasher.HashPassword(existingPlayer, input.Password);
+
+            if (existingPlayer.ReferredByEmail is null && referredByEmail is not null)
+            {
+                existingPlayer.ReferredByEmail = referredByEmail;
+                shouldAwardReferralBounty = true;
+            }
+
+            player = existingPlayer;
+        }
+        else
+        {
+            player = new PlayerAccount
+            {
+                Id = Guid.NewGuid(),
+                Email = email,
+                DisplayName = input.DisplayName.Trim(),
+                CreatedAtUtc = now,
+                ReferredByEmail = referredByEmail,
+            };
+
+            player.PasswordHash = hasher.HashPassword(player, input.Password);
+            db.PlayerAccounts.Add(player);
+            shouldAwardReferralBounty = referredByEmail is not null;
+        }
+
         await db.SaveChangesAsync();
+
+        // Award RECOMMEND_FRIEND bounty to the referrer if applicable.
+        if (shouldAwardReferralBounty && referredByEmail is not null)
+        {
+            try
+            {
+                await rankingService.IngestEventAsync(
+                    MasterRankingBountyCodes.RecommendFriend,
+                    referredByEmail,
+                    serverKey: null,
+                    externalEventId: null,
+                    uniqueScopeKey: player.Id.ToString(),
+                    proofReference: null,
+                    payloadJson: "{}",
+                    occurredAtUtc: now,
+                    cancellationToken: CancellationToken.None);
+            }
+            catch
+            {
+                // Referral bounty failure must never block registration.
+            }
+        }
 
         var session = GenerateToken(player, jwtOptions.Value);
 
@@ -125,7 +184,8 @@ public sealed partial class Mutation
     public async Task<SubscriptionInfo> ProlongSubscription(
         ProlongSubscriptionInput input,
         ClaimsPrincipal claimsPrincipal,
-        [Service] MasterDbContext db)
+        [Service] MasterDbContext db,
+        [Service] MasterRankingService rankingService)
     {
         if (input.Months < 1 || input.Months > 12)
         {
@@ -150,6 +210,28 @@ public sealed partial class Mutation
 
         await db.SaveChangesAsync();
 
+        // Award RECOMMEND_GOOD_FRIEND bounty to the referrer when a referred player subscribes.
+        if (player.ReferredByEmail is not null)
+        {
+            try
+            {
+                await rankingService.IngestEventAsync(
+                    MasterRankingBountyCodes.RecommendGoodFriend,
+                    player.ReferredByEmail,
+                    serverKey: null,
+                    externalEventId: null,
+                    uniqueScopeKey: $"sub:{player.Id}",
+                    proofReference: null,
+                    payloadJson: "{}",
+                    occurredAtUtc: now,
+                    cancellationToken: CancellationToken.None);
+            }
+            catch
+            {
+                // Bounty failure must never block the subscription flow.
+            }
+        }
+
         return Query.BuildSubscriptionInfo(resultSub, now);
     }
 
@@ -157,7 +239,8 @@ public sealed partial class Mutation
     [HotChocolate.Authorization.Authorize]
     public async Task<SubscriptionInfo> ClaimStartupPack(
         ClaimsPrincipal claimsPrincipal,
-        [Service] MasterDbContext db)
+        [Service] MasterDbContext db,
+        [Service] MasterRankingService rankingService)
     {
         var player = await Query.GetCurrentUserAsync(claimsPrincipal, db)
             ?? throw new GraphQLException(
@@ -179,6 +262,28 @@ public sealed partial class Mutation
         player.StartupPackClaimedAtUtc = now;
 
         await db.SaveChangesAsync();
+
+        // Award RECOMMEND_GOOD_FRIEND bounty to the referrer when a referred player claims the startup pack.
+        if (player.ReferredByEmail is not null)
+        {
+            try
+            {
+                await rankingService.IngestEventAsync(
+                    MasterRankingBountyCodes.RecommendGoodFriend,
+                    player.ReferredByEmail,
+                    serverKey: null,
+                    externalEventId: null,
+                    uniqueScopeKey: $"startup:{player.Id}",
+                    proofReference: null,
+                    payloadJson: "{}",
+                    occurredAtUtc: now,
+                    cancellationToken: CancellationToken.None);
+            }
+            catch
+            {
+                // Bounty failure must never block the startup pack claim flow.
+            }
+        }
 
         return Query.BuildSubscriptionInfo(resultSub, now);
     }

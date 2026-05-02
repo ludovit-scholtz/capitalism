@@ -64,6 +64,12 @@ public sealed class Loan
     /// <summary>Tick of the next scheduled repayment.</summary>
     public long NextPaymentTick { get; set; }
 
+    /// <summary>
+    /// Last <see cref="NextPaymentTick"/> value for which a due-soon notification was emitted.
+    /// Used to avoid duplicate alerts for the same scheduled payment.
+    /// </summary>
+    public long? DueSoonAlertForPaymentTick { get; set; }
+
     /// <summary>Amount of each periodic repayment instalment.</summary>
     public decimal PaymentAmount { get; set; }
 

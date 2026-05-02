@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { computed, ref } from 'vue'
 import { usesStore } from '@/stores/news'
+import { useNotificationsStore } from '@/stores/notifications'
 import { useGameAdminStore } from '@/stores/gameAdmin'
 import { useChatStore } from '@/stores/chat'
 import ContextSwitcher from '@/components/layout/ContextSwitcher.vue'
@@ -15,16 +17,21 @@ const themeStore = useThemeStore()
 themeStore.init()
 
 const { t } = useI18n()
+const router = useRouter()
 const auth = useAuthStore()
 const newsStore = usesStore()
+const notificationsStore = useNotificationsStore()
 const gameAdminStore = useGameAdminStore()
 const chatStore = useChatStore()
 const { unreadCount } = storeToRefs(newsStore)
+const { inbox: notificationsInbox, unreadCount: notificationUnreadCount, loading: notificationsLoading } = storeToRefs(notificationsStore)
 const { session } = storeToRefs(gameAdminStore)
 const { isChatOpen, unreadCount: chatUnreadCount } = storeToRefs(chatStore)
 const isMenuOpen = ref(false)
+const isNotificationsOpen = ref(false)
 
 const showUnreadBadge = computed(() => auth.isAuthenticated && unreadCount.value > 0)
+const showNotificationBadge = computed(() => auth.isAuthenticated && notificationUnreadCount.value > 0)
 
 const impersonationLabel = computed(() => {
   if (!session.value?.isImpersonating || !session.value.effectivePlayer) {
@@ -48,6 +55,39 @@ const closeMenu = () => {
 function handleChatToggle() {
   closeMenu()
   chatStore.toggleChat()
+}
+
+async function toggleNotificationsPanel() {
+  isNotificationsOpen.value = !isNotificationsOpen.value
+  if (isNotificationsOpen.value) {
+    await notificationsStore.fetchInbox(20)
+  }
+}
+
+function closeNotificationsPanel() {
+  isNotificationsOpen.value = false
+}
+
+async function handleNotificationClick(notificationId: string, isRead: boolean, buildingId: string | null, type: string) {
+  if (!isRead) {
+    await notificationsStore.markRead([notificationId])
+  }
+
+  if (buildingId) {
+    await router.push(`/building/${buildingId}`)
+  } else if (type === 'LOAN_REPAYMENT_DUE_SOON') {
+    await router.push('/banking')
+  } else if (type === 'BANK_ACCOUNT_LOW_BALANCE') {
+    await router.push('/bank-statement')
+  } else {
+    await router.push('/dashboard')
+  }
+
+  closeNotificationsPanel()
+}
+
+async function markAllNotificationsRead() {
+  await notificationsStore.markAllRead()
 }
 </script>
 
@@ -98,7 +138,7 @@ function handleChatToggle() {
           <font-awesome-icon :icon="['fas', 'file-invoice-dollar']" class="mr-2" />
           <span class="inline-block md:hidden">{{ t('nav.bankStatement') }}</span>
         </RouterLink>
-        <RouterLink v-if="auth.isAuthenticated" to="/marketing-analytics" :title="t('nav.campaignAnalytics')" class="nav-link" @click="closeMenu">
+        <RouterLink v-if="auth.isAuthenticated" to="/market-intelligence" :title="t('nav.campaignAnalytics')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'bullhorn']" class="mr-2" />
           <span class="inline-block md:hidden">{{ t('nav.campaignAnalytics') }}</span>
         </RouterLink>
@@ -143,6 +183,16 @@ function handleChatToggle() {
         </div>
 
         <template v-if="auth.isAuthenticated">
+          <button
+            class="btn btn-secondary h-9 w-9 p-0 justify-center relative notification-bell-btn"
+            :title="t('notifications.title')"
+            :aria-label="t('notifications.title')"
+            :aria-expanded="isNotificationsOpen"
+            @click="toggleNotificationsPanel"
+          >
+            <font-awesome-icon :icon="['fas', 'bell']" />
+            <span v-if="showNotificationBadge" class="notification-badge">{{ notificationUnreadCount }}</span>
+          </button>
           <ContextSwitcher @switched="closeMenu" />
           <button
             class="btn btn-secondary h-9 w-9 p-0 justify-center"
@@ -163,6 +213,33 @@ function handleChatToggle() {
         <ThemeToggle />
       </div>
     </div>
+
+    <div v-if="isNotificationsOpen" class="notification-overlay" @click="closeNotificationsPanel"></div>
+    <aside v-if="isNotificationsOpen" class="notification-panel" aria-live="polite">
+      <header class="notification-panel-header">
+        <div>
+          <h3>{{ t('notifications.title') }}</h3>
+          <p>{{ t('notifications.subtitle') }}</p>
+        </div>
+        <button class="btn btn-ghost btn-sm" :disabled="notificationUnreadCount === 0" @click="markAllNotificationsRead">
+          {{ t('notifications.markAllRead') }}
+        </button>
+      </header>
+
+      <div v-if="notificationsLoading" class="notification-panel-state">{{ t('common.loading') }}</div>
+      <div v-else-if="!notificationsInbox || notificationsInbox.items.length === 0" class="notification-panel-state">
+        {{ t('notifications.empty') }}
+      </div>
+      <ul v-else class="notification-list">
+        <li v-for="item in notificationsInbox.items" :key="item.id" class="notification-item" :class="{ 'notification-item-unread': !item.isRead }">
+          <button class="notification-item-btn" @click="handleNotificationClick(item.id, item.isRead, item.buildingId, item.type)">
+            <span class="notification-item-title">{{ item.title }}</span>
+            <span class="notification-item-message">{{ item.message }}</span>
+            <span class="notification-item-time">{{ new Date(item.createdAtUtc).toLocaleString() }}</span>
+          </button>
+        </li>
+      </ul>
+    </aside>
   </header>
 </template>
 
@@ -269,6 +346,122 @@ function handleChatToggle() {
 .nav-badge-chat {
   background: linear-gradient(135deg, #2196f3, #1565c0);
   box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
+}
+
+.notification-bell-btn {
+  z-index: 130;
+}
+
+.notification-badge {
+  position: absolute;
+  top: -0.38rem;
+  right: -0.4rem;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(135deg, #f43f5e, #e11d48);
+  font-size: 0.62rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.28rem;
+  box-shadow: 0 4px 10px rgba(244, 63, 94, 0.35);
+}
+
+.notification-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  z-index: 119;
+}
+
+.notification-panel {
+  position: fixed;
+  top: 4.4rem;
+  right: 1rem;
+  width: min(30rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 6rem);
+  overflow: auto;
+  border: 1px solid var(--color-divider);
+  border-radius: 0.9rem;
+  background: var(--color-card);
+  box-shadow: 0 22px 50px rgba(15, 23, 42, 0.35);
+  z-index: 120;
+  padding: 0.9rem;
+}
+
+.notification-panel-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.notification-panel-header h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.notification-panel-header p {
+  margin: 0.2rem 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+}
+
+.notification-panel-state {
+  border: 1px dashed var(--color-divider);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.notification-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.notification-item {
+  border: 1px solid var(--color-divider);
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.notification-item-unread {
+  border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-divider));
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+}
+
+.notification-item-btn {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 0.7rem 0.8rem;
+  display: grid;
+  gap: 0.18rem;
+}
+
+.notification-item-title {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.notification-item-message {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  line-height: 1.35;
+}
+
+.notification-item-time {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
 }
 
 /* ── Mobile hamburger ─────────────────────────────────────────────────────── */

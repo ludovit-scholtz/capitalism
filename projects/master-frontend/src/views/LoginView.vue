@@ -2,148 +2,169 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import ViewJumbotron from '@/components/layout/ViewJumbotron.vue'
+import ViewSubnav from '@/components/layout/ViewSubnav.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
 const { t } = useI18n()
 
-const mode = ref<'login' | 'register'>('login')
+const isRegister = ref(false)
 const email = ref('')
 const displayName = ref('')
 const password = ref('')
-const formError = ref('')
+const formError = ref<string | null>(null)
+const navItems = [
+  { label: t('nav.home'), to: '/' },
+  { label: t('nav.gameServers'), to: '/game-servers' },
+]
 
-async function submit() {
-  formError.value = ''
+async function handleSubmit() {
+  formError.value = null
+
   try {
-    if (mode.value === 'register') {
+    if (isRegister.value) {
       await auth.register(email.value, displayName.value, password.value)
     } else {
       await auth.login(email.value, password.value)
     }
+
     await auth.fetchSubscription()
     await router.push('/')
-  } catch (e: unknown) {
-    formError.value = e instanceof Error ? e.message : t('login.genericError')
+  } catch (error: unknown) {
+    formError.value = error instanceof Error ? error.message : t('login.genericError')
   }
 }
 </script>
 
 <template>
-  <main class="login-shell flex min-h-dvh items-center justify-center px-4 py-8">
-    <div
-      class="login-card w-full max-w-[440px] rounded-[32px] border border-[var(--color-border)] bg-[rgba(255,251,243,0.92)] p-10 shadow-[var(--shadow-soft)]"
-    >
-      <div class="login-brand mb-7">
-        <p class="eyebrow text-[0.72rem] uppercase tracking-[0.14em] text-[var(--color-accent)]">
-          {{ t('home.eyebrow') }}
-        </p>
-        <h1 class="mt-1.5 text-[2rem]">
-          {{ mode === 'login' ? t('login.signIn') : t('login.createAccount') }}
-        </h1>
-        <p class="login-sub mt-2 text-[0.95rem] text-[var(--color-muted)]">
-          {{ mode === 'login' ? t('login.signInSub') : t('login.createSub') }}
-        </p>
-      </div>
+  <main>
+    <ViewJumbotron
+      :kicker="isRegister ? t('login.createAccount') : t('login.signIn')"
+      :title="isRegister ? t('login.createAccount') : t('login.signIn')"
+      :subtitle="isRegister ? t('login.createSub') : t('login.signInSub')"
+      variant="default"
+    />
+    <ViewSubnav :items="navItems" aria-label="Authentication navigation" />
 
-      <form class="login-form flex flex-col gap-4" @submit.prevent="submit">
-        <div class="field-group flex flex-col gap-1.5">
-          <label for="email" class="text-sm font-medium text-[var(--color-ink)]">{{
-            t('login.email')
-          }}</label>
-          <input
-            id="email"
-            v-model="email"
-            type="email"
-            autocomplete="email"
-            placeholder="you@example.com"
-            class="rounded-[14px] border border-[var(--color-border)] bg-[var(--color-paper-strong)] px-4 py-3 text-[var(--color-ink)] outline-none transition-colors focus:border-[var(--color-accent)]"
-            required
-          />
-        </div>
-
-        <div v-if="mode === 'register'" class="field-group flex flex-col gap-1.5">
-          <label for="displayName" class="text-sm font-medium text-[var(--color-ink)]">{{
-            t('login.displayName')
-          }}</label>
-          <input
-            id="displayName"
-            v-model="displayName"
-            type="text"
-            autocomplete="name"
-            :placeholder="t('login.displayNamePlaceholder')"
-            class="rounded-[14px] border border-[var(--color-border)] bg-[var(--color-paper-strong)] px-4 py-3 text-[var(--color-ink)] outline-none transition-colors focus:border-[var(--color-accent)]"
-            required
-          />
-        </div>
-
-        <div class="field-group flex flex-col gap-1.5">
-          <label for="password" class="text-sm font-medium text-[var(--color-ink)]">{{
-            t('login.password')
-          }}</label>
-          <input
-            id="password"
-            v-model="password"
-            type="password"
-            autocomplete="current-password"
-            placeholder="••••••••"
-            class="rounded-[14px] border border-[var(--color-border)] bg-[var(--color-paper-strong)] px-4 py-3 text-[var(--color-ink)] outline-none transition-colors focus:border-[var(--color-accent)]"
-            required
-          />
-        </div>
-
-        <p
-          v-if="formError"
-          class="form-error rounded-[14px] bg-[rgba(176,67,44,0.08)] px-4 py-3 text-[0.9rem] text-[#a03826]"
-          role="alert"
+    <section class="container pb-16 pt-2 lg:pb-20 lg:pt-2">
+      <section
+        class="mx-auto flex min-h-[calc(100vh-64px-5rem)] max-w-md items-center justify-center py-4 lg:py-6"
+      >
+        <div
+          class="flex w-full flex-col gap-6 rounded-2xl border border-divider bg-card p-6 shadow-lg sm:p-8 lg:p-10"
         >
-          {{ formError }}
-        </p>
+          <div class="flex flex-col gap-2">
+            <h1 class="text-2xl font-bold text-body">
+              {{ isRegister ? t('login.createAccount') : t('login.signIn') }}
+            </h1>
+            <p class="text-sm text-muted">
+              {{ isRegister ? t('login.createSub') : t('login.signInSub') }}
+            </p>
+          </div>
 
-        <button
-          class="submit-btn mt-1 rounded-full bg-[var(--color-ink)] px-5 py-3 text-base font-bold text-[var(--color-paper)] transition duration-150 hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
-          type="submit"
-          :disabled="auth.loading"
-        >
-          {{
-            auth.loading
-              ? t('login.wait')
-              : mode === 'login'
-                ? t('login.signIn')
-                : t('login.createAccount')
-          }}
-        </button>
-      </form>
+          <form class="flex flex-col gap-5" @submit.prevent="handleSubmit">
+            <div
+              v-if="formError"
+              class="rounded-md bg-bad/10 px-3 py-3 text-sm text-bad"
+              role="alert"
+            >
+              {{ formError }}
+            </div>
 
-      <p class="toggle-mode mt-5 text-center text-[0.9rem] text-[var(--color-muted)]">
-        <span v-if="mode === 'login'">
-          {{ t('login.noAccount') }}
-          <button
-            class="link-btn border-0 bg-transparent font-bold text-[var(--color-ink)] underline"
-            type="button"
-            @click="mode = 'register'"
-          >
-            {{ t('login.register') }}
-          </button>
-        </span>
-        <span v-else>
-          {{ t('login.haveAccount') }}
-          <button
-            class="link-btn border-0 bg-transparent font-bold text-[var(--color-ink)] underline"
-            type="button"
-            @click="mode = 'login'"
-          >
-            {{ t('login.signIn') }}
-          </button>
-        </span>
-      </p>
+            <div class="flex flex-col gap-1.5">
+              <label for="email" class="text-sm font-medium text-muted">{{
+                t('login.email')
+              }}</label>
+              <input
+                id="email"
+                v-model="email"
+                type="email"
+                required
+                autocomplete="email"
+                class="form-input"
+              />
+            </div>
 
-      <p class="back-link mt-3 text-center text-[0.87rem] text-[var(--color-muted)]">
-        <a class="transition-colors hover:text-[var(--color-ink)]" href="/"
-          >← {{ t('login.backToDirectory') }}</a
-        >
-      </p>
-    </div>
+            <div v-if="isRegister" class="flex flex-col gap-1.5">
+              <label for="displayName" class="text-sm font-medium text-muted">{{
+                t('login.displayName')
+              }}</label>
+              <input
+                id="displayName"
+                v-model="displayName"
+                type="text"
+                required
+                autocomplete="name"
+                :placeholder="t('login.displayNamePlaceholder')"
+                class="form-input"
+              />
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+              <label for="password" class="text-sm font-medium text-muted">{{
+                t('login.password')
+              }}</label>
+              <input
+                id="password"
+                v-model="password"
+                type="password"
+                required
+                autocomplete="current-password"
+                class="form-input"
+              />
+            </div>
+
+            <button
+              type="submit"
+              class="btn btn-primary w-full justify-center gap-2"
+              :disabled="auth.loading"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                <path d="M10 17l5-5-5-5" />
+                <path d="M15 12H3" />
+              </svg>
+              {{
+                auth.loading
+                  ? t('login.wait')
+                  : isRegister
+                    ? t('login.createAccount')
+                    : t('login.signIn')
+              }}
+            </button>
+          </form>
+
+          <div class="text-center text-sm text-muted">
+            {{ isRegister ? t('login.haveAccount') : t('login.noAccount') }}
+            <button
+              class="border-0 bg-transparent text-sm text-brand underline"
+              type="button"
+              @click="isRegister = !isRegister"
+            >
+              {{ isRegister ? t('login.signIn') : t('login.register') }}
+            </button>
+          </div>
+
+          <div class="text-center text-sm text-muted">
+            <RouterLink class="transition-colors hover:text-body" to="/"
+              >← {{ t('login.backToDirectory') }}</RouterLink
+            >
+          </div>
+        </div>
+      </section>
+    </section>
   </main>
 </template>

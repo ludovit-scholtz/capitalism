@@ -42,6 +42,36 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+
+function getResourceTrend(offers: GlobalExchangeOffer[], bestCityId: string): Array<{ tick: number; askPricePerUnit: number }> {
+  const bestCityOffer = offers.find((offer) => offer.cityId === bestCityId)
+  const fallbackOffer = offers[0]
+  return (bestCityOffer?.askPriceHistory ?? fallbackOffer?.askPriceHistory ?? []) as Array<{ tick: number; askPricePerUnit: number }>
+}
+
+function sparklinePoints(history: Array<{ tick: number; askPricePerUnit: number }>): string {
+  if (history.length < 2) return ''
+  const values = history.map((item) => item.askPricePerUnit)
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const range = Math.max(0.0001, max - min)
+  return history
+    .map((item, index) => {
+      const x = (index / (history.length - 1)) * 100
+      const y = 100 - ((item.askPricePerUnit - min) / range) * 100
+      return `${x.toFixed(2)},${y.toFixed(2)}`
+    })
+    .join(' ')
+}
+
+function sparklineTrendClass(history: Array<{ tick: number; askPricePerUnit: number }>): string {
+  if (history.length < 2) return 'sparkline-flat'
+  const first = history[0]?.askPricePerUnit ?? 0
+  const last = history[history.length - 1]?.askPricePerUnit ?? 0
+  if (last > first * 1.01) return 'sparkline-up'
+  if (last < first * 0.99) return 'sparkline-down'
+  return 'sparkline-flat'
+}
 </script>
 
 <template>
@@ -101,9 +131,19 @@ const { t } = useI18n()
           <span class="resource-category-badge rounded-full bg-brand/15 px-2 py-0.5 text-[0.7rem] font-semibold uppercase tracking-[0.05em] text-brand">
             {{ localizedCategory(row.category) }}
           </span>
+          <div
+            v-if="getResourceTrend(row.offers, row.bestCityId).length > 1"
+            class="resource-sparkline ml-auto flex items-center gap-2 rounded-full border border-divider bg-card px-2.5 py-1"
+            :aria-label="`${row.resourceName} ${t('globalExchange.trendLast50Ticks')}`"
+          >
+            <span class="text-[0.62rem] font-semibold uppercase tracking-[0.05em] text-muted">{{ t('globalExchange.trendLast50') }}</span>
+            <svg class="h-5 w-16" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" :aria-label="t('globalExchange.trendLast50Ticks')">
+              <polyline :class="['sparkline-line', sparklineTrendClass(getResourceTrend(row.offers, row.bestCityId))]" :points="sparklinePoints(getResourceTrend(row.offers, row.bestCityId))" />
+            </svg>
+          </div>
           <RouterLink
             :to="`/encyclopedia/resources/${row.resourceSlug}`"
-            class="production-chain-link ml-auto whitespace-nowrap rounded border border-brand/40 px-2 py-0.5 text-xs font-semibold text-brand"
+            class="production-chain-link whitespace-nowrap rounded border border-brand/40 px-2 py-0.5 text-xs font-semibold text-brand"
             :aria-label="`${t('globalExchange.viewProductionChain')}: ${row.resourceName}`"
           >
             {{ t('globalExchange.viewProductionChain') }}
@@ -204,5 +244,24 @@ const { t } = useI18n()
   height: 9px;
   border-radius: 1px;
   background: var(--color-primary);
+}
+
+.sparkline-line {
+  fill: none;
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sparkline-up {
+  stroke: var(--color-success, #16a34a);
+}
+
+.sparkline-down {
+  stroke: var(--color-danger, #dc2626);
+}
+
+.sparkline-flat {
+  stroke: var(--color-muted, #6b7280);
 }
 </style>

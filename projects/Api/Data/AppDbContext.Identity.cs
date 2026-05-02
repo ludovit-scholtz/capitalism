@@ -31,6 +31,20 @@ public sealed partial class AppDbContext
             e.HasIndex(message => message.SentAtUtc);
         });
 
+        modelBuilder.Entity<PlayerNotification>(e =>
+        {
+            e.HasKey(notification => notification.Id);
+            e.Property(notification => notification.Type).HasMaxLength(60);
+            e.Property(notification => notification.Title).HasMaxLength(160);
+            e.Property(notification => notification.Message).HasMaxLength(1000);
+            e.HasOne(notification => notification.Player)
+                .WithMany(player => player.Notifications)
+                .HasForeignKey(notification => notification.PlayerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(notification => new { notification.PlayerId, notification.IsRead, notification.CreatedAtTick });
+            e.HasIndex(notification => notification.CreatedAtUtc);
+        });
+
         modelBuilder.Entity<PersonTradeRecord>(e =>
         {
             e.HasKey(t => t.Id);

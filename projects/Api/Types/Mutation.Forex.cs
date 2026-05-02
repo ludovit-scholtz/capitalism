@@ -1,9 +1,11 @@
+using Api.Configuration;
 using Api.Data;
 using Api.Data.Entities;
 using Api.Security;
 using Api.Utilities;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Api.Types;
 
@@ -26,7 +28,9 @@ public sealed partial class Mutation
     public async Task<ForexTradeResult> ExecuteForexSwap(
         ExecuteForexSwapInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] IMasterRankingTelemetryService rankingTelemetry,
+        [Service] IOptions<MasterServerRegistrationOptions> masterOptions)
     {
         var playerId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
@@ -224,6 +228,24 @@ public sealed partial class Mutation
         else
         {
             newToBalance = await Query.GetPersonalBalanceAsync(db, playerId, toCode);
+        }
+
+        // Fire FX_TRADER telemetry (fire-and-forget).
+        {
+            var playerEmail = await db.Players
+                .AsNoTracking()
+                .Where(p => p.Id == playerId)
+                .Select(p => p.Email)
+                .FirstOrDefaultAsync();
+            if (playerEmail is not null)
+            {
+                var today = DateTime.UtcNow.ToString("yyyyMMdd");
+                var serverKey = masterOptions.Value.ServerKey ?? string.Empty;
+                _ = rankingTelemetry.ReportEventAsync(
+                    MasterRankingBountyCodes.FxTrader,
+                    playerEmail,
+                    uniqueScopeKey: $"{MasterRankingBountyCodes.FxTrader}:{playerEmail}:{today}:{serverKey}");
+            }
         }
 
         return new ForexTradeResult

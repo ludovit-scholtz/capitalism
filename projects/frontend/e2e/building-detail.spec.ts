@@ -12753,8 +12753,8 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await expect(panel.locator('.mi-bar-revenue')).not.toHaveCount(0)
     await expect(panel.locator('.mi-bar-revenue').first()).toHaveAttribute('title', /T\d+:/)
 
-    // Market share section should show the company
-    await expect(panel.getByText('Market Share (latest tick)')).toBeVisible()
+    // Competition section should show the company share row
+    await expect(panel.getByText('Competition')).toBeVisible()
     await expect(panel.locator('.mi-share-row')).toHaveCount(1)
     await expect(panel.locator('.mi-share-pct')).toContainText('100.0%')
 
@@ -13137,10 +13137,10 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
-    // Price chart should be visible with rendered bar data
-    await expect(panel.getByText('Realized Price per Tick')).toBeVisible()
-    await expect(panel.locator('.mi-bar-price')).not.toHaveCount(0)
-    await expect(panel.locator('.mi-bar-price').first()).toHaveAttribute('title', /T\d+:/)
+    // Competition price trend chart should be visible with rendered bar data
+    await expect(panel.getByText('Price Trend (last 100 ticks)')).toBeVisible()
+    await expect(panel.locator('.mi-competition-price-bar')).not.toHaveCount(0)
+    await expect(panel.locator('.mi-competition-price-bar').first()).toHaveAttribute('title', /T\d+:/)
   })
 
   test('shows MODERATE demand signal with monitor hint', async ({ page }) => {
@@ -13302,7 +13302,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
       // 40% sold by this company; 60% unmet demand
       marketShare: [
         { label: 'Market Intel Corp', companyId: 'company-shop-mi', share: 0.4, isUnmet: false },
-        { label: 'Unmet Demand', companyId: null, share: 0.6, isUnmet: true },
+        { label: 'Unmet demand', companyId: null, share: 0.6, isUnmet: true },
       ],
       elasticityIndex: -1.0,
       unmetDemandShare: 0.6,
@@ -13331,7 +13331,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await expect(panel.locator('.mi-share-row')).toHaveCount(2)
     const unmetRow = panel.locator('.mi-share-row-unmet')
     await expect(unmetRow).toBeVisible()
-    await expect(unmetRow.locator('.mi-share-label')).toContainText('Unmet Demand')
+    await expect(unmetRow.locator('.mi-share-label')).toContainText('Unmet demand')
     await expect(unmetRow.locator('.mi-share-pct')).toContainText('60.0%')
   })
 
@@ -15204,8 +15204,8 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await expect(panel.locator('.mi-bar-revenue')).toHaveCount(100)
     // All 100 quantity bars should be present
     await expect(panel.locator('.mi-bar-quantity')).toHaveCount(100)
-    // All 100 price bars should be present
-    await expect(panel.locator('.mi-bar-price')).toHaveCount(100)
+    // All 100 competition price bars should be present
+    await expect(panel.locator('.mi-competition-price-bar')).toHaveCount(100)
 
     // Tick window badge should show readable dates (not raw T1/T100)
     await expect(panel.locator('.mi-tick-window')).toContainText('2000')
@@ -22414,5 +22414,365 @@ test.describe('Public sales pricing guidance panel', () => {
     expect(titleValue!).toMatch(/Purchase.*Manufacturing|purchase.*manufacturing/i)
     // Arrow symbol present
     expect(titleValue!).toContain('→')
+  })
+})
+
+test.describe('Supply chain tab', () => {
+  function makeFactoryBuildingWithUnits(overrides?: { buildingId?: string; companyId?: string }) {
+    const buildingId = overrides?.buildingId ?? 'building-sc-factory'
+    const companyId = overrides?.companyId ?? 'company-sc'
+    return {
+      companyId,
+      name: 'Supply Chain Co',
+      buildings: [
+        {
+          id: buildingId,
+          companyId,
+          cityId: 'city-ba',
+          type: 'FACTORY' as const,
+          name: 'SC Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'sc-unit-purchase',
+              buildingId,
+              unitType: 'PURCHASE',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: true,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+            {
+              id: 'sc-unit-mfg',
+              buildingId,
+              unitType: 'MANUFACTURING',
+              gridX: 1,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: true,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+            {
+              id: 'sc-unit-storage',
+              buildingId,
+              unitType: 'STORAGE',
+              gridX: 2,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+          ],
+        },
+      ],
+    }
+  }
+
+  test('supply chain tab appears for FACTORY buildings', async ({ page }) => {
+    const player = makePlayer()
+    const factoryData = makeFactoryBuildingWithUnits()
+    player.companies.push({ ...factoryData, id: factoryData.companyId, playerId: player.id, cash: 500000, foundedAtUtc: '2026-01-01T00:00:00Z' })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-sc-factory')
+    await expect(page.getByRole('heading', { name: 'SC Factory' })).toBeVisible()
+
+    // Supply Chain tab visible in building-level view
+    await expect(page.locator('.unit-detail-tabs').getByRole('button', { name: 'Supply Chain' })).toBeVisible()
+  })
+
+  test('supply chain tab shows health status and units when data loads', async ({ page }) => {
+    const player = makePlayer()
+    const factoryData = makeFactoryBuildingWithUnits()
+    player.companies.push({ ...factoryData, id: factoryData.companyId, playerId: player.id, cash: 500000, foundedAtUtc: '2026-01-01T00:00:00Z' })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    // Seed supply chain diagram data with GREEN health
+    state.supplyChainData['building-sc-factory'] = {
+      buildingId: 'building-sc-factory',
+      buildingName: 'SC Factory',
+      buildingType: 'FACTORY',
+      units: [
+        {
+          buildingUnitId: 'sc-unit-purchase',
+          unitType: 'PURCHASE',
+          gridX: 0,
+          gridY: 0,
+          level: 1,
+          status: 'ACTIVE',
+          idleTicks: 0,
+          fillPercent: 60,
+          resourceTypeId: null,
+          productTypeId: null,
+          resourceOrProductName: 'Wood',
+          estimatedTransitCost: null,
+        },
+        {
+          buildingUnitId: 'sc-unit-mfg',
+          unitType: 'MANUFACTURING',
+          gridX: 1,
+          gridY: 0,
+          level: 1,
+          status: 'ACTIVE',
+          idleTicks: 0,
+          fillPercent: 40,
+          resourceTypeId: null,
+          productTypeId: null,
+          resourceOrProductName: 'Wooden Chair',
+          estimatedTransitCost: 0.5,
+        },
+        {
+          buildingUnitId: 'sc-unit-storage',
+          unitType: 'STORAGE',
+          gridX: 2,
+          gridY: 0,
+          level: 1,
+          status: 'IDLE',
+          idleTicks: 2,
+          fillPercent: 10,
+          resourceTypeId: null,
+          productTypeId: null,
+          resourceOrProductName: null,
+          estimatedTransitCost: null,
+        },
+      ],
+      links: [
+        { fromUnitId: 'sc-unit-purchase', toUnitId: 'sc-unit-mfg', direction: 'RIGHT', estimatedTransitCost: 0.2 },
+        { fromUnitId: 'sc-unit-mfg', toUnitId: 'sc-unit-storage', direction: 'RIGHT', estimatedTransitCost: 0.3 },
+      ],
+      healthScore: 'GREEN',
+      healthReason: 'All units operating normally',
+      criticalUnitIds: [],
+      warningUnitIds: [],
+    }
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-sc-factory')
+    await expect(page.getByRole('heading', { name: 'SC Factory' })).toBeVisible()
+
+    // Click Supply Chain tab
+    await page.locator('.unit-detail-tabs').getByRole('button', { name: 'Supply Chain' }).click()
+
+    const supplyChainPanel = page.locator('.supply-chain-tab')
+
+    // Health status visible
+    await expect(supplyChainPanel.getByText('Supply Chain Health', { exact: true })).toBeVisible()
+    await expect(supplyChainPanel.getByText('Healthy', { exact: true })).toBeVisible()
+
+    // Unit count visible
+    await expect(supplyChainPanel.getByText('3', { exact: true })).toBeVisible()
+
+    // Unit detail rows visible
+    await expect(supplyChainPanel.getByText('PURCHASE', { exact: true })).toBeVisible()
+    await expect(supplyChainPanel.getByText('MANUFACTURING', { exact: true })).toBeVisible()
+    await expect(supplyChainPanel.getByText('STORAGE', { exact: true })).toBeVisible()
+  })
+
+  test('supply chain tab shows YELLOW health when units are stalling', async ({ page }) => {
+    const player = makePlayer()
+    const factoryData = makeFactoryBuildingWithUnits()
+    player.companies.push({ ...factoryData, id: factoryData.companyId, playerId: player.id, cash: 500000, foundedAtUtc: '2026-01-01T00:00:00Z' })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    state.supplyChainData['building-sc-factory'] = {
+      buildingId: 'building-sc-factory',
+      buildingName: 'SC Factory',
+      buildingType: 'FACTORY',
+      units: [
+        {
+          buildingUnitId: 'sc-unit-purchase',
+          unitType: 'PURCHASE',
+          gridX: 0,
+          gridY: 0,
+          level: 1,
+          status: 'IDLE',
+          idleTicks: 7,
+          fillPercent: 0,
+          resourceTypeId: null,
+          productTypeId: null,
+          resourceOrProductName: null,
+          estimatedTransitCost: null,
+        },
+      ],
+      links: [],
+      healthScore: 'YELLOW',
+      healthReason: '1 unit(s) showing signs of stall',
+      criticalUnitIds: [],
+      warningUnitIds: ['sc-unit-purchase'],
+    }
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-sc-factory')
+    await expect(page.getByRole('heading', { name: 'SC Factory' })).toBeVisible()
+    await page.locator('.unit-detail-tabs').getByRole('button', { name: 'Supply Chain' }).click()
+
+    const supplyChainPanel = page.locator('.supply-chain-tab')
+    await expect(supplyChainPanel.getByText('Warning', { exact: true })).toBeVisible()
+    await expect(supplyChainPanel.getByText('1 unit(s) showing signs of stall', { exact: true })).toBeVisible()
+  })
+
+  test('supply chain tab shows RED health for critical stalls', async ({ page }) => {
+    const player = makePlayer()
+    const factoryData = makeFactoryBuildingWithUnits()
+    player.companies.push({ ...factoryData, id: factoryData.companyId, playerId: player.id, cash: 500000, foundedAtUtc: '2026-01-01T00:00:00Z' })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    state.supplyChainData['building-sc-factory'] = {
+      buildingId: 'building-sc-factory',
+      buildingName: 'SC Factory',
+      buildingType: 'FACTORY',
+      units: [
+        {
+          buildingUnitId: 'sc-unit-purchase',
+          unitType: 'PURCHASE',
+          gridX: 0,
+          gridY: 0,
+          level: 1,
+          status: 'IDLE',
+          idleTicks: 25,
+          fillPercent: 0,
+          resourceTypeId: null,
+          productTypeId: null,
+          resourceOrProductName: null,
+          estimatedTransitCost: null,
+        },
+      ],
+      links: [],
+      healthScore: 'RED',
+      healthReason: '1 unit(s) in critical stall',
+      criticalUnitIds: ['sc-unit-purchase'],
+      warningUnitIds: [],
+    }
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-sc-factory')
+    await expect(page.getByRole('heading', { name: 'SC Factory' })).toBeVisible()
+    await page.locator('.unit-detail-tabs').getByRole('button', { name: 'Supply Chain' }).click()
+
+    const supplyChainPanel = page.locator('.supply-chain-tab')
+    await expect(supplyChainPanel.getByText('Critical', { exact: true })).toBeVisible()
+    await expect(supplyChainPanel.getByText('1 unit(s) in critical stall', { exact: true })).toBeVisible()
+  })
+
+  test('supply chain tab is hidden when a unit is selected', async ({ page }) => {
+    const player = makePlayer()
+    const factoryData = makeFactoryBuildingWithUnits()
+    player.companies.push({ ...factoryData, id: factoryData.companyId, playerId: player.id, cash: 500000, foundedAtUtc: '2026-01-01T00:00:00Z' })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-sc-factory')
+    await expect(page.getByRole('heading', { name: 'SC Factory' })).toBeVisible()
+
+    // Supply Chain tab visible before unit selection
+    await expect(page.locator('.unit-detail-tabs').getByRole('button', { name: 'Supply Chain' })).toBeVisible()
+
+    // Click a unit cell in the grid
+    const activeSection = getGridSection(page, 'Current Configuration')
+    await getGridCell(activeSection, 0, 0).click()
+
+    // After unit selection, Supply Chain tab is no longer in the tabs list
+    await expect(page.locator('.unit-detail-tabs').getByRole('button', { name: 'Supply Chain' })).toBeHidden()
+  })
+
+  test('supply chain tab does not appear for SALES_SHOP buildings', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-no-sc',
+      playerId: player.id,
+      name: 'No SC Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-no-sc-shop',
+          companyId: 'company-no-sc',
+          cityId: 'city-ba',
+          type: 'SALES_SHOP',
+          name: 'No SC Shop',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 1,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-no-sc-shop')
+    await expect(page.getByRole('heading', { name: 'No SC Shop' })).toBeVisible()
+
+    // Supply Chain tab must NOT be visible for a shop
+    await expect(page.locator('.unit-detail-tabs').getByRole('button', { name: 'Supply Chain' })).toBeHidden()
   })
 })

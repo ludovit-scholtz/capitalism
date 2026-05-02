@@ -804,3 +804,21 @@ public sealed class TransferFundsInput
     [MaxLength(200)]
     public string? Description { get; set; }
 }
+
+public sealed class MarkPlayerNotificationsReadInput
+{
+    [Required]
+    public List<Guid> NotificationIds { get; set; } = [];
+}
+
+public sealed class SetBankAccountAlertThresholdInput
+{
+    public Guid BankAccountId { get; set; }
+    public decimal? MinBalanceThreshold { get; set; }
+}
+
+public sealed class SetPublicSalesInventoryAlertThresholdInput
+{
+    public Guid BuildingUnitId { get; set; }
+    public decimal? MinInventoryThreshold { get; set; }
+}

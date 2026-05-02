@@ -46,7 +46,9 @@ test.describe('Account page — zero gold balance', () => {
 
     // No transactions
     await expect(
-      page.getByText('No transactions yet. Transactions will appear here once your balance changes.'),
+      page.getByText(
+        'No transactions yet. Transactions will appear here once your balance changes.',
+      ),
     ).toBeVisible()
   })
 })
@@ -207,7 +209,7 @@ test.describe('Account page — error state', () => {
 // ── Home page nav — account link ──────────────────────────────────────────
 
 test.describe('Home page — account link for authenticated users', () => {
-  test('shows My Gold link in nav for authenticated player', async ({ page }) => {
+  test('shows Tokenized Gold link in nav for authenticated player', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, {
       currentPlayer: player,
@@ -218,8 +220,8 @@ test.describe('Home page — account link for authenticated users', () => {
     await loginAs(page, state, player, 'token-player')
     await page.goto('/')
 
-    await expect(page.getByRole('link', { name: /My Gold/ })).toBeVisible()
-    const link = page.getByRole('link', { name: /My Gold/ })
+    await expect(page.getByRole('link', { name: /Tokenized Gold/i })).toBeVisible()
+    const link = page.getByRole('link', { name: /Tokenized Gold/i })
     await expect(link).toHaveAttribute('href', '/account')
   })
 })

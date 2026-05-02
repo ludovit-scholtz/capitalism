@@ -25,6 +25,9 @@ export interface ReferralDashboardRow {
   secondLevelActiveSubscriptions: number
 }
 
+export const DIRECT_ACTIVE_SUBSCRIPTION_GOLD_REWARD = 120
+export const SECOND_LEVEL_ACTIVE_SUBSCRIPTION_GOLD_REWARD = 40
+
 interface ReferralStorageRecord {
   players: Record<string, ReferralPlayerProfile>
 }
@@ -270,4 +273,14 @@ export function getReferralDashboard(email: string): ReferralDashboardRow[] {
   })
 
   return rows
+}
+
+export function calculateReferralGoldTokens(rows: ReferralDashboardRow[]): number {
+  return rows.reduce((total, row) => {
+    return (
+      total +
+      row.activeSubscriptions * DIRECT_ACTIVE_SUBSCRIPTION_GOLD_REWARD +
+      row.secondLevelActiveSubscriptions * SECOND_LEVEL_ACTIVE_SUBSCRIPTION_GOLD_REWARD
+    )
+  }, 0)
 }

@@ -1135,7 +1135,7 @@ useTickRefresh(async () => {
 
 <template>
   <div class="min-h-[calc(100vh-112px)] bg-gradient-to-b from-page to-[rgba(0,71,255,0.04)] py-8 px-4">
-    <div class="container max-w-[1120px]">
+    <div class="container">
       <div v-if="step < 7" class="text-center mb-8">
         <h1 class="text-3xl font-bold mb-2 bg-gradient-to-br from-brand to-[var(--color-secondary)] bg-clip-text text-transparent">{{ t('onboarding.title') }}</h1>
         <p class="text-muted text-sm">{{ t('onboarding.subtitle') }}</p>
@@ -1152,7 +1152,7 @@ useTickRefresh(async () => {
             v-for="ind in industries"
             :key="ind"
             class="industry-card flex flex-col gap-2 rounded-md border-2 border-divider bg-page p-6 text-center text-body transition-all duration-200 hover:-translate-y-0.5 hover:border-brand hover:shadow-[0_4px_16px_rgba(0,71,255,0.1)]"
-            :class="{ 'border-brand bg-brand/10 shadow-[0_0_0_1px_var(--color-primary),0_4px_16px_rgba(0,71,255,0.15)]': selectedIndustry === ind }"
+            :class="{ 'border-brand bg-brand/10 shadow-[0_0_0_1px_var(--color-primary),0_4px_16px_rgba(0,71,255,0.15)]': selectedIndustry === ind, 'pick-hint': !selectedIndustry }"
             @click="selectIndustry(ind)"
           >
             <span class="text-[2.5rem] leading-none">{{ industryIcons[ind] || '🏭' }}</span
@@ -1173,7 +1173,7 @@ useTickRefresh(async () => {
             v-for="prod in sortedProducts"
             :key="prod.id"
             class="product-card flex flex-col gap-2 rounded-md border-2 border-divider bg-page p-6 text-center text-body transition-all duration-200 hover:-translate-y-0.5 hover:border-brand hover:shadow-[0_4px_16px_rgba(0,71,255,0.1)]"
-            :class="{ 'border-brand bg-brand/10 shadow-[0_0_0_1px_var(--color-primary),0_4px_16px_rgba(0,71,255,0.15)]': selectedProductId === prod.id }"
+            :class="{ 'border-brand bg-brand/10 shadow-[0_0_0_1px_var(--color-primary),0_4px_16px_rgba(0,71,255,0.15)]': selectedProductId === prod.id, 'pick-hint': !selectedProductId }"
             @click="selectProduct(prod.id)"
           >
             <img :src="getProductImage(prod)" :alt="getProductName(prod)" class="w-full aspect-video object-cover rounded bg-card-raised" /><span class="font-bold text-base">{{
@@ -1202,7 +1202,7 @@ useTickRefresh(async () => {
             v-for="city in cities"
             :key="city.id"
             class="city-card flex flex-col gap-2 rounded-md border-2 border-divider bg-page p-6 text-left text-body transition-all duration-200 hover:-translate-y-0.5 hover:border-brand hover:shadow-[0_4px_16px_rgba(0,71,255,0.1)]"
-            :class="{ 'border-brand bg-brand/10 shadow-[0_0_0_1px_var(--color-primary),0_4px_16px_rgba(0,71,255,0.15)]': selectedCityId === city.id }"
+            :class="{ 'border-brand bg-brand/10 shadow-[0_0_0_1px_var(--color-primary),0_4px_16px_rgba(0,71,255,0.15)]': selectedCityId === city.id, 'pick-hint': !selectedCityId }"
             @click="selectCity(city.id)"
           >
             <div class="flex items-center gap-2">
@@ -1249,7 +1249,10 @@ useTickRefresh(async () => {
             v-for="option in ipoOptions"
             :key="option.raiseTarget"
             class="ipo-card flex flex-col gap-2 rounded-md border-2 border-divider bg-page px-4 py-4 text-left text-body transition-all duration-200 hover:-translate-y-0.5 hover:border-brand"
-            :class="{ 'border-brand bg-brand/10 shadow-[0_0_0_1px_var(--color-primary),0_4px_16px_rgba(0,71,255,0.15)]': selectedIpoRaiseTarget === option.raiseTarget }"
+            :class="{
+              'border-brand bg-brand/10 shadow-[0_0_0_1px_var(--color-primary),0_4px_16px_rgba(0,71,255,0.15)]': selectedIpoRaiseTarget === option.raiseTarget,
+              'pick-hint': selectedIpoRaiseTarget === null,
+            }"
             @click="selectIpoPlan(option.raiseTarget)"
           >
             <span class="font-bold text-sm">{{ t(option.titleKey) }}</span
@@ -1825,3 +1828,27 @@ useTickRefresh(async () => {
     </div>
   </div>
 </template>
+
+<style scoped>
+@keyframes pick-glow {
+  0%,
+  100% {
+    border-color: var(--color-divider);
+    box-shadow: none;
+  }
+  50% {
+    border-color: var(--color-primary);
+    box-shadow:
+      0 0 0 1px var(--color-primary),
+      0 0 12px 2px rgba(0, 71, 255, 0.25);
+  }
+}
+
+.pick-hint {
+  animation: pick-glow 1.8s ease-in-out infinite;
+}
+
+.pick-hint:hover {
+  animation: none;
+}
+</style>

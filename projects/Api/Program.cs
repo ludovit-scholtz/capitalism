@@ -130,6 +130,7 @@ public class Program
 
         builder.Services.AddScoped<IMasterGameAdministrationService, MasterGameAdministrationService>();
         builder.Services.AddScoped<GameAdminAuthorizationService>();
+        builder.Services.AddScoped<IMasterRankingTelemetryService, MasterRankingTelemetryService>();
         builder.Services.AddMemoryCache();
 
         // ── Game tick engine ──
@@ -152,9 +153,11 @@ public class Program
         builder.Services.AddScoped<ITickPhase, ResearchPhase>();
         builder.Services.AddScoped<ITickPhase, RentPhase>();
         builder.Services.AddScoped<ITickPhase, LoanRepaymentPhase>();
+        builder.Services.AddScoped<ITickPhase, PlayerAlertPhase>();
         builder.Services.AddScoped<ITickPhase, BankInterestPhase>();
         builder.Services.AddScoped<ITickPhase, TaxPhase>();
         builder.Services.AddScoped<ITickPhase, DividendPhase>();
+        builder.Services.AddScoped<ITickPhase, TelemetryBountyPhase>();
         builder.Services.AddScoped<ITickPhase, MarketReportPhase>();
         builder.Services.AddHostedService<GameTickHostedService>();
         builder.Services.AddHostedService<MasterServerRegistrationHostedService>();

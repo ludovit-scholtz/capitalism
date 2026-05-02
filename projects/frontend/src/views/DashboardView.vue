@@ -155,10 +155,24 @@ async function loadDashboardData() {
   }
 }
 
+function applyCityMaps(cities: City[]) {
+  const nameMap: Record<string, string> = {}
+  const currencyMap: Record<string, string> = {}
+  for (const city of cities) {
+    nameMap[city.id] = city.name
+    _cityNamesCache[city.id] = city.name
+    currencyMap[city.id] = city.currencyCode
+    _cityCurrenciesCache[city.id] = city.currencyCode
+  }
+  cityNames.value = nameMap
+  cityCurrencies.value = currencyMap
+}
+
 async function refreshCompanyDerivedData() {
-  const cityIds = [...new Set(companies.value.flatMap((company) => company.buildings.map((building) => building.cityId)))]
-  const companyIds = companies.value.map((company) => company.id)
-  const buildingIds = companies.value.flatMap((company) => company.buildings.map((building) => building.id))
+  const companiesForDerived = activeCompany.value ? [activeCompany.value] : []
+  const cityIds = [...new Set(companiesForDerived.flatMap((company) => company.buildings.map((building) => building.cityId)))]
+  const companyIds = companiesForDerived.map((company) => company.id)
+  const buildingIds = companiesForDerived.flatMap((company) => company.buildings.map((building) => building.id))
 
   await Promise.all([loadCityPowerBalances(cityIds), loadCityNames(), loadLedgers(companyIds), loadBuildingUnitStatuses(buildingIds), loadBuildingFinancials(buildingIds)])
 }
@@ -170,34 +184,58 @@ onMounted(async () => {
   }
 
   try {
-    await auth.fetchMe()
+    if (!auth.player) {
+      await auth.fetchMe()
+    }
     if (auth.player && !auth.player.onboardingCompletedAtUtc) {
       router.push('/onboarding')
       return
     }
-    const [companiesData, gameStateData] = await Promise.all([
-      gqlRequest<{ myCompanies: Company[] }>(
-        `{ myCompanies {
+    const initialData = await gqlRequest<{
+      myCompanies: Company[]
+      gameState: GameState
+      myPendingActions: ScheduledActionSummary[]
+      cities: City[]
+    }>(
+      `{
+        myCompanies {
           id name cash foundedAtUtc
           buildings { id name type level cityId powerStatus units { id unitType gridX gridY level } }
-        } }`,
-      ),
-      gqlRequest<{ gameState: GameState }>(
-        '{ gameState { currentTick lastTickAtUtc tickIntervalSeconds taxCycleTicks taxRate currentGameYear currentGameTimeUtc ticksPerDay ticksPerYear nextTaxTick nextTaxGameTimeUtc nextTaxGameYear } }',
-      ),
-    ])
-    companies.value = companiesData.myCompanies
-    gameState.value = gameStateData.gameState
+        }
+        gameState {
+          currentTick lastTickAtUtc tickIntervalSeconds taxCycleTicks taxRate
+          currentGameYear currentGameTimeUtc ticksPerDay ticksPerYear
+          nextTaxTick nextTaxGameTimeUtc nextTaxGameYear
+        }
+        myPendingActions {
+          id actionType buildingId buildingName buildingType
+          submittedAtUtc submittedAtTick appliesAtTick ticksRemaining totalTicksRequired
+        }
+        cities {
+          id
+          name
+          currencyCode
+        }
+      }`,
+    )
+
+    companies.value = initialData.myCompanies
+    pendingActions.value = initialData.myPendingActions
+    gameState.value = initialData.gameState
+    applyCityMaps(initialData.cities)
     startTickCountdown()
 
-    // Load city power balances for each unique city that has buildings.
-    await refreshCompanyDerivedData()
+    // Show dashboard immediately after critical payload arrives.
+    loading.value = false
 
-    await loadPendingActions()
+    // Non-critical derived widgets hydrate in the background.
+    void refreshCompanyDerivedData()
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Failed to load dashboard'
   } finally {
-    loading.value = false
+    if (error.value) {
+      loading.value = false
+    }
   }
 })
 
@@ -210,8 +248,9 @@ useTickRefresh(async () => {
   await Promise.all([loadDashboardData(), loadPendingActions()])
   startTickCountdown()
   // Refresh ledger, unit statuses, and building financials on tick but keep loading state quiet (non-critical).
-  const companyIds = companies.value.map((c) => c.id)
-  const buildingIds = companies.value.flatMap((c) => c.buildings.map((b) => b.id))
+  const companiesForDerived = activeCompany.value ? [activeCompany.value] : []
+  const companyIds = companiesForDerived.map((c) => c.id)
+  const buildingIds = companiesForDerived.flatMap((c) => c.buildings.map((b) => b.id))
   await Promise.all([loadLedgers(companyIds, true), loadBuildingUnitStatuses(buildingIds), loadBuildingFinancials(buildingIds, true)])
   await restoreScrollPosition(scrollPos)
 })
@@ -275,16 +314,7 @@ async function loadCityNames() {
   }
   try {
     const data = await gqlRequest<{ cities: City[] }>('{ cities { id name currencyCode } }')
-    const nameMap: Record<string, string> = {}
-    const currencyMap: Record<string, string> = {}
-    for (const city of data.cities) {
-      nameMap[city.id] = city.name
-      _cityNamesCache[city.id] = city.name
-      currencyMap[city.id] = city.currencyCode
-      _cityCurrenciesCache[city.id] = city.currencyCode
-    }
-    cityNames.value = nameMap
-    cityCurrencies.value = currencyMap
+    applyCityMaps(data.cities)
   } catch {
     // best-effort - city names are non-critical
   }
@@ -584,6 +614,11 @@ async function createCompany() {
             <div class="grid grid-cols-2 max-[700px]:grid-cols-1 gap-3 mb-4">
               <FinancialSummaryCard :ledger="companyLedgers[company.id] ?? null" :loading="ledgerLoading" />
               <StarterGuidance :company="company" :revenue="companyLedgers[company.id]?.totalRevenue ?? 0" :net-income="companyLedgers[company.id]?.netIncome ?? 0" />
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <RouterLink :to="selectedCityId ? { name: 'market-intelligence', query: { city: selectedCityId } } : { name: 'market-intelligence' }" class="btn btn-secondary">
+                📊 {{ t('dashboard.openMarketIntelligence') }}
+              </RouterLink>
             </div>
           </div>
 

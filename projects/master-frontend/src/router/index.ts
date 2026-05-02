@@ -14,6 +14,11 @@ const router = createRouter({
       component: () => import('@/views/LoginView.vue'),
     },
     {
+      path: '/game-servers',
+      name: 'game-servers',
+      component: () => import('@/views/GameServersView.vue'),
+    },
+    {
       path: '/account',
       name: 'account',
       component: () => import('@/views/AccountView.vue'),
@@ -44,12 +49,60 @@ const router = createRouter({
       component: () => import('@/views/SupportView.vue'),
     },
     {
+      path: '/support/new',
+      name: 'support-new',
+      component: () => import('@/views/SupportNewTicketView.vue'),
+    },
+    {
+      path: '/support/tickets',
+      name: 'support-tickets',
+      component: () => import('@/views/SupportTicketsView.vue'),
+    },
+    {
+      path: '/support/tickets/:ticketId',
+      name: 'support-ticket-detail',
+      component: () => import('@/views/SupportTicketDetailView.vue'),
+    },
+    {
       path: '/support/admin',
       name: 'support-admin',
       component: () => import('@/views/SupportAdminView.vue'),
     },
+    {
+      path: '/game-admin',
+      name: 'game-admin',
+      component: () => import('@/views/GameAdminDashboardView.vue'),
+    },
+    {
+      path: '/ranking',
+      name: 'ranking-dashboard',
+      component: () => import('@/views/RankingDashboardView.vue'),
+    },
+    {
+      path: '/ranking/bounties',
+      name: 'ranking-bounties',
+      component: () => import('@/views/RankingBountiesView.vue'),
+    },
+    {
+      path: '/ranking/bounties/history',
+      name: 'ranking-history',
+      component: () => import('@/views/RankingBountyHistoryView.vue'),
+    },
+    {
+      path: '/ranking/admin',
+      name: 'ranking-admin',
+      component: () => import('@/views/RankingAdminView.vue'),
+    },
   ],
-  scrollBehavior() {
+  scrollBehavior(to) {
+    if (to.hash) {
+      return {
+        el: to.hash,
+        top: 96,
+        behavior: 'smooth',
+      }
+    }
+
     return { top: 0 }
   },
 })

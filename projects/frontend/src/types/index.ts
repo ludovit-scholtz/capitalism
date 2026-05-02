@@ -229,6 +229,7 @@ export interface BuildingUnit {
   vendorLockCompanyId: string | null
   lockedCityId: string | null
   industryCategory: string | null
+  lowInventoryAlertThreshold?: number | null
 }
 
 export interface BuildingUnitInventorySummary {
@@ -293,6 +294,13 @@ export interface GlobalExchangeOffer {
   distanceKm: number
   /** Destination city fuel price index (1.0 = EUR baseline). */
   fuelPriceIndex?: number
+  /** Last 50 ticks of ask-price history for sparkline rendering. */
+  askPriceHistory?: ResourceAskPricePoint[]
+}
+
+export interface ResourceAskPricePoint {
+  tick: number
+  askPricePerUnit: number
 }
 
 /** A product marketplace listing from a player-placed SELL exchange order. */
@@ -1774,6 +1782,35 @@ export interface CampaignAnalyticsResult {
   rows: CampaignAnalyticsRow[]
 }
 
+/** Seller row for one product in the city-level market intelligence dashboard. */
+export interface MarketIntelligenceSellerRow {
+  rank: number
+  companyId: string
+  displayName: string
+  askingPricePerUnit: number
+  brandQuality: number | null
+  estimatedWeeklySalesVolume: number
+  marketShare: number
+}
+
+/** Per-product city market intelligence summary. */
+export interface MarketIntelligenceProductRow {
+  productTypeId: string
+  productName: string
+  productSlug: string
+  totalWeeklySalesVolume: number
+  sellers: MarketIntelligenceSellerRow[]
+}
+
+/** City-level competitive market intelligence for the last in-game week. */
+export interface MarketIntelligenceResult {
+  cityId: string
+  cityName: string
+  dataFromTick: number
+  dataToTick: number
+  products: MarketIntelligenceProductRow[]
+}
+
 /**
  * EUR-based FX rate entry returned by the `eurFxRates` query.
  * `rate` = units of this currency per 1 EUR (e.g. 25.20 for CZK, 1.08 for USD).
@@ -1821,6 +1858,7 @@ export interface BuildingBankAccountInfo {
   bankAccountId: string | null
   accountNumber: string | null
   balance: number | null
+  alertMinBalanceThreshold: number | null
   isSuspendedForFunds: boolean
   /** null | 'MISSING_BANK_ACCOUNT' | 'INSUFFICIENT_FUNDS:<amount>' */
   suspendedReason: string | null
@@ -1832,6 +1870,7 @@ export interface CompanyBankAccountSummary {
   accountNumber: string
   currencyCode: string
   balance: number
+  alertMinBalanceThreshold: number | null
 }
 
 /** A bank account owned by the player or one of the player's companies. Returned by the `myBankAccounts` query. */
@@ -1841,6 +1880,7 @@ export interface PlayerBankAccountSummary {
   currencyCode: string
   currencySymbol: string
   balance: number
+  alertMinBalanceThreshold: number | null
   companyId: string | null
   companyName: string | null
   ownerType: 'PERSON' | 'COMPANY'
@@ -1872,6 +1912,26 @@ export interface TransferFundsResult {
   currencyCode: string
   fromAccount: PlayerBankAccountSummary
   toAccount: PlayerBankAccountSummary
+}
+
+export interface PlayerNotificationItem {
+  id: string
+  type: string
+  title: string
+  message: string
+  isRead: boolean
+  createdAtTick: number
+  createdAtUtc: string
+  companyId: string | null
+  buildingId: string | null
+  buildingUnitId: string | null
+  bankAccountId: string | null
+  loanId: string | null
+}
+
+export interface PlayerNotificationInbox {
+  unreadCount: number
+  items: PlayerNotificationItem[]
 }
 
 /** Advertising income entry for a media house */
@@ -1920,4 +1980,46 @@ export interface MediaHouseAnalyticsResult {
   /** DOMINANT | COMPETITIVE | GROWING | EARLY_STAGE */
   strategyRating: string
   strategyTip: string
+}
+
+/** Health status for supply chain visualization */
+export type SupplyChainHealth = 'GREEN' | 'YELLOW' | 'RED'
+
+/** Unit summary in supply chain diagram */
+export interface SupplyChainUnitSummary {
+  buildingUnitId: string
+  unitType: string
+  gridX: number
+  gridY: number
+  level: number
+  /** ACTIVE | IDLE | BLOCKED | FULL | UNCONFIGURED */
+  status: string
+  idleTicks: number
+  fillPercent: number
+  resourceTypeId: string | null
+  productTypeId: string | null
+  resourceOrProductName: string | null
+  estimatedTransitCost: number | null
+}
+
+/** Link between two units in supply chain */
+export interface SupplyChainLink {
+  fromUnitId: string
+  toUnitId: string
+  /** RIGHT | DOWN | DIAGONAL_DR | etc. */
+  direction: string
+  estimatedTransitCost: number
+}
+
+/** Complete supply chain diagram for a factory */
+export interface BuildingSupplyChainDiagram {
+  buildingId: string
+  buildingName: string
+  buildingType: string
+  units: SupplyChainUnitSummary[]
+  links: SupplyChainLink[]
+  healthScore: SupplyChainHealth
+  healthReason: string
+  criticalUnitIds: string[]
+  warningUnitIds: string[]
 }

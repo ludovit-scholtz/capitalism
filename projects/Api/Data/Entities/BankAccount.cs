@@ -98,6 +98,18 @@ public sealed class BankAccount
     /// </summary>
     public decimal TotalInterestPaid { get; set; }
 
+    /// <summary>
+    /// Optional low-balance notification threshold in account currency.
+    /// When set, the player receives an alert once the balance drops below this value.
+    /// </summary>
+    public decimal? AlertMinBalanceThreshold { get; set; }
+
+    /// <summary>
+    /// Internal latch to avoid emitting repeated low-balance notifications every tick
+    /// while the account remains below <see cref="AlertMinBalanceThreshold"/>.
+    /// </summary>
+    public bool IsLowBalanceAlertActive { get; set; }
+
     /// <summary>UTC timestamp when this account was created.</summary>
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 

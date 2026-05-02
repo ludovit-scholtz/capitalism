@@ -2,6 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import ViewJumbotron from '@/components/layout/ViewJumbotron.vue'
+import ViewSubnav from '@/components/layout/ViewSubnav.vue'
 import {
   adjustGoldTokenBalance,
   fetchGoldTokenBalances,
@@ -59,6 +61,8 @@ const selectedBalance = computed(() =>
     ? (balances.value.find((b) => b.email === selectedEmail.value) ?? null)
     : null,
 )
+
+const navItems = computed(() => [{ label: t('nav.gameAdminDashboard'), to: '/game-admin' }])
 
 // ── Data loading ───────────────────────────────────────────────────────────
 
@@ -176,26 +180,29 @@ onMounted(async () => {
     void router.push('/login')
     return
   }
+
+  if (!auth.gameAdminChecked) {
+    await auth.refreshGameAdminAccess()
+  }
+
+  if (!auth.isGameAdmin) {
+    void router.push('/')
+    return
+  }
+
   await Promise.all([loadBalances(), loadTransactions()])
 })
 </script>
 
 <template>
   <div class="gold-admin-shell">
-    <header class="gold-admin-header">
-      <div class="gold-admin-header-inner">
-        <div>
-          <p class="section-kicker">{{ t('goldAdmin.kicker') }}</p>
-          <h1>{{ t('goldAdmin.title') }}</h1>
-          <p class="gold-admin-subtitle">
-            {{ t('goldAdmin.subtitle') }}
-          </p>
-        </div>
-        <nav class="gold-admin-nav">
-          <a href="/" class="nav-back-btn">← {{ t('common.backToPortal') }}</a>
-        </nav>
-      </div>
-    </header>
+    <ViewJumbotron
+      :kicker="t('goldAdmin.kicker')"
+      :title="t('goldAdmin.title')"
+      :subtitle="t('goldAdmin.subtitle')"
+      variant="admin"
+    />
+    <ViewSubnav :items="navItems" aria-label="Gold admin navigation" />
 
     <main class="gold-admin-main">
       <!-- Balance table -->

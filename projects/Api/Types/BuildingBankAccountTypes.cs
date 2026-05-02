@@ -30,6 +30,9 @@ public sealed class BuildingBankAccountInfo
     /// <summary>Current balance of the assigned account. Null when no account is assigned.</summary>
     public decimal? Balance { get; set; }
 
+    /// <summary>Optional low-balance notification threshold in account currency.</summary>
+    public decimal? AlertMinBalanceThreshold { get; set; }
+
     /// <summary>
     /// True when the building was suspended on the last tick due to insufficient bank account funds.
     /// Also true when the building has no bank account assigned (advisory state).
@@ -61,6 +64,9 @@ public sealed class CompanyBankAccountSummary
 
     /// <summary>Current balance of the account.</summary>
     public decimal Balance { get; set; }
+
+    /// <summary>Optional low-balance notification threshold in account currency.</summary>
+    public decimal? AlertMinBalanceThreshold { get; set; }
 }
 
 /// <summary>Result of the <c>fundBuildingBankAccount</c> mutation.</summary>
@@ -139,6 +145,9 @@ public sealed class PlayerBankAccountSummary
 
     /// <summary>Current balance of the account.</summary>
     public decimal Balance { get; set; }
+
+    /// <summary>Optional low-balance notification threshold in account currency.</summary>
+    public decimal? AlertMinBalanceThreshold { get; set; }
 
     /// <summary>ID of the company that owns this account. Null for personal accounts.</summary>
     public Guid? CompanyId { get; set; }

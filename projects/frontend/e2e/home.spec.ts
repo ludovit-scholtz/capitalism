@@ -33,12 +33,11 @@ test.describe('Home page', () => {
     await expect(page.getByRole('heading', { name: 'Top Players' })).toBeVisible()
   })
 
-  test('shows game status cards when data loads', async ({ page }) => {
+  test('shows leaderboard section when data loads', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/')
-    await expect(page.getByText('Current Time')).toBeVisible()
-    await expect(page.getByText('Tax Rate')).toBeVisible()
-    await expect(page.getByText('Active Players')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Top Players' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'View Full Leaderboard' })).toBeVisible()
   })
 
   test('shows leaderboard row for player with company', async ({ page }) => {
@@ -144,5 +143,54 @@ test.describe('Header navigation', () => {
     const gameTimeChip = page.locator('.game-time-chip')
     await expect(gameTimeChip).toBeVisible()
     await expect(gameTimeChip).toContainText('2000')
+  })
+
+  test('opens notifications panel and marks all notifications as read', async ({ page }) => {
+    const player = makePlayer()
+    const now = new Date().toISOString()
+    setupMockApi(page, {
+      players: [player],
+      currentUserId: player.id,
+      currentToken: `token-${player.id}`,
+      playerNotifications: [
+        {
+          id: 'notif-1',
+          type: 'BUILDING_CONSTRUCTION_COMPLETED',
+          title: 'Construction complete',
+          message: 'Your factory is ready.',
+          isRead: false,
+          createdAtTick: 42,
+          createdAtUtc: now,
+          buildingId: 'building-1',
+        },
+        {
+          id: 'notif-2',
+          type: 'BANK_ACCOUNT_LOW_BALANCE',
+          title: 'Low balance',
+          message: 'Top up your account.',
+          isRead: false,
+          createdAtTick: 41,
+          createdAtUtc: now,
+          bankAccountId: 'acc-1',
+        },
+      ],
+    })
+    await authenticate(page, `token-${player.id}`)
+
+    await page.goto('/')
+
+    await expect(page.locator('.notification-badge')).toContainText('2')
+
+    await page.getByRole('button', { name: 'Notifications' }).click()
+
+    const panel = page.locator('.notification-panel')
+    await expect(panel).toBeVisible()
+    await expect(panel.locator('.notification-item')).toHaveCount(2)
+    await expect(panel).toContainText('Construction complete')
+
+    await panel.getByRole('button', { name: 'Mark all read' }).click()
+
+    await expect(page.locator('.notification-badge')).toHaveCount(0)
+    await expect(panel.locator('.notification-item-unread')).toHaveCount(0)
   })
 })

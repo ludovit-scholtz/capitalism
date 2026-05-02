@@ -17,6 +17,8 @@
     "i18n:missing": "node scripts/find-missing-translation-keys.mjs",
     "i18n:template-missing": "node scripts/find-missing-template-translation-keys.mjs",
     "type-check": "vue-tsc --build",
+    "check-typescript-errors-tsc": "npx tsc --noEmit --project tsconfig.app.json",
+    "check-typescript-errors-vue": "npx vue-tsc --noEmit --project tsconfig.app.json",
     "lint": "run-s lint:*",
     "lint:oxlint": "oxlint . --fix",
     "lint:eslint": "eslint . --fix --cache",

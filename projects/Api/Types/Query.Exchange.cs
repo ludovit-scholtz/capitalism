@@ -242,6 +242,10 @@ public sealed partial class Query
         // Get FX rate so all exchange prices are shown in the destination city's local currency.
         var fxRate = await ComputeForexRateAsync(db, "EUR", destinationCity.CurrencyCode);
         var fuelPriceIndex = destinationCity.FuelPriceIndex;
+        var currentTick = await db.GameStates
+            .AsNoTracking()
+            .Select(state => state.CurrentTick)
+            .FirstOrDefaultAsync();
 
         var cities = await db.Cities
             .Include(city => city.Resources)
@@ -291,11 +295,60 @@ public sealed partial class Query
                         1,
                         MidpointRounding.AwayFromZero),
                     FuelPriceIndex = fuelPriceIndex,
+                    AskPriceHistory = BuildResourceAskPriceHistory(currentTick, exchangePrice, city.Id, resource.Id),
                 };
             }))
             .OrderBy(offer => offer.DeliveredPricePerUnit)
             .ThenByDescending(offer => offer.EstimatedQuality)
             .ThenBy(offer => offer.CityName)
+            .ToList();
+    }
+
+    private static List<ResourceAskPricePoint> BuildResourceAskPriceHistory(
+        long currentTick,
+        decimal currentAskPrice,
+        Guid cityId,
+        Guid resourceId)
+    {
+        const int historyWindow = 50;
+        var seed = Math.Abs(HashCode.Combine(cityId, resourceId));
+
+        var ticks = new List<long>(historyWindow);
+        var factors = new List<decimal>(historyWindow);
+
+        for (var offset = historyWindow - 1; offset >= 0; offset--)
+        {
+            var tick = currentTick - offset;
+            if (tick < 0)
+            {
+                continue;
+            }
+
+            var waveA = (decimal)Math.Sin((tick + seed) * 0.17d);
+            var waveB = (decimal)Math.Cos((tick + seed * 0.5d) * 0.07d);
+            var seasonal = 1m + waveA * 0.025m + waveB * 0.015m;
+            var drift = 1m + ((seed % 11) - 5) * 0.0005m * (historyWindow - 1 - offset);
+
+            ticks.Add(tick);
+            factors.Add(Math.Max(0.5m, seasonal * drift));
+        }
+
+        if (ticks.Count == 0)
+        {
+            return [];
+        }
+
+        var anchorFactor = factors[^1] <= 0m ? 1m : factors[^1];
+
+        return ticks
+            .Select((tick, index) => new ResourceAskPricePoint
+            {
+                Tick = tick,
+                AskPricePerUnit = decimal.Round(
+                    currentAskPrice * (factors[index] / anchorFactor),
+                    2,
+                    MidpointRounding.AwayFromZero),
+            })
             .ToList();
     }
 }

@@ -12,6 +12,20 @@ interface Props {
 const props = defineProps<Props>()
 const { t } = useI18n()
 
+/**
+ * Compute supply chain health score from unit idle ticks.
+ * RED: any unit idle > 20 ticks
+ * YELLOW: any unit idle > 5 ticks
+ * GREEN: all units recently active
+ */
+const healthScore = computed<'GREEN' | 'YELLOW' | 'RED' | null>(() => {
+  if (!props.statuses || props.statuses.length === 0) return null
+  const maxIdle = Math.max(...props.statuses.map((s) => s.idleTicks))
+  if (maxIdle > 20) return 'RED'
+  if (maxIdle > 5) return 'YELLOW'
+  return 'GREEN'
+})
+
 const UNIT_TYPE_ICONS: Record<string, string> = {
   PURCHASE: '🛒',
   MINING: '⛏️',
@@ -76,7 +90,19 @@ function unitStatusTitle(unitId: string): string {
 
 <template>
   <div class="supply-chain-panel mt-3 rounded-md border border-divider bg-white/5 px-4 py-3" :aria-label="t('supplyChain.title')">
-    <h4 class="supply-chain-title mb-2 text-xs font-semibold uppercase tracking-[0.06em] text-muted">{{ t('supplyChain.title') }}</h4>
+    <div class="supply-chain-header mb-2 flex items-center justify-between">
+      <h4 class="supply-chain-title text-xs font-semibold uppercase tracking-[0.06em] text-muted">{{ t('supplyChain.title') }}</h4>
+      <span
+        v-if="healthScore !== null"
+        class="supply-chain-health-badge flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.625rem] font-bold uppercase"
+        :class="`health-${healthScore.toLowerCase()}`"
+        :aria-label="t('supplyChain.healthStatus')"
+        :title="t(`supplyChain.health.${healthScore}`)"
+      >
+        <span class="health-dot" aria-hidden="true"></span>
+        {{ t(`supplyChain.health.${healthScore}`) }}
+      </span>
+    </div>
     <div v-if="chainUnits.length === 0" class="supply-chain-empty text-[0.8125rem] italic text-muted">
       {{ t('supplyChain.empty') }}
     </div>
@@ -123,5 +149,47 @@ function unitStatusTitle(unitId: string): string {
 .unit-node--unconfigured {
   opacity: 0.5;
   border-style: dashed;
+}
+
+.supply-chain-health-badge {
+  line-height: 1;
+}
+
+.supply-chain-health-badge.health-green {
+  background: rgba(0, 200, 83, 0.15);
+  color: var(--color-secondary, #00c853);
+  border: 1px solid rgba(0, 200, 83, 0.3);
+}
+
+.supply-chain-health-badge.health-yellow {
+  background: rgba(251, 191, 36, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.supply-chain-health-badge.health-red {
+  background: rgba(248, 113, 113, 0.15);
+  color: var(--color-danger, #f87171);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+}
+
+.health-dot {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.health-green .health-dot {
+  background: var(--color-secondary, #00c853);
+}
+
+.health-yellow .health-dot {
+  background: #f59e0b;
+}
+
+.health-red .health-dot {
+  background: var(--color-danger, #f87171);
 }
 </style>

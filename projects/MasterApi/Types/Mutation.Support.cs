@@ -15,7 +15,8 @@ public sealed partial class Mutation
     public async Task<SupportTicketInfo> CreateSupportTicket(
         CreateSupportTicketInput input,
         ClaimsPrincipal claimsPrincipal,
-        [Service] MasterDbContext db)
+        [Service] MasterDbContext db,
+        [Service] MasterRankingService rankingService)
     {
         var player = await Query.GetCurrentUserAsync(claimsPrincipal, db)
             ?? throw new GraphQLException(
@@ -61,6 +62,19 @@ public sealed partial class Mutation
 
         db.SupportTickets.Add(ticket);
         await db.SaveChangesAsync();
+
+        if (ticketType == SupportTicketType.Suggestion)
+        {
+            await rankingService.IngestEventAsync(
+                eventType: MasterRankingBountyCodes.GameImprover,
+                playerEmail: player.Email,
+                serverKey: null,
+                externalEventId: $"support-ticket:{ticket.Id}",
+                uniqueScopeKey: $"support-ticket:{ticket.Id}",
+                proofReference: null,
+                payloadJson: JsonSerializer.Serialize(new { ticketId = ticket.Id, ticketType = ticketType }),
+                occurredAtUtc: now);
+        }
 
         var created = await db.SupportTickets
             .AsNoTracking()

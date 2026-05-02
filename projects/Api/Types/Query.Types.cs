@@ -157,6 +157,18 @@ public sealed class GlobalExchangeOffer
     /// (1.0 = EUR baseline; values above 1.0 indicate costlier local fuel).
     /// </summary>
     public decimal FuelPriceIndex { get; set; } = 1.0m;
+
+    /// <summary>
+    /// Last 50 ticks of ask-price history for this city/resource offer.
+    /// Used by the global exchange sparkline UI.
+    /// </summary>
+    public List<ResourceAskPricePoint> AskPriceHistory { get; set; } = [];
+}
+
+public sealed class ResourceAskPricePoint
+{
+    public long Tick { get; set; }
+    public decimal AskPricePerUnit { get; set; }
 }
 
 /// <summary>
