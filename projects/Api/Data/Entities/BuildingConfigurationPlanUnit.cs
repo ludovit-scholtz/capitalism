@@ -115,4 +115,10 @@ public sealed class BuildingConfigurationPlanUnit
     /// </summary>
     [MaxLength(50)]
     public string? IndustryCategory { get; set; }
+
+    /// <summary>
+    /// Optional minimum inventory threshold for low-stock alerts on PUBLIC_SALES units.
+    /// Carried over from the active unit snapshot so the pending plan reflects the live alert setting.
+    /// </summary>
+    public decimal? LowInventoryAlertThreshold { get; set; }
 }
