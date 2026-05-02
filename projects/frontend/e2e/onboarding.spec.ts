@@ -5065,4 +5065,44 @@ test.describe('Electronics industry — Pro-gated starter path', () => {
     await expect(electronicsCard).toBeVisible()
     await expect(electronicsCard.locator('.industry-pro-badge')).toBeVisible()
   })
+
+  test('Pro subscriber sees LED Screen and Circuit Board as product choices', async ({ page }) => {
+    const proExpiry = new Date(Date.now() + 7_200_000).toISOString()
+    const player = makePlayer({ proSubscriptionEndsAtUtc: proExpiry })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/onboarding')
+    await page.locator('.industry-card', { hasText: 'Electronics' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).toBeVisible()
+
+    // All three starter Electronics products must be selectable
+    await expect(page.locator('.product-card', { hasText: 'Basic Electronics' })).toBeVisible()
+    await expect(page.locator('.product-card', { hasText: 'LED Screen' })).toBeVisible()
+    await expect(page.locator('.product-card', { hasText: 'Circuit Board' })).toBeVisible()
+  })
+
+  test('Electronics industry card description explains Pro-exclusive high-margin appeal', async ({ page }) => {
+    // The industry description must mention key PRO selling points per ROADMAP.
+    const proExpiry = new Date(Date.now() + 7_200_000).toISOString()
+    const player = makePlayer({ proSubscriptionEndsAtUtc: proExpiry })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/onboarding')
+    await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
+
+    const electronicsCard = page.locator('.industry-card', { hasText: 'Electronics' })
+    await expect(electronicsCard).toBeVisible()
+    // PRO badge must be present on the card
+    await expect(electronicsCard.locator('.industry-pro-badge')).toBeVisible()
+    // Card should have a first-product hint (shows starter product info)
+    await expect(electronicsCard.locator('.card-first-product')).toBeVisible()
+    // Card should have a why-choose tagline
+    await expect(electronicsCard.locator('.card-why')).toBeVisible()
+  })
 })

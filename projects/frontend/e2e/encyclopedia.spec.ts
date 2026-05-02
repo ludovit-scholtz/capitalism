@@ -983,3 +983,165 @@ test.describe('Encyclopedia resource detail — exchange cross-links', () => {
     await expect(exchangeLink).toHaveAttribute('href', '/exchange')
   })
 })
+
+test.describe('Electronics Pro-only products in encyclopedia', () => {
+  const siliconResource = {
+    id: 'res-silicon',
+    name: 'Silicon',
+    slug: 'silicon',
+    category: 'MINERAL' as const,
+    basePrice: 40,
+    weightPerUnit: 2,
+    unitName: 'Kilogram',
+    unitSymbol: 'kg',
+    imageUrl: null,
+    description: 'High-purity mineral used for wafers and electronics manufacturing.',
+  }
+
+  const basicElectronicsProduct = {
+    id: 'prod-basic-electronics',
+    name: 'Basic Electronics',
+    slug: 'basic-electronics',
+    industry: 'ELECTRONICS',
+    basePrice: 45,
+    baseCraftTicks: 3,
+    outputQuantity: 12,
+    energyConsumptionMwh: 1.0,
+    basicLaborHours: 1.8,
+    unitName: 'Pack',
+    unitSymbol: 'packs',
+    isProOnly: true,
+    description: 'A starter pack of electronic components assembled from raw silicon.',
+    recipes: [
+      {
+        resourceType: { id: 'res-silicon', name: 'Silicon', slug: 'silicon', unitName: 'Kilogram', unitSymbol: 'kg' },
+        inputProductType: null,
+        quantity: 1,
+      },
+    ],
+  }
+
+  const ledScreenProduct = {
+    id: 'prod-led-screen',
+    name: 'LED Screen',
+    slug: 'led-screen',
+    industry: 'ELECTRONICS',
+    basePrice: 85,
+    baseCraftTicks: 4,
+    outputQuantity: 6,
+    energyConsumptionMwh: 1.3,
+    basicLaborHours: 2.2,
+    unitName: 'Display',
+    unitSymbol: 'displays',
+    isProOnly: true,
+    description: 'A flat-panel LED display made from silicon.',
+    recipes: [
+      {
+        resourceType: { id: 'res-silicon', name: 'Silicon', slug: 'silicon', unitName: 'Kilogram', unitSymbol: 'kg' },
+        inputProductType: null,
+        quantity: 1,
+      },
+    ],
+  }
+
+  const circuitBoardProduct = {
+    id: 'prod-circuit-board',
+    name: 'Circuit Board',
+    slug: 'circuit-board',
+    industry: 'ELECTRONICS',
+    basePrice: 55,
+    baseCraftTicks: 3,
+    outputQuantity: 10,
+    energyConsumptionMwh: 1.1,
+    basicLaborHours: 2.0,
+    unitName: 'Board',
+    unitSymbol: 'boards',
+    isProOnly: true,
+    description: 'A populated circuit board assembled from silicon.',
+    recipes: [
+      {
+        resourceType: { id: 'res-silicon', name: 'Silicon', slug: 'silicon', unitName: 'Kilogram', unitSymbol: 'kg' },
+        inputProductType: null,
+        quantity: 2,
+      },
+    ],
+  }
+
+  test('Electronics products are hidden by default and Pro count hint is shown', async ({ page }) => {
+    setupMockApi(page, {
+      resourceTypes: [siliconResource],
+      productTypes: [basicElectronicsProduct, ledScreenProduct, circuitBoardProduct],
+    })
+
+    await page.goto('/encyclopedia')
+
+    // Pro products should NOT appear when showPro is off
+    await expect(page.getByRole('button', { name: /Basic Electronics/ })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /LED Screen/ })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /Circuit Board/ })).toHaveCount(0)
+
+    // A hint about hidden Pro products must be visible
+    await expect(page.locator('text=/pro/i').first()).toBeVisible()
+  })
+
+  test('Electronics products appear when "Show Pro products" toggle is enabled', async ({ page }) => {
+    setupMockApi(page, {
+      resourceTypes: [siliconResource],
+      productTypes: [basicElectronicsProduct, ledScreenProduct, circuitBoardProduct],
+    })
+
+    await page.goto('/encyclopedia?showPro=1')
+
+    // All three Electronics products must appear
+    await expect(page.getByRole('button', { name: /Basic Electronics/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /LED Screen/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Circuit Board/ })).toBeVisible()
+  })
+
+  test('ELECTRONICS industry filter shows Pro products when showPro is enabled', async ({ page }) => {
+    setupMockApi(page, {
+      resourceTypes: [siliconResource, woodResource],
+      productTypes: [basicElectronicsProduct, ledScreenProduct, electronicComponents],
+    })
+
+    await page.goto('/encyclopedia?showPro=1')
+
+    await page.getByLabel('Filter by industry').selectOption('ELECTRONICS')
+
+    // Basic Electronics (isProOnly=true) and Electronic Components (isProOnly=false) are ELECTRONICS
+    await expect(page.getByRole('button', { name: /Basic Electronics/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Electronic Components/ })).toBeVisible()
+    // Wood is a raw material — should not appear under ELECTRONICS filter
+    await expect(page.getByRole('button', { name: /Wood/ })).toHaveCount(0)
+  })
+
+  test('Silicon resource detail page shows downstream Electronics products when Pro is enabled', async ({ page }) => {
+    setupMockApi(page, {
+      resourceTypes: [siliconResource],
+      productTypes: [basicElectronicsProduct, ledScreenProduct, circuitBoardProduct],
+    })
+
+    await page.goto('/encyclopedia/resources/silicon?showPro=1')
+
+    await expect(page.getByRole('heading', { name: 'Silicon', level: 1 })).toBeVisible()
+
+    // Each Electronics product uses Silicon as its recipe input — they should appear as downstream product cards
+    await expect(page.locator('.product-card', { hasText: 'Basic Electronics' })).toBeVisible()
+    await expect(page.locator('.product-card', { hasText: 'LED Screen' })).toBeVisible()
+    await expect(page.locator('.product-card', { hasText: 'Circuit Board' })).toBeVisible()
+  })
+
+  test('Basic Electronics product detail shows Silicon recipe and Pro badge', async ({ page }) => {
+    setupMockApi(page, {
+      resourceTypes: [siliconResource],
+      productTypes: [basicElectronicsProduct],
+    })
+
+    await page.goto('/encyclopedia/resources/basic-electronics?showPro=1')
+
+    await expect(page.getByRole('heading', { name: 'Basic Electronics', level: 1 })).toBeVisible()
+
+    // Silicon must appear as an ingredient in the recipe section
+    await expect(page.locator('text=/silicon/i').first()).toBeVisible()
+  })
+})

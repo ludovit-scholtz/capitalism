@@ -10329,6 +10329,320 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.DoesNotContain("HEALTHCARE", proOnly);
     }
 
+    [Fact]
+    public async Task ProductTypes_Electronics_IsLockedForNonProUser()
+    {
+        // Non-Pro user querying productTypes should see Electronics products with isUnlockedForCurrentPlayer=false.
+        var token = await RegisterAndGetTokenAsync($"elec-lock-{Guid.NewGuid()}@test.com", "ElecLock");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            { productTypes(industry: "ELECTRONICS") {
+                slug isProOnly isUnlockedForCurrentPlayer
+              }
+            }
+            """,
+            null,
+            token);
+
+        var products = result.GetProperty("data").GetProperty("productTypes").EnumerateArray().ToList();
+        Assert.NotEmpty(products);
+        foreach (var p in products)
+        {
+            Assert.True(p.GetProperty("isProOnly").GetBoolean(), $"{p.GetProperty("slug").GetString()} must be isProOnly");
+            Assert.False(p.GetProperty("isUnlockedForCurrentPlayer").GetBoolean(),
+                $"{p.GetProperty("slug").GetString()} must be locked for non-Pro user");
+        }
+    }
+
+    [Fact]
+    public async Task ProductTypes_Electronics_IsUnlockedForProUser()
+    {
+        // Pro user querying productTypes should see Electronics products with isUnlockedForCurrentPlayer=true.
+        var email = $"elec-unlock-{Guid.NewGuid()}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "ElecUnlock");
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddDays(30);
+            await db.SaveChangesAsync();
+        }
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            { productTypes(industry: "ELECTRONICS") {
+                slug isProOnly isUnlockedForCurrentPlayer
+              }
+            }
+            """,
+            null,
+            token);
+
+        var products = result.GetProperty("data").GetProperty("productTypes").EnumerateArray().ToList();
+        Assert.NotEmpty(products);
+        foreach (var p in products)
+        {
+            Assert.True(p.GetProperty("isProOnly").GetBoolean(), $"{p.GetProperty("slug").GetString()} must be isProOnly");
+            Assert.True(p.GetProperty("isUnlockedForCurrentPlayer").GetBoolean(),
+                $"{p.GetProperty("slug").GetString()} must be unlocked for Pro user");
+        }
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_Electronics_AsNonProUser_ProductAccessDenied()
+    {
+        // This test simulates a player whose OnboardingIndustry was forcibly set to ELECTRONICS
+        // (bypassing startOnboardingCompany Pro gate via direct DB write) and then tries to
+        // call finishOnboarding with an Electronics product.  The backend's second Pro-access
+        // check on the product must block the attempt.
+        var email = $"finish-elec-nopro-{Guid.NewGuid()}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "FinElecNoPro");
+
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Pro Bypass Zone");
+
+        // First, start onboarding as FURNITURE (allowed for non-Pro) so the player has a company.
+        var startResult = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { company { id } factory { id } }
+            }
+            """,
+            new { input = new { industry = "FURNITURE", cityId, companyName = "Bypass Co", factoryLotId } },
+            token);
+        Assert.False(startResult.TryGetProperty("errors", out _), $"Start errors: {startResult}");
+
+        // Forcibly change OnboardingIndustry to ELECTRONICS in the DB (simulate tampering).
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.OnboardingIndustry = Industry.Electronics;
+            await db.SaveChangesAsync();
+        }
+
+        // Attempt finishOnboarding with an Electronics product.
+        var basicElectronicsId = await GetStarterProductIdAsync("ELECTRONICS", "basic-electronics");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Shop Zone Bypass");
+
+        var finishResult = await ExecuteGraphQlAsync(
+            """
+            mutation FinishOnboarding($input: FinishOnboardingInput!) {
+              finishOnboarding(input: $input) { company { id } }
+            }
+            """,
+            new { input = new { productTypeId = basicElectronicsId, shopLotId } },
+            token);
+
+        // Must be rejected — isUnlockedForCurrentPlayer=false for non-Pro.
+        Assert.True(finishResult.TryGetProperty("errors", out var errs), "Expected Pro-access error");
+        var code = errs[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("PRO_SUBSCRIPTION_REQUIRED", code);
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_Electronics_LedScreen_AsProUser_Succeeds()
+    {
+        var email = $"finish-ledscreen-{Guid.NewGuid()}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "FinLedPro");
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddDays(30);
+            await db.SaveChangesAsync();
+        }
+
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "LED Factory Zone");
+
+        var startResult = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { company { id } }
+            }
+            """,
+            new { input = new { industry = "ELECTRONICS", cityId, companyName = "LED Co", factoryLotId } },
+            token);
+        Assert.False(startResult.TryGetProperty("errors", out _), $"Start errors: {startResult}");
+
+        var ledScreenId = await GetStarterProductIdAsync("ELECTRONICS", "led-screen");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "LED Shop Zone");
+
+        var finishResult = await ExecuteGraphQlAsync(
+            """
+            mutation FinishOnboarding($input: FinishOnboardingInput!) {
+              finishOnboarding(input: $input) {
+                selectedProduct { slug isProOnly }
+                factory { units { unitType } }
+              }
+            }
+            """,
+            new { input = new { productTypeId = ledScreenId, shopLotId } },
+            token);
+
+        Assert.False(finishResult.TryGetProperty("errors", out _), $"Finish errors: {finishResult}");
+        var result = finishResult.GetProperty("data").GetProperty("finishOnboarding");
+        Assert.Equal("led-screen", result.GetProperty("selectedProduct").GetProperty("slug").GetString());
+        Assert.True(result.GetProperty("selectedProduct").GetProperty("isProOnly").GetBoolean());
+
+        var units = result.GetProperty("factory").GetProperty("units").EnumerateArray().ToList();
+        Assert.Contains(units, u => u.GetProperty("unitType").GetString() == "PURCHASE");
+        Assert.Contains(units, u => u.GetProperty("unitType").GetString() == "MANUFACTURING");
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_Electronics_CircuitBoard_AsProUser_Succeeds()
+    {
+        var email = $"finish-circuitboard-{Guid.NewGuid()}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "FinCircuitPro");
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddDays(30);
+            await db.SaveChangesAsync();
+        }
+
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Circuit Board Zone");
+
+        var startResult = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { company { id } }
+            }
+            """,
+            new { input = new { industry = "ELECTRONICS", cityId, companyName = "PCB Corp", factoryLotId } },
+            token);
+        Assert.False(startResult.TryGetProperty("errors", out _), $"Start errors: {startResult}");
+
+        var circuitBoardId = await GetStarterProductIdAsync("ELECTRONICS", "circuit-board");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "PCB Shop Zone");
+
+        var finishResult = await ExecuteGraphQlAsync(
+            """
+            mutation FinishOnboarding($input: FinishOnboardingInput!) {
+              finishOnboarding(input: $input) {
+                selectedProduct { slug isProOnly }
+                factory { units { unitType } }
+              }
+            }
+            """,
+            new { input = new { productTypeId = circuitBoardId, shopLotId } },
+            token);
+
+        Assert.False(finishResult.TryGetProperty("errors", out _), $"Finish errors: {finishResult}");
+        var result = finishResult.GetProperty("data").GetProperty("finishOnboarding");
+        Assert.Equal("circuit-board", result.GetProperty("selectedProduct").GetProperty("slug").GetString());
+        Assert.True(result.GetProperty("selectedProduct").GetProperty("isProOnly").GetBoolean());
+
+        var units = result.GetProperty("factory").GetProperty("units").EnumerateArray().ToList();
+        Assert.Contains(units, u => u.GetProperty("unitType").GetString() == "PURCHASE");
+        Assert.Contains(units, u => u.GetProperty("unitType").GetString() == "MANUFACTURING");
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_Electronics_PragueCity_AsProUser_Succeeds()
+    {
+        // Verify Electronics onboarding works for a non-EUR city (Prague / CZK).
+        var email = $"finish-elec-prague-{Guid.NewGuid()}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "ElecPrague");
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddDays(30);
+            await db.SaveChangesAsync();
+        }
+
+        var pragueId = await GetCityIdByNameAsync("Prague");
+        var factoryLotId = await CreateTestLotAsync(pragueId, "FACTORY,MINE", "Prague Silicon Zone");
+
+        var startResult = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { company { id } }
+            }
+            """,
+            new { input = new { industry = "ELECTRONICS", cityId = pragueId, companyName = "Prague Chips", factoryLotId } },
+            token);
+        Assert.False(startResult.TryGetProperty("errors", out _), $"Start errors: {startResult}");
+
+        var basicElectronicsId = await GetStarterProductIdAsync("ELECTRONICS", "basic-electronics");
+        var shopLotId = await CreateTestLotAsync(pragueId, "SALES_SHOP,COMMERCIAL", "Prague Chip Shop");
+
+        var finishResult = await ExecuteGraphQlAsync(
+            """
+            mutation FinishOnboarding($input: FinishOnboardingInput!) {
+              finishOnboarding(input: $input) {
+                selectedProduct { slug }
+                cityCurrencyCode
+              }
+            }
+            """,
+            new { input = new { productTypeId = basicElectronicsId, shopLotId } },
+            token);
+
+        Assert.False(finishResult.TryGetProperty("errors", out _), $"Prague finish errors: {finishResult}");
+        var result = finishResult.GetProperty("data").GetProperty("finishOnboarding");
+        Assert.Equal("basic-electronics", result.GetProperty("selectedProduct").GetProperty("slug").GetString());
+        Assert.Equal("CZK", result.GetProperty("cityCurrencyCode").GetString());
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_Electronics_ViennaCity_AsProUser_Succeeds()
+    {
+        // Verify Electronics onboarding works for Vienna / EUR (third city).
+        var email = $"finish-elec-vienna-{Guid.NewGuid()}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "ElecVienna");
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddDays(30);
+            await db.SaveChangesAsync();
+        }
+
+        var viennaId = await GetCityIdByNameAsync("Vienna");
+        var factoryLotId = await CreateTestLotAsync(viennaId, "FACTORY,MINE", "Vienna Silicon Zone");
+
+        var startResult = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { company { id } }
+            }
+            """,
+            new { input = new { industry = "ELECTRONICS", cityId = viennaId, companyName = "Vienna Chips", factoryLotId } },
+            token);
+        Assert.False(startResult.TryGetProperty("errors", out _), $"Start errors: {startResult}");
+
+        var basicElectronicsId = await GetStarterProductIdAsync("ELECTRONICS", "basic-electronics");
+        var shopLotId = await CreateTestLotAsync(viennaId, "SALES_SHOP,COMMERCIAL", "Vienna Chip Shop");
+
+        var finishResult = await ExecuteGraphQlAsync(
+            """
+            mutation FinishOnboarding($input: FinishOnboardingInput!) {
+              finishOnboarding(input: $input) {
+                selectedProduct { slug }
+                cityCurrencyCode
+              }
+            }
+            """,
+            new { input = new { productTypeId = basicElectronicsId, shopLotId } },
+            token);
+
+        Assert.False(finishResult.TryGetProperty("errors", out _), $"Vienna finish errors: {finishResult}");
+        var result = finishResult.GetProperty("data").GetProperty("finishOnboarding");
+        Assert.Equal("basic-electronics", result.GetProperty("selectedProduct").GetProperty("slug").GetString());
+        Assert.Equal("EUR", result.GetProperty("cityCurrencyCode").GetString());
+    }
 
     [Fact]
     public async Task StartOnboardingCompany_WithEmptyCompanyName_ReturnsError()
