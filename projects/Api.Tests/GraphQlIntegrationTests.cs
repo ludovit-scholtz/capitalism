@@ -1456,7 +1456,8 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var result = await ExecuteGraphQlAsync("{ starterIndustries { industries } }");
 
         var industries = result.GetProperty("data").GetProperty("starterIndustries").GetProperty("industries");
-        Assert.Equal(3, industries.GetArrayLength());
+        // 4 starter industries: FURNITURE, FOOD_PROCESSING, HEALTHCARE, ELECTRONICS
+        Assert.Equal(4, industries.GetArrayLength());
     }
 
     // ── Encyclopedia ──────────────────────────────────────────────────────────
@@ -10138,12 +10139,196 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
               startOnboardingCompany(input: $input) { company { id } }
             }
             """,
-            new { input = new { industry = "ELECTRONICS", cityId, companyName = "Electronics Co", factoryLotId = lotId } },
+            new { input = new { industry = "MINING", cityId, companyName = "Mining Co", factoryLotId = lotId } },
             token);
 
         Assert.True(result.TryGetProperty("errors", out var errors));
         Assert.Equal("INVALID_INDUSTRY", errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
+
+    [Fact]
+    public async Task StartOnboardingCompany_Electronics_AsNonProUser_ReturnsProError()
+    {
+        var token = await RegisterAndGetTokenAsync($"onboard-electronics-nopro-{Guid.NewGuid()}@test.com", "NoProElec");
+        var cityId = await GetCityIdByNameAsync();
+        var lotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Industrial Zone");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { company { id } }
+            }
+            """,
+            new { input = new { industry = "ELECTRONICS", cityId, companyName = "Electronics Co", factoryLotId = lotId } },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Equal("PRO_SUBSCRIPTION_REQUIRED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task StartOnboardingCompany_Electronics_AsProUser_Succeeds()
+    {
+        var email = $"onboard-electronics-pro-{Guid.NewGuid()}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "ProElec");
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddDays(30);
+            await db.SaveChangesAsync();
+        }
+
+        var cityId = await GetCityIdByNameAsync();
+        var lotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Industrial Zone");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) {
+                company { id name }
+                factory { id }
+                nextStep
+              }
+            }
+            """,
+            new { input = new { industry = "ELECTRONICS", cityId, companyName = "Silicon Valley Co", factoryLotId = lotId } },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _), $"Unexpected errors: {result}");
+        var data = result.GetProperty("data").GetProperty("startOnboardingCompany");
+        Assert.Equal("Silicon Valley Co", data.GetProperty("company").GetProperty("name").GetString());
+        Assert.Equal("SHOP_SELECTION", data.GetProperty("nextStep").GetString());
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_Electronics_AsProUser_Succeeds()
+    {
+        var email = $"finish-electronics-pro-{Guid.NewGuid()}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "FinElecPro");
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddDays(30);
+            await db.SaveChangesAsync();
+        }
+
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Industrial Zone A");
+
+        // Start onboarding to get company + factory
+        var startResult = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) {
+                company { id }
+                factory { id }
+              }
+            }
+            """,
+            new { input = new { industry = "ELECTRONICS", cityId, companyName = "Circuit Co", factoryLotId } },
+            token);
+
+        Assert.False(startResult.TryGetProperty("errors", out _), $"Start errors: {startResult}");
+
+        // Get a basic-electronics product
+        var basicElectronicsId = await GetStarterProductIdAsync("ELECTRONICS", "basic-electronics");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Shop Zone A");
+
+        var finishResult = await ExecuteGraphQlAsync(
+            """
+            mutation FinishOnboarding($input: FinishOnboardingInput!) {
+              finishOnboarding(input: $input) {
+                company { id name }
+                factory { id units { id unitType } }
+                salesShop { id units { id unitType } }
+                selectedProduct { id name slug isProOnly }
+                cityCurrencyCode
+              }
+            }
+            """,
+            new { input = new { productTypeId = basicElectronicsId, shopLotId } },
+            token);
+
+        Assert.False(finishResult.TryGetProperty("errors", out _), $"Finish errors: {finishResult}");
+        var result = finishResult.GetProperty("data").GetProperty("finishOnboarding");
+        Assert.Equal("Circuit Co", result.GetProperty("company").GetProperty("name").GetString());
+        Assert.Equal("basic-electronics", result.GetProperty("selectedProduct").GetProperty("slug").GetString());
+        Assert.True(result.GetProperty("selectedProduct").GetProperty("isProOnly").GetBoolean());
+        Assert.Equal("EUR", result.GetProperty("cityCurrencyCode").GetString());
+
+        // Factory should have PURCHASE, MANUFACTURING, STORAGE, B2BSales units
+        var factoryUnits = result.GetProperty("factory").GetProperty("units").EnumerateArray().ToList();
+        Assert.Contains(factoryUnits, u => u.GetProperty("unitType").GetString() == "PURCHASE");
+        Assert.Contains(factoryUnits, u => u.GetProperty("unitType").GetString() == "MANUFACTURING");
+
+        // Shop should have PURCHASE and PUBLIC_SALES units
+        var shopUnits = result.GetProperty("salesShop").GetProperty("units").EnumerateArray().ToList();
+        Assert.Contains(shopUnits, u => u.GetProperty("unitType").GetString() == "PUBLIC_SALES");
+    }
+
+    [Fact]
+    public async Task ElectronicsStarterProducts_AllHaveDirectSiliconRecipe()
+    {
+        var result = await ExecuteGraphQlAsync(
+            """
+            {
+              productTypes(industry: "ELECTRONICS") {
+                slug
+                isProOnly
+                recipes {
+                  quantity
+                  resourceType { slug }
+                  inputProductType { slug }
+                }
+              }
+            }
+            """);
+
+        var products = result.GetProperty("data").GetProperty("productTypes").EnumerateArray().ToList();
+        var starterSlugs = new[] { "basic-electronics", "led-screen", "circuit-board" };
+
+        foreach (var starterSlug in starterSlugs)
+        {
+            var product = products.FirstOrDefault(p => p.GetProperty("slug").GetString() == starterSlug);
+            Assert.True(product.ValueKind != System.Text.Json.JsonValueKind.Undefined, $"Product {starterSlug} not found");
+
+            // Must be Pro-only
+            Assert.True(product.GetProperty("isProOnly").GetBoolean(), $"{starterSlug} should be Pro-only");
+
+            // Must have at least one direct silicon resource recipe
+            var recipes = product.GetProperty("recipes").EnumerateArray().ToList();
+            var hasSiliconRecipe = recipes.Any(r =>
+                r.GetProperty("resourceType").ValueKind != System.Text.Json.JsonValueKind.Null &&
+                r.GetProperty("resourceType").GetProperty("slug").GetString() == "silicon");
+            Assert.True(hasSiliconRecipe, $"{starterSlug} should have a direct silicon recipe");
+        }
+    }
+
+    [Fact]
+    public async Task StarterIndustries_IncludesElectronicsAsProOnly()
+    {
+        var result = await ExecuteGraphQlAsync(
+            "{ starterIndustries { industries proOnlyIndustries } }");
+
+        var payload = result.GetProperty("data").GetProperty("starterIndustries");
+        var industries = payload.GetProperty("industries").EnumerateArray().Select(i => i.GetString()).ToList();
+        var proOnly = payload.GetProperty("proOnlyIndustries").EnumerateArray().Select(i => i.GetString()).ToList();
+
+        Assert.Contains("ELECTRONICS", industries);
+        Assert.Contains("FURNITURE", industries);
+        Assert.Contains("FOOD_PROCESSING", industries);
+        Assert.Contains("HEALTHCARE", industries);
+
+        Assert.Contains("ELECTRONICS", proOnly);
+        Assert.DoesNotContain("FURNITURE", proOnly);
+        Assert.DoesNotContain("FOOD_PROCESSING", proOnly);
+        Assert.DoesNotContain("HEALTHCARE", proOnly);
+    }
+
 
     [Fact]
     public async Task StartOnboardingCompany_WithEmptyCompanyName_ReturnsError()
@@ -10529,7 +10714,8 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.Contains("FURNITURE", industryList);
         Assert.Contains("FOOD_PROCESSING", industryList);
         Assert.Contains("HEALTHCARE", industryList);
-        Assert.Equal(3, industryList.Count);
+        Assert.Contains("ELECTRONICS", industryList);
+        Assert.Equal(4, industryList.Count);
     }
 
     [Fact]

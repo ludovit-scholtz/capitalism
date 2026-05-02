@@ -574,7 +574,8 @@ public sealed partial class Query
     {
         return new StarterIndustriesPayload
         {
-            Industries = Industry.StarterIndustries.ToList()
+            Industries = Industry.StarterIndustries.ToList(),
+            ProOnlyIndustries = Industry.ProOnlyStarterIndustries.ToList()
         };
     }
 }

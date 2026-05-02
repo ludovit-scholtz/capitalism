@@ -180,6 +180,7 @@ const starterProductSlugByIndustry: Record<string, string[]> = {
   FURNITURE: ['wooden-chair', 'wooden-table', 'wooden-bed'],
   FOOD_PROCESSING: ['bread', 'pasta', 'crackers'],
   HEALTHCARE: ['basic-medicine', 'bandages', 'first-aid-kit'],
+  ELECTRONICS: ['basic-electronics', 'led-screen', 'circuit-board'],
 }
 
 const step = ref(1)
@@ -200,6 +201,7 @@ const guestPassword = ref('')
 const guestDisplayName = ref('')
 
 const industries = ref<string[]>([])
+const proOnlyIndustries = ref<string[]>([])
 const cities = ref<City[]>([])
 const eurFxRates = ref<EurFxRate[]>([])
 const products = ref<ProductType[]>([])
@@ -400,6 +402,7 @@ const industryIcons: Record<string, string> = {
   FURNITURE: '🪑',
   FOOD_PROCESSING: '🍞',
   HEALTHCARE: '💊',
+  ELECTRONICS: '💻',
 }
 
 /** Maps each starter industry to its i18n description key. */
@@ -407,6 +410,7 @@ const industryDescKeys: Record<string, string> = {
   FURNITURE: 'onboarding.industryDescFurniture',
   FOOD_PROCESSING: 'onboarding.industryDescFoodProcessing',
   HEALTHCARE: 'onboarding.industryDescHealthcare',
+  ELECTRONICS: 'onboarding.industryDescElectronics',
 }
 
 /** Maps each starter industry to its i18n first-product hint key. */
@@ -414,6 +418,7 @@ const industryFirstProductKeys: Record<string, string> = {
   FURNITURE: 'onboarding.industryFirstProductFurniture',
   FOOD_PROCESSING: 'onboarding.industryFirstProductFoodProcessing',
   HEALTHCARE: 'onboarding.industryFirstProductHealthcare',
+  ELECTRONICS: 'onboarding.industryFirstProductElectronics',
 }
 
 /** Maps each starter industry to its i18n "why choose" tag key. */
@@ -421,6 +426,7 @@ const industryWhyKeys: Record<string, string> = {
   FURNITURE: 'onboarding.industryWhyFurniture',
   FOOD_PROCESSING: 'onboarding.industryWhyFoodProcessing',
   HEALTHCARE: 'onboarding.industryWhyHealthcare',
+  ELECTRONICS: 'onboarding.industryWhyElectronics',
 }
 
 function resolveMaxReachableStep(): number {
@@ -601,12 +607,15 @@ onMounted(async () => {
   try {
     loading.value = true
     const [industriesData, citiesData, fxRatesData] = await Promise.all([
-      gqlRequest<{ starterIndustries: { industries: string[] } }>('{ starterIndustries { industries } }'),
+      gqlRequest<{ starterIndustries: { industries: string[]; proOnlyIndustries: string[] } }>(
+        '{ starterIndustries { industries proOnlyIndustries } }',
+      ),
       gqlRequest<{ cities: City[] }>(CITIES_QUERY),
       gqlRequest<{ eurFxRates: EurFxRate[] }>('{ eurFxRates { currencyCode rate } }'),
     ])
 
     industries.value = industriesData.starterIndustries.industries
+    proOnlyIndustries.value = industriesData.starterIndustries.proOnlyIndustries
     cities.value = citiesData.cities
     eurFxRates.value = fxRatesData.eurFxRates
 
@@ -644,6 +653,13 @@ onMounted(async () => {
 
 async function selectIndustry(industry: string) {
   error.value = null
+
+  // Block authenticated non-Pro users from selecting Pro-only industries.
+  if (proOnlyIndustries.value.includes(industry) && hasAuthenticatedSession.value && !auth.isProSubscriber) {
+    error.value = t('onboarding.proRequiredError')
+    return
+  }
+
   selectedIndustry.value = industry
   selectedProductId.value = ''
   selectedCityId.value = ''
@@ -1151,10 +1167,19 @@ useTickRefresh(async () => {
           <button
             v-for="ind in industries"
             :key="ind"
-            class="industry-card flex flex-col gap-2 rounded-md border-2 border-divider bg-page p-6 text-center text-body transition-all duration-200 hover:-translate-y-0.5 hover:border-brand hover:shadow-[0_4px_16px_rgba(0,71,255,0.1)]"
-            :class="{ 'border-brand bg-brand/10 shadow-[0_0_0_1px_var(--color-primary),0_4px_16px_rgba(0,71,255,0.15)]': selectedIndustry === ind, 'pick-hint': !selectedIndustry }"
+            class="industry-card relative flex flex-col gap-2 rounded-md border-2 border-divider bg-page p-6 text-center text-body transition-all duration-200 hover:-translate-y-0.5 hover:border-brand hover:shadow-[0_4px_16px_rgba(0,71,255,0.1)]"
+            :class="{
+              'border-brand bg-brand/10 shadow-[0_0_0_1px_var(--color-primary),0_4px_16px_rgba(0,71,255,0.15)]': selectedIndustry === ind,
+              'pick-hint': !selectedIndustry,
+              'opacity-60 cursor-not-allowed': proOnlyIndustries.includes(ind) && !auth.isProSubscriber && hasAuthenticatedSession,
+            }"
+            :title="proOnlyIndustries.includes(ind) && !auth.isProSubscriber && hasAuthenticatedSession ? t('onboarding.proRequiredTooltip') : undefined"
             @click="selectIndustry(ind)"
           >
+            <span
+              v-if="proOnlyIndustries.includes(ind)"
+              class="industry-pro-badge absolute top-2 right-2 rounded bg-amber-400/20 px-1.5 py-0.5 text-[0.625rem] font-bold text-amber-400 uppercase tracking-wide leading-none"
+            >{{ t('onboarding.proBadge') }}</span>
             <span class="text-[2.5rem] leading-none">{{ industryIcons[ind] || '🏭' }}</span
             ><span class="font-bold text-base">{{ formatIndustry(ind) }}</span
             ><span class="card-first-product inline-block rounded bg-brand/10 px-2 py-0.5 text-xs font-semibold text-brand">{{ t(industryFirstProductKeys[ind] || '') }}</span
