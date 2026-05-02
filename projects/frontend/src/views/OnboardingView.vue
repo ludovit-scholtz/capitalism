@@ -62,23 +62,23 @@ const hasAuthenticatedSession = computed(() => auth.isAuthenticated || !!auth.pl
 
 const PERSONAL_STARTING_CASH = 200_000
 const FOUNDER_CONTRIBUTION = 200_000
-const DEFAULT_IPO_RAISE_TARGET = 400_000
+const DEFAULT_IPO_RAISE_TARGET = 200_000
 
 const ipoOptions = [
   {
-    raiseTarget: 400_000,
+    raiseTarget: 200_000,
     founderOwnershipRatio: 0.5,
     titleKey: 'onboarding.ipoOptionStarterTitle',
     descriptionKey: 'onboarding.ipoOptionStarterDesc',
   },
   {
-    raiseTarget: 600_000,
+    raiseTarget: 400_000,
     founderOwnershipRatio: 0.3333,
     titleKey: 'onboarding.ipoOptionGrowthTitle',
     descriptionKey: 'onboarding.ipoOptionGrowthDesc',
   },
   {
-    raiseTarget: 800_000,
+    raiseTarget: 600_000,
     founderOwnershipRatio: 0.25,
     titleKey: 'onboarding.ipoOptionExpansionTitle',
     descriptionKey: 'onboarding.ipoOptionExpansionDesc',
@@ -470,7 +470,7 @@ function resolveClampStep(requestedStep: number): number {
 
 function parseIpoRaiseTarget(value: unknown): number | null {
   const parsed = Number(value)
-  return [400000, 600000, 800000].includes(parsed) ? parsed : null
+  return [200000, 400000, 600000].includes(parsed) ? parsed : null
 }
 
 function applyRouteSelections() {
@@ -1152,7 +1152,7 @@ useTickRefresh(async () => {
           <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step1Title') }}</h2>
           <p class="text-muted text-sm">{{ t('onboarding.step1Desc') }}</p>
         </div>
-        <div class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4 mb-6">
+        <div class="grid grid-cols-1 gap-4 mb-6 md:grid-cols-2 xl:grid-cols-3">
           <button
             v-for="city in cities"
             :key="city.id"
@@ -1182,11 +1182,11 @@ useTickRefresh(async () => {
           <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step2Title') }}</h2>
           <p class="text-muted text-sm">{{ t('onboarding.step2Desc') }}</p>
         </div>
-        <div class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4 mb-6">
+        <div class="grid grid-cols-1 gap-4 mb-6 md:grid-cols-2 xl:grid-cols-3">
           <button
             v-for="ind in industries"
             :key="ind"
-            class="industry-card flex flex-col gap-2 rounded-md border-2 border-divider bg-page p-6 text-center text-body transition-all duration-200 hover:-translate-y-0.5 hover:border-brand hover:shadow-[0_4px_16px_rgba(0,71,255,0.1)]"
+            class="industry-card flex h-full w-full flex-col gap-2 rounded-md border-2 border-divider bg-page p-6 text-center text-body transition-all duration-200 hover:-translate-y-0.5 hover:border-brand hover:shadow-[0_4px_16px_rgba(0,71,255,0.1)]"
             :class="{ 'border-brand bg-brand/10 shadow-[0_0_0_1px_var(--color-primary),0_4px_16px_rgba(0,71,255,0.15)]': selectedIndustry === ind, 'pick-hint': !selectedIndustry }"
             @click="selectIndustry(ind)"
           >
@@ -1312,9 +1312,16 @@ useTickRefresh(async () => {
           :recommended-lot-ids="recommendedFactoryLotIds"
           :city="selectedCity"
         />
+        <p v-if="!selectedFactoryLotId" class="text-sm text-muted m-0" role="status">
+          {{ t('onboarding.selectFactoryLotToContinue') }}
+        </p>
         <div class="step-actions flex gap-3 justify-end mt-2">
           <button class="btn btn-secondary" :disabled="auth.player?.onboardingCurrentStep === 'SHOP_SELECTION'" @click="prevStep">← {{ t('common.back') }}</button
-          ><button class="btn btn-primary btn-lg" :disabled="!canProceedStep3 || loading" @click="startOnboardingCompany">
+          ><button
+            :class="selectedFactoryLotId ? 'btn btn-primary btn-lg' : 'btn btn-secondary btn-lg opacity-75 cursor-not-allowed'"
+            :disabled="!canProceedStep3 || loading"
+            @click="startOnboardingCompany"
+          >
             {{ loading ? t('common.loading') : t('onboarding.purchaseFactory') }} <span v-if="!loading" class="ml-1">🏭</span>
           </button>
         </div>
@@ -1360,6 +1367,9 @@ useTickRefresh(async () => {
           :recommended-lot-ids="recommendedShopLotIds"
           :city="selectedCity"
         />
+        <p v-if="!selectedShopLotId" class="text-sm text-muted m-0" role="status">
+          {{ t('onboarding.selectShopLotToContinue') }}
+        </p>
         <div v-if="canShowStep4Summary" class="summary bg-card-raised border border-divider rounded-lg p-4">
           <div class="flex items-center gap-2 mb-2">
             <span class="text-xl">📋</span>
@@ -1382,7 +1392,7 @@ useTickRefresh(async () => {
         </div>
         <div class="step-actions flex gap-3 justify-end mt-2">
           <button class="btn btn-secondary" :disabled="auth.player?.onboardingCurrentStep === 'SHOP_SELECTION'" @click="prevStep">← {{ t('common.back') }}</button
-          ><button class="btn btn-primary btn-lg" :disabled="!canProceedStep4 || loading" @click="completeOnboarding">
+          ><button :class="selectedShopLotId ? 'btn btn-primary btn-lg' : 'btn btn-secondary btn-lg opacity-75 cursor-not-allowed'" :disabled="!canProceedStep4 || loading" @click="completeOnboarding">
             {{ loading ? t('common.loading') : t('onboarding.purchaseShop') }} <span v-if="!loading" class="ml-1">🏪</span>
           </button>
         </div>
@@ -1859,7 +1869,7 @@ useTickRefresh(async () => {
 
 .step-content {
   width: 100%;
-  max-width: 920px;
+  max-width: 1160px;
   margin-inline: auto;
 }
 
@@ -1868,6 +1878,6 @@ useTickRefresh(async () => {
 }
 
 .step-content.completion-step {
-  max-width: 1080px;
+  max-width: 1160px;
 }
 </style>

@@ -7,7 +7,7 @@ namespace Api.Utilities;
 
 public static class PersonalBankAccountService
 {
-    public const string SettlementCurrencyCode = "EUR";
+    public const string SettlementCurrencyCode = "USD";
 
     private static bool UsePostgresCompatPath(AppDbContext db)
         => db.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
