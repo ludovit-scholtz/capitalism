@@ -16,12 +16,13 @@ public sealed partial class Query
     private const int BankStatementMaxLimit = 200;
 
     /// <summary>
-    /// Returns a bank statement for a company owned by the authenticated player.
+    /// Returns a bank statement for a company owned by the authenticated player
+    /// or for the authenticated player's personal account when accountId points to a personal account.
     /// Entries are ordered newest-first with a computed running balance column.
     /// </summary>
     [Authorize]
     public async Task<BankStatementResult> GetBankStatement(
-        Guid companyId,
+        Guid? companyId,
         int? limit,
         int? offset,
         Guid? accountId,
@@ -31,15 +32,38 @@ public sealed partial class Query
         [Service] IHttpContextAccessor httpContextAccessor)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+        var pageSize = Math.Clamp(limit ?? BankStatementDefaultLimit, 1, BankStatementMaxLimit);
+        var pageOffset = Math.Max(offset ?? 0, 0);
+
+        if (accountId.HasValue)
+        {
+            var personalAccount = await db.BankAccounts
+                .AsNoTracking()
+                .FirstOrDefaultAsync(account => account.Id == accountId.Value && account.PlayerId == userId && account.CompanyId == null);
+
+            if (personalAccount is not null)
+            {
+                return await BuildPersonalBankStatementAsync(
+                    db,
+                    userId,
+                    personalAccount,
+                    pageSize,
+                    pageOffset,
+                    fromTick,
+                    toTick);
+            }
+        }
+
+        if (!companyId.HasValue)
+        {
+            throw new GraphQLException(new Error("Company not found or you do not own it.", "COMPANY_NOT_FOUND"));
+        }
 
         var company = await db.Companies
             .AsNoTracking()
             .Include(c => c.Buildings).ThenInclude(b => b.City)
-            .FirstOrDefaultAsync(c => c.Id == companyId && c.PlayerId == userId)
+            .FirstOrDefaultAsync(c => c.Id == companyId.Value && c.PlayerId == userId)
             ?? throw new GraphQLException(new Error("Company not found or you do not own it.", "COMPANY_NOT_FOUND"));
-
-        var pageSize = Math.Clamp(limit ?? BankStatementDefaultLimit, 1, BankStatementMaxLimit);
-        var pageOffset = Math.Max(offset ?? 0, 0);
 
         string? filterCurrencyCode = null;
         BankAccount? selectedAccount = null;
@@ -47,7 +71,7 @@ public sealed partial class Query
         {
             selectedAccount = await db.BankAccounts
                 .AsNoTracking()
-                .FirstOrDefaultAsync(a => a.Id == accountId.Value && a.CompanyId == companyId);
+                .FirstOrDefaultAsync(a => a.Id == accountId.Value && a.CompanyId == companyId.Value);
             if (selectedAccount is null)
             {
                 throw new GraphQLException(new Error("Selected bank account not found for this company.", "ACCOUNT_NOT_FOUND"));
@@ -59,7 +83,7 @@ public sealed partial class Query
         // Load entries for the company or for one specific bank account.
         var entriesQuery = db.LedgerEntries
             .AsNoTracking()
-            .Where(e => e.CompanyId == companyId);
+            .Where(e => e.CompanyId == companyId.Value);
         if (accountId.HasValue)
             entriesQuery = entriesQuery.Where(e => e.BankAccountId == accountId.Value);
         if (fromTick.HasValue)
@@ -82,7 +106,7 @@ public sealed partial class Query
         var activeCompanyAccounts = selectedAccount is null
             ? await db.BankAccounts
                 .AsNoTracking()
-                .Where(a => a.CompanyId == companyId && a.ClosedAtUtc == null)
+                .Where(a => a.CompanyId == companyId.Value && a.ClosedAtUtc == null)
                 .Select(a => a.Balance)
                 .ToListAsync()
             : null;
@@ -141,6 +165,90 @@ public sealed partial class Query
             CurrencySymbol = Mutation.GetCurrencySymbol(primaryCurrencyCode),
             CurrentBalance = currentBalance,
             TotalEntries = allEntries.Count,
+            Rows = rows,
+        };
+    }
+
+    private static async Task<BankStatementResult> BuildPersonalBankStatementAsync(
+        AppDbContext db,
+        Guid playerId,
+        BankAccount personalAccount,
+        int pageSize,
+        int pageOffset,
+        long? fromTick,
+        long? toTick)
+    {
+        var founderEntries = await db.LedgerEntries
+            .AsNoTracking()
+            .Where(entry => entry.Category == LedgerCategory.FounderContribution && entry.Company.PlayerId == playerId)
+            .OrderBy(entry => entry.RecordedAtTick)
+            .ThenBy(entry => entry.RecordedAtUtc)
+            .ToListAsync();
+
+        var movementEntries = new List<BankStatementRow>();
+
+        if (string.Equals(personalAccount.CurrencyCode, "USD", StringComparison.OrdinalIgnoreCase))
+        {
+            movementEntries.Add(new BankStatementRow
+            {
+                Id = Guid.NewGuid(),
+                RecordedAtTick = 0,
+                RecordedAtUtc = personalAccount.CreatedAtUtc,
+                Description = "Government starter funding deposit",
+                Category = LedgerCategory.BankAccountTransferIn,
+                Amount = 200_000m,
+                RunningBalance = 0m,
+            });
+        }
+
+        foreach (var founderEntry in founderEntries)
+        {
+            movementEntries.Add(new BankStatementRow
+            {
+                Id = Guid.NewGuid(),
+                RecordedAtTick = founderEntry.RecordedAtTick,
+                RecordedAtUtc = founderEntry.RecordedAtUtc,
+                Description = string.IsNullOrWhiteSpace(founderEntry.Description)
+                    ? "Founder contribution to starter company (USD converted to city currency)"
+                    : founderEntry.Description,
+                Category = LedgerCategory.FounderContribution,
+                Amount = -200_000m,
+                RunningBalance = 0m,
+            });
+        }
+
+        var filteredEntries = movementEntries
+            .Where(entry => !fromTick.HasValue || entry.RecordedAtTick >= fromTick.Value)
+            .Where(entry => !toTick.HasValue || entry.RecordedAtTick <= toTick.Value)
+            .OrderBy(entry => entry.RecordedAtTick)
+            .ThenBy(entry => entry.RecordedAtUtc)
+            .ToList();
+
+        var movementNetBalance = filteredEntries.Sum(entry => entry.Amount);
+        var openingBalance = personalAccount.Balance - movementNetBalance;
+        var runningBalance = openingBalance;
+
+        foreach (var entry in filteredEntries)
+        {
+            runningBalance += entry.Amount;
+            entry.RunningBalance = runningBalance;
+        }
+
+        var rows = filteredEntries
+            .OrderByDescending(entry => entry.RecordedAtTick)
+            .ThenByDescending(entry => entry.RecordedAtUtc)
+            .Skip(pageOffset)
+            .Take(pageSize)
+            .ToList();
+
+        return new BankStatementResult
+        {
+            CompanyId = Guid.Empty,
+            CompanyName = "Personal Account",
+            CurrencyCode = personalAccount.CurrencyCode,
+            CurrencySymbol = Mutation.GetCurrencySymbol(personalAccount.CurrencyCode),
+            CurrentBalance = personalAccount.Balance,
+            TotalEntries = filteredEntries.Count,
             Rows = rows,
         };
     }
