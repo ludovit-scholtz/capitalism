@@ -382,6 +382,9 @@ test.describe('Theme contrast — OnboardingView (Tailwind migration regression)
     setupMockApi(page)
     await page.goto('/onboarding')
 
+    // Select a city to advance to the industry selection step (step 1 is city, step 2 is industry)
+    await page.locator('.city-card', { hasText: 'Bratislava' }).click()
+
     // Industry cards must be rendered
     await expect(page.locator('.industry-card').first()).toBeVisible()
 
@@ -407,6 +410,8 @@ test.describe('Theme contrast — OnboardingView (Tailwind migration regression)
     setupMockApi(page)
     await page.goto('/onboarding')
 
+    // Select a city to advance to the industry selection step (step 1 is city, step 2 is industry)
+    await page.locator('.city-card', { hasText: 'Bratislava' }).click()
     await expect(page.locator('.industry-card').first()).toBeVisible()
 
     // Switch to light mode via toggle

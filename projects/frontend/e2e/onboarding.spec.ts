@@ -3189,17 +3189,17 @@ test.describe('Onboarding wizard progress bar accuracy (AC1 — visible step pro
     await expect(firstSegment).toHaveClass(/active/)
     await expect(firstSegment).not.toHaveClass(/done/)
 
-    // Select city first, then industry.
+    // Select city — this advances to step 2 (industry selection)
     await chooseOnboardingCity(page)
-    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
 
-    // At step 2: first segment should now be done (shows ✓)
+    // At step 2: first segment (city) should now be done (shows ✓)
     await expect(firstSegment).toHaveClass(/done/)
     const doneIcon = firstSegment.locator('.check-icon')
     await expect(doneIcon).toBeVisible()
     await expect(doneIcon).toContainText('✓')
 
-    // Step 2 segment should now be active
+    // Step 2 (industry) segment should now be active but not yet done
     const secondSegment = page.locator('.progress-segment').nth(1)
     await expect(secondSegment).toHaveClass(/active/)
     await expect(secondSegment).not.toHaveClass(/done/)
@@ -5027,6 +5027,7 @@ test.describe('Electronics industry — Pro-gated starter path', () => {
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
     await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
 
     // Electronics card must appear alongside the three free industries
@@ -5042,6 +5043,7 @@ test.describe('Electronics industry — Pro-gated starter path', () => {
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
     await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
 
     const electronicsCard = page.locator('.industry-card', { hasText: 'Electronics' })
@@ -5058,6 +5060,7 @@ test.describe('Electronics industry — Pro-gated starter path', () => {
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
     await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
 
     // Wait for the PRO badge to confirm proOnlyIndustries has been loaded before clicking
@@ -5083,6 +5086,7 @@ test.describe('Electronics industry — Pro-gated starter path', () => {
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
     await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
 
     await page.locator('.industry-card', { hasText: 'Electronics' }).click()
@@ -5100,6 +5104,7 @@ test.describe('Electronics industry — Pro-gated starter path', () => {
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
     await page.locator('.industry-card', { hasText: 'Electronics' }).click()
     await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).toBeVisible()
 
@@ -5112,6 +5117,7 @@ test.describe('Electronics industry — Pro-gated starter path', () => {
     // Unauthenticated guests should see the Electronics card (no blocking, just a preview)
     setupMockApi(page)
     await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
     await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
 
     const electronicsCard = page.locator('.industry-card', { hasText: 'Electronics' })
@@ -5128,6 +5134,7 @@ test.describe('Electronics industry — Pro-gated starter path', () => {
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
     await page.locator('.industry-card', { hasText: 'Electronics' }).click()
     await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).toBeVisible()
 
@@ -5147,6 +5154,7 @@ test.describe('Electronics industry — Pro-gated starter path', () => {
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
     await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
 
     const electronicsCard = page.locator('.industry-card', { hasText: 'Electronics' })
