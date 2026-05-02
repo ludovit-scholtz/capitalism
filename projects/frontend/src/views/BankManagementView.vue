@@ -316,19 +316,17 @@ async function loadData(isRefresh = false) {
       // Operating accounts for the active context (company/person) matching this bank's city currency
       const bankCurrency = bankInfo.value?.cityCurrencyCode
       const activeComp = getActiveCompany(auth.player, userCompanies.value)
-      const operatingAccounts = (accountsResult.myBankAccounts ?? []).filter(
-        (a) => {
-          if (!bankCurrency || a.currencyCode.toUpperCase() !== bankCurrency.toUpperCase() || a.bankBuildingId !== bankBuildingId.value) {
-            return false
-          }
+      const operatingAccounts = (accountsResult.myBankAccounts ?? []).filter((a) => {
+        if (!bankCurrency || a.currencyCode.toUpperCase() !== bankCurrency.toUpperCase() || a.bankBuildingId !== bankBuildingId.value) {
+          return false
+        }
 
-          if (auth.player?.activeAccountType === 'COMPANY') {
-            return a.ownerType === 'COMPANY' && a.companyId === activeComp?.id
-          }
+        if (auth.player?.activeAccountType === 'COMPANY') {
+          return a.ownerType === 'COMPANY' && a.companyId === activeComp?.id
+        }
 
-          return a.ownerType === 'PERSON'
-        },
-      )
+        return a.ownerType === 'PERSON'
+      })
       if (!deepEqual(myOperatingAccountsHere.value, operatingAccounts)) {
         myOperatingAccountsHere.value = operatingAccounts
       }

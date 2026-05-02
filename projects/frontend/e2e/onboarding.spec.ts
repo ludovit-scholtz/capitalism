@@ -266,11 +266,7 @@ test.describe('Onboarding wizard', () => {
     await page.locator('.city-card', { hasText: 'Prague' }).click()
     await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
 
-    await expect
-      .poll(async () =>
-        page.evaluate(() => localStorage.getItem('selected_city_id')),
-      )
-      .toBe('city-pr')
+    await expect.poll(async () => page.evaluate(() => localStorage.getItem('selected_city_id'))).toBe('city-pr')
   })
 
   test('product cards show prices only for selected city currency', async ({ page }) => {
@@ -1375,9 +1371,9 @@ test.describe('Onboarding resume and progress persistence', () => {
 
     await page.goto('/onboarding')
 
-  // Select city first, then industry to proceed to product step
-  await chooseOnboardingCity(page)
-  await page.locator('.industry-card', { hasText: 'Furniture' }).click()
+    // Select city first, then industry to proceed to product step
+    await chooseOnboardingCity(page)
+    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
     await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).toBeVisible()
 
     // Simulate a page refresh
@@ -3211,17 +3207,17 @@ test.describe('Onboarding wizard progress bar accuracy (AC1 — visible step pro
     await page.locator('.industry-card', { hasText: 'Furniture' }).click()
     await page.locator('.product-card').first().click()
 
-  // Step 4 (IPO selection): steps 1, 2 and 3 should be done
-  const firstSegment = page.locator('.progress-segment').first()
-  const secondSegment = page.locator('.progress-segment').nth(1)
-  const thirdSegment = page.locator('.progress-segment').nth(2)
-  const fourthSegment = page.locator('.progress-segment').nth(3)
+    // Step 4 (IPO selection): steps 1, 2 and 3 should be done
+    const firstSegment = page.locator('.progress-segment').first()
+    const secondSegment = page.locator('.progress-segment').nth(1)
+    const thirdSegment = page.locator('.progress-segment').nth(2)
+    const fourthSegment = page.locator('.progress-segment').nth(3)
 
-  await expect(firstSegment).toHaveClass(/done/)
-  await expect(secondSegment).toHaveClass(/done/)
-  await expect(thirdSegment).toHaveClass(/done/)
-  await expect(fourthSegment).toHaveClass(/active/)
-  await expect(fourthSegment).not.toHaveClass(/done/)
+    await expect(firstSegment).toHaveClass(/done/)
+    await expect(secondSegment).toHaveClass(/done/)
+    await expect(thirdSegment).toHaveClass(/done/)
+    await expect(fourthSegment).toHaveClass(/active/)
+    await expect(fourthSegment).not.toHaveClass(/done/)
   })
 
   test('progress bar is hidden on the completion step (step 7)', async ({ page }) => {
