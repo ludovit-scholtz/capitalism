@@ -38,7 +38,7 @@ const router = createRouter({
     {
       path: '/marketing-analytics',
       name: 'marketing-analytics',
-      component: () => import('@/views/MarketIntelligenceView.vue'),
+      component: () => import('@/views/MarketingAnalyticsView.vue'),
     },
     {
       path: '/bank-statement/:companyId',
