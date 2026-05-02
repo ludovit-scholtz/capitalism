@@ -41,16 +41,16 @@ function makeLot(overrides: Partial<BuildingLot> = {}): BuildingLot {
 // ---------------------------------------------------------------------------
 
 describe('stepToKey', () => {
-  it('maps step 1 to "industry"', () => {
-    expect(stepToKey(1)).toBe('industry')
+  it('maps step 1 to "city"', () => {
+    expect(stepToKey(1)).toBe('city')
   })
 
-  it('maps step 2 to "product"', () => {
-    expect(stepToKey(2)).toBe('product')
+  it('maps step 2 to "industry"', () => {
+    expect(stepToKey(2)).toBe('industry')
   })
 
-  it('maps step 3 to "city"', () => {
-    expect(stepToKey(3)).toBe('city')
+  it('maps step 3 to "product"', () => {
+    expect(stepToKey(3)).toBe('product')
   })
 
   it('maps step 4 to "ipo"', () => {
@@ -69,10 +69,10 @@ describe('stepToKey', () => {
     expect(stepToKey(7)).toBe('complete')
   })
 
-  it('falls back to "industry" for unknown step values', () => {
-    expect(stepToKey(0)).toBe('industry')
-    expect(stepToKey(8)).toBe('industry')
-    expect(stepToKey(-1)).toBe('industry')
+  it('falls back to "city" for unknown step values', () => {
+    expect(stepToKey(0)).toBe('city')
+    expect(stepToKey(8)).toBe('city')
+    expect(stepToKey(-1)).toBe('city')
   })
 })
 
@@ -81,16 +81,16 @@ describe('stepToKey', () => {
 // ---------------------------------------------------------------------------
 
 describe('keyToStep', () => {
-  it('maps "industry" to 1', () => {
-    expect(keyToStep('industry')).toBe(1)
+  it('maps "city" to 1', () => {
+    expect(keyToStep('city')).toBe(1)
   })
 
-  it('maps "product" to 2', () => {
-    expect(keyToStep('product')).toBe(2)
+  it('maps "industry" to 2', () => {
+    expect(keyToStep('industry')).toBe(2)
   })
 
-  it('maps "city" to 3', () => {
-    expect(keyToStep('city')).toBe(3)
+  it('maps "product" to 3', () => {
+    expect(keyToStep('product')).toBe(3)
   })
 
   it('maps "ipo" to 4', () => {
@@ -150,21 +150,21 @@ describe('getMaxReachableStep', () => {
     expect(getMaxReachableStep(baseState)).toBe(1)
   })
 
-  it('returns 2 when an industry is selected', () => {
-    expect(getMaxReachableStep({ ...baseState, selectedIndustry: 'FURNITURE' })).toBe(2)
+  it('returns 2 when a city is selected', () => {
+    expect(getMaxReachableStep({ ...baseState, selectedCityId: 'city-1' })).toBe(2)
   })
 
-  it('returns 3 when a product is selected', () => {
-    expect(getMaxReachableStep({ ...baseState, selectedIndustry: 'FURNITURE', selectedProductId: 'prod-1' })).toBe(3)
+  it('returns 3 when an industry is selected', () => {
+    expect(getMaxReachableStep({ ...baseState, selectedCityId: 'city-1', selectedIndustry: 'FURNITURE' })).toBe(3)
   })
 
-  it('returns 4 when a city is selected', () => {
+  it('returns 4 when a product is selected', () => {
     expect(
       getMaxReachableStep({
         ...baseState,
+        selectedCityId: 'city-1',
         selectedIndustry: 'FURNITURE',
         selectedProductId: 'prod-1',
-        selectedCityId: 'city-1',
       }),
     ).toBe(4)
   })
@@ -173,9 +173,9 @@ describe('getMaxReachableStep', () => {
     expect(
       getMaxReachableStep({
         ...baseState,
+        selectedCityId: 'city-1',
         selectedIndustry: 'FURNITURE',
         selectedProductId: 'prod-1',
-        selectedCityId: 'city-1',
         hasSelectedIpoPlan: true,
       }),
     ).toBe(5)
@@ -185,9 +185,9 @@ describe('getMaxReachableStep', () => {
     expect(
       getMaxReachableStep({
         ...baseState,
+        selectedCityId: 'city-1',
         selectedIndustry: 'FURNITURE',
         selectedProductId: 'prod-1',
-        selectedCityId: 'city-1',
         onboardingCurrentStep: 'SHOP_SELECTION',
       }),
     ).toBe(6)
@@ -197,9 +197,9 @@ describe('getMaxReachableStep', () => {
     expect(
       getMaxReachableStep({
         ...baseState,
+        selectedCityId: 'city-1',
         selectedIndustry: 'FURNITURE',
         selectedProductId: 'prod-1',
-        selectedCityId: 'city-1',
         hasSelectedIpoPlan: true,
         hasLocalFactoryProgress: true,
       }),

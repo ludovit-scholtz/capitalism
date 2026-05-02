@@ -2,8 +2,9 @@ using System.Security.Claims;
 using Api.Data;
 using Api.Data.Entities;
 using Api.Utilities;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using Microsoft.AspNetCore.Identity;
 
 namespace Api.Security;
 
@@ -79,7 +80,22 @@ public sealed class AuthenticatedPlayerClaimsSyncService(AppDbContext db)
 
         if (changed)
         {
-            await db.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException exception) when (createdPlayer && IsDuplicatePlayerEmailViolation(exception))
+            {
+                // Another concurrent request provisioned the same email first. Reload and continue.
+                db.ChangeTracker.Clear();
+                player = await db.Players.FirstOrDefaultAsync(
+                    candidate => candidate.Email == normalizedEmail || candidate.Email.ToLower() == normalizedEmail,
+                    cancellationToken)
+                    ?? throw new InvalidOperationException("Player email conflict detected but no matching player was found after reload.");
+
+                await PersonalBankAccountService.EnsureTrackedSettlementAccountAsync(db, player, cancellationToken);
+                await db.SaveChangesAsync(cancellationToken);
+            }
         }
 
         EnsureClaim(identity, ClaimsPrincipalExtensions.AuthenticatedActorPlayerIdClaimType, player.Id.ToString());
@@ -111,4 +127,9 @@ public sealed class AuthenticatedPlayerClaimsSyncService(AppDbContext db)
             identity.AddClaim(new Claim(type, value));
         }
     }
+
+    private static bool IsDuplicatePlayerEmailViolation(DbUpdateException exception)
+        => exception.InnerException is PostgresException postgres
+            && postgres.SqlState == PostgresErrorCodes.UniqueViolation
+            && string.Equals(postgres.ConstraintName, "IX_Players_Email", StringComparison.Ordinal);
 }

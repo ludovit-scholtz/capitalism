@@ -53,15 +53,15 @@ public sealed partial class Mutation
 
     private static StarterIpoSelection ResolveStarterIpoSelection(decimal? raiseTarget)
     {
-        var normalizedRaiseTarget = raiseTarget ?? 400_000m;
+        var normalizedRaiseTarget = raiseTarget ?? 200_000m;
         return normalizedRaiseTarget switch
         {
-            400_000m => new StarterIpoSelection(400_000m, 0.5m),
-            600_000m => new StarterIpoSelection(600_000m, 0.3333m),
-            800_000m => new StarterIpoSelection(800_000m, 0.25m),
+            200_000m => new StarterIpoSelection(200_000m, 0.5m),
+            400_000m => new StarterIpoSelection(400_000m, 0.3333m),
+            600_000m => new StarterIpoSelection(600_000m, 0.25m),
             _ => throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("Supported IPO raise targets are 400000, 600000, or 800000.")
+                    .SetMessage("Supported IPO raise targets are 200000, 400000, or 600000.")
                     .SetCode("INVALID_IPO_RAISE_TARGET")
                     .Build())
         };

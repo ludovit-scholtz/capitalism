@@ -62,23 +62,23 @@ const hasAuthenticatedSession = computed(() => auth.isAuthenticated || !!auth.pl
 
 const PERSONAL_STARTING_CASH = 200_000
 const FOUNDER_CONTRIBUTION = 200_000
-const DEFAULT_IPO_RAISE_TARGET = 400_000
+const DEFAULT_IPO_RAISE_TARGET = 200_000
 
 const ipoOptions = [
   {
-    raiseTarget: 400_000,
+    raiseTarget: 200_000,
     founderOwnershipRatio: 0.5,
     titleKey: 'onboarding.ipoOptionStarterTitle',
     descriptionKey: 'onboarding.ipoOptionStarterDesc',
   },
   {
-    raiseTarget: 600_000,
+    raiseTarget: 400_000,
     founderOwnershipRatio: 0.3333,
     titleKey: 'onboarding.ipoOptionGrowthTitle',
     descriptionKey: 'onboarding.ipoOptionGrowthDesc',
   },
   {
-    raiseTarget: 800_000,
+    raiseTarget: 600_000,
     founderOwnershipRatio: 0.25,
     titleKey: 'onboarding.ipoOptionExpansionTitle',
     descriptionKey: 'onboarding.ipoOptionExpansionDesc',
@@ -215,6 +215,18 @@ const cityFxRate = computed<number>(() => {
   return rate?.rate ?? 1
 })
 
+/** FX rate for USD conversion: units of city currency per 1 USD. */
+const cityUsdFxRate = computed<number>(() => {
+  const targetCode = selectedCity.value?.currencyCode ?? 'USD'
+  if (targetCode === 'USD') return 1
+
+  const eurToTarget = getFxRateForCurrency(targetCode)
+  const eurToUsd = getFxRateForCurrency('USD')
+  if (!eurToUsd || eurToUsd <= 0) return 1
+
+  return eurToTarget / eurToUsd
+})
+
 const selectedIndustry = ref('')
 const selectedCityId = ref('')
 const selectedProductId = ref('')
@@ -244,8 +256,8 @@ const starterCompany = computed(() => {
   return auth.player?.companies.find((company) => company.id === companyId) ?? null
 })
 const selectedIpoOption = computed(() => ipoOptions.find((option) => option.raiseTarget === selectedIpoRaiseTarget.value) ?? ipoOptions[0])
-/** Company starting cash in the selected city's local currency. */
-const companyStartingCash = computed(() => Math.round((FOUNDER_CONTRIBUTION + selectedIpoOption.value.raiseTarget) * cityFxRate.value))
+/** Company starting cash in the selected city's local currency (USD founder + USD IPO raise). */
+const companyStartingCash = computed(() => Math.round((FOUNDER_CONTRIBUTION + selectedIpoOption.value.raiseTarget) * cityUsdFxRate.value))
 const remainingPersonalCash = computed(() => PERSONAL_STARTING_CASH - FOUNDER_CONTRIBUTION)
 const hasGuestFactoryPurchaseInRoute = computed(() => isGuestMode.value && (route.query.step === 'shop' || route.query.step === 'complete'))
 const effectiveOnboardingCompanyCash = computed(() => {
@@ -464,7 +476,7 @@ function resolveClampStep(requestedStep: number): number {
 
 function parseIpoRaiseTarget(value: unknown): number | null {
   const parsed = Number(value)
-  return [400000, 600000, 800000].includes(parsed) ? parsed : null
+  return [200000, 400000, 600000].includes(parsed) ? parsed : null
 }
 
 function applyRouteSelections() {
@@ -596,6 +608,7 @@ onMounted(async () => {
       const shopBuilding = auth.player?.companies.flatMap((company) => company.buildings).find((building) => building.id === auth.player?.onboardingShopBuildingId)
       if (shopBuilding?.cityId) {
         selectedCityId.value = shopBuilding.cityId
+        auth.switchCity(shopBuilding.cityId)
       }
 
       step.value = 7
@@ -629,6 +642,7 @@ onMounted(async () => {
     }
 
     if (selectedCityId.value) {
+      auth.switchCity(selectedCityId.value)
       await loadLots()
       if (!cityLots.value.some((lot) => lot.id === selectedFactoryLotId.value)) {
         selectedFactoryLotId.value = ''
@@ -662,39 +676,36 @@ async function selectIndustry(industry: string) {
 
   selectedIndustry.value = industry
   selectedProductId.value = ''
-  selectedCityId.value = ''
   selectedIpoRaiseTarget.value = null
   selectedFactoryLotId.value = ''
   selectedShopLotId.value = ''
   onboardingCompanyCash.value = null
-  cityLots.value = []
   await loadProducts()
-  step.value = 2
+  step.value = 3
   trackOnboardingEvent('industry_selected', { industry })
 }
 
 function selectProduct(productId: string) {
   error.value = null
   selectedProductId.value = productId
-  selectedCityId.value = ''
   selectedIpoRaiseTarget.value = null
   selectedFactoryLotId.value = ''
   selectedShopLotId.value = ''
   onboardingCompanyCash.value = null
-  cityLots.value = []
-  step.value = 3
+  step.value = 4
   trackOnboardingEvent('product_selected', { productId, industry: selectedIndustry.value })
 }
 
 async function selectCity(cityId: string) {
   error.value = null
   selectedCityId.value = cityId
+  auth.switchCity(cityId)
   selectedIpoRaiseTarget.value = null
   selectedFactoryLotId.value = ''
   selectedShopLotId.value = ''
   onboardingCompanyCash.value = null
   await loadLots()
-  step.value = 4
+  step.value = 2
   trackOnboardingEvent('city_selected', { cityId })
 }
 
@@ -996,14 +1007,8 @@ function getProductLocalPrice(product: Pick<ProductType, 'basePrice'>, currencyC
 }
 
 function getProductPriceSummary(product: ProductType): string {
-  if (selectedCity.value) {
-    return formatCurrency(getProductLocalPrice(product, selectedCity.value.currencyCode), selectedCity.value.currencyCode)
-  }
-
-  return cities.value
-    .slice(0, 3)
-    .map((city) => `${city.name}: ${formatCurrency(getProductLocalPrice(product, city.currencyCode), city.currencyCode)}`)
-    .join(' · ')
+  if (!selectedCity.value) return ''
+  return formatCurrency(getProductLocalPrice(product, selectedCity.value.currencyCode), selectedCity.value.currencyCode)
 }
 
 function getProductName(product: ProductType): string {
@@ -1150,8 +1155,8 @@ useTickRefresh(async () => {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-112px)] bg-gradient-to-b from-page to-[rgba(0,71,255,0.04)] py-8 px-4">
-    <div class="container">
+  <div class="min-h-[calc(100vh-112px)] bg-gradient-to-b from-page to-[rgba(0,71,255,0.04)] py-8 px-4 flex items-center">
+    <div class="container w-full max-w-[1280px] mx-auto">
       <div v-if="step < 7" class="text-center mb-8">
         <h1 class="text-3xl font-bold mb-2 bg-gradient-to-br from-brand to-[var(--color-secondary)] bg-clip-text text-transparent">{{ t('onboarding.title') }}</h1>
         <p class="text-muted text-sm">{{ t('onboarding.subtitle') }}</p>
@@ -1163,7 +1168,37 @@ useTickRefresh(async () => {
           <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step1Title') }}</h2>
           <p class="text-muted text-sm">{{ t('onboarding.step1Desc') }}</p>
         </div>
-        <div class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4 mb-6">
+        <div class="grid grid-cols-1 gap-4 mb-6 md:grid-cols-2 xl:grid-cols-3">
+          <button
+            v-for="city in cities"
+            :key="city.id"
+            class="city-card flex flex-col gap-2 rounded-md border-2 border-divider bg-page p-6 text-left text-body transition-all duration-200 hover:-translate-y-0.5 hover:border-brand hover:shadow-[0_4px_16px_rgba(0,71,255,0.1)]"
+            :class="{ 'border-brand bg-brand/10 shadow-[0_0_0_1px_var(--color-primary),0_4px_16px_rgba(0,71,255,0.15)]': selectedCityId === city.id, 'pick-hint': !selectedCityId }"
+            @click="selectCity(city.id)"
+          >
+            <div class="flex items-center gap-2">
+              <span class="text-2xl">🏙️</span><span class="font-bold text-base">{{ city.name }}</span>
+            </div>
+            <div class="flex gap-3 text-[0.8125rem] text-muted">
+              <span class="bg-card-raised px-2 py-0.5 rounded font-semibold text-xs">{{ city.countryCode }}</span
+              ><span v-if="city.currencyCode" class="city-currency bg-brand px-2 py-0.5 rounded font-semibold text-xs text-white">{{ city.currencyCode }}</span
+              ><span>{{ t('onboarding.population') }} {{ city.population.toLocaleString() }}</span>
+            </div>
+            <div class="flex flex-wrap gap-1.5 items-center">
+              <span class="text-xs text-muted">{{ t('onboarding.resources') }}:</span
+              ><span v-for="(resource, index) in city.resources" :key="index" class="bg-[rgba(0,200,83,0.1)] text-[var(--color-secondary)] px-2 py-0.5 rounded-full text-[0.6875rem] font-medium">
+                {{ getCityResourceName(city, index) }}
+              </span>
+            </div>
+          </button>
+        </div>
+      </div>
+      <div v-if="step === 2" class="step-content step-content-wide bg-card border border-divider rounded-xl p-8 flex flex-col gap-6">
+        <div>
+          <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step2Title') }}</h2>
+          <p class="text-muted text-sm">{{ t('onboarding.step2Desc') }}</p>
+        </div>
+        <div class="grid grid-cols-1 gap-4 mb-6 md:grid-cols-2 xl:grid-cols-3">
           <button
             v-for="ind in industries"
             :key="ind"
@@ -1188,11 +1223,14 @@ useTickRefresh(async () => {
             ><span class="card-why text-[0.6875rem] text-subtle italic leading-snug">{{ t(industryWhyKeys[ind] || '') }}</span>
           </button>
         </div>
+        <div class="step-actions flex gap-3 justify-end mt-2">
+          <button class="btn btn-secondary" @click="prevStep">← {{ t('common.back') }}</button>
+        </div>
       </div>
-      <div v-if="step === 2" class="step-content step-content-wide bg-card border border-divider rounded-xl p-8 flex flex-col gap-6">
-        <div>
-          <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step2Title') }}</h2>
-          <p class="text-muted text-sm">{{ t('onboarding.step2Desc') }}</p>
+      <div v-if="step === 3" class="step-content bg-card border border-divider rounded-xl p-8">
+        <div class="mb-4">
+          <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step3Title') }}</h2>
+          <p class="text-muted text-sm">{{ t('onboarding.step3Desc') }}</p>
         </div>
         <div class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
           <button
@@ -1218,39 +1256,6 @@ useTickRefresh(async () => {
           <button class="btn btn-secondary" @click="prevStep">← {{ t('common.back') }}</button>
         </div>
       </div>
-      <div v-if="step === 3" class="step-content bg-card border border-divider rounded-xl p-8">
-        <div class="mb-4">
-          <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step3Title') }}</h2>
-          <p class="text-muted text-sm">{{ t('onboarding.step3Desc') }}</p>
-        </div>
-        <div class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4 mb-6">
-          <button
-            v-for="city in cities"
-            :key="city.id"
-            class="city-card flex flex-col gap-2 rounded-md border-2 border-divider bg-page p-6 text-left text-body transition-all duration-200 hover:-translate-y-0.5 hover:border-brand hover:shadow-[0_4px_16px_rgba(0,71,255,0.1)]"
-            :class="{ 'border-brand bg-brand/10 shadow-[0_0_0_1px_var(--color-primary),0_4px_16px_rgba(0,71,255,0.15)]': selectedCityId === city.id, 'pick-hint': !selectedCityId }"
-            @click="selectCity(city.id)"
-          >
-            <div class="flex items-center gap-2">
-              <span class="text-2xl">🏙️</span><span class="font-bold text-base">{{ city.name }}</span>
-            </div>
-            <div class="flex gap-3 text-[0.8125rem] text-muted">
-              <span class="bg-card-raised px-2 py-0.5 rounded font-semibold text-xs">{{ city.countryCode }}</span
-              ><span v-if="city.currencyCode" class="city-currency bg-brand px-2 py-0.5 rounded font-semibold text-xs text-white">{{ city.currencyCode }}</span
-              ><span>{{ t('onboarding.population') }} {{ city.population.toLocaleString() }}</span>
-            </div>
-            <div class="flex flex-wrap gap-1.5 items-center">
-              <span class="text-xs text-muted">{{ t('onboarding.resources') }}:</span
-              ><span v-for="(resource, index) in city.resources" :key="index" class="bg-[rgba(0,200,83,0.1)] text-[var(--color-secondary)] px-2 py-0.5 rounded-full text-[0.6875rem] font-medium">
-                {{ getCityResourceName(city, index) }}
-              </span>
-            </div>
-          </button>
-        </div>
-        <div class="step-actions flex gap-3 justify-end mt-2">
-          <button class="btn btn-secondary" @click="prevStep">← {{ t('common.back') }}</button>
-        </div>
-      </div>
       <div v-if="step === 4" class="step-content step-content-wide bg-card border border-divider rounded-xl p-8 flex flex-col gap-6">
         <div>
           <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step4Title') }}</h2>
@@ -1263,11 +1268,11 @@ useTickRefresh(async () => {
           </article>
           <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
             <span class="text-muted text-xs">{{ t('onboarding.founderContribution') }}</span
-            ><strong>{{ formatCurrency(FOUNDER_CONTRIBUTION * cityFxRate) }}</strong>
+            ><strong>{{ formatCurrency(FOUNDER_CONTRIBUTION * cityUsdFxRate) }}</strong>
           </article>
           <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
             <span class="text-muted text-xs">{{ t('onboarding.personalCash') }}</span
-            ><strong>{{ formatCurrency(remainingPersonalCash, 'EUR') }}</strong>
+            ><strong>{{ formatCurrency(remainingPersonalCash, 'USD') }}</strong>
           </article>
         </div>
         <div class="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
@@ -1282,7 +1287,7 @@ useTickRefresh(async () => {
             @click="selectIpoPlan(option.raiseTarget)"
           >
             <span class="font-bold text-sm">{{ t(option.titleKey) }}</span
-            ><span class="text-muted text-xs">{{ t('onboarding.ipoRaise') }}: {{ formatCurrency(option.raiseTarget * cityFxRate) }}</span
+            ><span class="text-muted text-xs">{{ t('onboarding.ipoRaise') }}: {{ formatCurrency(option.raiseTarget * cityUsdFxRate) }}</span
             ><span class="text-muted text-xs">{{ t('onboarding.ipoFounderOwnership') }}: {{ formatPercent(option.founderOwnershipRatio) }}</span
             ><span class="text-muted text-xs">{{ t('onboarding.ipoPublicFloat') }}: {{ formatPercent(1 - option.founderOwnershipRatio) }}</span
             ><span class="text-muted text-[0.8125rem] leading-snug">{{ t(option.descriptionKey) }}</span>
@@ -1333,9 +1338,16 @@ useTickRefresh(async () => {
           :recommended-lot-ids="recommendedFactoryLotIds"
           :city="selectedCity"
         />
+        <p v-if="!selectedFactoryLotId" class="text-sm text-muted m-0" role="status">
+          {{ t('onboarding.selectFactoryLotToContinue') }}
+        </p>
         <div class="step-actions flex gap-3 justify-end mt-2">
           <button class="btn btn-secondary" :disabled="auth.player?.onboardingCurrentStep === 'SHOP_SELECTION'" @click="prevStep">← {{ t('common.back') }}</button
-          ><button class="btn btn-primary btn-lg" :disabled="!canProceedStep3 || loading" @click="startOnboardingCompany">
+          ><button
+            :class="selectedFactoryLotId ? 'btn btn-primary btn-lg' : 'btn btn-secondary btn-lg opacity-75 cursor-not-allowed'"
+            :disabled="!canProceedStep3 || loading"
+            @click="startOnboardingCompany"
+          >
             {{ loading ? t('common.loading') : t('onboarding.purchaseFactory') }} <span v-if="!loading" class="ml-1">🏭</span>
           </button>
         </div>
@@ -1381,6 +1393,9 @@ useTickRefresh(async () => {
           :recommended-lot-ids="recommendedShopLotIds"
           :city="selectedCity"
         />
+        <p v-if="!selectedShopLotId" class="text-sm text-muted m-0" role="status">
+          {{ t('onboarding.selectShopLotToContinue') }}
+        </p>
         <div v-if="canShowStep4Summary" class="summary bg-card-raised border border-divider rounded-lg p-4">
           <div class="flex items-center gap-2 mb-2">
             <span class="text-xl">📋</span>
@@ -1403,7 +1418,7 @@ useTickRefresh(async () => {
         </div>
         <div class="step-actions flex gap-3 justify-end mt-2">
           <button class="btn btn-secondary" :disabled="auth.player?.onboardingCurrentStep === 'SHOP_SELECTION'" @click="prevStep">← {{ t('common.back') }}</button
-          ><button class="btn btn-primary btn-lg" :disabled="!canProceedStep4 || loading" @click="completeOnboarding">
+          ><button :class="selectedShopLotId ? 'btn btn-primary btn-lg' : 'btn btn-secondary btn-lg opacity-75 cursor-not-allowed'" :disabled="!canProceedStep4 || loading" @click="completeOnboarding">
             {{ loading ? t('common.loading') : t('onboarding.purchaseShop') }} <span v-if="!loading" class="ml-1">🏪</span>
           </button>
         </div>
@@ -1876,5 +1891,19 @@ useTickRefresh(async () => {
 
 .pick-hint:hover {
   animation: none;
+}
+
+.step-content {
+  width: 100%;
+  max-width: 1160px;
+  margin-inline: auto;
+}
+
+.step-content.step-content-wide {
+  max-width: 1160px;
+}
+
+.step-content.completion-step {
+  max-width: 1160px;
 }
 </style>

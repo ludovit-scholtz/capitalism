@@ -6,14 +6,14 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
-### Fix onboarding (86% complete)
+### Fix onboarding (96% complete)
 
-- [ ] Change the onboarding steps. The first step will be city selection. When user selects the city in the onboarding make sure to set it also in the context changer in the navbar.
-- [ ] In product selection make sure to show the price only for the currently selected city
+- [x] Change the onboarding steps. The first step will be city selection. When user selects the city in the onboarding make sure to set it also in the context changer in the navbar.
+- [x] In product selection make sure to show the price only for the currently selected city
 - [ ] Create test which will check that after the onboarding there is 200k USD transfered from the personal account and the current balance is 0. Personal account must not have any money after the onboarding - 0 usd, 0 eur nor any other currency. It must be visible in the ledger that the personal account has deposited his funds to the company IPO from both sides - in the personal ledger as outgoing tx, and in the company ledger the incomming transaction from player and public IPO.
-- [ ] Each step in the onboarding make sure is centered into the middle
-- [ ] In bank full view, make sure to allow openning the bank account for personal account. At the moment i can see the bank card, but there is missing the open bank account button.
-- [ ] Fix pre-IPO deposit to be 200k USD not 200k EUR
+- [x] Each step in the onboarding make sure is centered into the middle
+- [x] In bank full view, make sure to allow openning the bank account for personal account. At the moment i can see the bank card, but there is missing the open bank account button.
+- [x] Fix pre-IPO deposit to be 200k USD not 200k EUR
 
 - [x] In forex swap allow to swap between the selected accounts only from the context switcher. At the moment it is possible to select person account and swap to the company account. This must not be possible.
 - [x] In forex transfer allow to transfer between the selected accounts only from the context switcher. At the moment it is possible to transfer from person account to company account. This must not be possible. It must be possible to transfer funds within the single company only using the transfer form.

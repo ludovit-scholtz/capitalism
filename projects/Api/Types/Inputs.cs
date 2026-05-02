@@ -132,8 +132,8 @@ public sealed class StartOnboardingCompanyInput
     public Guid FactoryLotId { get; set; }
 
     /// <summary>
-    /// Optional IPO raise target for the starter company. Supported values: 400000, 600000, 800000.
-    /// When omitted, the onboarding flow defaults to the 400000 raise / 50% founder-share option.
+    /// Optional IPO raise target for the starter company. Supported values: 200000, 400000, 600000.
+    /// When omitted, the onboarding flow defaults to the 200000 raise / 50% founder-share option.
     /// </summary>
     public decimal? IpoRaiseTarget { get; set; }
 }

@@ -45,7 +45,7 @@ const contextAccounts = computed<PlayerBankAccountSummary[]>(() => {
 const selectedAccount = computed<PlayerBankAccountSummary | null>(() => contextAccounts.value.find((account) => account.id === routeAccountOrCompanyId.value) ?? null)
 
 const BANK_STATEMENT_QUERY = `
-  query BankStatement($companyId: UUID!, $accountId: UUID, $limit: Int, $offset: Int, $fromTick: Long, $toTick: Long) {
+  query BankStatement($companyId: UUID, $accountId: UUID, $limit: Int, $offset: Int, $fromTick: Long, $toTick: Long) {
     bankStatement(companyId: $companyId, accountId: $accountId, limit: $limit, offset: $offset, fromTick: $fromTick, toTick: $toTick) {
       companyId
       companyName
@@ -88,17 +88,12 @@ const MY_BANK_ACCOUNTS_QUERY = `
 
 async function loadStatement() {
   if (!selectedAccount.value) return
-  if (!selectedAccount.value.companyId) {
-    statement.value = null
-    loading.value = false
-    return
-  }
 
   loading.value = true
   error.value = null
   try {
     const result = await gqlRequest<{ bankStatement: BankStatementResult }>(BANK_STATEMENT_QUERY, {
-      companyId: selectedAccount.value.companyId,
+      companyId: selectedAccount.value.companyId ?? undefined,
       accountId: selectedAccount.value.id,
       limit: pageSize.value,
       offset: (page.value - 1) * pageSize.value,

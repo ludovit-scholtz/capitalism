@@ -124,11 +124,11 @@ async function authenticateViaLocalStorage(page: Page, token: string) {
 }
 
 async function completeAuthenticatedOnboarding(page: Page, companyName: string) {
+  await page.locator('.city-card', { hasText: 'Bratislava' }).click()
+  await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
   await page.locator('.industry-card', { hasText: 'Furniture' }).click()
   await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).toBeVisible()
   await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
-  await expect(page.getByRole('heading', { name: 'Choose Your City' })).toBeVisible()
-  await page.locator('.city-card', { hasText: 'Bratislava' }).click()
   await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
   await page.locator('.ipo-card', { hasText: companyName ? 'Starter IPO' : 'Starter IPO' }).click()
   await page.getByRole('button', { name: 'List View' }).click()

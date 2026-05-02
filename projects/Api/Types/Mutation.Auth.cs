@@ -23,7 +23,9 @@ public sealed partial class Mutation
         [Service] AppDbContext db,
         [Service] IOptions<JwtOptions> jwtOptions)
     {
-        if (await db.Players.AnyAsync(p => p.Email == input.Email))
+        var normalizedEmail = input.Email.Trim().ToLowerInvariant();
+
+        if (await db.Players.AnyAsync(p => p.Email.ToLower() == normalizedEmail))
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -35,8 +37,8 @@ public sealed partial class Mutation
         var player = new Player
         {
             Id = Guid.NewGuid(),
-            Email = input.Email,
-            DisplayName = input.DisplayName,
+            Email = normalizedEmail,
+            DisplayName = input.DisplayName.Trim(),
             Role = PlayerRole.Player,
             ActiveAccountType = AccountContextType.Person,
             CreatedAtUtc = DateTime.UtcNow
@@ -64,7 +66,8 @@ public sealed partial class Mutation
         [Service] AppDbContext db,
         [Service] IOptions<JwtOptions> jwtOptions)
     {
-        var player = await db.Players.FirstOrDefaultAsync(p => p.Email == input.Email);
+        var normalizedEmail = input.Email.Trim().ToLowerInvariant();
+        var player = await db.Players.FirstOrDefaultAsync(p => p.Email.ToLower() == normalizedEmail);
         if (player is null)
         {
             throw new GraphQLException(
@@ -84,6 +87,11 @@ public sealed partial class Mutation
                     .SetMessage("Invalid email or password.")
                     .SetCode("INVALID_CREDENTIALS")
                     .Build());
+        }
+
+        if (!string.Equals(player.Email, normalizedEmail, StringComparison.Ordinal))
+        {
+            player.Email = normalizedEmail;
         }
 
         player.LastLoginAtUtc = DateTime.UtcNow;

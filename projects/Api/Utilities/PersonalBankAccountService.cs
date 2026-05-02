@@ -7,7 +7,7 @@ namespace Api.Utilities;
 
 public static class PersonalBankAccountService
 {
-    public const string SettlementCurrencyCode = "EUR";
+    public const string SettlementCurrencyCode = "USD";
 
     private static bool UsePostgresCompatPath(AppDbContext db)
         => db.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
@@ -68,6 +68,19 @@ public static class PersonalBankAccountService
 
         if (existingAccount is not null)
         {
+            if (db.Entry(existingAccount).State == EntityState.Detached)
+            {
+                var trackedAccount = await db.BankAccounts.FirstOrDefaultAsync(
+                    account => account.Id == existingAccount.Id,
+                    cancellationToken);
+                if (trackedAccount is not null)
+                {
+                    return trackedAccount;
+                }
+
+                db.BankAccounts.Attach(existingAccount);
+            }
+
             return existingAccount;
         }
 

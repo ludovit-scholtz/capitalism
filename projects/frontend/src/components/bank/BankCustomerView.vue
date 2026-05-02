@@ -13,6 +13,7 @@ const props = defineProps<{
   isAuthenticated: boolean
   activeCompany: Company | null
   isCompanyAccountActive: boolean
+  isPersonalAccountActive: boolean
   myOperatingAccountsHere: PlayerBankAccountSummary[]
   myLoansHere: LoanSummary[]
   myDepositsHere: BankDepositSummary[]
@@ -62,6 +63,7 @@ const directBorrowingOption = computed<LoanOfferSummary | null>(() => {
 
 const myActiveDepositsHere = computed(() => props.myDepositsHere.filter((d) => d.isActive && !d.isBaseCapital))
 const hasCustomerAccount = computed(() => myActiveDepositsHere.value.length > 0)
+const isEligibleDepositContext = computed(() => props.isCompanyAccountActive || props.isPersonalAccountActive)
 const myAccountBalance = computed(() => myActiveDepositsHere.value.reduce((sum, d) => sum + d.amount, 0))
 const myAccountInterestEarned = computed(() => myActiveDepositsHere.value.reduce((sum, d) => sum + d.totalInterestPaid, 0))
 const myestDeposit = computed<BankDepositSummary | null>(() => {
@@ -98,7 +100,7 @@ function formatOpenAccountError(errorMessage: string) {
 }
 
 async function submitCustomerDeposit() {
-  if (!props.activeCompany || !props.bankBuildingId) return
+  if (!props.bankBuildingId || !isEligibleDepositContext.value) return
   customerDepositLoading.value = true
   customerDepositError.value = null
   customerDepositSuccess.value = false
@@ -106,7 +108,7 @@ async function submitCustomerDeposit() {
     await gqlRequest(CREATE_DEPOSIT_MUTATION, {
       input: {
         bankBuildingId: props.bankBuildingId,
-        depositorCompanyId: props.activeCompany.id,
+        depositorCompanyId: props.isCompanyAccountActive ? props.activeCompany?.id : null,
         amount: 0,
       },
     })
@@ -181,12 +183,12 @@ function navigateToForexTransfer() {
 
   <div class="flex flex-col gap-6 lg:flex-row">
     <!-- Account-style deposit relationship -->
-    <section v-if="isAuthenticated && isCompanyAccountActive" class="customer-account-section grow rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
+    <section v-if="isAuthenticated && isEligibleDepositContext" class="customer-account-section grow rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
       <div class="account-header flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div class="account-header-info flex flex-row gap-2">
           <h2 class="section-title text-2xl font-bold text-body grow">{{ t('bank.myAccount') }}</h2>
           <span class="account-company-tag inline-flex w-fit items-center rounded-full border border-divider bg-card-raised px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
-            {{ activeCompany?.name }}
+            {{ isCompanyAccountActive ? activeCompany?.name : t('accountSwitcher.personalAccountHint') }}
           </span>
         </div>
         <div v-if="hasCustomerAccount && myAccountBalance > 0" class="account-actions flex flex-wrap gap-3">
