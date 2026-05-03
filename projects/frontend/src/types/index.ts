@@ -693,6 +693,10 @@ export interface GameState {
   nextTaxTick: number
   nextTaxGameTimeUtc: string
   nextTaxGameYear: number
+  /** Current game-year quarter index: 0=Q1, 1=Q2, 2=Q3, 3=Q4 */
+  currentQuarter: number
+  /** Human-readable quarter label e.g. "Q1" or "Q4" */
+  currentQuarterLabel: string
 }
 
 /** Matches backend BuildingLot entity */
@@ -968,6 +972,39 @@ export interface PublicSalesAnalytics {
    * Null when no product is configured on this unit.
    */
   cityAveragePrice: number | null
+  /**
+   * Seasonal demand outlook for this public sales unit.
+   * Null when no DemandSeasonality data exists for the product (defaults to 1.0× demand).
+   */
+  seasonalOutlook: SeasonalOutlook | null
+}
+
+export interface SeasonalOutlook {
+  /** Current quarter index: 0=Q1, 1=Q2, 2=Q3, 3=Q4 */
+  currentQuarterIndex: number
+  /** Label for current quarter e.g. "Q1 (Jan–Mar)" */
+  currentQuarterLabel: string
+  /** Demand multiplier active this quarter (e.g. 1.5, 0.8) */
+  currentMultiplier: number
+  /** HIGH | MODERATE | BELOW_AVERAGE | LOW */
+  demandLevel: string
+  /** Per-quarter demand forecast for Q1–Q4 */
+  quarterForecasts: QuarterForecast[]
+  /** Contextual callout text for this product and season */
+  callout: string
+}
+
+export interface QuarterForecast {
+  /** 0=Q1, 1=Q2, 2=Q3, 3=Q4 */
+  quarterIndex: number
+  /** e.g. "Q2 (Apr–Jun)" */
+  label: string
+  /** Demand multiplier for this quarter */
+  multiplier: number
+  /** Whether this is the currently active quarter */
+  isCurrent: boolean
+  /** GREEN | YELLOW | ORANGE | RED */
+  colorCode: string
 }
 
 export interface SalesTickSnapshot {

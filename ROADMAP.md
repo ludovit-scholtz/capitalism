@@ -78,11 +78,11 @@ It will use real world map. The game will start in single city and later other c
 - [ ] When a mine's raw material is fully depleted, stop the mining unit output and emit a player notification; display a "Depleted" badge on the building card and a recommended action to purchase a new mining lot.
 - [ ] Seed per-city resource replenishment events: every 8760 ticks (one game year), game engine randomly restores 10–30% of a subset of depleted mine deposits across all cities to simulate geological discovery, with a news event announcing the replenishment so players have opportunity to react.
 
-### Seasonal demand (0% complete)
+### Seasonal demand (100% complete)
 
-- [ ] Define a `DemandSeasonality` table seeded with per-product seasonal multipliers across the four game-year quarters (Q1 Jan–Mar, Q2 Apr–Jun, Q3 Jul–Sep, Q4 Oct–Dec) so that, for example, heating fuel has higher demand in Q4 and furniture has higher demand in Q2 spring/move season.
-- [ ] Apply the seasonal multiplier as an additional factor in `PublicSalesPhase` demand calculation alongside salary signal, brand quality, and price index so sales volumes fluctuate naturally during the year without requiring player action.
-- [ ] Expose the current season and seasonal demand outlook (next-quarter multiplier) in the public sales unit detail panel so players can plan inventory and pricing strategy ahead of demand peaks.
+- [x] Define a `DemandSeasonality` table seeded with per-product seasonal multipliers across the four game-year quarters (Q1 Jan–Mar, Q2 Apr–Jun, Q3 Jul–Sep, Q4 Oct–Dec) so that, for example, heating fuel has higher demand in Q4 and furniture has higher demand in Q2 spring/move season.
+- [x] Apply the seasonal multiplier as an additional factor in `PublicSalesPhase` demand calculation alongside salary signal, brand quality, and price index so sales volumes fluctuate naturally during the year without requiring player action.
+- [x] Expose the current season and seasonal demand outlook (next-quarter multiplier) in the public sales unit detail panel so players can plan inventory and pricing strategy ahead of demand peaks.
 
 ### In-game tutorials and interactive help (0% complete)
 

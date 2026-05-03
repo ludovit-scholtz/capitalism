@@ -52,6 +52,7 @@ export default {
     cityMap: 'Stadtkarte',
     companySettings: 'Unternehmenseinstellungen',
     gameTime: 'Spielzeit',
+    currentQuarter: 'Aktuelles Spielquartal (1 Quartal ≈ 2190 Ticks)',
     loans: 'Kredite',
     banking: 'Bankwesen',
     news: 'Neuigkeiten',
@@ -1513,6 +1514,20 @@ export default {
         factor_COMPETITION: 'Wettbewerb',
         factor_SALARY: 'Kaufkraft',
         factor_TREND: 'Markttrend',
+        factor_SEASONAL: 'Saisonale Nachfrage',
+      },
+      seasonalOutlook: {
+        title: 'Saisonaler Ausblick',
+        sectionLabel: 'Saisonaler Nachfrageausblick',
+        forecastChartLabel: 'Nachfrageprognose nach Quartal',
+        demandMultiplier: 'Nachfragemultiplikator',
+        now: 'jetzt',
+        demandLevel: {
+          HIGH: '⬆ Hohe Nachfrage',
+          MODERATE: '→ Mäßige Nachfrage',
+          BELOW_AVERAGE: '⬇ Unter Durchschnitt',
+          LOW: '⚠ Geringe Nachfrage',
+        },
       },
       priceUpdateFailed: 'Preisaktualisierung fehlgeschlagen. Bitte versuchen Sie es erneut.',
       priceUpdate: {

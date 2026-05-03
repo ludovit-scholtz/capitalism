@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
 import UnitResourceHistoryPanel from '@/components/buildings/UnitResourceHistoryPanel.vue'
 import SupplyChainTab from '@/components/buildings/SupplyChainTab.vue'
+import SeasonalOutlookPanel from '@/components/buildings/SeasonalOutlookPanel.vue'
 import type { BuildingUnit } from '@/types'
 import type { ExchangeSortBy } from '@/lib/globalExchange'
 
@@ -974,7 +975,12 @@ function buildCompetitionPieGradient(entries: CompetitionLegendEntry[]): string 
                 <p v-if="publicSalesAnalytics.actionHint" class="mi-action-hint text-[0.75rem] text-muted">
                   <strong>{{ t('buildingDetail.marketIntelligence.actionHint') }}:</strong> {{ publicSalesAnalytics.actionHint }}
                 </p>
-              </div></template
+              </div>
+              <!-- Seasonal Outlook Panel -->
+              <SeasonalOutlookPanel
+                v-if="publicSalesAnalytics.seasonalOutlook"
+                :seasonal-outlook="publicSalesAnalytics.seasonalOutlook"
+              /></template
             >
             <p v-else class="config-help">{{ t('buildingDetail.marketIntelligence.loadFailed') }}</p>
           </div>

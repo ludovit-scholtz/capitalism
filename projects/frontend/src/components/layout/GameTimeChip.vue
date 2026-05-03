@@ -104,6 +104,11 @@ onUnmounted(() => {
     <span class="game-time-chip-progress" :style="{ width: `${tickProgressPercent}%` }" aria-hidden="true" />
     <font-awesome-icon :icon="['fas', 'clock']" class="game-time-chip-content text-muted text-[0.75rem]" />
     <span class="game-time-chip-content text-[0.75rem] text-muted tabular-nums whitespace-nowrap">{{ formattedGameTime }}</span>
+    <span
+      v-if="gameState?.currentQuarterLabel"
+      class="game-time-chip-content game-quarter-badge text-[0.65rem] font-bold px-1.5 py-0.5 rounded bg-primary/15 text-primary"
+      :title="t('nav.currentQuarter')"
+    >{{ gameState.currentQuarterLabel }}</span>
   </div>
 </template>
 

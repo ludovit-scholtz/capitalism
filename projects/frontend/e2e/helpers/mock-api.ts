@@ -511,6 +511,23 @@ export type MockPublicSalesAnalytics = {
   cityCurrencyCode?: string
   /** City-average reference price for the product in the city's local currency. Null when no product configured. */
   cityAveragePrice?: number | null
+  /** Seasonal demand outlook. Null when no DemandSeasonality data for the product. */
+  seasonalOutlook?: MockSeasonalOutlook | null
+}
+
+export type MockSeasonalOutlook = {
+  currentQuarterIndex: number
+  currentQuarterLabel: string
+  currentMultiplier: number
+  demandLevel: string
+  callout: string
+  quarterForecasts: Array<{
+    quarterIndex: number
+    label: string
+    multiplier: number
+    isCurrent: boolean
+    colorCode: string
+  }>
 }
 
 export type MockMarketIntelligenceSeller = {
@@ -1074,6 +1091,7 @@ const DEFAULT_DIVIDEND_PAYOUT_RATIO = 0.2
 const GAME_START_YEAR = 2000
 const TICKS_PER_DAY = 24
 const TICKS_PER_YEAR = 24 * 365
+const TICKS_PER_QUARTER = TICKS_PER_YEAR / 4
 
 function normalizeMockBankAccount(
   account: {
@@ -1305,6 +1323,8 @@ function computeMockNextTaxTick(currentTick: number, taxCycleTicks: number) {
 function buildMockGameStatePayload(gameState: MockState['gameState']) {
   const currentGameYear = computeMockGameYear(gameState.currentTick)
   const nextTaxTick = computeMockNextTaxTick(gameState.currentTick, gameState.taxCycleTicks)
+  const currentQuarter = Math.floor(gameState.currentTick / TICKS_PER_QUARTER) % 4
+  const quarterLabels = ['Q1', 'Q2', 'Q3', 'Q4']
 
   return {
     ...gameState,
@@ -1315,6 +1335,8 @@ function buildMockGameStatePayload(gameState: MockState['gameState']) {
     nextTaxTick,
     nextTaxGameTimeUtc: computeMockInGameTimeUtc(nextTaxTick),
     nextTaxGameYear: computeMockGameYear(nextTaxTick),
+    currentQuarter,
+    currentQuarterLabel: quarterLabels[currentQuarter] ?? 'Q1',
   }
 }
 

@@ -19,6 +19,8 @@ const GAME_STATE_QUERY = `
       nextTaxTick
       nextTaxGameTimeUtc
       nextTaxGameYear
+      currentQuarter
+      currentQuarterLabel
     }
   }
 `

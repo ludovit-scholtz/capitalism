@@ -3569,6 +3569,20 @@ export function useBuildingDetail() {
             profitHistory { tick profit grossMarginPct }
             marketShare { label companyId share isUnmet }
             demandDrivers { factor impact score description }
+            seasonalOutlook {
+              currentQuarterIndex
+              currentQuarterLabel
+              currentMultiplier
+              demandLevel
+              callout
+              quarterForecasts {
+                quarterIndex
+                label
+                multiplier
+                isCurrent
+                colorCode
+              }
+            }
           }
         }`,
         { unitId },

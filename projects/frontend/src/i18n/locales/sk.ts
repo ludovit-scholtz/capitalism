@@ -52,6 +52,7 @@ export default {
     cityMap: 'Mapa mesta',
     companySettings: 'Nastavenia firmy',
     gameTime: 'Herný čas',
+    currentQuarter: 'Aktuálny herný kvartál (1 kvartál ≈ 2190 tikov)',
     loans: 'Pôžičky',
     banking: 'Bankovníctvo',
     news: 'Noviny',
@@ -1509,6 +1510,20 @@ export default {
         factor_COMPETITION: 'Konkurencia',
         factor_SALARY: 'Kúpna sila',
         factor_TREND: 'Trhový trend',
+        factor_SEASONAL: 'Sezónny dopyt',
+      },
+      seasonalOutlook: {
+        title: 'Sezónny výhľad',
+        sectionLabel: 'Sezónny výhľad dopytu',
+        forecastChartLabel: 'Prognóza dopytu podľa kvartálov',
+        demandMultiplier: 'koeficient dopytu',
+        now: 'teraz',
+        demandLevel: {
+          HIGH: '⬆ Vysoký dopyt',
+          MODERATE: '→ Stredný dopyt',
+          BELOW_AVERAGE: '⬇ Pod priemerom',
+          LOW: '⚠ Nízky dopyt',
+        },
       },
       priceUpdateFailed: 'Nepodarilo sa aktualizovať cenu. Skúste to znova.',
       priceUpdate: {
