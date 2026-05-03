@@ -1581,12 +1581,61 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             """);
 
         var cities = result.GetProperty("data").GetProperty("cities");
-        Assert.True(cities.GetArrayLength() >= 3);
+        Assert.True(cities.GetArrayLength() >= 9, $"Expected at least 9 cities, got {cities.GetArrayLength()}");
 
         var names = cities.EnumerateArray().Select(c => c.GetProperty("name").GetString()).ToList();
         Assert.Contains("Bratislava", names);
         Assert.Contains("Prague", names);
         Assert.Contains("Vienna", names);
+        Assert.Contains("Berlin", names);
+        Assert.Contains("Warsaw", names);
+        Assert.Contains("New York", names);
+        Assert.Contains("London", names);
+        Assert.Contains("Beijing", names);
+        Assert.Contains("Delhi", names);
+    }
+
+    [Fact]
+    public async Task Cities_BerlinAndWarsaw_HaveCorrectSeedData()
+    {
+        var result = await ExecuteGraphQlAsync(
+            """
+            {
+              cities {
+                name
+                countryCode
+                currencyCode
+                baseSalaryPerManhour
+                resources { resourceType { slug } abundance }
+              }
+            }
+            """);
+
+        var allCities = result.GetProperty("data").GetProperty("cities").EnumerateArray().ToList();
+
+        // Berlin
+        var berlin = allCities.First(c => c.GetProperty("name").GetString() == "Berlin");
+        Assert.Equal("DE", berlin.GetProperty("countryCode").GetString());
+        Assert.Equal("EUR", berlin.GetProperty("currencyCode").GetString());
+        Assert.True(berlin.GetProperty("baseSalaryPerManhour").GetDecimal() > 0m, "Berlin salary must be positive");
+        var berlinResources = berlin.GetProperty("resources").EnumerateArray()
+            .Select(r => r.GetProperty("resourceType").GetProperty("slug").GetString())
+            .ToList();
+        Assert.Contains("coal", berlinResources);
+        Assert.Contains("iron-ore", berlinResources);
+        Assert.Contains("silicon", berlinResources);
+
+        // Warsaw
+        var warsaw = allCities.First(c => c.GetProperty("name").GetString() == "Warsaw");
+        Assert.Equal("PL", warsaw.GetProperty("countryCode").GetString());
+        Assert.Equal("PLN", warsaw.GetProperty("currencyCode").GetString());
+        Assert.True(warsaw.GetProperty("baseSalaryPerManhour").GetDecimal() > 0m, "Warsaw salary must be positive");
+        var warsawResources = warsaw.GetProperty("resources").EnumerateArray()
+            .Select(r => r.GetProperty("resourceType").GetProperty("slug").GetString())
+            .ToList();
+        Assert.Contains("grain", warsawResources);
+        Assert.Contains("wood", warsawResources);
+        Assert.Contains("coal", warsawResources);
     }
 
     [Fact]

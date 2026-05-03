@@ -26,17 +26,19 @@ public sealed class GlobalCitiesAndFxRatesTests
 
         var cities = await db.Cities.OrderBy(c => c.Name).ToListAsync();
 
-        Assert.Equal(7, cities.Count);
+        Assert.True(cities.Count >= 9, $"Expected at least 9 cities, got {cities.Count}");
 
         var byCurrency = cities.ToDictionary(c => c.Name, c => c.CurrencyCode);
 
         Assert.Equal("CNY", byCurrency["Beijing"]);
+        Assert.Equal("EUR", byCurrency["Berlin"]);
         Assert.Equal("EUR", byCurrency["Bratislava"]);
         Assert.Equal("INR", byCurrency["Delhi"]);
         Assert.Equal("GBP", byCurrency["London"]);
         Assert.Equal("USD", byCurrency["New York"]);
         Assert.Equal("CZK", byCurrency["Prague"]);
         Assert.Equal("EUR", byCurrency["Vienna"]);
+        Assert.Equal("PLN", byCurrency["Warsaw"]);
     }
 
     [Fact]
@@ -506,7 +508,7 @@ public sealed class GlobalCitiesAndFxRatesTests
         Assert.False(doc.TryGetProperty("errors", out _));
 
         var cities = doc.GetProperty("data").GetProperty("cities").EnumerateArray().ToList();
-        Assert.Equal(7, cities.Count);
+        Assert.True(cities.Count >= 9, $"Expected at least 9 cities, got {cities.Count}");
 
         var byCurrency = cities.ToDictionary(
             c => c.GetProperty("name").GetString()!,
@@ -519,6 +521,8 @@ public sealed class GlobalCitiesAndFxRatesTests
         Assert.Equal("GBP", byCurrency["London"]);
         Assert.Equal("CNY", byCurrency["Beijing"]);
         Assert.Equal("INR", byCurrency["Delhi"]);
+        Assert.Equal("EUR", byCurrency["Berlin"]);
+        Assert.Equal("PLN", byCurrency["Warsaw"]);
     }
 
     #endregion
