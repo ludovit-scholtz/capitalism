@@ -1906,6 +1906,40 @@ export function makeDefaultCities(): MockCity[] {
         { resourceType: { id: 'res-cotton', name: 'Cotton', slug: 'cotton', category: 'ORGANIC' }, abundance: 0.7 },
       ],
     },
+    {
+      id: 'city-be',
+      name: 'Berlin',
+      countryCode: 'DE',
+      currencyCode: 'EUR',
+      latitude: 52.52,
+      longitude: 13.405,
+      population: 3677472,
+      averageRentPerSqm: 20,
+      baseSalaryPerManhour: 22,
+      resources: [
+        { resourceType: { id: 'res-coal', name: 'Coal', slug: 'coal', category: 'MINERAL' }, abundance: 0.8 },
+        { resourceType: { id: 'res-iron-ore', name: 'Iron Ore', slug: 'iron-ore', category: 'MINERAL' }, abundance: 0.7 },
+        { resourceType: { id: 'res-silicon', name: 'Silicon', slug: 'silicon', category: 'MINERAL' }, abundance: 0.6 },
+        { resourceType: { id: 'res-grain', name: 'Grain', slug: 'grain', category: 'ORGANIC' }, abundance: 0.6 },
+      ],
+    },
+    {
+      id: 'city-wa',
+      name: 'Warsaw',
+      countryCode: 'PL',
+      currencyCode: 'PLN',
+      latitude: 52.2297,
+      longitude: 21.0122,
+      population: 1860281,
+      averageRentPerSqm: 30,
+      baseSalaryPerManhour: 35,
+      resources: [
+        { resourceType: { id: 'res-grain', name: 'Grain', slug: 'grain', category: 'ORGANIC' }, abundance: 0.8 },
+        { resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', category: 'ORGANIC' }, abundance: 0.7 },
+        { resourceType: { id: 'res-coal', name: 'Coal', slug: 'coal', category: 'MINERAL' }, abundance: 0.6 },
+        { resourceType: { id: 'res-iron-ore', name: 'Iron Ore', slug: 'iron-ore', category: 'MINERAL' }, abundance: 0.5 },
+      ],
+    },
   ]
 }
 
