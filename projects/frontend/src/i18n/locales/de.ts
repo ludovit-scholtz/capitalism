@@ -59,6 +59,7 @@ export default {
     admin: 'Verwaltung',
     campaignAnalytics: 'Kampagnen',
     bankStatement: 'Kontoauszug',
+    cities: 'Städte',
   },
   news: {
     eyebrow: 'Offizieller Feed',
@@ -3029,5 +3030,16 @@ export default {
     insufficientFunds: 'Das Quellkonto hat nicht genügend Guthaben.',
     invalidAmount: 'Bitte einen positiven Betrag eingeben.',
     noMatchingDestination: 'Kein anderes Konto in derselben Währung. Eröffnen Sie zuerst eins.',
+  },
+
+  cities: {
+    eyebrow: 'Weltkarte',
+    title: 'Städte',
+    subtitle: 'Erkunden Sie alle Städte im Spiel mit Bevölkerung, Währungen, Gehaltssätzen und verfügbaren Bodenschätzen.',
+    loadFailed: 'Städte konnten nicht geladen werden.',
+    population: 'Bevölkerung',
+    baseSalary: 'Grundgehalt',
+    topResources: 'Top-Ressourcen',
+    viewMap: 'Stadtkarte anzeigen',
   },
 }

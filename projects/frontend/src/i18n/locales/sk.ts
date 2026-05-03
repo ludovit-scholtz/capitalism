@@ -59,6 +59,7 @@ export default {
     admin: 'Správa',
     campaignAnalytics: 'Kampane',
     bankStatement: 'Bankový výpis',
+    cities: 'Mestá',
   },
   news: {
     eyebrow: 'Oficiálny feed',
@@ -3015,5 +3016,16 @@ export default {
     insufficientFunds: 'Zdrojový účet nemá dostatok prostriedkov.',
     invalidAmount: 'Zadajte kladnú sumu.',
     noMatchingDestination: 'Nemáte iný účet v rovnakej mene. Najprv si nejaký otvorte.',
+  },
+
+  cities: {
+    eyebrow: 'Mapa sveta',
+    title: 'Mestá',
+    subtitle: 'Preskúmajte všetky mestá v hre, ich populáciu, meny, mzdové sadzby a dostupné prírodné zdroje.',
+    loadFailed: 'Nepodarilo sa načítať mestá.',
+    population: 'Obyvateľstvo',
+    baseSalary: 'Základná mzda',
+    topResources: 'Top zdroje',
+    viewMap: 'Zobraziť mapu mesta',
   },
 }
