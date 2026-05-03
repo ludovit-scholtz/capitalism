@@ -116,6 +116,12 @@
       <span class="detail-label">{{ t('cityMap.building') }}</span
       ><span class="detail-value"> {{ lot.building.name }} ({{ fmtBuildingType(lot.building.type) }}) </span>
     </div>
+    <!-- For Sale badge on occupied lot -->
+    <div v-if="lot.building?.isForSale" class="for-sale-info" data-testid="lot-for-sale-info">
+      <span class="for-sale-badge-panel">🏪 {{ t('buildingMarket.forSaleBadge') }}</span>
+      <span v-if="lot.building.askingPrice" class="for-sale-price">{{ fmtCurrency(lot.building.askingPrice) }}</span>
+      <RouterLink to="/buildings/market" class="for-sale-link">{{ t('buildingMarket.viewOnMarket') }}</RouterLink>
+    </div>
 
     <!-- Purchase flow -->
     <div v-if="!isAuthenticated" class="purchase-notice">{{ t('cityMap.loginRequired') }}</div>

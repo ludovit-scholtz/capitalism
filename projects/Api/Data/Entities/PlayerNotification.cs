@@ -43,4 +43,8 @@ public static class PlayerNotificationType
     public const string BankAccountLowBalance = "BANK_ACCOUNT_LOW_BALANCE";
     public const string PublicSalesInventoryLow = "PUBLIC_SALES_INVENTORY_LOW";
     public const string B2BSaleFulfilled = "B2B_SALE_FULFILLED";
+    public const string BuildingOfferReceived = "BUILDING_OFFER_RECEIVED";
+    public const string BuildingOfferAccepted = "BUILDING_OFFER_ACCEPTED";
+    public const string BuildingOfferRejected = "BUILDING_OFFER_REJECTED";
+    public const string BuildingSoldSuccessfully = "BUILDING_SOLD_SUCCESSFULLY";
 }

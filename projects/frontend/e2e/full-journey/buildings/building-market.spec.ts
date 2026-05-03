@@ -1,0 +1,275 @@
+import { test, expect } from '@playwright/test'
+import {
+  setupMockApi,
+  makePlayer,
+  type MockPlayer,
+  type MockBuildingMarketListing,
+  type MockBuildingMarketMyListing,
+  type MockBuildingMarketOffer,
+} from '../../helpers/mock-api'
+
+const BRATISLAVA = { id: 'city-ba', name: 'Bratislava', currencyCode: 'EUR', countryCode: 'SK' }
+const PRAGUE = { id: 'city-pr', name: 'Prague', currencyCode: 'CZK', countryCode: 'CZ' }
+
+function makePlayerWithCompany(): MockPlayer {
+  return makePlayer({
+    onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+    activeAccountType: 'COMPANY',
+    activeCompanyId: 'co-1',
+    companies: [
+      {
+        id: 'co-1',
+        playerId: 'player-1',
+        name: 'My Corp',
+        cash: 1000000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [],
+      },
+    ],
+  })
+}
+
+function makeMarketListing(overrides?: Partial<MockBuildingMarketListing['building']>): MockBuildingMarketListing {
+  return {
+    pendingOfferCount: 2,
+    building: {
+      id: 'bldg-1',
+      name: 'Iron Mine Alpha',
+      type: 'MINE',
+      isForSale: true,
+      askingPrice: 500000,
+      level: 2,
+      city: BRATISLAVA,
+      company: { id: 'co-seller', name: 'Seller Corp', player: { displayName: 'Alice' } },
+      ...overrides,
+    },
+  }
+}
+
+function makeMyListing(overrides?: Partial<MockBuildingMarketMyListing>): MockBuildingMarketMyListing {
+  return {
+    building: {
+      id: 'bldg-2',
+      name: 'Bread Factory',
+      type: 'FACTORY',
+      isForSale: true,
+      askingPrice: 300000,
+      level: 1,
+      city: BRATISLAVA,
+      company: { id: 'co-mine', name: 'My Corp' },
+    },
+    offers: [],
+    ...overrides,
+  }
+}
+
+function makePendingOffer(id = 'offer-1', price = 280000): MockBuildingMarketOffer {
+  return {
+    id,
+    offeredPrice: price,
+    status: 'PENDING',
+    negotiationNote: 'Please accept my offer',
+    createdAtUtc: '2026-01-01T10:00:00Z',
+    resolvedAtUtc: null,
+    buyerPlayer: { displayName: 'Bob' },
+    buyerCompany: { id: 'co-buyer', name: 'Buyer Corp' },
+  }
+}
+
+test('shows Building Market title on market page', async ({ page }) => {
+  setupMockApi(page, { buildingMarketListings: [] })
+  await page.goto('/buildings/market')
+  await expect(page.getByRole('heading', { name: 'Building Market' })).toBeVisible()
+})
+
+test('shows empty state when no listings are available', async ({ page }) => {
+  setupMockApi(page, { buildingMarketListings: [] })
+  await page.goto('/buildings/market')
+  await expect(page.getByText(/no buildings are currently listed for sale/i)).toBeVisible()
+})
+
+test('shows market listing card with building info', async ({ page }) => {
+  setupMockApi(page, { buildingMarketListings: [makeMarketListing()] })
+  await page.goto('/buildings/market')
+  await expect(page.locator('.market-listing-card').first()).toBeVisible()
+  await expect(page.locator('.building-name').first()).toContainText('Iron Mine Alpha')
+  await expect(page.locator('.asking-price').first()).toContainText('€500,000')
+  await expect(page.locator('.for-sale-badge').first()).toBeVisible()
+})
+
+test('shows seller and pending offer count', async ({ page }) => {
+  setupMockApi(page, {
+    buildingMarketListings: [makeMarketListing()],
+  })
+  await page.goto('/buildings/market')
+  await expect(page.locator('.market-listing-card').first()).toContainText('Seller Corp')
+  await expect(page.locator('.market-listing-card').first()).toContainText('2')
+})
+
+test('shows make offer button for authenticated users', async ({ page }) => {
+  const player = makePlayerWithCompany()
+  const state = setupMockApi(page, {
+    players: [player],
+    buildingMarketListings: [makeMarketListing()],
+  })
+  state.currentUserId = player.id
+  state.currentToken = `token-${player.id}`
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${player.id}`)
+  await page.goto('/buildings/market')
+  await expect(page.getByRole('button', { name: 'Make Offer' })).toBeVisible()
+})
+
+test('hides make offer button for guests', async ({ page }) => {
+  setupMockApi(page, { buildingMarketListings: [makeMarketListing()] })
+  await page.goto('/buildings/market')
+  await expect(page.getByRole('button', { name: 'Make Offer' })).toHaveCount(0)
+})
+
+test('opens offer modal when clicking make offer', async ({ page }) => {
+  const player = makePlayerWithCompany()
+  const state = setupMockApi(page, {
+    players: [player],
+    buildingMarketListings: [makeMarketListing()],
+  })
+  state.currentUserId = player.id
+  state.currentToken = `token-${player.id}`
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${player.id}`)
+  await page.goto('/buildings/market')
+  await page.getByRole('button', { name: 'Make Offer' }).click()
+  await expect(page.locator('.modal-panel')).toBeVisible()
+  await expect(page.locator('.modal-building-name')).toContainText('Iron Mine Alpha')
+})
+
+test('submits offer and shows success message', async ({ page }) => {
+  const player = makePlayerWithCompany()
+  const state = setupMockApi(page, {
+    players: [player],
+    buildingMarketListings: [makeMarketListing()],
+  })
+  state.currentUserId = player.id
+  state.currentToken = `token-${player.id}`
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${player.id}`)
+  await page.goto('/buildings/market')
+  await expect(page.getByRole('button', { name: 'Make Offer' })).toBeVisible()
+  await page.getByRole('button', { name: 'Make Offer' }).click()
+  await expect(page.locator('.modal-panel')).toBeVisible()
+  // Offer amount defaults to asking price; click submit
+  await expect(page.getByRole('button', { name: 'Submit Offer' })).toBeEnabled()
+  await page.getByRole('button', { name: 'Submit Offer' }).click()
+  await expect(page.locator('.alert-success')).toBeVisible()
+  await expect(page.locator('.modal-panel')).toHaveCount(0)
+})
+
+test('my listings tab shows empty state for authenticated user with no listings', async ({ page }) => {
+  const player = makePlayerWithCompany()
+  const state = setupMockApi(page, {
+    players: [player],
+    myBuildingListings: [],
+  })
+  state.currentUserId = player.id
+  state.currentToken = `token-${player.id}`
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${player.id}`)
+  await page.goto('/buildings/market')
+  await page.getByRole('tab', { name: 'My Listings' }).click()
+  await expect(page.getByText(/you have no buildings listed for sale/i)).toBeVisible()
+})
+
+test('my listings tab shows listing with pending offer', async ({ page }) => {
+  const player = makePlayerWithCompany()
+  const listing = makeMyListing({ offers: [makePendingOffer()] })
+  const state = setupMockApi(page, {
+    players: [player],
+    myBuildingListings: [listing],
+  })
+  state.currentUserId = player.id
+  state.currentToken = `token-${player.id}`
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${player.id}`)
+  await page.goto('/buildings/market')
+  await page.getByRole('tab', { name: 'My Listings' }).click()
+  await expect(page.locator('.my-listing-card')).toBeVisible()
+  await expect(page.locator('.offer-row').first()).toBeVisible()
+  await expect(page.locator('.offer-row').first()).toContainText('Buyer Corp')
+})
+
+test('can accept a pending offer from my listings tab', async ({ page }) => {
+  const player = makePlayerWithCompany()
+  const listing = makeMyListing({ offers: [makePendingOffer()] })
+  const state = setupMockApi(page, {
+    players: [player],
+    myBuildingListings: [listing],
+  })
+  state.currentUserId = player.id
+  state.currentToken = `token-${player.id}`
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${player.id}`)
+  await page.goto('/buildings/market')
+  await page.getByRole('tab', { name: 'My Listings' }).click()
+  await expect(page.locator('.offer-row')).toBeVisible()
+  await page.getByRole('button', { name: 'Accept' }).click()
+  await expect(page.locator('.alert-success')).toBeVisible()
+  await expect(page.locator('.alert-success')).toContainText('accepted')
+})
+
+test('can reject a pending offer from my listings tab', async ({ page }) => {
+  const player = makePlayerWithCompany()
+  const listing = makeMyListing({ offers: [makePendingOffer()] })
+  const state = setupMockApi(page, {
+    players: [player],
+    myBuildingListings: [listing],
+  })
+  state.currentUserId = player.id
+  state.currentToken = `token-${player.id}`
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${player.id}`)
+  await page.goto('/buildings/market')
+  await page.getByRole('tab', { name: 'My Listings' }).click()
+  await expect(page.locator('.offer-row')).toBeVisible()
+  await page.getByRole('button', { name: 'Reject' }).click()
+  await expect(page.locator('.alert-success')).toBeVisible()
+  await expect(page.locator('.alert-success')).toContainText('rejected')
+})
+
+test('shows CZK asking price for Prague listing', async ({ page }) => {
+  const pragueListing = makeMarketListing({
+    id: 'bldg-prag',
+    name: 'Czech Factory',
+    city: PRAGUE,
+    askingPrice: 12000000,
+  })
+  setupMockApi(page, { buildingMarketListings: [pragueListing] })
+  await page.goto('/buildings/market')
+  await expect(page.locator('.asking-price').first()).toContainText('CZK')
+})
+
+test('shows multiple listings in a grid', async ({ page }) => {
+  const listings = [
+    makeMarketListing({ id: 'b1', name: 'Mine A' }),
+    makeMarketListing({ id: 'b2', name: 'Mine B' }),
+    makeMarketListing({ id: 'b3', name: 'Factory C', type: 'FACTORY' }),
+  ]
+  setupMockApi(page, { buildingMarketListings: listings })
+  await page.goto('/buildings/market')
+  await expect(page.locator('.market-listing-card')).toHaveCount(3)
+  await expect(page.locator('.building-name').nth(0)).toContainText('Mine A')
+  await expect(page.locator('.building-name').nth(1)).toContainText('Mine B')
+  await expect(page.locator('.building-name').nth(2)).toContainText('Factory C')
+})

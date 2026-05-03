@@ -834,3 +834,34 @@ public sealed class SetPublicSalesInventoryAlertThresholdInput
     public Guid BuildingUnitId { get; set; }
     public decimal? MinInventoryThreshold { get; set; }
 }
+
+/// <summary>Input for a buyer to make a purchase offer on a for-sale building.</summary>
+public sealed class MakeOfferOnBuildingInput
+{
+    /// <summary>The building to make an offer on.</summary>
+    public Guid BuildingId { get; set; }
+
+    /// <summary>The company on behalf of which the buyer is purchasing.</summary>
+    public Guid BuyerCompanyId { get; set; }
+
+    /// <summary>The offered purchase price in the building city's currency.</summary>
+    public decimal OfferedPrice { get; set; }
+
+    /// <summary>Optional negotiation note. Only used when the listing allows negotiation.</summary>
+    [MaxLength(500)]
+    public string? NegotiationNote { get; set; }
+}
+
+/// <summary>Input for a seller to accept a pending offer.</summary>
+public sealed class AcceptBuildingOfferInput
+{
+    /// <summary>The offer to accept.</summary>
+    public Guid OfferId { get; set; }
+}
+
+/// <summary>Input for a seller to reject a pending offer.</summary>
+public sealed class RejectBuildingOfferInput
+{
+    /// <summary>The offer to reject.</summary>
+    public Guid OfferId { get; set; }
+}

@@ -424,6 +424,20 @@ async function buyBuilding() {
       <UiStateLoading v-if="loading" :label="t('common.loading')" />
 
       <template v-else>
+        <!-- Building market discovery banner -->
+        <div class="mb-6 flex items-center justify-between gap-4 px-4 py-3 bg-[rgba(0,71,255,0.05)] border border-[rgba(0,71,255,0.2)] rounded-lg">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🏪</span>
+            <div>
+              <span class="font-semibold text-sm">{{ t('buildingMarket.title') }}</span>
+              <span class="text-muted text-xs ml-2">{{ t('buildingMarket.subtitle') }}</span>
+            </div>
+          </div>
+          <RouterLink to="/buildings/market" class="btn-market-link shrink-0 text-sm font-semibold text-brand hover:underline no-underline">
+            {{ t('buildingMarket.tabMarket') }} →
+          </RouterLink>
+        </div>
+
         <!-- Step 1: Building type (hidden when ?type= is pre-selected in URL) -->
         <div v-if="!route.query.type || !buildingTypes.includes(String(route.query.type))" class="mb-8">
           <h2 class="text-lg font-semibold mb-3">{{ t('buildings.selectType') }}</h2>

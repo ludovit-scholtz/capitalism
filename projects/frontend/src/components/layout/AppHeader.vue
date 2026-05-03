@@ -122,6 +122,10 @@ async function markAllNotificationsRead() {
           <font-awesome-icon :icon="['fas', 'globe']" class="mr-2" />
           <span class="inline-block md:hidden">{{ t('nav.cities') }}</span>
         </RouterLink>
+        <RouterLink to="/buildings/market" :title="t('nav.buildingMarket')" class="nav-link" @click="closeMenu">
+          <font-awesome-icon :icon="['fas', 'store']" class="mr-2" />
+          <span class="inline-block md:hidden">{{ t('nav.buildingMarket') }}</span>
+        </RouterLink>
         <RouterLink to="/encyclopedia" :title="t('nav.encyclopedia')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'book']" class="mr-2" />
           <span class="inline-block md:hidden">{{ t('nav.encyclopedia') }}</span>

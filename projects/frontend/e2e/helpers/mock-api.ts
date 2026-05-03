@@ -1019,6 +1019,49 @@ export type MockState = {
       warningUnitIds: string[]
     }
   >
+  /** Buildings listed for sale on the secondary market (for buildingMarket query). */
+  buildingMarketListings: MockBuildingMarketListing[]
+  /** My building listings with offers (for myBuildingListings query). */
+  myBuildingListings: MockBuildingMarketMyListing[]
+}
+
+export interface MockBuildingMarketListing {
+  pendingOfferCount: number
+  building: {
+    id: string
+    name: string
+    type: string
+    isForSale: boolean
+    askingPrice: number | null
+    level: number
+    city: { id: string; name: string; currencyCode: string; countryCode: string }
+    company: { id: string; name: string; player: { displayName: string } }
+  }
+}
+
+export interface MockBuildingMarketOffer {
+  id: string
+  offeredPrice: number
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED'
+  negotiationNote: string | null
+  createdAtUtc: string
+  resolvedAtUtc: string | null
+  buyerPlayer: { displayName: string }
+  buyerCompany: { id: string; name: string }
+}
+
+export interface MockBuildingMarketMyListing {
+  building: {
+    id: string
+    name: string
+    type: string
+    isForSale: boolean
+    askingPrice: number | null
+    level: number
+    city: { id: string; name: string; currencyCode: string }
+    company: { id: string; name: string }
+  }
+  offers: MockBuildingMarketOffer[]
 }
 
 const mockStateByPage = new WeakMap<Page, MockState>()
@@ -2430,6 +2473,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     goldBalance: { balance: 0, blockedInPools: 0, availableBalance: 0 },
     marketReports: [],
     supplyChainData: {},
+    buildingMarketListings: [],
+    myBuildingListings: [],
     ...initial,
   }
 
@@ -6470,6 +6515,62 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const limit = Math.min(vars.limit ?? 10, 100)
       reports = reports.slice(0, limit)
       return routeJson({ cityMarketReports: reports })
+    }
+
+    if (query.includes('buildingMarket') && !query.includes('myBuildingListings')) {
+      return routeJson({ buildingMarket: state.buildingMarketListings })
+    }
+
+    if (query.includes('myBuildingListings')) {
+      return routeJson({ myBuildingListings: state.myBuildingListings })
+    }
+
+    if (query.includes('makeOfferOnBuilding')) {
+      const input = body.variables?.input ?? {}
+      const newOffer: MockBuildingMarketOffer = {
+        id: `offer-${Date.now()}`,
+        offeredPrice: input.offeredPrice ?? 0,
+        status: 'PENDING',
+        negotiationNote: input.negotiationNote ?? null,
+        createdAtUtc: new Date().toISOString(),
+        resolvedAtUtc: null,
+        buyerPlayer: { displayName: 'Buyer' },
+        buyerCompany: { id: input.buyerCompanyId ?? 'co-1', name: 'Buyer Corp' },
+      }
+      return routeJson({ makeOfferOnBuilding: { id: newOffer.id, offeredPrice: newOffer.offeredPrice, status: 'PENDING' } })
+    }
+
+    if (query.includes('acceptBuildingOffer')) {
+      const offerId = body.variables?.input?.offerId
+      // Update myBuildingListings mock state
+      for (const listing of state.myBuildingListings) {
+        const offer = listing.offers.find((o) => o.id === offerId)
+        if (offer) {
+          offer.status = 'ACCEPTED'
+          offer.resolvedAtUtc = new Date().toISOString()
+          listing.building.isForSale = false
+          break
+        }
+      }
+      return routeJson({
+        acceptBuildingOffer: {
+          building: { id: 'b-1', name: 'Test Building', companyId: 'co-2', isForSale: false },
+          offer: { id: offerId, status: 'ACCEPTED' },
+        },
+      })
+    }
+
+    if (query.includes('rejectBuildingOffer')) {
+      const offerId = body.variables?.input?.offerId
+      for (const listing of state.myBuildingListings) {
+        const offer = listing.offers.find((o) => o.id === offerId)
+        if (offer) {
+          offer.status = 'REJECTED'
+          offer.resolvedAtUtc = new Date().toISOString()
+          break
+        }
+      }
+      return routeJson({ rejectBuildingOffer: { id: offerId, status: 'REJECTED' } })
     }
 
     if (query.includes('gameAdminSession') && !query.includes('buildingBankAccount') && !query.includes('assignBuildingBankAccount') && !query.includes('createCompanyBankAccount')) {
