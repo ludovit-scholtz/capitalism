@@ -187,6 +187,7 @@ const starterProductSlugByIndustry: Record<string, string[]> = {
 const step = ref(1)
 const loading = ref(false)
 const error = ref<string | null>(null)
+const factoryActionError = ref<string | null>(null)
 const onboardingCompanyCash = ref<number | null>(null)
 const milestoneLoading = ref(false)
 const milestoneError = ref<string | null>(null)
@@ -513,6 +514,10 @@ function isRouteQuerySynced(nextQuery: Record<string, string>): boolean {
 }
 
 watch([step, selectedIndustry, selectedProductId, selectedCityId, selectedIpoRaiseTarget, selectedFactoryLotId, selectedShopLotId], async () => {
+  if (factoryActionError.value) {
+    factoryActionError.value = null
+  }
+
   if (!isRouteStateReady.value) {
     return
   }
@@ -730,8 +735,54 @@ function prevStep() {
   }
 }
 
+function resolveFactoryStartValidationError(): string | null {
+  if (!selectedFactoryLotId.value) {
+    return t('onboarding.selectFactoryLotToContinue')
+  }
+
+  if (!selectedFactoryLot.value) {
+    return t('onboarding.lotUnavailableBody')
+  }
+
+  if (selectedFactoryLot.value.ownerCompanyId) {
+    return t('onboarding.lotUnavailableBody')
+  }
+
+  if (companyStartingCash.value < selectedFactoryLot.value.price) {
+    return t('onboarding.needsMoreCash')
+  }
+
+  return null
+}
+
+function reportFactoryStartError(message: string, details?: unknown) {
+  factoryActionError.value = message
+  console.error('[Onboarding] Failed to buy first factory lot.', {
+    message,
+    selectedFactoryLotId: selectedFactoryLotId.value,
+    selectedCityId: selectedCityId.value,
+    selectedIndustry: selectedIndustry.value,
+    companyStartingCash: companyStartingCash.value,
+    selectedLotPrice: selectedFactoryLot.value?.price ?? null,
+    details,
+  })
+}
+
 async function startOnboardingCompany() {
-  if (!canProceedStep3.value || !selectedFactoryLot.value) return
+  factoryActionError.value = null
+
+  const validationError = resolveFactoryStartValidationError()
+  if (validationError) {
+    reportFactoryStartError(validationError)
+    return
+  }
+
+  if (!canProceedStep3.value || !selectedFactoryLot.value) {
+    reportFactoryStartError(t('onboarding.lotUnavailableBody'), {
+      canProceedStep3: canProceedStep3.value,
+    })
+    return
+  }
 
   if (isGuestMode.value) {
     onboardingCompanyCash.value = companyStartingCash.value - selectedFactoryLot.value.price
@@ -789,7 +840,9 @@ async function startOnboardingCompany() {
     await loadLots()
     step.value = 6
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : t('onboarding.lotUnavailableBody')
+    const message = e instanceof Error ? e.message : t('onboarding.lotUnavailableBody')
+    error.value = message
+    reportFactoryStartError(message, e)
     await loadLots()
     if (selectedFactoryLot.value?.ownerCompanyId) {
       selectedFactoryLotId.value = ''
@@ -800,6 +853,8 @@ async function startOnboardingCompany() {
 }
 
 async function completeOnboarding() {
+  factoryActionError.value = null
+
   if (isGuestMode.value) {
     onboardingCompanyCash.value = Math.max(starterCash.value - (selectedShopLot.value?.price ?? 0), 0)
     trackOnboardingEvent('shop_configured', {
@@ -1350,12 +1405,15 @@ useTickRefresh(async () => {
           <button class="btn btn-secondary" :disabled="auth.player?.onboardingCurrentStep === 'SHOP_SELECTION'" @click="prevStep">← {{ t('common.back') }}</button
           ><button
             :class="selectedFactoryLotId ? 'btn btn-primary btn-lg' : 'btn btn-secondary btn-lg opacity-75 cursor-not-allowed'"
-            :disabled="!canProceedStep3 || loading"
+            :disabled="loading"
             @click="startOnboardingCompany"
           >
             {{ loading ? t('common.loading') : t('onboarding.purchaseFactory') }} <span v-if="!loading" class="ml-1">🏭</span>
           </button>
         </div>
+        <p v-if="factoryActionError" class="mt-2 text-sm text-bad text-right" role="alert">
+          {{ factoryActionError }}
+        </p>
       </div>
       <div v-if="step === 6" class="step-content step-content-wide bg-card border border-divider rounded-xl p-8 flex flex-col gap-6">
         <div>

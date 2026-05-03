@@ -10,7 +10,6 @@ interface CityResource {
   resourceType: {
     name: string
     slug: string
-    emoji: string
   }
 }
 
@@ -46,7 +45,6 @@ const CITIES_QUERY = `
         resourceType {
           name
           slug
-          emoji
         }
       }
     }
@@ -83,6 +81,21 @@ function formatPopulation(population: number): string {
 
 function topResources(city: City): CityResource[] {
   return [...city.resources].sort((a, b) => b.abundance - a.abundance).slice(0, TOP_RESOURCES_DISPLAY_LIMIT)
+}
+
+const RESOURCE_ICONS_BY_SLUG: Record<string, string> = {
+  wood: '🪵',
+  'iron-ore': '⛓️',
+  coal: '🪨',
+  gold: '🥇',
+  'chemical-minerals': '🧪',
+  cotton: '🧵',
+  grain: '🌾',
+  silicon: '🔹',
+}
+
+function getResourceIcon(slug: string): string {
+  return RESOURCE_ICONS_BY_SLUG[slug] ?? '📦'
 }
 
 async function fetchCities() {
@@ -193,7 +206,7 @@ onMounted(() => {
                 class="resource-chip inline-flex items-center gap-1 bg-surface border border-divider rounded-full px-2 py-0.5 text-[0.72rem]"
                 :title="`${res.resourceType.name} — ${Math.round(res.abundance * 100)}%`"
               >
-                <span>{{ res.resourceType.emoji }}</span>
+                <span>{{ getResourceIcon(res.resourceType.slug) }}</span>
                 <span class="text-muted">{{ Math.round(res.abundance * 100) }}%</span>
               </span>
             </div>
