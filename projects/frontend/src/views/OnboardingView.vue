@@ -205,15 +205,8 @@ const eurFxRates = ref<EurFxRate[]>([])
 const products = ref<ProductType[]>([])
 const cityLots = ref<BuildingLot[]>([])
 
-const visibleIndustries = computed(() => {
-  return industries.value.filter((industry) => {
-    if (!proOnlyIndustries.value.includes(industry)) {
-      return true
-    }
-
-    return hasAuthenticatedSession.value && auth.isProSubscriber
-  })
-})
+// Guests see only free industries; authenticated users see all (pro-only show a badge and are gated at click time)
+const visibleIndustries = computed(() => industries.value.filter((industry) => !proOnlyIndustries.value.includes(industry) || hasAuthenticatedSession.value))
 
 /** FX rate for the currently selected city: units of city currency per 1 EUR. Defaults to 1 (EUR). */
 const cityFxRate = computed<number>(() => {
