@@ -219,7 +219,7 @@ test.describe('Seasonal demand – Public Sales unit panel', () => {
     // 4 forecast bars
     const bars = panel.locator('.seasonal-forecast-bar')
     await expect(bars).not.toHaveCount(0)
-    expect(await bars.count()).toBe(4)
+    await expect(bars).toHaveCount(4)
 
     // Callout is visible
     await expect(panel.locator('.seasonal-callout')).toBeVisible()
@@ -368,7 +368,7 @@ test.describe('Seasonal demand – Public Sales unit panel', () => {
     // 4 quarter labels
     const quarterLabels = panel.locator('.seasonal-quarter-label')
     await expect(quarterLabels).not.toHaveCount(0)
-    expect(await quarterLabels.count()).toBe(4)
+    await expect(quarterLabels).toHaveCount(4)
 
     // Forecast chart is visible
     await expect(panel.locator('.seasonal-forecast-chart')).toBeVisible()
