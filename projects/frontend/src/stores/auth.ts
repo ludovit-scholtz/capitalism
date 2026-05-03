@@ -7,9 +7,18 @@ import type { AccountContextResult, AccountContextType, Player, AuthPayload } fr
 
 const BIATEC_OIDC_AUTHORIZE_URL = import.meta.env.VITE_BIATEC_OIDC_AUTHORIZE_URL || 'https://localhost:44305/authorize'
 const BIATEC_OIDC_CLIENT_ID = import.meta.env.VITE_BIATEC_OIDC_CLIENT_ID || 'capitalism'
-const BIATEC_OIDC_REDIRECT_URI = import.meta.env.VITE_BIATEC_OIDC_REDIRECT_URI || 'http://localhost:5173/auth/callback'
+const BIATEC_OIDC_REDIRECT_URI = import.meta.env.VITE_BIATEC_OIDC_REDIRECT_URI
 const BIATEC_OIDC_SCOPE = import.meta.env.VITE_BIATEC_OIDC_SCOPE || 'openid'
+const BIATEC_OIDC_AUDIENCE = import.meta.env.VITE_BIATEC_OIDC_AUDIENCE || BIATEC_OIDC_CLIENT_ID
+const BIATEC_OIDC_ALLOWED_ISSUERS = (import.meta.env.VITE_BIATEC_OIDC_ALLOWED_ISSUERS || 'https://google.biatec.io,https://localhost:44305')
+  .split(',')
+  .map((entry: string) => entry.trim())
+  .filter((entry: string) => entry.length > 0)
+const TOKEN_RENEW_BEFORE_MS = 60 * 1000
 const OIDC_STATE_KEY = 'biatec_oidc_state'
+const AUTH_PROVIDER_KEY = 'auth_provider'
+const AUTH_PROVIDER_LOCAL = 'local'
+const AUTH_PROVIDER_BIATEC = 'biatec_oidc'
 
 interface OidcPendingState {
   state: string
@@ -78,11 +87,69 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
   const selectedCityId = ref<string | null>(null)
+  let renewalTimer: ReturnType<typeof setTimeout> | null = null
+
+  function clearRenewalTimer() {
+    if (renewalTimer) {
+      clearTimeout(renewalTimer)
+      renewalTimer = null
+    }
+  }
+
+  function getConfiguredRedirectUri() {
+    if (BIATEC_OIDC_REDIRECT_URI) {
+      return BIATEC_OIDC_REDIRECT_URI
+    }
+
+    if (typeof window !== 'undefined') {
+      return `${window.location.origin}/auth/callback`
+    }
+
+    return 'http://localhost:5173/auth/callback'
+  }
+
+  function getStoredAuthProvider() {
+    if (typeof localStorage === 'undefined') {
+      return AUTH_PROVIDER_LOCAL
+    }
+
+    return localStorage.getItem(AUTH_PROVIDER_KEY) || AUTH_PROVIDER_LOCAL
+  }
+
+  function setStoredAuthProvider(provider: string) {
+    if (typeof localStorage === 'undefined') {
+      return
+    }
+
+    localStorage.setItem(AUTH_PROVIDER_KEY, provider)
+  }
+
+  function scheduleTokenRenewal(expiresAtUtc: string) {
+    clearRenewalTimer()
+
+    if (getStoredAuthProvider() !== AUTH_PROVIDER_BIATEC || typeof window === 'undefined') {
+      return
+    }
+
+    const expiryMs = new Date(expiresAtUtc).getTime()
+    if (Number.isNaN(expiryMs)) {
+      return
+    }
+
+    const delay = Math.max(5_000, expiryMs - Date.now() - TOKEN_RENEW_BEFORE_MS)
+    renewalTimer = setTimeout(() => {
+      const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}` || '/'
+      startBiatecOidcSignIn(currentPath, true)
+    }, delay)
+  }
 
   function createRandomBase64Url(bytes = 24) {
     const random = new Uint8Array(bytes)
     crypto.getRandomValues(random)
-    return btoa(String.fromCharCode(...random)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+    return btoa(String.fromCharCode(...random))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '')
   }
 
   function getPendingOidcState() {
@@ -162,10 +229,28 @@ export const useAuthStore = defineStore('auth', () => {
       throw new Error('OIDC nonce validation failed. Please try signing in again.')
     }
 
+    const issuer = typeof tokenPayload.iss === 'string' ? tokenPayload.iss : null
+    if (!issuer || !BIATEC_OIDC_ALLOWED_ISSUERS.includes(issuer)) {
+      throw new Error('OIDC issuer validation failed. Please try signing in again.')
+    }
+
+    const audienceClaim = tokenPayload.aud
+    const audiences = Array.isArray(audienceClaim)
+      ? audienceClaim.filter((entry): entry is string => typeof entry === 'string')
+      : typeof audienceClaim === 'string'
+        ? [audienceClaim]
+        : []
+    if (!audiences.includes(BIATEC_OIDC_AUDIENCE)) {
+      throw new Error('OIDC audience validation failed. Please try signing in again.')
+    }
+
     const exp = typeof tokenPayload.exp === 'number' ? tokenPayload.exp : null
+    const expiresIn = Number(readParam('expires_in') || '')
     const expiresAtUtc = exp
       ? new Date(exp * 1000).toISOString()
-      : new Date(Date.now() + 120 * 60 * 1000).toISOString()
+      : Number.isFinite(expiresIn) && expiresIn > 0
+        ? new Date(Date.now() + expiresIn * 1000).toISOString()
+        : new Date(Date.now() + 120 * 60 * 1000).toISOString()
 
     return {
       token: tokenValue,
@@ -190,6 +275,7 @@ export const useAuthStore = defineStore('auth', () => {
       localStorage.removeItem('auth_token')
       localStorage.removeItem('auth_expires')
       localStorage.removeItem('selected_city_id')
+      localStorage.removeItem(AUTH_PROVIDER_KEY)
     }
 
     if (typeof document !== 'undefined') {
@@ -272,6 +358,12 @@ export const useAuthStore = defineStore('auth', () => {
   function initFromStorage() {
     token.value = getStoredToken()
     selectedCityId.value = getStoredCityId()
+    if (token.value) {
+      const expiresAtUtc = typeof localStorage !== 'undefined' ? localStorage.getItem('auth_expires') : null
+      if (expiresAtUtc) {
+        scheduleTokenRenewal(expiresAtUtc)
+      }
+    }
   }
 
   function setSession(auth: AuthPayload) {
@@ -279,10 +371,12 @@ export const useAuthStore = defineStore('auth', () => {
     player.value = auth.player
   }
 
-  function applyStoredSession(tokenValue: string, expiresAtUtc: string) {
+  function applyStoredSession(tokenValue: string, expiresAtUtc: string, provider = AUTH_PROVIDER_LOCAL) {
     token.value = tokenValue
     localStorage.setItem('auth_token', tokenValue)
     localStorage.setItem('auth_expires', expiresAtUtc)
+    setStoredAuthProvider(provider)
+    scheduleTokenRenewal(expiresAtUtc)
     if (typeof document !== 'undefined') {
       document.cookie = `auth_token=${encodeURIComponent(tokenValue)}; path=/`
       document.cookie = `auth_expires=${encodeURIComponent(expiresAtUtc)}; path=/`
@@ -334,7 +428,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  function startBiatecOidcSignIn(redirectPath = '/') {
+  function startBiatecOidcSignIn(redirectPath = '/', silentPrompt = false) {
     if (typeof sessionStorage === 'undefined') {
       throw new Error('OIDC sign-in requires browser session storage.')
     }
@@ -351,19 +445,22 @@ export const useAuthStore = defineStore('auth', () => {
 
     const authorizeUrl = new URL(BIATEC_OIDC_AUTHORIZE_URL)
     authorizeUrl.searchParams.set('client_id', BIATEC_OIDC_CLIENT_ID)
-    authorizeUrl.searchParams.set('redirect_uri', BIATEC_OIDC_REDIRECT_URI)
+    authorizeUrl.searchParams.set('redirect_uri', getConfiguredRedirectUri())
     authorizeUrl.searchParams.set('scope', BIATEC_OIDC_SCOPE)
     authorizeUrl.searchParams.set('response_type', 'id_token')
     authorizeUrl.searchParams.set('response_mode', 'query')
     authorizeUrl.searchParams.set('state', state)
     authorizeUrl.searchParams.set('nonce', nonce)
+    if (silentPrompt) {
+      authorizeUrl.searchParams.set('prompt', 'none')
+    }
 
     window.location.assign(authorizeUrl.toString())
   }
 
   async function completeBiatecOidcSignIn() {
     const callbackSession = getTokenFromCallback()
-    applyStoredSession(callbackSession.token, callbackSession.expiresAtUtc)
+    applyStoredSession(callbackSession.token, callbackSession.expiresAtUtc, AUTH_PROVIDER_BIATEC)
 
     try {
       await fetchCurrentPlayer()
@@ -430,6 +527,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function logout() {
+    clearRenewalTimer()
     token.value = null
     player.value = null
     clearStoredSession()

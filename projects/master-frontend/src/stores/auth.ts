@@ -13,6 +13,58 @@ import {
 
 const TOKEN_KEY = 'master_auth_token'
 const EXPIRES_KEY = 'master_auth_expires'
+const AUTH_PROVIDER_KEY = 'master_auth_provider'
+const OIDC_STATE_KEY = 'master_biatec_oidc_state'
+const AUTH_PROVIDER_LOCAL = 'local'
+const AUTH_PROVIDER_BIATEC = 'biatec_oidc'
+const BIATEC_OIDC_AUTHORIZE_URL =
+  import.meta.env.VITE_BIATEC_OIDC_AUTHORIZE_URL || 'https://localhost:44305/authorize'
+const BIATEC_OIDC_CLIENT_ID = import.meta.env.VITE_BIATEC_OIDC_CLIENT_ID || 'capitalism-master'
+const BIATEC_OIDC_REDIRECT_URI = import.meta.env.VITE_BIATEC_OIDC_REDIRECT_URI
+const BIATEC_OIDC_SCOPE = import.meta.env.VITE_BIATEC_OIDC_SCOPE || 'openid'
+const BIATEC_OIDC_AUDIENCE = import.meta.env.VITE_BIATEC_OIDC_AUDIENCE || BIATEC_OIDC_CLIENT_ID
+const BIATEC_OIDC_ALLOWED_ISSUERS = (
+  import.meta.env.VITE_BIATEC_OIDC_ALLOWED_ISSUERS || 'https://google.biatec.io,https://localhost:44305'
+)
+  .split(',')
+  .map((entry) => entry.trim())
+  .filter((entry) => entry.length > 0)
+const TOKEN_RENEW_BEFORE_MS = 60 * 1000
+
+interface OidcStateRecord {
+  state: string
+  nonce: string
+  redirectPath: string
+}
+
+interface BiatecCallbackSession {
+  token: string
+  expiresAtUtc: string
+  redirectPath: string
+}
+
+function generateOidcRandom(length = 32) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+  const bytes = new Uint8Array(length)
+  crypto.getRandomValues(bytes)
+  let result = ''
+  for (const value of bytes) {
+    result += chars[value % chars.length]
+  }
+  return result
+}
+
+function parseJwtPayload(token: string): Record<string, unknown> {
+  const [, payload] = token.split('.')
+  if (!payload) {
+    throw new Error('Invalid token payload.')
+  }
+
+  const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
+  const decoded = atob(padded)
+  return JSON.parse(decoded) as Record<string, unknown>
+}
 
 function buildFallbackAdminEmails(): Set<string> {
   const configured = (import.meta.env.VITE_MASTER_ADMIN_EMAILS as string | undefined)
@@ -34,21 +86,142 @@ export const useAuthStore = defineStore('masterAuth', () => {
   const error = ref<string | null>(null)
   const isGameAdmin = ref(false)
   const gameAdminChecked = ref(false)
+  let renewalTimer: ReturnType<typeof setTimeout> | null = null
 
   const isAuthenticated = computed(() => !!token.value)
+
+  function clearRenewalTimer() {
+    if (renewalTimer) {
+      clearTimeout(renewalTimer)
+      renewalTimer = null
+    }
+  }
+
+  function getConfiguredRedirectUri() {
+    if (BIATEC_OIDC_REDIRECT_URI) {
+      return BIATEC_OIDC_REDIRECT_URI
+    }
+
+    if (typeof window !== 'undefined') {
+      return `${window.location.origin}/auth/callback`
+    }
+
+    return 'http://localhost:5174/auth/callback'
+  }
+
+  function getStoredAuthProvider() {
+    return localStorage.getItem(AUTH_PROVIDER_KEY) || AUTH_PROVIDER_LOCAL
+  }
+
+  function setStoredAuthProvider(provider: string) {
+    localStorage.setItem(AUTH_PROVIDER_KEY, provider)
+  }
+
+  function clearStoredOidcState() {
+    localStorage.removeItem(OIDC_STATE_KEY)
+  }
+
+  function getStoredOidcState(): OidcStateRecord | null {
+    const raw = localStorage.getItem(OIDC_STATE_KEY)
+    if (!raw) {
+      return null
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as OidcStateRecord
+      if (!parsed.state || !parsed.nonce) {
+        return null
+      }
+
+      return parsed
+    } catch {
+      return null
+    }
+  }
+
+  function scheduleTokenRenewal(expiresAtUtc: string) {
+    clearRenewalTimer()
+
+    if (getStoredAuthProvider() !== AUTH_PROVIDER_BIATEC || typeof window === 'undefined') {
+      return
+    }
+
+    const expiryMs = new Date(expiresAtUtc).getTime()
+    if (Number.isNaN(expiryMs)) {
+      return
+    }
+
+    const delay = Math.max(5_000, expiryMs - Date.now() - TOKEN_RENEW_BEFORE_MS)
+    renewalTimer = setTimeout(() => {
+      const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}` || '/'
+      startBiatecOidcSignIn(currentPath, true)
+    }, delay)
+  }
+
+  function getBiatecTokenFromCallback(): BiatecCallbackSession {
+    const url = new URL(window.location.href)
+    const tokenValue = url.searchParams.get('id_token') || url.searchParams.get('token')
+    const returnedState = url.searchParams.get('state')
+    if (!tokenValue || !returnedState) {
+      throw new Error('OIDC callback is missing required parameters.')
+    }
+
+    const pendingState = getStoredOidcState()
+    clearStoredOidcState()
+    if (!pendingState || pendingState.state !== returnedState) {
+      throw new Error('OIDC state validation failed. Please try signing in again.')
+    }
+
+    const tokenPayload = parseJwtPayload(tokenValue)
+    const nonce = typeof tokenPayload.nonce === 'string' ? tokenPayload.nonce : null
+    if (nonce && nonce !== pendingState.nonce) {
+      throw new Error('OIDC nonce validation failed. Please try signing in again.')
+    }
+
+    const issuer = typeof tokenPayload.iss === 'string' ? tokenPayload.iss : null
+    if (!issuer || !BIATEC_OIDC_ALLOWED_ISSUERS.includes(issuer)) {
+      throw new Error('OIDC issuer validation failed. Please try signing in again.')
+    }
+
+    const audienceClaim = tokenPayload.aud
+    const audiences = Array.isArray(audienceClaim)
+      ? audienceClaim.filter((entry): entry is string => typeof entry === 'string')
+      : typeof audienceClaim === 'string'
+        ? [audienceClaim]
+        : []
+    if (!audiences.includes(BIATEC_OIDC_AUDIENCE)) {
+      throw new Error('OIDC audience validation failed. Please try signing in again.')
+    }
+
+    const exp = typeof tokenPayload.exp === 'number' ? tokenPayload.exp : null
+    const expiresIn = Number(url.searchParams.get('expires_in') || '')
+    const expiresAtUtc = exp
+      ? new Date(exp * 1000).toISOString()
+      : Number.isFinite(expiresIn) && expiresIn > 0
+        ? new Date(Date.now() + expiresIn * 1000).toISOString()
+        : new Date(Date.now() + 120 * 60 * 1000).toISOString()
+
+    return {
+      token: tokenValue,
+      expiresAtUtc,
+      redirectPath: pendingState.redirectPath || '/',
+    }
+  }
 
   function initFromStorage() {
     const stored = localStorage.getItem(TOKEN_KEY)
     const expires = localStorage.getItem(EXPIRES_KEY)
     if (stored && expires && new Date(expires) > new Date()) {
       token.value = stored
+      scheduleTokenRenewal(expires)
     } else {
       localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem(EXPIRES_KEY)
+      localStorage.removeItem(AUTH_PROVIDER_KEY)
     }
   }
 
-  function setSession(auth: MasterAuthPayload) {
+  function setSession(auth: MasterAuthPayload, provider = AUTH_PROVIDER_LOCAL) {
     token.value = auth.token
     player.value = auth.player
     subscription.value = null
@@ -56,6 +229,8 @@ export const useAuthStore = defineStore('masterAuth', () => {
     gameAdminChecked.value = false
     localStorage.setItem(TOKEN_KEY, auth.token)
     localStorage.setItem(EXPIRES_KEY, auth.expiresAtUtc)
+    setStoredAuthProvider(provider)
+    scheduleTokenRenewal(auth.expiresAtUtc)
   }
 
   async function refreshGameAdminAccess() {
@@ -112,6 +287,49 @@ export const useAuthStore = defineStore('masterAuth', () => {
     }
   }
 
+  function startBiatecOidcSignIn(redirectPath = '/', silentPrompt = false) {
+    const state = generateOidcRandom(32)
+    const nonce = generateOidcRandom(32)
+
+    const stateRecord: OidcStateRecord = {
+      state,
+      nonce,
+      redirectPath,
+    }
+    localStorage.setItem(OIDC_STATE_KEY, JSON.stringify(stateRecord))
+
+    const authorizeUrl = new URL(BIATEC_OIDC_AUTHORIZE_URL)
+    authorizeUrl.searchParams.set('client_id', BIATEC_OIDC_CLIENT_ID)
+    authorizeUrl.searchParams.set('redirect_uri', getConfiguredRedirectUri())
+    authorizeUrl.searchParams.set('scope', BIATEC_OIDC_SCOPE)
+    authorizeUrl.searchParams.set('response_type', 'id_token')
+    authorizeUrl.searchParams.set('response_mode', 'query')
+    authorizeUrl.searchParams.set('state', state)
+    authorizeUrl.searchParams.set('nonce', nonce)
+    if (silentPrompt) {
+      authorizeUrl.searchParams.set('prompt', 'none')
+    }
+
+    window.location.href = authorizeUrl.toString()
+  }
+
+  async function completeBiatecOidcSignIn() {
+    const callbackSession = getBiatecTokenFromCallback()
+    token.value = callbackSession.token
+    player.value = null
+    subscription.value = null
+    isGameAdmin.value = false
+    gameAdminChecked.value = false
+    localStorage.setItem(TOKEN_KEY, callbackSession.token)
+    localStorage.setItem(EXPIRES_KEY, callbackSession.expiresAtUtc)
+    setStoredAuthProvider(AUTH_PROVIDER_BIATEC)
+    scheduleTokenRenewal(callbackSession.expiresAtUtc)
+
+    await fetchProfile()
+    await fetchSubscription()
+    return callbackSession.redirectPath
+  }
+
   async function fetchSubscription() {
     if (!token.value) return
     try {
@@ -151,6 +369,7 @@ export const useAuthStore = defineStore('masterAuth', () => {
   }
 
   function logout() {
+    clearRenewalTimer()
     token.value = null
     player.value = null
     subscription.value = null
@@ -158,6 +377,8 @@ export const useAuthStore = defineStore('masterAuth', () => {
     gameAdminChecked.value = false
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(EXPIRES_KEY)
+    localStorage.removeItem(AUTH_PROVIDER_KEY)
+    clearStoredOidcState()
   }
 
   return {
@@ -176,6 +397,8 @@ export const useAuthStore = defineStore('masterAuth', () => {
     fetchSubscription,
     prolong,
     claimStartupPackOffer,
+    startBiatecOidcSignIn,
+    completeBiatecOidcSignIn,
     refreshGameAdminAccess,
     logout,
   }

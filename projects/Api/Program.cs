@@ -34,9 +34,14 @@ public class Program
             ?? throw new InvalidOperationException("JWT configuration is missing.");
         var biatecOidcOptions = builder.Configuration.GetSection(BiatecOidcOptions.SectionName).Get<BiatecOidcOptions>()
             ?? new BiatecOidcOptions();
-        var biatecIssuer = string.IsNullOrWhiteSpace(biatecOidcOptions.Issuer)
-            ? biatecOidcOptions.Authority
-            : biatecOidcOptions.Issuer;
+        var biatecKnownIssuers = new[]
+        {
+            biatecOidcOptions.Issuer,
+            biatecOidcOptions.Authority,
+        }
+            .Where(issuer => !string.IsNullOrWhiteSpace(issuer))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
         builder.Services.AddCors(options =>
         {
@@ -117,7 +122,9 @@ public class Program
                     try
                     {
                         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
-                        if (biatecOidcOptions.Enabled && string.Equals(jwt.Issuer, biatecIssuer, StringComparison.OrdinalIgnoreCase))
+                        if (biatecOidcOptions.Enabled
+                            && biatecKnownIssuers.Any(issuer =>
+                                string.Equals(jwt.Issuer, issuer, StringComparison.OrdinalIgnoreCase)))
                         {
                             return "biatec-oidc";
                         }
@@ -165,7 +172,7 @@ public class Program
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
-                    ValidIssuer = biatecIssuer,
+                    ValidIssuers = biatecKnownIssuers,
                     ValidateAudience = true,
                     ValidAudience = biatecOidcOptions.Audience,
                     ValidateLifetime = true,

@@ -136,7 +136,10 @@ test.describe('Header navigation', () => {
 
     await expect(page).toHaveURL(/https:\/\/localhost:44305\/authorize/)
     await expect(page).toHaveURL(/client_id=capitalism/)
-    await expect(page).toHaveURL(/redirect_uri=http%3A%2F%2Flocalhost%3A5173%2Fauth%2Fcallback/)
+    const authorizeUrl = new URL(page.url())
+    const redirectUri = authorizeUrl.searchParams.get('redirect_uri')
+    expect(redirectUri).toBeTruthy()
+    expect(decodeURIComponent(redirectUri ?? '')).toMatch(/\/auth\/callback$/)
     await expect(page).toHaveURL(/scope=openid/)
     await expect(page).toHaveURL(/state=/)
     await expect(page).toHaveURL(/nonce=/)

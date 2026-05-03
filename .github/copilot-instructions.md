@@ -145,6 +145,7 @@ The game is seeded with:
 - Tokens are stored in `localStorage` under `auth_token` and `auth_expires` keys.
 - The GraphQL client automatically attaches the JWT token as a Bearer token in the `Authorization` header.
 - The auth store (`src/stores/auth.ts`) provides `initFromStorage()`, `register()`, `login()`, `startBiatecOidcSignIn()`, `completeBiatecOidcSignIn()`, `fetchMe()`, and `logout()`.
+- The master portal auth store (`projects/master-frontend/src/stores/auth.ts`) must support the same dual mode (`register/login` + Biatec OIDC callback at `/auth/callback`) and schedule proactive renewal before OIDC token expiry.
 - `initFromStorage()` is called in `App.vue`'s `<script setup>` so the token is available to all views.
 - Token expiry: 120 minutes for native tokens (HS256). Biatec OIDC tokens are issuer-managed and must be validated by issuer, audience, lifetime, and signature.
 - Security requirements for OIDC: always validate callback `state`/`nonce`, never trust unvalidated callback tokens for privileged decisions, and keep `iss`/`aud`/signature validation enforced server-side.

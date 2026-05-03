@@ -32,13 +32,14 @@ When player creates the account, he creates it at the master server. When user r
 
 The game supports two authentication modes:
 - Native account authentication via `register` and `login` GraphQL mutations (email + password).
-- Biatec OpenID Connect sign-in via redirect to the Biatec `/authorize` endpoint and callback handling at `/auth/callback`.
+- Biatec OpenID Connect sign-in via redirect to the Biatec `/authorize` endpoint and callback handling at `/auth/callback` in both game frontend and master frontend.
 
 OIDC integration requirements:
 - Client flow must validate `state` and `nonce` before accepting callback tokens.
-- API must validate external JWT `iss`, `aud`, signature, and expiry against the Biatec OIDC configuration and JWKS.
+- API and Master API must validate external JWT `iss`, `aud`, signature, and expiry against the Biatec OIDC configuration and JWKS.
 - Existing local JWT validation for native login must remain enabled in parallel.
 - Player provisioning from external claims must use normalized email matching to prevent duplicate-player creation.
+- OIDC sessions should schedule periodic renewal before token expiry to avoid hard logout during active use.
 - Production environments must use HTTPS for OIDC authority and redirect URIs.
 
 ## Buildings

@@ -1,4 +1,4 @@
-﻿export default {
+export default {
   common: {
     backToPortal: 'Späť na portál',
     allRightsReserved: '© {year} Capitalism HQ. Všetky práva vyhradené.',
@@ -129,6 +129,7 @@
   },
   login: {
     signIn: 'Prihlásiť sa',
+    signInWithBiatec: 'Prihlásiť sa cez Biatec',
     createAccount: 'Vytvoriť účet',
     signInSub: 'Prístup k Pro predplatnému a adresáru serverov.',
     createSub: 'Pridaj sa do Capitalism Network a sleduj svoje predplatné.',
@@ -142,6 +143,10 @@
     haveAccount: 'Už máš účet?',
     backToDirectory: 'Späť na zoznam serverov',
     genericError: 'Nastala chyba. Skús to znova.',
+    biatecCallbackTitle: 'Dokončujem prihlásenie cez Biatec',
+    biatecCallbackLoading: 'Overujem reláciu a načítavam účet...',
+    biatecCallbackSuccess: 'Prihlásenie je hotové. Presmerovávam...',
+    biatecCallbackError: 'Prihlásenie cez Biatec zlyhalo. Vráť sa na prihlásenie a skús to znova.',
   },
   account: {
     kicker: 'Môj účet',

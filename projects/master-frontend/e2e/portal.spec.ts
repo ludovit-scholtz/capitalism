@@ -7,7 +7,7 @@ test.describe('Home page', () => {
     await page.goto('/')
 
     await expect(page.locator('.hero-title')).toContainText('CAPITALISM')
-    await expect(page.getByRole('heading', { name: 'Top competitors' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Leaderboard' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Game Servers' }).first()).toBeVisible()
   })
 
@@ -105,7 +105,7 @@ test.describe('Login page', () => {
     setupMockApi(page)
     await page.goto('/login')
 
-    await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible()
     await expect(page.getByLabel('Email')).toBeVisible()
     await expect(page.getByLabel('Password')).toBeVisible()
   })
@@ -125,9 +125,27 @@ test.describe('Login page', () => {
 
     await page.getByLabel('Email').fill('wrong@example.com')
     await page.getByLabel('Password').fill('badpass')
-    await page.getByRole('button', { name: 'Sign in' }).click()
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 
     await expect(page.getByRole('alert')).toBeVisible()
+  })
+
+  test('redirects to Biatec authorize endpoint with required OIDC params', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/login')
+
+    const [request] = await Promise.all([
+      page.waitForRequest((req) => req.url().startsWith('https://localhost:44305/authorize')),
+      page.getByRole('button', { name: 'Sign in with Biatec' }).click(),
+    ])
+
+    const url = new URL(request.url())
+    expect(url.searchParams.get('client_id')).toBe('capitalism-master')
+    expect(url.searchParams.get('redirect_uri')).toContain('/auth/callback')
+    expect(url.searchParams.get('response_type')).toBe('id_token')
+    expect(url.searchParams.get('scope')).toContain('openid')
+    expect(url.searchParams.get('state')).toBeTruthy()
+    expect(url.searchParams.get('nonce')).toBeTruthy()
   })
 })
 
