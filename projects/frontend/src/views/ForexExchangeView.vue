@@ -610,7 +610,7 @@ watch(contextScopedBankAccounts, () => {
             <div v-if="hasBankAccounts" class="ba-notice flex items-center gap-2 rounded-lg border border-divider bg-card-raised px-4 py-2.5 text-sm text-muted" role="note">
               <span class="text-lg">🏦</span>
               <span>{{ t('forex.bankAccountMode') }}</span>
-              <RouterLink v-if="auth.player?.companies?.length" :to="`/bank-statement/${auth.player.companies[0]?.id ?? ''}`" class="ml-1 text-xs font-semibold text-brand hover:underline">
+              <RouterLink v-if="auth.player?.companies?.length" :to="`/bank-statement/${auth.player.companies[0]?.id ?? ''}`" class="statement-link ml-1 text-xs font-semibold text-brand hover:underline">
                 {{ t('forex.viewBankStatement') }} ->
               </RouterLink>
             </div>

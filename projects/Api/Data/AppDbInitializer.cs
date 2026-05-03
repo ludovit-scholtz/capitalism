@@ -114,6 +114,12 @@ public sealed partial class AppDbInitializer(
         await EnsurePragueMiningLotsAsync();
         await EnsureViennaMiningLotsAsync();
 
+        // Idempotent: ensure Electronics starter products (Basic Electronics, LED Screen,
+        // and Circuit Board with direct Silicon recipe) exist.  Databases seeded before
+        // this change will not have basic-electronics / led-screen and may have the old
+        // product-ingredient circuit-board recipe.
+        await EnsureElectronicsStarterProductsAsync();
+
         var currentTick = await dbContext.GameStates
             .AsNoTracking()
             .Select(state => state.CurrentTick)

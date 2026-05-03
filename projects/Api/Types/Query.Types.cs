@@ -78,6 +78,9 @@ public sealed class StarterIndustriesPayload
 {
     /// <summary>Available starter industry values.</summary>
     public List<string> Industries { get; set; } = [];
+
+    /// <summary>Industries within the starter list that require an active Pro subscription.</summary>
+    public List<string> ProOnlyIndustries { get; set; } = [];
 }
 
 /// <summary>Type values for scheduled actions visible to the player.</summary>

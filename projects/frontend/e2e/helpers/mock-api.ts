@@ -2152,6 +2152,54 @@ export function makeDefaultProducts(): MockProductType[] {
       description: 'Retail first aid kit.',
       recipes: [{ resourceType: { id: 'res-chem', name: 'Chemical Minerals', slug: 'chemical-minerals', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 2 }],
     },
+    {
+      id: 'prod-basic-electronics',
+      name: 'Basic Electronics',
+      slug: 'basic-electronics',
+      industry: 'ELECTRONICS',
+      basePrice: 45,
+      baseCraftTicks: 3,
+      outputQuantity: 12,
+      energyConsumptionMwh: 1.0,
+      basicLaborHours: 1.8,
+      unitName: 'Pack',
+      unitSymbol: 'packs',
+      isProOnly: true,
+      description: 'A starter pack of electronic components assembled from raw silicon.',
+      recipes: [{ resourceType: { id: 'res-silicon', name: 'Silicon', slug: 'silicon', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 1 }],
+    },
+    {
+      id: 'prod-led-screen',
+      name: 'LED Screen',
+      slug: 'led-screen',
+      industry: 'ELECTRONICS',
+      basePrice: 85,
+      baseCraftTicks: 4,
+      outputQuantity: 6,
+      energyConsumptionMwh: 1.3,
+      basicLaborHours: 2.2,
+      unitName: 'Display',
+      unitSymbol: 'displays',
+      isProOnly: true,
+      description: 'A flat-panel LED display made from silicon.',
+      recipes: [{ resourceType: { id: 'res-silicon', name: 'Silicon', slug: 'silicon', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 1 }],
+    },
+    {
+      id: 'prod-circuit-board',
+      name: 'Circuit Board',
+      slug: 'circuit-board',
+      industry: 'ELECTRONICS',
+      basePrice: 55,
+      baseCraftTicks: 3,
+      outputQuantity: 10,
+      energyConsumptionMwh: 1.1,
+      basicLaborHours: 1.9,
+      unitName: 'Board',
+      unitSymbol: 'boards',
+      isProOnly: true,
+      description: 'A populated circuit board assembled from silicon.',
+      recipes: [{ resourceType: { id: 'res-silicon', name: 'Silicon', slug: 'silicon', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 2 }],
+    },
   ]
 }
 
@@ -4448,7 +4496,12 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          data: { starterIndustries: { industries: ['FURNITURE', 'FOOD_PROCESSING', 'HEALTHCARE'] } },
+          data: {
+            starterIndustries: {
+              industries: ['FURNITURE', 'FOOD_PROCESSING', 'HEALTHCARE', 'ELECTRONICS'],
+              proOnlyIndustries: ['ELECTRONICS'],
+            },
+          },
         }),
       })
     }

@@ -1,4 +1,5 @@
 using Api.Data.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace Api.Data;
 
@@ -26,6 +27,93 @@ public sealed partial class AppDbInitializer
             UnitSymbol = seed.UnitSymbol,
             Description = seed.Description
         }));
+    }
+
+    /// <summary>
+    /// Idempotent upgrade: ensures the three Electronics starter products with direct Silicon
+    /// recipes are present.  Databases seeded before the Electronics Pro-starter increment
+    /// will not have <c>basic-electronics</c> or <c>led-screen</c>, and will have
+    /// <c>circuit-board</c> using old product-ingredient recipes.
+    /// </summary>
+    private async Task EnsureElectronicsStarterProductsAsync()
+    {
+        var silicon = await dbContext.ResourceTypes.FirstOrDefaultAsync(r => r.Slug == "silicon");
+        if (silicon == null) return;
+
+        // Products to ensure exist with a direct Silicon resource recipe.
+        var starterSeeds = new[]
+        {
+            (Slug: "basic-electronics",  Name: "Basic Electronics",  BasePrice: 45m,  CraftTicks: 3, Output: 12m, Energy: 1.0m, Description: "A starter pack of electronic components assembled from raw silicon. The entry point for any electronics manufacturer.", UnitName: "Pack",    UnitSymbol: "packs",   SiliconQty: 1m),
+            (Slug: "led-screen",         Name: "LED Screen",         BasePrice: 85m,  CraftTicks: 4, Output: 6m,  Energy: 1.3m, Description: "A flat-panel LED display made from silicon. High-margin starter product for premium retail channels.",              UnitName: "Display",  UnitSymbol: "displays", SiliconQty: 1m),
+            (Slug: "circuit-board",      Name: "Circuit Board",      BasePrice: 55m,  CraftTicks: 3, Output: 10m, Energy: 1.1m, Description: "A populated circuit board assembled from silicon. Core platform for advanced electronics assemblies.",               UnitName: "Board",    UnitSymbol: "boards",   SiliconQty: 2m),
+        };
+
+        foreach (var seed in starterSeeds)
+        {
+            var productId = CreateDeterministicGuid($"product:{seed.Slug}");
+            var existing = await dbContext.ProductTypes
+                .Include(p => p.Recipes)
+                .FirstOrDefaultAsync(p => p.Id == productId);
+
+            if (existing == null)
+            {
+                // Product doesn't exist yet — add it.
+                var labor = ComputeBasicLaborHours(seed.CraftTicks, seed.Energy, 1);
+                var elasticity = DeterminePriceElasticity(Industry.Electronics);
+                var product = new ProductType
+                {
+                    Id = productId,
+                    Name = seed.Name,
+                    Slug = seed.Slug,
+                    Industry = Industry.Electronics,
+                    BasePrice = seed.BasePrice,
+                    PriceElasticity = elasticity,
+                    BaseCraftTicks = seed.CraftTicks,
+                    OutputQuantity = seed.Output,
+                    EnergyConsumptionMwh = seed.Energy,
+                    BasicLaborHours = labor,
+                    IsProOnly = true,
+                    UnitName = seed.UnitName,
+                    UnitSymbol = seed.UnitSymbol,
+                    Description = seed.Description
+                };
+                dbContext.ProductTypes.Add(product);
+
+                dbContext.ProductRecipes.Add(new ProductRecipe
+                {
+                    Id = CreateDeterministicGuid($"recipe:{seed.Slug}:silicon"),
+                    ProductTypeId = productId,
+                    ResourceTypeId = silicon.Id,
+                    Quantity = seed.SiliconQty
+                });
+            }
+            else
+            {
+                // Product exists — ensure it has at least one direct Silicon resource recipe
+                // (circuit-board was originally seeded with product-ingredient recipes only).
+                var hasSiliconRecipe = existing.Recipes.Any(r => r.ResourceTypeId == silicon.Id);
+                if (!hasSiliconRecipe)
+                {
+                    // Remove old product-ingredient recipes and replace with silicon.
+                    dbContext.ProductRecipes.RemoveRange(existing.Recipes);
+                    dbContext.ProductRecipes.Add(new ProductRecipe
+                    {
+                        Id = CreateDeterministicGuid($"recipe:{seed.Slug}:silicon"),
+                        ProductTypeId = productId,
+                        ResourceTypeId = silicon.Id,
+                        Quantity = seed.SiliconQty
+                    });
+                }
+
+                // Ensure the product is correctly marked as Pro-only.
+                if (!existing.IsProOnly)
+                {
+                    existing.IsProOnly = true;
+                }
+            }
+        }
+
+        await dbContext.SaveChangesAsync();
     }
 
     private static IReadOnlyList<ProductSeed> GetProductSeeds() =>
@@ -181,11 +269,16 @@ public sealed partial class AppDbInitializer
 
     private static IEnumerable<ProductSeed> GetElectronicsProducts()
     {
+        // Starter electronics products — all use Silicon directly so they work as
+        // onboarding factory configurations (purchase → manufacture → sell).
+        yield return Product("Basic Electronics", "basic-electronics", Industry.Electronics, 45m, 3, "A starter pack of electronic components assembled from raw silicon. The entry point for any electronics manufacturer.", "Pack", "packs", 12m, 1.0m, ResourceIngredient("silicon", 1m));
+        yield return Product("LED Screen", "led-screen", Industry.Electronics, 85m, 4, "A flat-panel LED display made from silicon. High-margin starter product for premium retail channels.", "Display", "displays", 6m, 1.3m, ResourceIngredient("silicon", 1m));
+        yield return Product("Circuit Board", "circuit-board", Industry.Electronics, 55m, 3, "A populated circuit board assembled from silicon. Core platform for advanced electronics assemblies.", "Board", "boards", 10m, 1.1m, ResourceIngredient("silicon", 2m));
+
         yield return Product("Silicon Wafer", "silicon-wafer", Industry.Electronics, 22m, 2, "Processed silicon wafer used as the basis for chips and sensors.", "Wafer", "wafers", 12m, 0.9m, ResourceIngredient("silicon", 1m));
         yield return Product("Glass Pane", "glass-pane", Industry.Electronics, 18m, 2, "Industrial glass pane made from processed silicon.", "Pane", "panes", 12m, 0.8m, ResourceIngredient("silicon", 1m));
         yield return Product("Gold Contact", "gold-contact", Industry.Electronics, 65m, 2, "Precision gold contact used in high-end electronic assemblies.", "Set", "sets", 10m, 0.8m, ResourceIngredient("gold", 0.2m));
         yield return Product("Electronic Components", "electronic-components", Industry.Electronics, 48m, 3, "Mixed component pack for smart devices, controls, and electronics furniture.", "Pack", "packs", 16m, 1.2m, ProductIngredient("silicon-wafer", 1m), ProductIngredient("gold-contact", 1m));
-        yield return Product("Circuit Board", "circuit-board", Industry.Electronics, 55m, 3, "Populated board used in control panels and consumer devices.", "Board", "boards", 10m, 1.1m, ProductIngredient("silicon-wafer", 1m), ProductIngredient("gold-contact", 1m), ProductIngredient("electronic-components", 2m));
         yield return Product("Sensor Module", "sensor-module", Industry.Electronics, 72m, 4, "Compact sensor package for automation and smart-home products.", "Module", "modules", 8m, 1.4m, ProductIngredient("electronic-components", 3m), ProductIngredient("circuit-board", 1m));
         yield return Product("Battery Pack", "battery-pack", Industry.Electronics, 46m, 3, "Rechargeable battery pack using treated carbon and chemical inputs.", "Pack", "packs", 10m, 1.3m, ResourceIngredient("coal", 1m), ResourceIngredient("chemical-minerals", 1m));
         yield return Product("LED Lamp", "led-lamp", Industry.Electronics, 28m, 3, "Energy-efficient lighting unit for retail and construction buyers.", "Piece", "pcs", 12m, 1m, ProductIngredient("electronic-components", 2m), ProductIngredient("glass-pane", 1m));

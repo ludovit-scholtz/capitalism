@@ -77,5 +77,8 @@ public static class Industry
     public const string Electronics = "ELECTRONICS";
     public const string Construction = "CONSTRUCTION";
 
-    public static readonly string[] StarterIndustries = [Furniture, FoodProcessing, Healthcare];
+    public static readonly string[] StarterIndustries = [Furniture, FoodProcessing, Healthcare, Electronics];
+
+    /// <summary>Starter industries that require an active Pro subscription to select during onboarding.</summary>
+    public static readonly string[] ProOnlyStarterIndustries = [Electronics];
 }

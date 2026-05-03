@@ -58,6 +58,16 @@ public sealed partial class Mutation
                     .Build());
         }
 
+        // Electronics is a Pro-only starter industry.
+        if (Industry.ProOnlyStarterIndustries.Contains(input.Industry) && !hasActiveProSubscription)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("This industry starter path requires a Pro subscription.")
+                    .SetCode("PRO_SUBSCRIPTION_REQUIRED")
+                    .Build());
+        }
+
         // Validate city
         var city = await db.Cities.FindAsync(input.CityId);
         if (city is null)
@@ -288,6 +298,17 @@ public sealed partial class Mutation
                 ErrorBuilder.New()
                     .SetMessage($"Invalid starter industry: {input.Industry}")
                     .SetCode("INVALID_INDUSTRY")
+                    .Build());
+        }
+
+        // Electronics is a Pro-only starter industry.
+        var hasProForStart = ProductAccessService.HasActiveProSubscription(player, nowUtc);
+        if (Industry.ProOnlyStarterIndustries.Contains(input.Industry) && !hasProForStart)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("This industry starter path requires a Pro subscription.")
+                    .SetCode("PRO_SUBSCRIPTION_REQUIRED")
                     .Build());
         }
 

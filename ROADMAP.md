@@ -27,13 +27,16 @@ It will use real world map. The game will start in single city and later other c
 - [x] Implement share buyback: when a company purchases its own shares on the stock exchange, reduce the total issued share count by the purchased amount and remove those shares from public float, updating share price accordingly.
 - [x] Add E2E and backend integration tests for takeover trigger at exactly 50%, merge at exactly 90%, and buyback share-count reduction so these mechanics are regression-proof.
 
-### More industries and products (0% complete)
+### More industries and products (50% complete)
 
-- [ ] Add Electronics industry with Silicon as raw input: define product types for Basic Electronics (smartphone components), LED Screen, and Circuit Board with manufacturing recipes linking Silicon resource to each product via factory purchase → manufacturing → public sales chain.
+**Shipped increment (Electronics Pro-starter):** Electronics industry is now a fully playable Pro-subscriber-exclusive onboarding starter path. Three Silicon-driven products (Basic Electronics, LED Screen, Circuit Board) are seeded with direct silicon manufacturing recipes, exposed in the encyclopedia and resource-detail views, and Pro-gated at both the backend (`Player.IsProSubscriber` check in `startOnboardingCompany` / `finishOnboarding`) and the frontend (industry card with PRO badge, error on non-Pro click). The manufacturing encyclopedia and resource detail views already surface the full Electronics chain via the existing industry filter. All existing test suites pass, and new backend and E2E tests cover Pro-gating, product seeding, and the full Electronics onboarding flow.
+
+- [x] Add Electronics industry with Silicon as raw input: define product types for Basic Electronics, LED Screen, and Circuit Board with manufacturing recipes linking Silicon resource to each product via factory purchase → manufacturing → public sales chain.
+- [x] Expose Electronics as a Pro-subscription-only starter choice in the onboarding industry selection step, gating it behind `Player.IsProSubscriber` on the backend; free players see only Furniture, Food Processing, and Healthcare.
+- [x] Add 3 Electronics starter products to the database initializer with correct silicon-only recipes resolvable via the manufacturing encyclopedia.
+- [x] Update encyclopedia and resource detail views to surface Electronics product chains (Silicon resource detail page links to all three starter products).
 - [ ] Add Construction industry with Iron Ore as raw input: define product types for Steel Beam, Reinforced Concrete Panel, and Prefab Window Unit, ensuring construction products have higher base price and weight for shipping cost differentiation.
-- [ ] Expose Electronics and Construction industries as Pro-subscription-only starter choices in the onboarding industry selection step, gating them behind `Player.IsProSubscriber` on the backend so free players see Furniture, Food Processing, and Healthcare while Pro players see all five.
-- [ ] Add 3 new seeded product types per new industry to the database initializer and ensure recipe data is correct and resolvable via the manufacturing encyclopedia.
-- [ ] Update encyclopedia and resource detail views to surface Electronics and Construction product chains with their own industry filter chips.
+- [ ] Expose Construction as a Pro-subscription-only starter choice alongside Electronics.
 
 ### Supply chain visualization (100% complete)
 
