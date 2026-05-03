@@ -135,6 +135,9 @@ It will use real world map. The game will start in single city and later other c
 
 - [ ] Optimize test speed so that every tests (.net tests, e2e tests and unit tests) runs faster and takes no more then 10 minutes to run
 - [ ] Pick only the most important tests to keep which allows wider end to end testing and archive all other tests so that the tests will take less then 10 minutes to run
+- [ ] please organize the frontend e2e tests to special folders . I want to archive old tests to e2e/archive folder, screenshots for documentation tests to e2e/docs, full end to end tests to e2e/full-journey. Also organize the next level subfolder according to the test category. Extract full journey tests from the current test files to full-journey folder. Create npm run commands to run the tests. Also update the pipeline which runs e2e tests to run only full journey tests.
+- [ ] For further development please focus on running full journey end to end tests only which tests longer user walkthrough with navigation and expected features.
+- [ ] Update copilot instructions to follow this rules.
 
 ### Tailwind migration (40% complete)
 
