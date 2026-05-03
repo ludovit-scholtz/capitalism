@@ -119,22 +119,14 @@ onMounted(() => {
 <template>
   <div class="min-h-screen">
     <!-- Hero -->
-    <div
-      class="border-b border-divider py-12 text-center"
-      style="background: linear-gradient(160deg, #0d1117 0%, rgba(0, 71, 255, 0.14) 100%)"
-    >
+    <div class="border-b border-divider py-12 text-center" style="background: linear-gradient(160deg, #0d1117 0%, rgba(0, 71, 255, 0.14) 100%)">
       <div class="container mx-auto px-4">
         <p class="text-[0.75rem] font-bold tracking-[0.1em] uppercase text-brand mb-2">
           {{ t('cities.eyebrow') }}
         </p>
         <h1
           class="text-4xl sm:text-[2.25rem] font-extrabold mb-3"
-          style="
-            background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-          "
+          style="background: linear-gradient(135deg, var(--color-primary), var(--color-secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text"
         >
           {{ t('cities.title') }}
         </h1>
@@ -158,15 +150,8 @@ onMounted(() => {
       </div>
 
       <!-- Cities grid -->
-      <div
-        v-else
-        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-[1100px] mx-auto"
-      >
-        <div
-          v-for="city in cities"
-          :key="city.id"
-          class="city-card bg-card border border-divider rounded-xl p-5 hover:border-brand transition-colors"
-        >
+      <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-[1100px] mx-auto">
+        <div v-for="city in cities" :key="city.id" class="city-card bg-card border border-divider rounded-xl p-5 hover:border-brand transition-colors">
           <!-- City header -->
           <div class="flex items-center gap-3 mb-4">
             <span class="text-3xl" :aria-label="city.countryCode">{{ getFlag(city.countryCode) }}</span>
@@ -188,9 +173,7 @@ onMounted(() => {
               <p class="text-[0.7rem] text-muted uppercase tracking-wide mb-0.5">
                 {{ t('cities.baseSalary') }}
               </p>
-              <p class="text-base font-bold">
-                {{ city.baseSalaryPerManhour }} {{ city.currencyCode }}/h
-              </p>
+              <p class="text-base font-bold">{{ city.baseSalaryPerManhour }} {{ city.currencyCode }}/h</p>
             </div>
           </div>
 
@@ -213,12 +196,7 @@ onMounted(() => {
           </div>
 
           <!-- City map link -->
-          <RouterLink
-            :to="`/city/${city.id}`"
-            class="mt-4 flex items-center justify-center gap-2 btn btn-secondary btn-sm w-full"
-          >
-            🗺️ {{ t('cities.viewMap') }}
-          </RouterLink>
+          <RouterLink :to="`/city/${city.id}`" class="mt-4 flex items-center justify-center gap-2 btn btn-secondary btn-sm w-full"> 🗺️ {{ t('cities.viewMap') }} </RouterLink>
         </div>
       </div>
     </div>

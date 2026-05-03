@@ -630,9 +630,7 @@ onMounted(async () => {
   try {
     loading.value = true
     const [industriesData, citiesData, fxRatesData] = await Promise.all([
-      gqlRequest<{ starterIndustries: { industries: string[]; proOnlyIndustries: string[] } }>(
-        '{ starterIndustries { industries proOnlyIndustries } }',
-      ),
+      gqlRequest<{ starterIndustries: { industries: string[]; proOnlyIndustries: string[] } }>('{ starterIndustries { industries proOnlyIndustries } }'),
       gqlRequest<{ cities: City[] }>(CITIES_QUERY),
       gqlRequest<{ eurFxRates: EurFxRate[] }>('{ eurFxRates { currencyCode rate } }'),
     ])
@@ -1275,7 +1273,8 @@ useTickRefresh(async () => {
             <span
               v-if="proOnlyIndustries.includes(ind)"
               class="industry-pro-badge absolute top-2 right-2 rounded bg-amber-400/20 px-1.5 py-0.5 text-[0.625rem] font-bold text-amber-400 uppercase tracking-wide leading-none"
-            >{{ t('onboarding.proBadge') }}</span>
+              >{{ t('onboarding.proBadge') }}</span
+            >
             <span class="text-[2.5rem] leading-none">{{ industryIcons[ind] || '🏭' }}</span
             ><span class="font-bold text-base">{{ formatIndustry(ind) }}</span
             ><span class="card-first-product inline-block rounded bg-brand/10 px-2 py-0.5 text-xs font-semibold text-brand">{{ t(industryFirstProductKeys[ind] || '') }}</span
@@ -1403,11 +1402,7 @@ useTickRefresh(async () => {
         </p>
         <div class="step-actions flex gap-3 justify-end mt-2">
           <button class="btn btn-secondary" :disabled="auth.player?.onboardingCurrentStep === 'SHOP_SELECTION'" @click="prevStep">← {{ t('common.back') }}</button
-          ><button
-            :class="selectedFactoryLotId ? 'btn btn-primary btn-lg' : 'btn btn-secondary btn-lg opacity-75 cursor-not-allowed'"
-            :disabled="loading"
-            @click="startOnboardingCompany"
-          >
+          ><button :class="selectedFactoryLotId ? 'btn btn-primary btn-lg' : 'btn btn-secondary btn-lg opacity-75 cursor-not-allowed'" :disabled="loading" @click="startOnboardingCompany">
             {{ loading ? t('common.loading') : t('onboarding.purchaseFactory') }} <span v-if="!loading" class="ml-1">🏭</span>
           </button>
         </div>
