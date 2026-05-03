@@ -119,8 +119,10 @@ public sealed partial class Mutation
                     .Build());
         }
 
+        var personalUsdBalance = await EnsureStarterFounderFundingAsync(db, player, httpContextAccessor.HttpContext!.RequestAborted);
+
         // Create company
-        if (await PersonalBankAccountService.GetTrackedBalanceAsync(db, player.Id, "USD", httpContextAccessor.HttpContext!.RequestAborted) < StarterFounderContribution)
+        if (personalUsdBalance < StarterFounderContribution)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -322,7 +324,9 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        if (await PersonalBankAccountService.GetTrackedBalanceAsync(db, player.Id, "USD", httpContextAccessor.HttpContext!.RequestAborted) < StarterFounderContribution)
+        var personalUsdBalance = await EnsureStarterFounderFundingAsync(db, player, httpContextAccessor.HttpContext!.RequestAborted);
+
+        if (personalUsdBalance < StarterFounderContribution)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -587,5 +591,32 @@ public sealed partial class Mutation
             SelectedProduct = product,
             CityCurrencyCode = onboardingCityCurrencyCode
         };
+    }
+
+    private async Task<decimal> EnsureStarterFounderFundingAsync(
+        AppDbContext db,
+        Player player,
+        CancellationToken cancellationToken)
+    {
+        if (player.OnboardingCompletedAtUtc is not null
+            || !string.IsNullOrEmpty(player.OnboardingCurrentStep)
+            || player.OnboardingCompanyId is not null)
+        {
+            return await PersonalBankAccountService.GetTrackedBalanceAsync(db, player.Id, "USD", cancellationToken);
+        }
+
+        // Starter funding is guaranteed only before the first company is created.
+        if (await db.Companies.AsNoTracking().AnyAsync(company => company.PlayerId == player.Id, cancellationToken))
+        {
+            return await PersonalBankAccountService.GetTrackedBalanceAsync(db, player.Id, "USD", cancellationToken);
+        }
+
+        var settlementAccount = await PersonalBankAccountService.EnsureTrackedSettlementAccountAsync(db, player, cancellationToken);
+        if (settlementAccount.Balance < StarterFounderContribution)
+        {
+            settlementAccount.Balance = StarterFounderContribution;
+        }
+
+        return settlementAccount.Balance;
     }
 }
