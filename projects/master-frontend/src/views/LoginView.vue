@@ -39,7 +39,8 @@ async function handleSubmit() {
 
 function handleBiatecSignIn() {
   const redirectPath = router.currentRoute.value.query.redirect
-  const targetPath = typeof redirectPath === 'string' && redirectPath.length > 0 ? redirectPath : '/'
+  const targetPath =
+    typeof redirectPath === 'string' && redirectPath.length > 0 ? redirectPath : '/'
   auth.startBiatecOidcSignIn(targetPath)
 }
 </script>

@@ -395,7 +395,7 @@ export default {
     guestCompanyPlaceholder: 'Ihr Unternehmen',
     guestShopPlaceholder: 'Ihr Laden',
     guestSaveTitle: 'Fortschritt speichern',
-    guestSaveSubtitle: 'Erstellen Sie ein kostenloses Konto oder melden Sie sich an, um Ihre Auswahl zu sichern und echten Spielgewinn zu erzielen.',
+    guestSaveSubtitle: 'Melden Sie sich mit Biatec an, um Ihre Auswahl zu sichern und Ihr Unternehmen richtig zu starten.',
     guestSaveKeepsLabel: 'Sie behalten:',
     guestSaveKeepsCompany: 'Ihr Unternehmensname',
     guestSaveKeepsCity: 'Ihre Startstadt',

@@ -395,7 +395,7 @@ export default {
     guestCompanyPlaceholder: 'Your Company',
     guestShopPlaceholder: 'Your Shop',
     guestSaveTitle: 'Save Your Progress',
-    guestSaveSubtitle: 'Create a free account or log in to lock in your choices and start earning real in-game profit.',
+    guestSaveSubtitle: 'Sign in with Biatec to lock in your choices and launch your company for real.',
     guestSaveKeepsLabel: 'You keep:',
     guestSaveKeepsCompany: 'Your company name',
     guestSaveKeepsCity: 'Your starter city',

@@ -5,12 +5,12 @@ import { gqlRequest as gqlMasterRequest } from '@/lib/graphqlMasterServer'
 import { deepEqual } from '@/lib/utils'
 import type { AccountContextResult, AccountContextType, Player, AuthPayload } from '@/types'
 
-const BIATEC_OIDC_AUTHORIZE_URL = import.meta.env.VITE_BIATEC_OIDC_AUTHORIZE_URL || 'https://localhost:44305/authorize'
+const BIATEC_OIDC_AUTHORIZE_URL = import.meta.env.VITE_BIATEC_OIDC_AUTHORIZE_URL || 'https://google.biatec.io/authorize'
 const BIATEC_OIDC_CLIENT_ID = import.meta.env.VITE_BIATEC_OIDC_CLIENT_ID || 'capitalism'
 const BIATEC_OIDC_REDIRECT_URI = import.meta.env.VITE_BIATEC_OIDC_REDIRECT_URI
 const BIATEC_OIDC_SCOPE = import.meta.env.VITE_BIATEC_OIDC_SCOPE || 'openid'
 const BIATEC_OIDC_AUDIENCE = import.meta.env.VITE_BIATEC_OIDC_AUDIENCE || BIATEC_OIDC_CLIENT_ID
-const BIATEC_OIDC_ALLOWED_ISSUERS = (import.meta.env.VITE_BIATEC_OIDC_ALLOWED_ISSUERS || 'https://google.biatec.io,https://localhost:44305')
+const BIATEC_OIDC_ALLOWED_ISSUERS = (import.meta.env.VITE_BIATEC_OIDC_ALLOWED_ISSUERS || 'https://google.biatec.io,https://google.biatec.io')
   .split(',')
   .map((entry: string) => entry.trim())
   .filter((entry: string) => entry.length > 0)
@@ -235,11 +235,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     const audienceClaim = tokenPayload.aud
-    const audiences = Array.isArray(audienceClaim)
-      ? audienceClaim.filter((entry): entry is string => typeof entry === 'string')
-      : typeof audienceClaim === 'string'
-        ? [audienceClaim]
-        : []
+    const audiences = Array.isArray(audienceClaim) ? audienceClaim.filter((entry): entry is string => typeof entry === 'string') : typeof audienceClaim === 'string' ? [audienceClaim] : []
     if (!audiences.includes(BIATEC_OIDC_AUDIENCE)) {
       throw new Error('OIDC audience validation failed. Please try signing in again.')
     }

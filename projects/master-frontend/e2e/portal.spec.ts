@@ -135,7 +135,7 @@ test.describe('Login page', () => {
     await page.goto('/login')
 
     const [request] = await Promise.all([
-      page.waitForRequest((req) => req.url().startsWith('https://localhost:44305/authorize')),
+      page.waitForRequest((req) => req.url().startsWith('https://google.biatec.io/authorize')),
       page.getByRole('button', { name: 'Sign in with Biatec' }).click(),
     ])
 
