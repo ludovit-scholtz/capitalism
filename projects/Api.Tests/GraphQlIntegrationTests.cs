@@ -26274,6 +26274,105 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.Equal("Q1", gameState.CurrentQuarterLabel);
     }
 
+    [Fact]
+    public async Task GameState_GraphQl_ReturnsCurrentQuarterFields()
+    {
+        // The gameState GraphQL query must expose currentQuarter (0-3) and currentQuarterLabel ("Q1"-"Q4")
+        // so the frontend can display the seasonal quarter badge in the navbar.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var result = await ExecuteGraphQlAsync(isolatedClient,
+            "{ gameState { currentTick currentQuarter currentQuarterLabel } }", null, null);
+
+        var state = result.GetProperty("data").GetProperty("gameState");
+
+        // currentQuarter must be 0-3
+        var quarter = state.GetProperty("currentQuarter").GetInt32();
+        Assert.InRange(quarter, 0, 3);
+
+        // currentQuarterLabel must be one of Q1-Q4
+        var label = state.GetProperty("currentQuarterLabel").GetString();
+        Assert.Contains(label, ["Q1", "Q2", "Q3", "Q4"]);
+
+        // At tick 0 the default game starts in Q1
+        Assert.Equal(0, state.GetProperty("currentTick").GetInt64());
+        Assert.Equal(0, quarter);
+        Assert.Equal("Q1", label);
+    }
+
+    [Fact]
+    public async Task PublicSalesAnalytics_SeasonalOutlook_NextQuarterMultiplierIsVisible()
+    {
+        // The 4 quarter forecasts must include next-quarter data (ROADMAP: "next-quarter multiplier")
+        // so players can plan inventory and pricing strategy ahead of demand peaks.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var gs = await db.GameStates.FirstOrDefaultDeterministicAsync();
+        Assert.NotNull(gs);
+        // Force Q1 so that Q2 is definitively the "next quarter"
+        gs!.CurrentTick = 0; // Q1
+        await db.SaveChangesAsync();
+
+        var email = $"nq-{Guid.NewGuid():N}@test.com";
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "NQPlayer");
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        var company = new Company { PlayerId = player.Id, Name = "NQCo", Cash = 5_000_000m };
+        db.Companies.Add(company);
+        var building = new Building { CompanyId = company.Id, CityId = city.Id, Type = BuildingType.SalesShop, Name = "NQShop", Level = 1, Latitude = city.Latitude, Longitude = city.Longitude };
+        db.Buildings.Add(building);
+        await db.SaveChangesAsync();
+
+        var unit = new BuildingUnit { Id = Guid.NewGuid(), BuildingId = building.Id, UnitType = UnitType.PublicSales, GridX = 0, GridY = 0, Level = 1, ProductTypeId = product.Id };
+        db.BuildingUnits.Add(unit);
+        db.PublicSalesRecords.Add(new PublicSalesRecord
+        {
+            Id = Guid.NewGuid(), BuildingUnitId = unit.Id, BuildingId = building.Id,
+            CompanyId = company.Id, CityId = city.Id, ProductTypeId = product.Id,
+            Tick = 1, QuantitySold = 5m, PricePerUnit = 45m, Revenue = 225m, Demand = 10m, SalesCapacity = 20m,
+        });
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(isolatedClient,
+            $@"{{ publicSalesAnalytics(unitId: ""{unit.Id}"") {{
+                seasonalOutlook {{
+                    currentQuarterIndex
+                    quarterForecasts {{
+                        quarterIndex label multiplier isCurrent colorCode
+                    }}
+                }}
+            }} }}",
+            null, token);
+
+        var outlook = result.GetProperty("data").GetProperty("publicSalesAnalytics").GetProperty("seasonalOutlook");
+        Assert.NotEqual(System.Text.Json.JsonValueKind.Null, outlook.ValueKind);
+
+        var currentQi = outlook.GetProperty("currentQuarterIndex").GetInt32();
+        Assert.Equal(0, currentQi); // Forced Q1
+
+        var forecasts = outlook.GetProperty("quarterForecasts");
+        Assert.Equal(4, forecasts.GetArrayLength());
+
+        // The next quarter (Q2, index 1) must be present with a multiplier value
+        // Furniture Q2 seeded at 1.5× (spring/move season peak).
+        var nextQ = forecasts.EnumerateArray().FirstOrDefault(f => f.GetProperty("quarterIndex").GetInt32() == 1);
+        Assert.NotEqual(default, nextQ);
+        var nextQMultiplier = nextQ.GetProperty("multiplier").GetDecimal();
+        Assert.True(nextQMultiplier > 1.0m,
+            $"Furniture next-quarter (Q2) multiplier should be >1.0 (spring peak), got {nextQMultiplier}");
+        Assert.False(nextQ.GetProperty("isCurrent").GetBoolean(),
+            "Next quarter must not be marked as current");
+    }
+
     #endregion // Seasonal Demand
 
 }
