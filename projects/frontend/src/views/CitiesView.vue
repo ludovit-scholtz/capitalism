@@ -53,6 +53,8 @@ const CITIES_QUERY = `
   }
 `
 
+const TOP_RESOURCES_DISPLAY_LIMIT = 4
+
 const COUNTRY_FLAGS: Record<string, string> = {
   SK: '🇸🇰',
   CZ: '🇨🇿',
@@ -80,7 +82,7 @@ function formatPopulation(population: number): string {
 }
 
 function topResources(city: City): CityResource[] {
-  return [...city.resources].sort((a, b) => b.abundance - a.abundance).slice(0, 4)
+  return [...city.resources].sort((a, b) => b.abundance - a.abundance).slice(0, TOP_RESOURCES_DISPLAY_LIMIT)
 }
 
 async function fetchCities() {
@@ -88,7 +90,7 @@ async function fetchCities() {
   error.value = null
   try {
     const data = await gqlRequest<{ cities: City[] }>(CITIES_QUERY)
-    cities.value = data.cities.slice().sort((a, b) => b.population - a.population)
+    cities.value = data.cities.sort((a, b) => b.population - a.population)
   } catch (e) {
     error.value = e instanceof Error ? e.message : t('cities.loadFailed')
   } finally {

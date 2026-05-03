@@ -534,7 +534,7 @@ public sealed partial class AppDbInitializer(
             new City { Id = CreateDeterministicGuid("city:london"), Name = "London", CountryCode = "GB", CurrencyCode = "GBP", Latitude = 51.5074, Longitude = -0.1278, Population = 8_982_000, AverageRentPerSqm = 62m, BaseSalaryPerManhour = 32m, FuelPriceIndex = 1.25m },
             new City { Id = CreateDeterministicGuid("city:beijing"), Name = "Beijing", CountryCode = "CN", CurrencyCode = "CNY", Latitude = 39.9042, Longitude = 116.4074, Population = 21_540_000, AverageRentPerSqm = 30m, BaseSalaryPerManhour = 20m, FuelPriceIndex = 0.70m },
             new City { Id = CreateDeterministicGuid("city:delhi"), Name = "Delhi", CountryCode = "IN", CurrencyCode = "INR", Latitude = 28.6139, Longitude = 77.2090, Population = 32_000_000, AverageRentPerSqm = 8m, BaseSalaryPerManhour = 6m, FuelPriceIndex = 0.65m },
-            new City { Id = CreateDeterministicGuid("city:berlin"), Name = "Berlin", CountryCode = "DE", CurrencyCode = "EUR", Latitude = 52.52, Longitude = 13.405, Population = 3_677_472, AverageRentPerSqm = 20m, BaseSalaryPerManhour = 22m, FuelPriceIndex = 1.10m },
+            new City { Id = CreateDeterministicGuid("city:berlin"), Name = "Berlin", CountryCode = "DE", CurrencyCode = "EUR", Latitude = 52.5200, Longitude = 13.4050, Population = 3_677_472, AverageRentPerSqm = 20m, BaseSalaryPerManhour = 22m, FuelPriceIndex = 1.10m },
             new City { Id = CreateDeterministicGuid("city:warsaw"), Name = "Warsaw", CountryCode = "PL", CurrencyCode = "PLN", Latitude = 52.2297, Longitude = 21.0122, Population = 1_860_281, AverageRentPerSqm = 30m, BaseSalaryPerManhour = 35m, FuelPriceIndex = 1.00m });
     }
 
