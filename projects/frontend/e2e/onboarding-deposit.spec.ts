@@ -1,7 +1,7 @@
 /**
  * E2E tests for the onboarding pre-IPO deposit flow.
  *
- * Verifies that the 200k USD (EUR) founder contribution is correctly transferred from the
+ * Verifies that the 200k EUR founder contribution is correctly transferred from the
  * player's personal account to the new company when they purchase their first factory lot.
  * After the deposit the personal account must have a zero balance in all currencies.
  *
@@ -174,8 +174,7 @@ test.describe('Pre-IPO deposit — company receives correct capital', () => {
   test('completion screen configure-guide shows correct remaining company cash', async ({ page }) => {
     // The "Review your cash" configure-guide step must display the remaining balance
     // matching STARTING_COMPANY_CASH_AFTER_SHOP.
-    const { player, state } = await setupAuthenticatedPlayer(page)
-    state.currentUserId = player.id
+    await setupAuthenticatedPlayer(page)
     await page.goto('/onboarding')
 
     await completeRouteChoices(page)
@@ -395,8 +394,7 @@ test.describe('Pre-IPO deposit — onboarding step state transitions', () => {
     // The shop-selection step displays the company's "Available cash" to help the player
     // choose a lot they can afford. This panel indirectly confirms the deposit succeeded
     // (company has capital, personal account was the source).
-    const { player, state } = await setupAuthenticatedPlayer(page)
-    state.currentUserId = player.id
+    const { player } = await setupAuthenticatedPlayer(page)
     await page.goto('/onboarding')
 
     await completeRouteChoices(page)
