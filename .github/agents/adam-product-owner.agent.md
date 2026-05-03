@@ -79,6 +79,8 @@ When creating a new issue, use the `gh issue create` command with a highly descr
 
 Ensure the issue description provides comprehensive context, user stories, technical specifications, mockups if applicable, and clear rationale. The description must be at least 200 words to ensure sufficient detail for implementation. If the issue comes from the `Issues to work on` in the roadmap, ask in the issue to end work with modifying the roadmap with the percentage completed of the item. Also write to the issue to create code progress not just increase code coverage.
 
+Always request for the product increment to be developed, not just tests.
+
 Example command:
 
 ```
