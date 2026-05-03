@@ -6,6 +6,32 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
+### FX Exchange with AMM Liquidity Pools (100% complete)
+
+**Shipped:** Dynamic FX exchange mechanics with AMM (Automated Market Maker) liquidity pools for gold token (XAU) trading are fully implemented. Players can create fiat/XAU pools seeded with Uniswap v2 LP shares, add or remove liquidity proportionally, and execute constant-product swaps with a 1% fee that accrues to liquidity providers.
+
+The backend enforces that deposited funds cannot be double-spent, guards against excessive slippage via `MinOutputAmount`, and persists every swap as an auditable `GoldAmmTradeRecord`.
+
+The frontend exposes all operations under a dedicated "Gold AMM" tab inside the Forex Exchange view: a pool creation form, add/remove liquidity panels, a swap direction selector with real-time quote preview showing fee and slippage, and a "My Positions" tab showing claimable fiat and gold balances.
+
+- [x] Create `GoldAmmPool` entity: stores currency code, fiat/gold reserves, total LP shares, and timestamps with one-pool-per-currency enforcement.
+- [x] Create `GoldAmmPosition` entity: tracks per-player LP shares, fiat and gold originally deposited, with player and pool navigation properties.
+- [x] Create `GoldAmmTradeRecord` entity: audit log per swap with direction, amounts, fee, implied price, and game tick.
+- [x] Register all three entities in `AppDbContext` with proper indexes (player+currency on positions) and EF migrations.
+- [x] Implement `createGoldAmmPool` mutation: validates 3-letter non-XAU currency code, checks available fiat and gold balances, seeds pool with `sqrt(fiat × gold)` LP shares (Uniswap v2), deducts from player balances atomically.
+- [x] Implement `addGoldAmmLiquidity` mutation: proportional gold calculation from fiat input, slippage guard via `MaxGoldAmount`, creates new position or updates existing position, updates pool reserves.
+- [x] Implement `removeGoldAmmLiquidity` mutation: fractional share removal (0–1), proportional fiat/gold return from pool, position cleanup when shares reach zero, credits balances atomically.
+- [x] Implement `executeGoldAmmSwap` mutation: constant-product AMM formula with 1% fee staying in pool, slippage guard via `MinOutputAmount`, inserts `GoldAmmTradeRecord`, updates pool reserves atomically.
+- [x] Implement `goldAmmPools` public query returning all pools with optional authenticated player position (claimable fiat/gold, share percent).
+- [x] Implement `goldAmmSwapQuote` query returning output amount, fee, slippage percent, and available input balance without executing the swap.
+- [x] Implement `myGoldAmmPositions` query returning the authenticated player's positions with claimable amounts.
+- [x] Implement `myGoldBalance` query returning total wallet gold, sum of gold originally deposited in pools, and available gold.
+- [x] Add `GoldAmmSection.vue` frontend component with inner tab navigation: Swap, My Positions, Add Liquidity, Create Pool.
+- [x] Integrate Gold AMM section as the "gold" tab in `ForexExchangeView.vue` with deep-link support (`?tab=gold`).
+- [x] Add i18n strings for all Gold AMM UI labels and messages to `en.ts`, `sk.ts`, and `de.ts`.
+- [x] Add comprehensive backend integration tests in `GoldAmmTests.cs`: AMM math unit tests, pool creation/duplication/insufficient-funds cases, add/remove liquidity flows, swap quote validation, swap execution with balance checks, blocked-resource enforcement, fee accrual, and full deposit-then-withdrawal round-trip.
+- [x] Add Playwright E2E tests in `forex-exchange.spec.ts` covering Gold AMM tab navigation, swap form, positions tab empty/populated states, add liquidity happy path, blocked-funds warning, and pool creation form display.
+
 ### Fix onboarding (100% complete)
 
 - [x] Change the onboarding steps. The first step will be city selection. When user selects the city in the onboarding make sure to set it also in the context changer in the navbar.
