@@ -36,6 +36,12 @@ async function handleSubmit() {
     formError.value = error instanceof Error ? error.message : t('login.genericError')
   }
 }
+
+function handleBiatecSignIn() {
+  const redirectPath = router.currentRoute.value.query.redirect
+  const targetPath = typeof redirectPath === 'string' && redirectPath.length > 0 ? redirectPath : '/'
+  auth.startBiatecOidcSignIn(targetPath)
+}
 </script>
 
 <template>
@@ -144,6 +150,15 @@ async function handleSubmit() {
                     ? t('login.createAccount')
                     : t('login.signIn')
               }}
+            </button>
+
+            <button
+              type="button"
+              class="btn btn-ghost w-full justify-center"
+              :disabled="auth.loading"
+              @click="handleBiatecSignIn"
+            >
+              {{ t('login.signInWithBiatec') }}
             </button>
           </form>
 

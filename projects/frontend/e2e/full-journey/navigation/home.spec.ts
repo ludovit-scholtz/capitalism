@@ -121,6 +121,30 @@ test.describe('Header navigation', () => {
     await expect(page).toHaveURL(/\/$/)
   })
 
+  test('login view redirects to Biatec authorize endpoint', async ({ page }) => {
+    setupMockApi(page)
+    await page.route('https://localhost:44305/**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/html',
+        body: '<html><body>OIDC authorize mock</body></html>',
+      })
+    })
+
+    await page.goto('/login')
+    await page.getByRole('button', { name: 'Sign in with Biatec' }).click()
+
+    await expect(page).toHaveURL(/https:\/\/localhost:44305\/authorize/)
+    await expect(page).toHaveURL(/client_id=capitalism/)
+    const authorizeUrl = new URL(page.url())
+    const redirectUri = authorizeUrl.searchParams.get('redirect_uri')
+    expect(redirectUri).toBeTruthy()
+    expect(decodeURIComponent(redirectUri ?? '')).toMatch(/\/auth\/callback$/)
+    await expect(page).toHaveURL(/scope=openid/)
+    await expect(page).toHaveURL(/state=/)
+    await expect(page).toHaveURL(/nonce=/)
+  })
+
   test('shows Dashboard link when authenticated', async ({ page }) => {
     const player = makePlayer()
     setupMockApi(page, {

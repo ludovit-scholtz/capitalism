@@ -1,5 +1,6 @@
 ﻿namespace Api;
 
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Api.Configuration;
@@ -23,6 +24,7 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
 
         builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
+        builder.Services.Configure<BiatecOidcOptions>(builder.Configuration.GetSection(BiatecOidcOptions.SectionName));
         builder.Services.Configure<SeedDataOptions>(builder.Configuration.GetSection(SeedDataOptions.SectionName));
         builder.Services.Configure<VapidOptions>(builder.Configuration.GetSection("Vapid"));
         builder.Services.Configure<GameEngineOptions>(builder.Configuration.GetSection(GameEngineOptions.SectionName));
@@ -30,6 +32,16 @@ public class Program
 
         var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
             ?? throw new InvalidOperationException("JWT configuration is missing.");
+        var biatecOidcOptions = builder.Configuration.GetSection(BiatecOidcOptions.SectionName).Get<BiatecOidcOptions>()
+            ?? new BiatecOidcOptions();
+        var biatecKnownIssuers = new[]
+        {
+            biatecOidcOptions.Issuer,
+            biatecOidcOptions.Authority,
+        }
+            .Where(issuer => !string.IsNullOrWhiteSpace(issuer))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
         builder.Services.AddCors(options =>
         {
@@ -86,10 +98,48 @@ public class Program
                 serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("push")));
 
         builder.Services
-            .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer(options =>
+            .AddAuthentication(options =>
             {
-                var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
+                options.DefaultAuthenticateScheme = "dynamic-jwt";
+                options.DefaultChallengeScheme = "dynamic-jwt";
+            })
+            .AddPolicyScheme("dynamic-jwt", "Local or Biatec JWT", options =>
+            {
+                options.ForwardDefaultSelector = context =>
+                {
+                    var authorization = context.Request.Headers.Authorization.ToString();
+                    if (!authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return "local-jwt";
+                    }
+
+                    var token = authorization["Bearer ".Length..].Trim();
+                    if (string.IsNullOrWhiteSpace(token))
+                    {
+                        return "local-jwt";
+                    }
+
+                    try
+                    {
+                        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
+                        if (biatecOidcOptions.Enabled
+                            && biatecKnownIssuers.Any(issuer =>
+                                string.Equals(jwt.Issuer, issuer, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            return "biatec-oidc";
+                        }
+                    }
+                    catch
+                    {
+                        // Keep defaulting to local JWT to preserve existing behavior on malformed tokens.
+                    }
+
+                    return "local-jwt";
+                };
+            })
+            .AddJwtBearer("local-jwt", options =>
+            {
+                var localJwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
                     ?? new JwtOptions();
 
                 options.TokenValidationParameters = new TokenValidationParameters
@@ -98,9 +148,9 @@ public class Program
                     ValidateAudience = true,
                     ValidateIssuerSigningKey = true,
                     ValidateLifetime = true,
-                    ValidIssuer = jwtOptions.Issuer,
-                    ValidAudience = jwtOptions.Audience,
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SigningKey)),
+                    ValidIssuer = localJwtOptions.Issuer,
+                    ValidAudience = localJwtOptions.Audience,
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(localJwtOptions.SigningKey)),
                     ClockSkew = TimeSpan.FromMinutes(1),
                 };
                 options.Events = new JwtBearerEvents
@@ -112,6 +162,54 @@ public class Program
                             var synchronizer = context.HttpContext.RequestServices.GetRequiredService<AuthenticatedPlayerClaimsSyncService>();
                             await synchronizer.SyncAsync(context.Principal, identity, context.HttpContext.RequestAborted);
                         }
+                    }
+                };
+            })
+            .AddJwtBearer("biatec-oidc", options =>
+            {
+                options.Authority = biatecOidcOptions.Authority;
+                options.RequireHttpsMetadata = biatecOidcOptions.RequireHttpsMetadata;
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidIssuers = biatecKnownIssuers,
+                    ValidateAudience = true,
+                    ValidAudience = biatecOidcOptions.Audience,
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.FromMinutes(1),
+                };
+                options.MapInboundClaims = false;
+                options.Events = new JwtBearerEvents
+                {
+                    OnTokenValidated = async context =>
+                    {
+                        if (context.Principal?.Identity is not ClaimsIdentity identity || !identity.IsAuthenticated)
+                        {
+                            return;
+                        }
+
+                        var emailClaim = identity.FindFirst("email")?.Value;
+                        if (!string.IsNullOrWhiteSpace(emailClaim) && !identity.HasClaim(claim => claim.Type == ClaimTypes.Email))
+                        {
+                            identity.AddClaim(new Claim(ClaimTypes.Email, emailClaim));
+                        }
+
+                        var displayNameClaim = identity.FindFirst("preferred_username")?.Value
+                            ?? identity.FindFirst("name")?.Value
+                            ?? emailClaim;
+                        if (!string.IsNullOrWhiteSpace(displayNameClaim) && !identity.HasClaim(claim => claim.Type == ClaimTypes.Name))
+                        {
+                            identity.AddClaim(new Claim(ClaimTypes.Name, displayNameClaim));
+                        }
+
+                        var subClaim = identity.FindFirst("sub")?.Value;
+                        if (!string.IsNullOrWhiteSpace(subClaim) && !identity.HasClaim(claim => claim.Type == ClaimTypes.NameIdentifier))
+                        {
+                            identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, subClaim));
+                        }
+
+                        var synchronizer = context.HttpContext.RequestServices.GetRequiredService<AuthenticatedPlayerClaimsSyncService>();
+                        await synchronizer.SyncAsync(context.Principal, identity, context.HttpContext.RequestAborted);
                     }
                 };
             });

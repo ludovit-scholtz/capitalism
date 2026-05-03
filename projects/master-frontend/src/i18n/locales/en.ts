@@ -1,4 +1,4 @@
-﻿export default {
+export default {
   common: {
     backToPortal: 'Back to portal',
     allRightsReserved: '© {year} Capitalism HQ. All rights reserved.',
@@ -129,6 +129,7 @@
   },
   login: {
     signIn: 'Sign in',
+    signInWithBiatec: 'Sign in with Biatec',
     createAccount: 'Create account',
     signInSub: 'Access your Pro subscription and server directory.',
     createSub: 'Join the Capitalism Network to track your subscription.',
@@ -142,6 +143,10 @@
     haveAccount: 'Already have an account?',
     backToDirectory: 'Back to server directory',
     genericError: 'Something went wrong. Please try again.',
+    biatecCallbackTitle: 'Completing Biatec sign-in',
+    biatecCallbackLoading: 'Verifying your session and loading your account...',
+    biatecCallbackSuccess: 'Sign-in complete. Redirecting...',
+    biatecCallbackError: 'Biatec sign-in failed. Please return to login and try again.',
   },
   account: {
     kicker: 'My Account',

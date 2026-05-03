@@ -234,6 +234,10 @@ export default {
     loginToAccess: 'Anmelden für Zugriff',
     loginFailed: 'Anmeldung fehlgeschlagen. Bitte überprüfen Sie Ihre Zugangsdaten und versuchen Sie es erneut.',
     loginRequired: 'Bitte melden Sie sich an, um fortzufahren.',
+    loginWithBiatec: 'Mit Biatec anmelden',
+    oidcCallbackTitle: 'Anmeldung wird abgeschlossen',
+    oidcCallbackLoading: 'Ihr Biatec-Token wird geprüft und Ihr Spielprofil geladen…',
+    oidcCallbackFailed: 'Die Biatec-Anmeldung ist fehlgeschlagen. Bitte versuchen Sie es erneut.',
   },
   onboarding: {
     title: 'Starten Sie Ihr Imperium',

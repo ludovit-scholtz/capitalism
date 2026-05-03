@@ -122,6 +122,7 @@ The game is seeded with:
 - Key GraphQL operations:
   - **Queries**: `me`, `cities`, `city(id)`, `resourceTypes`, `productTypes(industry?)`, `rankings`, `myCompanies`, `gameState`, `starterIndustries`, `gameNewsFeed`, `gameAdminSession`, `gameAdminDashboard`
   - **Mutations**: `register(input)`, `login(input)`, `createCompany(input)`, `placeBuilding(input)`, `completeOnboarding(input)`, `startOnboardingCompany(input)`, `finishOnboarding(input)`, `purchaseLot(input)`, `markGameNewsRead(input)`, `upsertGameNewsEntry(input)`, `startAdminImpersonation(input)`, `stopAdminImpersonation`, `setPlayerInvisibleInChat(input)`, `setLocalGameAdminRole(input)`, `assignGlobalGameAdminRole(input)`, `removeGlobalGameAdminRole(input)`
+- Authentication is dual-mode: native GraphQL login/register and external Biatec OIDC redirect login. OIDC callback route is `/auth/callback`.
 - The staged onboarding flow now uses `startOnboardingCompany` to create the first company and purchase the first factory lot, then `finishOnboarding` to select the starter product, purchase the first sales shop lot, configure both buildings, and complete onboarding.
 - Master-server GraphQL operations are `gameServers` and `registerGameServer(input)`.
 
@@ -140,16 +141,19 @@ The game is seeded with:
 - If a field could be abused to bypass ticks, ownership checks, prices, cooldowns, or other game rules, keep it server-controlled and cover the rule with backend tests.
 
 ## Authentication
-- JWT tokens are obtained via `register` or `login` GraphQL mutations.
+- JWT tokens are obtained either via `register`/`login` GraphQL mutations or via Biatec OIDC `/authorize` redirect flow that returns a JWT to `/auth/callback`.
 - Tokens are stored in `localStorage` under `auth_token` and `auth_expires` keys.
 - The GraphQL client automatically attaches the JWT token as a Bearer token in the `Authorization` header.
-- The auth store (`src/stores/auth.ts`) provides `initFromStorage()`, `register()`, `login()`, `fetchMe()`, and `logout()`.
+- The auth store (`src/stores/auth.ts`) provides `initFromStorage()`, `register()`, `login()`, `startBiatecOidcSignIn()`, `completeBiatecOidcSignIn()`, `fetchMe()`, and `logout()`.
+- The master portal auth store (`projects/master-frontend/src/stores/auth.ts`) must support the same dual mode (`register/login` + Biatec OIDC callback at `/auth/callback`) and schedule proactive renewal before OIDC token expiry.
 - `initFromStorage()` is called in `App.vue`'s `<script setup>` so the token is available to all views.
-- Token expiry: 120 minutes. HS256 signing.
+- Token expiry: 120 minutes for native tokens (HS256). Biatec OIDC tokens are issuer-managed and must be validated by issuer, audience, lifetime, and signature.
+- Security requirements for OIDC: always validate callback `state`/`nonce`, never trust unvalidated callback tokens for privileged decisions, and keep `iss`/`aud`/signature validation enforced server-side.
 
 ## Frontend pages
 - **HomeView** (`/`): Hero section, game status cards (tick, tax rate, active players), leaderboard table. CTA changes based on auth state: "Get Started" (unauthenticated) → "Start Your Empire" (authenticated but onboarding not completed) → "Go to Dashboard" (onboarding completed).
-- **LoginView** (`/login`): Login/Register toggle form with email, password, optional display name.
+- **LoginView** (`/login`): Login/Register toggle form with email, password, optional display name, plus Biatec OIDC sign-in redirect.
+- **AuthCallbackView** (`/auth/callback`): OIDC callback handler that validates state/nonce, stores token session, and loads player profile.
 - **OnboardingView** (`/onboarding`): guided staged onboarding flow: (1) choose industry, (2) choose city, (3) name company + purchase the first factory lot on the city map, (4) choose starter product + purchase the first sales shop lot, then completion. If onboarding is interrupted after the factory purchase, the player resumes directly into the shop step using backend-owned onboarding state.
 - **DashboardView** (`/dashboard`): Player info, company cards with buildings list, empty state with link to onboarding.
 - **ManufacturingEncyclopediaView** (`/encyclopedia` and `/encyclopedia/:topicSlug`): The encyclopedia opens with a top topic menu and supports routed topics `onboarding-help`, `factory-layout-help`, and `resources-definition`. Onboarding help includes six step screenshots (industry, product, city, IPO, factory lot, shop lot) with deeper localized explanations; factory layout help and resources definition content remain separately selectable from the top menu.

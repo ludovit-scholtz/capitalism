@@ -1548,6 +1548,21 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task Me_MasterStyleToken_NonGuidSubject_StillProvisionsPlayer()
+    {
+        const string email = "oidc-subject@test.com";
+        var token = CreateSharedToken("oidc-subject-123", email, "OIDC Subject User");
+
+        var result = await ExecuteGraphQlAsync("{ me { id email displayName role } }", token: token);
+
+        Assert.False(result.TryGetProperty("errors", out _));
+        var me = result.GetProperty("data").GetProperty("me");
+        Assert.Equal(email, me.GetProperty("email").GetString());
+        Assert.Equal("OIDC Subject User", me.GetProperty("displayName").GetString());
+        Assert.Equal("PLAYER", me.GetProperty("role").GetString());
+    }
+
+    [Fact]
     public void IsImpersonating_FalseWhenEffectiveAndActorIdsMatch()
     {
         var playerId = Guid.NewGuid();

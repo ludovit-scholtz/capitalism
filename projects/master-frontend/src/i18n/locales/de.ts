@@ -1,4 +1,4 @@
-﻿export default {
+export default {
   common: {
     backToPortal: 'Zurück zum Portal',
     allRightsReserved: '© {year} Capitalism HQ. Alle Rechte vorbehalten.',
@@ -130,6 +130,7 @@
   },
   login: {
     signIn: 'Anmelden',
+    signInWithBiatec: 'Mit Biatec anmelden',
     createAccount: 'Konto erstellen',
     signInSub: 'Greife auf dein Pro-Abonnement und Serververzeichnis zu.',
     createSub: 'Tritt dem Capitalism Network bei und verfolge dein Abonnement.',
@@ -143,6 +144,10 @@
     haveAccount: 'Bereits ein Konto?',
     backToDirectory: 'Zurück zur Serverübersicht',
     genericError: 'Etwas ist schiefgelaufen. Bitte versuche es erneut.',
+    biatecCallbackTitle: 'Biatec-Anmeldung wird abgeschlossen',
+    biatecCallbackLoading: 'Deine Sitzung wird geprüft und dein Konto geladen...',
+    biatecCallbackSuccess: 'Anmeldung abgeschlossen. Weiterleitung...',
+    biatecCallbackError: 'Biatec-Anmeldung fehlgeschlagen. Bitte kehre zum Login zurück und versuche es erneut.',
   },
   account: {
     kicker: 'Mein Konto',
