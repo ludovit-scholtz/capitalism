@@ -199,9 +199,24 @@ public sealed partial class PublicSalesPhase : ITickPhase
             context.RecentSalaryByCity.TryGetValue(city.Id, out var recentSalary);
             var salaryFactor = PublicSalesPricingModel.ComputeBlendedSalaryFactor(
                 city.BaseSalaryPerManhour, recentSalary, city.Population);
+
+            // ── Seasonal demand multiplier ────────────────────────────────────────
+            // The seasonal multiplier adjusts city demand based on the current
+            // game-year quarter (Q1=Jan–Mar, Q2=Apr–Jun, Q3=Jul–Sep, Q4=Oct–Dec).
+            // This implements the ROADMAP "Seasonal Demand" mechanic.
+            // Products without a DemandSeasonality row default to 1.0× (neutral).
+            var seasonalMultiplier = 1.0m;
+            if (firstOffer.Inventory?.ProductTypeId.HasValue == true
+                && context.SeasonalityByProductTypeId.TryGetValue(
+                    firstOffer.Inventory.ProductTypeId!.Value, out var seasonality))
+            {
+                var quarterIndex = (int)((context.CurrentTick / GameConstants.TicksPerQuarter) % 4);
+                seasonalMultiplier = seasonality.GetMultiplierForQuarter(quarterIndex);
+            }
+
             // Apply trend and random multipliers to the base city demand.
             var cityBaseDemand = city.Population * GameConstants.BaseDemandPerCapita
-                * salaryFactor * trendFactor * randomMultiplier;
+                * salaryFactor * trendFactor * randomMultiplier * seasonalMultiplier;
             if (cityBaseDemand <= 0m)
                 continue;
 

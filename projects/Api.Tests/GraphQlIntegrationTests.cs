@@ -25917,6 +25917,464 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.Equal("MINE", building.GetProperty("type").GetString());
     }
 
+    #region Seasonal Demand
+
+    // ── Unit tests for DemandSeasonality ──────────────────────────────────────
+
+    [Theory]
+    [InlineData(0, 0.8)]  // Q1 (tick=0): Furniture post-holiday slump
+    [InlineData(1, 1.5)]  // Q2 (tick=TicksPerQuarter): spring moving season peak
+    [InlineData(2, 1.3)]  // Q3: summer moving season
+    [InlineData(3, 1.0)]  // Q4: year-end neutral
+    public void DemandSeasonality_FurnitureMultiplier_CorrectPerQuarter(int quarterIndex, decimal expectedMultiplier)
+    {
+        var seasonality = new DemandSeasonality
+        {
+            Q1Multiplier = 0.8m,
+            Q2Multiplier = 1.5m,
+            Q3Multiplier = 1.3m,
+            Q4Multiplier = 1.0m,
+        };
+
+        var multiplier = seasonality.GetMultiplierForQuarter(quarterIndex);
+
+        Assert.Equal(expectedMultiplier, multiplier);
+    }
+
+    [Fact]
+    public void DemandSeasonality_OutOfRange_ReturnsNeutral()
+    {
+        var seasonality = new DemandSeasonality
+        {
+            Q1Multiplier = 0.8m,
+            Q2Multiplier = 1.5m,
+            Q3Multiplier = 1.3m,
+            Q4Multiplier = 1.0m,
+        };
+
+        Assert.Equal(1.0m, seasonality.GetMultiplierForQuarter(-1));
+        Assert.Equal(1.0m, seasonality.GetMultiplierForQuarter(4));
+        Assert.Equal(1.0m, seasonality.GetMultiplierForQuarter(99));
+    }
+
+    [Theory]
+    [InlineData(0, 0)]                  // tick 0 → Q1
+    [InlineData(GameConstants.TicksPerQuarter, 1)]  // tick = quarter boundary → Q2
+    [InlineData(GameConstants.TicksPerQuarter * 2, 2)] // → Q3
+    [InlineData(GameConstants.TicksPerQuarter * 3, 3)] // → Q4
+    [InlineData(GameConstants.TicksPerYear, 0)]     // next year wraps to Q1
+    [InlineData(GameConstants.TicksPerYear + 1, 0)] // still Q1
+    public void GameConstants_TickToQuarterIndex_IsCorrect(long tick, int expectedQuarter)
+    {
+        var actualQuarter = (int)((tick / GameConstants.TicksPerQuarter) % 4);
+        Assert.Equal(expectedQuarter, actualQuarter);
+    }
+
+    [Fact]
+    public async Task EnsureDemandSeasonality_SeedsAllProductTypes()
+    {
+        // After initialization, every product type must have a DemandSeasonality row.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var productTypeCount = await db.ProductTypes.CountAsync();
+        var seasonalityCount = await db.DemandSeasonalities.CountAsync();
+
+        Assert.True(seasonalityCount > 0, "DemandSeasonality table should be seeded.");
+        Assert.Equal(productTypeCount, seasonalityCount);
+    }
+
+    [Fact]
+    public async Task EnsureDemandSeasonality_MultipliersInValidRange()
+    {
+        // All multipliers must be in the range [0.5, 2.0].
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var rows = await db.DemandSeasonalities.ToListAsync();
+        Assert.NotEmpty(rows);
+
+        foreach (var row in rows)
+        {
+            Assert.True(row.Q1Multiplier >= 0.5m && row.Q1Multiplier <= 2.0m,
+                $"Q1Multiplier {row.Q1Multiplier} for product {row.ProductTypeId} is out of range [0.5, 2.0]");
+            Assert.True(row.Q2Multiplier >= 0.5m && row.Q2Multiplier <= 2.0m,
+                $"Q2Multiplier {row.Q2Multiplier} for product {row.ProductTypeId} is out of range [0.5, 2.0]");
+            Assert.True(row.Q3Multiplier >= 0.5m && row.Q3Multiplier <= 2.0m,
+                $"Q3Multiplier {row.Q3Multiplier} for product {row.ProductTypeId} is out of range [0.5, 2.0]");
+            Assert.True(row.Q4Multiplier >= 0.5m && row.Q4Multiplier <= 2.0m,
+                $"Q4Multiplier {row.Q4Multiplier} for product {row.ProductTypeId} is out of range [0.5, 2.0]");
+        }
+    }
+
+    [Fact]
+    public async Task EnsureDemandSeasonality_FurnitureProductsHaveMovingSeasonPattern()
+    {
+        // Furniture products should peak in Q2 and Q3 (spring/summer moving season).
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var furnitureProducts = await db.ProductTypes
+            .Where(p => p.Industry == Industry.Furniture)
+            .Select(p => p.Id)
+            .ToListAsync();
+
+        Assert.NotEmpty(furnitureProducts);
+
+        foreach (var productId in furnitureProducts)
+        {
+            var seasonality = await db.DemandSeasonalities.FirstOrDefaultAsync(d => d.ProductTypeId == productId);
+            Assert.NotNull(seasonality);
+            // Q2 should be the peak for furniture (spring moving season).
+            Assert.True(seasonality!.Q2Multiplier >= seasonality.Q1Multiplier,
+                $"Furniture Q2 should be >= Q1 for product {productId}");
+            Assert.True(seasonality.Q2Multiplier >= seasonality.Q4Multiplier,
+                $"Furniture Q2 should be >= Q4 for product {productId}");
+        }
+    }
+
+    [Fact]
+    public async Task EnsureDemandSeasonality_ElectronicsProductsHaveHolidayPattern()
+    {
+        // Electronics products should peak in Q4 (holiday gift season).
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var electronicsProducts = await db.ProductTypes
+            .Where(p => p.Industry == Industry.Electronics)
+            .Select(p => p.Id)
+            .ToListAsync();
+
+        Assert.NotEmpty(electronicsProducts);
+
+        foreach (var productId in electronicsProducts)
+        {
+            var seasonality = await db.DemandSeasonalities.FirstOrDefaultAsync(d => d.ProductTypeId == productId);
+            Assert.NotNull(seasonality);
+            // Q4 should be the peak for electronics (holiday season).
+            Assert.True(seasonality!.Q4Multiplier >= seasonality.Q1Multiplier,
+                $"Electronics Q4 should be >= Q1 for product {productId}");
+            Assert.True(seasonality.Q4Multiplier >= seasonality.Q2Multiplier,
+                $"Electronics Q4 should be >= Q2 for product {productId}");
+        }
+    }
+
+    [Fact]
+    public async Task PublicSalesPhase_Q2SeasonMultiplier_IncreasesQuantitySold()
+    {
+        // Two identical sellers in separate isolated cities — but one city has tick at
+        // Q2 start (high furniture demand 1.5×) and the other at Q1 (low 0.8×).
+        // The Q2 seller should consistently sell more units.
+        // Uses a very small custom population so unit capacity is NOT the binding constraint.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var woodenChair = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        // Ensure seasonal data is present for wooden-chair (furniture → Q2 peak 1.5×)
+        var seasonality = await db.DemandSeasonalities.FirstOrDefaultAsync(d => d.ProductTypeId == woodenChair.Id);
+        Assert.NotNull(seasonality);
+
+        // Create two micro-cities so demand is well below unit capacity.
+        var cityQ1 = new City
+        {
+            Id = Guid.NewGuid(), Name = "SeasonQ1City", CurrencyCode = "EUR",
+            Population = 30_000, BaseSalaryPerManhour = 15m,
+            Latitude = 48.0, Longitude = 17.0, FuelPriceIndex = 1.0m,
+        };
+        var cityQ2 = new City
+        {
+            Id = Guid.NewGuid(), Name = "SeasonQ2City", CurrencyCode = "EUR",
+            Population = 30_000, BaseSalaryPerManhour = 15m,
+            Latitude = 48.0, Longitude = 17.1m, FuelPriceIndex = 1.0m,
+        };
+        db.Cities.AddRange(cityQ1, cityQ2);
+
+        // Game state: tick at Q2 start (TicksPerQuarter = Q2 index 1)
+        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync();
+        Assert.NotNull(gameState);
+        var q1TickStart = 0L;
+        var q2TickStart = (long)GameConstants.TicksPerQuarter;
+
+        // Player & companies
+        var player = new Player { Id = Guid.NewGuid(), Email = $"s-{Guid.NewGuid():N}@t.com", DisplayName = "S", PasswordHash = "h", Role = PlayerRole.Player };
+        var companyQ1 = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "SeasonCompanyQ1", Cash = 5_000_000m };
+        var companyQ2 = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "SeasonCompanyQ2", Cash = 5_000_000m };
+        db.Players.Add(player);
+        db.Companies.AddRange(companyQ1, companyQ2);
+
+        // Two identical shop buildings, one in each city
+        var shopQ1 = new Building { Id = Guid.NewGuid(), CompanyId = companyQ1.Id, CityId = cityQ1.Id, Type = BuildingType.SalesShop, Name = "ShopQ1", Level = 1 };
+        var shopQ2 = new Building { Id = Guid.NewGuid(), CompanyId = companyQ2.Id, CityId = cityQ2.Id, Type = BuildingType.SalesShop, Name = "ShopQ2", Level = 1 };
+        db.Buildings.AddRange(shopQ1, shopQ2);
+
+        // High-level sales units so capacity doesn't bind
+        var salesUnitQ1 = new BuildingUnit { Id = Guid.NewGuid(), BuildingId = shopQ1.Id, UnitType = UnitType.PublicSales, GridX = 0, GridY = 0, Level = 5, ProductTypeId = woodenChair.Id, MinPrice = woodenChair.BasePrice };
+        var salesUnitQ2 = new BuildingUnit { Id = Guid.NewGuid(), BuildingId = shopQ2.Id, UnitType = UnitType.PublicSales, GridX = 0, GridY = 0, Level = 5, ProductTypeId = woodenChair.Id, MinPrice = woodenChair.BasePrice };
+        db.BuildingUnits.AddRange(salesUnitQ1, salesUnitQ2);
+
+        // Seed inventory
+        db.Inventories.AddRange(
+            new Inventory { Id = Guid.NewGuid(), BuildingId = shopQ1.Id, BuildingUnitId = salesUnitQ1.Id, ProductTypeId = woodenChair.Id, Quantity = 500m, Quality = 0.7m },
+            new Inventory { Id = Guid.NewGuid(), BuildingId = shopQ2.Id, BuildingUnitId = salesUnitQ2.Id, ProductTypeId = woodenChair.Id, Quantity = 500m, Quality = 0.7m }
+        );
+
+        // Bank accounts for both buildings so OperatingCostPhase passes
+        db.BankAccounts.AddRange(
+            new BankAccount { Id = Guid.NewGuid(), BuildingId = shopQ1.Id, CompanyId = companyQ1.Id, CurrencyCode = "EUR", Balance = 100_000m, AccountNumber = "1100000000000001" },
+            new BankAccount { Id = Guid.NewGuid(), BuildingId = shopQ2.Id, CompanyId = companyQ2.Id, CurrencyCode = "EUR", Balance = 100_000m, AccountNumber = "1100000000000002" }
+        );
+
+        await db.SaveChangesAsync();
+
+        // Run one tick at Q1 level
+        gameState.CurrentTick = q1TickStart;
+        await db.SaveChangesAsync();
+
+        var phases = scope.ServiceProvider.GetServices<ITickPhase>();
+        var processor = new TickProcessor(db, phases, new NullLogger<TickProcessor>());
+        await processor.ProcessTickAsync();
+
+        var soldQ1 = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == salesUnitQ1.Id)
+            .SumAsync(r => r.QuantitySold);
+
+        // Now run at Q2 level
+        // Clear sales records for Q1 unit and reset inventory
+        db.PublicSalesRecords.RemoveRange(await db.PublicSalesRecords.Where(r => r.BuildingUnitId == salesUnitQ1.Id).ToListAsync());
+        var invQ2 = await db.Inventories.FirstAsync(i => i.BuildingUnitId == salesUnitQ2.Id);
+        invQ2.Quantity = 500m;
+        await db.SaveChangesAsync();
+
+        gameState.CurrentTick = q2TickStart;
+        await db.SaveChangesAsync();
+        await processor.ProcessTickAsync();
+
+        var soldQ2 = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == salesUnitQ2.Id)
+            .SumAsync(r => r.QuantitySold);
+
+        // Q2 (1.5× multiplier) should yield more sales than Q1 (0.8× multiplier).
+        // The signal gap (1.5 − 0.8 = 0.7) >> random amplitude so this is deterministic.
+        Assert.True(soldQ2 > soldQ1,
+            $"Q2 (seasonal 1.5×) should sell more than Q1 (0.8×). Q1 sold: {soldQ1}, Q2 sold: {soldQ2}");
+    }
+
+    [Fact]
+    public async Task PublicSalesAnalytics_SeasonalOutlook_IsReturnedForConfiguredUnit()
+    {
+        // A unit with a product type that has seasonal data should return SeasonalOutlook
+        // with non-null quarterForecasts and a valid currentMultiplier.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var email = $"so-{Guid.NewGuid():N}@test.com";
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "SOPlayer");
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        var company = new Company { PlayerId = player.Id, Name = "SOCo", Cash = 5_000_000m };
+        db.Companies.Add(company);
+        var building = new Building { CompanyId = company.Id, CityId = city.Id, Type = BuildingType.SalesShop, Name = "SOShop", Level = 1, Latitude = city.Latitude, Longitude = city.Longitude };
+        db.Buildings.Add(building);
+        await db.SaveChangesAsync();
+
+        var unit = new BuildingUnit { Id = Guid.NewGuid(), BuildingId = building.Id, UnitType = UnitType.PublicSales, GridX = 0, GridY = 0, Level = 1, ProductTypeId = product.Id };
+        db.BuildingUnits.Add(unit);
+        db.PublicSalesRecords.Add(new PublicSalesRecord
+        {
+            Id = Guid.NewGuid(), BuildingUnitId = unit.Id, BuildingId = building.Id,
+            CompanyId = company.Id, CityId = city.Id, ProductTypeId = product.Id,
+            Tick = 1, QuantitySold = 5m, PricePerUnit = 45m, Revenue = 225m, Demand = 10m, SalesCapacity = 20m,
+        });
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(isolatedClient,
+            $@"{{ publicSalesAnalytics(unitId: ""{unit.Id}"") {{
+                seasonalOutlook {{
+                    currentQuarterIndex
+                    currentQuarterLabel
+                    currentMultiplier
+                    demandLevel
+                    callout
+                    quarterForecasts {{
+                        quarterIndex
+                        label
+                        multiplier
+                        isCurrent
+                        colorCode
+                    }}
+                }}
+            }} }}",
+            null, token);
+
+        var outlook = result.GetProperty("data").GetProperty("publicSalesAnalytics").GetProperty("seasonalOutlook");
+        Assert.NotEqual(System.Text.Json.JsonValueKind.Null, outlook.ValueKind);
+
+        // Current quarter index must be 0–3
+        var qi = outlook.GetProperty("currentQuarterIndex").GetInt32();
+        Assert.InRange(qi, 0, 3);
+
+        // Current multiplier must be in the seeded range for furniture
+        var multiplier = outlook.GetProperty("currentMultiplier").GetDecimal();
+        Assert.True(multiplier >= 0.5m && multiplier <= 2.0m, $"Multiplier {multiplier} out of range");
+
+        // Must have exactly 4 quarter forecasts
+        var forecasts = outlook.GetProperty("quarterForecasts");
+        Assert.Equal(4, forecasts.GetArrayLength());
+
+        // One of them must be marked isCurrent = true
+        var currentCount = 0;
+        for (int i = 0; i < 4; i++)
+        {
+            if (forecasts[i].GetProperty("isCurrent").GetBoolean())
+                currentCount++;
+        }
+        Assert.Equal(1, currentCount);
+
+        // Callout must not be empty
+        var callout = outlook.GetProperty("callout").GetString();
+        Assert.NotEmpty(callout ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task GameState_CurrentQuarterLabel_ReturnsCorrectQuarter()
+    {
+        // GameState.CurrentQuarterLabel must return "Q1"–"Q4" based on the current tick.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync();
+        Assert.NotNull(gameState);
+
+        gameState!.CurrentTick = 0;
+        Assert.Equal("Q1", gameState.CurrentQuarterLabel);
+
+        gameState.CurrentTick = GameConstants.TicksPerQuarter;
+        Assert.Equal("Q2", gameState.CurrentQuarterLabel);
+
+        gameState.CurrentTick = GameConstants.TicksPerQuarter * 2;
+        Assert.Equal("Q3", gameState.CurrentQuarterLabel);
+
+        gameState.CurrentTick = GameConstants.TicksPerQuarter * 3;
+        Assert.Equal("Q4", gameState.CurrentQuarterLabel);
+
+        // Wraps correctly at year boundary
+        gameState.CurrentTick = GameConstants.TicksPerYear;
+        Assert.Equal("Q1", gameState.CurrentQuarterLabel);
+    }
+
+    [Fact]
+    public async Task GameState_GraphQl_ReturnsCurrentQuarterFields()
+    {
+        // The gameState GraphQL query must expose currentQuarter (0-3) and currentQuarterLabel ("Q1"-"Q4")
+        // so the frontend can display the seasonal quarter badge in the navbar.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var result = await ExecuteGraphQlAsync(isolatedClient,
+            "{ gameState { currentTick currentQuarter currentQuarterLabel } }", null, null);
+
+        var state = result.GetProperty("data").GetProperty("gameState");
+
+        // currentQuarter must be 0-3
+        var quarter = state.GetProperty("currentQuarter").GetInt32();
+        Assert.InRange(quarter, 0, 3);
+
+        // currentQuarterLabel must be one of Q1-Q4
+        var label = state.GetProperty("currentQuarterLabel").GetString();
+        Assert.Contains(label, ["Q1", "Q2", "Q3", "Q4"]);
+
+        // At tick 0 the default game starts in Q1
+        Assert.Equal(0, state.GetProperty("currentTick").GetInt64());
+        Assert.Equal(0, quarter);
+        Assert.Equal("Q1", label);
+    }
+
+    [Fact]
+    public async Task PublicSalesAnalytics_SeasonalOutlook_NextQuarterMultiplierIsVisible()
+    {
+        // The 4 quarter forecasts must include next-quarter data (ROADMAP: "next-quarter multiplier")
+        // so players can plan inventory and pricing strategy ahead of demand peaks.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var gs = await db.GameStates.FirstOrDefaultDeterministicAsync();
+        Assert.NotNull(gs);
+        // Force Q1 so that Q2 is definitively the "next quarter"
+        gs!.CurrentTick = 0; // Q1
+        await db.SaveChangesAsync();
+
+        var email = $"nq-{Guid.NewGuid():N}@test.com";
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "NQPlayer");
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        var company = new Company { PlayerId = player.Id, Name = "NQCo", Cash = 5_000_000m };
+        db.Companies.Add(company);
+        var building = new Building { CompanyId = company.Id, CityId = city.Id, Type = BuildingType.SalesShop, Name = "NQShop", Level = 1, Latitude = city.Latitude, Longitude = city.Longitude };
+        db.Buildings.Add(building);
+        await db.SaveChangesAsync();
+
+        var unit = new BuildingUnit { Id = Guid.NewGuid(), BuildingId = building.Id, UnitType = UnitType.PublicSales, GridX = 0, GridY = 0, Level = 1, ProductTypeId = product.Id };
+        db.BuildingUnits.Add(unit);
+        db.PublicSalesRecords.Add(new PublicSalesRecord
+        {
+            Id = Guid.NewGuid(), BuildingUnitId = unit.Id, BuildingId = building.Id,
+            CompanyId = company.Id, CityId = city.Id, ProductTypeId = product.Id,
+            Tick = 1, QuantitySold = 5m, PricePerUnit = 45m, Revenue = 225m, Demand = 10m, SalesCapacity = 20m,
+        });
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(isolatedClient,
+            $@"{{ publicSalesAnalytics(unitId: ""{unit.Id}"") {{
+                seasonalOutlook {{
+                    currentQuarterIndex
+                    quarterForecasts {{
+                        quarterIndex label multiplier isCurrent colorCode
+                    }}
+                }}
+            }} }}",
+            null, token);
+
+        var outlook = result.GetProperty("data").GetProperty("publicSalesAnalytics").GetProperty("seasonalOutlook");
+        Assert.NotEqual(System.Text.Json.JsonValueKind.Null, outlook.ValueKind);
+
+        var currentQi = outlook.GetProperty("currentQuarterIndex").GetInt32();
+        Assert.Equal(0, currentQi); // Forced Q1
+
+        var forecasts = outlook.GetProperty("quarterForecasts");
+        Assert.Equal(4, forecasts.GetArrayLength());
+
+        // The next quarter (Q2, index 1) must be present with a multiplier value
+        // Furniture Q2 seeded at 1.5× (spring/move season peak).
+        var nextQ = forecasts.EnumerateArray().FirstOrDefault(f => f.GetProperty("quarterIndex").GetInt32() == 1);
+        Assert.NotEqual(default, nextQ);
+        var nextQMultiplier = nextQ.GetProperty("multiplier").GetDecimal();
+        Assert.True(nextQMultiplier > 1.0m,
+            $"Furniture next-quarter (Q2) multiplier should be >1.0 (spring peak), got {nextQMultiplier}");
+        Assert.False(nextQ.GetProperty("isCurrent").GetBoolean(),
+            "Next quarter must not be marked as current");
+    }
+
+    #endregion // Seasonal Demand
+
 }
 
 /// <summary>
@@ -37206,5 +37664,4 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var result = await ExecuteGraphQlAsync(client, "{ me { id } }", token: token);
         return Guid.Parse(result.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
     }
-
 }

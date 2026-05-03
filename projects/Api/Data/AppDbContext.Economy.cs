@@ -288,5 +288,16 @@ public sealed partial class AppDbContext
             e.HasIndex(r => new { r.CityId, r.ReportType, r.TickFrom }).IsUnique();
             e.HasIndex(r => r.GeneratedAtUtc);
         });
+
+        modelBuilder.Entity<DemandSeasonality>(e =>
+        {
+            e.HasKey(d => d.Id);
+            e.Property(d => d.Q1Multiplier).HasPrecision(5, 3);
+            e.Property(d => d.Q2Multiplier).HasPrecision(5, 3);
+            e.Property(d => d.Q3Multiplier).HasPrecision(5, 3);
+            e.Property(d => d.Q4Multiplier).HasPrecision(5, 3);
+            e.HasOne(d => d.ProductType).WithMany().HasForeignKey(d => d.ProductTypeId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(d => d.ProductTypeId).IsUnique();
+        });
     }
 }

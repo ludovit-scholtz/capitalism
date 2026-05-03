@@ -506,7 +506,7 @@ export async function loginAs(page: Page, state: MockState, player: MockPlayer):
   await page.goto('/login')
   await page.getByLabel('Email').fill(player.email)
   await page.getByLabel('Password').fill(player.password)
-  await page.getByRole('button', { name: 'Sign In' }).click()
+  await page.getByRole('button', { name: 'Sign In', exact: true }).click()
   await page.waitForURL('/')
   state.currentUserId = player.id
   state.currentToken = `token-${player.id}`

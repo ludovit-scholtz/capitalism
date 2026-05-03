@@ -105,6 +105,15 @@ public sealed partial class TickContext
     /// </summary>
     public Dictionary<Guid, BankAccount> BankAccountsById { get; init; } = [];
 
+    /// <summary>
+    /// Per-product seasonal demand multipliers keyed by <see cref="ProductType"/> ID.
+    /// Pre-loaded by <see cref="TickProcessor"/> from <see cref="Data.AppDbContext.DemandSeasonalities"/>.
+    /// Used by <see cref="Phases.PublicSalesPhase"/> to apply the seasonal multiplier
+    /// for the current game-year quarter.
+    /// Products without a row default to 1.0× (neutral seasonality).
+    /// </summary>
+    public Dictionary<Guid, DemandSeasonality> SeasonalityByProductTypeId { get; init; } = [];
+
     public List<Inventory> NewInventory { get; } = [];
     public List<BuildingUnitResourceHistory> NewUnitResourceHistories { get; } = [];
 

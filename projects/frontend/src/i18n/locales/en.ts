@@ -52,6 +52,7 @@ export default {
     cityMap: 'City Map',
     companySettings: 'Company Settings',
     gameTime: 'Game Time',
+    currentQuarter: 'Current game quarter (1 quarter ≈ 2190 ticks)',
     loans: 'Loans',
     banking: 'Banking',
     news: 'News',
@@ -1514,6 +1515,20 @@ export default {
         factor_COMPETITION: 'Competition',
         factor_SALARY: 'Purchasing Power',
         factor_TREND: 'Market Trend',
+        factor_SEASONAL: 'Seasonal Demand',
+      },
+      seasonalOutlook: {
+        title: 'Seasonal Outlook',
+        sectionLabel: 'Seasonal demand outlook',
+        forecastChartLabel: 'Demand forecast by quarter',
+        demandMultiplier: 'demand multiplier',
+        now: 'now',
+        demandLevel: {
+          HIGH: '⬆ High Demand',
+          MODERATE: '→ Moderate',
+          BELOW_AVERAGE: '⬇ Below Avg',
+          LOW: '⚠ Low Demand',
+        },
       },
       priceUpdateFailed: 'Failed to update price. Please try again.',
       priceUpdate: {

@@ -141,7 +141,7 @@ test.describe('Authentication', () => {
     await expect(page.getByRole('heading', { name: 'Sign In' })).toBeVisible()
     await page.getByLabel('Email').fill('existing@test.com')
     await page.getByLabel('Password').fill('TestPass1!')
-    await page.getByRole('button', { name: 'Sign In' }).click()
+    await page.getByRole('button', { name: 'Sign In', exact: true }).click()
     await page.waitForURL('/')
     await expect(page).toHaveURL('/')
   })
@@ -153,7 +153,7 @@ test.describe('Authentication', () => {
 
     await page.getByLabel('Email').fill('existing@test.com')
     await page.getByLabel('Password').fill('WrongPass!')
-    await page.getByRole('button', { name: 'Sign In' }).click()
+    await page.getByRole('button', { name: 'Sign In', exact: true }).click()
     await expect(page.getByRole('alert')).toBeVisible()
   })
 
@@ -170,7 +170,7 @@ test.describe('Authentication', () => {
     await expect(page.getByLabel('Display Name')).toBeVisible()
 
     // Switch back to login
-    await page.getByRole('button', { name: 'Sign In' }).click()
+    await page.getByRole('button', { name: 'Sign In', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Sign In' })).toBeVisible()
   })
 })

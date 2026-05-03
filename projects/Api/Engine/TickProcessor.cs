@@ -191,6 +191,10 @@ public sealed class TickProcessor(
         // Load bank accounts (needed for OperatingCostPhase fund checks).
         var bankAccounts = await db.BankAccounts.ToListAsync(ct);
 
+        // Load seasonal demand multipliers for all products (needed for PublicSalesPhase).
+        var seasonalities = await db.DemandSeasonalities.ToListAsync(ct);
+        var seasonalityByProductTypeId = seasonalities.ToDictionary(s => s.ProductTypeId);
+
         return new TickContext
         {
             Db = db,
@@ -237,6 +241,7 @@ public sealed class TickProcessor(
             ResearchBudgetsByKey = researchBudgets.ToDictionary(rb => (rb.CompanyId, rb.ProductTypeId)),
             WeatherByCity = weatherByCity,
             BankAccountsById = bankAccounts.ToDictionary(a => a.Id),
+            SeasonalityByProductTypeId = seasonalityByProductTypeId,
         };
     }
 }

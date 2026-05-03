@@ -179,6 +179,9 @@ public sealed partial class AppDbInitializer(
 
         // Property buildings must always have numeric occupancy and known area.
         await EnsurePropertyBuildingDefaultsAsync();
+
+        // Idempotent: ensure seasonal demand multipliers exist for all product types.
+        await EnsureDemandSeasonalitySeedAsync();
     }
 
     private async Task SeedFxRatesAsync()
