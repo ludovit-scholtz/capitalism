@@ -37,6 +37,62 @@ public sealed class OnboardingFundingRegressionTests : IClassFixture<ApiWebAppli
     }
 
     [Fact]
+    public async Task StartOnboardingCompany_LegacyNonUsdPersonalCash_SelfHealsUsdFounderFunding()
+    {
+        var email = $"onboarding-legacy-currency-{Guid.NewGuid():N}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "Legacy Currency Tester", "Password1!");
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(candidate => candidate.Email == email);
+
+            var usdAccount = await PersonalBankAccountService.EnsureTrackedAccountAsync(db, player.Id, "USD");
+            usdAccount.Balance = 0m;
+
+            var eurAccount = await PersonalBankAccountService.EnsureTrackedAccountAsync(db, player.Id, "EUR");
+            eurAccount.Balance = 200_000m;
+
+            await db.SaveChangesAsync();
+        }
+
+        var cityId = await GetCityIdByNameAsync("Bratislava");
+        var factoryLotId = await GetAvailableLotIdAsync(cityId, "FACTORY");
+
+        var startResult = await ExecuteGraphQlAsync(
+            """
+            mutation Start($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) {
+                company { id }
+              }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    industry = "FURNITURE",
+                    cityId,
+                    ipoRaiseTarget = (int)StarterIpoRaiseTarget,
+                    companyName = "Legacy Self Heal Co",
+                    factoryLotId,
+                },
+            },
+            token);
+
+        Assert.False(startResult.TryGetProperty("errors", out _),
+            "StartOnboardingCompany should self-heal legacy non-USD startup cash into USD founder funding.");
+
+        await using var verifyScope = _factory.Services.CreateAsyncScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var verifyPlayer = await verifyDb.Players.SingleAsync(candidate => candidate.Email == email);
+        var healedUsd = await PersonalBankAccountService.GetTrackedAccountAsync(verifyDb, verifyPlayer.Id, "USD");
+
+        Assert.NotNull(healedUsd);
+        Assert.Equal(0m, healedUsd!.Balance);
+    }
+
+    [Fact]
     public async Task FinishOnboarding_ConsumesUsdStarterCash_AndRecordsCompanyFundingLedgerEntries()
     {
         const string email = "onboarding-funding@test.com";

@@ -69,6 +69,12 @@ function handleBiatecSignIn() {
           </button>
 
           <button type="button" class="btn btn-secondary w-full justify-center" :disabled="auth.loading" @click="handleBiatecSignIn">
+            <svg class="mr-2 h-4 w-4" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.3-1.5 3.9-5.5 3.9-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.2.8 3.9 1.5l2.7-2.6C16.9 3.3 14.7 2.4 12 2.4 6.7 2.4 2.4 6.7 2.4 12S6.7 21.6 12 21.6c6.9 0 9.6-4.8 9.6-7.2 0-.5-.1-.9-.1-1.2H12z" />
+              <path fill="#34A853" d="M2.4 7.7l3.2 2.3C6.5 8 9 6 12 6c1.9 0 3.2.8 3.9 1.5l2.7-2.6C16.9 3.3 14.7 2.4 12 2.4 8.1 2.4 4.7 4.6 2.4 7.7z" />
+              <path fill="#FBBC05" d="M12 21.6c2.6 0 4.8-.9 6.5-2.5l-3-2.5c-.8.6-1.9 1.1-3.5 1.1-3.9 0-5.3-2.6-5.5-3.9l-3.2 2.5c2.2 3.2 5.7 5.3 8.7 5.3z" />
+              <path fill="#4285F4" d="M21.6 12.4c0-.8-.1-1.3-.2-1.9H12v3.9h5.5c-.3 1.5-1.6 2.8-2.8 3.6l3 2.5c1.8-1.6 2.9-4 2.9-8.1z" />
+            </svg>
             {{ t('auth.loginWithBiatec') }}
           </button>
         </form>

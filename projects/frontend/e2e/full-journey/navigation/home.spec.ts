@@ -132,7 +132,7 @@ test.describe('Header navigation', () => {
     })
 
     await page.goto('/login')
-    await page.getByRole('button', { name: 'Sign in with Biatec' }).click()
+    await page.getByRole('button', { name: 'Sign in with google' }).click()
 
     await expect(page).toHaveURL(/https:\/\/google.biatec.io\/authorize/)
     await expect(page).toHaveURL(/client_id=capitalism/)
