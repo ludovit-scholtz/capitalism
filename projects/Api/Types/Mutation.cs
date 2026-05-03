@@ -45,7 +45,8 @@ public sealed partial class Mutation
         [Industry.Furniture] = ["wooden-chair", "wooden-table", "wooden-bed"],
         [Industry.FoodProcessing] = ["bread", "pasta", "crackers"],
         [Industry.Healthcare] = ["basic-medicine", "bandages", "first-aid-kit"],
-        [Industry.Electronics] = ["basic-electronics", "led-screen", "circuit-board"]
+        [Industry.Electronics] = ["basic-electronics", "led-screen", "circuit-board"],
+        [Industry.Construction] = ["residential-block", "commercial-block", "industrial-block"]
     };
 
 

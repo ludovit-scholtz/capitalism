@@ -58,7 +58,7 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        // Electronics is a Pro-only starter industry.
+        // Electronics and Construction are Pro-only starter industries.
         if (Industry.ProOnlyStarterIndustries.Contains(input.Industry) && !hasActiveProSubscription)
         {
             throw new GraphQLException(
@@ -301,7 +301,7 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        // Electronics is a Pro-only starter industry.
+        // Electronics and Construction are Pro-only starter industries.
         var hasProForStart = ProductAccessService.HasActiveProSubscription(player, nowUtc);
         if (Industry.ProOnlyStarterIndustries.Contains(input.Industry) && !hasProForStart)
         {
