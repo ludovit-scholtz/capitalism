@@ -233,6 +233,10 @@ export default {
     loginToAccess: 'Prihláste sa pre prístup',
     loginFailed: 'Prihl\u00e1senie zlyhalo. Skontrolujte prihlasovacie \u00fadaje a sk\u00faste znova.',
     loginRequired: 'Pred pokračovaním sa prihláste.',
+    loginWithBiatec: 'Prihlásiť cez Biatec',
+    oidcCallbackTitle: 'Dokončovanie prihlásenia',
+    oidcCallbackLoading: 'Overujeme váš Biatec token a načítavame herný profil…',
+    oidcCallbackFailed: 'Prihlásenie cez Biatec zlyhalo. Skúste to znova.',
   },
   onboarding: {
     title: 'Začnite svoje impérium',

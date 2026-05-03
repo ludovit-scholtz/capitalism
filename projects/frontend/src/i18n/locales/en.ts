@@ -234,6 +234,10 @@ export default {
     loginFailed: 'Login failed. Please check your credentials and try again.',
     loginToAccess: 'Log in to access',
     loginRequired: 'Please log in to continue.',
+    loginWithBiatec: 'Sign in with Biatec',
+    oidcCallbackTitle: 'Completing sign in',
+    oidcCallbackLoading: 'We are verifying your Biatec token and loading your game profile…',
+    oidcCallbackFailed: 'Biatec sign-in failed. Please try again.',
   },
   onboarding: {
     title: 'Start Your Empire',

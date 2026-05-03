@@ -30,6 +30,17 @@ Master API has its own database and handles the subscription management.
 
 When player creates the account, he creates it at the master server. When user requests the token, he does it against the master server. The token is usable against every game server and master server.
 
+The game supports two authentication modes:
+- Native account authentication via `register` and `login` GraphQL mutations (email + password).
+- Biatec OpenID Connect sign-in via redirect to the Biatec `/authorize` endpoint and callback handling at `/auth/callback`.
+
+OIDC integration requirements:
+- Client flow must validate `state` and `nonce` before accepting callback tokens.
+- API must validate external JWT `iss`, `aud`, signature, and expiry against the Biatec OIDC configuration and JWKS.
+- Existing local JWT validation for native login must remain enabled in parallel.
+- Player provisioning from external claims must use normalized email matching to prevent duplicate-player creation.
+- Production environments must use HTTPS for OIDC authority and redirect URIs.
+
 ## Buildings
 
 Every building must be placed on existing land. Land can be purchased on the map and has value that can increase over time, GPS coordinates, and attributes like population index that feed public-sales calculations.

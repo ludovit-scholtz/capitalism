@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 
 const { t } = useI18n()
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 
 const isRegister = ref(false)
@@ -26,6 +27,12 @@ async function handleSubmit() {
   } catch (e: unknown) {
     formError.value = e instanceof Error ? e.message : 'An error occurred'
   }
+}
+
+function handleBiatecSignIn() {
+  formError.value = null
+  const redirectPath = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
+  auth.startBiatecOidcSignIn(redirectPath)
 }
 </script>
 
@@ -59,6 +66,10 @@ async function handleSubmit() {
 
           <button type="submit" class="btn btn-primary w-full justify-center" :disabled="auth.loading">
             {{ auth.loading ? t('common.loading') : isRegister ? t('auth.registerButton') : t('auth.loginButton') }}
+          </button>
+
+          <button type="button" class="btn btn-secondary w-full justify-center" :disabled="auth.loading" @click="handleBiatecSignIn">
+            {{ t('auth.loginWithBiatec') }}
           </button>
         </form>
 
