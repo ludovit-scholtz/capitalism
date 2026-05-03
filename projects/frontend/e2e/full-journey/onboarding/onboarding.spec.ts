@@ -1179,9 +1179,7 @@ test.describe('Guest onboarding wizard', () => {
 
     await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
 
-    const convertedEvents = (await page.evaluate(
-      () => (window as unknown as Record<string, unknown[]>).__convertedEvents ?? []
-    )) as Array<Record<string, unknown>>
+    const convertedEvents = (await page.evaluate(() => (window as unknown as Record<string, unknown[]>).__convertedEvents ?? [])) as Array<Record<string, unknown>>
     const convertedEvent = convertedEvents[0]
     expect(convertedEvent).toBeTruthy()
     expect(convertedEvent?.industry).toBe('FURNITURE')
