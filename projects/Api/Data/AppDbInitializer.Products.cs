@@ -116,6 +116,88 @@ public sealed partial class AppDbInitializer
         await dbContext.SaveChangesAsync();
     }
 
+    /// <summary>
+    /// Idempotent upgrade: ensures the three Construction starter products with direct Iron Ore
+    /// recipes are present. Databases seeded before the Construction Pro-starter increment
+    /// will not have <c>residential-block</c>, <c>commercial-block</c>, or <c>industrial-block</c>.
+    /// </summary>
+    private async Task EnsureConstructionStarterProductsAsync()
+    {
+        var ironOre = await dbContext.ResourceTypes.FirstOrDefaultAsync(r => r.Slug == "iron-ore");
+        if (ironOre == null) return;
+
+        // Products to ensure exist with a direct Iron Ore resource recipe.
+        var starterSeeds = new[]
+        {
+            (Slug: "residential-block",  Name: "Residential Block",  BasePrice: 80m,  CraftTicks: 3, Output: 8m,  Energy: 1.2m, Description: "A prefabricated residential building block made from processed iron. The entry point for any construction company entering the housing market.", UnitName: "Block",  UnitSymbol: "blocks", IronOreQty: 2m),
+            (Slug: "commercial-block",   Name: "Commercial Block",   BasePrice: 120m, CraftTicks: 4, Output: 5m,  Energy: 1.5m, Description: "A structural block for commercial buildings. Higher iron content means premium durability for shops, offices, and service buildings.", UnitName: "Block",  UnitSymbol: "blocks", IronOreQty: 3m),
+            (Slug: "industrial-block",   Name: "Industrial Block",   BasePrice: 180m, CraftTicks: 5, Output: 3m,  Energy: 1.8m, Description: "A heavy-duty industrial building block engineered for factories and warehouses. Maximum iron content for maximum load-bearing capacity.", UnitName: "Block",  UnitSymbol: "blocks", IronOreQty: 4m),
+        };
+
+        foreach (var seed in starterSeeds)
+        {
+            var productId = CreateDeterministicGuid($"product:{seed.Slug}");
+            var existing = await dbContext.ProductTypes
+                .Include(p => p.Recipes)
+                .FirstOrDefaultAsync(p => p.Id == productId);
+
+            if (existing == null)
+            {
+                // Product doesn't exist yet — add it.
+                var labor = ComputeBasicLaborHours(seed.CraftTicks, seed.Energy, 1);
+                var elasticity = DeterminePriceElasticity(Industry.Construction);
+                var product = new ProductType
+                {
+                    Id = productId,
+                    Name = seed.Name,
+                    Slug = seed.Slug,
+                    Industry = Industry.Construction,
+                    BasePrice = seed.BasePrice,
+                    PriceElasticity = elasticity,
+                    BaseCraftTicks = seed.CraftTicks,
+                    OutputQuantity = seed.Output,
+                    EnergyConsumptionMwh = seed.Energy,
+                    BasicLaborHours = labor,
+                    IsProOnly = true,
+                    UnitName = seed.UnitName,
+                    UnitSymbol = seed.UnitSymbol,
+                    Description = seed.Description
+                };
+                dbContext.ProductTypes.Add(product);
+
+                dbContext.ProductRecipes.Add(new ProductRecipe
+                {
+                    Id = CreateDeterministicGuid($"recipe:{seed.Slug}:iron-ore"),
+                    ProductTypeId = productId,
+                    ResourceTypeId = ironOre.Id,
+                    Quantity = seed.IronOreQty
+                });
+            }
+            else
+            {
+                // Ensure the product is correctly marked as Pro-only and has an Iron Ore recipe.
+                var hasIronOreRecipe = existing.Recipes.Any(r => r.ResourceTypeId == ironOre.Id);
+                if (!hasIronOreRecipe)
+                {
+                    dbContext.ProductRecipes.Add(new ProductRecipe
+                    {
+                        Id = CreateDeterministicGuid($"recipe:{seed.Slug}:iron-ore"),
+                        ProductTypeId = productId,
+                        ResourceTypeId = ironOre.Id,
+                        Quantity = seed.IronOreQty
+                    });
+                }
+
+                if (!existing.IsProOnly)
+                {
+                    existing.IsProOnly = true;
+                }
+            }
+        }
+
+        await dbContext.SaveChangesAsync();
+    }
+
     private static IReadOnlyList<ProductSeed> GetProductSeeds() =>
     [
         .. GetFurnitureProducts(),

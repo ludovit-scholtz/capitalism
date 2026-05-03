@@ -27,16 +27,18 @@ It will use real world map. The game will start in single city and later other c
 - [x] Implement share buyback: when a company purchases its own shares on the stock exchange, reduce the total issued share count by the purchased amount and remove those shares from public float, updating share price accordingly.
 - [x] Add E2E and backend integration tests for takeover trigger at exactly 50%, merge at exactly 90%, and buyback share-count reduction so these mechanics are regression-proof.
 
-### More industries and products (50% complete)
+### More industries and products (70% complete)
 
 **Shipped increment (Electronics Pro-starter):** Electronics industry is now a fully playable Pro-subscriber-exclusive onboarding starter path. Three Silicon-driven products (Basic Electronics, LED Screen, Circuit Board) are seeded with direct silicon manufacturing recipes, exposed in the encyclopedia and resource-detail views, and Pro-gated at both the backend (`Player.IsProSubscriber` check in `startOnboardingCompany` / `finishOnboarding`) and the frontend (industry card with PRO badge, error on non-Pro click). The manufacturing encyclopedia and resource detail views already surface the full Electronics chain via the existing industry filter. All existing test suites pass, and new backend and E2E tests cover Pro-gating, product seeding, and the full Electronics onboarding flow.
+
+**Shipped increment (Construction Pro-starter):** Construction industry is now a fully playable Pro-subscriber-exclusive onboarding starter path alongside Electronics. Three Iron Ore-driven products (Residential Block, Commercial Block, Industrial Block) are seeded with direct iron-ore manufacturing recipes and are Pro-gated at both the backend (`ProOnlyStarterIndustries` constant in `startOnboardingCompany` / `finishOnboarding`) and the frontend (industry card with PRO badge, crane 🏗️ icon, and error on non-Pro click). The manufacturing encyclopedia surfaces the Construction chain via the existing industry filter. All existing test suites pass, and new backend and E2E tests cover Pro-gating, product seeding, recipe correctness, and the full Construction onboarding flow.
 
 - [x] Add Electronics industry with Silicon as raw input: define product types for Basic Electronics, LED Screen, and Circuit Board with manufacturing recipes linking Silicon resource to each product via factory purchase → manufacturing → public sales chain.
 - [x] Expose Electronics as a Pro-subscription-only starter choice in the onboarding industry selection step, gating it behind `Player.IsProSubscriber` on the backend; free players see only Furniture, Food Processing, and Healthcare.
 - [x] Add 3 Electronics starter products to the database initializer with correct silicon-only recipes resolvable via the manufacturing encyclopedia.
 - [x] Update encyclopedia and resource detail views to surface Electronics product chains (Silicon resource detail page links to all three starter products).
-- [ ] Add Construction industry with Iron Ore as raw input: define product types for Steel Beam, Reinforced Concrete Panel, and Prefab Window Unit, ensuring construction products have higher base price and weight for shipping cost differentiation.
-- [ ] Expose Construction as a Pro-subscription-only starter choice alongside Electronics.
+- [x] Add Construction industry with Iron Ore as raw input: three starter products (Residential Block, Commercial Block, Industrial Block) with direct iron-ore manufacturing recipes and higher base prices ($80–$180) compared to other starter industries.
+- [x] Expose Construction as a Pro-subscription-only starter choice alongside Electronics.
 
 ### Supply chain visualization (100% complete)
 

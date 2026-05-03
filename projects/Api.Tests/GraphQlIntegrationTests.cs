@@ -10172,13 +10172,14 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         // The configure-guide in the frontend depends on selectedProduct.basePrice from the
         // FinishOnboarding result to show the player the market benchmark selling price.
         // If this field is ever dropped from the GraphQL response, the guide silently shows
-        // generic text instead of the concrete price ($45 Furniture, $3 Bread, $50 Medicine, $45 Electronics).
+        // generic text instead of the concrete price ($45 Furniture, $3 Bread, $50 Medicine, $45 Electronics, $80 Construction).
         var industries = new[]
         {
             ("FURNITURE", "wooden-chair", 45m, false),
             ("FOOD_PROCESSING", "bread", 3m, false),
             ("HEALTHCARE", "basic-medicine", 50m, false),
             ("ELECTRONICS", "basic-electronics", 45m, true),
+            ("CONSTRUCTION", "residential-block", 80m, true),
         };
 
         foreach (var (industry, slug, expectedBasePrice, requiresPro) in industries)
@@ -10965,6 +10966,273 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var result = finishResult.GetProperty("data").GetProperty("finishOnboarding");
         Assert.Equal("basic-electronics", result.GetProperty("selectedProduct").GetProperty("slug").GetString());
         Assert.Equal("EUR", result.GetProperty("cityCurrencyCode").GetString());
+    }
+
+    [Fact]
+    public async Task StartOnboardingCompany_Construction_AsNonProUser_ReturnsProError()
+    {
+        var token = await RegisterAndGetTokenAsync($"start-construction-nonpro-{Guid.NewGuid()}@test.com", "NonProConstruct");
+        var cityId = await GetCityIdByNameAsync();
+        var lotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Construction Industrial Zone");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { company { id } }
+            }
+            """,
+            new { input = new { industry = "CONSTRUCTION", cityId, companyName = "Construction Co", factoryLotId = lotId } },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Equal("PRO_SUBSCRIPTION_REQUIRED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task StartOnboardingCompany_Construction_AsProUser_Succeeds()
+    {
+        var email = $"start-construction-pro-{Guid.NewGuid()}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "ProConstruct");
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddDays(30);
+            await db.SaveChangesAsync();
+        }
+
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Construction Pro Zone");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { company { id name } }
+            }
+            """,
+            new { input = new { industry = "CONSTRUCTION", cityId, companyName = "Pro Build Co", factoryLotId } },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _), $"Pro Construction start failed: {result}");
+        var company = result.GetProperty("data").GetProperty("startOnboardingCompany").GetProperty("company");
+        Assert.Equal("Pro Build Co", company.GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_Construction_AsProUser_Succeeds()
+    {
+        var email = $"finish-construction-pro-{Guid.NewGuid()}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "FinishBuildPro");
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddDays(30);
+            await db.SaveChangesAsync();
+        }
+
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Construction Factory Zone");
+
+        var startResult = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { company { id } }
+            }
+            """,
+            new { input = new { industry = "CONSTRUCTION", cityId, companyName = "Build Empire", factoryLotId } },
+            token);
+        Assert.False(startResult.TryGetProperty("errors", out _), $"Start errors: {startResult}");
+
+        var residentialBlockId = await GetStarterProductIdAsync("CONSTRUCTION", "residential-block");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Construction Shop Zone");
+
+        var finishResult = await ExecuteGraphQlAsync(
+            """
+            mutation FinishOnboarding($input: FinishOnboardingInput!) {
+              finishOnboarding(input: $input) {
+                selectedProduct { id name slug isProOnly }
+                factory { units { unitType } }
+              }
+            }
+            """,
+            new { input = new { productTypeId = residentialBlockId, shopLotId } },
+            token);
+
+        Assert.False(finishResult.TryGetProperty("errors", out _), $"Finish errors: {finishResult}");
+        var finishData = finishResult.GetProperty("data").GetProperty("finishOnboarding");
+        Assert.Equal("residential-block", finishData.GetProperty("selectedProduct").GetProperty("slug").GetString());
+        Assert.True(finishData.GetProperty("selectedProduct").GetProperty("isProOnly").GetBoolean());
+
+        var units = finishData.GetProperty("factory").GetProperty("units").EnumerateArray().ToList();
+        Assert.Contains(units, u => u.GetProperty("unitType").GetString() == "PURCHASE");
+        Assert.Contains(units, u => u.GetProperty("unitType").GetString() == "MANUFACTURING");
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_Construction_AsNonProUser_ProductAccessDenied()
+    {
+        // Non-Pro user attempts to use a Construction product in FinishOnboarding.
+        // Even if they somehow bypassed the industry gate, the product-access check must block them.
+        var email = $"finish-construction-nonpro-{Guid.NewGuid()}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "NonProFinishBuild");
+
+        // Manually set OnboardingIndustry to Construction bypassing the Pro check at StartOnboardingCompany.
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Construction Bypass Zone");
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            // Grant Pro temporarily to start, then revoke before finishing.
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddDays(30);
+            await db.SaveChangesAsync();
+        }
+
+        var startResult = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { company { id } }
+            }
+            """,
+            new { input = new { industry = "CONSTRUCTION", cityId, companyName = "Bypass Build Co", factoryLotId } },
+            token);
+        Assert.False(startResult.TryGetProperty("errors", out _), $"Start errors: {startResult}");
+
+        // Now revoke Pro subscription before FinishOnboarding.
+        await using (var revokeScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = revokeScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddMinutes(-1);
+            await db.SaveChangesAsync();
+        }
+
+        var residentialBlockId = await GetStarterProductIdAsync("CONSTRUCTION", "residential-block");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Bypass Shop Zone");
+
+        var finishResult = await ExecuteGraphQlAsync(
+            """
+            mutation FinishOnboarding($input: FinishOnboardingInput!) {
+              finishOnboarding(input: $input) { selectedProduct { slug } }
+            }
+            """,
+            new { input = new { productTypeId = residentialBlockId, shopLotId } },
+            token);
+
+        Assert.True(finishResult.TryGetProperty("errors", out var finishErrors));
+        var code = finishErrors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("PRO_SUBSCRIPTION_REQUIRED", code);
+    }
+
+    [Fact]
+    public async Task ConstructionStarterProducts_AllHaveDirectIronOreRecipe()
+    {
+        var starterSlugs = new[] { "residential-block", "commercial-block", "industrial-block" };
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            {
+              productTypes(industry: "CONSTRUCTION") {
+                slug
+                isProOnly
+                recipes { resourceType { slug } inputProductType { slug } quantity }
+              }
+            }
+            """);
+
+        var products = result.GetProperty("data").GetProperty("productTypes").EnumerateArray()
+            .Where(p => starterSlugs.Contains(p.GetProperty("slug").GetString()))
+            .ToList();
+
+        Assert.Equal(3, products.Count);
+
+        foreach (var product in products)
+        {
+            var slug = product.GetProperty("slug").GetString();
+            Assert.True(product.GetProperty("isProOnly").GetBoolean(), $"{slug} should be Pro-only");
+
+            var recipes = product.GetProperty("recipes").EnumerateArray().ToList();
+            var ironOreRecipe = recipes.FirstOrDefault(r =>
+                r.TryGetProperty("resourceType", out var rt) &&
+                rt.ValueKind != System.Text.Json.JsonValueKind.Null &&
+                rt.GetProperty("slug").GetString() == "iron-ore");
+
+            Assert.True(ironOreRecipe.ValueKind != System.Text.Json.JsonValueKind.Undefined,
+                $"{slug} must have a direct iron-ore recipe");
+        }
+    }
+
+    [Fact]
+    public async Task StarterIndustries_IncludesConstructionAsProOnly()
+    {
+        var result = await ExecuteGraphQlAsync(
+            "{ starterIndustries { industries proOnlyIndustries } }");
+
+        var payload = result.GetProperty("data").GetProperty("starterIndustries");
+        var industries = payload.GetProperty("industries").EnumerateArray().Select(i => i.GetString()).ToList();
+        var proOnly = payload.GetProperty("proOnlyIndustries").EnumerateArray().Select(i => i.GetString()).ToList();
+
+        Assert.Contains("CONSTRUCTION", industries);
+        Assert.Contains("CONSTRUCTION", proOnly);
+        Assert.DoesNotContain("FURNITURE", proOnly);
+        Assert.DoesNotContain("FOOD_PROCESSING", proOnly);
+        Assert.DoesNotContain("HEALTHCARE", proOnly);
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_ResultIncludesSelectedProductBasePrice_ForConstructionIndustry()
+    {
+        // Construction starter products (Residential Block) should return basePrice=$80 in the result.
+        var email = $"guide-price-construction-{Guid.NewGuid():N}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "Guide Price Construction");
+
+        await using var proScope = _factory.Services.CreateAsyncScope();
+        {
+            var db = proScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddDays(30);
+            await db.SaveChangesAsync();
+        }
+
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await GetAvailableLotIdAsync(cityId, "FACTORY");
+        var startResult = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { company { id } }
+            }
+            """,
+            new { input = new { industry = "CONSTRUCTION", cityId, companyName = "Build Price Co", factoryLotId } },
+            token);
+        Assert.False(startResult.TryGetProperty("errors", out _), $"StartOnboardingCompany failed for CONSTRUCTION");
+
+        var residentialBlockId = await GetStarterProductIdAsync("CONSTRUCTION", "residential-block");
+        var shopLotId = await GetAvailableLotIdAsync(cityId, "SALES_SHOP");
+
+        var finishResult = await ExecuteGraphQlAsync(
+            """
+            mutation FinishOnboarding($input: FinishOnboardingInput!) {
+              finishOnboarding(input: $input) {
+                selectedProduct { id name basePrice }
+              }
+            }
+            """,
+            new { input = new { productTypeId = residentialBlockId, shopLotId } },
+            token);
+
+        Assert.False(finishResult.TryGetProperty("errors", out _), $"FinishOnboarding failed for CONSTRUCTION");
+        var returnedBasePrice = finishResult
+            .GetProperty("data")
+            .GetProperty("finishOnboarding")
+            .GetProperty("selectedProduct")
+            .GetProperty("basePrice")
+            .GetDecimal();
+
+        Assert.Equal(80m, returnedBasePrice);
     }
 
     [Fact]

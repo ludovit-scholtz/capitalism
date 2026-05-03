@@ -181,6 +181,7 @@ const starterProductSlugByIndustry: Record<string, string[]> = {
   FOOD_PROCESSING: ['bread', 'pasta', 'crackers'],
   HEALTHCARE: ['basic-medicine', 'bandages', 'first-aid-kit'],
   ELECTRONICS: ['basic-electronics', 'led-screen', 'circuit-board'],
+  CONSTRUCTION: ['residential-block', 'commercial-block', 'industrial-block'],
 }
 
 const step = ref(1)
@@ -415,6 +416,7 @@ const industryIcons: Record<string, string> = {
   FOOD_PROCESSING: '🍞',
   HEALTHCARE: '💊',
   ELECTRONICS: '💻',
+  CONSTRUCTION: '🏗️',
 }
 
 /** Maps each starter industry to its i18n description key. */
@@ -423,6 +425,7 @@ const industryDescKeys: Record<string, string> = {
   FOOD_PROCESSING: 'onboarding.industryDescFoodProcessing',
   HEALTHCARE: 'onboarding.industryDescHealthcare',
   ELECTRONICS: 'onboarding.industryDescElectronics',
+  CONSTRUCTION: 'onboarding.industryDescConstruction',
 }
 
 /** Maps each starter industry to its i18n first-product hint key. */
@@ -431,6 +434,7 @@ const industryFirstProductKeys: Record<string, string> = {
   FOOD_PROCESSING: 'onboarding.industryFirstProductFoodProcessing',
   HEALTHCARE: 'onboarding.industryFirstProductHealthcare',
   ELECTRONICS: 'onboarding.industryFirstProductElectronics',
+  CONSTRUCTION: 'onboarding.industryFirstProductConstruction',
 }
 
 /** Maps each starter industry to its i18n "why choose" tag key. */
@@ -439,6 +443,7 @@ const industryWhyKeys: Record<string, string> = {
   FOOD_PROCESSING: 'onboarding.industryWhyFoodProcessing',
   HEALTHCARE: 'onboarding.industryWhyHealthcare',
   ELECTRONICS: 'onboarding.industryWhyElectronics',
+  CONSTRUCTION: 'onboarding.industryWhyConstruction',
 }
 
 function resolveMaxReachableStep(): number {

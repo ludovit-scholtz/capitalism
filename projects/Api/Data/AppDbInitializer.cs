@@ -120,6 +120,10 @@ public sealed partial class AppDbInitializer(
         // product-ingredient circuit-board recipe.
         await EnsureElectronicsStarterProductsAsync();
 
+        // Idempotent: ensure Construction starter products (Residential Block, Commercial Block,
+        // and Industrial Block with direct Iron Ore recipe) exist.
+        await EnsureConstructionStarterProductsAsync();
+
         var currentTick = await dbContext.GameStates
             .AsNoTracking()
             .Select(state => state.CurrentTick)
