@@ -448,3 +448,91 @@ test.describe('Seasonal demand – mobile viewport', () => {
     await expect(panel.locator('.seasonal-current-multiplier')).toContainText('1.5×')
   })
 })
+
+test.describe('Seasonal demand – Q3 and healthcare scenarios', () => {
+  test('displays seasonal outlook panel for Q3 (above average demand)', async ({ page }) => {
+    const player = makeSeasonalShopPlayer()
+    const state = setupMockApi(page, {
+      players: [player],
+      cities: makeDefaultCities(),
+      products: makeDefaultProducts(),
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    // Q3: furniture 1.3× — MODERATE/HIGH demand
+    state.publicSalesAnalytics['unit-seasonal-ps'] = makeAnalyticsWithSeasonal(2)
+
+    await page.addInitScript(
+      ({ token, expires }) => {
+        localStorage.setItem('auth_token', token)
+        localStorage.setItem('auth_expires', expires)
+      },
+      { token: `token-${player.id}`, expires: new Date(Date.now() + 7_200_000).toISOString() },
+    )
+
+    await page.goto('/building/building-seasonal-shop')
+    await expect(page.getByRole('heading', { name: 'Seasonal Test Shop' })).toBeVisible()
+
+    const activeSection = getGridSection(page, 'Current Configuration')
+    await getGridCell(activeSection, 0, 0).click()
+    await clickUnitTab(page, 'Market')
+
+    const panel = page.locator('[aria-label="Market Intelligence"]')
+    await expect(panel.locator('.seasonal-outlook')).toBeVisible()
+
+    // Q3 for furniture: 1.3× multiplier
+    await expect(panel.locator('.seasonal-current-multiplier')).toContainText('1.3×')
+
+    // Quarter badge shows Q3
+    await expect(panel.locator('.seasonal-current-quarter')).toContainText('Q3')
+
+    // All 4 forecast bars visible
+    const quarterLabels = panel.locator('.seasonal-forecast-chart .seasonal-quarter-label')
+    await expect(quarterLabels).toHaveCount(4)
+
+    // Q3 is the current indicator
+    await expect(panel.locator('.seasonal-current-indicator')).toHaveCount(1)
+  })
+
+  test('null seasonalOutlook on analytics does not show panel or cause errors', async ({
+    page,
+  }) => {
+    const player = makeSeasonalShopPlayer()
+    const state = setupMockApi(page, {
+      players: [player],
+      cities: makeDefaultCities(),
+      products: makeDefaultProducts(),
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    // Override: no seasonalOutlook returned
+    state.publicSalesAnalytics['unit-seasonal-ps'] = {
+      ...makeAnalyticsWithSeasonal(0),
+      seasonalOutlook: null,
+    }
+
+    await page.addInitScript(
+      ({ token, expires }) => {
+        localStorage.setItem('auth_token', token)
+        localStorage.setItem('auth_expires', expires)
+      },
+      { token: `token-${player.id}`, expires: new Date(Date.now() + 7_200_000).toISOString() },
+    )
+
+    await page.goto('/building/building-seasonal-shop')
+    await expect(page.getByRole('heading', { name: 'Seasonal Test Shop' })).toBeVisible()
+
+    const activeSection = getGridSection(page, 'Current Configuration')
+    await getGridCell(activeSection, 0, 0).click()
+    await clickUnitTab(page, 'Market')
+
+    const panel = page.locator('[aria-label="Market Intelligence"]')
+    await expect(panel).toBeVisible()
+
+    // No seasonal outlook panel when data is null
+    await expect(panel.locator('.seasonal-outlook')).toHaveCount(0)
+
+    // Page must not show any error overlay
+    await expect(page.locator('.page-error, .error-banner')).toHaveCount(0)
+  })
+})

@@ -8206,6 +8206,6 @@ export async function loginAs(page: Page, state: MockState, player: MockPlayer):
     document.cookie = `auth_token=${encodeURIComponent(token)}; path=/`
     document.cookie = `auth_expires=${encodeURIComponent(expires)}; path=/`
   }, token)
-  await page.getByRole('button', { name: 'Sign In' }).click()
+  await page.getByRole('button', { name: 'Sign In', exact: true }).click()
   await page.waitForURL('/')
 }

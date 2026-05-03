@@ -372,4 +372,173 @@ public sealed class DemandSeasonalityTests
 
         Assert.True(sold > 0, $"Neutral season (1.0×) should still produce sales. Sold: {sold}");
     }
+
+    [Fact]
+    public async Task EnsureDemandSeasonality_FoodProcessingPeaksInQ4()
+    {
+        // Food processing holiday/winter pattern: Q4 (1.2×) must be >= Q2/Q3 (1.0×).
+        await using var factory = new ApiWebApplicationFactory();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var ids = await db.ProductTypes
+            .Where(p => p.Industry == Industry.FoodProcessing)
+            .Select(p => p.Id).ToListAsync();
+
+        Assert.NotEmpty(ids);
+
+        foreach (var id in ids)
+        {
+            var s = await db.DemandSeasonalities.FirstAsync(d => d.ProductTypeId == id);
+            Assert.True(s.Q4Multiplier >= s.Q2Multiplier,
+                $"FoodProcessing Q4 ({s.Q4Multiplier}) should be >= Q2 ({s.Q2Multiplier}) for {id}");
+            Assert.True(s.Q4Multiplier >= s.Q3Multiplier,
+                $"FoodProcessing Q4 ({s.Q4Multiplier}) should be >= Q3 ({s.Q3Multiplier}) for {id}");
+        }
+    }
+
+    [Fact]
+    public async Task EnsureDemandSeasonality_HealthcareHasWinterFluPeaks()
+    {
+        // Healthcare flu season: Q1 and Q4 must be higher than summer trough Q3 (0.9×).
+        await using var factory = new ApiWebApplicationFactory();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var ids = await db.ProductTypes
+            .Where(p => p.Industry == Industry.Healthcare)
+            .Select(p => p.Id).ToListAsync();
+
+        Assert.NotEmpty(ids);
+
+        foreach (var id in ids)
+        {
+            var s = await db.DemandSeasonalities.FirstAsync(d => d.ProductTypeId == id);
+            Assert.True(s.Q1Multiplier > s.Q3Multiplier,
+                $"Healthcare Q1 ({s.Q1Multiplier}) should be > Q3 (summer trough {s.Q3Multiplier}) for {id}");
+            Assert.True(s.Q4Multiplier > s.Q3Multiplier,
+                $"Healthcare Q4 ({s.Q4Multiplier}) should be > Q3 (summer trough {s.Q3Multiplier}) for {id}");
+        }
+    }
+
+    [Fact]
+    public async Task PublicSalesPhase_Q4ElectronicsSeasonMultiplier_IncreasesQuantitySold_VsQ1()
+    {
+        // Electronics Q4 holiday gift season (1.5×) must produce more sales than Q1 (0.9×).
+        // Uses small isolated cities so demand < unit capacity (no capacity binding).
+        await using var factory = new ApiWebApplicationFactory();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var tablet = await db.ProductTypes.FirstAsync(p => p.Industry == Industry.Electronics);
+
+        var seasonality = await db.DemandSeasonalities
+            .FirstOrDefaultAsync(d => d.ProductTypeId == tablet.Id);
+        Assert.NotNull(seasonality);
+
+        // Verify that Q4 > Q1 for electronics seed data (1.5 vs 0.9)
+        Assert.True(seasonality!.Q4Multiplier > seasonality.Q1Multiplier,
+            $"Electronics Q4 ({seasonality.Q4Multiplier}) should exceed Q1 ({seasonality.Q1Multiplier})");
+
+        var cityQ1 = new City
+        {
+            Id = Guid.NewGuid(), Name = "ElecCityQ1", CurrencyCode = "EUR",
+            Population = 20_000, BaseSalaryPerManhour = 15m,
+            Latitude = 48.0, Longitude = 17.3, FuelPriceIndex = 1.0m,
+        };
+        var cityQ4 = new City
+        {
+            Id = Guid.NewGuid(), Name = "ElecCityQ4", CurrencyCode = "EUR",
+            Population = 20_000, BaseSalaryPerManhour = 15m,
+            Latitude = 48.0, Longitude = 17.4, FuelPriceIndex = 1.0m,
+        };
+        db.Cities.AddRange(cityQ1, cityQ4);
+
+        var player = new Player { Id = Guid.NewGuid(), Email = $"elec-{Guid.NewGuid():N}@t.com", DisplayName = "E", PasswordHash = "h", Role = PlayerRole.Player };
+        var coQ1 = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "ElecCoQ1", Cash = 5_000_000m };
+        var coQ4 = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "ElecCoQ4", Cash = 5_000_000m };
+        db.Players.Add(player);
+        db.Companies.AddRange(coQ1, coQ4);
+
+        var shopQ1 = new Building { Id = Guid.NewGuid(), CompanyId = coQ1.Id, CityId = cityQ1.Id, Type = BuildingType.SalesShop, Name = "ElecShopQ1", Level = 1 };
+        var shopQ4 = new Building { Id = Guid.NewGuid(), CompanyId = coQ4.Id, CityId = cityQ4.Id, Type = BuildingType.SalesShop, Name = "ElecShopQ4", Level = 1 };
+        db.Buildings.AddRange(shopQ1, shopQ4);
+
+        // High-level units so capacity doesn't cap sales
+        var unitQ1 = new BuildingUnit { Id = Guid.NewGuid(), BuildingId = shopQ1.Id, UnitType = UnitType.PublicSales, GridX = 0, GridY = 0, Level = 5, ProductTypeId = tablet.Id, MinPrice = tablet.BasePrice };
+        var unitQ4 = new BuildingUnit { Id = Guid.NewGuid(), BuildingId = shopQ4.Id, UnitType = UnitType.PublicSales, GridX = 0, GridY = 0, Level = 5, ProductTypeId = tablet.Id, MinPrice = tablet.BasePrice };
+        db.BuildingUnits.AddRange(unitQ1, unitQ4);
+
+        db.Inventories.AddRange(
+            new Inventory { Id = Guid.NewGuid(), BuildingId = shopQ1.Id, BuildingUnitId = unitQ1.Id, ProductTypeId = tablet.Id, Quantity = 500m, Quality = 0.7m },
+            new Inventory { Id = Guid.NewGuid(), BuildingId = shopQ4.Id, BuildingUnitId = unitQ4.Id, ProductTypeId = tablet.Id, Quantity = 500m, Quality = 0.7m }
+        );
+
+        db.BankAccounts.AddRange(
+            new BankAccount { Id = Guid.NewGuid(), BankBuildingId = shopQ1.Id, CompanyId = coQ1.Id, CurrencyCode = "EUR", Balance = 100_000m, AccountNumber = "1400000000000001" },
+            new BankAccount { Id = Guid.NewGuid(), BankBuildingId = shopQ4.Id, CompanyId = coQ4.Id, CurrencyCode = "EUR", Balance = 100_000m, AccountNumber = "1400000000000002" }
+        );
+
+        await db.SaveChangesAsync();
+
+        var gs = await db.GameStates.FirstOrDefaultDeterministicAsync();
+        Assert.NotNull(gs);
+
+        var phases = scope.ServiceProvider.GetServices<ITickPhase>();
+        var processor = new TickProcessor(db, phases, new NullLogger<TickProcessor>());
+
+        // ── Q1 (electronics 0.9× slump) ──────────────────────────
+        gs!.CurrentTick = 0L; // Q1
+        await db.SaveChangesAsync();
+        await processor.ProcessTickAsync();
+
+        var soldQ1 = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == unitQ1.Id)
+            .SumAsync(r => r.QuantitySold);
+
+        // Reset inventory and records for cityQ4
+        db.PublicSalesRecords.RemoveRange(
+            await db.PublicSalesRecords.Where(r => r.BuildingUnitId == unitQ1.Id || r.BuildingUnitId == unitQ4.Id).ToListAsync()
+        );
+        var invQ4 = await db.Inventories.FirstAsync(i => i.BuildingUnitId == unitQ4.Id);
+        invQ4.Quantity = 500m;
+        await db.SaveChangesAsync();
+
+        // ── Q4 (electronics 1.5× holiday peak) ──────────────────────────
+        gs.CurrentTick = (long)GameConstants.TicksPerQuarter * 3; // Q4
+        await db.SaveChangesAsync();
+        await processor.ProcessTickAsync();
+
+        var soldQ4 = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == unitQ4.Id)
+            .SumAsync(r => r.QuantitySold);
+
+        // Gap: 1.5 − 0.9 = 0.6 >> random noise amplitude (~0.08), so this is deterministic.
+        Assert.True(soldQ4 > soldQ1,
+            $"Electronics Q4 (1.5×) should exceed Q1 (0.9×). Sold: Q1={soldQ1:F2}, Q4={soldQ4:F2}");
+    }
+
+    [Fact]
+    public async Task EnsureDemandSeasonality_ConstructionWinterTroughIsLow()
+    {
+        // Construction industry: Q1 (winter trough 0.7×) must be the lowest quarter.
+        await using var factory = new ApiWebApplicationFactory();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var ids = await db.ProductTypes
+            .Where(p => p.Industry == Industry.Construction)
+            .Select(p => p.Id).ToListAsync();
+
+        Assert.NotEmpty(ids);
+
+        foreach (var id in ids)
+        {
+            var s = await db.DemandSeasonalities.FirstAsync(d => d.ProductTypeId == id);
+            Assert.True(s.Q1Multiplier < s.Q3Multiplier,
+                $"Construction Q1 ({s.Q1Multiplier}) should be < Q3 peak ({s.Q3Multiplier}) for {id}");
+            Assert.True(s.Q1Multiplier < s.Q2Multiplier,
+                $"Construction Q1 ({s.Q1Multiplier}) should be < Q2 ({s.Q2Multiplier}) for {id}");
+        }
+    }
 }
