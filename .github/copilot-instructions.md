@@ -161,8 +161,13 @@ The game is seeded with:
 ### Structure
 - Tests live in `projects/frontend/e2e/`.
 - Shared API mock helpers are in `e2e/helpers/mock-api.ts`.
-- Active test files: `home.spec.ts` (home page + header nav), `onboarding.spec.ts` (auth, onboarding wizard, dashboard, full journey), `building-detail.spec.ts` (queued building upgrades and unit-link behavior), `city-map.spec.ts` (city map rendering, lot selection, purchase flow, dashboard→map navigation), `game-admin-news.spec.ts` (unread news badge, admin dashboard, impersonation, newsroom publishing).
-- Old events-specific spec files (`auth.spec.ts`, `category.spec.ts`, etc.) contain `test.skip` placeholders.
+- Test folders are organized as:
+  - `e2e/full-journey/<category>/` — canonical CI suite and default local suite.
+  - `e2e/docs/<category>/` — screenshot/documentation specs only.
+  - `e2e/archive/<category>/` — archived or narrower regression specs not run by default.
+- Default `npm run test:e2e` and CI must execute only `e2e/full-journey/**`.
+- Screenshot specs are stored under `e2e/docs/` and are opt-in.
+- Archived specs stay runnable with dedicated commands but are excluded from default runs.
 
 ### Always use the shared mock helper
 All tests must set up API mocks **before** calling `page.goto()`. Use `setupMockApi(page, initialState)` from `./helpers/mock-api` to intercept all GraphQL API requests.
@@ -220,18 +225,18 @@ Use Playwright's accessible locators in this order of preference:
 ### CI
 - Playwright tests run via `.github/workflows/playwright.yml`.
 - Only Chromium is used in CI. Run all browsers locally if needed.
-- The CI workflow builds the client first then runs `npm run test:e2e`.
-- If you change onboarding, auth routing, home CTA behavior, or dashboard redirect/resume behavior, run the broader affected specs locally instead of only a single targeted onboarding spec. At minimum include `e2e/onboarding.spec.ts` and `e2e/home.spec.ts`, and run `npm run test:e2e` if the change touches shared routing or mocked auth behavior.
+- The CI workflow builds the client first then runs `npm run test:e2e:full-journey -- --project=chromium`.
+- If you change onboarding, auth routing, home CTA behavior, or dashboard redirect/resume behavior, run the broader affected full-journey specs locally instead of only a single targeted test. At minimum include `e2e/full-journey/onboarding/onboarding.spec.ts` and `e2e/full-journey/navigation/home.spec.ts`, and run `npm run test:e2e` if the change touches shared routing or mocked auth behavior.
 
 ### Running tests locally
 ```bash
 cd projects/frontend
-npx playwright install --with-deps chromium
-npx playwright test --project=chromium
+npx playwright install chromium
+npm run test:e2e -- --project=chromium
 # Specific file
-npx playwright test --project=chromium e2e/onboarding.spec.ts
+npx playwright test --project=chromium e2e/full-journey/onboarding/onboarding.spec.ts
 # Debug mode
-npx playwright test --debug --project=chromium
+npx playwright test --debug --project=chromium e2e/full-journey
 ```
 
 ### Help and encyclopedia screenshots (real FullHD)
@@ -246,9 +251,9 @@ CI=true npm run test:screenshots
 - To run a single screenshot spec:
 ```bash
 cd projects/frontend
-CI=true npx playwright test --project=chromium e2e/encyclopedia-screenshots.spec.ts
+CI=true npx playwright test --project=chromium e2e/docs/encyclopedia/encyclopedia-screenshots.spec.ts
 ```
-- Screenshot spec files: `encyclopedia-screenshots.spec.ts`, `forex-help-screenshots.spec.ts`, `onboarding-help-screenshots.spec.ts`, `sales-shop-help-screenshots.spec.ts`, `stock-exchange-help-screenshots.spec.ts`.
+- Screenshot spec files: `e2e/docs/encyclopedia/encyclopedia-screenshots.spec.ts`, `e2e/docs/help/forex-help-screenshots.spec.ts`, `e2e/docs/help/onboarding-help-screenshots.spec.ts`, `e2e/docs/help/sales-shop-help-screenshots.spec.ts`, `e2e/docs/help/stock-exchange-help-screenshots.spec.ts`.
 - Output folder must be: `projects/frontend/docs/screenshots/encyclopedia-help/`.
 - Required minimum captures:
   - `encyclopedia-onboarding-help-1920x1080.png`

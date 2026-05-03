@@ -131,13 +131,15 @@ It will use real world map. The game will start in single city and later other c
 
 **Shipped (increment 5):** `ProductPicker.vue` was split so the teleported dropdown panel now lives in `ProductPickerPanel.vue`, reducing the picker parent from 735 lines to 278 lines while preserving the existing `.product-picker-panel` and `.picker-*` DOM hooks used by the UI flow.
 
-### Archive E2E tests (0% complete)
+### Archive E2E tests (60% complete)
 
 - [ ] Optimize test speed so that every tests (.net tests, e2e tests and unit tests) runs faster and takes no more then 10 minutes to run
 - [ ] Pick only the most important tests to keep which allows wider end to end testing and archive all other tests so that the tests will take less then 10 minutes to run
-- [ ] please organize the frontend e2e tests to special folders . I want to archive old tests to e2e/archive folder, screenshots for documentation tests to e2e/docs, full end to end tests to e2e/full-journey. Also organize the next level subfolder according to the test category. Extract full journey tests from the current test files to full-journey folder. Create npm run commands to run the tests. Also update the pipeline which runs e2e tests to run only full journey tests.
-- [ ] For further development please focus on running full journey end to end tests only which tests longer user walkthrough with navigation and expected features.
-- [ ] Update copilot instructions to follow this rules.
+- [x] please organize the frontend e2e tests to special folders . I want to archive old tests to e2e/archive folder, screenshots for documentation tests to e2e/docs, full end to end tests to e2e/full-journey. Also organize the next level subfolder according to the test category. Extract full journey tests from the current test files to full-journey folder. Create npm run commands to run the tests. Also update the pipeline which runs e2e tests to run only full journey tests.
+- [x] For further development please focus on running full journey end to end tests only which tests longer user walkthrough with navigation and expected features.
+- [x] Update copilot instructions to follow this rules.
+
+**Shipped (increment 1):** Frontend Playwright specs are now organized by intent: `e2e/full-journey/<category>/` for the canonical CI suite, `e2e/docs/<category>/` for screenshot documentation specs, and `e2e/archive/<category>/` for archived regression coverage. NPM scripts were added for full-journey/archive/docs runs, screenshot paths were updated, and `.github/workflows/playwright.yml` now executes only the full-journey suite by default.
 
 ### Tailwind migration (40% complete)
 

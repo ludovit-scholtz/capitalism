@@ -47,8 +47,8 @@ jobs:
         env:
           VITE_GRAPHQL_URL: http://localhost:4000/graphql
 
-      - name: Run Playwright tests
-        run: npm run test:e2e -- --project=chromium
+      - name: Run Playwright full-journey tests
+        run: npm run test:e2e:full-journey -- --project=chromium
         env:
           CI: true
 
