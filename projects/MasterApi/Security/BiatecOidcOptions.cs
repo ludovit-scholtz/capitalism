@@ -6,7 +6,7 @@ public sealed class BiatecOidcOptions
 
     public bool Enabled { get; set; } = true;
 
-    public string Authority { get; set; } = "https://localhost:44305";
+    public string Authority { get; set; } = "https://google.biatec.io";
 
     public string Issuer { get; set; } = "https://google.biatec.io";
 

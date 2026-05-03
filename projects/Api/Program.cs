@@ -34,12 +34,19 @@ public class Program
             ?? throw new InvalidOperationException("JWT configuration is missing.");
         var biatecOidcOptions = builder.Configuration.GetSection(BiatecOidcOptions.SectionName).Get<BiatecOidcOptions>()
             ?? new BiatecOidcOptions();
+        static string NormalizeIssuer(string issuer) => issuer.Trim().TrimEnd('/');
         var biatecKnownIssuers = new[]
         {
             biatecOidcOptions.Issuer,
             biatecOidcOptions.Authority,
         }
             .Where(issuer => !string.IsNullOrWhiteSpace(issuer))
+            .Select(issuer => issuer!)
+            .SelectMany(issuer =>
+            {
+                var normalized = NormalizeIssuer(issuer);
+                return new[] { normalized, normalized + "/" };
+            })
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
@@ -124,7 +131,7 @@ public class Program
                         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
                         if (biatecOidcOptions.Enabled
                             && biatecKnownIssuers.Any(issuer =>
-                                string.Equals(jwt.Issuer, issuer, StringComparison.OrdinalIgnoreCase)))
+                                string.Equals(NormalizeIssuer(jwt.Issuer), NormalizeIssuer(issuer), StringComparison.OrdinalIgnoreCase)))
                         {
                             return "biatec-oidc";
                         }

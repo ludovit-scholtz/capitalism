@@ -18,13 +18,14 @@ const OIDC_STATE_KEY = 'master_biatec_oidc_state'
 const AUTH_PROVIDER_LOCAL = 'local'
 const AUTH_PROVIDER_BIATEC = 'biatec_oidc'
 const BIATEC_OIDC_AUTHORIZE_URL =
-  import.meta.env.VITE_BIATEC_OIDC_AUTHORIZE_URL || 'https://localhost:44305/authorize'
+  import.meta.env.VITE_BIATEC_OIDC_AUTHORIZE_URL || 'https://google.biatec.io/authorize'
 const BIATEC_OIDC_CLIENT_ID = import.meta.env.VITE_BIATEC_OIDC_CLIENT_ID || 'capitalism-master'
 const BIATEC_OIDC_REDIRECT_URI = import.meta.env.VITE_BIATEC_OIDC_REDIRECT_URI
 const BIATEC_OIDC_SCOPE = import.meta.env.VITE_BIATEC_OIDC_SCOPE || 'openid'
 const BIATEC_OIDC_AUDIENCE = import.meta.env.VITE_BIATEC_OIDC_AUDIENCE || BIATEC_OIDC_CLIENT_ID
 const BIATEC_OIDC_ALLOWED_ISSUERS = (
-  import.meta.env.VITE_BIATEC_OIDC_ALLOWED_ISSUERS || 'https://google.biatec.io,https://localhost:44305'
+  import.meta.env.VITE_BIATEC_OIDC_ALLOWED_ISSUERS ||
+  'https://google.biatec.io,https://google.biatec.io'
 )
   .split(',')
   .map((entry) => entry.trim())
@@ -153,7 +154,8 @@ export const useAuthStore = defineStore('masterAuth', () => {
 
     const delay = Math.max(5_000, expiryMs - Date.now() - TOKEN_RENEW_BEFORE_MS)
     renewalTimer = setTimeout(() => {
-      const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}` || '/'
+      const currentPath =
+        `${window.location.pathname}${window.location.search}${window.location.hash}` || '/'
       startBiatecOidcSignIn(currentPath, true)
     }, delay)
   }

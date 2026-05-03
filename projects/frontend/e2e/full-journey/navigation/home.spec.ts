@@ -123,7 +123,7 @@ test.describe('Header navigation', () => {
 
   test('login view redirects to Biatec authorize endpoint', async ({ page }) => {
     setupMockApi(page)
-    await page.route('https://localhost:44305/**', async (route) => {
+    await page.route('https://google.biatec.io/**', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'text/html',
@@ -134,7 +134,7 @@ test.describe('Header navigation', () => {
     await page.goto('/login')
     await page.getByRole('button', { name: 'Sign in with Biatec' }).click()
 
-    await expect(page).toHaveURL(/https:\/\/localhost:44305\/authorize/)
+    await expect(page).toHaveURL(/https:\/\/google.biatec.io\/authorize/)
     await expect(page).toHaveURL(/client_id=capitalism/)
     const authorizeUrl = new URL(page.url())
     const redirectUri = authorizeUrl.searchParams.get('redirect_uri')
