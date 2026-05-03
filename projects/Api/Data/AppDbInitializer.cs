@@ -114,6 +114,12 @@ public sealed partial class AppDbInitializer(
         await EnsurePragueMiningLotsAsync();
         await EnsureViennaMiningLotsAsync();
 
+        // Idempotent: ensure curated building lots for Berlin and Warsaw exist.
+        // Databases seeded before this change will rely on auto-generated lots only;
+        // this adds the hand-crafted lots with realistic district names and GPS coordinates.
+        await EnsureBerlinWarsawLotsAsync();
+        await dbContext.SaveChangesAsync();
+
         // Idempotent: ensure Electronics starter products (Basic Electronics, LED Screen,
         // and Circuit Board with direct Silicon recipe) exist.  Databases seeded before
         // this change will not have basic-electronics / led-screen and may have the old
