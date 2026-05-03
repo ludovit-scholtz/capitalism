@@ -59,6 +59,7 @@ export default {
     admin: 'Admin',
     campaignAnalytics: 'Campaigns',
     bankStatement: 'Bank Statement',
+    cities: 'Cities',
   },
   news: {
     eyebrow: 'Official feed',
@@ -3027,5 +3028,16 @@ export default {
     insufficientFunds: 'Source account does not have enough funds for this transfer.',
     invalidAmount: 'Enter a positive amount.',
     noMatchingDestination: 'No other bank account in the same currency. Open one first.',
+  },
+
+  cities: {
+    eyebrow: 'World Map',
+    title: 'Cities',
+    subtitle: 'Explore all cities in the game, their populations, currencies, salary rates, and available natural resources.',
+    loadFailed: 'Failed to load cities.',
+    population: 'Population',
+    baseSalary: 'Base Salary',
+    topResources: 'Top Resources',
+    viewMap: 'View City Map',
   },
 }
