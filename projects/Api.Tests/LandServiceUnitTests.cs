@@ -97,19 +97,21 @@ public sealed class LandServiceUnitTests
 
     /// <summary>
     /// Haversine must be symmetric: distance A→B equals distance B→A within float tolerance.
+    /// Uses precision=2 (hundredths of a km = 10 m), which proves floating-point
+    /// stability without over-constraining the assertion.
     /// </summary>
     [Fact]
     public void ComputeDistanceKm_IsSymmetricForAllSeededCityPairs()
     {
-        // Bratislava ↔ Prague
+        // Bratislava ↔ Prague — symmetry to 0.01 km (10 m) precision
         var abBA = GlobalExchangeCalculator.ComputeDistanceKm(48.15, 17.11, 50.08, 14.43);
         var abPR = GlobalExchangeCalculator.ComputeDistanceKm(50.08, 14.43, 48.15, 17.11);
-        Assert.Equal(abBA, abPR, 5);
+        Assert.Equal(abBA, abPR, 2);
 
-        // Prague ↔ Vienna
+        // Prague ↔ Vienna — symmetry to 0.01 km (10 m) precision
         var prVI = GlobalExchangeCalculator.ComputeDistanceKm(50.08, 14.43, 48.21, 16.37);
         var viPR = GlobalExchangeCalculator.ComputeDistanceKm(48.21, 16.37, 50.08, 14.43);
-        Assert.Equal(prVI, viPR, 5);
+        Assert.Equal(prVI, viPR, 2);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

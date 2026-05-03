@@ -67,11 +67,11 @@ test.describe('Real-world Map Integration', () => {
     await page.getByRole('button', { name: /List View/i }).click()
     await page.getByRole('button', { name: /High Street Retail Space/i }).click()
 
-    const panel = page.getByRole('complementary')
-    // Lat/lon must be visible in the lot detail panel
-    // Mock data: lat=48.145, lon=17.107
-    await expect(panel.getByText(/48\.\d+/)).toBeVisible()
-    await expect(panel.getByText(/17\.\d+/)).toBeVisible()
+    // AC1: GPS coordinates displayed in the lot detail panel (data-testid="lot-coordinates")
+    // Mock data: lat=48.145, lon=17.107 → rendered as "48.14500°N, 17.10700°E"
+    await expect(page.getByTestId('lot-coordinates')).toBeVisible()
+    await expect(page.getByTestId('lot-coordinates')).toContainText('48.')
+    await expect(page.getByTestId('lot-coordinates')).toContainText('17.')
   })
 
   test('GPS coordinates are stored with decimal precision for all mock lots', async ({ page }) => {
@@ -83,9 +83,10 @@ test.describe('Real-world Map Integration', () => {
 
     // Verify Factory Site B1 coordinates (lat=48.15, lon=17.13) are shown
     await page.getByRole('button', { name: /Factory Site B1/i }).click()
-    const panel = page.getByRole('complementary')
-    await expect(panel.getByText(/48\.\d+/)).toBeVisible()
-    await expect(panel.getByText(/17\.\d+/)).toBeVisible()
+    // GPS coords are in data-testid="lot-coordinates", e.g. "48.15000°N, 17.13000°E"
+    await expect(page.getByTestId('lot-coordinates')).toBeVisible()
+    await expect(page.getByTestId('lot-coordinates')).toContainText('48.')
+    await expect(page.getByTestId('lot-coordinates')).toContainText('17.')
   })
 
   // ── AC4: Land Availability — minimum lots are displayed per building type ──
@@ -136,10 +137,9 @@ test.describe('Real-world Map Integration', () => {
     await page.goto('/city/city-ba')
     await page.getByRole('button', { name: /List View/i }).click()
 
-    // Capture the GPS coordinates shown before purchase
+    // Capture the GPS coordinates shown before purchase using the specific data-testid
     await page.getByRole('button', { name: /High Street Retail Space/i }).click()
-    const panel = page.getByRole('complementary')
-    const latTextBefore = await panel.getByText(/48\.\d+/).first().textContent()
+    const coordsBefore = await page.getByTestId('lot-coordinates').textContent()
 
     // Initiate purchase
     await page.getByRole('button', { name: /Purchase Lot/i }).click()
@@ -147,10 +147,10 @@ test.describe('Real-world Map Integration', () => {
     await page.getByRole('complementary').locator('input[type="text"]').fill('My City Shop')
     await page.getByRole('button', { name: /Confirm Purchase/i }).click()
 
-    // After purchase, re-open the lot — verify coordinates have not changed
+    // After purchase, re-open the lot — verify coordinates have not changed (AC8: immutable)
     await expect(page.locator('.status-badge.yours')).toBeVisible()
-    const latTextAfter = panel.getByText(/48\.\d+/).first()
-    await expect(latTextAfter).toHaveText(latTextBefore)
+    const coordsAfter = page.getByTestId('lot-coordinates')
+    await expect(coordsAfter).toHaveText(coordsBefore)
   })
 
   test('purchase form validates building type must match lot suitable types', async ({ page }) => {
