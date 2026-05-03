@@ -3677,26 +3677,23 @@ test.describe('City selection — Vienna as starter city', () => {
     // Proves a player can select Warsaw and proceed through industry and lot selection.
     const state = setupMockApi(page)
     // Add a Warsaw factory lot so the lot-purchase step has something to show
-    state.buildingLots = [
-      ...state.buildingLots,
-      {
-        id: 'lot-warsaw-factory-1',
-        cityId: 'city-wa',
-        name: 'Ursus Factory Site',
-        description: 'Former tractor-factory plot repurposed for modern light manufacturing.',
-        district: 'Industrial Zone',
-        latitude: 52.1935,
-        longitude: 20.8902,
-        price: 4_500_000,
-        basePrice: 4_500_000,
-        materialQuality: null,
-        materialQuantity: null,
-        resourceTypeId: null,
-        suitableTypes: 'FACTORY,POWER_PLANT',
-        ownerCompanyId: null,
-        buildingId: null,
-      },
-    ]
+    state.buildingLots.push({
+      id: 'lot-warsaw-factory-1',
+      cityId: 'city-wa',
+      name: 'Ursus Factory Site',
+      description: 'Former tractor-factory plot repurposed for modern light manufacturing.',
+      district: 'Industrial Zone',
+      latitude: 52.1935,
+      longitude: 20.8902,
+      price: 4_500_000,
+      basePrice: 4_500_000,
+      materialQuality: null,
+      materialQuantity: null,
+      resourceTypeId: null,
+      suitableTypes: 'FACTORY,POWER_PLANT',
+      ownerCompanyId: null,
+      buildingId: null,
+    })
     await page.goto('/onboarding')
 
     await expect(page.getByRole('heading', { name: 'Choose Your City' })).toBeVisible()

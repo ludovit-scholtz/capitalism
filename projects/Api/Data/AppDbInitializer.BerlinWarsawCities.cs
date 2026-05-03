@@ -246,8 +246,7 @@ public sealed partial class AppDbInitializer
             },
         });
 
-        dbContext.BuildingLots.AddRange(lots);
-
+        // Compute final prices (base land appraisal + resource premium) before persisting.
         foreach (var lot in lots)
         {
             var resourcePremium = LandService.ComputeResourcePremium(
@@ -258,6 +257,8 @@ public sealed partial class AppDbInitializer
                 lot.Price = appraisedLandValue + resourcePremium;
             }
         }
+
+        dbContext.BuildingLots.AddRange(lots);
     }
 
     /// <summary>
