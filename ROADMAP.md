@@ -58,11 +58,13 @@ It will use real world map. The game will start in single city and later other c
 - [x] Add a notification bell icon to the navigation bar showing unread notification count as a badge, opening a slide-over panel listing the last 20 notifications with timestamp and a direct link to the relevant building, bank account, or loan contract.
 - [x] Allow players to configure alert thresholds per bank account (minimum balance trigger) and per public sales unit (notify when inventory drops below X units) through the building detail and bank account settings panels.
 
-### City expansion (0% complete)
+### City expansion (67% complete)
 
-- [ ] Add at least two additional cities to the seeded city list: Berlin (EUR, Germany) and Warsaw (PLN, Poland) with their own resource abundance profiles, starting lot inventory, weather patterns, and per-city salary base rates consistent with real-world data.
+**Shipped increment (Berlin and Warsaw):** Berlin (DE, EUR) and Warsaw (PL, PLN) are now fully playable cities. Both cities are seeded with correct GPS coordinates within validated bounds, population data, salary rates, fuel-price indices, and resource abundance profiles. Curated hand-crafted building lots (7 per city) cover all building types: industrial/mine deposits (coal, iron-ore, grain, wood), factory-only starter sites, commercial storefronts, bank/office plots, residential blocks, and energy zones. The `/cities` overview page shows all 9 cities with key metrics and resource chips. The onboarding city-selection step lists Berlin and Warsaw alongside all other cities with their EUR/PLN currency badges. Integration tests validate lot seeding, city metadata, coordinate bounds, resource abundances, and salary rates.
+
+- [x] Add at least two additional cities to the seeded city list: Berlin (EUR, Germany) and Warsaw (PLN, Poland) with their own resource abundance profiles, starting lot inventory, weather patterns, and per-city salary base rates consistent with real-world data.
 - [ ] Implement inter-city trade routes: allow a player to configure a B2B sales unit in one city to fulfill purchase orders from a factory purchase unit in a different city, with transit costs calculated from real GPS distance and product weight constants defined in `GameConstants`.
-- [ ] Add a city selection map overview page (`/cities`) that shows all available game cities on a world map with key metrics (population, active players, dominant industry, average resource prices) so new players can make an informed city choice during onboarding.
+- [x] Add a city selection map overview page (`/cities`) that shows all available game cities on a world map with key metrics (population, active players, dominant industry, average resource prices) so new players can make an informed city choice during onboarding.
 
 ### Building secondary market (0% complete)
 

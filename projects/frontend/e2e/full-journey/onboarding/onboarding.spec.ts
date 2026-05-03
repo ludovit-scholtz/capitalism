@@ -3567,14 +3567,14 @@ test.describe('City selection — Vienna as starter city', () => {
     await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
   })
 
-  test('All 7 global cities are shown on step 2 — including New York, London, Beijing, Delhi', async ({ page }) => {
-    // Proves that the expanded city roster (4 new global cities) shows up in the wizard.
+  test('All 9 global cities are shown on step 2 — including Berlin and Warsaw', async ({ page }) => {
+    // Proves that the expanded city roster (all 9 cities including Berlin and Warsaw) shows up in the wizard.
     setupMockApi(page)
     await page.goto('/onboarding')
 
     await expect(page.getByRole('heading', { name: 'Choose Your City' })).toBeVisible()
 
-    // All 7 cities must be visible
+    // All 9 cities must be visible
     await expect(page.locator('.city-card', { hasText: 'Bratislava' })).toBeVisible()
     await expect(page.locator('.city-card', { hasText: 'Prague' })).toBeVisible()
     await expect(page.locator('.city-card', { hasText: 'Vienna' })).toBeVisible()
@@ -3582,6 +3582,8 @@ test.describe('City selection — Vienna as starter city', () => {
     await expect(page.locator('.city-card', { hasText: 'London' })).toBeVisible()
     await expect(page.locator('.city-card', { hasText: 'Beijing' })).toBeVisible()
     await expect(page.locator('.city-card', { hasText: 'Delhi' })).toBeVisible()
+    await expect(page.locator('.city-card', { hasText: 'Berlin' })).toBeVisible()
+    await expect(page.locator('.city-card', { hasText: 'Warsaw' })).toBeVisible()
   })
 
   test('New York city card shows USD currency label', async ({ page }) => {
@@ -3636,6 +3638,75 @@ test.describe('City selection — Vienna as starter city', () => {
     // Proceed to factory-lot step via IPO selection
     await page.locator('.ipo-card', { hasText: 'Starter IPO' }).click()
     // Step 3 heading: "Choose Your First Factory Lot"
+    await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
+  })
+
+  test('Berlin city card shows EUR currency label and is selectable', async ({ page }) => {
+    // Proves Berlin (DE, EUR) shows correct metadata and advances to industry step.
+    setupMockApi(page)
+    await page.goto('/onboarding')
+
+    await expect(page.getByRole('heading', { name: 'Choose Your City' })).toBeVisible()
+    const berlinCard = page.locator('.city-card', { hasText: 'Berlin' })
+    await expect(berlinCard).toBeVisible()
+    // Berlin must display the EUR currency badge
+    await expect(berlinCard.locator('.city-currency', { hasText: 'EUR' })).toBeVisible()
+
+    // Clicking the card advances to the industry selection step
+    await berlinCard.click()
+    await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
+  })
+
+  test('Warsaw city card shows PLN currency label and is selectable', async ({ page }) => {
+    // Proves Warsaw (PL, PLN) shows correct metadata and advances to industry step.
+    setupMockApi(page)
+    await page.goto('/onboarding')
+
+    await expect(page.getByRole('heading', { name: 'Choose Your City' })).toBeVisible()
+    const warsawCard = page.locator('.city-card', { hasText: 'Warsaw' })
+    await expect(warsawCard).toBeVisible()
+    // Warsaw must display the PLN currency badge
+    await expect(warsawCard.locator('.city-currency', { hasText: 'PLN' })).toBeVisible()
+
+    // Clicking the card advances to the industry selection step
+    await warsawCard.click()
+    await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
+  })
+
+  test('Warsaw city card selection persists through to factory-lot step', async ({ page }) => {
+    // Proves a player can select Warsaw and proceed through industry and lot selection.
+    const state = setupMockApi(page)
+    // Add a Warsaw factory lot so the lot-purchase step has something to show
+    state.buildingLots = [
+      ...state.buildingLots,
+      {
+        id: 'lot-warsaw-factory-1',
+        cityId: 'city-wa',
+        name: 'Ursus Factory Site',
+        description: 'Former tractor-factory plot repurposed for modern light manufacturing.',
+        district: 'Industrial Zone',
+        latitude: 52.1935,
+        longitude: 20.8902,
+        price: 4_500_000,
+        basePrice: 4_500_000,
+        materialQuality: null,
+        materialQuantity: null,
+        resourceTypeId: null,
+        suitableTypes: 'FACTORY,POWER_PLANT',
+        ownerCompanyId: null,
+        buildingId: null,
+      },
+    ]
+    await page.goto('/onboarding')
+
+    await expect(page.getByRole('heading', { name: 'Choose Your City' })).toBeVisible()
+    await page.locator('.city-card', { hasText: 'Warsaw' }).click()
+
+    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
+    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
+
+    // Proceed to factory-lot step via IPO selection
+    await page.locator('.ipo-card', { hasText: 'Starter IPO' }).click()
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
   })
 })
