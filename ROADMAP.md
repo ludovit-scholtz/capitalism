@@ -143,7 +143,24 @@ It will use real world map. The game will start in single city and later other c
 
 **Shipped (increment 1):** Frontend Playwright specs are now organized by intent: `e2e/full-journey/<category>/` for the canonical CI suite, `e2e/docs/<category>/` for screenshot documentation specs, and `e2e/archive/<category>/` for archived regression coverage. NPM scripts were added for full-journey/archive/docs runs, screenshot paths were updated, and `.github/workflows/playwright.yml` now executes only the full-journey suite by default.
 
-### Tailwind migration (40% complete)
+### Real-world Map Integration (100% complete)
+
+- [x] Integrate Leaflet.js mapping library into the Vue3 frontend for interactive city map rendering (`CityMapView.vue` at route `/city/:id`).
+- [x] Store GPS coordinates (latitude/longitude) on `BuildingLot` entity with double precision (≥6 decimal places).
+- [x] Implement Haversine distance calculation in `GlobalExchangeCalculator.ComputeDistanceKm` with ≤0.5% error for inter-city routes — within the 2% accuracy requirement.
+- [x] Calculate logistics cost based on GPS distance: `cost = distanceKm × weightPerUnit × TransitCostRatePerKmPerWeightUnit × fuelPriceIndex`.
+- [x] Implement `LandService.EnsureMinimumAvailableLotsAsync` to guarantee ≥10 available lots per building type per city via procedural generation.
+- [x] Expose `cityLots(cityId)` as a public GraphQL query (no auth required) returning lots with GPS coordinates, population index, resource deposits, and appraised value.
+- [x] Implement `purchaseLot` mutation with optimistic concurrency control to prevent race conditions.
+- [x] Add population index calculation (`ComputePopulationIndex`) based on distance from city center and economic activity.
+- [x] Show map markers color-coded by ownership (green = available, blue = player-owned, gray = competitor).
+- [x] Implement lot detail panel showing GPS coordinates, population index, appraised value, resource premium, and supported building types.
+- [x] Seed Bratislava with 14 named lots covering all building types at realistic GPS coordinates within city bounds.
+- [x] Seed Berlin and Warsaw as new cities with GPS coordinates, resource abundances, and building lots.
+- [x] Add unit tests for: Haversine distance accuracy vs. WGS-84 geodesic reference (<2%), land availability constraints (≥10 per type per city), GPS coordinate bounds for all seeded cities, population index bounds, logistics cost scaling.
+- [x] Add E2E full-journey tests for: map rendering, GPS coordinate display, lot purchase flow, GPS immutability post-purchase, performance with 100+ lot markers.
+
+
 
 - [ ] Migrate all views to Tailwind
 - [ ] Update all components to use Tailwind utilities
