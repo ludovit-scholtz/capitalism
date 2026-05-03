@@ -88,12 +88,16 @@ export function clampStep(requestedStep: number, maxReachable: number): number {
  * Filters available lots to those suitable for `buildingType` and not yet owned.
  */
 export function getAvailableLots(lots: BuildingLot[], buildingType: string): BuildingLot[] {
-  return lots.filter((lot) =>
-    lot.suitableTypes
+  return lots.filter((lot) => {
+    if (lot.ownerCompanyId) {
+      return false
+    }
+
+    return lot.suitableTypes
       .split(',')
       .map((type) => type.trim())
-      .includes(buildingType),
-  )
+      .includes(buildingType)
+  })
 }
 
 /**

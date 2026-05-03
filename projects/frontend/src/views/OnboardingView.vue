@@ -197,10 +197,6 @@ const milestoneCompleted = ref(false)
 const isGuestMode = computed(() => !hasAuthenticatedSession.value)
 const guestSaveError = ref<string | null>(null)
 const guestSaveLoading = ref(false)
-const guestAuthMode = ref<'register' | 'login'>('register')
-const guestEmail = ref('')
-const guestPassword = ref('')
-const guestDisplayName = ref('')
 
 const industries = ref<string[]>([])
 const proOnlyIndustries = ref<string[]>([])
@@ -585,6 +581,95 @@ async function syncOngoingOnboardingState() {
   step.value = 6
 }
 
+function hasPendingGuestProgress() {
+  return !!(selectedIndustry.value && selectedCityId.value && selectedFactoryLotId.value && selectedProductId.value && selectedShopLotId.value)
+}
+
+async function migrateGuestProgressToAuthenticated() {
+  if (!hasPendingGuestProgress()) {
+    step.value = 1
+    return
+  }
+
+  try {
+    loading.value = true
+    error.value = null
+
+    const startResult = await gqlRequest<{ startOnboardingCompany: OnboardingStartResult }>(
+      `mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+        startOnboardingCompany(input: $input) {
+          nextStep
+          company { id name cash }
+          factory { id name type }
+          factoryLot {
+            id cityId name description district latitude longitude price suitableTypes
+            ownerCompanyId buildingId
+            ownerCompany { id name }
+            building { id name type }
+          }
+        }
+      }`,
+      {
+        input: {
+          industry: selectedIndustry.value,
+          cityId: selectedCityId.value,
+          ipoRaiseTarget: selectedIpoRaiseTarget.value ?? DEFAULT_IPO_RAISE_TARGET,
+          companyName: companyName.value,
+          factoryLotId: selectedFactoryLotId.value,
+        },
+      },
+    )
+
+    onboardingCompanyCash.value = startResult.startOnboardingCompany.company.cash
+    selectedFactoryLotId.value = startResult.startOnboardingCompany.factoryLot.id
+    await auth.fetchMe()
+
+    const finishResult = await gqlRequest<{ finishOnboarding: OnboardingResult }>(
+      `mutation FinishOnboarding($input: FinishOnboardingInput!) {
+        finishOnboarding(input: $input) {
+          company { id name cash }
+          factory { id name type units { id unitType gridX gridY level linkRight } }
+          salesShop { id name type units { id unitType gridX gridY level linkRight } }
+          selectedProduct { name industry basePrice }
+          cityCurrencyCode
+        }
+      }`,
+      {
+        input: {
+          productTypeId: selectedProductId.value,
+          shopLotId: selectedShopLotId.value,
+        },
+      },
+    )
+
+    completionResult.value = finishResult.finishOnboarding
+    onboardingCompanyCash.value = finishResult.finishOnboarding.company.cash
+    await auth.fetchMe()
+    step.value = 7
+    trackOnboardingEvent('onboarding_converted', {
+      industry: selectedIndustry.value,
+      cityId: selectedCityId.value,
+      authMode: 'biatec_oidc',
+    })
+  } catch (migrationErr: unknown) {
+    const code = migrationErr instanceof GraphQLError ? migrationErr.code : undefined
+    if (code === 'LOT_ALREADY_OWNED') {
+      onboardingCompanyCash.value = null
+      completionResult.value = null
+      selectedFactoryLotId.value = ''
+      selectedShopLotId.value = ''
+      await loadLots()
+      step.value = 1
+      error.value = t('onboarding.guestMigrationRetry')
+    } else {
+      error.value = migrationErr instanceof Error ? migrationErr.message : t('onboarding.guestMigrationGenericError')
+    }
+  } finally {
+    loading.value = false
+    guestSaveLoading.value = false
+  }
+}
+
 onMounted(async () => {
   trackOnboardingEvent('onboarding_start', { authenticated: hasAuthenticatedSession.value })
 
@@ -662,6 +747,11 @@ onMounted(async () => {
 
     if (hasAuthenticatedSession.value) {
       await syncOngoingOnboardingState()
+
+      if (!auth.player?.onboardingCurrentStep && !auth.player?.onboardingCompletedAtUtc && !auth.player?.onboardingFirstSaleCompletedAtUtc && hasPendingGuestProgress()) {
+        guestSaveLoading.value = true
+        await migrateGuestProgressToAuthenticated()
+      }
     }
 
     step.value = resolveClampStep(keyToStep(route.query.step))
@@ -928,124 +1018,13 @@ async function completeOnboarding() {
  */
 async function saveGuestProgress() {
   guestSaveError.value = null
-
-  // Client-side validation: password must be at least 8 characters for registration
-  if (guestAuthMode.value === 'register' && guestPassword.value.length < 8) {
-    guestSaveError.value = t('auth.passwordTooShort')
-    return
-  }
-
   guestSaveLoading.value = true
 
   try {
-    if (guestAuthMode.value === 'register') {
-      await auth.register(guestEmail.value, guestDisplayName.value || companyName.value, guestPassword.value)
-    } else {
-      await auth.login(guestEmail.value, guestPassword.value)
-    }
-
-    // Persist the onboarding city so it survives login and is the active city after authentication.
-    if (selectedCityId.value) {
-      auth.switchCity(selectedCityId.value)
-    }
-
-    // Now authenticated — check if this player already completed onboarding
-    if (!auth.player) {
-      await auth.fetchMe()
-    }
-
-    if (auth.player?.onboardingFirstSaleCompletedAtUtc || auth.player?.onboardingCompletedAtUtc) {
-      router.push('/dashboard')
-      return
-    }
-
-    if (selectedIndustry.value && selectedCityId.value && selectedFactoryLotId.value && selectedProductId.value && selectedShopLotId.value) {
-      try {
-        loading.value = true
-        error.value = null
-
-        const startResult = await gqlRequest<{ startOnboardingCompany: OnboardingStartResult }>(
-          `mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
-            startOnboardingCompany(input: $input) {
-              nextStep
-              company { id name cash }
-              factory { id name type }
-              factoryLot {
-                id cityId name description district latitude longitude price suitableTypes
-                ownerCompanyId buildingId
-                ownerCompany { id name }
-                building { id name type }
-              }
-            }
-          }`,
-          {
-            input: {
-              industry: selectedIndustry.value,
-              cityId: selectedCityId.value,
-              ipoRaiseTarget: selectedIpoRaiseTarget.value ?? DEFAULT_IPO_RAISE_TARGET,
-              companyName: companyName.value,
-              factoryLotId: selectedFactoryLotId.value,
-            },
-          },
-        )
-
-        onboardingCompanyCash.value = startResult.startOnboardingCompany.company.cash
-        selectedFactoryLotId.value = startResult.startOnboardingCompany.factoryLot.id
-        await auth.fetchMe()
-
-        const finishResult = await gqlRequest<{ finishOnboarding: OnboardingResult }>(
-          `mutation FinishOnboarding($input: FinishOnboardingInput!) {
-            finishOnboarding(input: $input) {
-              company { id name cash }
-              factory { id name type units { id unitType gridX gridY level linkRight } }
-              salesShop { id name type units { id unitType gridX gridY level linkRight } }
-              selectedProduct { name industry basePrice }
-              cityCurrencyCode
-            }
-          }`,
-          {
-            input: {
-              productTypeId: selectedProductId.value,
-              shopLotId: selectedShopLotId.value,
-            },
-          },
-        )
-
-        completionResult.value = finishResult.finishOnboarding
-        onboardingCompanyCash.value = finishResult.finishOnboarding.company.cash
-        await auth.fetchMe()
-        step.value = 7
-        trackOnboardingEvent('onboarding_converted', {
-          industry: selectedIndustry.value,
-          cityId: selectedCityId.value,
-          authMode: guestAuthMode.value,
-        })
-      } catch (migrationErr: unknown) {
-        const code = migrationErr instanceof GraphQLError ? migrationErr.code : undefined
-        if (code === 'LOT_ALREADY_OWNED') {
-          // A lot was taken between the guest simulation and the real purchase — restart
-          // wizard from step 1 so the player can pick fresh lots.
-          onboardingCompanyCash.value = null
-          completionResult.value = null
-          selectedFactoryLotId.value = ''
-          selectedShopLotId.value = ''
-          await loadLots()
-          step.value = 1
-          error.value = t('onboarding.guestMigrationRetry')
-        } else {
-          // Any other backend failure (network outage, validation error, auth mismatch,
-          // duplicate submit, etc.) must be shown explicitly — NOT masked as a lot-conflict.
-          error.value = migrationErr instanceof Error ? migrationErr.message : t('onboarding.guestMigrationGenericError')
-        }
-      } finally {
-        loading.value = false
-      }
-    } else {
-      step.value = 1
-    }
+    const redirectPath = route.fullPath || '/onboarding'
+    auth.startBiatecOidcSignIn(redirectPath)
   } catch (e: unknown) {
-    guestSaveError.value = e instanceof Error ? e.message : t('auth.loginFailed')
-  } finally {
+    guestSaveError.value = e instanceof Error ? e.message : t('auth.oidcCallbackFailed')
     guestSaveLoading.value = false
   }
 }
@@ -1402,7 +1381,11 @@ useTickRefresh(async () => {
         </p>
         <div class="step-actions flex gap-3 justify-end mt-2">
           <button class="btn btn-secondary" :disabled="auth.player?.onboardingCurrentStep === 'SHOP_SELECTION'" @click="prevStep">← {{ t('common.back') }}</button
-          ><button :class="selectedFactoryLotId ? 'btn btn-primary btn-lg' : 'btn btn-secondary btn-lg opacity-75 cursor-not-allowed'" :disabled="loading" @click="startOnboardingCompany">
+          ><button
+            :class="selectedFactoryLotId ? 'btn btn-primary btn-lg' : 'btn btn-secondary btn-lg opacity-75 cursor-not-allowed'"
+            :disabled="!selectedFactoryLotId || !canProceedStep3 || loading"
+            @click="startOnboardingCompany"
+          >
             {{ loading ? t('common.loading') : t('onboarding.purchaseFactory') }} <span v-if="!loading" class="ml-1">🏭</span>
           </button>
         </div>
@@ -1476,7 +1459,11 @@ useTickRefresh(async () => {
         </div>
         <div class="step-actions flex gap-3 justify-end mt-2">
           <button class="btn btn-secondary" :disabled="auth.player?.onboardingCurrentStep === 'SHOP_SELECTION'" @click="prevStep">← {{ t('common.back') }}</button
-          ><button :class="selectedShopLotId ? 'btn btn-primary btn-lg' : 'btn btn-secondary btn-lg opacity-75 cursor-not-allowed'" :disabled="!canProceedStep4 || loading" @click="completeOnboarding">
+          ><button
+            :class="selectedShopLotId ? 'btn btn-primary btn-lg' : 'btn btn-secondary btn-lg opacity-75 cursor-not-allowed'"
+            :disabled="!selectedShopLotId || !canProceedStep4 || loading"
+            @click="completeOnboarding"
+          >
             {{ loading ? t('common.loading') : t('onboarding.purchaseShop') }} <span v-if="!loading" class="ml-1">🏪</span>
           </button>
         </div>
@@ -1636,58 +1623,10 @@ useTickRefresh(async () => {
             </li>
             <li>✅ {{ t('onboarding.guestSaveKeepsSetup') }}</li>
           </ul>
-          <div class="guest-auth-toggle flex border-2 border-divider rounded-lg overflow-hidden w-fit">
-            <button
-              class="btn-tab border-none bg-transparent px-5 py-2 text-sm font-medium text-muted cursor-pointer transition-colors"
-              :class="{ 'bg-brand text-white': guestAuthMode === 'register' }"
-              @click="guestAuthMode = 'register'"
-            >
-              {{ t('onboarding.guestRegister') }}</button
-            ><button
-              class="btn-tab border-none bg-transparent px-5 py-2 text-sm font-medium text-muted cursor-pointer transition-colors"
-              :class="{ 'bg-brand text-white': guestAuthMode === 'login' }"
-              @click="guestAuthMode = 'login'"
-            >
-              {{ t('onboarding.guestLogin') }}
-            </button>
-          </div>
           <div class="flex flex-col gap-3 max-w-[420px]">
-            <div class="flex flex-col gap-1.5">
-              <label for="guestEmail" class="text-sm font-semibold">{{ t('auth.email') }}</label
-              ><input
-                id="guestEmail"
-                v-model="guestEmail"
-                type="email"
-                autocomplete="email"
-                :placeholder="t('auth.emailPlaceholder')"
-                class="px-4 py-3 border-2 border-divider rounded-lg bg-page text-body text-base focus:outline-none focus:border-brand"
-              />
-            </div>
-            <div v-if="guestAuthMode === 'register'" class="flex flex-col gap-1.5">
-              <label for="guestDisplayName" class="text-sm font-semibold">{{ t('auth.displayName') }}</label
-              ><input
-                id="guestDisplayName"
-                v-model="guestDisplayName"
-                type="text"
-                autocomplete="name"
-                :placeholder="companyName || t('auth.displayNamePlaceholder')"
-                class="px-4 py-3 border-2 border-divider rounded-lg bg-page text-body text-base focus:outline-none focus:border-brand"
-              />
-            </div>
-            <div class="flex flex-col gap-1.5">
-              <label for="guestPassword" class="text-sm font-semibold">{{ t('auth.password') }}</label
-              ><input
-                id="guestPassword"
-                v-model="guestPassword"
-                type="password"
-                autocomplete="current-password"
-                :placeholder="t('auth.passwordPlaceholder')"
-                class="px-4 py-3 border-2 border-divider rounded-lg bg-page text-body text-base focus:outline-none focus:border-brand"
-              />
-            </div>
             <p v-if="guestSaveError" class="text-bad text-sm m-0" role="alert">{{ guestSaveError }}</p>
             <button class="btn btn-primary btn-lg w-full justify-center" :disabled="guestSaveLoading" @click="saveGuestProgress">
-              {{ guestSaveLoading ? t('common.loading') : t('onboarding.guestSaveCta') }} <span v-if="!guestSaveLoading" class="ml-1">💾</span>
+              {{ guestSaveLoading ? t('common.loading') : t('auth.loginWithBiatec') }} <span v-if="!guestSaveLoading" class="ml-1">🔐</span>
             </button>
           </div>
         </section>

@@ -36,14 +36,15 @@ let map: L.Map | null = null
 let markers: L.Marker[] = []
 
 const filteredLots = computed(() => {
+  const unownedLots = props.lots.filter((lot) => !lot.ownerCompanyId)
   if (showAvailableOnly.value) {
-    return props.lots.filter((lot) => !lot.ownerCompanyId)
+    return unownedLots
   }
 
-  return props.lots
+  return unownedLots
 })
 
-const selectedLot = computed(() => props.lots.find((lot) => lot.id === props.selectedLotId) ?? null)
+const selectedLot = computed(() => filteredLots.value.find((lot) => lot.id === props.selectedLotId) ?? null)
 
 function formatCurrency(value: number): string {
   return formatMoney(value, props.city?.currencyCode ?? 'EUR', locale.value)
@@ -185,6 +186,10 @@ function initMap(): void {
 }
 
 watch(filteredLots, () => {
+  if (props.selectedLotId && !filteredLots.value.some((lot) => lot.id === props.selectedLotId)) {
+    emit('update:selectedLotId', '')
+  }
+
   if (map) {
     updateMarkers()
   }

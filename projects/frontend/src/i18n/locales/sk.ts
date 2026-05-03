@@ -393,7 +393,7 @@ export default {
     guestCompanyPlaceholder: 'Vaša firma',
     guestShopPlaceholder: 'Váš obchod',
     guestSaveTitle: 'Uložte si pokrok',
-    guestSaveSubtitle: 'Vytvorte si bezplatný účet alebo sa prihláste, aby ste si zaistili výber a začali zarábať skutočný herný zisk.',
+    guestSaveSubtitle: 'Prihláste sa cez Biatec, aby ste si uložili výber a spustili firmu naostro.',
     guestSaveKeepsLabel: 'Uchovávate si:',
     guestSaveKeepsCompany: 'Názov vašej spoločnosti',
     guestSaveKeepsCity: 'Vaše štartovacie mesto',
