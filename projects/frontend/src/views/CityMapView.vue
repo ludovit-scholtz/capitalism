@@ -43,6 +43,7 @@
                 <span class="lot-list-name">{{ lot.name }}</span>
                 <span class="lot-list-district">{{ lot.district }}</span>
                 <span v-if="lot.resourceType" class="lot-list-resource-badge" data-testid="lot-resource-badge">⛏ {{ lot.resourceType.name }}</span>
+              <span v-if="lot.building?.isForSale" class="lot-for-sale-badge" data-testid="lot-for-sale-badge">🏪 {{ t('buildingMarket.forSaleBadge') }}</span>
               </div>
               <div class="lot-list-meta">
                 <span class="lot-list-price">{{ formatCurrency(lot.price) }}</span>
@@ -174,7 +175,7 @@ async function fetchData() {
             populationIndex basePrice price suitableTypes
             ownerCompanyId buildingId
             ownerCompany { id name }
-            building { id name type isUnderConstruction constructionCompletesAtTick constructionCost }
+            building { id name type isUnderConstruction constructionCompletesAtTick constructionCost isForSale askingPrice }
             resourceType { id name slug }
             materialQuality materialQuantity
           }
@@ -602,6 +603,18 @@ watch(viewMode, async (mode) => {
   color: var(--color-primary);
   background: rgba(139, 92, 246, 0.1);
   border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+}
+
+.lot-for-sale-badge {
+  display: inline-block;
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
   border-radius: 999px;
   padding: 0.05rem 0.4rem;
 }

@@ -140,5 +140,19 @@ public sealed partial class AppDbContext
             e.HasOne(cr => cr.City).WithMany(c => c.Resources).HasForeignKey(cr => cr.CityId);
             e.HasOne(cr => cr.ResourceType).WithMany().HasForeignKey(cr => cr.ResourceTypeId);
         });
+
+        modelBuilder.Entity<BuildingSaleOffer>(e =>
+        {
+            e.HasKey(o => o.Id);
+            e.Property(o => o.OfferedPrice).HasPrecision(18, 2);
+            e.Property(o => o.Status).HasMaxLength(20);
+            e.Property(o => o.NegotiationNote).HasMaxLength(500);
+            e.HasIndex(o => o.BuildingId);
+            e.HasIndex(o => o.BuyerPlayerId);
+            e.HasIndex(o => new { o.BuildingId, o.Status });
+            e.HasOne(o => o.Building).WithMany().HasForeignKey(o => o.BuildingId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(o => o.BuyerPlayer).WithMany().HasForeignKey(o => o.BuyerPlayerId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(o => o.BuyerCompany).WithMany().HasForeignKey(o => o.BuyerCompanyId).OnDelete(DeleteBehavior.Cascade);
+        });
     }
 }

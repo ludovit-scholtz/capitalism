@@ -85,4 +85,14 @@ public static class LedgerCategory
     /// Amount is proportional to fuel procured × city fuel price index.
     /// </summary>
     public const string FuelCost = "FUEL_COST";
+    /// <summary>
+    /// Debit recorded on the buyer's company ledger when they purchase a building from another player.
+    /// Amount is negative (expense). A corresponding credit is recorded on the seller's ledger.
+    /// </summary>
+    public const string BuildingAcquisition = "BUILDING_ACQUISITION";
+    /// <summary>
+    /// Credit recorded on the seller's company ledger when they sell a building to another player.
+    /// Amount is positive (income). A corresponding debit is recorded on the buyer's ledger.
+    /// </summary>
+    public const string BuildingSale = "BUILDING_SALE";
 }

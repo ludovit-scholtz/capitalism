@@ -27,6 +27,7 @@ import {
   faBullhorn,
   faBell,
   faFileInvoiceDollar,
+  faStore,
 } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
@@ -49,6 +50,7 @@ library.add(
   faBullhorn,
   faBell,
   faFileInvoiceDollar,
+  faStore,
 )
 
 export function createApp() {
