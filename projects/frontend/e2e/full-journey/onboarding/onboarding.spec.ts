@@ -575,8 +575,6 @@ test.describe('Onboarding wizard', () => {
     await expect(page.locator('.industry-card', { hasText: 'Furniture' }).locator('.card-first-product')).toContainText('Wooden Chair')
     await expect(page.locator('.industry-card', { hasText: 'Food Processing' }).locator('.card-first-product')).toContainText('Bread')
     await expect(page.locator('.industry-card', { hasText: 'Healthcare' }).locator('.card-first-product')).toContainText('Basic Medicine')
-    // Electronics card always visible (Pro-locked but discoverable).
-    await expect(page.locator('.industry-card', { hasText: 'Electronics' }).locator('.card-first-product')).toContainText('Basic Electronics')
   })
 
   test('industry cards show why-choose tagline for each starter industry', async ({ page }) => {
@@ -587,8 +585,6 @@ test.describe('Onboarding wizard', () => {
     await expect(page.locator('.industry-card', { hasText: 'Furniture' }).locator('.card-why')).toContainText('Low entry cost')
     await expect(page.locator('.industry-card', { hasText: 'Food Processing' }).locator('.card-why')).toContainText('High volume')
     await expect(page.locator('.industry-card', { hasText: 'Healthcare' }).locator('.card-why')).toContainText('Premium margin')
-    // Electronics tagline proves the Pro-exclusive positioning copy.
-    await expect(page.locator('.industry-card', { hasText: 'Electronics' }).locator('.card-why')).toContainText('High margin')
   })
 
   test('industry card descriptions explain the business fantasy', async ({ page }) => {
@@ -5320,9 +5316,7 @@ test.describe('Construction Pro-gated onboarding', () => {
     await expect(constructionCard.locator('.industry-pro-badge')).toBeVisible()
   })
 
-  test('Construction industry card has correct content (first-product hint and why-tag)', async ({
-    page,
-  }) => {
+  test('Construction industry card has correct content (first-product hint and why-tag)', async ({ page }) => {
     const proExpiry = new Date(Date.now() + 7_200_000).toISOString()
     const player = makePlayer({ proSubscriptionEndsAtUtc: proExpiry })
     const state = setupMockApi(page, { players: [player] })

@@ -205,6 +205,16 @@ const eurFxRates = ref<EurFxRate[]>([])
 const products = ref<ProductType[]>([])
 const cityLots = ref<BuildingLot[]>([])
 
+const visibleIndustries = computed(() => {
+  return industries.value.filter((industry) => {
+    if (!proOnlyIndustries.value.includes(industry)) {
+      return true
+    }
+
+    return hasAuthenticatedSession.value && auth.isProSubscriber
+  })
+})
+
 /** FX rate for the currently selected city: units of city currency per 1 EUR. Defaults to 1 (EUR). */
 const cityFxRate = computed<number>(() => {
   const code = selectedCity.value?.currencyCode ?? 'EUR'
@@ -726,6 +736,7 @@ onMounted(async () => {
     eurFxRates.value = fxRatesData.eurFxRates
 
     applyRouteSelections()
+    ensureSelectedIndustryIsVisible()
 
     if (selectedIndustry.value) {
       await loadProducts()
@@ -1088,6 +1099,23 @@ function formatDateTime(value: string): string {
   }).format(new Date(value))
 }
 
+function ensureSelectedIndustryIsVisible() {
+  if (!selectedIndustry.value || visibleIndustries.value.includes(selectedIndustry.value)) {
+    return
+  }
+
+  selectedIndustry.value = ''
+  selectedProductId.value = ''
+  selectedIpoRaiseTarget.value = null
+  selectedFactoryLotId.value = ''
+  selectedShopLotId.value = ''
+  onboardingCompanyCash.value = null
+
+  if (step.value > 2) {
+    step.value = 2
+  }
+}
+
 async function markMilestoneComplete() {
   milestoneError.value = null
   milestoneLoading.value = true
@@ -1189,6 +1217,10 @@ useTickRefresh(async () => {
     await loadFirstSaleMission()
   }
 })
+
+watch(visibleIndustries, () => {
+  ensureSelectedIndustryIsVisible()
+})
 </script>
 
 <template>
@@ -1237,16 +1269,13 @@ useTickRefresh(async () => {
         </div>
         <div class="grid grid-cols-1 gap-4 mb-6 md:grid-cols-2 xl:grid-cols-3">
           <button
-            v-for="ind in industries"
+            v-for="ind in visibleIndustries"
             :key="ind"
             class="industry-card relative flex flex-col gap-2 rounded-md border-2 border-divider bg-page p-6 text-center text-body transition-all duration-200 hover:-translate-y-0.5 hover:border-brand hover:shadow-[0_4px_16px_rgba(0,71,255,0.1)]"
             :class="{
               'border-brand bg-brand/10 shadow-[0_0_0_1px_var(--color-primary),0_4px_16px_rgba(0,71,255,0.15)]': selectedIndustry === ind,
               'pick-hint': !selectedIndustry,
-              'opacity-60 cursor-not-allowed': proOnlyIndustries.includes(ind) && !auth.isProSubscriber && hasAuthenticatedSession,
             }"
-            :aria-disabled="proOnlyIndustries.includes(ind) && !auth.isProSubscriber && hasAuthenticatedSession ? 'true' : undefined"
-            :title="proOnlyIndustries.includes(ind) && !auth.isProSubscriber && hasAuthenticatedSession ? t('onboarding.proRequiredTooltip') : undefined"
             @click="selectIndustry(ind)"
           >
             <span
@@ -1270,7 +1299,7 @@ useTickRefresh(async () => {
           <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step3Title') }}</h2>
           <p class="text-muted text-sm">{{ t('onboarding.step3Desc') }}</p>
         </div>
-        <div class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
+        <div class="grid grid-cols-1 gap-4 mb-6 md:grid-cols-2 xl:grid-cols-3">
           <button
             v-for="prod in sortedProducts"
             :key="prod.id"
