@@ -898,6 +898,18 @@ export type MockState = {
       buildingName: string | null
     }>
   >
+  /** Personal bank statement rows returned when bankStatement is called with a personal accountId. */
+  personalBankStatementRows: Array<{
+    id: string
+    recordedAtTick: number
+    recordedAtUtc: string
+    description: string
+    category: string
+    amount: number
+    runningBalance: number
+    buildingId: string | null
+    buildingName: string | null
+  }>
   /** Media houses returned by cityMediaHouses query, keyed by cityId. */
   cityMediaHouses: Record<string, MockCityMediaHouseInfo[]>
   /** Building bank account info keyed by buildingId. */
@@ -2375,6 +2387,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     playerCurrencyBalances: [],
     forexTradeHistory: [],
     bankStatementRows: {},
+    personalBankStatementRows: [],
     cityMediaHouses: {},
     buildingBankAccounts: {},
     playerNotifications: [],
@@ -2793,6 +2806,52 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       player.onboardingCityId = input.cityId
       player.onboardingCompanyId = company.id
       player.onboardingFactoryLotId = lot.id
+
+      // Seed personal USD bank account (balance now 0 after founder contribution was transferred)
+      const personalAccountId = `personal-usd-${player.id}`
+      const existingPersonalAccount = state.myBankAccounts.find((a) => a.id === personalAccountId)
+      if (!existingPersonalAccount) {
+        state.myBankAccounts.push({
+          id: personalAccountId,
+          accountNumber: '1234567890123456',
+          currencyCode: 'USD',
+          currencySymbol: '$',
+          balance: 0,
+          companyId: null,
+          companyName: null,
+          ownerType: 'PERSON',
+          ownerDisplayName: player.displayName,
+        })
+      } else {
+        existingPersonalAccount.balance = 0
+      }
+
+      // Seed personal bank statement rows: government deposit then founder contribution
+      const nowIso = new Date().toISOString()
+      state.personalBankStatementRows = [
+        {
+          id: `row-gov-deposit-${player.id}`,
+          recordedAtTick: 0,
+          recordedAtUtc: nowIso,
+          description: 'Government starter funding deposit',
+          category: 'BANK_ACCOUNT_TRANSFER_IN',
+          amount: STARTER_FOUNDER_CONTRIBUTION,
+          runningBalance: STARTER_FOUNDER_CONTRIBUTION,
+          buildingId: null,
+          buildingName: null,
+        },
+        {
+          id: `row-founder-contribution-${player.id}`,
+          recordedAtTick: 1,
+          recordedAtUtc: nowIso,
+          description: `Founder contribution: ${STARTER_FOUNDER_CONTRIBUTION.toLocaleString()} USD government starter deposit`,
+          category: 'FOUNDER_CONTRIBUTION',
+          amount: -STARTER_FOUNDER_CONTRIBUTION,
+          runningBalance: 0,
+          buildingId: null,
+          buildingName: null,
+        },
+      ]
 
       return route.fulfill({
         status: 200,
@@ -5933,12 +5992,40 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
     if (query.includes('bankStatement') && !query.includes('executeForexSwap')) {
       if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
-      const vars = body.variables as { companyId?: string; limit?: number; offset?: number } | undefined
+      const vars = body.variables as { companyId?: string; accountId?: string; limit?: number; offset?: number } | undefined
+      const accountId = vars?.accountId ?? null
       const companyId = vars?.companyId ?? ''
       const limit = vars?.limit ?? 50
       const offset = vars?.offset ?? 0
       const player = state.players.find((p) => p.id === state.currentUserId)
       if (!player) return routeJsonError('Player not found', 'PLAYER_NOT_FOUND')
+
+      // Handle personal bank account statement (PERSON-type account keyed by accountId)
+      const personalAccount = accountId
+        ? state.myBankAccounts.find((acc) => acc.id === accountId && (acc.ownerType === 'PERSON' || acc.companyId === null))
+        : null
+      if (personalAccount) {
+        const allRows = state.personalBankStatementRows
+        const rows = allRows.slice(offset, offset + limit)
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              bankStatement: {
+                companyId: null,
+                companyName: player.displayName,
+                currencyCode: personalAccount.currencyCode,
+                currencySymbol: personalAccount.currencySymbol,
+                currentBalance: personalAccount.balance,
+                totalEntries: allRows.length,
+                rows,
+              },
+            },
+          }),
+        })
+      }
+
       const company = player.companies.find((c) => c.id === companyId)
       if (!company) return routeJsonError('Company not found or you do not own it.', 'COMPANY_NOT_FOUND')
       const allRows = state.bankStatementRows[companyId] ?? []
