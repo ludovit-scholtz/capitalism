@@ -132,6 +132,9 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Generated weekly and monthly city market reports.</summary>
     public DbSet<CityMarketReport> CityMarketReports => Set<CityMarketReport>();
 
+    /// <summary>Per-product seasonal demand multipliers for Q1–Q4.</summary>
+    public DbSet<DemandSeasonality> DemandSeasonalities => Set<DemandSeasonality>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

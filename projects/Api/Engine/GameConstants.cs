@@ -19,6 +19,13 @@ public static partial class GameConstants
     /// <summary>Game ticks in one in-game month (30 days × 24 ticks/day).</summary>
     public const int TicksPerMonth = TicksPerDay * 30;
 
+    /// <summary>
+    /// Game ticks in one in-game quarter (one-fourth of a game year).
+    /// Q1 = Jan–Mar, Q2 = Apr–Jun, Q3 = Jul–Sep, Q4 = Oct–Dec.
+    /// Used for seasonal demand multiplier calculation.
+    /// </summary>
+    public const int TicksPerQuarter = TicksPerYear / 4;
+
     /// <summary>Base holding capacity (units) per unit level for purchase, sales, mining, and manufacturing units.</summary>
     public static decimal StorageCapacity(int level) => level switch
     {

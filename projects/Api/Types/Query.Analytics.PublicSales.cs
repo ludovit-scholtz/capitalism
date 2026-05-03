@@ -332,6 +332,74 @@ public sealed partial class Query
             cityAveragePrice = Math.Round(productTypeForAnalytics.BasePrice * fxRate, 2);
         }
 
+        // ── Seasonal outlook ─────────────────────────────────────────────────────
+        // Load DemandSeasonality for the resolved product type and build a SeasonalOutlook
+        // that the frontend can render without further computation.
+        SeasonalOutlook? seasonalOutlook = null;
+        if (resolvedProductTypeId.HasValue && gameStateForSalary is not null)
+        {
+            var seasonality = await db.DemandSeasonalities
+                .FirstOrDefaultAsync(d => d.ProductTypeId == resolvedProductTypeId.Value);
+            if (seasonality is not null)
+            {
+                var currentQuarterIndex = (int)((gameStateForSalary.CurrentTick / Engine.GameConstants.TicksPerQuarter) % 4);
+                var currentMultiplier = seasonality.GetMultiplierForQuarter(currentQuarterIndex);
+
+                static string QuarterLabel(int qi) => qi switch
+                {
+                    0 => "Q1 (Jan–Mar)",
+                    1 => "Q2 (Apr–Jun)",
+                    2 => "Q3 (Jul–Sep)",
+                    3 => "Q4 (Oct–Dec)",
+                    _ => $"Q{qi + 1}",
+                };
+
+                static string DemandLevelFor(decimal m) => m switch
+                {
+                    >= 1.3m => "HIGH",
+                    >= 1.0m => "MODERATE",
+                    >= 0.7m => "BELOW_AVERAGE",
+                    _ => "LOW",
+                };
+
+                static string ColorCodeFor(decimal m) => m switch
+                {
+                    >= 1.3m => "GREEN",
+                    >= 1.0m => "YELLOW",
+                    >= 0.7m => "ORANGE",
+                    _ => "RED",
+                };
+
+                var forecasts = Enumerable.Range(0, 4)
+                    .Select(qi => new QuarterForecast
+                    {
+                        QuarterIndex = qi,
+                        Label = QuarterLabel(qi),
+                        Multiplier = seasonality.GetMultiplierForQuarter(qi),
+                        IsCurrent = qi == currentQuarterIndex,
+                        ColorCode = ColorCodeFor(seasonality.GetMultiplierForQuarter(qi)),
+                    })
+                    .ToList();
+
+                // Identify the peak quarter(s) for the callout message.
+                var peakQuarter = forecasts.OrderByDescending(f => f.Multiplier).First();
+                var productName = productTypeForAnalytics?.Name ?? "This product";
+                var callout = currentQuarterIndex == peakQuarter.QuarterIndex
+                    ? $"{peakQuarter.Label} is peak demand season for {productName}. Build and stage inventory now."
+                    : $"{peakQuarter.Label} has peak demand ({peakQuarter.Multiplier:F1}×) for {productName}. Plan ahead.";
+
+                seasonalOutlook = new SeasonalOutlook
+                {
+                    CurrentQuarterIndex = currentQuarterIndex,
+                    CurrentQuarterLabel = QuarterLabel(currentQuarterIndex),
+                    CurrentMultiplier = currentMultiplier,
+                    DemandLevel = DemandLevelFor(currentMultiplier),
+                    QuarterForecasts = forecasts,
+                    Callout = callout,
+                };
+            }
+        }
+
         return new PublicSalesAnalytics
         {
             BuildingUnitId = unit.Id,
@@ -365,6 +433,7 @@ public sealed partial class Query
             TrendFactor = currentTrendFactor,
             CityCurrencyCode = city?.CurrencyCode ?? "EUR",
             CityAveragePrice = cityAveragePrice,
+            SeasonalOutlook = seasonalOutlook,
         };
     }
 

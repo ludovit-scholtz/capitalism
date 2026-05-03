@@ -291,6 +291,11 @@ public sealed class PublicSalesAnalytics
     /// Null when no product is configured on this unit.
     /// </summary>
     public decimal? CityAveragePrice { get; set; }
+    /// <summary>
+    /// Seasonal demand outlook for this public sales unit.
+    /// Null when no DemandSeasonality data exists for the product (defaults to 1.0× demand).
+    /// </summary>
+    public SeasonalOutlook? SeasonalOutlook { get; set; }
 }
 
 public sealed class ProfitTickSnapshot
@@ -582,4 +587,46 @@ public sealed class MediaHouseAnalyticsResult
     /// <summary>DOMINANT | COMPETITIVE | GROWING | EARLY_STAGE</summary>
     public string StrategyRating { get; set; } = string.Empty;
     public string StrategyTip { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Seasonal demand outlook for a public sales unit.
+/// Shows the demand multiplier for each game-year quarter and the current seasonal context.
+/// </summary>
+public sealed class SeasonalOutlook
+{
+    /// <summary>
+    /// Current quarter index (0=Q1, 1=Q2, 2=Q3, 3=Q4) derived from the current game tick.
+    /// </summary>
+    public int CurrentQuarterIndex { get; set; }
+
+    /// <summary>Label for the current quarter, e.g. "Q1 (Jan–Mar)".</summary>
+    public string CurrentQuarterLabel { get; set; } = string.Empty;
+
+    /// <summary>Seasonal demand multiplier active this quarter (e.g. 1.5, 0.8).</summary>
+    public decimal CurrentMultiplier { get; set; }
+
+    /// <summary>Demand level label: HIGH | MODERATE | BELOW_AVERAGE | LOW</summary>
+    public string DemandLevel { get; set; } = string.Empty;
+
+    /// <summary>Forecasted multipliers for the four quarters Q1–Q4 in game-year order.</summary>
+    public List<QuarterForecast> QuarterForecasts { get; set; } = [];
+
+    /// <summary>Short contextual callout explaining the seasonal pattern for this product.</summary>
+    public string Callout { get; set; } = string.Empty;
+}
+
+/// <summary>Seasonal demand forecast for one quarter.</summary>
+public sealed class QuarterForecast
+{
+    /// <summary>Quarter index 0=Q1, 1=Q2, 2=Q3, 3=Q4.</summary>
+    public int QuarterIndex { get; set; }
+    /// <summary>Label, e.g. "Q1 (Jan–Mar)".</summary>
+    public string Label { get; set; } = string.Empty;
+    /// <summary>Demand multiplier for this quarter (e.g. 1.5).</summary>
+    public decimal Multiplier { get; set; }
+    /// <summary>Whether this is the currently active quarter.</summary>
+    public bool IsCurrent { get; set; }
+    /// <summary>Color code: GREEN | YELLOW | ORANGE | RED</summary>
+    public string ColorCode { get; set; } = string.Empty;
 }

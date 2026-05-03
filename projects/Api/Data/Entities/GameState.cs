@@ -48,4 +48,17 @@ public sealed class GameState
 
     [NotMapped]
     public int NextTaxGameYear => GameTime.GetGameYear(NextTaxTick);
+
+    /// <summary>
+    /// Current game-year quarter index (0=Q1 Jan–Mar, 1=Q2 Apr–Jun,
+    /// 2=Q3 Jul–Sep, 3=Q4 Oct–Dec). Derived from the current tick.
+    /// </summary>
+    [NotMapped]
+    public int CurrentQuarter => (int)((CurrentTick / GameConstants.TicksPerQuarter) % 4);
+
+    /// <summary>
+    /// Human-readable label for the current quarter, e.g. "Q1" or "Q4".
+    /// </summary>
+    [NotMapped]
+    public string CurrentQuarterLabel => $"Q{CurrentQuarter + 1}";
 }
