@@ -92,17 +92,17 @@ const onboardingGuideCards = [
   {
     titleKey: 'encyclopedia.onboardingGuideStep1Title',
     bodyKey: 'encyclopedia.onboardingGuideStep1Body',
-    imageUrl: '/onboarding-help/step-1-industry.png',
+    imageUrl: '/onboarding-help/step-1-city.png',
   },
   {
     titleKey: 'encyclopedia.onboardingGuideStep2Title',
     bodyKey: 'encyclopedia.onboardingGuideStep2Body',
-    imageUrl: '/onboarding-help/step-2-product.png',
+    imageUrl: '/onboarding-help/step-2-industry.png',
   },
   {
     titleKey: 'encyclopedia.onboardingGuideStep3Title',
     bodyKey: 'encyclopedia.onboardingGuideStep3Body',
-    imageUrl: '/onboarding-help/step-3-city.png',
+    imageUrl: '/onboarding-help/step-3-product.png',
   },
   {
     titleKey: 'encyclopedia.onboardingGuideStep4Title',
@@ -118,6 +118,11 @@ const onboardingGuideCards = [
     titleKey: 'encyclopedia.onboardingGuideStep6Title',
     bodyKey: 'encyclopedia.onboardingGuideStep6Body',
     imageUrl: '/onboarding-help/step-6-shop-lot.png',
+  },
+  {
+    titleKey: 'encyclopedia.onboardingGuideStep7Title',
+    bodyKey: 'encyclopedia.onboardingGuideStep7Body',
+    imageUrl: '/onboarding-help/step-7-save-progress.png',
   },
 ]
 

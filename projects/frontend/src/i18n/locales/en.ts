@@ -238,6 +238,8 @@ export default {
     loginToAccess: 'Log in to access',
     loginRequired: 'Please log in to continue.',
     loginWithBiatec: 'Sign in with google',
+    oidcRetryDriveAccessHint:
+      'Google Drive file creation access is required for the Biatec wallet setup. Start Google sign-in again and allow the Drive permission to finish authentication.',
     oidcCallbackTitle: 'Completing sign in',
     oidcCallbackLoading: 'We are verifying your Biatec token and loading your game profile…',
     oidcCallbackFailed: 'Biatec sign-in failed. Please try again.',
@@ -410,6 +412,8 @@ export default {
     guestShopPlaceholder: 'Your Shop',
     guestSaveTitle: 'Save Your Progress',
     guestSaveSubtitle: 'Sign in with google to lock in your choices and launch your company for real.',
+    guestSaveDriveAccessNotice:
+      'Google Drive file creation access is required here so Biatec can create the wallet file used to secure your account progress.',
     guestSaveKeepsLabel: 'You keep:',
     guestSaveKeepsCompany: 'Your company name',
     guestSaveKeepsCity: 'Your starter city',
@@ -791,16 +795,16 @@ export default {
     gameplayGuideCardIterationTitle: 'Adjust every few ticks',
     gameplayGuideCardIterationBody: 'Review sales and inventory often, then tune prices and sourcing caps to improve margins without starving production.',
     onboardingGuideTitle: 'Onboarding Help',
-    onboardingGuideSubtitle: 'A complete screenshot walkthrough of every onboarding decision from industry to first shop.',
-    onboardingGuideStep1Title: 'Step 1 - Choose your industry',
+    onboardingGuideSubtitle: 'A complete screenshot walkthrough of every onboarding decision from city selection to saved account progress.',
+    onboardingGuideStep1Title: 'Step 1 - Choose your city',
     onboardingGuideStep1Body:
-      'In this step, you choose the business identity your company will grow around. Furniture is the most forgiving opening because input chains are simple and early demand is stable. Food Processing teaches volume management, where small pricing changes can move many units quickly. Healthcare starts slower but rewards disciplined setup with stronger margins per sale. While selecting, compare starter products, expected selling prices, and the operational complexity you are willing to manage in your first hour. Your industry choice defines your first production rhythm, the quality strategy you will optimize, and how quickly your first cash-flow loop becomes reliable enough to scale into a second city or product line.',
-    onboardingGuideStep2Title: 'Step 2 - Select your starter product',
+      'City choice comes first now because it fixes your starting currency, active account context, and available lot market before you commit to an industry. Treat this as an operating-environment choice, not just a cosmetic location pick. Your city determines the currency used for IPO funding, land prices, and the first bank-account context you will manage. Pick a city whose scale and familiarity help you learn quickly, then keep the later choices consistent with that local market. This first decision anchors every later onboarding screen, so make it deliberately and read the city card as a business setup summary rather than a decorative label.',
+    onboardingGuideStep2Title: 'Step 2 - Choose your industry',
     onboardingGuideStep2Body:
-      'Here you lock the exact starter product your first factory and shop will support. This is not only a cosmetic pick; it changes raw input requirements, labor and energy behavior, and your first realistic price corridor. Read the product card carefully, especially base price and craft timing, because those values shape your early margin and inventory turnover. A product with faster cycles can generate quicker learning feedback, while a higher-price product can amplify mistakes if stock flow is unstable. Choose with your first ten ticks in mind: you want enough demand to validate your setup, enough margin to survive mistakes, and a simple enough chain that you can confidently adjust pricing after your first sales signal appears.',
-    onboardingGuideStep3Title: 'Step 3 - Pick your city',
+      'Once the city is fixed, choose the business fantasy you want to learn first: Furniture, Food Processing, or Healthcare. This step controls your first supply chain, your starter product pool, and the economic logic you need to understand during the first few ticks. Do not optimize for abstract difficulty alone; choose the industry whose production story you can reason about clearly. A good onboarding industry is one where you can explain to yourself what gets bought, what gets produced, and what will be sold before you click forward. The more clearly you understand that chain now, the faster your first pricing and expansion decisions will become evidence-based later.',
+    onboardingGuideStep3Title: 'Step 3 - Choose your first product',
     onboardingGuideStep3Body:
-      'The city choice defines your opening economic environment. Currency context changes how prices are displayed and what feels affordable when you compare lots, operating costs, and expansion plans. Lot availability determines how quickly you can secure a production footprint without overpaying. Population and city conditions influence sales potential and how aggressively you can set prices in your first retail unit. Think of this as choosing your launch terrain: some cities reward careful cost control, others reward faster scaling once your chain is stable. Select a city where you can afford both your factory lot and your first shop lot without draining all liquidity, so your company can still absorb purchasing, labor, and timing volatility in the next tick cycles.',
+      'Product selection turns your industry fantasy into a concrete launch plan. The chosen starter product drives the factory configuration, the shop setup, the benchmark price shown in the guide, and the first material flow you need to keep alive. Read the product card as a commitment to a specific operating loop, not as a flavor choice. Your goal is not to find a perfect forever product; it is to pick a clean first chain that helps you learn sourcing, production, and sales without unnecessary confusion. Once selected, use the rest of the onboarding steps to build a company around that one clear commercial path.',
     onboardingGuideStep4Title: 'Step 4 - Choose IPO plan',
     onboardingGuideStep4Body:
       'This screen balances control against runway. A lower raise preserves founder ownership but leaves less working capital for lot purchases, unit setup, and early operating mistakes. A higher raise gives stronger liquidity and more room to recover from poor pricing or temporary stock imbalances, but it dilutes your founder stake. There is no universally best option; the right choice depends on your confidence and play style. If this is your first run, extra cash can reduce stress and help you learn faster. If you already know the setup sequence, a tighter raise can keep ownership stronger. Read the ownership and public-float values as strategic levers, not just numbers, because they shape both your short-term safety and long-term wealth trajectory.',
@@ -810,6 +814,9 @@ export default {
     onboardingGuideStep6Title: 'Step 6 - Buy first sales-shop lot',
     onboardingGuideStep6Body:
       'This final onboarding purchase opens your go-to-market path. The shop lot is where production becomes revenue, so this step marks the transition from setup to live execution. After buying the lot, your next priority is clean PUBLIC_SALES configuration: set a realistic minimum price, ensure inventory can arrive from upstream flow, and watch the next ticks for your first real sale record. Early pricing should favor learning and turnover, not maximum margin, because fast feedback helps you correct issues sooner. Once the first sales appear, you can tighten margins and test demand elasticity with controlled changes. If this step is handled well, your company enters a stable loop where each tick produces data you can use to compound growth.',
+    onboardingGuideStep7Title: 'Step 7 - Save progress to your account',
+    onboardingGuideStep7Body:
+      'The final guest step is now explicit: save the prepared company into your real account. When you press Save and Launch, Biatec must be allowed to create files in your Google Drive because that permission is used to create and manage the wallet file securing your account. If you deny that permission, authentication cannot finish correctly and you will need to retry sign-in with consent again. Read this screen carefully, confirm what progress will be preserved, and grant the Drive permission when Google asks. This is the handoff from sandbox planning into a persistent player account, so the permission prompt is part of the onboarding, not an unrelated external step.',
     onboardingGuideStepIndustryTitle: '1. Pick your starting industry',
     onboardingGuideStepIndustryBody: 'Choose Furniture, Food Processing, or Healthcare. This decides your first supply chain and starter pricing logic.',
     onboardingGuideStepProductTitle: '2. Lock your first product',

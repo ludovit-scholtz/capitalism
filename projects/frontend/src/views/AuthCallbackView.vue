@@ -15,7 +15,10 @@ onMounted(async () => {
     const redirectPath = await auth.completeBiatecOidcSignIn()
     await router.replace(redirectPath || '/')
   } catch (e: unknown) {
-    callbackError.value = e instanceof Error ? e.message : t('auth.oidcCallbackFailed')
+    const didReset = auth.resetBiatecSessionForRetry('drive_access')
+    if (!didReset) {
+      callbackError.value = e instanceof Error ? e.message : t('auth.oidcCallbackFailed')
+    }
   }
 })
 </script>

@@ -144,6 +144,8 @@ export default {
     haveAccount: 'Bereits ein Konto?',
     backToDirectory: 'Zurück zur Serverübersicht',
     genericError: 'Etwas ist schiefgelaufen. Bitte versuche es erneut.',
+    oidcRetryDriveAccessHint:
+      'Für die Einrichtung der Biatec-Wallet muss das Erstellen von Dateien in Google Drive erlaubt sein. Starten Sie die Google-Anmeldung erneut und erlauben Sie den Drive-Zugriff, damit die Anmeldung abgeschlossen werden kann.',
     biatecCallbackTitle: 'Biatec-Anmeldung wird abgeschlossen',
     biatecCallbackLoading: 'Deine Sitzung wird geprüft und dein Konto geladen...',
     biatecCallbackSuccess: 'Anmeldung abgeschlossen. Weiterleitung...',

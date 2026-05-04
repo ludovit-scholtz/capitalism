@@ -1038,7 +1038,7 @@ async function saveGuestProgress() {
 
   try {
     const redirectPath = route.fullPath || '/onboarding'
-    auth.startBiatecOidcSignIn(redirectPath)
+    auth.startBiatecOidcSignIn(redirectPath, { prompt: 'consent' })
   } catch (e: unknown) {
     guestSaveError.value = e instanceof Error ? e.message : t('auth.oidcCallbackFailed')
     guestSaveLoading.value = false
@@ -1658,6 +1658,9 @@ watch(visibleIndustries, () => {
             <li>✅ {{ t('onboarding.guestSaveKeepsSetup') }}</li>
           </ul>
           <div class="flex flex-col gap-3 max-w-[420px]">
+            <p class="m-0 rounded-md border border-brand/25 bg-brand/10 px-3 py-3 text-sm text-body">
+              {{ t('onboarding.guestSaveDriveAccessNotice') }}
+            </p>
             <p v-if="guestSaveError" class="text-bad text-sm m-0" role="alert">{{ guestSaveError }}</p>
             <button class="btn btn-primary btn-lg w-full justify-center" :disabled="guestSaveLoading" @click="saveGuestProgress">
               <template v-if="guestSaveLoading">{{ t('common.loading') }}</template>

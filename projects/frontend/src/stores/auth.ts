@@ -28,8 +28,21 @@ interface OidcPendingState {
   redirectPath: string
 }
 
+interface BiatecSignInOptions {
+  silentPrompt?: boolean
+  prompt?: string
+}
+
 interface LogoutOptions {
   federated?: boolean
+}
+
+function normalizeRedirectPath(redirectPath: string | null | undefined) {
+  if (!redirectPath || !redirectPath.startsWith('/')) {
+    return '/'
+  }
+
+  return redirectPath
 }
 
 const PLAYER_SELECTION = `
@@ -147,6 +160,14 @@ export const useAuthStore = defineStore('auth', () => {
       const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}` || '/'
       startBiatecOidcSignIn(currentPath, true)
     }, delay)
+  }
+
+  function normalizeBiatecSignInOptions(options?: boolean | BiatecSignInOptions): BiatecSignInOptions {
+    if (typeof options === 'boolean') {
+      return { silentPrompt: options }
+    }
+
+    return options ?? {}
   }
 
   function createRandomBase64Url(bytes = 24) {
@@ -315,7 +336,7 @@ export const useAuthStore = defineStore('auth', () => {
     return `${window.location.origin}/login`
   }
 
-  function buildBiatecEndSessionUrl(idTokenHint: string | null) {
+  function buildBiatecEndSessionUrl(idTokenHint: string | null, postLogoutRedirectUri = getPostLogoutRedirectUri()) {
     if (typeof window === 'undefined') {
       return null
     }
@@ -328,7 +349,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       const logoutUrl = new URL(endpoint)
       const state = createLogoutState()
-      logoutUrl.searchParams.set('post_logout_redirect_uri', getPostLogoutRedirectUri())
+      logoutUrl.searchParams.set('post_logout_redirect_uri', postLogoutRedirectUri)
       logoutUrl.searchParams.set('client_id', BIATEC_OIDC_CLIENT_ID)
       logoutUrl.searchParams.set('state', state)
 
@@ -381,6 +402,26 @@ export const useAuthStore = defineStore('auth', () => {
     } else {
       localStorage.removeItem('selected_city_id')
     }
+  }
+
+  function resetBiatecSessionForRetry(_reason = 'drive_access') {
+    if (typeof window === 'undefined') {
+      return false
+    }
+
+    const redirectPath = normalizeRedirectPath(getPendingOidcState()?.redirectPath)
+
+    clearRenewalTimer()
+    token.value = null
+    player.value = null
+    clearStoredSession()
+    clearPendingOidcState()
+
+    // Skip end_session — the Biatec IdP session is still valid.
+    // prompt=consent re-shows the Google consent screen without requiring
+    // a post_logout_redirect_uri in the server allowlist.
+    startBiatecOidcSignIn(redirectPath, { prompt: 'consent' })
+    return true
   }
 
   function deriveMostUsedCityId(playerValue: Player | null): string | null {
@@ -486,10 +527,13 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  function startBiatecOidcSignIn(redirectPath = '/', silentPrompt = false) {
+  function startBiatecOidcSignIn(redirectPath = '/', options?: boolean | BiatecSignInOptions) {
     if (typeof sessionStorage === 'undefined') {
       throw new Error('OIDC sign-in requires browser session storage.')
     }
+
+    const normalizedOptions = normalizeBiatecSignInOptions(options)
+    const normalizedRedirectPath = normalizeRedirectPath(redirectPath)
 
     const state = createRandomBase64Url()
     const nonce = createRandomBase64Url()
@@ -497,7 +541,7 @@ export const useAuthStore = defineStore('auth', () => {
     const pendingState: OidcPendingState = {
       state,
       nonce,
-      redirectPath,
+      redirectPath: normalizedRedirectPath,
     }
     sessionStorage.setItem(OIDC_STATE_KEY, JSON.stringify(pendingState))
 
@@ -509,7 +553,9 @@ export const useAuthStore = defineStore('auth', () => {
     authorizeUrl.searchParams.set('response_mode', 'query')
     authorizeUrl.searchParams.set('state', state)
     authorizeUrl.searchParams.set('nonce', nonce)
-    if (silentPrompt) {
+    if (normalizedOptions.prompt) {
+      authorizeUrl.searchParams.set('prompt', normalizedOptions.prompt)
+    } else if (normalizedOptions.silentPrompt) {
       authorizeUrl.searchParams.set('prompt', 'none')
     }
 
@@ -525,7 +571,10 @@ export const useAuthStore = defineStore('auth', () => {
       clearPendingOidcState()
       return callbackSession.redirectPath
     } catch (e: unknown) {
-      logout()
+      clearRenewalTimer()
+      token.value = null
+      player.value = null
+      clearStoredSession()
       throw e
     }
   }
@@ -614,6 +663,7 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     startBiatecOidcSignIn,
     completeBiatecOidcSignIn,
+    resetBiatecSessionForRetry,
     applyAuthPayload: setSession,
     fetchMe,
     switchAccountContext,

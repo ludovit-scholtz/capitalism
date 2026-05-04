@@ -46,8 +46,21 @@ interface BiatecCallbackSession {
   redirectPath: string
 }
 
+interface BiatecSignInOptions {
+  silentPrompt?: boolean
+  prompt?: string
+}
+
 interface LogoutOptions {
   federated?: boolean
+}
+
+function normalizeRedirectPath(redirectPath: string | null | undefined) {
+  if (!redirectPath || !redirectPath.startsWith('/')) {
+    return '/'
+  }
+
+  return redirectPath
 }
 
 function generateOidcRandom(length = 32) {
@@ -156,7 +169,7 @@ export const useAuthStore = defineStore('masterAuth', () => {
     return `${window.location.origin}/login`
   }
 
-  function buildBiatecEndSessionUrl(idTokenHint: string | null) {
+  function buildBiatecEndSessionUrl(idTokenHint: string | null, postLogoutRedirectUri = getPostLogoutRedirectUri()) {
     if (typeof window === 'undefined') {
       return null
     }
@@ -169,7 +182,7 @@ export const useAuthStore = defineStore('masterAuth', () => {
 
       const logoutUrl = new URL(endpoint)
       const state = createLogoutState()
-      logoutUrl.searchParams.set('post_logout_redirect_uri', getPostLogoutRedirectUri())
+      logoutUrl.searchParams.set('post_logout_redirect_uri', postLogoutRedirectUri)
       logoutUrl.searchParams.set('client_id', BIATEC_OIDC_CLIENT_ID)
       logoutUrl.searchParams.set('state', state)
 
@@ -199,6 +212,14 @@ export const useAuthStore = defineStore('masterAuth', () => {
     } catch {
       return null
     }
+  }
+
+  function normalizeBiatecSignInOptions(options?: boolean | BiatecSignInOptions): BiatecSignInOptions {
+    if (typeof options === 'boolean') {
+      return { silentPrompt: options }
+    }
+
+    return options ?? {}
   }
 
   function scheduleTokenRenewal(expiresAtUtc: string) {
@@ -252,7 +273,6 @@ export const useAuthStore = defineStore('masterAuth', () => {
     }
 
     const pendingState = getStoredOidcState()
-    clearStoredOidcState()
     if (!pendingState || pendingState.state !== returnedState) {
       throw new Error('OIDC state validation failed. Please try signing in again.')
     }
@@ -289,8 +309,33 @@ export const useAuthStore = defineStore('masterAuth', () => {
     return {
       token: tokenValue,
       expiresAtUtc,
-      redirectPath: pendingState.redirectPath || '/',
+      redirectPath: normalizeRedirectPath(pendingState.redirectPath),
     }
+  }
+
+  function resetBiatecSessionForRetry(_reason = 'drive_access') {
+    if (typeof window === 'undefined') {
+      return false
+    }
+
+    const redirectPath = normalizeRedirectPath(getStoredOidcState()?.redirectPath)
+
+    clearRenewalTimer()
+    token.value = null
+    player.value = null
+    subscription.value = null
+    isGameAdmin.value = false
+    gameAdminChecked.value = false
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(EXPIRES_KEY)
+    localStorage.removeItem(AUTH_PROVIDER_KEY)
+    clearStoredOidcState()
+
+    // Skip end_session — the Biatec IdP session is still valid.
+    // prompt=consent re-shows the Google consent screen without requiring
+    // a post_logout_redirect_uri in the server allowlist.
+    startBiatecOidcSignIn(redirectPath, { prompt: 'consent' })
+    return true
   }
 
   function initFromStorage() {
@@ -372,14 +417,15 @@ export const useAuthStore = defineStore('masterAuth', () => {
     }
   }
 
-  function startBiatecOidcSignIn(redirectPath = '/', silentPrompt = false) {
+  function startBiatecOidcSignIn(redirectPath = '/', options?: boolean | BiatecSignInOptions) {
+    const normalizedOptions = normalizeBiatecSignInOptions(options)
     const state = generateOidcRandom(32)
     const nonce = generateOidcRandom(32)
 
     const stateRecord: OidcStateRecord = {
       state,
       nonce,
-      redirectPath,
+      redirectPath: normalizeRedirectPath(redirectPath),
     }
     sessionStorage.setItem(OIDC_STATE_KEY, JSON.stringify(stateRecord))
 
@@ -391,7 +437,9 @@ export const useAuthStore = defineStore('masterAuth', () => {
     authorizeUrl.searchParams.set('response_mode', 'query')
     authorizeUrl.searchParams.set('state', state)
     authorizeUrl.searchParams.set('nonce', nonce)
-    if (silentPrompt) {
+    if (normalizedOptions.prompt) {
+      authorizeUrl.searchParams.set('prompt', normalizedOptions.prompt)
+    } else if (normalizedOptions.silentPrompt) {
       authorizeUrl.searchParams.set('prompt', 'none')
     }
 
@@ -410,9 +458,24 @@ export const useAuthStore = defineStore('masterAuth', () => {
     setStoredAuthProvider(AUTH_PROVIDER_BIATEC)
     scheduleTokenRenewal(callbackSession.expiresAtUtc)
 
-    await fetchProfile()
-    await fetchSubscription()
-    return callbackSession.redirectPath
+    try {
+      player.value = await fetchMe(callbackSession.token)
+      await refreshGameAdminAccess()
+      clearStoredOidcState()
+      await fetchSubscription()
+      return callbackSession.redirectPath
+    } catch (e: unknown) {
+      clearRenewalTimer()
+      token.value = null
+      player.value = null
+      subscription.value = null
+      isGameAdmin.value = false
+      gameAdminChecked.value = false
+      localStorage.removeItem(TOKEN_KEY)
+      localStorage.removeItem(EXPIRES_KEY)
+      localStorage.removeItem(AUTH_PROVIDER_KEY)
+      throw e
+    }
   }
 
   async function fetchSubscription() {
@@ -493,6 +556,7 @@ export const useAuthStore = defineStore('masterAuth', () => {
     claimStartupPackOffer,
     startBiatecOidcSignIn,
     completeBiatecOidcSignIn,
+    resetBiatecSessionForRetry,
     refreshGameAdminAccess,
     logout,
   }

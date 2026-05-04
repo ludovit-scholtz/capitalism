@@ -237,6 +237,8 @@ export default {
     loginFailed: 'Prihl\u00e1senie zlyhalo. Skontrolujte prihlasovacie \u00fadaje a sk\u00faste znova.',
     loginRequired: 'Pred pokračovaním sa prihláste.',
     loginWithBiatec: 'Prihlásiť cez Google',
+    oidcRetryDriveAccessHint:
+      'Na nastavenie Biatec peňaženky je potrebné povoliť vytváranie súborov v Google Drive. Spustite prihlásenie cez Google znova a povoľte prístup k Drive, aby sa autentifikácia dokončila.',
     oidcCallbackTitle: 'Dokončovanie prihlásenia',
     oidcCallbackLoading: 'Overujeme váš Biatec token a načítavame herný profil…',
     oidcCallbackFailed: 'Prihlásenie cez Biatec zlyhalo. Skúste to znova.',
@@ -409,6 +411,8 @@ export default {
     guestShopPlaceholder: 'Váš obchod',
     guestSaveTitle: 'Uložte si pokrok',
     guestSaveSubtitle: 'Prihláste sa cez Google, aby ste si uložili výber a spustili firmu naostro.',
+    guestSaveDriveAccessNotice:
+      'Tu je potrebné povoliť vytváranie súborov v Google Drive, aby Biatec mohol vytvoriť wallet súbor, ktorý zabezpečí uložený postup vo vašom účte.',
     guestSaveKeepsLabel: 'Uchovávate si:',
     guestSaveKeepsCompany: 'Názov vašej spoločnosti',
     guestSaveKeepsCity: 'Vaše štartovacie mesto',
@@ -789,16 +793,16 @@ export default {
     gameplayGuideCardIterationTitle: 'Upravujte každých pár tickov',
     gameplayGuideCardIterationBody: 'Pravidelne kontrolujte predaje a zásoby, potom dolaďte ceny a limity nákupu pre lepšiu maržu bez výpadku výroby.',
     onboardingGuideTitle: 'Pomoc s onboardingom',
-    onboardingGuideSubtitle: 'Kompletný sprievodca so screenshotmi cez všetky onboarding rozhodnutia od odvetvia po prvú predajňu.',
-    onboardingGuideStep1Title: 'Krok 1 - Výber odvetvia',
+    onboardingGuideSubtitle: 'Kompletný sprievodca so screenshotmi cez všetky onboarding rozhodnutia od výberu mesta po uloženie progresu do účtu.',
+    onboardingGuideStep1Title: 'Krok 1 - Vyberte mesto',
     onboardingGuideStep1Body:
-      'V tomto kroku si vyberáte podnikateľskú identitu, podľa ktorej sa bude formovať celý váš prvý biznis. Nábytok je najbezpečnejší štart, pretože má jednoduchší vstupný reťazec a stabilný dopyt. Potravinárstvo vás učí pracovať s objemom, kde malé zmeny ceny dokážu výrazne pohnúť predajmi. Zdravotníctvo je náročnejšie na disciplínu, ale odmeňuje vyššou maržou na jednotku. Pri výbere porovnajte štartové produkty, rýchlosť výroby a to, koľko zložitosti chcete riešiť v prvých tickoch. Toto rozhodnutie určí váš prvý výrobný rytmus, spôsob cenotvorby aj tempo, akým sa dostanete k stabilnému cash-flow vhodnému na expanziu.',
-    onboardingGuideStep2Title: 'Krok 2 - Výber štartového produktu',
+      'Výber mesta je teraz prvý, pretože určuje štartovaciu menu, aktívny kontext účtu aj trh pozemkov ešte skôr, než sa zaviažete k odvetviu. Vnímajte ho ako rozhodnutie o operačnom prostredí, nie iba ako kozmetický výber lokality. Mesto určí menu IPO financovania, ceny parciel aj prvý bankový kontext, s ktorým budete pracovať. Vyberte si mesto, ktorého rozsah a čitateľnosť vám pomôžu rýchlo sa zorientovať, a ďalšie kroky stavajte na tomto lokálnom trhu. Toto rozhodnutie kotví všetky ďalšie onboarding obrazovky, preto kartu mesta čítajte ako súhrn štartovacieho biznis prostredia.',
+    onboardingGuideStep2Title: 'Krok 2 - Vyberte odvetvie',
     onboardingGuideStep2Body:
-      'Tu definitívne uzamknete produkt, ktorý bude vaša prvá továreň vyrábať a predajňa predávať. Nie je to len vizuálna voľba. Mení sa tým potrebný vstupný materiál, očakávané náklady na výrobný cyklus aj realistický cenový koridor pre prvé predaje. Pozrite si základnú cenu, recept a tempo craftu, pretože práve tieto údaje ovplyvnia vašu počiatočnú maržu a obrátku zásob. Produkt s rýchlym cyklom prináša rýchlejšiu spätnú väzbu, produkt s vyššou cenou zase zosilní chyby pri zlej konfigurácii. Vyberajte tak, aby ste v prvých desiatich tickoch zvládli dopyt, maržu aj jednoduchosť nastavovania bez zbytočného chaosu.',
-    onboardingGuideStep3Title: 'Krok 3 - Výber mesta',
+      'Keď je mesto pevné, vyberte si podnikateľskú fantasy, ktorú sa chcete naučiť ako prvú: Nábytok, Potravinárstvo alebo Zdravotníctvo. Tento krok určuje prvý dodávateľský reťazec, sadu štartovacích produktov aj ekonomickú logiku, ktorú budete v prvých tickoch sledovať. Neoptimalizujte iba podľa abstraktnej náročnosti; vyberte si odvetvie, ktorého príbeh výroby a predaja viete rozumne vysvetliť. Dobrý onboardingový výber je taký, pri ktorom si už teraz viete povedať, čo sa nakúpi, čo sa vyrobí a čo sa bude predávať. Čím jasnejší je pre vás tento tok, tým rýchlejšie budú neskoršie rozhodnutia o cene a rozšírení firmy založené na dátach.',
+    onboardingGuideStep3Title: 'Krok 3 - Vyberte prvý produkt',
     onboardingGuideStep3Body:
-      'Výber mesta určuje ekonomické prostredie vášho štartu. Mena ovplyvňuje spôsob, akým čítate ceny, dostupnosť kapitálu a porovnávanie investícií medzi lotmi. Dostupnosť pozemkov rozhodne, či viete rýchlo spustiť výrobný reťazec bez preplácania. Lokálna ekonomika a veľkosť trhu zas vplývajú na to, ako agresívne môžete nastaviť predajnú cenu v prvých kolách. Berte to ako výber terénu pre celý launch: niekde je výhodnejšia stabilita a opatrné náklady, inde rýchlejší rast po rozbehu. Kľúčové je nevyčerpať sa pri nákupoch lotov, aby vám ostala rezerva na nákup vstupov, mzdy a doladenie konfigurácie v nasledujúcich tickoch.',
+      'Výber produktu mení všeobecnú podnikateľskú myšlienku na konkrétny štartovací plán. Zvolený produkt riadi konfiguráciu továrne, nastavenie predajne, benchmark ceny v sprievodcovi aj prvý tok vstupov, ktorý musíte udržať funkčný. Kartu produktu čítajte ako záväzok k jednému jasnému operačnému cyklu, nie iba ako tematickú voľbu. Cieľom nie je nájsť dokonalý produkt navždy, ale čistý prvý reťazec, na ktorom sa naučíte sourcing, výrobu a predaj bez zbytočného chaosu. Keď produkt uzamknete, ďalšie onboarding kroky už budujú firmu okolo tejto konkrétnej obchodnej cesty.',
     onboardingGuideStep4Title: 'Krok 4 - Voľba IPO plánu',
     onboardingGuideStep4Body:
       'IPO plán je strategický kompromis medzi kontrolou a runway. Nižší úpis ponechá zakladateľovi silnejší podiel, ale dá firme menej hotovosti na loty, jednotky a počiatočné chyby. Vyšší úpis pridá bezpečnostnú rezervu a zníži tlak pri prvých rozhodnutiach, no zároveň oslabí váš vlastnícky podiel. Správna voľba závisí od skúsenosti a štýlu hry. Ak onboarding robíte prvýkrát, vyššia hotovosť pomáha zvládnuť učenie bez kritického stresu. Ak už viete presné kroky, môžete ísť efektívnejšie cez nižší úpis. Čítajte hodnoty founder ownership a public float ako riadiace páky dlhodobej stratégie, nie iba ako čísla na obrazovke.',
@@ -808,6 +812,9 @@ export default {
     onboardingGuideStep6Title: 'Krok 6 - Kúpa prvého lotu pre predajňu',
     onboardingGuideStep6Body:
       'Posledným onboarding nákupom dokončíte prvú cestu produktu k zákazníkovi. Predajný lot je miesto, kde sa výroba mení na tržby, preto je tento krok prechodom z prípravy do aktívnej exekúcie. Po kúpe sa sústreďte na čisté nastavenie VEREJNÉHO_PREDAJA: realistická minimálna cena, dostupnosť zásob a pozorovanie nasledujúcich tickov, kým príde prvý reálny predaj. Na začiatku je dôležitejšia rýchla spätná väzba než maximalizácia marže, preto nastavujte cenu tak, aby sa tovar hýbal. Keď sa objaví prvý predajný signál, môžete systematicky testovať elasticitu dopytu a dolaďovať maržu. Tento krok uzatvára onboarding a štartuje opakovateľnú rastovú slučku.',
+    onboardingGuideStep7Title: 'Krok 7 - Uložte si progres do účtu',
+    onboardingGuideStep7Body:
+      'Posledný hosťovský krok je teraz explicitný: preniesť pripravenú firmu do skutočného účtu. Keď stlačíte Uložiť a spustiť, Biatec musí dostať povolenie vytvárať súbory v Google Drive, pretože cez tento prístup vytvára a spravuje wallet súbor, ktorý chráni váš uložený progres. Ak toto povolenie odmietnete, autentifikácia sa nedokončí správne a prihlásenie budete musieť zopakovať s opätovným súhlasom. Túto obrazovku preto čítajte ako súčasť onboardingu: skontrolujte, čo sa uloží, a pri Google výzve povoľte prístup k Drive. Ide o prechod zo sandboxu do perzistentného hráčskeho účtu, nie o vedľajší externý krok.',
     onboardingGuideStepIndustryTitle: '1. Vyberte štartové odvetvie',
     onboardingGuideStepIndustryBody: 'Vyberte Nábytok, Potravinárstvo alebo Zdravotníctvo. To určí prvý dodávateľský reťazec aj cenovú logiku.',
     onboardingGuideStepProductTitle: '2. Uzamknite prvý produkt',

@@ -237,6 +237,8 @@ export default {
     loginFailed: 'Anmeldung fehlgeschlagen. Bitte überprüfen Sie Ihre Zugangsdaten und versuchen Sie es erneut.',
     loginRequired: 'Bitte melden Sie sich an, um fortzufahren.',
     loginWithBiatec: 'Mit Google anmelden',
+    oidcRetryDriveAccessHint:
+      'Für die Einrichtung der Biatec-Wallet muss das Erstellen von Dateien in Google Drive erlaubt sein. Starten Sie die Google-Anmeldung erneut und erlauben Sie den Drive-Zugriff, damit die Anmeldung abgeschlossen werden kann.',
     oidcCallbackTitle: 'Anmeldung wird abgeschlossen',
     oidcCallbackLoading: 'Ihr Biatec-Token wird geprüft und Ihr Spielprofil geladen…',
     oidcCallbackFailed: 'Die Biatec-Anmeldung ist fehlgeschlagen. Bitte versuchen Sie es erneut.',
@@ -410,6 +412,8 @@ export default {
     guestShopPlaceholder: 'Ihr Laden',
     guestSaveTitle: 'Fortschritt speichern',
     guestSaveSubtitle: 'Melden Sie sich mit Google an, um Ihre Auswahl zu sichern und Ihr Unternehmen richtig zu starten.',
+    guestSaveDriveAccessNotice:
+      'Hier muss das Erstellen von Dateien in Google Drive erlaubt werden, damit Biatec die Wallet-Datei anlegen kann, die Ihren gespeicherten Kontofortschritt absichert.',
     guestSaveKeepsLabel: 'Sie behalten:',
     guestSaveKeepsCompany: 'Ihr Unternehmensname',
     guestSaveKeepsCity: 'Ihre Startstadt',
@@ -790,16 +794,16 @@ export default {
     gameplayGuideCardIterationTitle: 'Alle paar Ticks nachjustieren',
     gameplayGuideCardIterationBody: 'Prüfen Sie Verkäufe und Bestand regelmäßig und justieren Sie Preise sowie Einkaufslimits für bessere Margen ohne Produktionsstopp.',
     onboardingGuideTitle: 'Onboarding-Hilfe',
-    onboardingGuideSubtitle: 'Eine vollständige Screenshot-Anleitung durch jede Onboarding-Entscheidung von Branche bis zum ersten Shop.',
-    onboardingGuideStep1Title: 'Schritt 1 - Startbranche wählen',
+    onboardingGuideSubtitle: 'Eine vollständige Screenshot-Anleitung durch jede Onboarding-Entscheidung von der Stadtwahl bis zum gespeicherten Kontofortschritt.',
+    onboardingGuideStep1Title: 'Schritt 1 - Stadt wählen',
     onboardingGuideStep1Body:
-      'In diesem Schritt legen Sie die unternehmerische Identität fest, auf der Ihr gesamter Start basiert. Möbel ist der robusteste Einstieg, weil die ersten Inputketten einfacher sind und die Nachfrage meist stabil bleibt. Lebensmittelverarbeitung trainiert Volumensteuerung, bei der kleine Preisänderungen große Absatzwirkungen haben können. Gesundheitswesen startet anspruchsvoller, belohnt aber saubere Ausführung mit höheren Margen pro Einheit. Vergleichen Sie beim Auswählen Starterprodukte, Herstellungstempo und die operative Komplexität, die Sie in Ihrer ersten Stunde tragen möchten. Ihre Branchenwahl bestimmt Produktionsrhythmus, frühe Preisstrategie und wie schnell Sie einen verlässlichen Cashflow erreichen, der für Expansion in weitere Produkte oder Städte geeignet ist.',
-    onboardingGuideStep2Title: 'Schritt 2 - Starterprodukt festlegen',
+      'Die Stadtwahl steht jetzt am Anfang, weil sie Ihre Startwährung, den aktiven Kontokontext und den verfügbaren Grundstücksmarkt festlegt, bevor Sie sich auf eine Branche festlegen. Behandeln Sie diese Auswahl als Entscheidung über Ihr Betriebsumfeld, nicht nur als hübsche Kulisse. Ihre Stadt bestimmt die Währung für IPO-Finanzierung, Grundstückspreise und den ersten Bankkontokontext, den Sie verwalten. Wählen Sie eine Stadt, deren Größe und Lesbarkeit Ihnen einen sauberen Einstieg erlaubt, und halten Sie spätere Entscheidungen konsistent zu diesem lokalen Markt. Diese erste Auswahl verankert alle weiteren Onboarding-Schritte, deshalb sollte die Stadtkarte wie eine geschäftliche Startzusammenfassung gelesen werden.',
+    onboardingGuideStep2Title: 'Schritt 2 - Branche wählen',
     onboardingGuideStep2Body:
-      'Hier fixieren Sie das konkrete Starterprodukt, das Ihre erste Fabrik herstellt und Ihr erster Shop verkauft. Diese Entscheidung ist nicht nur visuell, sondern ändert Inputbedarf, Kostenverhalten und Ihren realistischen Einstiegspreisbereich. Lesen Sie Produktkarte, Basispreis und Fertigungstakt genau, denn diese Werte prägen frühe Marge und Lagerumschlag. Ein schnelleres Produkt gibt Ihnen schnelleres Lernfeedback, ein höherpreisiges Produkt verstärkt dagegen Fehlkonfigurationen stärker. Wählen Sie mit Blick auf die ersten zehn Ticks: genug Nachfrage für klare Signale, genug Marge für Stabilität und eine Kette, die Sie ohne Überforderung steuern können. So erhalten Sie früh belastbare Daten, statt in den ersten Runden nur auf kurzfristige Zufälle zu reagieren.',
-    onboardingGuideStep3Title: 'Schritt 3 - Stadt auswählen',
+      'Sobald die Stadt feststeht, wählen Sie die Geschäftsfantasie, die Sie zuerst lernen möchten: Möbel, Lebensmittelverarbeitung oder Gesundheitswesen. Dieser Schritt bestimmt Ihre erste Lieferkette, den Starter-Produktpool und die wirtschaftliche Logik, die Sie in den ersten Ticks verstehen müssen. Optimieren Sie nicht nur nach gefühlter Schwierigkeit; wählen Sie die Branche, deren Produktionsgeschichte Sie klar erklären können. Eine gute Startbranche ist eine, bei der Sie schon jetzt benennen können, was eingekauft, was produziert und was später verkauft wird. Je klarer dieser Ablauf für Sie ist, desto schneller werden Preis- und Ausbauentscheidungen später datenbasiert statt improvisiert.',
+    onboardingGuideStep3Title: 'Schritt 3 - Erstes Produkt wählen',
     onboardingGuideStep3Body:
-      'Mit der Stadtwahl definieren Sie Ihr wirtschaftliches Startgelände. Der Währungskontext beeinflusst Preiswahrnehmung, Budgetvergleich und die praktische Bezahlbarkeit von Grundstücken und Folgeschritten. Die Verfügbarkeit passender Lots entscheidet, wie schnell Sie ohne Überzahlung eine lauffähige Kette aufbauen. Lokale Marktbedingungen wirken auf Nachfrage und darauf, wie aggressiv Ihre erste Verkaufspreissetzung sein darf. Denken Sie strategisch: Sie brauchen nicht die prestigeträchtigste Lage, sondern ein Umfeld, das Fabrik- und Shopkauf ermöglicht und gleichzeitig Liquidität für Betriebsschwankungen lässt. Wenn nach den beiden Grundstückskäufen kaum Reserve übrig bleibt, wird jede kleine Abweichung im Einkauf oder Verkauf kritisch. Eine kluge Stadtwahl schafft daher operativen Spielraum und beschleunigt sichere Lernzyklen.',
+      'Mit der Produktwahl wird aus der Branchenidee ein konkreter Startplan. Das gewählte Starterprodukt steuert die Fabrikkonfiguration, das Shop-Setup, den Richtpreis im Leitfaden und den ersten Materialfluss, den Sie stabil halten müssen. Lesen Sie die Produktkarte als Bekenntnis zu einem klaren operativen Kreislauf, nicht als reine Stilentscheidung. Ihr Ziel ist nicht das perfekte Endspiel-Produkt, sondern eine saubere erste Kette, an der Sie Einkauf, Produktion und Verkauf ohne unnötige Komplexität lernen. Sobald das Produkt feststeht, bauen die restlichen Onboarding-Schritte Ihr Unternehmen genau um diesen ersten kommerziellen Pfad herum auf.',
     onboardingGuideStep4Title: 'Schritt 4 - IPO-Plan wählen',
     onboardingGuideStep4Body:
       'Der IPO-Plan ist ein bewusstes Verhältnis von Kontrolle zu Startreichweite. Niedrigeres Raise hält Ihren Gründeranteil höher, reduziert jedoch die Liquiditätsreserve für Grundstücke, Konfiguration und frühe Fehlentscheidungen. Höheres Raise gibt Sicherheit und mehr operative Luft, verwässert dafür Ihren Eigentumsanteil stärker. Es gibt keine universelle Bestwahl: Anfänger profitieren oft von zusätzlichem Puffer, erfahrene Spieler können mit engerem Kapital effizienter starten. Lesen Sie Founder Ownership und Public Float als strategische Hebel, nicht als reine Anzeigezahlen. Diese Werte prägen, wie risikofreudig Sie in den ersten Zyklen agieren können und wie stark Ihr langfristiger Vermögensaufbau pro erfolgreicher Expansion ausfällt. Ein passender IPO-Plan stabilisiert die erste Woche Ihrer Wirtschaftssimulation spürbar.',
@@ -809,6 +813,9 @@ export default {
     onboardingGuideStep6Title: 'Schritt 6 - Erstes Shopgrundstück kaufen',
     onboardingGuideStep6Body:
       'Mit diesem letzten Kauf schließen Sie Ihren ersten Go-to-Market-Pfad. Das Shop-Lot ist die Stelle, an der Produktionsleistung in echten Umsatz übergeht. Nach dem Kauf folgt die entscheidende operative Feinarbeit: PUBLIC_SALES sauber konfigurieren, realistischen Mindestpreis setzen, Bestandsfluss sicherstellen und die nächsten Ticks aufmerksam beobachten. Zu Beginn ist Lernqualität wichtiger als Maximalmarge, daher sollte die Preisstrategie schnelle Rückmeldung ermöglichen. Sobald die ersten Verkäufe erscheinen, können Sie strukturiert mit Preiselastizität experimentieren und die Marge kontrolliert erhöhen. Wenn dieser Schritt sauber gelingt, entsteht ein stabiler Kreislauf aus Produktion, Verkauf und Auswertung. Genau dieser Kreislauf macht den Übergang vom Onboarding zur skalierbaren Unternehmensführung möglich.',
+    onboardingGuideStep7Title: 'Schritt 7 - Fortschritt im Konto speichern',
+    onboardingGuideStep7Body:
+      'Der letzte Gastschritt ist jetzt ausdrücklich Teil des Onboardings: Übertragen Sie das vorbereitete Unternehmen in Ihr echtes Konto. Wenn Sie Speichern und starten drücken, muss Biatec Dateien in Google Drive anlegen dürfen, weil diese Berechtigung für die Wallet-Datei genutzt wird, die Ihren Kontofortschritt absichert. Wenn Sie diese Freigabe verweigern, kann die Anmeldung nicht korrekt abgeschlossen werden und Sie müssen die Anmeldung mit erneuter Zustimmung wiederholen. Lesen Sie diesen Bildschirm daher bewusst, prüfen Sie, was übernommen wird, und erlauben Sie bei Google den Drive-Zugriff. Das ist der Übergang vom Sandbox-Plan in ein dauerhaftiges Spielerkonto und kein nebensächlicher externer Dialog.',
     onboardingGuideStepIndustryTitle: '1. Startbranche wählen',
     onboardingGuideStepIndustryBody: 'Wählen Sie Möbel, Lebensmittelverarbeitung oder Gesundheitswesen. Das bestimmt Ihre erste Lieferkette und Preislogik.',
     onboardingGuideStepProductTitle: '2. Erstes Produkt festlegen',

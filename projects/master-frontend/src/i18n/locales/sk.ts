@@ -143,6 +143,8 @@ export default {
     haveAccount: 'Už máš účet?',
     backToDirectory: 'Späť na zoznam serverov',
     genericError: 'Nastala chyba. Skús to znova.',
+    oidcRetryDriveAccessHint:
+      'Na nastavenie Biatec peňaženky je potrebné povoliť vytváranie súborov v Google Drive. Spustite prihlásenie cez Google znova a povoľte prístup k Drive, aby sa autentifikácia dokončila.',
     biatecCallbackTitle: 'Dokončujem prihlásenie cez Biatec',
     biatecCallbackLoading: 'Overujem reláciu a načítavam účet...',
     biatecCallbackSuccess: 'Prihlásenie je hotové. Presmerovávam...',

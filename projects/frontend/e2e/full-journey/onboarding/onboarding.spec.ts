@@ -169,6 +169,13 @@ async function completeGuidedOnboardingForIndustry(page: Page, _companyName: str
 }
 
 test.describe('Authentication', () => {
+  test('login shows drive access retry hint after failed oidc consent flow', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/login?oidc_retry=consent&oidc_reason=drive_access&redirect=%2Fonboarding')
+
+    await expect(page.getByText(/google drive file creation access is required/i)).toBeVisible()
+  })
+
   test('register new account and redirect to home', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/login')
@@ -4712,6 +4719,16 @@ test.describe('Guest save-progress conversion step — city, industry, and keeps
     // At minimum: city and product must be visible on narrow viewport
     await expect(saveSectionList).toContainText(/Bratislava/i)
     await expect(saveSectionList).toContainText(/Wooden Chair/i)
+  })
+
+  test('Save Your Progress section explains the Google Drive access requirement', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/onboarding')
+    await completeGuestSteps1to4(page)
+
+    await expect(
+      page.getByText(/google drive file creation access is required here/i),
+    ).toBeVisible()
   })
 })
 

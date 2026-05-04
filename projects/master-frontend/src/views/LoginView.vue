@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import ViewJumbotron from '@/components/layout/ViewJumbotron.vue'
 import ViewSubnav from '@/components/layout/ViewSubnav.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
+const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 
@@ -15,6 +16,10 @@ const email = ref('')
 const displayName = ref('')
 const password = ref('')
 const formError = ref<string | null>(null)
+const requiresConsentRetry = computed(() => route.query.oidc_retry === 'consent')
+const showsDriveAccessHint = computed(
+  () => requiresConsentRetry.value && route.query.oidc_reason === 'drive_access',
+)
 const navItems = [
   { label: t('nav.home'), to: '/' },
   { label: t('nav.gameServers'), to: '/game-servers' },
@@ -38,10 +43,10 @@ async function handleSubmit() {
 }
 
 function handleBiatecSignIn() {
-  const redirectPath = router.currentRoute.value.query.redirect
+  const redirectPath = route.query.redirect
   const targetPath =
     typeof redirectPath === 'string' && redirectPath.length > 0 ? redirectPath : '/'
-  auth.startBiatecOidcSignIn(targetPath)
+  auth.startBiatecOidcSignIn(targetPath, requiresConsentRetry.value ? { prompt: 'consent' } : undefined)
 }
 </script>
 
@@ -72,6 +77,14 @@ function handleBiatecSignIn() {
           </div>
 
           <form class="flex flex-col gap-5" @submit.prevent="handleSubmit">
+            <div
+              v-if="showsDriveAccessHint"
+              class="rounded-md border border-brand/25 bg-brand/10 px-3 py-3 text-sm text-body"
+              role="status"
+            >
+              {{ t('login.oidcRetryDriveAccessHint') }}
+            </div>
+
             <div
               v-if="formError"
               class="rounded-md bg-bad/10 px-3 py-3 text-sm text-bad"

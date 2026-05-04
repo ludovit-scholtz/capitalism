@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
@@ -14,6 +14,10 @@ const email = ref('')
 const displayName = ref('')
 const password = ref('')
 const formError = ref<string | null>(null)
+const requiresConsentRetry = computed(() => route.query.oidc_retry === 'consent')
+const showsDriveAccessHint = computed(
+  () => requiresConsentRetry.value && route.query.oidc_reason === 'drive_access',
+)
 
 async function handleSubmit() {
   formError.value = null
@@ -32,7 +36,7 @@ async function handleSubmit() {
 function handleBiatecSignIn() {
   formError.value = null
   const redirectPath = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
-  auth.startBiatecOidcSignIn(redirectPath)
+  auth.startBiatecOidcSignIn(redirectPath, requiresConsentRetry.value ? { prompt: 'consent' } : undefined)
 }
 </script>
 
@@ -45,6 +49,14 @@ function handleBiatecSignIn() {
         </h1>
 
         <form class="flex flex-col gap-5" @submit.prevent="handleSubmit">
+          <div
+            v-if="showsDriveAccessHint"
+            class="rounded-md border border-brand/25 bg-brand/10 px-3 py-3 text-sm text-body"
+            role="status"
+          >
+            {{ t('auth.oidcRetryDriveAccessHint') }}
+          </div>
+
           <div v-if="formError" class="bg-bad/10 text-bad rounded-md px-3 py-3 text-sm" role="alert">
             {{ formError }}
           </div>
