@@ -173,11 +173,13 @@ public sealed class BotRobustnessScenarioTests
     [Fact]
     public void AnnualisedRate_OnlyOneTick_IsHighAndNonZero()
     {
-        // A 10% gain in a single tick annualises to 87 600% (10% × 8760 ticks/year).
+        // A 10% gain in a single tick annualises to a very high percentage.
+        // Formula: ratePerTick = delta / (initial × ticksElapsed) = 10 000 / 100 000 = 0.1
+        // annualised = ratePerTick × ticksPerYear × 100 = 0.1 × 8760 × 100 = 87 600%
         var rate = BotProfitCalculator.ComputeAnnualisedRatePercent(
             110_000m, 100_000m, ticksElapsed: 1, ticksPerYear: 8760);
         Assert.True(rate > 0m, "Single-tick 10% gain must produce a positive rate.");
-        Assert.Equal(10m * 8760m, rate); // 10% per tick × 8760 ticks/year × 100
+        Assert.Equal(87_600m, rate);
     }
 
     [Fact]

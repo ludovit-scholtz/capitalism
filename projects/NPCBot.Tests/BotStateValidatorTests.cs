@@ -361,12 +361,15 @@ public sealed class BotStateValidatorTests
     [Fact]
     public void Validate_IssueListIsImmutable()
     {
-        // BotStateValidationResult.Issues is IReadOnlyList<string> — cast should fail.
+        // BotStateValidationResult.Issues is backed by ReadOnlyCollection<string>.
+        // Verify that attempting to add an item through the IList<string> interface throws.
         var bot = MakeReadyBot();
         bot.IsSkipped = true;
 
         var result = BotStateValidator.Validate(bot);
         Assert.IsNotType<List<string>>(result.Issues);
+        Assert.Throws<NotSupportedException>(() =>
+            ((System.Collections.Generic.IList<string>)result.Issues).Add("injected"));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
