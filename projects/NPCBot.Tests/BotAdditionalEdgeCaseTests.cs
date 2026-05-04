@@ -228,7 +228,7 @@ public sealed class BotAdditionalEdgeCaseTests
     // ── BotStateValidator: IsAtRisk with skipped bot having many errors ───────
 
     [Fact]
-    public void IsAtRisk_SkippedBotWithExtremlyHighErrors_ReturnsFalse()
+    public void IsAtRisk_SkippedBotWithExtremelyHighErrors_ReturnsFalse()
     {
         // A skipped bot is permanently excluded from operation — IsAtRisk must return false
         // even if ConsecutiveErrors is orders of magnitude above the limit.
