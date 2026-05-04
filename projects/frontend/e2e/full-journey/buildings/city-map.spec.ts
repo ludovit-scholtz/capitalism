@@ -257,4 +257,54 @@ test.describe('Real-world Map Integration', () => {
     // Should load within 5 seconds (well within performance budget)
     expect(elapsed).toBeLessThan(5000)
   })
+
+  // ── Secondary Market: For-Sale Badge on Lot Marker ─────────────────────────
+
+  test('lot detail panel shows "For Sale" badge when building on lot is listed', async ({ page }) => {
+    // The commercial lot (index 2) is "High Street Retail Space" — override it with a for-sale building
+    const lots = makeDefaultBuildingLots()
+    lots[2] = {
+      ...lots[2]!,
+      ownerCompanyId: 'co-other',
+      buildingId: 'bldg-for-sale',
+      ownerCompany: { id: 'co-other', name: 'Other Corp' },
+      building: {
+        id: 'bldg-for-sale',
+        name: 'For Sale Building',
+        type: 'SALES_SHOP',
+        isForSale: true,
+        askingPrice: 750000,
+      },
+    }
+    setupMockApi(page, { buildingLots: lots })
+    await page.goto('/city/city-ba')
+    await page.getByRole('button', { name: /List View/i }).click()
+    await page.getByRole('button', { name: /High Street Retail Space/i }).click()
+    await expect(page.getByTestId('lot-for-sale-badge')).toBeVisible()
+  })
+
+  test('lot detail panel does not show "For Sale" badge for non-listed buildings', async ({
+    page,
+  }) => {
+    // The commercial lot (index 2) has a building that is NOT for sale
+    const lots = makeDefaultBuildingLots()
+    lots[2] = {
+      ...lots[2]!,
+      ownerCompanyId: 'co-other',
+      buildingId: 'bldg-not-sale',
+      ownerCompany: { id: 'co-other', name: 'Other Corp' },
+      building: {
+        id: 'bldg-not-sale',
+        name: 'Normal Building',
+        type: 'SALES_SHOP',
+        isForSale: false,
+        askingPrice: null,
+      },
+    }
+    setupMockApi(page, { buildingLots: lots })
+    await page.goto('/city/city-ba')
+    await page.getByRole('button', { name: /List View/i }).click()
+    await page.getByRole('button', { name: /High Street Retail Space/i }).click()
+    await expect(page.getByTestId('lot-for-sale-badge')).toHaveCount(0)
+  })
 })

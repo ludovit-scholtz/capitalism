@@ -273,3 +273,54 @@ test('shows multiple listings in a grid', async ({ page }) => {
   await expect(page.locator('.building-name').nth(1)).toContainText('Mine B')
   await expect(page.locator('.building-name').nth(2)).toContainText('Factory C')
 })
+
+test('unlist building removes it from market listings', async ({ page }) => {
+  const player = makePlayerWithCompany()
+  const state = setupMockApi(page, {
+    players: [player],
+    myBuildingListings: [
+      makeMyListing({
+        building: {
+          id: 'bldg-listed',
+          name: 'Listed Factory',
+          type: 'FACTORY',
+          isForSale: true,
+          askingPrice: 400000,
+          level: 1,
+          city: BRATISLAVA,
+          company: { id: 'co-1', name: 'My Corp' },
+        },
+      }),
+    ],
+  })
+  state.currentUserId = player.id
+  state.currentToken = `token-${player.id}`
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${player.id}`)
+
+  await page.goto('/buildings/market')
+  await page.getByRole('tab', { name: 'My Listings' }).click()
+
+  // Listing should be visible initially
+  await expect(page.locator('.my-listing-card').first()).toBeVisible()
+
+  // Simulate unlist: update mock state and reload
+  state.myBuildingListings = []
+  await page.reload()
+  await page.getByRole('tab', { name: 'My Listings' }).click()
+  await expect(page.getByText(/you have no buildings listed for sale/i)).toBeVisible()
+})
+
+test('market shows two listings from different cities', async ({ page }) => {
+  const listings = [
+    makeMarketListing({ id: 'b1', name: 'BA Mine', city: BRATISLAVA }),
+    makeMarketListing({ id: 'b2', name: 'PR Mine', city: PRAGUE }),
+  ]
+  setupMockApi(page, { buildingMarketListings: listings })
+  await page.goto('/buildings/market')
+
+  // Both listings shown initially
+  await expect(page.locator('.market-listing-card')).toHaveCount(2)
+})

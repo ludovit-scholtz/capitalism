@@ -81,6 +81,21 @@ public sealed partial class Mutation
                     .Build());
         }
 
+        // Prevent duplicate pending offers from the same buyer on the same building
+        var existingPendingOffer = await db.BuildingSaleOffers
+            .AnyAsync(o => o.BuildingId == building.Id
+                && o.BuyerCompanyId == buyerCompany.Id
+                && o.Status == BuildingSaleOfferStatus.Pending);
+
+        if (existingPendingOffer)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("You already have a pending offer on this building. Withdraw or wait for resolution before submitting a new offer.")
+                    .SetCode("DUPLICATE_OFFER")
+                    .Build());
+        }
+
         var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync();
 
         var offer = new BuildingSaleOffer
