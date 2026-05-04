@@ -404,7 +404,8 @@ export const useAuthStore = defineStore('masterAuth', () => {
   }
 
   function logout(options: LogoutOptions = {}) {
-    const shouldFederatedLogout = options.federated === true && getStoredAuthProvider() === AUTH_PROVIDER_BIATEC
+    const shouldFederatedLogout =
+      options.federated === true && getStoredAuthProvider() === AUTH_PROVIDER_BIATEC
     const idTokenHint = token.value
     const federatedLogoutUrl = shouldFederatedLogout ? buildBiatecEndSessionUrl(idTokenHint) : null
 
