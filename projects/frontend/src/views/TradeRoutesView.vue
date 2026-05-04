@@ -59,7 +59,7 @@
             <th>{{ t('tradeRoutes.shippingEstimate') }}</th>
             <th>{{ t('tradeRoutes.transitTicks') }}</th>
             <th>{{ t('tradeRoutes.arrivalTick') }}</th>
-            <th>Status</th>
+            <th>{{ t('tradeRoutes.statusLabel') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -72,8 +72,8 @@
             <td>{{ route.destinationCityName }}</td>
             <td>{{ route.resourceTypeName ?? route.productTypeName ?? '—' }}</td>
             <td>{{ route.quantity }}</td>
-            <td>{{ formatCurrency(route.pricePerUnit, 'EUR') }}</td>
-            <td>{{ formatCurrency(route.shippingCostEstimate, 'EUR') }}</td>
+            <td>{{ formatCurrency(route.pricePerUnit, route.sourceCurrencyCode) }}</td>
+            <td>{{ formatCurrency(route.shippingCostEstimate, route.sourceCurrencyCode) }}</td>
             <td>{{ route.transitTicks }}</td>
             <td>{{ route.expectedArrivalTick }}</td>
             <td>
@@ -140,8 +140,8 @@ async function fetchRoutes() {
       query MyTradeRoutes {
         myTradeRoutes {
           id companyId
-          sourceBuildingId sourceBuildingName sourceCityName
-          destinationBuildingId destinationBuildingName destinationCityName
+          sourceBuildingId sourceBuildingName sourceCityName sourceCurrencyCode
+          destinationBuildingId destinationBuildingName destinationCityName destinationCurrencyCode
           productTypeId productTypeName
           resourceTypeId resourceTypeName
           quantity quality pricePerUnit

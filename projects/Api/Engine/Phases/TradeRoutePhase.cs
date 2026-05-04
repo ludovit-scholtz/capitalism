@@ -146,27 +146,37 @@ public sealed class TradeRoutePhase : ITickPhase
         if (!context.CompaniesById.TryGetValue(destBuilding.CompanyId, out var buyerCompany))
             return;
 
-        // Debit buyer for the goods.
+        // Attempt to debit buyer for the goods; if insufficient funds, skip payment
+        // (goods are still delivered – the buyer receives inventory on credit in this
+        // implementation, matching the existing B2B sales phase behaviour).
         var buyerFundingAccount = context.GetBuildingFundingAccount(destBuilding);
+        bool paymentSucceeded;
         if (buyerFundingAccount is not null && buyerFundingAccount.Balance >= totalRevenue)
         {
             buyerFundingAccount.Balance -= totalRevenue;
+            paymentSucceeded = true;
         }
         else
         {
-            CompanyBankingService.TryDebit(context.GetCompanyBankAccounts(buyerCompany.Id), totalRevenue);
+            paymentSucceeded = CompanyBankingService.TryDebit(
+                context.GetCompanyBankAccounts(buyerCompany.Id), totalRevenue);
         }
 
-        // Credit seller for the goods.
-        var sellerAccount = context.GetBuildingFundingAccount(sourceBuilding);
-        if (sellerAccount is not null)
+        // Credit seller only when the buyer was successfully debited.
+        if (paymentSucceeded && totalRevenue > 0m)
         {
-            sellerAccount.Balance += totalRevenue;
+            var sellerAccount = context.GetBuildingFundingAccount(sourceBuilding);
+            if (sellerAccount is not null)
+            {
+                sellerAccount.Balance += totalRevenue;
+            }
+            else
+            {
+                CompanyBankingService.TryCredit(context.GetCompanyBankAccounts(sellerCompany.Id), totalRevenue, null, out _);
+            }
         }
-        else
-        {
-            CompanyBankingService.TryCredit(context.GetCompanyBankAccounts(sellerCompany.Id), totalRevenue, null, out _);
-        }
+
+        var sellerAccount2 = context.GetBuildingFundingAccount(sourceBuilding);
 
         // Calculate and deduct actual shipping cost from seller.
         var itemWeight = ComputeItemWeight(context, route.ResourceTypeId, route.ProductTypeId);
@@ -181,9 +191,9 @@ public sealed class TradeRoutePhase : ITickPhase
         route.ShippingCostActual = actualShippingCost;
 
         // Deduct shipping cost from seller account.
-        if (sellerAccount is not null && sellerAccount.Balance >= actualShippingCost)
+        if (sellerAccount2 is not null && sellerAccount2.Balance >= actualShippingCost)
         {
-            sellerAccount.Balance -= actualShippingCost;
+            sellerAccount2.Balance -= actualShippingCost;
         }
         else
         {

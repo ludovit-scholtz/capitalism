@@ -1107,9 +1107,11 @@ export interface MockTradeRoute {
   sourceBuildingId: string
   sourceBuildingName: string
   sourceCityName: string
+  sourceCurrencyCode: string
   destinationBuildingId: string
   destinationBuildingName: string
   destinationCityName: string
+  destinationCurrencyCode: string
   productTypeId: string | null
   productTypeName: string | null
   resourceTypeId: string | null

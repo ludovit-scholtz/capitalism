@@ -3141,6 +3141,7 @@ export default {
     transitTicks: 'Transit Ticks',
     arrivalTick: 'ETA (tick)',
     completedAt: 'Completed',
+    statusLabel: 'Status',
     failureReason: 'Failure Reason',
     filter: {
       all: 'All',

@@ -3129,6 +3129,7 @@ export default {
     transitTicks: 'Tiky prepravy',
     arrivalTick: 'ETA (tick)',
     completedAt: 'Dokončené',
+    statusLabel: 'Stav',
     failureReason: 'Dôvod zlyhania',
     filter: {
       all: 'Všetky',

@@ -3143,6 +3143,7 @@ export default {
     transitTicks: 'Transitgänge',
     arrivalTick: 'ETA (Tick)',
     completedAt: 'Abgeschlossen',
+    statusLabel: 'Status',
     failureReason: 'Fehlergrund',
     filter: {
       all: 'Alle',
