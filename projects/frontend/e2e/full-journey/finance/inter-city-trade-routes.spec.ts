@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { setupMockApi, makePlayer, makeDefaultCities } from '../../helpers/mock-api'
+import { setupMockApi, makePlayer } from '../../helpers/mock-api'
 import type { MockTradeRoute } from '../../helpers/mock-api'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
