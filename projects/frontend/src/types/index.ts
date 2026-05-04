@@ -2167,3 +2167,24 @@ export interface TutorialMilestoneStatus {
   isCompleted: boolean
   completedAtUtc: string | null
 }
+
+// ─── City Economic Health ─────────────────────────────────────────────────────
+
+export interface CityEconomicReport {
+  id: string
+  cityId: string
+  taxCycleEnd: number
+  totalSalaries: number
+  totalPublicRevenue: number
+  activeCompanies: number
+  totalPowerConsumption: number
+  totalPowerSupply: number
+  averageProductQuality: number
+  economicIndex: number
+  computedAtUtc: string
+}
+
+export interface CityEconomicReportResult {
+  latest: CityEconomicReport | null
+  history: CityEconomicReport[]
+}

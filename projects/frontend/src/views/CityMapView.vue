@@ -76,6 +76,10 @@
 
       <CityMediaHousesSection :media-houses="cityMediaHouses" :loading="mediaHousesLoading" />
       <CityPowerPlanningSection :city-weather="cityWeather" :city-power-balance="cityPowerBalance" />
+      <section class="city-economic-health-section">
+        <h2 class="section-heading">{{ t('cityHealth.panelTitle') }}</h2>
+        <HealthIndicatorsPanel :data="cityEconomicReport" :loading="economicReportLoading" />
+      </section>
     </template>
   </div>
 </template>
@@ -93,7 +97,8 @@ import { getActiveCompany } from '@/lib/accountContext'
 import CityLotDetailPanel from '@/components/cityMap/CityLotDetailPanel.vue'
 import CityMediaHousesSection from '@/components/cityMap/CityMediaHousesSection.vue'
 import CityPowerPlanningSection from '@/components/cityMap/CityPowerPlanningSection.vue'
-import type { City, BuildingLot, Company, PurchaseLotResult, CityMediaHouseInfo, CityWeatherForecast, CityPowerBalance } from '@/types'
+import HealthIndicatorsPanel from '@/components/cityMap/HealthIndicatorsPanel.vue'
+import type { City, BuildingLot, Company, PurchaseLotResult, CityMediaHouseInfo, CityWeatherForecast, CityPowerBalance, CityEconomicReportResult } from '@/types'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -117,6 +122,8 @@ const viewMode = ref<'map' | 'list'>('map')
 
 const cityWeather = ref<CityWeatherForecast | null>(null)
 const cityPowerBalance = ref<CityPowerBalance | null>(null)
+const cityEconomicReport = ref<CityEconomicReportResult | null>(null)
+const economicReportLoading = ref(false)
 
 const mapContainer = ref<HTMLDivElement | null>(null)
 let map: L.Map | null = null
@@ -249,6 +256,35 @@ async function fetchCityPowerBalance() {
     cityPowerBalance.value = data.cityPowerBalance ?? null
   } catch {
     cityPowerBalance.value = null
+  }
+}
+
+async function fetchCityEconomicReport() {
+  if (!cityId.value) return
+  economicReportLoading.value = true
+  try {
+    const data = await gqlRequest<{ getCityEconomicReport: CityEconomicReportResult }>(
+      `query GetCityEconomicReport($cityId: UUID!) {
+        getCityEconomicReport(cityId: $cityId) {
+          latest {
+            id cityId taxCycleEnd totalSalaries totalPublicRevenue
+            activeCompanies totalPowerConsumption totalPowerSupply
+            averageProductQuality economicIndex computedAtUtc
+          }
+          history {
+            id cityId taxCycleEnd totalSalaries totalPublicRevenue
+            activeCompanies totalPowerConsumption totalPowerSupply
+            averageProductQuality economicIndex computedAtUtc
+          }
+        }
+      }`,
+      { cityId: cityId.value },
+    )
+    cityEconomicReport.value = data.getCityEconomicReport ?? null
+  } catch {
+    cityEconomicReport.value = null
+  } finally {
+    economicReportLoading.value = false
   }
 }
 
@@ -408,6 +444,7 @@ watch(cityId, async () => {
   void fetchMediaHouses()
   void fetchWeatherForecast()
   void fetchCityPowerBalance()
+  void fetchCityEconomicReport()
 
   if (!error.value) {
     await nextTick()
@@ -424,6 +461,7 @@ onMounted(async () => {
   void fetchMediaHouses()
   void fetchWeatherForecast()
   void fetchCityPowerBalance()
+  void fetchCityEconomicReport()
 
   await nextTick()
   if (viewMode.value === 'map') {

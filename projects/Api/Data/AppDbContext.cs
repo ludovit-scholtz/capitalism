@@ -147,6 +147,9 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Per-player tutorial milestone completion tracking.</summary>
     public DbSet<TutorialProgress> TutorialProgresses => Set<TutorialProgress>();
 
+    /// <summary>Tax-cycle economic health snapshots for each city.</summary>
+    public DbSet<CityEconomicReport> CityEconomicReports => Set<CityEconomicReport>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

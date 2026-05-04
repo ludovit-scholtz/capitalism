@@ -165,11 +165,13 @@ All three industries are Pro-gated at both backend (`ProOnlyStarterIndustries`) 
 
 **Shipped (increment 1):** `startAdditionalCompany` GraphQL mutation enforces five prerequisite gates (oldest company ≥ 8 760 ticks, ≥ 365-tick profitability window, personal USD balance ≥ $200 k, < 5 existing companies, valid city). On success it atomically creates the new `Company`, provisions an FX-scaled bank account, debits the player's personal settlement account, records `FounderContribution` + `IpoRaise` ledger entries, and seeds a founder `Shareholding`. The `additionalCompanyPrerequisites` query returns a per-gate eligibility snapshot for the CTA checklist. The frontend `NewCompanyModal.vue` two-step wizard (name+city → IPO tier cards) lives on the personal-account Overview tab of the Dashboard, showing a prerequisite checklist when gates are not met and redirecting to the onboarding flow after a successful launch.
 
-### City economic health indicators (0% complete)
+### City economic health indicators (100% complete)
 
-- [ ] Add a `CityEconomicReport` that is computed each tax cycle and stores: total salaries paid in the city that cycle, total public sales revenue, number of active companies, total power consumption vs. supply, and average product quality index across all public sales units.
-- [ ] Show a "City Health" mini-dashboard card on the city map page (`/city/:id`) with an overall economic index score (0–100) derived from the latest report, a traffic-light colour (green/yellow/red), and sparkline trends for the last 10 tax cycles.
-- [ ] Surface the city economic health index as an input to the `PopulationIndex` recalculation so thriving cities see slight population growth over game years and declining cities (few salaries, low power) see slow population erosion, creating genuine city competition dynamics.
+- [x] Add a `CityEconomicReport` that is computed each tax cycle and stores: total salaries paid in the city that cycle, total public sales revenue, number of active companies, total power consumption vs. supply, and average product quality index across all public sales units.
+- [x] Show a "City Health" mini-dashboard card on the city map page (`/city/:id`) with an overall economic index score (0–100) derived from the latest report, a traffic-light colour (green/yellow/red), and sparkline trends for the last 10 tax cycles.
+- [x] Surface the city economic health index as an input to the `PopulationIndex` recalculation so thriving cities see slight population growth over game years and declining cities (few salaries, low power) see slow population erosion, creating genuine city competition dynamics.
+
+**Shipped:** `EconomicReportPhase` (Order=1050) computes per-city economic index each tax cycle (0.4×salary + 0.3×revenue + 0.15×power + 0.15×quality scores). Index ≥70 → +0.5% population growth, 40-69 → neutral, <40 → −0.2% erosion. GraphQL queries `getCityEconomicReport` and `cityEconomicHistory` expose data. `HealthIndicatorsPanel.vue` renders SVG score ring, traffic-light status badge, 2×2 metrics grid, sparkline trend, and detail modal with full history. 15 backend integration tests and 8 E2E tests shipped.
 
 ### Dashboard speed
 
