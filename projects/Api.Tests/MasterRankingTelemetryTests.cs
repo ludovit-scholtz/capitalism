@@ -131,6 +131,21 @@ public sealed class MasterRankingTelemetryTests
         return result.GetProperty("data").GetProperty("register").GetProperty("token").GetString()!;
     }
 
+    private static async Task<string> LoginAndGetTokenAsync(
+        HttpClient client, string email, string password = "TestPass123!")
+    {
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            mutation Login($input: LoginInput!) {
+              login(input: $input) { token }
+            }
+            """,
+            new { input = new { email, password } });
+
+        return result.GetProperty("data").GetProperty("login").GetProperty("token").GetString()!;
+    }
+
     #endregion
 
     #region LOGIN_TO_GAME
@@ -151,6 +166,39 @@ public sealed class MasterRankingTelemetryTests
         Assert.Contains(capturing.Calls,
             c => c.EventType == MasterRankingBountyCodes.LoginToGame
               && c.PlayerEmail == "login-telemetry@example.com");
+    }
+
+    [Fact]
+    public async Task Register_EmitsLoginToGameTelemetry_WithoutMeQuery()
+    {
+        var capturing = new CapturingTelemetryService();
+        await using var factory = new TelemetryAwareFactory(capturing);
+        var client = factory.CreateClient();
+
+        const string email = "register-telemetry@example.com";
+        _ = await RegisterAndGetTokenAsync(client, email);
+
+        Assert.Contains(capturing.Calls,
+            c => c.EventType == MasterRankingBountyCodes.LoginToGame
+              && c.PlayerEmail == email);
+    }
+
+    [Fact]
+    public async Task Login_EmitsLoginToGameTelemetry_WithoutMeQuery()
+    {
+        var capturing = new CapturingTelemetryService();
+        await using var factory = new TelemetryAwareFactory(capturing);
+        var client = factory.CreateClient();
+
+        const string email = "login-mutation-telemetry@example.com";
+        _ = await RegisterAndGetTokenAsync(client, email);
+        capturing.Calls.Clear();
+
+        _ = await LoginAndGetTokenAsync(client, email);
+
+        Assert.Contains(capturing.Calls,
+            c => c.EventType == MasterRankingBountyCodes.LoginToGame
+              && c.PlayerEmail == email);
     }
 
     [Fact]

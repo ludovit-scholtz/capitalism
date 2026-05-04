@@ -66,6 +66,8 @@ public sealed class MasterRankingTelemetryService(
 
         try
         {
+            var normalizedEventType = eventType.Trim().ToUpperInvariant();
+            var normalizedPlayerEmail = playerEmail.Trim().ToLowerInvariant();
             var client = httpClientFactory.CreateClient("master-server");
             var body = new
             {
@@ -83,27 +85,41 @@ public sealed class MasterRankingTelemetryService(
                     {
                         registrationKey = options.Value.RegistrationKey,
                         serverKey = options.Value.ServerKey,
-                        eventType = eventType,
-                        playerEmail = playerEmail,
+                        eventType = normalizedEventType,
+                        playerEmail = normalizedPlayerEmail,
                         uniqueScopeKey = uniqueScopeKey,
                         externalEventId = externalEventId,
                         payloadJson = "{}",
-                        occurredAtUtc = (DateTime?)null,
+                        occurredAtUtc = DateTime.UtcNow,
                     }
                 }
             };
 
             using var response = await client.PostAsJsonAsync(options.Value.ApiUrl, body, cancellationToken);
-            response.EnsureSuccessStatusCode();
+            var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
+            var result = TryDeserializeGraphQlResponse(responseText);
 
-            var result = await response.Content.ReadFromJsonAsync<GraphQlResponse>(JsonOptions, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogWarning(
+                    "MasterRankingTelemetry: ingestRankingEvent failed with HTTP {StatusCode} for event {EventType}, player {Email}, scope {ScopeKey}. GraphQLErrors={Errors}. Response={Response}",
+                    (int)response.StatusCode,
+                    normalizedEventType,
+                    normalizedPlayerEmail,
+                    uniqueScopeKey,
+                    BuildGraphQlErrorSummary(result),
+                    TrimForLog(responseText));
+                return;
+            }
+
             if (result?.Errors is { Count: > 0 })
             {
                 logger.LogWarning(
-                    "MasterRankingTelemetry: ingestRankingEvent returned error for event {EventType}, player {Email}: {Error}",
-                    eventType,
-                    playerEmail,
-                    result.Errors[0].Message);
+                    "MasterRankingTelemetry: ingestRankingEvent returned GraphQL errors for event {EventType}, player {Email}, scope {ScopeKey}. Errors={Errors}",
+                    normalizedEventType,
+                    normalizedPlayerEmail,
+                    uniqueScopeKey,
+                    BuildGraphQlErrorSummary(result));
             }
         }
         catch (Exception ex)
@@ -116,6 +132,49 @@ public sealed class MasterRankingTelemetryService(
         }
     }
 
+    private static GraphQlResponse? TryDeserializeGraphQlResponse(string responseText)
+    {
+        if (string.IsNullOrWhiteSpace(responseText))
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<GraphQlResponse>(responseText, JsonOptions);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string BuildGraphQlErrorSummary(GraphQlResponse? response)
+    {
+        if (response?.Errors is not { Count: > 0 })
+        {
+            return "none";
+        }
+
+        return string.Join(" | ", response.Errors.Select(error =>
+        {
+            var code = string.IsNullOrWhiteSpace(error.Code) ? "no-code" : error.Code;
+            return $"{code}:{error.Message}";
+        }));
+    }
+
+    private static string TrimForLog(string? value, int maxLength = 1200)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        return value.Length <= maxLength
+            ? value
+            : value[..maxLength] + "...";
+    }
+
     private sealed class GraphQlResponse
     {
         public List<GraphQlError>? Errors { get; init; }
@@ -124,5 +183,27 @@ public sealed class MasterRankingTelemetryService(
     private sealed class GraphQlError
     {
         public string Message { get; init; } = string.Empty;
+
+        public Dictionary<string, JsonElement>? Extensions { get; init; }
+
+        public string? Code
+        {
+            get
+            {
+                if (Extensions is null)
+                {
+                    return null;
+                }
+
+                if (!Extensions.TryGetValue("code", out var codeElement))
+                {
+                    return null;
+                }
+
+                return codeElement.ValueKind == JsonValueKind.String
+                    ? codeElement.GetString()
+                    : codeElement.ToString();
+            }
+        }
     }
 }

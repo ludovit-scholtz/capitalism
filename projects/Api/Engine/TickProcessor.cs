@@ -25,7 +25,7 @@ public sealed class TickProcessor(
     /// </summary>
     public async Task<int> ProcessTickAsync(CancellationToken ct = default)
     {
-        var gameState = await db.GameStates.FirstOrDefaultAsync(ct);
+        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync(ct);
         if (gameState is null)
         {
             logger.LogWarning("No game state found; skipping tick.");

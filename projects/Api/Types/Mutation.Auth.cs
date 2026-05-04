@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Api.Configuration;
 using Api.Data;
 using Api.Data.Entities;
 using Api.Engine;
@@ -21,7 +22,9 @@ public sealed partial class Mutation
     public async Task<AuthPayload> Register(
         RegisterInput input,
         [Service] AppDbContext db,
-        [Service] IOptions<JwtOptions> jwtOptions)
+        [Service] IOptions<JwtOptions> jwtOptions,
+        [Service] IMasterRankingTelemetryService rankingTelemetry,
+        [Service] IOptions<MasterServerRegistrationOptions> masterOptions)
     {
         var normalizedEmail = input.Email.Trim().ToLowerInvariant();
 
@@ -50,6 +53,7 @@ public sealed partial class Mutation
         db.Players.Add(player);
         await PersonalBankAccountService.EnsureTrackedAccountAsync(db, player.Id, "USD", 200_000m);
         await db.SaveChangesAsync();
+        FireLoginTelemetry(rankingTelemetry, masterOptions.Value.ServerKey, player.Email);
 
         var session = GenerateToken(player, jwtOptions.Value);
         return new AuthPayload
@@ -64,7 +68,9 @@ public sealed partial class Mutation
     public async Task<AuthPayload> Login(
         LoginInput input,
         [Service] AppDbContext db,
-        [Service] IOptions<JwtOptions> jwtOptions)
+        [Service] IOptions<JwtOptions> jwtOptions,
+        [Service] IMasterRankingTelemetryService rankingTelemetry,
+        [Service] IOptions<MasterServerRegistrationOptions> masterOptions)
     {
         var normalizedEmail = input.Email.Trim().ToLowerInvariant();
         var player = await db.Players.FirstOrDefaultAsync(p => p.Email.ToLower() == normalizedEmail);
@@ -96,6 +102,7 @@ public sealed partial class Mutation
 
         player.LastLoginAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync();
+        FireLoginTelemetry(rankingTelemetry, masterOptions.Value.ServerKey, player.Email);
 
         var session = GenerateToken(player, jwtOptions.Value);
         return new AuthPayload
@@ -168,5 +175,18 @@ public sealed partial class Mutation
             ExpiresAtUtc = session.ExpiresAtUtc,
             Player = actorPlayer,
         };
+    }
+
+    private static void FireLoginTelemetry(
+        IMasterRankingTelemetryService rankingTelemetry,
+        string? serverKey,
+        string playerEmail)
+    {
+        var today = DateTime.UtcNow.ToString("yyyyMMdd");
+        var normalizedServerKey = serverKey ?? string.Empty;
+        _ = rankingTelemetry.ReportEventAsync(
+            MasterRankingBountyCodes.LoginToGame,
+            playerEmail,
+            uniqueScopeKey: $"{MasterRankingBountyCodes.LoginToGame}:{playerEmail}:{today}:{normalizedServerKey}");
     }
 }
