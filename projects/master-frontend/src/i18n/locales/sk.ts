@@ -129,7 +129,7 @@ export default {
   },
   login: {
     signIn: 'Prihlásiť sa',
-    signInWithBiatec: 'Prihlásiť sa cez Biatec',
+    signInWithBiatec: 'Autentifikovať cez Google',
     createAccount: 'Vytvoriť účet',
     signInSub: 'Prístup k Pro predplatnému a adresáru serverov.',
     createSub: 'Pridaj sa do Capitalism Network a sleduj svoje predplatné.',

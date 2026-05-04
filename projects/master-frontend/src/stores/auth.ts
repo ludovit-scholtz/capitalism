@@ -63,7 +63,7 @@ function generateOidcRandom(length = 32) {
 
 function createLogoutState() {
   const state = generateOidcRandom(32)
-  localStorage.setItem(OIDC_LOGOUT_STATE_KEY, state)
+  sessionStorage.setItem(OIDC_LOGOUT_STATE_KEY, state)
   return state
 }
 
@@ -131,6 +131,7 @@ export const useAuthStore = defineStore('masterAuth', () => {
   }
 
   function clearStoredOidcState() {
+    sessionStorage.removeItem(OIDC_STATE_KEY)
     localStorage.removeItem(OIDC_STATE_KEY)
   }
 
@@ -183,7 +184,7 @@ export const useAuthStore = defineStore('masterAuth', () => {
   }
 
   function getStoredOidcState(): OidcStateRecord | null {
-    const raw = localStorage.getItem(OIDC_STATE_KEY)
+    const raw = sessionStorage.getItem(OIDC_STATE_KEY) || localStorage.getItem(OIDC_STATE_KEY)
     if (!raw) {
       return null
     }
@@ -222,8 +223,30 @@ export const useAuthStore = defineStore('masterAuth', () => {
 
   function getBiatecTokenFromCallback(): BiatecCallbackSession {
     const url = new URL(window.location.href)
-    const tokenValue = url.searchParams.get('id_token') || url.searchParams.get('token')
-    const returnedState = url.searchParams.get('state')
+    const query = url.searchParams
+    const hash = window.location.hash.startsWith('#')
+      ? window.location.hash.slice(1)
+      : window.location.hash
+    const fragment = new URLSearchParams(hash)
+
+    const readParam = (...keys: string[]) => {
+      for (const key of keys) {
+        const value = query.get(key) ?? fragment.get(key)
+        if (value) {
+          return value
+        }
+      }
+      return null
+    }
+
+    const oidcError = readParam('error')
+    if (oidcError) {
+      const description = readParam('error_description')
+      throw new Error(description || `OIDC login failed: ${oidcError}`)
+    }
+
+    const tokenValue = readParam('id_token', 'access_token', 'token', 'jwt')
+    const returnedState = readParam('state')
     if (!tokenValue || !returnedState) {
       throw new Error('OIDC callback is missing required parameters.')
     }
@@ -256,7 +279,7 @@ export const useAuthStore = defineStore('masterAuth', () => {
     }
 
     const exp = typeof tokenPayload.exp === 'number' ? tokenPayload.exp : null
-    const expiresIn = Number(url.searchParams.get('expires_in') || '')
+    const expiresIn = Number(readParam('expires_in') || '')
     const expiresAtUtc = exp
       ? new Date(exp * 1000).toISOString()
       : Number.isFinite(expiresIn) && expiresIn > 0
@@ -358,7 +381,7 @@ export const useAuthStore = defineStore('masterAuth', () => {
       nonce,
       redirectPath,
     }
-    localStorage.setItem(OIDC_STATE_KEY, JSON.stringify(stateRecord))
+    sessionStorage.setItem(OIDC_STATE_KEY, JSON.stringify(stateRecord))
 
     const authorizeUrl = new URL(BIATEC_OIDC_AUTHORIZE_URL)
     authorizeUrl.searchParams.set('client_id', BIATEC_OIDC_CLIENT_ID)

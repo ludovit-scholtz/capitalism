@@ -129,7 +129,7 @@ export default {
   },
   login: {
     signIn: 'Sign in',
-    signInWithBiatec: 'Sign in with Biatec',
+    signInWithBiatec: 'Authenticate using Google',
     createAccount: 'Create account',
     signInSub: 'Access your Pro subscription and server directory.',
     createSub: 'Join the Capitalism Network to track your subscription.',
