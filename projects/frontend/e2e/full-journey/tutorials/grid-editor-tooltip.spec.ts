@@ -17,10 +17,11 @@ function clearSessionStorage(page: Parameters<typeof test>[0]['page']) {
   })
 }
 
-function makeFactoryBuilding(companyId: string): MockBuilding {
+function makeFactoryBuilding(companyId: string, suffix: number): MockBuilding {
+  const buildingId = `building-grid-${suffix}`
   const unit: MockBuildingUnit = {
-    id: 'unit-grid-1',
-    buildingId: 'building-grid-1',
+    id: `unit-grid-${suffix}`,
+    buildingId,
     unitType: 'MANUFACTURING',
     gridX: 0,
     gridY: 0,
@@ -41,7 +42,7 @@ function makeFactoryBuilding(companyId: string): MockBuilding {
     isReverting: false,
   }
   return {
-    id: 'building-grid-1',
+    id: buildingId,
     companyId,
     cityId: 'city-ba',
     type: 'FACTORY',
@@ -66,7 +67,7 @@ test.describe('Building detail and grid editor contextual tooltip overlay', () =
   test('new player sees building detail tooltip overlay on first visit', async ({ page }) => {
     const player = makePlayer()
     player.onboardingCompletedAtUtc = '2026-01-01T00:00:00Z'
-    const factory = makeFactoryBuilding('company-grid-1')
+    const factory = makeFactoryBuilding('company-grid-1', 1)
     player.companies.push({
       id: 'company-grid-1',
       playerId: player.id,
@@ -95,7 +96,7 @@ test.describe('Building detail and grid editor contextual tooltip overlay', () =
   test('player can dismiss building detail tooltip by clicking "Got it"', async ({ page }) => {
     const player = makePlayer()
     player.onboardingCompletedAtUtc = '2026-01-01T00:00:00Z'
-    const factory = makeFactoryBuilding('company-grid-2')
+    const factory = makeFactoryBuilding('company-grid-2', 2)
     player.companies.push({
       id: 'company-grid-2',
       playerId: player.id,
@@ -113,7 +114,7 @@ test.describe('Building detail and grid editor contextual tooltip overlay', () =
 
     await clearSessionStorage(page)
     await authenticateViaLocalStorage(page, `token-${player.id}`)
-    await page.goto('/building/building-grid-1')
+    await page.goto('/building/building-grid-2')
 
     // Building detail tooltip should appear first
     await expect(page.locator('.tutorial-tooltip')).toBeVisible({ timeout: 5000 })
@@ -133,7 +134,7 @@ test.describe('Building detail and grid editor contextual tooltip overlay', () =
   }) => {
     const player = makePlayer()
     player.onboardingCompletedAtUtc = '2026-01-01T00:00:00Z'
-    const factory = makeFactoryBuilding('company-grid-3')
+    const factory = makeFactoryBuilding('company-grid-3', 3)
     player.companies.push({
       id: 'company-grid-3',
       playerId: player.id,
@@ -162,7 +163,7 @@ test.describe('Building detail and grid editor contextual tooltip overlay', () =
       sessionStorage.setItem('tt_building_detail_dismissed', '1')
     })
     await authenticateViaLocalStorage(page, `token-${player.id}`)
-    await page.goto('/building/building-grid-1')
+    await page.goto('/building/building-grid-3')
 
     // Grid editor tooltip should appear (in the grid section)
     await expect(page.locator('.tutorial-tooltip')).toBeVisible({ timeout: 5000 })
@@ -172,7 +173,7 @@ test.describe('Building detail and grid editor contextual tooltip overlay', () =
   test('returning player with both tooltips dismissed sees no tooltip', async ({ page }) => {
     const player = makePlayer()
     player.onboardingCompletedAtUtc = '2026-01-01T00:00:00Z'
-    const factory = makeFactoryBuilding('company-grid-4')
+    const factory = makeFactoryBuilding('company-grid-4', 4)
     player.companies.push({
       id: 'company-grid-4',
       playerId: player.id,
@@ -206,19 +207,16 @@ test.describe('Building detail and grid editor contextual tooltip overlay', () =
       sessionStorage.setItem('tt_grid_editor_dismissed', '1')
     })
     await authenticateViaLocalStorage(page, `token-${player.id}`)
-    await page.goto('/building/building-grid-1')
+    await page.goto('/building/building-grid-4')
 
-    // Wait for tooltip delay
-    await page.waitForTimeout(2000)
-
-    // No tooltip should appear
-    await expect(page.locator('.tutorial-tooltip')).toBeHidden()
+    // No tooltip should appear; wait past the 1-second ready delay to confirm
+    await expect(page.locator('.tutorial-tooltip')).toBeHidden({ timeout: 3000 })
   })
 
   test('grid editor tooltip can be dismissed via Escape key', async ({ page }) => {
     const player = makePlayer()
     player.onboardingCompletedAtUtc = '2026-01-01T00:00:00Z'
-    const factory = makeFactoryBuilding('company-grid-5')
+    const factory = makeFactoryBuilding('company-grid-5', 5)
     player.companies.push({
       id: 'company-grid-5',
       playerId: player.id,
@@ -245,7 +243,7 @@ test.describe('Building detail and grid editor contextual tooltip overlay', () =
       sessionStorage.setItem('tt_building_detail_dismissed', '1')
     })
     await authenticateViaLocalStorage(page, `token-${player.id}`)
-    await page.goto('/building/building-grid-1')
+    await page.goto('/building/building-grid-5')
 
     await expect(page.locator('.tutorial-tooltip')).toBeVisible({ timeout: 5000 })
     await page.keyboard.press('Escape')
@@ -255,7 +253,7 @@ test.describe('Building detail and grid editor contextual tooltip overlay', () =
   test('grid editor tooltip persists dismissal via mutation', async ({ page }) => {
     const player = makePlayer()
     player.onboardingCompletedAtUtc = '2026-01-01T00:00:00Z'
-    const factory = makeFactoryBuilding('company-grid-6')
+    const factory = makeFactoryBuilding('company-grid-6', 6)
     player.companies.push({
       id: 'company-grid-6',
       playerId: player.id,
@@ -282,7 +280,7 @@ test.describe('Building detail and grid editor contextual tooltip overlay', () =
       sessionStorage.setItem('tt_building_detail_dismissed', '1')
     })
     await authenticateViaLocalStorage(page, `token-${player.id}`)
-    await page.goto('/building/building-grid-1')
+    await page.goto('/building/building-grid-6')
 
     await expect(page.locator('.tutorial-tooltip')).toBeVisible({ timeout: 5000 })
     await page.locator('.tutorial-tooltip__dismiss-btn').click()

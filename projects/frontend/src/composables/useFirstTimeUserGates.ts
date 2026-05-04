@@ -46,9 +46,9 @@ const MARK_TOOLTIP_MUTATION = `
 // ─── Composable ───────────────────────────────────────────────────────────────
 
 /**
- * Manages first-time user gate tooltips for the dashboard and building detail
+ * manages first-time user gate tooltips for the dashboard and building detail
  * views. State is persisted to sessionStorage immediately (so it survives same-
- * session navigations) and asynchronously to the backend (so it survists future
+ * session navigations) and asynchronously to the backend (so it survives future
  * sessions for authenticated players).
  */
 export function useFirstTimeUserGates() {

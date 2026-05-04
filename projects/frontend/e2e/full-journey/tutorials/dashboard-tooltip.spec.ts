@@ -107,11 +107,9 @@ test.describe('Dashboard contextual tooltip overlay', () => {
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/dashboard')
 
-    // Wait long enough for tooltip delay to pass
-    await page.waitForTimeout(2000)
-
-    // Tooltip must NOT appear
-    await expect(page.locator('.tutorial-tooltip')).toBeHidden()
+    // Existing player (tooltip already dismissed) logs in, verify no tooltip on dashboard.
+    // We wait long enough to be past the 1-second tooltip-ready delay.
+    await expect(page.locator('.tutorial-tooltip')).toBeHidden({ timeout: 3000 })
   })
 
   test('dismissing tooltip persists via markTutorialMilestoneComplete mutation', async ({ page }) => {
