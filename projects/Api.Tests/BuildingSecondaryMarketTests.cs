@@ -542,4 +542,194 @@ public sealed class BuildingSecondaryMarketTests
         Assert.Equal(1, listing.GetProperty("offers").GetArrayLength());
         Assert.Equal("PENDING", listing.GetProperty("offers")[0].GetProperty("status").GetString());
     }
+
+    [Fact]
+    public async Task MakeOfferOnBuilding_ReturnsError_WhenDuplicatePendingOffer()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var sellerToken = await RegisterAsync(client, "seller14@market.test");
+        var buyerToken = await RegisterAsync(client, "buyer14@market.test");
+        var (buildingId, _, _) = await SeedOwnerWithBuildingAsync(factory, sellerToken);
+        var (_, buyerCompanyId, _) = await SeedOwnerWithBuildingAsync(factory, buyerToken, 5_000_000m);
+
+        await ExecAsync(client,
+            "mutation SetForSale($input: SetBuildingForSaleInput!) { setBuildingForSale(input: $input) { id } }",
+            new { input = new { buildingId, isForSale = true, askingPrice = 1_000_000m } },
+            sellerToken);
+
+        // First offer — must succeed
+        var first = await ExecAsync(client,
+            "mutation MakeOffer($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id } }",
+            new { input = new { buildingId, buyerCompanyId, offeredPrice = 900_000m } },
+            buyerToken);
+        Assert.False(first.TryGetProperty("errors", out _), "First offer should succeed");
+
+        // Second offer from the same buyer — must fail with DUPLICATE_OFFER
+        var second = await ExecAsync(client,
+            "mutation MakeOffer($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id } }",
+            new { input = new { buildingId, buyerCompanyId, offeredPrice = 950_000m } },
+            buyerToken);
+        var errors = second.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0);
+        Assert.Contains("DUPLICATE_OFFER",
+            errors.EnumerateArray().Select(e => e.GetProperty("extensions").GetProperty("code").GetString()));
+    }
+
+    [Fact]
+    public async Task AcceptBuildingOffer_TransfersUnitsWithBuilding()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var sellerToken = await RegisterAsync(client, "seller15@market.test");
+        var buyerToken = await RegisterAsync(client, "buyer15@market.test");
+
+        // Seed seller with a building that has a unit
+        var playerResult = await ExecAsync(client, "query { me { id } }", token: sellerToken);
+        var sellerPlayerId = Guid.Parse(playerResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+        var sellerCompany = new Company { Id = Guid.NewGuid(), Name = "Seller15 Corp", PlayerId = sellerPlayerId };
+        db.Companies.Add(sellerCompany);
+
+        var building = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = sellerCompany.Id,
+            CityId = city.Id,
+            Type = BuildingType.Factory,
+            Name = "Transfer Unit Factory",
+            Latitude = 48.1,
+            Longitude = 17.1,
+            Level = 1,
+        };
+        db.Buildings.Add(building);
+
+        // Add a unit to the building
+        var unit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = building.Id,
+            UnitType = UnitType.Storage,
+            GridX = 0,
+            GridY = 0,
+            Level = 1,
+        };
+        db.BuildingUnits.Add(unit);
+
+        var sellerAccount = new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = $"{Random.Shared.NextInt64(1_000_000_000_000_000L, 9_999_999_999_999_999L)}",
+            CurrencyCode = city.CurrencyCode,
+            Balance = 1_000m,
+            CompanyId = sellerCompany.Id,
+        };
+        db.BankAccounts.Add(sellerAccount);
+        await db.SaveChangesAsync();
+
+        var (_, buyerCompanyId, _) = await SeedOwnerWithBuildingAsync(factory, buyerToken, 5_000_000m);
+
+        await ExecAsync(client,
+            "mutation SetForSale($input: SetBuildingForSaleInput!) { setBuildingForSale(input: $input) { id } }",
+            new { input = new { buildingId = building.Id, isForSale = true, askingPrice = 1_000_000m } },
+            sellerToken);
+
+        var offerResult = await ExecAsync(client,
+            "mutation MakeOffer($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id } }",
+            new { input = new { buildingId = building.Id, buyerCompanyId, offeredPrice = 1_000_000m } },
+            buyerToken);
+        var offerId = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("id").GetString()!);
+
+        await ExecAsync(client,
+            "mutation Accept($input: AcceptBuildingOfferInput!) { acceptBuildingOffer(input: $input) { building { id companyId } } }",
+            new { input = new { offerId } },
+            sellerToken);
+
+        // Verify the unit is now owned by the buyer's building
+        await using var verifyScope = factory.Services.CreateAsyncScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var transferredBuilding = await verifyDb.Buildings
+            .Include(b => b.Units)
+            .FirstAsync(b => b.Id == building.Id);
+        Assert.Equal(buyerCompanyId, transferredBuilding.CompanyId);
+        Assert.Single(transferredBuilding.Units);
+        Assert.Equal(unit.Id, transferredBuilding.Units.First().Id);
+    }
+
+    [Fact]
+    public async Task BuildingMarket_FiltersByCity_ReturnsOnlyMatchingListings()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var seller1Token = await RegisterAsync(client, "seller16a@market.test");
+        var seller2Token = await RegisterAsync(client, "seller16b@market.test");
+
+        // Get city IDs
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var bratislava = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+        var prague = await db.Cities.FirstAsync(c => c.Name == "Prague");
+
+        // Seed a seller building in Bratislava
+        var player1Result = await ExecAsync(client, "query { me { id } }", token: seller1Token);
+        var p1Id = Guid.Parse(player1Result.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+        var co1 = new Company { Id = Guid.NewGuid(), Name = "BA Corp", PlayerId = p1Id };
+        db.Companies.Add(co1);
+        var baBldg = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = co1.Id, CityId = bratislava.Id,
+            Type = BuildingType.Factory, Name = "BA Factory", Latitude = 48.1, Longitude = 17.1, Level = 1,
+        };
+        db.Buildings.Add(baBldg);
+        db.BankAccounts.Add(new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = $"{Random.Shared.NextInt64(1_000_000_000_000_000L, 9_999_999_999_999_999L)}",
+            CurrencyCode = bratislava.CurrencyCode, Balance = 500m, CompanyId = co1.Id,
+        });
+
+        // Seed a seller building in Prague
+        var player2Result = await ExecAsync(client, "query { me { id } }", token: seller2Token);
+        var p2Id = Guid.Parse(player2Result.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+        var co2 = new Company { Id = Guid.NewGuid(), Name = "PR Corp", PlayerId = p2Id };
+        db.Companies.Add(co2);
+        var prBldg = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = co2.Id, CityId = prague.Id,
+            Type = BuildingType.Factory, Name = "PR Factory", Latitude = 50.1, Longitude = 14.4, Level = 1,
+        };
+        db.Buildings.Add(prBldg);
+        db.BankAccounts.Add(new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = $"{Random.Shared.NextInt64(1_000_000_000_000_000L, 9_999_999_999_999_999L)}",
+            CurrencyCode = prague.CurrencyCode, Balance = 500m, CompanyId = co2.Id,
+        });
+        await db.SaveChangesAsync();
+
+        // List both for sale
+        await ExecAsync(client,
+            "mutation S($i: SetBuildingForSaleInput!) { setBuildingForSale(input: $i) { id } }",
+            new { i = new { buildingId = baBldg.Id, isForSale = true, askingPrice = 200_000m } }, seller1Token);
+        await ExecAsync(client,
+            "mutation S($i: SetBuildingForSaleInput!) { setBuildingForSale(input: $i) { id } }",
+            new { i = new { buildingId = prBldg.Id, isForSale = true, askingPrice = 300_000m } }, seller2Token);
+
+        // Query filtered to Bratislava only
+        var result = await ExecAsync(client,
+            "query GetBM($cityId: UUID) { buildingMarket(cityId: $cityId) { building { id name city { name } } } }",
+            new { cityId = bratislava.Id });
+        var listings = result.GetProperty("data").GetProperty("buildingMarket");
+        // All returned listings must be in Bratislava
+        foreach (var listing in listings.EnumerateArray())
+        {
+            Assert.Equal("Bratislava", listing.GetProperty("building").GetProperty("city").GetProperty("name").GetString());
+        }
+        Assert.True(listings.GetArrayLength() >= 1);
+        Assert.DoesNotContain(listings.EnumerateArray(), l =>
+            l.GetProperty("building").GetProperty("name").GetString() == "PR Factory");
+    }
 }

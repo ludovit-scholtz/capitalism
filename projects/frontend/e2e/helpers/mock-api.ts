@@ -394,6 +394,8 @@ export type MockBuildingLot = {
     isUnderConstruction?: boolean
     constructionCompletesAtTick?: number | null
     constructionCost?: number
+    isForSale?: boolean
+    askingPrice?: number | null
   } | null
   resourceType: { id: string; name: string; slug: string } | null
   materialQuality: number | null

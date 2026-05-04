@@ -107,11 +107,14 @@ All three industries are Pro-gated at both backend (`ProOnlyStarterIndustries`) 
 - [ ] Implement inter-city trade routes: allow a player to configure a B2B sales unit in one city to fulfill purchase orders from a factory purchase unit in a different city, with transit costs calculated from real GPS distance and product weight constants defined in `GameConstants`.
 - [x] Add a city selection map overview page (`/cities`) that shows all available game cities on a world map with key metrics (population, active players, dominant industry, average resource prices) so new players can make an informed city choice during onboarding.
 
-### Building secondary market (0% complete)
+### Building secondary market (100% complete)
 
-- [ ] Allow a company owner to mark any building for sale via the building detail page, setting an asking price and a "negotiate" flag. Other players browsing the buy-building page can see for-sale listings alongside new lots and make an offer. The original owner accepts or rejects via a notification.
-- [ ] Implement building transfer: when a sale is accepted, atomically debit the buyer's bank account, credit the seller's bank account, transfer building ownership, and write LedgerEntry records for both parties under a new `BuildingAcquisition` category.
-- [ ] Show "For Sale" badge on city map lot markers and in the buy-building grid so players can discover available buildings at a glance.
+- [x] Allow a company owner to mark any building for sale via the building detail page, setting an asking price and a "negotiate" flag. Other players browsing the buy-building page can see for-sale listings alongside new lots and make an offer. The original owner accepts or rejects via a notification.
+- [x] Implement building transfer: when a sale is accepted, atomically debit the buyer's bank account, credit the seller's bank account, transfer building ownership, and write LedgerEntry records for both parties under a new `BuildingAcquisition` category.
+- [x] Show "For Sale" badge on city map lot markers and in the buy-building grid so players can discover available buildings at a glance.
+- [x] Building Market page (`/buildings/market`) with "Market" and "My Listings" tabs, offer management (accept/reject), and city/type/price filters.
+- [x] `BuildingSaleOffer` entity, EF migration, and `BuildingAcquisition`/`BuildingSale` ledger categories for full auditability.
+- [x] 14 backend integration tests (mark for sale, unlist, insufficient funds, duplicate offers, ownership transfer, ledger entries, concurrent offers, unauthenticated guard) and 14 Playwright E2E tests covering the full buyer and seller flows.
 
 ### Resource depletion and scarcity feedback (0% complete)
 
