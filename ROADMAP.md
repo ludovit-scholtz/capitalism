@@ -181,9 +181,9 @@ All three industries are Pro-gated at both backend (`ProOnlyStarterIndustries`) 
 
 ### Bots
 
-- [ ] Create NPC bot console app
-- [ ] If the bot did not setup a company yet, create an account and resolve the onboarding process
-- [ ] On npc bot console app run check the current state of the account and check if it is profitable to change the current settings
+- [x] Create NPC bot console app — 100% complete. `projects/NPCBot/` is a standalone .NET 10 console application targeting the game GraphQL API. It supports configurable bot counts, allowed industries, poll interval, and graceful Ctrl+C shutdown.
+- [x] If the bot did not setup a company yet, create an account and resolve the onboarding process — 100% complete. The bot automatically registers (or logs in if already registered), completes `startOnboardingCompany` + `finishOnboarding`, and resumes from the shop-selection step if interrupted mid-flow.
+- [ ] On npc bot console app run check the current state of the account and check if it is profitable to change the current settings — 50% complete. Basic profitability tracking (net worth delta) is implemented; advanced strategy decisions (price optimisation, restocking) are Phase 2.
 
 ### Architecture optimization (24% complete)
 
