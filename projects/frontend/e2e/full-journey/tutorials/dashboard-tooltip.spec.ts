@@ -130,11 +130,9 @@ test.describe('Dashboard contextual tooltip overlay', () => {
     await expect(page.locator('.tutorial-tooltip')).toBeHidden()
 
     // Verify the milestone was persisted in mock state
-    await page.waitForTimeout(500)
-    const savedMilestone = state.tutorialProgress.find(
-      (m) => m.milestone === 'TOOLTIP_DASHBOARD_SHOWN',
-    )
-    expect(savedMilestone?.isCompleted).toBe(true)
+    await expect
+      .poll(() => state.tutorialProgress.find((m) => m.milestone === 'TOOLTIP_DASHBOARD_SHOWN')?.isCompleted, { timeout: 3000 })
+      .toBe(true)
   })
 
   test('dashboard tooltip renders in Slovak locale', async ({ page }) => {

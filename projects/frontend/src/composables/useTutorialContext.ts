@@ -60,8 +60,14 @@ export function useTutorialContext() {
     () => milestones.value.length > 0 && milestones.value.every((m) => m.isCompleted),
   )
 
-  /** Count of completed milestones. */
-  const completedCount = computed(() => milestones.value.filter((m) => m.isCompleted).length)
+  /** Count of completed milestones (only counts the 5 real tutorial milestones,
+   *  not internal tracking milestones like tooltip-dismissal flags). */
+  const completedCount = computed(
+    () =>
+      milestones.value.filter(
+        (m) => m.isCompleted && (ALL_MILESTONES as readonly string[]).includes(m.milestone),
+      ).length,
+  )
 
   /** Returns true if the given milestone has been completed. */
   function isMilestoneCompleted(milestone: string): boolean {

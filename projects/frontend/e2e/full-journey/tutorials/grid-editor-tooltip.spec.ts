@@ -287,8 +287,8 @@ test.describe('Building detail and grid editor contextual tooltip overlay', () =
     await expect(page.locator('.tutorial-tooltip')).toBeHidden()
 
     // Verify milestone was persisted
-    await page.waitForTimeout(500)
-    const saved = state.tutorialProgress.find((m) => m.milestone === 'TOOLTIP_GRID_EDITOR_SHOWN')
-    expect(saved?.isCompleted).toBe(true)
+    await expect
+      .poll(() => state.tutorialProgress.find((m) => m.milestone === 'TOOLTIP_GRID_EDITOR_SHOWN')?.isCompleted, { timeout: 3000 })
+      .toBe(true)
   })
 })
