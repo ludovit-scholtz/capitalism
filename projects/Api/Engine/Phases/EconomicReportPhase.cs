@@ -70,17 +70,21 @@ public sealed class EconomicReportPhase(ILogger<EconomicReportPhase> logger) : I
             }
         }
 
-        // ── 2. Aggregate public-sales quality per city ──
-        var cycleSales = await context.Db.PublicSalesRecords
-            .Where(r => r.Tick >= cycleStart && r.Tick <= cycleEnd)
+        // ── 2. Aggregate public-sales quality per city from current inventory ──
+        var salesInventory = await context.Db.Inventories
+            .Where(inv => inv.BuildingUnit != null && inv.BuildingUnit.UnitType == UnitType.PublicSales)
+            .Include(inv => inv.BuildingUnit)
+            .ThenInclude(u => u!.Building)
             .ToListAsync();
 
         var qualitySumByCity   = new Dictionary<Guid, decimal>();
         var qualityCountByCity = new Dictionary<Guid, int>();
-        foreach (var sale in cycleSales)
+        foreach (var inv in salesInventory)
         {
-            // Quality is stored per inventory; use unit-level avg quality if available.
-            // Fall back to 0.5 neutral when no quality data is recorded.
+            var cityId = inv.BuildingUnit?.Building?.CityId;
+            if (cityId == null || inv.Quantity <= 0) continue;
+            qualitySumByCity[cityId.Value] = qualitySumByCity.GetValueOrDefault(cityId.Value) + inv.Quality;
+            qualityCountByCity[cityId.Value] = qualityCountByCity.GetValueOrDefault(cityId.Value) + 1;
         }
 
         // ── 3. Aggregate per-city company count and power balance ──

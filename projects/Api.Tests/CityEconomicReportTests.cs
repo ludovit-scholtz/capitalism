@@ -488,4 +488,59 @@ public sealed class CityEconomicReportTests
         Assert.NotNull(report);
         Assert.Equal(0m, report.TotalSalaries); // outside cycle → not counted
     }
+
+    [Fact]
+    public async Task EconomicReportPhase_PublicSalesInventoryQuality_IsAggregatedPerCity()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        _ = factory.CreateClient();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+        var (companyId, buildingId) = await SeedCompanyBuildingAsync(db, city.Id);
+
+        // Add a PUBLIC_SALES unit to the building
+        var unit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = buildingId,
+            UnitType = UnitType.PublicSales,
+            GridX = 0,
+            GridY = 0,
+            Level = 1,
+        };
+        db.BuildingUnits.Add(unit);
+
+        // Seed inventory with quality 0.8 and positive quantity
+        var product = await db.ProductTypes.FirstAsync();
+        var inv = new Inventory
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = buildingId,
+            BuildingUnitId = unit.Id,
+            ProductTypeId = product.Id,
+            Quantity = 100m,
+            Quality = 0.8m,
+        };
+        db.Inventories.Add(inv);
+
+        var gs = await db.GameStates.FirstAsync();
+        gs.TaxCycleTicks = 10;
+        gs.CurrentTick = 10;
+        await db.SaveChangesAsync();
+
+        var buildings = await db.Buildings.Where(b => b.CityId == city.Id).ToListAsync();
+        var phase = new EconomicReportPhase(NullLogger<EconomicReportPhase>.Instance);
+        var context = BuildContext(db, gs, buildings);
+        await phase.ProcessAsync(context);
+        await db.SaveChangesAsync();
+
+        var report = await db.CityEconomicReports.FirstOrDefaultAsync(r => r.CityId == city.Id);
+        Assert.NotNull(report);
+        // avgQuality drawn from inventory: one item at 0.8 → AverageProductQuality = 0.8
+        Assert.Equal(0.8m, report.AverageProductQuality);
+        // qualityScore = quality * 100 = 80; weighted 15% → contributes 12 to the index
+        Assert.True(report.EconomicIndex > 0, "Quality contribution should push index above 0");
+    }
 }

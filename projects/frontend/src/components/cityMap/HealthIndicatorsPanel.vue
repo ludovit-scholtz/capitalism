@@ -56,7 +56,7 @@ function formatPower(mw: number | null | undefined): string {
 const sparkPoints = computed(() => {
   const items = history.value.slice(-10)
   if (items.length === 0) return ''
-  const maxVal = Math.max(...items.map((r: CityEconomicReport) => r.economicIndex), 1)
+  const maxVal = items.reduce((m: number, r: CityEconomicReport) => Math.max(m, r.economicIndex), 1)
   const w = 100 / Math.max(items.length - 1, 1)
   return items
     .map((r: CityEconomicReport, i: number) => {
@@ -78,7 +78,15 @@ const sparkPoints = computed(() => {
 
     <div v-else class="health-content">
       <!-- Score ring -->
-      <div class="score-ring-wrap" @click="showModal = true" role="button" :aria-label="t('cityHealth.detailsAriaLabel')">
+      <div
+        class="score-ring-wrap"
+        role="button"
+        tabindex="0"
+        :aria-label="t('cityHealth.detailsAriaLabel')"
+        @click="showModal = true"
+        @keydown.enter.prevent="showModal = true"
+        @keydown.space.prevent="showModal = true"
+      >
         <svg class="score-ring" viewBox="0 0 88 88" width="88" height="88">
           <circle cx="44" cy="44" :r="RADIUS" fill="none" stroke="var(--color-border)" stroke-width="8" />
           <circle
