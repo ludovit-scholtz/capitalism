@@ -166,7 +166,7 @@ test.describe('City Economic Health Indicators', () => {
     await expect(page.locator('.health-modal')).toBeVisible()
 
     await page.locator('.modal-close-btn').click()
-    await expect(page.locator('.health-modal')).not.toBeVisible()
+    await expect(page.locator('.health-modal')).toBeHidden()
   })
 
   // ── History sparkline ─────────────────────────────────────────────────────

@@ -1100,6 +1100,30 @@ export type MockState = {
   } | null
   /** Tutorial milestone completion state for the current player. */
   tutorialProgress: Array<{ milestone: string; isCompleted: boolean; completedAtUtc: string | null }>
+  /** Achievement badges for a player (keyed by playerId). */
+  playerBadges: Record<
+    string,
+    Array<{
+      id: string
+      badgeType: string
+      rarity: string
+      unlockCondition: string
+      unlockedAtUtc: string
+      unlockedAtTick: number
+    }>
+  >
+  /** Rank snapshots for a player (keyed by playerId). */
+  playerRankSnapshots: Record<
+    string,
+    Array<{
+      snapshotTick: number
+      snapshotUtc: string
+      leaderboardRank: number
+      wealthUsd: number
+      percentileRank: number
+      positionChange: number | null
+    }>
+  >
 }
 
 export interface MockBuildingMarketListing {
@@ -2744,6 +2768,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       { milestone: 'FIRST_COMPETITOR_OBSERVED', isCompleted: false, completedAtUtc: null },
       { milestone: 'FIRST_BRAND_ESTABLISHED', isCompleted: false, completedAtUtc: null },
     ],
+    playerBadges: {},
+    playerRankSnapshots: {},
     ...initial,
   }
 
@@ -5877,6 +5903,95 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { companyRankings } }),
+      })
+    }
+
+    if (query.includes('playerBadges') && !query.includes('playerRankHistory')) {
+      const targetPlayerId = body.variables?.playerId as string | undefined
+      const badges = (targetPlayerId ? state.playerBadges[targetPlayerId] : null) ?? []
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { playerBadges: badges } }),
+      })
+    }
+
+    if (query.includes('playerProfile')) {
+      const targetPlayerId = body.variables?.playerId as string | undefined
+      const targetPlayer = state.players.find((p) => p.id === targetPlayerId)
+      if (!targetPlayer) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { playerProfile: null } }),
+        })
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            playerProfile: {
+              playerId: targetPlayer.id,
+              displayName: targetPlayer.displayName,
+              bio: null,
+              createdAtUtc: '2024-01-01T00:00:00Z',
+              joinGameYear: 2024,
+              hasProSubscription: targetPlayer.hasProSubscription ?? false,
+              totalWealthUsd: 500000,
+              totalCompanyEquityUsd: 300000,
+              companyCount: targetPlayer.companies.length,
+              leaderboardRank: 1,
+              activeBuildingTypes: ['FACTORY', 'SALES_SHOP'],
+              citiesWithBuildings: 1,
+              totalProductsSold: 1000,
+              hallOfFame: {
+                highestSingleTickRevenue: 25000,
+                highestSingleTickRevenueTick: 42,
+                largestBuildingAcquisitionPrice: 150000,
+                largestBuildingAcquisitionName: 'Acme Factory',
+                highestBrandQuality: 0.78,
+                highestBrandQualityName: 'Acme Brand',
+                accountAgeTicks: 100,
+              },
+            },
+          },
+        }),
+      })
+    }
+
+    if (query.includes('playerRankHistory')) {
+      const targetPlayerId = body.variables?.playerId as string | undefined
+      const snapshots = (targetPlayerId ? state.playerRankSnapshots[targetPlayerId] : null) ?? []
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { playerRankHistory: snapshots } }),
+      })
+    }
+
+    if (query.includes('generateStatsExport')) {
+      if (!state.currentUserId) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Not authenticated.' }] }),
+        })
+      }
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      const format = (body.variables?.i?.format as string) ?? 'CSV'
+      const dateStr = new Date().toISOString().slice(0, 10)
+      const name = (player?.displayName ?? 'Player').replace(/\s+/g, '_')
+      const fileName = `${name}_Stats_${dateStr}.${format === 'HTML' ? 'html' : 'csv'}`
+      // Return a minimal base64-encoded stub (a single CSV line).
+      const content = format === 'HTML'
+        ? `<html><body><h1>${player?.displayName ?? 'Player'} Stats</h1></body></html>`
+        : `Player,${player?.displayName ?? 'Player'}\nExported,${dateStr}`
+      const contentBase64 = btoa(content)
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { generateStatsExport: { format, fileName, contentBase64 } } }),
       })
     }
 
