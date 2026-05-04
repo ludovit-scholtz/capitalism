@@ -182,8 +182,7 @@ public sealed class BotOrchestrator
             bot.ConsecutiveErrors = 0;
             bot.LastSuccessUtc = DateTime.UtcNow;
 
-            _logger.LogDebug("{Bot} Tick {Tick}: net worth {NW:N0}, delta {Delta:+0;-0;0}",
-                bot, _currentTick, bot.CurrentNetWorth, bot.ProfitDelta);
+            EvaluateAndLogProfitability(bot);
         }
         catch (Exception ex)
         {
@@ -226,15 +225,25 @@ public sealed class BotOrchestrator
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Computes a simple net-worth proxy by summing <c>Company.Cash</c> across all companies.
-    /// NOTE: the game's target model stores spendable funds in bank accounts, not directly
-    /// on <c>Company.Cash</c>. This method should be updated to query bank-account balances
-    /// once the GraphQL surface exposes per-company account totals to authenticated bots.
-    /// </summary>
-    private static decimal ComputeNetWorth(PlayerProfile profile)
+    private static decimal ComputeNetWorth(PlayerProfile profile) =>
+        BotProfitCalculator.ComputeNetWorth(profile);
+
+    private void EvaluateAndLogProfitability(BotAccount bot)
     {
-        // Sum of cash across all companies as a simple proxy for net worth
-        return profile.Companies.Sum(c => c.Cash);
+        var status = BotProfitCalculator.Classify(bot.CurrentNetWorth, bot.InitialNetWorth);
+        var ticksElapsed = _currentTick - bot.TrackingStartTick;
+        var recommendation = BotProfitCalculator.Recommend(
+            bot.CurrentNetWorth, bot.InitialNetWorth, ticksElapsed,
+            _options.MinTicksBeforeAdjustment);
+
+        var rate = BotProfitCalculator.ComputeAnnualisedRatePercent(
+            bot.CurrentNetWorth, bot.InitialNetWorth, ticksElapsed);
+
+        _logger.LogDebug(
+            "{Bot} Profitability={Status}  rate={Rate:N1}%/yr  delta={Delta:+0;-0;0}",
+            bot, status, rate, bot.ProfitDelta);
+
+        if (recommendation.ShouldAct)
+            _logger.LogInformation("{Bot} Strategy recommendation: {Reason}", bot, recommendation.Reason);
     }
 }

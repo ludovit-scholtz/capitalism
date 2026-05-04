@@ -48,6 +48,13 @@ public sealed class BotOptions
     public int TokenRefreshBufferMinutes { get; set; } = 5;
     public int MaxConsecutiveErrors { get; set; } = 5;
 
+    /// <summary>
+    /// Minimum number of ticks that must have elapsed before the profitability
+    /// calculator makes a price-adjustment recommendation.  Prevents premature
+    /// strategy changes during the early-game ramp-up period.
+    /// </summary>
+    public int MinTicksBeforeAdjustment { get; set; } = 5;
+
     /// <summary>Free-to-use starter industries that NPC bots may join.</summary>
     public string[] AllowedIndustries { get; set; } =
     [
