@@ -2097,3 +2097,61 @@ export interface AcceptBuildingOfferResult {
   building: Building
   offer: BuildingSaleOffer
 }
+
+// ── Inter-city trade routes ──────────────────────────────────────────────────
+
+export type TradeRouteStatus = 'SCHEDULED' | 'IN_TRANSIT' | 'DELIVERED' | 'FAILED'
+
+export interface TradeRouteResult {
+  id: string
+  companyId: string
+  sourceBuildingId: string
+  sourceBuildingName: string
+  sourceCityName: string
+  destinationBuildingId: string
+  destinationBuildingName: string
+  destinationCityName: string
+  productTypeId: string | null
+  productTypeName: string | null
+  resourceTypeId: string | null
+  resourceTypeName: string | null
+  quantity: number
+  quality: number
+  pricePerUnit: number
+  scheduledDepartureTick: number
+  expectedArrivalTick: number
+  transitTicks: number
+  shippingCostEstimate: number
+  shippingCostActual: number
+  status: TradeRouteStatus
+  failureReason: string | null
+  createdAtUtc: string
+  departedAtUtc: string | null
+  completedAtUtc: string | null
+}
+
+export interface TradeRouteEstimate {
+  distanceKm: number
+  transitTicks: number
+  shippingCostPerUnit: number
+  totalShippingCost: number
+}
+
+export interface CreateTradeRouteInput {
+  companyId: string
+  sourceBuildingId: string
+  sourceBuildingUnitId: string
+  destinationBuildingId: string
+  destinationBuildingUnitId: string
+  productTypeId?: string | null
+  resourceTypeId?: string | null
+  quantity: number
+  pricePerUnit: number
+}
+
+export interface CreateTradeRoutePayload {
+  isSuccess: boolean
+  errorCode: string | null
+  errorMessage: string | null
+  route: TradeRouteResult | null
+}

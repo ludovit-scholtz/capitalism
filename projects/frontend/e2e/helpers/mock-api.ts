@@ -1058,6 +1058,8 @@ export type MockState = {
   buildingMarketListings: MockBuildingMarketListing[]
   /** My building listings with offers (for myBuildingListings query). */
   myBuildingListings: MockBuildingMarketMyListing[]
+  /** Inter-city trade routes returned by myTradeRoutes query. */
+  tradeRoutes: MockTradeRoute[]
 }
 
 export interface MockBuildingMarketListing {
@@ -1097,6 +1099,34 @@ export interface MockBuildingMarketMyListing {
     company: { id: string; name: string }
   }
   offers: MockBuildingMarketOffer[]
+}
+
+export interface MockTradeRoute {
+  id: string
+  companyId: string
+  sourceBuildingId: string
+  sourceBuildingName: string
+  sourceCityName: string
+  destinationBuildingId: string
+  destinationBuildingName: string
+  destinationCityName: string
+  productTypeId: string | null
+  productTypeName: string | null
+  resourceTypeId: string | null
+  resourceTypeName: string | null
+  quantity: number
+  quality: number
+  pricePerUnit: number
+  scheduledDepartureTick: number
+  expectedArrivalTick: number
+  transitTicks: number
+  shippingCostEstimate: number
+  shippingCostActual: number
+  status: 'SCHEDULED' | 'IN_TRANSIT' | 'DELIVERED' | 'FAILED'
+  failureReason: string | null
+  createdAtUtc: string
+  departedAtUtc: string | null
+  completedAtUtc: string | null
 }
 
 const mockStateByPage = new WeakMap<Page, MockState>()
@@ -2663,6 +2693,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     supplyChainData: {},
     buildingMarketListings: [],
     myBuildingListings: [],
+    tradeRoutes: [],
     ...initial,
   }
 
@@ -6724,6 +6755,10 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
     if (query.includes('myBuildingListings')) {
       return routeJson({ myBuildingListings: state.myBuildingListings })
+    }
+
+    if (query.includes('myTradeRoutes')) {
+      return routeJson({ myTradeRoutes: state.tradeRoutes })
     }
 
     if (query.includes('makeOfferOnBuilding')) {

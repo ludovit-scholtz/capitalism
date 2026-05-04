@@ -53,6 +53,11 @@ const router = createRouter({
       name: 'bank-statement-default',
       component: () => import('@/views/BankStatementView.vue'),
     },
+    {
+      path: '/trade-routes',
+      name: 'trade-routes',
+      component: () => import('@/views/TradeRoutesView.vue'),
+    },
   ],
   scrollBehavior() {
     return { top: 0 }

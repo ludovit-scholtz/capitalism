@@ -28,6 +28,7 @@ import {
   faBell,
   faFileInvoiceDollar,
   faStore,
+  faRoute,
 } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
@@ -51,6 +52,7 @@ library.add(
   faBell,
   faFileInvoiceDollar,
   faStore,
+  faRoute,
 )
 
 export function createApp() {
