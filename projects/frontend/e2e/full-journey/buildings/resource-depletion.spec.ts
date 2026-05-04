@@ -4,6 +4,8 @@ import { makePlayer, setupMockApi, type MockBuilding } from '../../helpers/mock-
 /**
  * Creates a MINE building with optional depletion state.
  * The MINING unit is placed at (0,0) so `.grid-cell.first()` selects it.
+ * The building grid renders cells in row-major order starting at (0,0),
+ * so a unit at gridX:0, gridY:0 is always the first rendered cell.
  */
 function makeMineBuilding(
   opts: {
@@ -125,6 +127,7 @@ test.describe('Resource Depletion - Mining Unit Detail Panel', () => {
 
     await expect(page.locator('.mining-resource-status-panel')).toBeVisible()
     // At exactly 20%, no badge should be shown (boundary check)
+    await expect(page.locator('.active-deposit-state')).toBeVisible()
     await expect(page.locator('.mining-resource-status-panel .depletion-risk-badge')).toHaveCount(0)
     await expect(page.locator('.mining-resource-status-panel')).toContainText('20% Remaining')
   })
@@ -140,8 +143,8 @@ test.describe('Resource Depletion - Mining Unit Detail Panel', () => {
 
     // Panel shows estimated depletion count in ticks
     await expect(page.locator('.mining-resource-status-panel')).toContainText('ticks')
-    // Should show exact 50 ticks (500 remaining / 10 per tick)
-    await expect(page.locator('.mining-resource-status-panel')).toContainText('50')
+    // Should show exact 50 ticks (500 remaining / 10 per tick); i18n renders as "~50 ticks"
+    await expect(page.locator('.mining-resource-status-panel')).toContainText('~50 ticks')
   })
 
   test('shows depleted state when materialQuantity is 0', async ({ page }) => {
