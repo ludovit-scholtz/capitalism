@@ -258,6 +258,58 @@ public sealed class BotStateValidatorTests
         Assert.False(BotStateValidator.IsAtRisk(bot, maxConsecutiveErrors: 4));
     }
 
+    // ── Additional Validate edge cases ────────────────────────────────────────
+
+    [Fact]
+    public void Validate_NullLastSuccessUtc_IsNotStale()
+    {
+        // A bot that has never run is NOT considered stale — it is uninitialised.
+        var bot = MakeReadyBot();
+        bot.LastSuccessUtc = null;
+
+        var result = BotStateValidator.Validate(bot, staleAfterMinutes: 10);
+        Assert.True(result.IsValid, "A bot with null LastSuccessUtc should not be flagged as stale.");
+        Assert.Empty(result.Issues);
+    }
+
+    [Fact]
+    public void Validate_CustomStaleThreshold_IsRespected()
+    {
+        // Bot had a successful operation 5 minutes ago.
+        // With staleAfterMinutes=10 it is fine; with staleAfterMinutes=2 it is stale.
+        var bot = MakeReadyBot();
+        bot.LastSuccessUtc = DateTime.UtcNow.AddMinutes(-5);
+
+        var notStale = BotStateValidator.Validate(bot, staleAfterMinutes: 10);
+        var stale = BotStateValidator.Validate(bot, staleAfterMinutes: 2);
+
+        Assert.True(notStale.IsValid);
+        Assert.False(stale.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Summary_IsReadyWhenValid()
+    {
+        var bot = MakeReadyBot();
+        bot.LastSuccessUtc = DateTime.UtcNow;
+
+        var result = BotStateValidator.Validate(bot);
+        Assert.Contains("ready", result.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Validate_Summary_ContainsAllIssuesText()
+    {
+        var bot = MakeReadyBot();
+        bot.IsSkipped = true;
+        bot.Token = null;
+
+        var result = BotStateValidator.Validate(bot);
+        // Summary should be a join of all individual issue strings
+        foreach (var issue in result.Issues)
+            Assert.Contains(issue, result.Summary);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static BotAccount MakeReadyBot() => new()

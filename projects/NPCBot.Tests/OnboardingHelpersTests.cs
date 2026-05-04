@@ -291,4 +291,35 @@ public sealed class OnboardingHelpersTests
         // Empty string is non-null → treated as occupied (lot is filtered out).
         Assert.Null(result);
     }
+
+    [Fact]
+    public void PickCheapestAvailableLot_TwoLotsAtSamePrice_ReturnsBothEligible()
+    {
+        // When two lots have the same price, FirstOrDefault picks the one that appears first.
+        // This test verifies that at least one of the two matching lots is returned (no crash).
+        var lots = new[]
+        {
+            new BuildingLotSummary { Id = "lot-a", SuitableTypes = "FACTORY", Price = 80_000m },
+            new BuildingLotSummary { Id = "lot-b", SuitableTypes = "FACTORY", Price = 80_000m },
+        };
+        var result = OnboardingHelpers.PickCheapestAvailableLot(lots, "FACTORY");
+        Assert.NotNull(result);
+        Assert.Contains(result.Id, new[] { "lot-a", "lot-b" });
+    }
+
+    // ── Additional PickCheapestFreeProduct edge cases ─────────────────────────
+
+    [Fact]
+    public void PickCheapestFreeProduct_TwoFreeProductsAtSamePrice_ReturnsBothEligible()
+    {
+        // When two products have the same price, FirstOrDefault picks the first.
+        var products = new[]
+        {
+            new ProductTypeSummary { Id = "a", IsProOnly = false, BasePrice = 45m },
+            new ProductTypeSummary { Id = "b", IsProOnly = false, BasePrice = 45m },
+        };
+        var result = OnboardingHelpers.PickCheapestFreeProduct(products);
+        Assert.NotNull(result);
+        Assert.Contains(result.Id, new[] { "a", "b" });
+    }
 }

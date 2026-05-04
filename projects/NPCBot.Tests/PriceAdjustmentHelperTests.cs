@@ -340,4 +340,60 @@ public sealed class PriceAdjustmentHelperTests
         Assert.Equal("u1", unit.Id);
         Assert.Equal("Downtown Shop", buildingName);
     }
+
+    // ── Edge cases ────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void SelectAdjustableUnits_CompanyWithNoBuildings_ReturnsEmpty()
+    {
+        var companies = new List<CompanySummary>
+        {
+            new() { Id = "c1", Name = "Empty Co", Buildings = [] },
+        };
+
+        var result = PriceAdjustmentHelper.SelectAdjustableUnits(companies).ToList();
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void SelectAdjustableUnits_BuildingWithNoUnits_ReturnsEmpty()
+    {
+        var companies = new List<CompanySummary>
+        {
+            new()
+            {
+                Id = "c1", Name = "Co",
+                Buildings =
+                [
+                    new() { Id = "b1", Name = "Empty Building", Units = [] },
+                ],
+            },
+        };
+
+        var result = PriceAdjustmentHelper.SelectAdjustableUnits(companies).ToList();
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void IsAdjustmentMeaningful_BothPricesZero_ReturnsFalse()
+    {
+        // 0 → 0 produces |0 - 0| = 0 which is less than 0.01
+        Assert.False(PriceAdjustmentHelper.IsAdjustmentMeaningful(0m, 0m));
+    }
+
+    [Fact]
+    public void IsAdjustmentMeaningful_BothAtFloor_ReturnsFalse()
+    {
+        // MinimumAllowedPrice → MinimumAllowedPrice: no change
+        Assert.False(PriceAdjustmentHelper.IsAdjustmentMeaningful(
+            PriceAdjustmentHelper.MinimumAllowedPrice,
+            PriceAdjustmentHelper.MinimumAllowedPrice));
+    }
+
+    [Fact]
+    public void ComputeNewPrice_ExactMidpointRounding_RoundsAwayFromZero()
+    {
+        // 10.005 rounds to 10.01 (AwayFromZero midpoint rounding, not banker's rounding)
+        Assert.Equal(10.01m, PriceAdjustmentHelper.ComputeNewPrice(10.005m, 1.0m));
+    }
 }
