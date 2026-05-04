@@ -265,6 +265,7 @@ public class Program
         builder.Services.AddScoped<ITickPhase, TaxPhase>();
         builder.Services.AddScoped<ITickPhase, DividendPhase>();
         builder.Services.AddScoped<ITickPhase, TelemetryBountyPhase>();
+        builder.Services.AddScoped<ITickPhase, EconomicReportPhase>();
         builder.Services.AddScoped<ITickPhase, MarketReportPhase>();
         builder.Services.AddHostedService<GameTickHostedService>();
         builder.Services.AddHostedService<MasterServerRegistrationHostedService>();

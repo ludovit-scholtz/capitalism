@@ -818,6 +818,20 @@ export type MockCityWeatherForecast = {
   forecast: MockWeatherTick[]
 }
 
+export type MockCityEconomicReport = {
+  id: string
+  cityId: string
+  taxCycleEnd: number
+  totalSalaries: number
+  totalPublicRevenue: number
+  activeCompanies: number
+  totalPowerConsumption: number
+  totalPowerSupply: number
+  averageProductQuality: number
+  economicIndex: number
+  computedAtUtc: string
+}
+
 export type MockCityMediaHouseInfo = {
   id: string
   name: string
@@ -953,6 +967,8 @@ export type MockState = {
   }>
   /** Media houses returned by cityMediaHouses query, keyed by cityId. */
   cityMediaHouses: Record<string, MockCityMediaHouseInfo[]>
+  /** City economic reports returned by getCityEconomicReport query, keyed by cityId. */
+  cityEconomicReports?: Record<string, MockCityEconomicReport[]>
   /** Building bank account info keyed by buildingId. */
   buildingBankAccounts: Record<
     string,
@@ -6068,6 +6084,21 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { cityPowerBalance } }),
+      })
+    }
+
+    if (query.includes('getCityEconomicReport') && !query.includes('cityPowerBalance')) {
+      const cityId = body.variables?.cityId as string | undefined
+      const cityReports = cityId ? (state.cityEconomicReports?.[cityId] ?? []) : []
+      const latest = cityReports.length > 0 ? cityReports[cityReports.length - 1] : null
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            getCityEconomicReport: { latest, history: cityReports },
+          },
+        }),
       })
     }
 

@@ -299,5 +299,19 @@ public sealed partial class AppDbContext
             e.HasOne(d => d.ProductType).WithMany().HasForeignKey(d => d.ProductTypeId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(d => d.ProductTypeId).IsUnique();
         });
+
+        modelBuilder.Entity<CityEconomicReport>(e =>
+        {
+            e.HasKey(r => r.Id);
+            e.HasOne(r => r.City).WithMany().HasForeignKey(r => r.CityId).OnDelete(DeleteBehavior.Cascade);
+            e.Property(r => r.TotalSalaries).HasPrecision(18, 4);
+            e.Property(r => r.TotalPublicRevenue).HasPrecision(18, 4);
+            e.Property(r => r.TotalPowerConsumption).HasPrecision(18, 4);
+            e.Property(r => r.TotalPowerSupply).HasPrecision(18, 4);
+            e.Property(r => r.AverageProductQuality).HasPrecision(5, 4);
+            e.Property(r => r.EconomicIndex).HasPrecision(5, 2);
+            // Efficient historical lookups per city ordered by cycle.
+            e.HasIndex(r => new { r.CityId, r.TaxCycleEnd });
+        });
     }
 }
