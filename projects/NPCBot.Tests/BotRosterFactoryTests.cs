@@ -60,7 +60,7 @@ public sealed class BotRosterFactoryTests
     }
 
     [Fact]
-    public void Build_IndicesAreContiguousAndOneBaseed()
+    public void Build_IndicesAreContiguousAndOneBased()
     {
         var opts = DefaultOptions();
         opts.BotCount = 5;
