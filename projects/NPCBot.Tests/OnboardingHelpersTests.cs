@@ -243,7 +243,7 @@ public sealed class OnboardingHelpersTests
     // ── Additional ContainsSuitableType edge cases ────────────────────────────
 
     [Fact]
-    public void ContainsSuitableType_SingleItemCsv_MatchesExactly()
+    public void ContainsSuitableType_SingleItem_MatchesExactly()
     {
         // A single-item field with no commas must still match.
         Assert.True(OnboardingHelpers.ContainsSuitableType("SALES_SHOP", "SALES_SHOP"));
@@ -281,16 +281,14 @@ public sealed class OnboardingHelpersTests
     [Fact]
     public void PickCheapestAvailableLot_EmptyBuildingId_TreatedAsOccupied()
     {
-        // The game API sets BuildingId to a non-null non-empty string when occupied.
-        // An empty string is treated as not occupied (null check only).
+        // PickCheapestAvailableLot checks `BuildingId is null` — an empty string is
+        // NOT null, so a lot with BuildingId="" is treated as occupied and skipped.
         var lots = new[]
         {
             new BuildingLotSummary { Id = "empty-id", SuitableTypes = "FACTORY", BuildingId = string.Empty, Price = 50_000m },
         };
-        // BuildingId="" is not null — OnboardingHelpers treats non-null as occupied.
-        // Verify current behaviour: lot is considered occupied.
         var result = OnboardingHelpers.PickCheapestAvailableLot(lots, "FACTORY");
-        // Empty string is not null → treated as occupied (the lot has a BuildingId set).
+        // Empty string is non-null → treated as occupied (lot is filtered out).
         Assert.Null(result);
     }
 }
