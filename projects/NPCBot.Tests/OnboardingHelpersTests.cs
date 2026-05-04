@@ -322,4 +322,107 @@ public sealed class OnboardingHelpersTests
         Assert.NotNull(result);
         Assert.Contains(result.Id, new[] { "a", "b" });
     }
+
+    // ── ShouldResumeFromShopStep ──────────────────────────────────────────────
+
+    [Fact]
+    public void ShouldResume_NullProfile_ReturnsFalse()
+    {
+        var bot = new BotAccount { Index = 1, DisplayName = "NPC 001", Email = "npc@test.local", Strategy = "FURNITURE", Profile = null };
+        Assert.False(OnboardingHelpers.ShouldResumeFromShopStep(bot));
+    }
+
+    [Fact]
+    public void ShouldResume_NullOnboardingCurrentStep_ReturnsFalse()
+    {
+        var bot = new BotAccount
+        {
+            Index = 1, DisplayName = "NPC 001", Email = "npc@test.local", Strategy = "FURNITURE",
+            Profile = new PlayerProfile { OnboardingCurrentStep = null },
+        };
+        Assert.False(OnboardingHelpers.ShouldResumeFromShopStep(bot));
+    }
+
+    [Fact]
+    public void ShouldResume_EmptyOnboardingCurrentStep_ReturnsFalse()
+    {
+        var bot = new BotAccount
+        {
+            Index = 1, DisplayName = "NPC 001", Email = "npc@test.local", Strategy = "FURNITURE",
+            Profile = new PlayerProfile { OnboardingCurrentStep = string.Empty },
+        };
+        Assert.False(OnboardingHelpers.ShouldResumeFromShopStep(bot));
+    }
+
+    [Fact]
+    public void ShouldResume_ShopSelectionExactCase_ReturnsTrue()
+    {
+        var bot = new BotAccount
+        {
+            Index = 1, DisplayName = "NPC 001", Email = "npc@test.local", Strategy = "FURNITURE",
+            Profile = new PlayerProfile { OnboardingCurrentStep = "SHOP_SELECTION" },
+        };
+        Assert.True(OnboardingHelpers.ShouldResumeFromShopStep(bot));
+    }
+
+    [Fact]
+    public void ShouldResume_ShopSelectionLowercase_ReturnsTrue()
+    {
+        // Comparison must be case-insensitive
+        var bot = new BotAccount
+        {
+            Index = 1, DisplayName = "NPC 001", Email = "npc@test.local", Strategy = "FURNITURE",
+            Profile = new PlayerProfile { OnboardingCurrentStep = "shop_selection" },
+        };
+        Assert.True(OnboardingHelpers.ShouldResumeFromShopStep(bot));
+    }
+
+    [Fact]
+    public void ShouldResume_ShopSelectionMixedCase_ReturnsTrue()
+    {
+        var bot = new BotAccount
+        {
+            Index = 1, DisplayName = "NPC 001", Email = "npc@test.local", Strategy = "FURNITURE",
+            Profile = new PlayerProfile { OnboardingCurrentStep = "Shop_Selection" },
+        };
+        Assert.True(OnboardingHelpers.ShouldResumeFromShopStep(bot));
+    }
+
+    [Fact]
+    public void ShouldResume_CitySelectionStep_ReturnsFalse()
+    {
+        var bot = new BotAccount
+        {
+            Index = 1, DisplayName = "NPC 001", Email = "npc@test.local", Strategy = "FURNITURE",
+            Profile = new PlayerProfile { OnboardingCurrentStep = "CITY_SELECTION" },
+        };
+        Assert.False(OnboardingHelpers.ShouldResumeFromShopStep(bot));
+    }
+
+    [Fact]
+    public void ShouldResume_IndustrySelectionStep_ReturnsFalse()
+    {
+        var bot = new BotAccount
+        {
+            Index = 1, DisplayName = "NPC 001", Email = "npc@test.local", Strategy = "FURNITURE",
+            Profile = new PlayerProfile { OnboardingCurrentStep = "INDUSTRY_SELECTION" },
+        };
+        Assert.False(OnboardingHelpers.ShouldResumeFromShopStep(bot));
+    }
+
+    [Fact]
+    public void ShouldResume_CompletedOnboardingHasNoStep_ReturnsFalse()
+    {
+        // A fully-onboarded bot sets OnboardingCompletedAtUtc but clears OnboardingCurrentStep.
+        var bot = new BotAccount
+        {
+            Index = 1, DisplayName = "NPC 001", Email = "npc@test.local", Strategy = "FURNITURE",
+            Profile = new PlayerProfile
+            {
+                OnboardingCompletedAtUtc = DateTime.UtcNow.AddDays(-1),
+                OnboardingCurrentStep = null,
+            },
+        };
+        Assert.False(OnboardingHelpers.ShouldResumeFromShopStep(bot));
+    }
 }

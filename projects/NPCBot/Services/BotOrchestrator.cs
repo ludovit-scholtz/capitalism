@@ -240,6 +240,29 @@ public sealed class BotOrchestrator
         !bot.HasValidToken   ? "NO_TOKEN" :
         !bot.OnboardingCompleted ? "ONBOARDING" : "ACTIVE";
 
+    /// <summary>
+    /// Computes a strategy recommendation for a bot given the current tick.
+    /// Extracted as a public static method so it can be unit tested without
+    /// an orchestrator instance or live HTTP calls.
+    /// </summary>
+    /// <param name="bot">The bot whose profitability should be evaluated.</param>
+    /// <param name="currentTick">The current game tick (from <c>gameState.currentTick</c>).</param>
+    /// <param name="minTicksBeforeAdjustment">
+    /// Minimum ticks that must elapse after tracking start before a recommendation is made.
+    /// </param>
+    public static StrategyRecommendation ComputeRecommendationForBot(
+        BotAccount bot,
+        long currentTick,
+        int minTicksBeforeAdjustment = 5)
+    {
+        var ticksElapsed = currentTick - bot.TrackingStartTick;
+        return BotProfitCalculator.Recommend(
+            bot.CurrentNetWorth,
+            bot.InitialNetWorth,
+            ticksElapsed,
+            minTicksBeforeAdjustment);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static decimal ComputeNetWorth(PlayerProfile profile) =>
@@ -248,11 +271,10 @@ public sealed class BotOrchestrator
     private void EvaluateAndLogProfitability(BotAccount bot)
     {
         var status = BotProfitCalculator.Classify(bot.CurrentNetWorth, bot.InitialNetWorth);
-        var ticksElapsed = _currentTick - bot.TrackingStartTick;
-        var recommendation = BotProfitCalculator.Recommend(
-            bot.CurrentNetWorth, bot.InitialNetWorth, ticksElapsed,
-            _options.MinTicksBeforeAdjustment);
+        var recommendation = ComputeRecommendationForBot(
+            bot, _currentTick, _options.MinTicksBeforeAdjustment);
 
+        var ticksElapsed = _currentTick - bot.TrackingStartTick;
         var rate = BotProfitCalculator.ComputeAnnualisedRatePercent(
             bot.CurrentNetWorth, bot.InitialNetWorth, ticksElapsed);
 

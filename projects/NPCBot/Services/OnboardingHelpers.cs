@@ -9,6 +9,18 @@ namespace Capitalism.NPCBot.Services;
 public static class OnboardingHelpers
 {
     /// <summary>
+    /// Returns <c>true</c> when the bot's onboarding is already at the shop-selection
+    /// step and should resume with <c>finishOnboarding</c> rather than starting over.
+    /// Comparison is case-insensitive so backend enum casing changes don't cause silent failures.
+    /// </summary>
+    public static bool ShouldResumeFromShopStep(BotAccount bot) =>
+        string.Equals(
+            bot.Profile?.OnboardingCurrentStep,
+            "SHOP_SELECTION",
+            StringComparison.OrdinalIgnoreCase);
+
+
+    /// <summary>
     /// Returns the cheapest available lot that has no building placed on it yet
     /// and whose <see cref="BuildingLotSummary.SuitableTypes"/> contains
     /// <paramref name="suitableType"/>.

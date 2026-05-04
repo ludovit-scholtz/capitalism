@@ -73,12 +73,7 @@ public sealed class GameApiClient
 
         if (root.TryGetProperty("errors", out var errors))
         {
-            var firstMsg = errors[0].GetProperty("message").GetString() ?? "Unknown error";
-            var code = string.Empty;
-            if (errors[0].TryGetProperty("extensions", out var ext) &&
-                ext.TryGetProperty("code", out var codeEl))
-                code = codeEl.GetString() ?? string.Empty;
-
+            var (firstMsg, code) = GraphQLResponseParser.ParseFirstError(errors);
             _logger.LogWarning("GraphQL error [{Code}]: {Message}", code, firstMsg);
             throw new GraphQLException(firstMsg, code);
         }

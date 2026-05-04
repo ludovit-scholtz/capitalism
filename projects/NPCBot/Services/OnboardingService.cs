@@ -77,7 +77,7 @@ public sealed class OnboardingService
             throw new InvalidOperationException($"{bot}: Profile must be loaded before onboarding.");
 
         // Resume from shop step if partially done
-        if (string.Equals(bot.Profile.OnboardingCurrentStep, "SHOP_SELECTION", StringComparison.OrdinalIgnoreCase))
+        if (OnboardingHelpers.ShouldResumeFromShopStep(bot))
         {
             _logger.LogInformation("{Bot} Resuming from shop selection step.", bot);
             await FinishOnboardingAsync(bot, bot.Profile.OnboardingIndustry!, ct);

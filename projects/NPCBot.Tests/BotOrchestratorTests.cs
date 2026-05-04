@@ -250,4 +250,105 @@ public sealed class BotOrchestratorTests
         Assert.Equal("SKIPPED", BotOrchestrator.GetBotStatusLabel(bot1));
         Assert.Equal("ACTIVE", BotOrchestrator.GetBotStatusLabel(bot2));
     }
+
+    // ── ComputeRecommendationForBot ───────────────────────────────────────────
+
+    [Fact]
+    public void ComputeRecommendation_NoElapsedTicks_ReturnsNoAction()
+    {
+        // Bot just started: TrackingStartTick == currentTick → 0 ticks elapsed → no action
+        var bot = MakeBot();
+        bot.InitialNetWorth = 100_000m;
+        bot.CurrentNetWorth = 90_000m; // would be a loss if ticks had passed
+        bot.TrackingStartTick = 100;
+
+        var rec = BotOrchestrator.ComputeRecommendationForBot(bot, currentTick: 100, minTicksBeforeAdjustment: 5);
+        Assert.False(rec.ShouldAct, "No action expected when no ticks have elapsed.");
+    }
+
+    [Fact]
+    public void ComputeRecommendation_BelowMinTicks_ReturnsNoAction()
+    {
+        // Only 3 ticks elapsed, minimum is 5 → too early to recommend
+        var bot = MakeBot();
+        bot.InitialNetWorth = 100_000m;
+        bot.CurrentNetWorth = 85_000m; // severe loss if we were allowed to evaluate
+        bot.TrackingStartTick = 50;
+
+        var rec = BotOrchestrator.ComputeRecommendationForBot(bot, currentTick: 53, minTicksBeforeAdjustment: 5);
+        Assert.False(rec.ShouldAct, "No action expected before minimum ticks threshold.");
+    }
+
+    [Fact]
+    public void ComputeRecommendation_AtMinTicks_SevereLoss_ReturnsAction()
+    {
+        // Exactly at min ticks (5) with severe loss → recommendation fires
+        var bot = MakeBot();
+        bot.InitialNetWorth = 100_000m;
+        bot.CurrentNetWorth = 85_000m; // −15 % → severe
+        bot.TrackingStartTick = 10;
+
+        var rec = BotOrchestrator.ComputeRecommendationForBot(bot, currentTick: 15, minTicksBeforeAdjustment: 5);
+        Assert.True(rec.ShouldAct);
+        Assert.Equal(BotProfitCalculator.AggressivePriceReductionFactor, rec.PriceAdjustmentFactor);
+    }
+
+    [Fact]
+    public void ComputeRecommendation_ZeroInitialNetWorth_ReturnsNoAction()
+    {
+        // Cannot compute profitability without a starting baseline
+        var bot = MakeBot();
+        bot.InitialNetWorth = 0m;
+        bot.CurrentNetWorth = 50_000m;
+        bot.TrackingStartTick = 0;
+
+        var rec = BotOrchestrator.ComputeRecommendationForBot(bot, currentTick: 100, minTicksBeforeAdjustment: 5);
+        Assert.False(rec.ShouldAct, "No action when InitialNetWorth is 0.");
+    }
+
+    [Fact]
+    public void ComputeRecommendation_MildLoss_ReturnsMildFactor()
+    {
+        // −5 % loss → mild reduction
+        var bot = MakeBot();
+        bot.InitialNetWorth = 100_000m;
+        bot.CurrentNetWorth = 95_000m;
+        bot.TrackingStartTick = 0;
+
+        var rec = BotOrchestrator.ComputeRecommendationForBot(bot, currentTick: 10, minTicksBeforeAdjustment: 5);
+        Assert.True(rec.ShouldAct);
+        Assert.Equal(BotProfitCalculator.MildPriceReductionFactor, rec.PriceAdjustmentFactor);
+    }
+
+    [Fact]
+    public void ComputeRecommendation_Profitable_ReturnsNoAction()
+    {
+        // +10 % gain → no action needed
+        var bot = MakeBot();
+        bot.InitialNetWorth = 100_000m;
+        bot.CurrentNetWorth = 110_000m;
+        bot.TrackingStartTick = 5;
+
+        var rec = BotOrchestrator.ComputeRecommendationForBot(bot, currentTick: 20, minTicksBeforeAdjustment: 5);
+        Assert.False(rec.ShouldAct, "No action when bot is profitable.");
+    }
+
+    [Fact]
+    public void ComputeRecommendation_TicksElapsedCalculation_UsesTrackingStartTick()
+    {
+        // Verify that ticksElapsed = currentTick - TrackingStartTick, not currentTick alone.
+        // With TrackingStartTick = 100 and currentTick = 103: only 3 ticks → below min(5) → no action.
+        // With TrackingStartTick = 0 and currentTick = 103: 103 ticks → above min(5) → action allowed.
+        var bot = MakeBot();
+        bot.InitialNetWorth = 100_000m;
+        bot.CurrentNetWorth = 85_000m;
+
+        bot.TrackingStartTick = 100;
+        var recTooFew = BotOrchestrator.ComputeRecommendationForBot(bot, currentTick: 103, minTicksBeforeAdjustment: 5);
+        Assert.False(recTooFew.ShouldAct, "Should not act when only 3 ticks have elapsed since tracking start.");
+
+        bot.TrackingStartTick = 0;
+        var recEnough = BotOrchestrator.ComputeRecommendationForBot(bot, currentTick: 103, minTicksBeforeAdjustment: 5);
+        Assert.True(recEnough.ShouldAct, "Should act when 103 ticks have elapsed since tracking start.");
+    }
 }
