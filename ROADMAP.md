@@ -146,11 +146,16 @@ All three industries are Pro-gated at both backend (`ProOnlyStarterIndustries`) 
 - [x] All tooltip and tutorial UI strings available in English, Slovak, and German via vue-i18n.
 - [ ] Contextual tooltip overlays on the dashboard and building detail views (first grid-editor open, first building detail visit) using `TutorialTooltip.vue` and `useTutorialContext` — integration deferred to next increment.
 
-### Player profile and statistics page (0% complete)
+### Player profile and statistics page (60% complete)
 
-- [ ] Add a `/player/:id` public profile page showing: player display name, join date (game year), total company equity, current leaderboard rank, industries active in, number of cities with buildings, and total products sold across all ticks.
-- [ ] Include a "Hall of Fame" panel on the profile page listing the player's highest single-tick revenue, largest single acquisition, highest brand quality ever achieved, and longest consecutive days active.
-- [ ] Allow players to add a short bio (max 160 chars) and a custom profile badge unlocked by specific master-ranking bounty completions, visible on their profile page and on the leaderboard table.
+**Shipped (increment 1):** `/player/:id` public profile page is live. Each player row on the leaderboard now links directly to the profile page. The profile displays: player display name (with Pro badge), join date, game year, bio (editable by the player, max 160 chars), global leaderboard rank, total wealth in USD, company count, cities active, active building types, total products sold, company equity, and a Hall-of-Fame panel (highest single-tick revenue, largest building acquisition, highest brand quality with brand name). Backend: `playerProfile(playerId: UUID!)` GraphQL query, `updatePlayerBio` mutation (authenticated), and `Players.Bio` column (EF Core migration `AddPlayerBio`).
+
+- [x] Add a `/player/:id` public profile page showing: player display name, join date (game year), total company equity, current leaderboard rank, industries active in, number of cities with buildings, and total products sold across all ticks.
+- [x] Include a "Hall of Fame" panel on the profile page listing the player's highest single-tick revenue, largest single acquisition, highest brand quality ever achieved.
+- [x] Allow players to add a short bio (max 160 chars) visible on their profile page.
+- [ ] Add a custom profile badge unlocked by specific master-ranking bounty completions, visible on the leaderboard table.
+- [ ] Rank history chart over last 365 ticks.
+- [ ] Export statistics as PDF or CSV.
 
 ### Company growth and second IPO path (100% complete)
 
