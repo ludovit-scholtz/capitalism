@@ -139,5 +139,17 @@ public sealed partial class AppDbContext
                 .HasForeignKey(setting => setting.CityId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
+
+        modelBuilder.Entity<TutorialProgress>(e =>
+        {
+            e.HasKey(tp => tp.Id);
+            e.Property(tp => tp.Milestone).HasMaxLength(60);
+            e.HasOne(tp => tp.Player)
+                .WithMany()
+                .HasForeignKey(tp => tp.PlayerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(tp => tp.PlayerId);
+            e.HasIndex(tp => new { tp.PlayerId, tp.Milestone }).IsUnique();
+        });
     }
 }

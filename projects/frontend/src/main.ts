@@ -29,6 +29,7 @@ import {
   faFileInvoiceDollar,
   faStore,
   faRoute,
+  faGraduationCap,
 } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
@@ -53,6 +54,7 @@ library.add(
   faFileInvoiceDollar,
   faStore,
   faRoute,
+  faGraduationCap,
 )
 
 export function createApp() {

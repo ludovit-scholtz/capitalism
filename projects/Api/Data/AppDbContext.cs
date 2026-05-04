@@ -144,6 +144,9 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Per-city scheduling rows for the annual resource replenishment cycle.</summary>
     public DbSet<ResourceReplenishmentSchedule> ResourceReplenishmentSchedules => Set<ResourceReplenishmentSchedule>();
 
+    /// <summary>Per-player tutorial milestone completion tracking.</summary>
+    public DbSet<TutorialProgress> TutorialProgresses => Set<TutorialProgress>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

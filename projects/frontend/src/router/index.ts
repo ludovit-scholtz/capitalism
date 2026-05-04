@@ -58,6 +58,7 @@ const router = createRouter({
       name: 'trade-routes',
       component: () => import('@/views/TradeRoutesView.vue'),
     },
+    { path: '/tutorial', name: 'tutorial', component: () => import('@/views/TutorialView.vue') },
   ],
   scrollBehavior() {
     return { top: 0 }

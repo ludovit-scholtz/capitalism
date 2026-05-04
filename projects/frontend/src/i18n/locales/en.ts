@@ -63,6 +63,7 @@ export default {
     bankStatement: 'Bank Statement',
     cities: 'Cities',
     buildingMarket: 'Building Market',
+    tutorial: 'Tutorial',
   },
   news: {
     eyebrow: 'Official feed',
@@ -3213,5 +3214,59 @@ export default {
     viewAvailableLots: 'View Available Lots',
     depletedDescription: 'This mine lot has been fully extracted.',
     dashboardBadgeTooltip: 'Only {percent}% resource remaining. Plan for replacement mine soon.',
+  },
+  tutorial: {
+    title: 'Tutorial',
+    subtitle: 'Complete guided milestones to master Capitalism V and earn bounty points.',
+    progressLabel: '{done}/{total} milestones completed',
+    pointsEarned: '{earned}/{total} pts earned',
+    resume: 'Resume',
+    done: 'Done',
+    completedAria: 'Completed',
+    pendingAria: 'Pending',
+    authNotice: 'Sign in to track your progress and earn bounty points for each milestone.',
+    signIn: 'Sign In',
+    gotIt: 'Got it',
+    milestones: {
+      firstResourceSold: {
+        title: 'First Resource Sold',
+        desc: 'Set up your sales shop and make your first sale to consumers in the city market.',
+        value: 'Learn how public sales work and start generating your first revenue.',
+      },
+      firstB2BTrade: {
+        title: 'First B2B Trade',
+        desc: 'Execute your first business-to-business sale through the global exchange.',
+        value: 'Discover how inter-company trade routes create supply chain efficiency.',
+      },
+      firstLoanTaken: {
+        title: 'First Loan Taken',
+        desc: 'Visit a bank building and take out your first loan to fund expansion.',
+        value: 'Understand how leverage and financing can accelerate your empire growth.',
+      },
+      firstCompetitorObserved: {
+        title: 'First Competitor Observed',
+        desc: 'Open market intelligence and view a competitor company operating in your city.',
+        value: 'Learn to benchmark your prices and strategy against rivals in the market.',
+      },
+      firstBrandEstablished: {
+        title: 'First Brand Established',
+        desc: 'Invest in branding for your product and achieve measurable brand awareness.',
+        value: 'Discover how brand quality boosts demand and lets you charge premium prices.',
+      },
+    },
+    tooltips: {
+      gridEditorIntro: {
+        title: 'Grid Editor',
+        desc: 'Drag unit tiles to configure your building layout and link production chains.',
+      },
+      buildingControlsIntro: {
+        title: 'Building Controls',
+        desc: 'Use these controls to upgrade units, view analytics, and manage your building.',
+      },
+      firstSale: {
+        title: 'Selling to Public',
+        desc: 'Your shop sells to city consumers each tick. Set a competitive price to boost sales.',
+      },
+    },
   },
 }

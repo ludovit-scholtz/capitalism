@@ -63,6 +63,7 @@ export default {
     bankStatement: 'Bankový výpis',
     cities: 'Mestá',
     buildingMarket: 'Trh budov',
+    tutorial: 'Tutoriál',
   },
   news: {
     eyebrow: 'Oficiálny feed',
@@ -3201,5 +3202,59 @@ export default {
     viewAvailableLots: 'Zobraziť dostupné pozemky',
     depletedDescription: 'Tento banský pozemok bol úplne vyťažený.',
     dashboardBadgeTooltip: 'Zostatok len {percent}% suroviny. Naplánujte náhradný dôl.',
+  },
+  tutorial: {
+    title: 'Tutoriál',
+    subtitle: 'Plňte riadené míľniky, zvládnite Capitalism V a získajte odmeny.',
+    progressLabel: '{done}/{total} míľnikov dokončených',
+    pointsEarned: '{earned}/{total} bodov získaných',
+    resume: 'Pokračovať',
+    done: 'Hotovo',
+    completedAria: 'Dokončené',
+    pendingAria: 'Čaká',
+    authNotice: 'Prihláste sa, aby ste mohli sledovať postup a získavať body za každý míľnik.',
+    signIn: 'Prihlásiť sa',
+    gotIt: 'Rozumiem',
+    milestones: {
+      firstResourceSold: {
+        title: 'Prvý predaj',
+        desc: 'Nastavte svoju predajňu a uskutočnite prvý predaj spotrebiteľom na mestskom trhu.',
+        value: 'Naučte sa, ako fungujú verejné predaje a začnite generovať prvé príjmy.',
+      },
+      firstB2BTrade: {
+        title: 'Prvý B2B obchod',
+        desc: 'Uskutočnite prvý predaj medzi firmami cez globálnu burzu.',
+        value: 'Objavte, ako medzifiremné obchodné trasy vytvárajú efektivitu dodávateľského reťazca.',
+      },
+      firstLoanTaken: {
+        title: 'Prvý úver',
+        desc: 'Navštívte bankovú budovu a vezmite si prvý úver na financovanie expanzie.',
+        value: 'Pochopte, ako môže pákový efekt a financovanie urýchliť rast vašej ríše.',
+      },
+      firstCompetitorObserved: {
+        title: 'Prvý konkurent pozorovaný',
+        desc: 'Otvorte trhové spravodajstvo a pozrite si konkurenčnú firmu vo vašom meste.',
+        value: 'Naučte sa porovnávať ceny a stratégiu s konkurentmi na trhu.',
+      },
+      firstBrandEstablished: {
+        title: 'Prvá značka vytvorená',
+        desc: 'Investujte do brandingu produktu a dosiahnite merateľnú povedomosť o značke.',
+        value: 'Objavte, ako kvalita značky zvyšuje dopyt a umožňuje účtovať prémiové ceny.',
+      },
+    },
+    tooltips: {
+      gridEditorIntro: {
+        title: 'Editor mriežky',
+        desc: 'Presúvajte dlaždice jednotiek na konfiguráciu rozloženia budovy a prepájanie výrobných reťazcov.',
+      },
+      buildingControlsIntro: {
+        title: 'Ovládanie budovy',
+        desc: 'Pomocou týchto ovládacích prvkov môžete upgradeovať jednotky, zobrazovať analytiku a spravovať budovu.',
+      },
+      firstSale: {
+        title: 'Predaj verejnosti',
+        desc: 'Vaša predajňa predáva mestským spotrebiteľom každý tik. Nastavte konkurencieschopnú cenu.',
+      },
+    },
   },
 }
