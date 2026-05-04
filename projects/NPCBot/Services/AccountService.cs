@@ -19,7 +19,7 @@ public sealed class AccountService
             onboardingCurrentStep onboardingIndustry
             onboardingCityId onboardingCompanyId
             onboardingFactoryLotId onboardingShopBuildingId
-            companies { id name cash buildings { id name type cityId } }
+            companies { id name cash buildings { id name type cityId units { id unitType minPrice } } }
           }
         }
         """;
@@ -48,6 +48,12 @@ public sealed class AccountService
 
     private const string RankingsQuery = """
         { rankings { rank displayName netWorth } }
+        """;
+
+    private const string UpdatePublicSalesPriceMutation = """
+        mutation UpdatePublicSalesPrice($input: UpdatePublicSalesPriceInput!) {
+          updatePublicSalesPrice(input: $input) { id unitType minPrice }
+        }
         """;
 
     private readonly GameApiClient _api;
@@ -125,6 +131,30 @@ public sealed class AccountService
         return result.Rankings;
     }
 
+    /// <summary>
+    /// Updates the minimum sale price on a PUBLIC_SALES building unit.
+    /// Takes effect from the next tick without requiring a queued upgrade plan.
+    /// </summary>
+    /// <param name="unitId">The ID of the PUBLIC_SALES unit to update.</param>
+    /// <param name="newMinPrice">The new minimum sale price. Must be greater than zero.</param>
+    /// <param name="token">Bearer token for the authenticated bot.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The updated unit summary.</returns>
+    public async Task<UnitSummary> UpdatePublicSalesPriceAsync(
+        string unitId,
+        decimal newMinPrice,
+        string token,
+        CancellationToken ct)
+    {
+        var result = await _api.ExecuteAsync<UpdatePriceWrapper>(
+            UpdatePublicSalesPriceMutation,
+            new { input = new { unitId, newMinPrice } },
+            bearerToken: token,
+            ct: ct);
+
+        return result.UpdatePublicSalesPrice;
+    }
+
     // ── Wrapper types ─────────────────────────────────────────────────────────
 
     private sealed record RegisterWrapper(AuthPayload Register);
@@ -132,4 +162,5 @@ public sealed class AccountService
     private sealed record MeWrapper(PlayerProfile Me);
     private sealed record GameStateWrapper(GameStateSummary GameState);
     private sealed record RankingsWrapper(List<RankingEntry> Rankings);
+    private sealed record UpdatePriceWrapper(UnitSummary UpdatePublicSalesPrice);
 }

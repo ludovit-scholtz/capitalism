@@ -236,4 +236,52 @@ public sealed class GameModelsTests
         var profile = new PlayerProfile();
         Assert.Null(profile.OnboardingCityId);
     }
+
+    // ── UnitSummary ───────────────────────────────────────────────────────────
+
+    [Fact]
+    public void UnitSummary_DefaultsHaveEmptyId()
+    {
+        var unit = new UnitSummary();
+        Assert.Equal(string.Empty, unit.Id);
+    }
+
+    [Fact]
+    public void UnitSummary_DefaultsHaveEmptyUnitType()
+    {
+        var unit = new UnitSummary();
+        Assert.Equal(string.Empty, unit.UnitType);
+    }
+
+    [Fact]
+    public void UnitSummary_DefaultsHaveNullMinPrice()
+    {
+        var unit = new UnitSummary();
+        Assert.Null(unit.MinPrice);
+    }
+
+    [Fact]
+    public void UnitSummary_CanSetAllProperties()
+    {
+        var unit = new UnitSummary { Id = "u1", UnitType = "PUBLIC_SALES", MinPrice = 99.99m };
+        Assert.Equal("u1", unit.Id);
+        Assert.Equal("PUBLIC_SALES", unit.UnitType);
+        Assert.Equal(99.99m, unit.MinPrice);
+    }
+
+    [Fact]
+    public void BuildingSummary_DefaultsHaveEmptyUnitsList()
+    {
+        var building = new BuildingSummary();
+        Assert.NotNull(building.Units);
+        Assert.Empty(building.Units);
+    }
+
+    [Fact]
+    public void BuildingSummary_CanAddUnits()
+    {
+        var building = new BuildingSummary();
+        building.Units.Add(new UnitSummary { Id = "u1", UnitType = "PUBLIC_SALES", MinPrice = 50m });
+        Assert.Single(building.Units);
+    }
 }

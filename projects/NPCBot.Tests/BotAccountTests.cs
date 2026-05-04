@@ -205,4 +205,32 @@ public sealed class BotAccountTests
         var bot = new BotAccount();
         Assert.Equal(0L, bot.TrackingStartTick);
     }
+
+    [Fact]
+    public void Defaults_PendingRecommendationIsNull()
+    {
+        var bot = new BotAccount();
+        Assert.Null(bot.PendingRecommendation);
+    }
+
+    [Fact]
+    public void PendingRecommendation_CanBeSet()
+    {
+        var bot = new BotAccount();
+        var rec = new StrategyRecommendation { ShouldAct = true, Reason = "Test", PriceAdjustmentFactor = 0.95m };
+        bot.PendingRecommendation = rec;
+        Assert.NotNull(bot.PendingRecommendation);
+        Assert.True(bot.PendingRecommendation.ShouldAct);
+    }
+
+    [Fact]
+    public void PendingRecommendation_CanBeCleared()
+    {
+        var bot = new BotAccount
+        {
+            PendingRecommendation = new StrategyRecommendation { ShouldAct = true, Reason = "x", PriceAdjustmentFactor = 0.9m },
+        };
+        bot.PendingRecommendation = null;
+        Assert.Null(bot.PendingRecommendation);
+    }
 }

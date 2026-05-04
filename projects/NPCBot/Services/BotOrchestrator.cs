@@ -14,6 +14,7 @@ public sealed class BotOrchestrator
     private readonly List<BotAccount> _bots;
     private readonly AccountService _accounts;
     private readonly OnboardingService _onboarding;
+    private readonly PriceAdjustmentService _priceAdjustment;
     private readonly BotOptions _options;
     private readonly ILogger<BotOrchestrator> _logger;
     private long _currentTick;
@@ -22,12 +23,14 @@ public sealed class BotOrchestrator
         IEnumerable<BotAccount> bots,
         AccountService accounts,
         OnboardingService onboarding,
+        PriceAdjustmentService priceAdjustment,
         IOptions<BotOptions> options,
         ILogger<BotOrchestrator> logger)
     {
         _bots = [.. bots];
         _accounts = accounts;
         _onboarding = onboarding;
+        _priceAdjustment = priceAdjustment;
         _options = options.Value;
         _logger = logger;
     }
@@ -183,6 +186,9 @@ public sealed class BotOrchestrator
             bot.LastSuccessUtc = DateTime.UtcNow;
 
             EvaluateAndLogProfitability(bot);
+
+            // Apply any pending strategy recommendation (price adjustments)
+            await ApplyPendingRecommendationAsync(bot, ct);
         }
         catch (Exception ex)
         {
@@ -245,5 +251,18 @@ public sealed class BotOrchestrator
 
         if (recommendation.ShouldAct)
             _logger.LogInformation("{Bot} Strategy recommendation: {Reason}", bot, recommendation.Reason);
+
+        bot.PendingRecommendation = recommendation;
+    }
+
+    private async Task ApplyPendingRecommendationAsync(BotAccount bot, CancellationToken ct)
+    {
+        if (bot.PendingRecommendation is null || !bot.PendingRecommendation.ShouldAct)
+            return;
+
+        await _priceAdjustment.ApplyAdjustmentAsync(bot, bot.PendingRecommendation, ct);
+        // Always clear after every application attempt (success or no-op) to prevent
+        // infinite retry loops when no adjustable units exist or all changes are sub-cent.
+        bot.PendingRecommendation = null;
     }
 }

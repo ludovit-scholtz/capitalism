@@ -1382,3 +1382,18 @@ Root-cause of a quality failure (May 2026, PR #236 NPC bot console app):
 4. **Test project must include a `GlobalUsings.cs` with `global using Xunit;`** for test attribute discovery — the xunit runner package does NOT auto-generate global using for the `Xunit` namespace in all .NET SDK configurations.
 5. **For console apps with configuration options (`BotOptions`, `AppSettings`), add tests that assert all default values** match the documented defaults and that free/restricted resource lists are correctly seeded.
 6. **Build and run the test project with `dotnet test --configuration Release` before every `report_progress` call.** Do not push console app code without verified passing tests.
+
+## NPC bot recommendation-to-action gap — always close the loop from check to change
+
+Root-cause of a recurring quality failure (May 2026, PR #236 NPC bot — repeated "increase test coverage" feedback):
+- The ROADMAP says "check if it is profitable to change the current settings" — each previous iteration implemented **checking** (profitability classification, recommendation generation) but stopped short of **acting** on the recommendation.
+- `BotProfitCalculator.Recommend()` produced a `StrategyRecommendation` with `ShouldAct = true` and a `PriceAdjustmentFactor`, but the orchestrator only logged the recommendation; no mutation was ever sent to the game API.
+- The `updatePublicSalesPrice` GraphQL mutation existed in the game API from the start but was never wired into the bot.
+- This is the same "recommendation without action" anti-pattern that causes repeated "aligned with ROADMAP" feedback.
+
+**Rules to prevent recurrence:**
+1. **When the ROADMAP says "change X", the implementation must call a mutation/API to actually change X** — not just compute and log what should change. Logging a recommendation is NOT completing the item.
+2. **For any recommendation-producing helper (profitability, strategy, risk), always add a companion service that applies the recommendation via the API.** Extract the pure computation into `*Helper` for testability, then wrap the network call in a `*Service`.
+3. **The full loop must be: (1) compute recommendation, (2) store on bot state (`PendingRecommendation`), (3) apply via API mutation, (4) clear `PendingRecommendation` after successful apply.** Steps 3 and 4 are mandatory for ROADMAP alignment.
+4. **When reviewing a "check if it is profitable to change" item, verify that the orchestrator code calls a mutation** — not just that a `StrategyRecommendation` is produced. Search for the actual GraphQL mutation call in the service before declaring the item complete.
+5. **Always test the pure price-computation helper** (`PriceAdjustmentHelper.ComputeNewPrice`, `SelectAdjustableUnits`, `IsAdjustmentMeaningful`) with edge cases: zero price, sub-cent round-trip, no-op identity factor, case-insensitive unit type, null/zero prices excluded.

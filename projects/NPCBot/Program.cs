@@ -51,6 +51,7 @@ public static class Program
                 services.AddHttpClient<GameApiClient>();
                 services.AddTransient<AccountService>();
                 services.AddTransient<OnboardingService>();
+                services.AddTransient<PriceAdjustmentService>();
 
                 // Build the bot roster from config
                 services.AddSingleton<IEnumerable<BotAccount>>(sp =>

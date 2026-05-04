@@ -86,6 +86,23 @@ public sealed class BuildingSummary
 
     [JsonPropertyName("cityId")]
     public string CityId { get; set; } = string.Empty;
+
+    [JsonPropertyName("units")]
+    public List<UnitSummary> Units { get; set; } = [];
+}
+
+// ── Unit ─────────────────────────────────────────────────────────────────────
+
+public sealed class UnitSummary
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    [JsonPropertyName("unitType")]
+    public string UnitType { get; set; } = string.Empty;
+
+    [JsonPropertyName("minPrice")]
+    public decimal? MinPrice { get; set; }
 }
 
 // ── City ─────────────────────────────────────────────────────────────────────

@@ -1,3 +1,5 @@
+using Capitalism.NPCBot.Services;
+
 namespace Capitalism.NPCBot.Models;
 
 /// <summary>Mutable runtime state for a single NPC bot account.</summary>
@@ -63,6 +65,13 @@ public sealed class BotAccount
 
     /// <summary>Profitability delta: positive means the bot is making money.</summary>
     public decimal ProfitDelta => CurrentNetWorth - InitialNetWorth;
+
+    /// <summary>
+    /// The most recent strategy recommendation produced by <see cref="Services.BotProfitCalculator"/>.
+    /// Set each tick by the orchestrator; cleared after every application attempt (success or no-op)
+    /// to prevent infinite retry loops when no units are adjustable or all changes are sub-cent.
+    /// </summary>
+    public StrategyRecommendation? PendingRecommendation { get; set; }
 
     public override string ToString() =>
         $"[Bot #{Index} {DisplayName} ({Strategy})]";
