@@ -283,6 +283,12 @@ function getRankGradient(index: number): string | undefined {
                 <span class="opacity-40">·</span>
                 <span :title="t('leaderboard.stocksTooltip')"> 📈 {{ formatWealth(rank.sharesValue) }} </span>
               </div>
+              <RouterLink
+                :to="`/player/${rank.playerId}`"
+                class="view-profile-link mt-1 inline-block text-xs text-brand hover:underline"
+              >
+                {{ t('leaderboard.viewProfile') }} →
+              </RouterLink>
             </div>
           </div>
         </div>
@@ -345,6 +351,12 @@ function getRankGradient(index: number): string | undefined {
                 <span class="opacity-40">·</span>
                 <span :title="t('leaderboard.inventoryTooltip')"> 📦 {{ formatWealth(rank.inventoryValue, rank.currencyCode) }} </span>
               </div>
+              <RouterLink
+                :to="`/player/${rank.playerId}`"
+                class="view-profile-link mt-1 inline-block text-xs text-brand hover:underline"
+              >
+                {{ t('leaderboard.viewProfile') }} →
+              </RouterLink>
             </div>
           </div>
         </div>

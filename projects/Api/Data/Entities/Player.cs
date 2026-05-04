@@ -82,6 +82,13 @@ public sealed class Player
     /// <summary>UTC timestamp when the player completed the first-sale/first-profit onboarding milestone. Null when not yet achieved.</summary>
     public DateTime? OnboardingFirstSaleCompletedAtUtc { get; set; }
 
+    /// <summary>
+    /// Optional short biography set by the player. Maximum 160 characters.
+    /// Displayed on the public player profile page.
+    /// </summary>
+    [MaxLength(160)]
+    public string? Bio { get; set; }
+
     /// <summary>Companies owned by this player.</summary>
     public ICollection<Company> Companies { get; set; } = new List<Company>();
 
