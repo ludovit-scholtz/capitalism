@@ -209,6 +209,55 @@ public sealed class BotStateValidatorTests
         Assert.Contains("skipped", result.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void Validate_StaleAndNotOnboarded_ReportsBothIssues()
+    {
+        var bot = MakeReadyBot();
+        bot.Profile = new PlayerProfile { OnboardingCompletedAtUtc = null };
+        bot.LastSuccessUtc = DateTime.UtcNow.AddHours(-1);
+
+        var result = BotStateValidator.Validate(bot, staleAfterMinutes: 10);
+        Assert.False(result.IsValid);
+        Assert.True(result.Issues.Count >= 2);
+        Assert.Contains(result.Issues, i => i.Contains("onboarding", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(result.Issues, i => i.Contains("minutes", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Validate_AllProblems_ReportsAllFourIssues()
+    {
+        // All four possible issues: skipped, no token, not onboarded, stale.
+        var bot = MakeReadyBot();
+        bot.IsSkipped = true;
+        bot.Token = null;
+        bot.Profile = new PlayerProfile { OnboardingCompletedAtUtc = null };
+        bot.LastSuccessUtc = DateTime.UtcNow.AddHours(-2);
+
+        var result = BotStateValidator.Validate(bot, staleAfterMinutes: 10);
+        Assert.False(result.IsValid);
+        Assert.Equal(4, result.Issues.Count);
+    }
+
+    // ── IsAtRisk boundary ─────────────────────────────────────────────────────
+
+    [Fact]
+    public void IsAtRisk_ExactlyAtHalfLimit_ReturnsTrue()
+    {
+        // 50% of 4 = 2 errors — exactly at the half-limit threshold.
+        var bot = MakeReadyBot();
+        bot.ConsecutiveErrors = 2;
+        Assert.True(BotStateValidator.IsAtRisk(bot, maxConsecutiveErrors: 4));
+    }
+
+    [Fact]
+    public void IsAtRisk_OneBeforeHalfLimit_ReturnsFalse()
+    {
+        // 1/4 = 25% — below the 50% threshold.
+        var bot = MakeReadyBot();
+        bot.ConsecutiveErrors = 1;
+        Assert.False(BotStateValidator.IsAtRisk(bot, maxConsecutiveErrors: 4));
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static BotAccount MakeReadyBot() => new()

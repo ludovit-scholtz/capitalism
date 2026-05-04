@@ -161,4 +161,48 @@ public sealed class BotAccountTests
         Assert.Contains("NPC_Trading_03", str);
         Assert.Contains("Trading", str);
     }
+
+    // ── Defaults ──────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Defaults_ConsecutiveErrorsIsZero()
+    {
+        var bot = new BotAccount();
+        Assert.Equal(0, bot.ConsecutiveErrors);
+    }
+
+    [Fact]
+    public void Defaults_IsSkippedIsFalse()
+    {
+        var bot = new BotAccount();
+        Assert.False(bot.IsSkipped);
+    }
+
+    [Fact]
+    public void Defaults_LastSuccessUtcIsNull()
+    {
+        var bot = new BotAccount();
+        Assert.Null(bot.LastSuccessUtc);
+    }
+
+    [Fact]
+    public void Defaults_InitialNetWorthIsZero()
+    {
+        var bot = new BotAccount();
+        Assert.Equal(0m, bot.InitialNetWorth);
+    }
+
+    [Fact]
+    public void Defaults_CurrentNetWorthIsZero()
+    {
+        var bot = new BotAccount();
+        Assert.Equal(0m, bot.CurrentNetWorth);
+    }
+
+    [Fact]
+    public void Defaults_TrackingStartTickIsZero()
+    {
+        var bot = new BotAccount();
+        Assert.Equal(0L, bot.TrackingStartTick);
+    }
 }

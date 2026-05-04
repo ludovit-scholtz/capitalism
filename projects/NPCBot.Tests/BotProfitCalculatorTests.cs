@@ -254,4 +254,52 @@ public sealed class BotProfitCalculatorTests
         Assert.True(BotProfitCalculator.NeutralBandPercent > 0m);
         Assert.True(BotProfitCalculator.NeutralBandPercent < 0.10m);
     }
+
+    // ── Recommend boundary cases ──────────────────────────────────────────────
+
+    [Fact]
+    public void Recommend_OneTickBelowMinimum_ReturnsNoAction()
+    {
+        // ticksElapsed = minTicksBeforeAdjustment - 1 must still return NoAction.
+        var rec = BotProfitCalculator.Recommend(
+            50_000m, 100_000m,
+            ticksElapsed: 4, minTicksBeforeAdjustment: 5);
+        Assert.False(rec.ShouldAct);
+    }
+
+    [Fact]
+    public void Recommend_ExactlyAtMinTicksBoundary_EvaluatesNormally()
+    {
+        // ticksElapsed == minTicksBeforeAdjustment should NOT be blocked by the guard.
+        // With a −50% loss at exactly the threshold, an action must be recommended.
+        var rec = BotProfitCalculator.Recommend(
+            50_000m, 100_000m,
+            ticksElapsed: 5, minTicksBeforeAdjustment: 5);
+        Assert.True(rec.ShouldAct);
+    }
+
+    [Fact]
+    public void Recommend_LargePositiveGrowth_ReturnsNoAction()
+    {
+        // Even with 200% growth, no corrective action is needed.
+        var rec = BotProfitCalculator.Recommend(300_000m, 100_000m, ticksElapsed: 100);
+        Assert.False(rec.ShouldAct);
+    }
+
+    [Fact]
+    public void Recommend_ExactlyAtNeutralBandNegative_ReturnsNoAction()
+    {
+        // Exactly −2% (the band boundary itself) → Neutral → no action.
+        var rec = BotProfitCalculator.Recommend(98_000m, 100_000m, ticksElapsed: 10);
+        Assert.False(rec.ShouldAct);
+    }
+
+    [Fact]
+    public void Recommend_JustBeyondNeutralBand_ReturnsMildAction()
+    {
+        // −3% is beyond the ±2% neutral band but above the −10% severe threshold.
+        var rec = BotProfitCalculator.Recommend(97_000m, 100_000m, ticksElapsed: 10);
+        Assert.True(rec.ShouldAct);
+        Assert.Equal(BotProfitCalculator.MildPriceReductionFactor, rec.PriceAdjustmentFactor);
+    }
 }

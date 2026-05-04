@@ -127,4 +127,113 @@ public sealed class GameModelsTests
         var product = new ProductTypeSummary();
         Assert.Equal(0m, product.BasePrice);
     }
+
+    // ── CitySummary ───────────────────────────────────────────────────────────
+
+    [Fact]
+    public void CitySummary_DefaultCountryCodeIsEmpty()
+    {
+        var city = new CitySummary();
+        Assert.Equal(string.Empty, city.CountryCode);
+    }
+
+    [Fact]
+    public void CitySummary_DefaultPopulationIsZero()
+    {
+        var city = new CitySummary();
+        Assert.Equal(0, city.Population);
+    }
+
+    [Fact]
+    public void CitySummary_CanStoreAllFields()
+    {
+        var city = new CitySummary
+        {
+            Id = "city-ba",
+            Name = "Bratislava",
+            CountryCode = "SK",
+            Population = 475_000,
+        };
+        Assert.Equal("Bratislava", city.Name);
+        Assert.Equal("SK", city.CountryCode);
+        Assert.Equal(475_000, city.Population);
+    }
+
+    // ── AuthPayload ───────────────────────────────────────────────────────────
+
+    [Fact]
+    public void AuthPayload_DefaultTokenIsEmpty()
+    {
+        var auth = new AuthPayload();
+        Assert.Equal(string.Empty, auth.Token);
+    }
+
+    [Fact]
+    public void AuthPayload_PlayerIsNullByDefault()
+    {
+        var auth = new AuthPayload();
+        Assert.Null(auth.Player);
+    }
+
+    [Fact]
+    public void AuthPayload_CanStoreTokenAndExpiry()
+    {
+        var expiry = DateTime.UtcNow.AddHours(2);
+        var auth = new AuthPayload { Token = "jwt-abc", ExpiresAtUtc = expiry };
+        Assert.Equal("jwt-abc", auth.Token);
+        Assert.Equal(expiry, auth.ExpiresAtUtc);
+    }
+
+    // ── BuildingSummary ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void BuildingSummary_DefaultTypeIsEmpty()
+    {
+        var building = new BuildingSummary();
+        Assert.Equal(string.Empty, building.Type);
+    }
+
+    [Fact]
+    public void BuildingSummary_DefaultCityIdIsEmpty()
+    {
+        var building = new BuildingSummary();
+        Assert.Equal(string.Empty, building.CityId);
+    }
+
+    [Fact]
+    public void BuildingSummary_CanStoreAllFields()
+    {
+        var building = new BuildingSummary
+        {
+            Id = "bldg-1",
+            Name = "NPC Factory",
+            Type = "FACTORY",
+            CityId = "city-ba",
+        };
+        Assert.Equal("FACTORY", building.Type);
+        Assert.Equal("city-ba", building.CityId);
+    }
+
+    // ── PlayerProfile onboarding fields ──────────────────────────────────────
+
+    [Fact]
+    public void PlayerProfile_OnboardingCurrentStepIsNullByDefault()
+    {
+        var profile = new PlayerProfile();
+        Assert.Null(profile.OnboardingCurrentStep);
+    }
+
+    [Fact]
+    public void PlayerProfile_OnboardingIndustryIsNullByDefault()
+    {
+        var profile = new PlayerProfile();
+        Assert.Null(profile.OnboardingIndustry);
+    }
+
+    [Fact]
+    public void PlayerProfile_OnboardingCityIdIsNullByDefault()
+    {
+        var profile = new PlayerProfile();
+        Assert.Null(profile.OnboardingCityId);
+    }
 }

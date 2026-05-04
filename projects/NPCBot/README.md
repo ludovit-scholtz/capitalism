@@ -6,7 +6,13 @@ A standalone .NET 10 console application that autonomously manages Capitalism ga
 
 - **Registers** NPC bot accounts (or logs in if they already exist — idempotent).
 - **Completes the full onboarding flow**: city selection → industry selection → IPO → factory lot → shop lot, with automatic mid-flow resume if interrupted.
-- **Periodically polls** each bot's state to verify onboarding is complete, track company net worth, and log profitability deltas.
+- **Selects the cheapest available lot and product**: pure helper logic picks the lowest-priced available lot matching the required building type, and the cheapest non-Pro starter product.
+- **Periodically polls** each bot's state to verify onboarding is complete, refresh the net worth, and evaluate profitability.
+- **Classifies profitability**: each bot is rated Profitable / Neutral / Unprofitable / Unknown based on a ±2 % neutral band applied to the net-worth delta since tracking started.
+- **Computes an annualised profit rate** (% / yr) and logs it on every tick.
+- **Produces strategy recommendations**: when a bot has run for the minimum required ticks and is losing money, a `StrategyRecommendation` is generated — a mild 5 % price reduction for small losses, an aggressive 15 % cut for losses ≥ 10 %.
+- **State validation**: `BotStateValidator` detects stale bots (no successful operation for N minutes), expired tokens, incomplete onboarding, and at-risk error counts.
+- **Error isolation**: each bot tracks consecutive errors independently; skipped after `MaxConsecutiveErrors` without affecting other bots.
 - **Graceful shutdown** on `Ctrl+C` or `SIGTERM`.
 
 ## Quick start
@@ -68,17 +74,26 @@ NPCBot/
 ├── Configuration/BotOptions.cs      # Configuration model
 ├── Models/
 │   ├── BotAccount.cs                # Per-bot runtime state
-│   └── GameModels.cs                # GraphQL response types
+│   ├── GameModels.cs                # GraphQL response types
+│   ├── ProfitabilityStatus.cs       # Profitability classification enum
+│   └── StrategyRecommendation.cs    # Price-adjustment advisory result
 ├── Services/
 │   ├── GameApiClient.cs             # GraphQL HTTP client
 │   ├── AccountService.cs            # Auth, profile, game state
 │   ├── OnboardingService.cs         # Automated onboarding flow
+│   ├── OnboardingHelpers.cs         # Pure lot / product selection helpers
+│   ├── BotProfitCalculator.cs       # Net-worth classification, rate, recommendations
+│   ├── BotStateValidator.cs         # Token, onboarding, staleness, error-risk checks
 │   └── BotOrchestrator.cs           # Main orchestration loop
+├── BotRosterFactory.cs              # Creates bot accounts from configuration
 ├── Program.cs                       # Entry point, DI, graceful shutdown
 └── appsettings.json                 # Default configuration
 ```
 
 ## Roadmap
 
-- **Phase 1 (done):** Account creation, onboarding, and net-worth tracking.
-- **Phase 2 (planned):** Price optimisation (undercut competitors by 5–10%), inventory restocking, advanced strategy profiles.
+All three ROADMAP items are complete:
+
+- ✅ **Account creation and onboarding** — idempotent register/login, full onboarding flow with mid-flow resume.
+- ✅ **Profitability analysis** — `BotProfitCalculator` classifies Profitable / Neutral / Unprofitable / Unknown, computes annualised rate, and produces price-adjustment recommendations when losses exceed thresholds.
+- ✅ **State monitoring** — `BotStateValidator` checks token validity, onboarding completion, staleness, and error proximity on every tick.

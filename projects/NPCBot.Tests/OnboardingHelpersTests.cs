@@ -239,4 +239,58 @@ public sealed class OnboardingHelpersTests
         var result = OnboardingHelpers.PickCheapestFreeProduct(products);
         Assert.Equal("free-pricey", result!.Id);
     }
+
+    // ── Additional ContainsSuitableType edge cases ────────────────────────────
+
+    [Fact]
+    public void ContainsSuitableType_SingleItemCsv_MatchesExactly()
+    {
+        // A single-item field with no commas must still match.
+        Assert.True(OnboardingHelpers.ContainsSuitableType("SALES_SHOP", "SALES_SHOP"));
+    }
+
+    [Fact]
+    public void ContainsSuitableType_PrefixSubstring_DoesNotMatch()
+    {
+        // "MINE" should NOT match "MINER" — whole-segment requirement.
+        Assert.False(OnboardingHelpers.ContainsSuitableType("MINER,STORAGE", "MINE"));
+    }
+
+    [Fact]
+    public void ContainsSuitableType_SuffixSubstring_DoesNotMatch()
+    {
+        // "SHOP" should NOT match "SALES_SHOP" — it is a suffix, not the whole segment.
+        Assert.False(OnboardingHelpers.ContainsSuitableType("SALES_SHOP", "SHOP"));
+    }
+
+    // ── Additional PickCheapestAvailableLot edge cases ────────────────────────
+
+    [Fact]
+    public void PickCheapestAvailableLot_NullBuildingId_TreatedAsAvailable()
+    {
+        // A lot with BuildingId = null should be selected as available.
+        var lots = new[]
+        {
+            new BuildingLotSummary { Id = "free-null", SuitableTypes = "FACTORY", BuildingId = null, Price = 80_000m },
+        };
+        var result = OnboardingHelpers.PickCheapestAvailableLot(lots, "FACTORY");
+        Assert.NotNull(result);
+        Assert.Equal("free-null", result.Id);
+    }
+
+    [Fact]
+    public void PickCheapestAvailableLot_EmptyBuildingId_TreatedAsOccupied()
+    {
+        // The game API sets BuildingId to a non-null non-empty string when occupied.
+        // An empty string is treated as not occupied (null check only).
+        var lots = new[]
+        {
+            new BuildingLotSummary { Id = "empty-id", SuitableTypes = "FACTORY", BuildingId = string.Empty, Price = 50_000m },
+        };
+        // BuildingId="" is not null — OnboardingHelpers treats non-null as occupied.
+        // Verify current behaviour: lot is considered occupied.
+        var result = OnboardingHelpers.PickCheapestAvailableLot(lots, "FACTORY");
+        // Empty string is not null → treated as occupied (the lot has a BuildingId set).
+        Assert.Null(result);
+    }
 }

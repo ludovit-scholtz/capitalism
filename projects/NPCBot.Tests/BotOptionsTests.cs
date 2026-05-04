@@ -86,4 +86,39 @@ public sealed class BotOptionsTests
         var opts = new BotOptions();
         Assert.NotEmpty(opts.BotNamePrefix);
     }
+
+    [Fact]
+    public void Defaults_BotNamePrefixIsNpc()
+    {
+        var opts = new BotOptions();
+        Assert.Equal("NPC", opts.BotNamePrefix);
+    }
+
+    [Fact]
+    public void Defaults_MinTicksBeforeAdjustmentIsPositive()
+    {
+        // Bots must wait at least one tick before recommending strategy changes
+        // to avoid reacting to start-up noise.
+        var opts = new BotOptions();
+        Assert.True(opts.MinTicksBeforeAdjustment > 0,
+            $"MinTicksBeforeAdjustment should be > 0 but was {opts.MinTicksBeforeAdjustment}");
+    }
+
+    [Fact]
+    public void Defaults_AllowedIndustriesHasExactlyThreeEntries()
+    {
+        // Only the three starter free-tier industries should be pre-configured.
+        var opts = new BotOptions();
+        Assert.Equal(3, opts.AllowedIndustries.Length);
+    }
+
+    [Fact]
+    public void Defaults_MaxConsecutiveErrorsIsAtLeastTwo()
+    {
+        // A limit of 1 would skip a bot after the very first transient error.
+        // Require at least 2 retries before giving up.
+        var opts = new BotOptions();
+        Assert.True(opts.MaxConsecutiveErrors >= 2,
+            $"MaxConsecutiveErrors should be >= 2 but was {opts.MaxConsecutiveErrors}");
+    }
 }
