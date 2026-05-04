@@ -17,7 +17,7 @@ public sealed class ProIndustrySeederTests
     // ─── Pharmaceuticals (Gold-based) seeder tests ──────────────────────────
 
     [Fact]
-    public async Task Pharmaceuticals_StarterProducts_AreSeededdWithGoldRecipe()
+    public async Task Pharmaceuticals_StarterProducts_AreSeededWithGoldRecipe()
     {
         await using var factory = new ApiWebApplicationFactory();
         await using var scope = factory.Services.CreateAsyncScope();
@@ -62,7 +62,7 @@ public sealed class ProIndustrySeederTests
     // ─── Energy (Coal-based) seeder tests ───────────────────────────────────
 
     [Fact]
-    public async Task Energy_StarterProducts_AreSeededdWithCoalRecipe()
+    public async Task Energy_StarterProducts_AreSeededWithCoalRecipe()
     {
         await using var factory = new ApiWebApplicationFactory();
         await using var scope = factory.Services.CreateAsyncScope();
@@ -106,7 +106,7 @@ public sealed class ProIndustrySeederTests
     // ─── Logistics (Cotton-based) seeder tests ──────────────────────────────
 
     [Fact]
-    public async Task Logistics_StarterProducts_AreSeededdWithCottonRecipe()
+    public async Task Logistics_StarterProducts_AreSeededWithCottonRecipe()
     {
         await using var factory = new ApiWebApplicationFactory();
         await using var scope = factory.Services.CreateAsyncScope();
