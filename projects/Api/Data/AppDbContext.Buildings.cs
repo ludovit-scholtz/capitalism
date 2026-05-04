@@ -126,11 +126,30 @@ public sealed partial class AppDbContext
             e.Property(lot => lot.SuitableTypes).HasMaxLength(200);
             e.Property(lot => lot.MaterialQuality).HasPrecision(5, 4);
             e.Property(lot => lot.MaterialQuantity).HasPrecision(18, 2);
+            e.Property(lot => lot.OriginalMaterialQuantity).HasPrecision(18, 2);
             e.Property(lot => lot.ConcurrencyToken).IsConcurrencyToken();
             e.HasOne(lot => lot.City).WithMany(c => c.Lots).HasForeignKey(lot => lot.CityId);
             e.HasOne(lot => lot.OwnerCompany).WithMany().HasForeignKey(lot => lot.OwnerCompanyId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(lot => lot.Building).WithMany().HasForeignKey(lot => lot.BuildingId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(lot => lot.ResourceType).WithMany().HasForeignKey(lot => lot.ResourceTypeId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<MineDepletionRecord>(e =>
+        {
+            e.HasKey(r => r.Id);
+            e.Property(r => r.ResourceTypeName).HasMaxLength(100);
+            e.Property(r => r.OriginalQuantity).HasPrecision(18, 2);
+            e.HasIndex(r => r.LotId);
+            e.HasIndex(r => r.CompanyId);
+            e.HasIndex(r => r.DepletedAtTick);
+        });
+
+        modelBuilder.Entity<ResourceReplenishmentSchedule>(e =>
+        {
+            e.HasKey(s => s.Id);
+            e.HasOne(s => s.City).WithMany().HasForeignKey(s => s.CityId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(s => s.CityId).IsUnique();
+            e.HasIndex(s => s.NextReplenishmentTick);
         });
 
         modelBuilder.Entity<CityResource>(e =>

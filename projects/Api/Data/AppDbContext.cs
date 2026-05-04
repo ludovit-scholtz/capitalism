@@ -138,6 +138,12 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Scheduled, in-transit, and completed inter-city trade routes.</summary>
     public DbSet<InterCityTradeRoute> InterCityTradeRoutes => Set<InterCityTradeRoute>();
 
+    /// <summary>Audit records created when a mine lot is fully depleted.</summary>
+    public DbSet<MineDepletionRecord> MineDepletionRecords => Set<MineDepletionRecord>();
+
+    /// <summary>Per-city scheduling rows for the annual resource replenishment cycle.</summary>
+    public DbSet<ResourceReplenishmentSchedule> ResourceReplenishmentSchedules => Set<ResourceReplenishmentSchedule>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -219,6 +219,14 @@ export type MockBuilding = {
   adjustedMarketRentPerSqm?: number | null
   /** Lot PopulationIndex (APARTMENT/COMMERCIAL only) */
   populationIndex?: number | null
+  /** Remaining mine deposit quantity (MINE only). Null for non-mine buildings. */
+  lotMaterialQuantity?: number | null
+  /** Original mine deposit quantity when first seeded (MINE only). Null for non-mine buildings. */
+  lotOriginalMaterialQuantity?: number | null
+  /** Mine deposit resource type ID (MINE only). Null for non-mine buildings. */
+  lotResourceTypeId?: string | null
+  /** Mine deposit material quality 0..1 (MINE only). Null for non-mine buildings. */
+  lotMaterialQuality?: number | null
   units: MockBuildingUnit[]
   pendingConfiguration: MockBuildingConfigurationPlan | null
 }

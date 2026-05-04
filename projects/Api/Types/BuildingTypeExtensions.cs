@@ -49,6 +49,18 @@ public sealed class BuildingTypeExtensions
         return lot?.MaterialQuantity;
     }
 
+    public async Task<decimal?> GetLotOriginalMaterialQuantity(
+        [Parent] Building building,
+        [Service] AppDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var lot = await db.BuildingLots
+            .AsNoTracking()
+            .FirstOrDefaultAsync(l => l.BuildingId == building.Id, cancellationToken);
+
+        return lot?.OriginalMaterialQuantity;
+    }
+
     /// <summary>
     /// The city's base average rent per m² in local currency.
     /// Useful as a reference for players setting rent on apartment/commercial buildings.

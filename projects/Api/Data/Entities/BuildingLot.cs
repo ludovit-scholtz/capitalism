@@ -90,6 +90,13 @@ public sealed class BuildingLot
     public decimal? MaterialQuantity { get; set; }
 
     /// <summary>
+    /// Original deposit size at the time the lot was seeded or last replenished (in tonnes).
+    /// Used to calculate the depletion percentage for the UI progress bar.
+    /// Null when no resource is present or the lot pre-dates depletion tracking.
+    /// </summary>
+    public decimal? OriginalMaterialQuantity { get; set; }
+
+    /// <summary>
     /// Application-managed concurrency token that makes lot purchase atomic.
     /// Only one request may persist a transition from available to owned.
     /// </summary>

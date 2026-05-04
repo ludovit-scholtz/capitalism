@@ -85,7 +85,7 @@ test.describe('Launch New Company — CTA visibility and prerequisites', () => {
 
     const ctaBtn = page.locator('.launch-new-company-btn')
     await expect(ctaBtn).toBeVisible()
-    await expect(ctaBtn).not.toBeDisabled()
+    await expect(ctaBtn).toBeEnabled()
   })
 
   test('shows prerequisite checklist when requirements not met', async ({ page }) => {
@@ -119,7 +119,7 @@ test.describe('Launch New Company — modal wizard', () => {
     await page.waitForURL('/dashboard')
 
     const ctaBtn = page.locator('.launch-new-company-btn')
-    await expect(ctaBtn).not.toBeDisabled()
+    await expect(ctaBtn).toBeEnabled()
     await ctaBtn.click()
 
     await expect(page.locator('.new-company-modal')).toBeVisible()
@@ -172,7 +172,7 @@ test.describe('Launch New Company — modal wizard', () => {
     await page.locator('#nc-city').selectOption({ index: 1 })
 
     const nextBtn = page.locator('.new-company-step1').getByRole('button', { name: 'Next' })
-    await expect(nextBtn).not.toBeDisabled()
+    await expect(nextBtn).toBeEnabled()
     await nextBtn.click()
 
     await expect(page.locator('.new-company-step2')).toBeVisible()

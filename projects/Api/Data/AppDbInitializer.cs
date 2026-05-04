@@ -194,12 +194,75 @@ public sealed partial class AppDbInitializer(
 
         // Idempotent: ensure seasonal demand multipliers exist for all product types.
         await EnsureDemandSeasonalitySeedAsync();
+
+        // Idempotent: ensure resource replenishment schedules exist for all cities.
+        await EnsureResourceReplenishmentSchedulesAsync();
+
+        // Idempotent: backfill OriginalMaterialQuantity for lots that pre-date depletion tracking.
+        await EnsureLotOriginalMaterialQuantityBackfillAsync();
     }
 
     private async Task SeedFxRatesAsync()
     {
         var rates = await nbsExchangeRateService.FetchLatestRatesAsync();
         dbContext.FxRates.AddRange(rates);
+        await dbContext.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Idempotent: backfills <see cref="BuildingLot.OriginalMaterialQuantity"/> for any lot
+    /// that has a raw-material deposit but was created before depletion tracking was introduced.
+    /// Sets <c>OriginalMaterialQuantity = MaterialQuantity</c> when the original value is still null.
+    /// </summary>
+    private async Task EnsureLotOriginalMaterialQuantityBackfillAsync()
+    {
+        var lotsToBackfill = await dbContext.BuildingLots
+            .Where(lot => lot.MaterialQuantity.HasValue
+                && lot.MaterialQuantity > 0m
+                && !lot.OriginalMaterialQuantity.HasValue)
+            .ToListAsync();
+
+        foreach (var lot in lotsToBackfill)
+        {
+            lot.OriginalMaterialQuantity = lot.MaterialQuantity;
+        }
+
+        if (lotsToBackfill.Count > 0)
+        {
+            await dbContext.SaveChangesAsync();
+        }
+    }
+
+    /// <summary>
+    /// Idempotent: ensures one <see cref="ResourceReplenishmentSchedule"/> row exists for every city.
+    /// Inserts missing rows with <see cref="GameConstants.ReplenishmentIntervalTicks"/> as the first interval.
+    /// </summary>
+    private async Task EnsureResourceReplenishmentSchedulesAsync()
+    {
+        var cities = await dbContext.Cities.ToListAsync();
+        var existingCityIds = await dbContext.ResourceReplenishmentSchedules
+            .Select(s => s.CityId)
+            .ToListAsync();
+
+        var currentTick = await dbContext.GameStates
+            .AsNoTracking()
+            .Select(g => g.CurrentTick)
+            .FirstOrDefaultDeterministicAsync();
+
+        foreach (var city in cities)
+        {
+            if (existingCityIds.Contains(city.Id))
+                continue;
+
+            dbContext.ResourceReplenishmentSchedules.Add(new Entities.ResourceReplenishmentSchedule
+            {
+                Id = Guid.NewGuid(),
+                CityId = city.Id,
+                LastReplenishmentTick = 0,
+                NextReplenishmentTick = currentTick + GameConstants.ReplenishmentIntervalTicks,
+            });
+        }
+
         await dbContext.SaveChangesAsync();
     }
 
