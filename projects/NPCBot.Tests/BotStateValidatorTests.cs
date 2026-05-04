@@ -63,7 +63,7 @@ public sealed class BotStateValidatorTests
     public void IsStale_NullLastSuccess_ReturnsFalse()
     {
         var bot = new BotAccount { Index = 1, DisplayName = "Test", Email = "t@t.com", Strategy = "S" };
-        Assert.False(BotStateValidator.IsStale(bot, staleAfterMinutes: 1));
+        Assert.False(BotStateValidator.IsStale(bot, staleAfterMinutes: 10));
     }
 
     [Fact]

@@ -112,9 +112,7 @@ public static class BotProfitCalculator
         if (ticksElapsed < minTicksBeforeAdjustment || initialNetWorth == 0m)
             return StrategyRecommendation.NoAction;
 
-        var deltaPercent = initialNetWorth == 0m
-            ? 0m
-            : (currentNetWorth - initialNetWorth) / Math.Abs(initialNetWorth);
+        var deltaPercent = (currentNetWorth - initialNetWorth) / Math.Abs(initialNetWorth);
 
         // Severe loss → aggressively reduce prices to stimulate sales
         if (deltaPercent <= SeverelyUnprofitableThresholdPercent)
