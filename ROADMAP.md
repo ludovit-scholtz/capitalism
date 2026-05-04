@@ -53,11 +53,19 @@ The frontend exposes all operations under a dedicated "Gold AMM" tab inside the 
 - [x] Implement share buyback: when a company purchases its own shares on the stock exchange, reduce the total issued share count by the purchased amount and remove those shares from public float, updating share price accordingly.
 - [x] Add E2E and backend integration tests for takeover trigger at exactly 50%, merge at exactly 90%, and buyback share-count reduction so these mechanics are regression-proof.
 
-### More industries and products (70% complete)
+### More industries and products (90% complete)
 
 **Shipped increment (Electronics Pro-starter):** Electronics industry is now a fully playable Pro-subscriber-exclusive onboarding starter path. Three Silicon-driven products (Basic Electronics, LED Screen, Circuit Board) are seeded with direct silicon manufacturing recipes, exposed in the encyclopedia and resource-detail views, and Pro-gated at both the backend (`Player.IsProSubscriber` check in `startOnboardingCompany` / `finishOnboarding`) and the frontend (industry card with PRO badge, error on non-Pro click). The manufacturing encyclopedia and resource detail views already surface the full Electronics chain via the existing industry filter. All existing test suites pass, and new backend and E2E tests cover Pro-gating, product seeding, and the full Electronics onboarding flow.
 
 **Shipped increment (Construction Pro-starter):** Construction industry is now a fully playable Pro-subscriber-exclusive onboarding starter path alongside Electronics. Three Iron Ore-driven products (Residential Block, Commercial Block, Industrial Block) are seeded with direct iron-ore manufacturing recipes and are Pro-gated at both the backend (`ProOnlyStarterIndustries` constant in `startOnboardingCompany` / `finishOnboarding`) and the frontend (industry card with PRO badge, crane 🏗️ icon, and error on non-Pro click). The manufacturing encyclopedia surfaces the Construction chain via the existing industry filter. All existing test suites pass, and new backend and E2E tests cover Pro-gating, product seeding, recipe correctness, and the full Construction onboarding flow.
+
+**Shipped increment (Pharmaceuticals, Energy, Logistics Pro-starters):** Three new Pro-exclusive starter industries are now fully playable:
+
+- **Pharmaceuticals 💊** — Gold-driven industry with three tier-1 products: Aspirin (€55), Vitamin Capsule (€80), Antibiotic (€120). High-margin pharma chain with inelastic consumer demand. Plus 9 advanced tier-2/3 products (Analgesic Syrup, Antiseptic Gel, Cough Syrup, Eye Drops, Pharmaceutical Capsule, Medical Cream, Vaccine Vial, Insulin Pen, Paracetamol Pack, Diagnostic Kit, Nasal Spray).
+- **Energy ⚡** — Coal-driven industry with three tier-1 products: Coal Briquette (€28), Heating Oil (€50), Industrial Fuel (€75). Steady industrial demand across every city. Plus 9 advanced products (Coke Block, Charcoal Pack, Gas Canister, Battery Cell, Power Pellet, Refined Kerosene, Turbine Oil, Fuel Rod, Compressed Gas Bottle, Energy Tablet).
+- **Logistics 📦** — Cotton-driven industry with three tier-1 products: Shipping Bag (€20), Storage Sack (€35), Cargo Pack (€55). Volume-play supply chain backbone. Plus 8 advanced products (Cotton Wrap, Padded Envelope, Tote Bag, Fabric Label, Insulated Liner, Pallet Cover, Courier Bag, Heavy Duty Sack, Flat Pack Box).
+
+All three industries are Pro-gated at both backend (`ProOnlyStarterIndustries`) and frontend (PRO badge on industry card, upgrade modal for non-Pro players). Full E2E tests cover the onboarding flow for each industry, Pro-gating errors, product selection step, and card content (first product hint, why-choose tagline, description).
 
 - [x] Add Electronics industry with Silicon as raw input: define product types for Basic Electronics, LED Screen, and Circuit Board with manufacturing recipes linking Silicon resource to each product via factory purchase → manufacturing → public sales chain.
 - [x] Expose Electronics as a Pro-subscription-only starter choice in the onboarding industry selection step, gating it behind `Player.IsProSubscriber` on the backend; free players see only Furniture, Food Processing, and Healthcare.
@@ -65,6 +73,13 @@ The frontend exposes all operations under a dedicated "Gold AMM" tab inside the 
 - [x] Update encyclopedia and resource detail views to surface Electronics product chains (Silicon resource detail page links to all three starter products).
 - [x] Add Construction industry with Iron Ore as raw input: three starter products (Residential Block, Commercial Block, Industrial Block) with direct iron-ore manufacturing recipes and higher base prices ($80–$180) compared to other starter industries.
 - [x] Expose Construction as a Pro-subscription-only starter choice alongside Electronics.
+- [x] Add Pharmaceuticals industry with Gold as raw input: three tier-1 starter products (Aspirin €55, Vitamin Capsule €80, Antibiotic €120) and 9 advanced tier-2/3 products with manufacturing recipes.
+- [x] Add Energy industry with Coal as raw input: three tier-1 starter products (Coal Briquette €28, Heating Oil €50, Industrial Fuel €75) and 9 advanced products covering fuel processing and storage.
+- [x] Add Logistics industry with Cotton as raw input: three tier-1 starter products (Shipping Bag €20, Storage Sack €35, Cargo Pack €55) and 8 advanced packaging and shipping products.
+- [x] Expose Pharmaceuticals, Energy, and Logistics as Pro-subscription-only starter choices with PRO badges, disable click for non-Pro players with upgrade modal.
+- [x] Integrate all three new industries into the onboarding industry selector with i18n keys (en/sk/de) for descriptions, first-product hints, and why-choose taglines.
+- [x] Backend integration test `FinishOnboarding_ResultIncludesSelectedProductBasePrice_ForAllIndustries` covers all 8 industries including the three new ones.
+- [x] Full Playwright E2E tests for each new industry: card visible to authenticated users, PRO badge, non-Pro upgrade modal, Pro subscriber can advance, product step shows three starter options, card content assertions.
 
 ### Supply chain visualization (100% complete)
 

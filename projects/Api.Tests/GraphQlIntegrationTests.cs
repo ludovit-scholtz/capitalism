@@ -10236,7 +10236,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         // The configure-guide in the frontend depends on selectedProduct.basePrice from the
         // FinishOnboarding result to show the player the market benchmark selling price.
         // If this field is ever dropped from the GraphQL response, the guide silently shows
-        // generic text instead of the concrete price ($45 Furniture, $3 Bread, $50 Medicine, $45 Electronics, $80 Construction).
+        // generic text instead of the concrete price ($45 Furniture, $3 Bread, $50 Medicine, $45 Electronics, $80 Construction, $55 Pharmaceuticals, $28 Energy, $20 Logistics).
         var industries = new[]
         {
             ("FURNITURE", "wooden-chair", 45m, false),
@@ -10244,6 +10244,9 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             ("HEALTHCARE", "basic-medicine", 50m, false),
             ("ELECTRONICS", "basic-electronics", 45m, true),
             ("CONSTRUCTION", "residential-block", 80m, true),
+            ("PHARMACEUTICALS", "aspirin", 55m, true),
+            ("ENERGY", "coal-briquette", 28m, true),
+            ("LOGISTICS", "shipping-bag", 20m, true),
         };
 
         foreach (var (industry, slug, expectedBasePrice, requiresPro) in industries)

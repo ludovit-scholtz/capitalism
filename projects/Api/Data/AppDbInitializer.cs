@@ -130,6 +130,18 @@ public sealed partial class AppDbInitializer(
         // and Industrial Block with direct Iron Ore recipe) exist.
         await EnsureConstructionStarterProductsAsync();
 
+        // Idempotent: ensure Pharmaceuticals starter products (Aspirin, Vitamin Capsule,
+        // and Antibiotic with direct Gold recipe) exist.
+        await EnsurePharmaceuticalsStarterProductsAsync();
+
+        // Idempotent: ensure Energy starter products (Coal Briquette, Heating Oil,
+        // and Industrial Fuel with direct Coal recipe) exist.
+        await EnsureEnergyStarterProductsAsync();
+
+        // Idempotent: ensure Logistics starter products (Shipping Bag, Storage Sack,
+        // and Cargo Pack with direct Cotton recipe) exist.
+        await EnsureLogisticsStarterProductsAsync();
+
         var currentTick = await dbContext.GameStates
             .AsNoTracking()
             .Select(state => state.CurrentTick)

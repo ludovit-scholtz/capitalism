@@ -182,6 +182,9 @@ const starterProductSlugByIndustry: Record<string, string[]> = {
   HEALTHCARE: ['basic-medicine', 'bandages', 'first-aid-kit'],
   ELECTRONICS: ['basic-electronics', 'led-screen', 'circuit-board'],
   CONSTRUCTION: ['residential-block', 'commercial-block', 'industrial-block'],
+  PHARMACEUTICALS: ['aspirin', 'vitamin-capsule', 'antibiotic'],
+  ENERGY: ['coal-briquette', 'heating-oil', 'industrial-fuel'],
+  LOGISTICS: ['shipping-bag', 'storage-sack', 'cargo-pack'],
 }
 
 const step = ref(1)
@@ -426,6 +429,9 @@ const industryDescKeys: Record<string, string> = {
   HEALTHCARE: 'onboarding.industryDescHealthcare',
   ELECTRONICS: 'onboarding.industryDescElectronics',
   CONSTRUCTION: 'onboarding.industryDescConstruction',
+  PHARMACEUTICALS: 'onboarding.industryDescPharmaceuticals',
+  ENERGY: 'onboarding.industryDescEnergy',
+  LOGISTICS: 'onboarding.industryDescLogistics',
 }
 
 /** Maps each starter industry to its i18n first-product hint key. */
@@ -435,6 +441,9 @@ const industryFirstProductKeys: Record<string, string> = {
   HEALTHCARE: 'onboarding.industryFirstProductHealthcare',
   ELECTRONICS: 'onboarding.industryFirstProductElectronics',
   CONSTRUCTION: 'onboarding.industryFirstProductConstruction',
+  PHARMACEUTICALS: 'onboarding.industryFirstProductPharmaceuticals',
+  ENERGY: 'onboarding.industryFirstProductEnergy',
+  LOGISTICS: 'onboarding.industryFirstProductLogistics',
 }
 
 /** Maps each starter industry to its i18n "why choose" tag key. */
@@ -444,6 +453,9 @@ const industryWhyKeys: Record<string, string> = {
   HEALTHCARE: 'onboarding.industryWhyHealthcare',
   ELECTRONICS: 'onboarding.industryWhyElectronics',
   CONSTRUCTION: 'onboarding.industryWhyConstruction',
+  PHARMACEUTICALS: 'onboarding.industryWhyPharmaceuticals',
+  ENERGY: 'onboarding.industryWhyEnergy',
+  LOGISTICS: 'onboarding.industryWhyLogistics',
 }
 
 function resolveMaxReachableStep(): number {

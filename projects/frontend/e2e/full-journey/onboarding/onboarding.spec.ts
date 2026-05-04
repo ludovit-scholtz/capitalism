@@ -624,6 +624,8 @@ test.describe('Onboarding wizard', () => {
 
   test('industry cards show first product hint for each starter industry', async ({ page }) => {
     // ROADMAP: "Each option should explain the fantasy, likely first product, and why a player might choose it."
+    // Only free-tier industries are visible to unauthenticated guests.
+    // Pro-only cards (Electronics, Construction, Pharmaceuticals, Energy, Logistics) are hidden until login.
     setupMockApi(page)
     await page.goto('/onboarding')
     await chooseOnboardingCity(page)
@@ -634,6 +636,7 @@ test.describe('Onboarding wizard', () => {
 
   test('industry cards show why-choose tagline for each starter industry', async ({ page }) => {
     // ROADMAP: "Each option should explain ... why a player might choose it."
+    // Only free-tier industries are visible to unauthenticated guests.
     setupMockApi(page)
     await page.goto('/onboarding')
     await chooseOnboardingCity(page)
@@ -660,6 +663,12 @@ test.describe('Onboarding wizard', () => {
     await expect(page.locator('.industry-card', { hasText: 'Healthcare' }).locator('.card-desc')).toContainText('premium')
     // Electronics description explains the silicon supply-chain complexity
     await expect(page.locator('.industry-card', { hasText: 'Electronics' }).locator('.card-desc')).toContainText('silicon')
+    // Pharmaceuticals description explains gold-based pharma synthesis
+    await expect(page.locator('.industry-card', { hasText: 'Pharmaceuticals' }).locator('.card-desc')).toContainText('gold')
+    // Energy description explains coal-to-fuel conversion
+    await expect(page.locator('.industry-card', { hasText: 'Energy' }).locator('.card-desc')).toContainText('coal')
+    // Logistics description explains cotton packaging chain
+    await expect(page.locator('.industry-card', { hasText: 'Logistics' }).locator('.card-desc')).toContainText(/cotton/i)
   })
 
   test('can complete onboarding with Food Processing industry', async ({ page }) => {
@@ -5060,9 +5069,9 @@ test.describe('Electronics industry — Pro-gated starter path', () => {
     await chooseOnboardingCity(page)
     await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
 
-    // Electronics card must appear alongside the three free industries and Construction
+    // Electronics card must appear alongside the three free industries and 4 other Pro industries
     await expect(page.locator('.industry-card', { hasText: 'Electronics' })).toBeVisible()
-    await expect(page.locator('.industry-card')).toHaveCount(5)
+    await expect(page.locator('.industry-card')).toHaveCount(8)
   })
 
   test('Electronics card shows a PRO badge', async ({ page }) => {
@@ -5296,5 +5305,307 @@ test.describe('Construction Pro-gated onboarding', () => {
     await expect(constructionCard.locator('.industry-pro-badge')).toBeVisible()
     await expect(constructionCard.locator('.card-first-product')).toBeVisible()
     await expect(constructionCard.locator('.card-why')).toBeVisible()
+  })
+})
+
+test.describe('Pharmaceuticals Pro-gated onboarding', () => {
+  test('Pharmaceuticals industry card appears in the industry selection step', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
+    await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
+
+    await expect(page.locator('.industry-card', { hasText: 'Pharmaceuticals' })).toBeVisible()
+  })
+
+  test('Pharmaceuticals card shows a PRO badge', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
+    await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
+
+    const pharmCard = page.locator('.industry-card', { hasText: 'Pharmaceuticals' })
+    await expect(pharmCard.locator('.industry-pro-badge')).toBeVisible()
+    await expect(pharmCard.locator('.industry-pro-badge')).toContainText('PRO')
+  })
+
+  test('non-Pro user cannot select Pharmaceuticals and sees an error', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
+    await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
+
+    const pharmCard = page.locator('.industry-card', { hasText: 'Pharmaceuticals' })
+    await expect(pharmCard.locator('.industry-pro-badge')).toBeVisible()
+    await pharmCard.dispatchEvent('click')
+
+    await expect(page.getByRole('alert')).toBeVisible()
+    await expect(page.getByRole('alert')).toContainText('Pro subscription')
+    await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).toBeHidden()
+  })
+
+  test('Pro subscriber can select Pharmaceuticals and advance to product step', async ({ page }) => {
+    const proExpiry = new Date(Date.now() + 7_200_000).toISOString()
+    const player = makePlayer({ proSubscriptionEndsAtUtc: proExpiry })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
+    await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
+
+    await page.locator('.industry-card', { hasText: 'Pharmaceuticals' }).click()
+
+    await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).toBeVisible()
+  })
+
+  test('Pharmaceuticals product step shows the three starter products', async ({ page }) => {
+    const proExpiry = new Date(Date.now() + 7_200_000).toISOString()
+    const player = makePlayer({ proSubscriptionEndsAtUtc: proExpiry })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
+    await page.locator('.industry-card', { hasText: 'Pharmaceuticals' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).toBeVisible()
+
+    await expect(page.locator('.product-card', { hasText: 'Aspirin' })).toBeVisible()
+    await expect(page.locator('.product-card', { hasText: 'Vitamin Capsule' })).toBeVisible()
+    await expect(page.locator('.product-card', { hasText: 'Antibiotic' })).toBeVisible()
+  })
+
+  test('Pharmaceuticals card shows first product hint and why-choose tagline', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
+    await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
+
+    const pharmCard = page.locator('.industry-card', { hasText: 'Pharmaceuticals' })
+    await expect(pharmCard.locator('.card-first-product')).toContainText('Aspirin')
+    await expect(pharmCard.locator('.card-why')).toContainText('Inelastic demand')
+  })
+})
+
+test.describe('Energy Pro-gated onboarding', () => {
+  test('Energy industry card appears in the industry selection step', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
+    await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
+
+    await expect(page.locator('.industry-card', { hasText: 'Energy' })).toBeVisible()
+  })
+
+  test('Energy card shows a PRO badge', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
+
+    const energyCard = page.locator('.industry-card', { hasText: 'Energy' })
+    await expect(energyCard.locator('.industry-pro-badge')).toBeVisible()
+    await expect(energyCard.locator('.industry-pro-badge')).toContainText('PRO')
+  })
+
+  test('non-Pro user cannot select Energy and sees an error', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
+    await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
+
+    const energyCard = page.locator('.industry-card', { hasText: 'Energy' })
+    await expect(energyCard.locator('.industry-pro-badge')).toBeVisible()
+    await energyCard.dispatchEvent('click')
+
+    await expect(page.getByRole('alert')).toBeVisible()
+    await expect(page.getByRole('alert')).toContainText('Pro subscription')
+  })
+
+  test('Pro subscriber can select Energy and advance to product step', async ({ page }) => {
+    const proExpiry = new Date(Date.now() + 7_200_000).toISOString()
+    const player = makePlayer({ proSubscriptionEndsAtUtc: proExpiry })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
+    await page.locator('.industry-card', { hasText: 'Energy' }).click()
+
+    await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).toBeVisible()
+  })
+
+  test('Energy product step shows the three starter products', async ({ page }) => {
+    const proExpiry = new Date(Date.now() + 7_200_000).toISOString()
+    const player = makePlayer({ proSubscriptionEndsAtUtc: proExpiry })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
+    await page.locator('.industry-card', { hasText: 'Energy' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).toBeVisible()
+
+    await expect(page.locator('.product-card', { hasText: 'Coal Briquette' })).toBeVisible()
+    await expect(page.locator('.product-card', { hasText: 'Heating Oil' })).toBeVisible()
+    await expect(page.locator('.product-card', { hasText: 'Industrial Fuel' })).toBeVisible()
+  })
+
+  test('Energy card shows first product hint and why-choose tagline', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
+    await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
+
+    const energyCard = page.locator('.industry-card', { hasText: 'Energy' })
+    await expect(energyCard.locator('.card-first-product')).toContainText('Coal Briquette')
+    await expect(energyCard.locator('.card-why')).toContainText('Steady demand')
+  })
+})
+
+test.describe('Logistics Pro-gated onboarding', () => {
+  test('Logistics industry card appears in the industry selection step', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
+    await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
+
+    await expect(page.locator('.industry-card', { hasText: 'Logistics' })).toBeVisible()
+  })
+
+  test('Logistics card shows a PRO badge', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
+
+    const logisticsCard = page.locator('.industry-card', { hasText: 'Logistics' })
+    await expect(logisticsCard.locator('.industry-pro-badge')).toBeVisible()
+    await expect(logisticsCard.locator('.industry-pro-badge')).toContainText('PRO')
+  })
+
+  test('non-Pro user cannot select Logistics and sees an error', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
+    await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
+
+    const logisticsCard = page.locator('.industry-card', { hasText: 'Logistics' })
+    await expect(logisticsCard.locator('.industry-pro-badge')).toBeVisible()
+    await logisticsCard.dispatchEvent('click')
+
+    await expect(page.getByRole('alert')).toBeVisible()
+    await expect(page.getByRole('alert')).toContainText('Pro subscription')
+  })
+
+  test('Pro subscriber can select Logistics and advance to product step', async ({ page }) => {
+    const proExpiry = new Date(Date.now() + 7_200_000).toISOString()
+    const player = makePlayer({ proSubscriptionEndsAtUtc: proExpiry })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
+    await page.locator('.industry-card', { hasText: 'Logistics' }).click()
+
+    await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).toBeVisible()
+  })
+
+  test('Logistics product step shows the three starter products', async ({ page }) => {
+    const proExpiry = new Date(Date.now() + 7_200_000).toISOString()
+    const player = makePlayer({ proSubscriptionEndsAtUtc: proExpiry })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
+    await page.locator('.industry-card', { hasText: 'Logistics' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).toBeVisible()
+
+    await expect(page.locator('.product-card', { hasText: 'Shipping Bag' })).toBeVisible()
+    await expect(page.locator('.product-card', { hasText: 'Storage Sack' })).toBeVisible()
+    await expect(page.locator('.product-card', { hasText: 'Cargo Pack' })).toBeVisible()
+  })
+
+  test('Logistics card shows first product hint and why-choose tagline', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
+    await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
+
+    const logisticsCard = page.locator('.industry-card', { hasText: 'Logistics' })
+    await expect(logisticsCard.locator('.card-first-product')).toContainText('Shipping Bag')
+    await expect(logisticsCard.locator('.card-why')).toContainText('Volume play')
   })
 })

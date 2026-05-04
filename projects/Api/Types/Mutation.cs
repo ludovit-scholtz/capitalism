@@ -46,7 +46,10 @@ public sealed partial class Mutation
         [Industry.FoodProcessing] = ["bread", "pasta", "crackers"],
         [Industry.Healthcare] = ["basic-medicine", "bandages", "first-aid-kit"],
         [Industry.Electronics] = ["basic-electronics", "led-screen", "circuit-board"],
-        [Industry.Construction] = ["residential-block", "commercial-block", "industrial-block"]
+        [Industry.Construction] = ["residential-block", "commercial-block", "industrial-block"],
+        [Industry.Pharmaceuticals] = ["aspirin", "vitamin-capsule", "antibiotic"],
+        [Industry.Energy] = ["coal-briquette", "heating-oil", "industrial-fuel"],
+        [Industry.Logistics] = ["shipping-bag", "storage-sack", "cargo-pack"]
     };
 
 

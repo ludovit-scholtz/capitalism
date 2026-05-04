@@ -76,9 +76,12 @@ public static class Industry
     public const string Healthcare = "HEALTHCARE";
     public const string Electronics = "ELECTRONICS";
     public const string Construction = "CONSTRUCTION";
+    public const string Pharmaceuticals = "PHARMACEUTICALS";
+    public const string Energy = "ENERGY";
+    public const string Logistics = "LOGISTICS";
 
-    public static readonly string[] StarterIndustries = [Furniture, FoodProcessing, Healthcare, Electronics, Construction];
+    public static readonly string[] StarterIndustries = [Furniture, FoodProcessing, Healthcare, Electronics, Construction, Pharmaceuticals, Energy, Logistics];
 
     /// <summary>Starter industries that require an active Pro subscription to select during onboarding.</summary>
-    public static readonly string[] ProOnlyStarterIndustries = [Electronics, Construction];
+    public static readonly string[] ProOnlyStarterIndustries = [Electronics, Construction, Pharmaceuticals, Energy, Logistics];
 }
