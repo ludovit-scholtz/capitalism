@@ -578,4 +578,69 @@ public sealed partial class Query
             ProOnlyIndustries = Industry.ProOnlyStarterIndustries.ToList()
         };
     }
+
+    /// <summary>
+    /// Returns eligibility details for the "Launch Additional Company" IPO flow.
+    /// Shows which prerequisites are met and which still need to be fulfilled.
+    /// Requires authentication.
+    /// </summary>
+    [Authorize]
+    public async Task<AdditionalCompanyPrerequisites> GetAdditionalCompanyPrerequisites(
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+        var ct = httpContextAccessor.HttpContext!.RequestAborted;
+
+        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync();
+        var currentTick = gameState?.CurrentTick ?? 0L;
+
+        var playerCompanies = await db.Companies
+            .Where(c => c.PlayerId == userId)
+            .ToListAsync(ct);
+
+        var companyCount = playerCompanies.Count;
+        const int maxPlayerCompanies = 5;
+        var underMaxCap = companyCount < maxPlayerCompanies;
+        var hasExistingCompany = companyCount > 0;
+
+        long companyAgeTicks = 0;
+        long ticksUntilAgeRequirementMet = Mutation.MinCompanyAgeTicksConst;
+        bool companyAgeRequirementMet = false;
+        decimal netIncomeInWindow = 0m;
+        bool profitabilityRequirementMet = false;
+
+        if (hasExistingCompany)
+        {
+            var firstCompany = playerCompanies.OrderBy(c => c.FoundedAtTick).First();
+            companyAgeTicks = currentTick - firstCompany.FoundedAtTick;
+            companyAgeRequirementMet = companyAgeTicks >= Mutation.MinCompanyAgeTicksConst;
+            ticksUntilAgeRequirementMet = companyAgeRequirementMet ? 0L : Mutation.MinCompanyAgeTicksConst - companyAgeTicks;
+
+            var windowStart = currentTick - Mutation.ProfitabilityWindowTicksConst;
+            netIncomeInWindow = await db.LedgerEntries
+                .Where(e => e.CompanyId == firstCompany.Id && e.RecordedAtTick >= windowStart)
+                .SumAsync(e => (decimal?)e.Amount, ct) ?? 0m;
+            profitabilityRequirementMet = netIncomeInWindow > 0m;
+        }
+
+        var personalBalance = await PersonalBankAccountService.GetTrackedBalanceAsync(db, userId, "USD", ct);
+        const decimal founderContributionRequired = 200_000m;
+        var balanceRequirementMet = personalBalance >= founderContributionRequired;
+
+        return new AdditionalCompanyPrerequisites
+        {
+            CompanyCount = companyCount,
+            UnderMaxCap = underMaxCap,
+            HasExistingCompany = hasExistingCompany,
+            CompanyAgeTicks = companyAgeTicks,
+            CompanyAgeRequirementMet = companyAgeRequirementMet,
+            TicksUntilAgeRequirementMet = ticksUntilAgeRequirementMet,
+            NetIncomeInWindow = netIncomeInWindow,
+            ProfitabilityRequirementMet = profitabilityRequirementMet,
+            PersonalBalanceUsd = personalBalance,
+            BalanceRequirementMet = balanceRequirementMet,
+            AllRequirementsMet = underMaxCap && hasExistingCompany && companyAgeRequirementMet && profitabilityRequirementMet && balanceRequirementMet,
+        };
+    }
 }

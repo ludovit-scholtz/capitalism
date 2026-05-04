@@ -1060,6 +1060,20 @@ export type MockState = {
   myBuildingListings: MockBuildingMarketMyListing[]
   /** Inter-city trade routes returned by myTradeRoutes query. */
   tradeRoutes: MockTradeRoute[]
+  /** Prerequisites for launching an additional company (additionalCompanyPrerequisites query). */
+  additionalCompanyPrerequisites: {
+    allRequirementsMet: boolean
+    companyCount: number
+    underMaxCap: boolean
+    hasExistingCompany: boolean
+    companyAgeTicks: number
+    companyAgeRequirementMet: boolean
+    ticksUntilAgeRequirementMet: number
+    netIncomeInWindow: number
+    profitabilityRequirementMet: boolean
+    personalBalanceUsd: number
+    balanceRequirementMet: boolean
+  } | null
 }
 
 export interface MockBuildingMarketListing {
@@ -2696,6 +2710,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     buildingMarketListings: [],
     myBuildingListings: [],
     tradeRoutes: [],
+    additionalCompanyPrerequisites: null,
     ...initial,
   }
 
@@ -6077,7 +6092,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
-    if (query.includes('cities')) {
+    if (query.includes('cities') && !query.includes('additionalCompanyPrerequisites')) {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -6761,6 +6776,67 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
     if (query.includes('myTradeRoutes')) {
       return routeJson({ myTradeRoutes: state.tradeRoutes })
+    }
+
+    // ── Additional Company IPO ─────────────────────────────────────────────────
+    if (query.includes('additionalCompanyPrerequisites')) {
+      const prereqs = state.additionalCompanyPrerequisites ?? {
+        allRequirementsMet: false,
+        companyCount: 0,
+        underMaxCap: true,
+        hasExistingCompany: false,
+        companyAgeTicks: 0,
+        companyAgeRequirementMet: false,
+        ticksUntilAgeRequirementMet: 8760,
+        netIncomeInWindow: 0,
+        profitabilityRequirementMet: false,
+        personalBalanceUsd: 0,
+        balanceRequirementMet: false,
+      }
+      const responseData: Record<string, unknown> = { additionalCompanyPrerequisites: prereqs }
+      if (query.includes('cities')) {
+        responseData.cities = state.cities ?? []
+      }
+      return routeJson(responseData)
+    }
+
+    if (query.includes('startAdditionalCompany')) {
+      const input = body.variables?.input ?? {}
+      const companyName: string = input.companyName ?? 'New Company'
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      if (!player) {
+        return routeJson({ errors: [{ message: 'Not authenticated', extensions: { code: 'UNAUTHORIZED' } }] })
+      }
+      const prereqs = state.additionalCompanyPrerequisites
+      if (prereqs && !prereqs.allRequirementsMet) {
+        if (!prereqs.hasExistingCompany) {
+          return routeJson({ errors: [{ message: 'No existing company', extensions: { code: 'NO_EXISTING_COMPANY' } }] })
+        }
+        if (!prereqs.companyAgeRequirementMet) {
+          return routeJson({ errors: [{ message: 'Company too young', extensions: { code: 'COMPANY_TOO_YOUNG' } }] })
+        }
+        if (!prereqs.profitabilityRequirementMet) {
+          return routeJson({ errors: [{ message: 'Company not profitable', extensions: { code: 'COMPANY_NOT_PROFITABLE' } }] })
+        }
+        if (!prereqs.balanceRequirementMet) {
+          return routeJson({ errors: [{ message: 'Insufficient personal funds', extensions: { code: 'INSUFFICIENT_PERSONAL_FUNDS' } }] })
+        }
+        if (!prereqs.underMaxCap) {
+          return routeJson({ errors: [{ message: 'Max companies reached', extensions: { code: 'MAX_COMPANIES_REACHED' } }] })
+        }
+      }
+      // Create new company
+      const newCompanyId = `company-ipo-${Date.now()}`
+      const newCompany: typeof player.companies[0] = {
+        id: newCompanyId,
+        playerId: player.id,
+        name: companyName,
+        cash: 400000,
+        foundedAtUtc: new Date().toISOString(),
+        buildings: [],
+      }
+      player.companies.push(newCompany)
+      return routeJson({ startAdditionalCompany: { id: newCompanyId, name: companyName } })
     }
 
     if (query.includes('makeOfferOnBuilding')) {

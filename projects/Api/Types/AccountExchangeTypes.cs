@@ -162,3 +162,40 @@ public sealed class CompanyOwnershipResult
     /// <summary>Named shareholders ordered by ownership descending.</summary>
     public List<CompanyShareholderResult> Shareholders { get; set; } = [];
 }
+
+/// <summary>Eligibility snapshot for the "Launch Additional Company" flow.</summary>
+public sealed class AdditionalCompanyPrerequisites
+{
+    /// <summary>Number of companies the player currently controls.</summary>
+    public int CompanyCount { get; set; }
+
+    /// <summary>True if the player controls fewer than the maximum allowed companies.</summary>
+    public bool UnderMaxCap { get; set; }
+
+    /// <summary>True if the player has at least one existing company.</summary>
+    public bool HasExistingCompany { get; set; }
+
+    /// <summary>Age of the player's oldest company in ticks.</summary>
+    public long CompanyAgeTicks { get; set; }
+
+    /// <summary>True if the oldest company is at least 8 760 ticks (1 game year) old.</summary>
+    public bool CompanyAgeRequirementMet { get; set; }
+
+    /// <summary>Ticks remaining until the age requirement is met (0 when already met).</summary>
+    public long TicksUntilAgeRequirementMet { get; set; }
+
+    /// <summary>Net income of the oldest company in the last 365 ticks.</summary>
+    public decimal NetIncomeInWindow { get; set; }
+
+    /// <summary>True if the oldest company had positive net income in the last 365 ticks.</summary>
+    public bool ProfitabilityRequirementMet { get; set; }
+
+    /// <summary>Player's current personal USD settlement balance.</summary>
+    public decimal PersonalBalanceUsd { get; set; }
+
+    /// <summary>True if the player's personal balance ≥ $200 000 USD.</summary>
+    public bool BalanceRequirementMet { get; set; }
+
+    /// <summary>True when all prerequisites are met and the player may call startAdditionalCompany.</summary>
+    public bool AllRequirementsMet { get; set; }
+}
