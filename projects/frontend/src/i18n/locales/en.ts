@@ -3367,6 +3367,18 @@ export default {
         title: 'Selling to Public',
         desc: 'Your shop sells to city consumers each tick. Set a competitive price to boost sales.',
       },
+      dashboardOverlay: {
+        title: 'Welcome to Your Dashboard',
+        body: 'This is your command centre. Monitor your companies, track pending upgrades, and keep an eye on your supply chain performance. Explore each tab to manage your buildings and review financial activity.',
+      },
+      buildingDetailOverlay: {
+        title: 'Building Detail View',
+        body: 'Here you can inspect every unit in your building, configure production chains, and queue upgrades. Click any grid cell to select a unit and see its current settings.',
+      },
+      gridEditorOverlay: {
+        title: 'Unit Grid Editor',
+        body: 'Drag unit tiles into the grid to set up your production layout. Link units together to form efficient production chains. Visit the Tutorial page for a step-by-step guide.',
+      },
     },
   },
 }

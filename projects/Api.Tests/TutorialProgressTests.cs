@@ -63,7 +63,7 @@ public sealed class TutorialProgressTests
     }
 
     [Fact]
-    public async Task GetTutorialProgress_NewPlayer_ReturnsAllFiveMilestonesIncomplete()
+    public async Task GetTutorialProgress_NewPlayer_ReturnsAllMilestonesIncomplete()
     {
         await using var factory = new ApiWebApplicationFactory();
         var client = factory.CreateClient();
@@ -72,7 +72,8 @@ public sealed class TutorialProgressTests
         var result = await ExecAsync(client, "{ tutorialProgress { milestone isCompleted completedAtUtc } }", token: token);
 
         var milestones = result.GetProperty("data").GetProperty("tutorialProgress");
-        Assert.Equal(5, milestones.GetArrayLength());
+        // 5 original milestones + 3 tooltip overlay milestones = 8 total
+        Assert.Equal(TutorialMilestone.All.Count, milestones.GetArrayLength());
 
         foreach (var m in milestones.EnumerateArray())
         {
@@ -101,6 +102,10 @@ public sealed class TutorialProgressTests
         Assert.Contains("FIRST_LOAN_TAKEN", returned);
         Assert.Contains("FIRST_COMPETITOR_OBSERVED", returned);
         Assert.Contains("FIRST_BRAND_ESTABLISHED", returned);
+        // Tooltip overlay milestones
+        Assert.Contains("TOOLTIP_DASHBOARD_SHOWN", returned);
+        Assert.Contains("TOOLTIP_BUILDING_DETAIL_SHOWN", returned);
+        Assert.Contains("TOOLTIP_GRID_EDITOR_SHOWN", returned);
     }
 
     [Fact]
@@ -194,7 +199,7 @@ public sealed class TutorialProgressTests
     }
 
     [Fact]
-    public async Task MarkTutorialMilestoneComplete_AllFiveMilestones_AllPersistCorrectly()
+    public async Task MarkTutorialMilestoneComplete_OriginalFiveMilestones_AllPersistCorrectly()
     {
         await using var factory = new ApiWebApplicationFactory();
         var client = factory.CreateClient();
@@ -221,11 +226,162 @@ public sealed class TutorialProgressTests
             Assert.True(payload.GetProperty("isCompleted").GetBoolean());
         }
 
-        // Verify all are returned as completed in the progress query
+        // Verify progress query returns all milestones (8 total) and the 5 we completed are marked
         var progressResult = await ExecAsync(client, "{ tutorialProgress { milestone isCompleted } }", token: token);
         var progress = progressResult.GetProperty("data").GetProperty("tutorialProgress").EnumerateArray().ToList();
-        Assert.Equal(5, progress.Count);
-        Assert.All(progress, m => Assert.True(m.GetProperty("isCompleted").GetBoolean()));
+        Assert.Equal(TutorialMilestone.All.Count, progress.Count);
+
+        // All 5 explicitly-completed milestones must be true
+        var completedSet = progress
+            .Where(m => m.GetProperty("isCompleted").GetBoolean())
+            .Select(m => m.GetProperty("milestone").GetString()!)
+            .ToHashSet();
+        foreach (var m in milestones)
+            Assert.Contains(m, completedSet);
+
+        // The 3 tooltip milestones were NOT explicitly marked, so they remain false
+        Assert.DoesNotContain("TOOLTIP_DASHBOARD_SHOWN", completedSet);
+        Assert.DoesNotContain("TOOLTIP_BUILDING_DETAIL_SHOWN", completedSet);
+        Assert.DoesNotContain("TOOLTIP_GRID_EDITOR_SHOWN", completedSet);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Tooltip-overlay milestone tests (new contextual tooltips for dashboard
+    // and building-detail views — TOOLTIP_DASHBOARD_SHOWN, etc.)
+    // ──────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task MarkTutorialMilestoneComplete_TooltipDashboardShown_PersistsCorrectly()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "tooltip-dashboard@test.com");
+
+        var result = await ExecAsync(client,
+            "mutation M($i: MarkTutorialMilestoneCompleteInput!) { markTutorialMilestoneComplete(input: $i) { milestone isCompleted completedAtUtc } }",
+            new { i = new { milestone = "TOOLTIP_DASHBOARD_SHOWN" } },
+            token: token);
+
+        var payload = result.GetProperty("data").GetProperty("markTutorialMilestoneComplete");
+        Assert.Equal("TOOLTIP_DASHBOARD_SHOWN", payload.GetProperty("milestone").GetString());
+        Assert.True(payload.GetProperty("isCompleted").GetBoolean());
+        Assert.NotEqual(JsonValueKind.Null, payload.GetProperty("completedAtUtc").ValueKind);
+
+        // Verify it is reflected in the progress query
+        var queryResult = await ExecAsync(client, "{ tutorialProgress { milestone isCompleted } }", token: token);
+        var milestones = queryResult.GetProperty("data").GetProperty("tutorialProgress").EnumerateArray().ToList();
+        var dashMilestone = milestones.First(m => m.GetProperty("milestone").GetString() == "TOOLTIP_DASHBOARD_SHOWN");
+        Assert.True(dashMilestone.GetProperty("isCompleted").GetBoolean());
+
+        // Other tooltip milestones must remain incomplete
+        var detailMilestone = milestones.First(m => m.GetProperty("milestone").GetString() == "TOOLTIP_BUILDING_DETAIL_SHOWN");
+        Assert.False(detailMilestone.GetProperty("isCompleted").GetBoolean());
+    }
+
+    [Fact]
+    public async Task MarkTutorialMilestoneComplete_TooltipBuildingDetailShown_PersistsCorrectly()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "tooltip-building@test.com");
+
+        var result = await ExecAsync(client,
+            "mutation M($i: MarkTutorialMilestoneCompleteInput!) { markTutorialMilestoneComplete(input: $i) { milestone isCompleted completedAtUtc } }",
+            new { i = new { milestone = "TOOLTIP_BUILDING_DETAIL_SHOWN" } },
+            token: token);
+
+        var payload = result.GetProperty("data").GetProperty("markTutorialMilestoneComplete");
+        Assert.Equal("TOOLTIP_BUILDING_DETAIL_SHOWN", payload.GetProperty("milestone").GetString());
+        Assert.True(payload.GetProperty("isCompleted").GetBoolean());
+        Assert.NotEqual(JsonValueKind.Null, payload.GetProperty("completedAtUtc").ValueKind);
+    }
+
+    [Fact]
+    public async Task MarkTutorialMilestoneComplete_TooltipGridEditorShown_PersistsCorrectly()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "tooltip-grid@test.com");
+
+        var result = await ExecAsync(client,
+            "mutation M($i: MarkTutorialMilestoneCompleteInput!) { markTutorialMilestoneComplete(input: $i) { milestone isCompleted completedAtUtc } }",
+            new { i = new { milestone = "TOOLTIP_GRID_EDITOR_SHOWN" } },
+            token: token);
+
+        var payload = result.GetProperty("data").GetProperty("markTutorialMilestoneComplete");
+        Assert.Equal("TOOLTIP_GRID_EDITOR_SHOWN", payload.GetProperty("milestone").GetString());
+        Assert.True(payload.GetProperty("isCompleted").GetBoolean());
+        Assert.NotEqual(JsonValueKind.Null, payload.GetProperty("completedAtUtc").ValueKind);
+    }
+
+    [Fact]
+    public async Task MarkTutorialMilestoneComplete_AllTooltipMilestones_AreIdempotent()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "tooltip-idempotent@test.com");
+
+        const string mutDoc =
+            "mutation M($i: MarkTutorialMilestoneCompleteInput!) { markTutorialMilestoneComplete(input: $i) { milestone isCompleted } }";
+
+        var tooltipMilestones = new[]
+        {
+            "TOOLTIP_DASHBOARD_SHOWN",
+            "TOOLTIP_BUILDING_DETAIL_SHOWN",
+            "TOOLTIP_GRID_EDITOR_SHOWN",
+        };
+
+        // Mark each twice — must succeed both times without duplicate DB rows
+        foreach (var m in tooltipMilestones)
+        {
+            var vars = new { i = new { milestone = m } };
+            var first = await ExecAsync(client, mutDoc, vars, token: token);
+            var second = await ExecAsync(client, mutDoc, vars, token: token);
+
+            Assert.True(first.GetProperty("data").GetProperty("markTutorialMilestoneComplete")
+                .GetProperty("isCompleted").GetBoolean(), $"First call for {m} must be completed.");
+            Assert.True(second.GetProperty("data").GetProperty("markTutorialMilestoneComplete")
+                .GetProperty("isCompleted").GetBoolean(), $"Second idempotent call for {m} must be completed.");
+        }
+
+        // Verify exactly one DB row per tooltip milestone
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var playerResult = await ExecAsync(client, "{ me { id } }", token: token);
+        var playerId = Guid.Parse(playerResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        foreach (var m in tooltipMilestones)
+        {
+            var rowCount = db.TutorialProgresses.Count(tp => tp.PlayerId == playerId && tp.Milestone == m);
+            Assert.Equal(1, rowCount);
+        }
+    }
+
+    [Fact]
+    public async Task GetTutorialProgress_TooltipMilestonesIsolatedPerPlayer()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token1 = await RegisterAsync(client, "tooltip-player1@test.com");
+        var token2 = await RegisterAsync(client, "tooltip-player2@test.com");
+
+        // Player 1 dismisses dashboard tooltip
+        await ExecAsync(client,
+            "mutation M($i: MarkTutorialMilestoneCompleteInput!) { markTutorialMilestoneComplete(input: $i) { milestone isCompleted } }",
+            new { i = new { milestone = "TOOLTIP_DASHBOARD_SHOWN" } },
+            token: token1);
+
+        // Player 2 should still see dashboard tooltip as incomplete
+        var p2Result = await ExecAsync(client, "{ tutorialProgress { milestone isCompleted } }", token: token2);
+        var p2Progress = p2Result.GetProperty("data").GetProperty("tutorialProgress").EnumerateArray().ToList();
+        var p2Dash = p2Progress.First(m => m.GetProperty("milestone").GetString() == "TOOLTIP_DASHBOARD_SHOWN");
+        Assert.False(p2Dash.GetProperty("isCompleted").GetBoolean(), "Player 2 must not see Player 1's tooltip dismissal.");
+
+        // Player 1 should see dashboard tooltip as completed
+        var p1Result = await ExecAsync(client, "{ tutorialProgress { milestone isCompleted } }", token: token1);
+        var p1Progress = p1Result.GetProperty("data").GetProperty("tutorialProgress").EnumerateArray().ToList();
+        var p1Dash = p1Progress.First(m => m.GetProperty("milestone").GetString() == "TOOLTIP_DASHBOARD_SHOWN");
+        Assert.True(p1Dash.GetProperty("isCompleted").GetBoolean());
     }
 
     [Fact]

@@ -183,7 +183,7 @@ test.describe('Player Profile – Statistics Export', () => {
     const player = makePlayer()
     setupMockApi(page, { players: [player] })
     await page.goto(`/player/${player.id}`)
-    await expect(page.locator('.export-btn')).not.toBeVisible()
+    await expect(page.locator('.export-btn')).toBeHidden()
   })
 })
 

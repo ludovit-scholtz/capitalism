@@ -2767,6 +2767,10 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       { milestone: 'FIRST_LOAN_TAKEN', isCompleted: false, completedAtUtc: null },
       { milestone: 'FIRST_COMPETITOR_OBSERVED', isCompleted: false, completedAtUtc: null },
       { milestone: 'FIRST_BRAND_ESTABLISHED', isCompleted: false, completedAtUtc: null },
+      // Tooltip milestones default to completed so existing tests are not interrupted by overlays
+      { milestone: 'TOOLTIP_DASHBOARD_SHOWN', isCompleted: true, completedAtUtc: '2026-01-01T00:00:00Z' },
+      { milestone: 'TOOLTIP_BUILDING_DETAIL_SHOWN', isCompleted: true, completedAtUtc: '2026-01-01T00:00:00Z' },
+      { milestone: 'TOOLTIP_GRID_EDITOR_SHOWN', isCompleted: true, completedAtUtc: '2026-01-01T00:00:00Z' },
     ],
     playerBadges: {},
     playerRankSnapshots: {},
@@ -5581,6 +5585,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       }
       if (query.includes('cities')) {
         responseData.cities = state.cities ?? []
+      }
+      if (query.includes('tutorialProgress')) {
+        responseData.tutorialProgress = state.tutorialProgress
       }
 
       return route.fulfill({

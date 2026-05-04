@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, provide } from 'vue'
+import { computed, provide, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useBuildingDetail, BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
+import { useFirstTimeUserGates } from '@/composables/useFirstTimeUserGates'
+import { gqlRequest } from '@/lib/graphql'
 import BuildingDetailHeader from '@/components/buildings/BuildingDetailHeader.vue'
 import PurchaseSelectorDialog from '@/components/buildings/PurchaseSelectorDialog.vue'
 import BuildingPropertyPanel from '@/components/buildings/BuildingPropertyPanel.vue'
@@ -14,6 +16,7 @@ import BuildingUnitGrid from '@/components/buildings/BuildingUnitGrid.vue'
 import BuildingEditingSidebar from '@/components/buildings/BuildingEditingSidebar.vue'
 import BuildingReadonlySidebar from '@/components/buildings/BuildingReadonlySidebar.vue'
 import BuildingOverviewSidebar from '@/components/buildings/BuildingOverviewSidebar.vue'
+import TutorialTooltip from '@/components/ui/TutorialTooltip.vue'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -61,10 +64,46 @@ const showOverviewSidebar = computed(() => !showEditingSidebar.value && !showRea
 
 /** True for multi-unit building types that should show the factory-style grid editor. */
 const isMultiUnitBuilding = computed(() => building.value?.type !== 'APARTMENT' && building.value?.type !== 'COMMERCIAL' && building.value?.type !== 'MEDIA_HOUSE')
+
+// ── First-time user tutorial tooltips ────────────────────────────────────────
+const {
+  showBuildingDetailTooltip,
+  showGridEditorTooltip,
+  hydrateFromBackend,
+  dismissBuildingDetailTooltip,
+  dismissGridEditorTooltip,
+} = useFirstTimeUserGates()
+
+const buildingDetailTooltipReady = ref(false)
+
+onMounted(async () => {
+  // Hydrate tooltip state from backend (best-effort)
+  try {
+    const data = await gqlRequest<{
+      tutorialProgress: Array<{ milestone: string; isCompleted: boolean; completedAtUtc: string | null }>
+    }>('{ tutorialProgress { milestone isCompleted completedAtUtc } }')
+    await hydrateFromBackend(data.tutorialProgress ?? [])
+  } catch {
+    // Non-critical: fall through to sessionStorage state
+  }
+  // Small delay so building loads before tooltip
+  setTimeout(() => {
+    buildingDetailTooltipReady.value = true
+  }, 800)
+})
 </script>
 
 <template>
-  <div class="building-detail-view container px-4 py-8 max-[768px]:px-2 max-[768px]:py-4">
+  <div class="building-detail-view container px-4 py-8 max-[768px]:px-2 max-[768px]:py-4 relative">
+    <!-- Building detail first-visit contextual tooltip overlay -->
+    <TutorialTooltip
+      v-if="buildingDetailTooltipReady && showBuildingDetailTooltip"
+      milestone="TOOLTIP_BUILDING_DETAIL_SHOWN"
+      :title="t('tutorial.tooltips.buildingDetailOverlay.title')"
+      :description="t('tutorial.tooltips.buildingDetailOverlay.body')"
+      position="bottom"
+      @dismiss="dismissBuildingDetailTooltip"
+    />
     <div class="page-nav mb-6">
       <RouterLink to="/dashboard" class="back-link inline-flex items-center gap-1.5 text-sm text-muted no-underline hover:text-brand">
         <span>←</span> {{ t('buildingDetail.backToDashboard') }}
@@ -164,7 +203,18 @@ const isMultiUnitBuilding = computed(() => building.value?.type !== 'APARTMENT' 
         class="main-content grid items-start gap-8 [grid-template-columns:minmax(0,1.05fr)_minmax(360px,0.95fr)] min-[1320px]:[grid-template-columns:minmax(0,1fr)_minmax(420px,1fr)] max-[1024px]:grid-cols-1 max-[1024px]:gap-6 max-[768px]:gap-4"
       >
         <template v-if="isMultiUnitBuilding">
-          <BuildingUnitGrid />
+          <!-- Grid editor section with contextual tooltip for first-time visitors -->
+          <div class="relative">
+            <TutorialTooltip
+              v-if="buildingDetailTooltipReady && showGridEditorTooltip && !showBuildingDetailTooltip"
+              milestone="TOOLTIP_GRID_EDITOR_SHOWN"
+              :title="t('tutorial.tooltips.gridEditorOverlay.title')"
+              :description="t('tutorial.tooltips.gridEditorOverlay.body')"
+              position="bottom"
+              @dismiss="dismissGridEditorTooltip"
+            />
+            <BuildingUnitGrid />
+          </div>
           <BuildingEditingSidebar v-if="showEditingSidebar" />
           <BuildingReadonlySidebar v-else-if="showReadonlySidebar" />
           <BuildingOverviewSidebar v-if="showOverviewSidebar" />

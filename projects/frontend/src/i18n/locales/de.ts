@@ -3369,6 +3369,18 @@ export default {
         title: 'An die Öffentlichkeit verkaufen',
         desc: 'Ihr Laden verkauft pro Tick an Stadtverbraucher. Setzen Sie einen wettbewerbsfähigen Preis.',
       },
+      dashboardOverlay: {
+        title: 'Willkommen in Ihrem Dashboard',
+        body: 'Dies ist Ihre Kommandozentrale. Überwachen Sie Unternehmen, ausstehende Upgrades und die Lieferkettenleistung. Erkunden Sie die Tabs, um Gebäude zu verwalten und Finanzdaten einzusehen.',
+      },
+      buildingDetailOverlay: {
+        title: 'Gebäudedetailansicht',
+        body: 'Hier können Sie jede Einheit Ihres Gebäudes einsehen, Produktionsketten konfigurieren und Upgrades einreihen. Klicken Sie auf eine Rasterzelle, um eine Einheit auszuwählen und ihre Einstellungen zu sehen.',
+      },
+      gridEditorOverlay: {
+        title: 'Einheiten-Raster-Editor',
+        body: 'Ziehen Sie Einheitenkacheln in das Raster, um Ihr Produktionslayout einzurichten. Verbinden Sie Einheiten für effiziente Produktionsketten. Besuchen Sie die Tutorial-Seite für eine Schritt-für-Schritt-Anleitung.',
+      },
     },
   },
 }

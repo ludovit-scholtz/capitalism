@@ -9,6 +9,7 @@ import { gqlRequest } from '@/lib/graphql'
 import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useTickCountdown } from '@/composables/useTickCountdown'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
+import { useFirstTimeUserGates } from '@/composables/useFirstTimeUserGates'
 import { deepEqual } from '@/lib/utils'
 import { getActiveCompany } from '@/lib/accountContext'
 import { formatInGameTime } from '@/lib/gameTime'
@@ -20,6 +21,7 @@ import DashboardChatPanel from '@/components/dashboard/DashboardChatPanel.vue'
 import DashboardTabNav from '@/components/dashboard/DashboardTabNav.vue'
 import BuildingHeaderFinancials from '@/components/buildings/BuildingHeaderFinancials.vue'
 import NewCompanyModal from '@/components/dashboard/NewCompanyModal.vue'
+import TutorialTooltip from '@/components/ui/TutorialTooltip.vue'
 import type { Company, GameState, ScheduledActionSummary, CityPowerBalance, CompanyLedgerSummary, City, BuildingUnitOperationalStatus } from '@/types'
 
 // Module-level cache for city names - cities are static and never change during a session.
@@ -78,6 +80,16 @@ const personAccountTabs = computed(() => [
 
 const { tickCountdown, startTickCountdown, stopTickCountdown } = useTickCountdown(gameState)
 const { saveScrollPosition, restoreScrollPosition } = useScrollPreservation()
+
+// ── First-time user tutorial tooltip ────────────────────────────────────────
+const {
+  showDashboardTooltip,
+  hydrateFromBackend,
+  dismissDashboardTooltip,
+} = useFirstTimeUserGates()
+
+// Delay tooltip 1 s so the page renders before showing the overlay
+const dashboardTooltipReady = ref(false)
 
 const activeCompany = computed(() => getActiveCompany(auth.player, companies.value))
 const isPersonAccount = computed(() => auth.player?.activeAccountType !== 'COMPANY' || !activeCompany.value)
@@ -197,6 +209,7 @@ onMounted(async () => {
       gameState: GameState
       myPendingActions: ScheduledActionSummary[]
       cities: City[]
+      tutorialProgress: Array<{ milestone: string; isCompleted: boolean; completedAtUtc: string | null }>
     }>(
       `{
         myCompanies {
@@ -217,6 +230,11 @@ onMounted(async () => {
           name
           currencyCode
         }
+        tutorialProgress {
+          milestone
+          isCompleted
+          completedAtUtc
+        }
       }`,
     )
 
@@ -226,8 +244,16 @@ onMounted(async () => {
     applyCityMaps(initialData.cities)
     startTickCountdown()
 
+    // Hydrate tooltip dismissed state from backend progress
+    await hydrateFromBackend(initialData.tutorialProgress ?? [])
+
     // Show dashboard immediately after critical payload arrives.
     loading.value = false
+
+    // Delay tooltip 1 s so the initial render is complete before showing overlay
+    setTimeout(() => {
+      dashboardTooltipReady.value = true
+    }, 1000)
 
     // Non-critical derived widgets hydrate in the background.
     void refreshCompanyDerivedData()
@@ -525,7 +551,16 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="container py-8 px-4">
+  <div class="container py-8 px-4 relative">
+    <!-- Dashboard first-visit contextual tooltip overlay -->
+    <TutorialTooltip
+      v-if="dashboardTooltipReady && showDashboardTooltip"
+      milestone="TOOLTIP_DASHBOARD_SHOWN"
+      :title="t('tutorial.tooltips.dashboardOverlay.title')"
+      :description="t('tutorial.tooltips.dashboardOverlay.body')"
+      position="bottom"
+      @dismiss="dismissDashboardTooltip"
+    />
     <!-- Dashboard header: title + tick clock -->
     <div class="flex justify-between items-start mb-8 flex-wrap gap-4">
       <div>

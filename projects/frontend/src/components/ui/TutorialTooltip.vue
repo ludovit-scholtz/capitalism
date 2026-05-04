@@ -98,104 +98,115 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* ── Fullscreen fixed overlay wrapper ────────────────────────────────────── */
 .tutorial-tooltip {
-  position: absolute;
-  z-index: 500;
-}
-
-.tutorial-tooltip--bottom {
-  top: calc(100% + 8px);
-  left: 0;
-}
-
-.tutorial-tooltip--top {
-  bottom: calc(100% + 8px);
-  left: 0;
-}
-
-.tutorial-tooltip--left {
-  right: calc(100% + 8px);
-  top: 0;
-}
-
-.tutorial-tooltip--right {
-  left: calc(100% + 8px);
-  top: 0;
-}
-
-.tutorial-tooltip__overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
-  z-index: -1;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
 }
 
+/* Semi-transparent glassmorphic backdrop */
+.tutorial-tooltip__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  cursor: pointer;
+}
+
+/* Centered content card */
 .tutorial-tooltip__card {
+  position: relative;
+  z-index: 1;
   background: var(--color-card, #1e293b);
   border: 1px solid var(--color-accent, #6366f1);
-  border-radius: 10px;
-  padding: 14px 16px;
-  max-width: 300px;
-  min-width: 200px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  border-radius: 14px;
+  padding: 24px 28px;
+  max-width: 440px;
+  width: 100%;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.3),
+    0 20px 48px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .tutorial-tooltip__header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .tutorial-tooltip__icon {
-  font-size: 1.1rem;
+  font-size: 1.4rem;
   flex-shrink: 0;
 }
 
 .tutorial-tooltip__title {
-  font-size: 0.9rem;
-  font-weight: 600;
+  font-size: 1.05rem;
+  font-weight: 700;
   color: var(--color-text-primary, #f1f5f9);
   line-height: 1.3;
 }
 
 .tutorial-tooltip__body {
-  font-size: 0.82rem;
+  font-size: 0.88rem;
   color: var(--color-text-secondary, #94a3b8);
-  line-height: 1.5;
-  margin: 0 0 12px;
+  line-height: 1.6;
+  margin: 0 0 20px;
 }
 
 .tutorial-tooltip__footer {
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
 }
 
 .tutorial-tooltip__dismiss-btn {
-  padding: 5px 14px;
-  font-size: 0.82rem;
+  padding: 8px 22px;
+  font-size: 0.9rem;
   font-weight: 600;
   background: var(--color-accent, #6366f1);
   color: #fff;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s, transform 0.1s;
 }
 
 .tutorial-tooltip__dismiss-btn:hover {
-  opacity: 0.85;
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+
+.tutorial-tooltip__dismiss-btn:focus-visible {
+  outline: 2px solid var(--color-accent, #6366f1);
+  outline-offset: 3px;
 }
 
 /* Fade animation */
 .tt-fade-enter-active,
 .tt-fade-leave-active {
-  transition: opacity 0.25s ease, transform 0.25s ease;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.tt-fade-enter-active .tutorial-tooltip__card,
+.tt-fade-leave-active .tutorial-tooltip__card {
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 .tt-fade-enter-from,
 .tt-fade-leave-to {
   opacity: 0;
-  transform: translateY(-4px);
+}
+
+.tt-fade-enter-from .tutorial-tooltip__card,
+.tt-fade-leave-to .tutorial-tooltip__card {
+  opacity: 0;
+  transform: scale(0.95) translateY(8px);
 }
 </style>
