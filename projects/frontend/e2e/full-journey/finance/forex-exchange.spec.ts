@@ -1076,4 +1076,130 @@ test.describe('Forex Exchange page', () => {
     await page.getByRole('tab', { name: 'AMM Swap' }).click()
     await expect(page.locator('[aria-label="Gold Swap"]')).toBeVisible()
   })
+
+  test('Gold AMM swap execution: get quote and confirm swap updates balances', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.playerCurrencyBalances = [{ currencyCode: 'EUR', currencySymbol: '€', balance: 50000 }]
+    state.goldBalance = { balance: 2.0, blockedInPools: 0, availableBalance: 2.0 }
+    state.goldAmmPools = [
+      {
+        id: 'pool-eur-swap',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        fiatReserve: 20000,
+        goldReserve: 10.0,
+        totalLiquidityShares: 1000,
+        impliedGoldPrice: 2000,
+        myPosition: null,
+      } satisfies MockGoldAmmPool,
+    ]
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex?tab=gold')
+
+    const swapSection = page.locator('[aria-label="Gold Swap"]')
+
+    // Fill in swap amount and request quote
+    await swapSection.locator('input[type="number"]').fill('1000')
+    await swapSection.getByRole('button', { name: 'Get Quote' }).click()
+
+    // Quote confirmation panel appears
+    const quotePanel = page.locator('[aria-label="Swap Quote"]')
+    await expect(quotePanel).toBeVisible()
+    await expect(quotePanel.getByText('1,000')).toBeVisible() // input amount
+    // The "You receive" row contains XAU (gold output)
+    await expect(quotePanel.getByText(/XAU$/).first()).toBeVisible()
+
+    // Confirm the swap
+    await quotePanel.getByRole('button', { name: 'Confirm Swap' }).click()
+
+    // Success message with received gold amount
+    await expect(swapSection.locator('[role="status"]')).toBeVisible()
+    await expect(swapSection.locator('[role="status"]')).toContainText('XAU')
+  })
+
+  test('Gold AMM remove liquidity: confirms removal and shows success', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.goldBalance = { balance: 0, blockedInPools: 5.0, availableBalance: 0 }
+    state.goldAmmPools = [
+      {
+        id: 'pool-eur-remove',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        fiatReserve: 10000,
+        goldReserve: 5.0,
+        totalLiquidityShares: 1000,
+        impliedGoldPrice: 2000,
+        myPosition: {
+          id: 'pos-remove-1',
+          poolId: 'pool-eur-remove',
+          currencyCode: 'EUR',
+          liquidityShares: 1000,
+          sharePercent: 100,
+          claimableFiat: 10000,
+          claimableGold: 5.0,
+          fiatProvided: 10000,
+          goldProvided: 5.0,
+        },
+      } satisfies MockGoldAmmPool,
+    ]
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex?tab=gold')
+
+    // Navigate to My Positions tab
+    await page.getByRole('tab', { name: 'My Positions' }).click()
+
+    const positionsPanel = page.locator('[aria-label="My Liquidity Positions"]')
+    await expect(positionsPanel.getByText('EUR/XAU', { exact: true })).toBeVisible()
+
+    // Click Remove Liquidity (button text is 'Remove' per i18n removeLiquidity key)
+    await positionsPanel.getByRole('button', { name: 'Remove', exact: true }).click()
+
+    // Success message appears
+    await expect(positionsPanel.locator('[role="status"]')).toBeVisible()
+    await expect(positionsPanel.locator('[role="status"]')).toContainText('Liquidity removed')
+  })
+
+  test('Gold AMM create pool: submitting form creates pool and shows success', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.playerCurrencyBalances = [{ currencyCode: 'EUR', currencySymbol: '€', balance: 50000 }]
+    state.goldBalance = { balance: 10.0, blockedInPools: 0, availableBalance: 10.0 }
+    // No existing pools so Create Pool form is shown
+    state.goldAmmPools = []
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex?tab=gold')
+
+    await page.getByRole('tab', { name: 'Add Liquidity' }).click()
+
+    const addSection = page.locator('[aria-label="Add Liquidity"]')
+    await expect(addSection.getByText('Create New Pool')).toBeVisible()
+
+    // Fill in pool creation form
+    const inputs = addSection.locator('input[type="number"]')
+    await inputs.nth(0).fill('5000')
+    await inputs.nth(1).fill('2.5')
+
+    await addSection.getByRole('button', { name: 'Create Pool' }).click()
+
+    // Success message appears (rendered outside the collapsed showCreateForm block)
+    await expect(page.locator('[aria-label="Add Liquidity"]').locator('[role="status"]')).toBeVisible()
+    await expect(page.locator('[aria-label="Add Liquidity"]').locator('[role="status"]')).toContainText('Liquidity pool created')
+  })
 })

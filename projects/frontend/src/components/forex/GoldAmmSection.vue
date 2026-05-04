@@ -11,7 +11,7 @@ const props = defineProps<{
   balances: CurrencyBalance[]
 }>()
 
-const emit = defineEmits<{
+defineEmits<{
   (e: 'refresh'): void
 }>()
 
@@ -91,8 +91,8 @@ const showCreateForm = computed(() => pools.value.length < props.availableCurren
 
 // ÔöÇÔöÇ Methods ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 
-async function loadData() {
-  loading.value = true
+async function loadData(isRefresh = false) {
+  if (!isRefresh) loading.value = true
   error.value = null
   try {
     const [poolsResult, balanceResult] = await Promise.all([
@@ -129,7 +129,7 @@ async function loadData() {
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
-    loading.value = false
+    if (!isRefresh) loading.value = false
   }
 }
 
@@ -195,8 +195,7 @@ async function executeSwap() {
     swapShowConfirm.value = false
     swapQuote.value = null
     swapAmount.value = null
-    await loadData()
-    emit('refresh')
+    await loadData(true)
   } catch (e: unknown) {
     swapError.value = e instanceof Error ? e.message : t('goldAmm.swapFailed')
   } finally {
@@ -234,8 +233,7 @@ async function addLiquidity() {
     addSuccess.value = t('goldAmm.addLiquiditySuccess')
     addFiatAmount.value = null
     addMaxGold.value = null
-    await loadData()
-    emit('refresh')
+    await loadData(true)
   } catch (e: unknown) {
     addError.value = e instanceof Error ? e.message : t('goldAmm.swapFailed')
   } finally {
@@ -268,8 +266,7 @@ async function createPool() {
     createSuccess.value = t('goldAmm.createPoolSuccess')
     createFiatAmount.value = null
     createGoldAmount.value = null
-    await loadData()
-    emit('refresh')
+    await loadData(true)
   } catch (e: unknown) {
     createError.value = e instanceof Error ? e.message : t('goldAmm.swapFailed')
   } finally {
@@ -300,8 +297,7 @@ async function removeLiquidity(positionId: string) {
       },
     )
     removeSuccess.value = t('goldAmm.removeLiquiditySuccess')
-    await loadData()
-    emit('refresh')
+    await loadData(true)
   } catch (e: unknown) {
     removeError.value = e instanceof Error ? e.message : t('goldAmm.swapFailed')
   } finally {
@@ -529,10 +525,11 @@ onMounted(loadData)
                 {{ removeLoading && removePositionId === pool.myPosition?.id ? t('common.loading') : t('goldAmm.removeLiquidity') }}
               </button>
             </div>
-            <div v-if="removeSuccess && removePositionId === null" class="text-sm text-good mt-2" role="status">{{ removeSuccess }}</div>
-            <div v-if="removeError && removePositionId === null" class="text-sm text-bad mt-2" role="alert">{{ removeError }}</div>
           </div>
         </div>
+        <!-- Remove liquidity success/error shown outside the v-for so they persist after the position is removed -->
+        <div v-if="removeSuccess" class="text-sm text-good px-4 py-3 bg-good/10 border border-good rounded-lg" role="status">✅ {{ removeSuccess }}</div>
+        <div v-if="removeError" class="text-sm text-bad" role="alert">{{ removeError }}</div>
       </div>
 
       <!-- ÔöÇÔöÇ Add Liquidity Tab ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ -->
@@ -605,7 +602,6 @@ onMounted(loadData)
 
             <div v-if="goldBalance && goldBalance.blockedInPools > 0" class="text-xs text-caution px-3 py-2 bg-caution/10 rounded-md" role="note">⚠️ {{ t('goldAmm.blockedGoldWarning') }}</div>
 
-            <div v-if="createSuccess" class="text-sm text-good" role="status">{{ createSuccess }}</div>
             <div v-if="createError" class="text-sm text-bad" role="alert">{{ createError }}</div>
 
             <div>
@@ -616,7 +612,11 @@ onMounted(loadData)
           </div>
         </div>
 
+        <!-- Create pool success shown even after the form collapses (pool count now >= currency count) -->
+        <div v-if="createSuccess" class="text-sm text-good px-4 py-3 bg-good/10 border border-good rounded-lg" role="status">✅ {{ createSuccess }}</div>
+
         <div v-if="pools.length === 0 && !showCreateForm" class="text-center py-8 text-muted italic text-sm">{{ t('goldAmm.noPools') }}</div>
+
       </div>
     </template>
   </section>

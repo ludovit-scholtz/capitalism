@@ -352,6 +352,20 @@ export type MockGoldAmmPool = {
   myPosition: MockGoldAmmPosition | null
 }
 
+export type MockGoldAmmTradeRecord = {
+  id: string
+  playerId: string
+  poolId: string
+  direction: string
+  currencyCode: string
+  inputAmount: number
+  outputAmount: number
+  feeAmount: number
+  impliedPrice: number
+  executedAtTick: number
+  executedAtUtc: string
+}
+
 export type MockGoldBalance = {
   balance: number
   blockedInPools: number
@@ -977,6 +991,8 @@ export type MockState = {
   goldAmmPools: MockGoldAmmPool[]
   /** Player gold token balance for the Gold AMM exchange. */
   goldBalance: MockGoldBalance
+  /** Recent gold AMM swap trade records returned by goldAmmSwapHistory. */
+  goldAmmSwapHistory: MockGoldAmmTradeRecord[]
   /** City market reports returned by the cityMarketReports query. */
   marketReports: Array<{
     id: string
@@ -2493,6 +2509,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     myBankAccounts: [],
     goldAmmPools: [],
     goldBalance: { balance: 0, blockedInPools: 0, availableBalance: 0 },
+    goldAmmSwapHistory: [],
     marketReports: [],
     supplyChainData: {},
     buildingMarketListings: [],
@@ -6409,6 +6426,19 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             },
           },
         }),
+      })
+    }
+
+    if (query.includes('goldAmmSwapHistory')) {
+      const variables = body.variables as { currencyCode?: string; myTradesOnly?: boolean; limit?: number } | undefined
+      const currency = variables?.currencyCode
+      const mockHistory = (state.goldAmmSwapHistory ?? []).filter(
+        (h) => !currency || h.currencyCode === currency,
+      )
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { goldAmmSwapHistory: mockHistory } }),
       })
     }
 
