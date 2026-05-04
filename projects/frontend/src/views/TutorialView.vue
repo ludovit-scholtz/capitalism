@@ -83,7 +83,7 @@ const earnedPoints = computed(() => {
   return MILESTONE_DEFS.filter((def) => isCompleted(def.id)).reduce((sum, m) => sum + m.bountyPoints, 0)
 })
 const progressPercent = computed(() => {
-  const total: number = ALL_MILESTONES.length
+  const total = (ALL_MILESTONES as readonly string[]).length
   if (total === 0) return 0
   return Math.round((completedCount.value / total) * 100)
 })

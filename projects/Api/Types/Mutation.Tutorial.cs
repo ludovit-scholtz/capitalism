@@ -36,7 +36,13 @@ public sealed partial class Mutation
 
         if (existing is not null)
         {
-            // Idempotent: return the existing record.
+            // Idempotent: always ensure IsCompleted=true regardless of current state.
+            if (!existing.IsCompleted)
+            {
+                existing.IsCompleted = true;
+                existing.CompletedAtUtc ??= DateTime.UtcNow;
+                await db.SaveChangesAsync(httpContextAccessor.HttpContext.RequestAborted);
+            }
             return new TutorialMilestoneStatus
             {
                 Milestone = existing.Milestone,

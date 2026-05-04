@@ -104,8 +104,9 @@ export function useTutorialContext() {
       } else {
         milestones.value.push(updated)
       }
-    } catch {
-      // Silently swallow errors to avoid interrupting user flow
+    } catch (err) {
+      // Log for debugging while not interrupting user flow
+      console.warn('Failed to complete milestone:', milestone, err)
     }
   }
 
