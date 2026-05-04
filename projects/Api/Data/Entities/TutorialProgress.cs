@@ -48,6 +48,15 @@ public static class TutorialMilestone
     /// <summary>Player establishes their first brand.</summary>
     public const string FirstBrandEstablished = "FIRST_BRAND_ESTABLISHED";
 
+    /// <summary>Player dismissed the dashboard contextual tooltip overlay on first visit.</summary>
+    public const string TooltipDashboardShown = "TOOLTIP_DASHBOARD_SHOWN";
+
+    /// <summary>Player dismissed the building detail contextual tooltip overlay on first visit.</summary>
+    public const string TooltipBuildingDetailShown = "TOOLTIP_BUILDING_DETAIL_SHOWN";
+
+    /// <summary>Player dismissed the grid editor contextual tooltip overlay on first use.</summary>
+    public const string TooltipGridEditorShown = "TOOLTIP_GRID_EDITOR_SHOWN";
+
     /// <summary>All milestone identifiers in display order.</summary>
     public static readonly IReadOnlyList<string> All =
     [
@@ -56,5 +65,8 @@ public static class TutorialMilestone
         FirstLoanTaken,
         FirstCompetitorObserved,
         FirstBrandEstablished,
+        TooltipDashboardShown,
+        TooltipBuildingDetailShown,
+        TooltipGridEditorShown,
     ];
 }

@@ -3348,6 +3348,18 @@ export default {
         title: 'Predaj verejnosti',
         desc: 'Vaša predajňa predáva mestským spotrebiteľom každý tik. Nastavte konkurencieschopnú cenu.',
       },
+      dashboardOverlay: {
+        title: 'Vitajte vo vašom dashboarde',
+        body: 'Toto je vaše veliteľské centrum. Sledujte firmy, čakajúce vylepšenia a výkon dodávateľského reťazca. Preskúmajte každú kartu na správu budov a finančnú prehľadnosť.',
+      },
+      buildingDetailOverlay: {
+        title: 'Detail budovy',
+        body: 'Tu môžete kontrolovať každú jednotku budovy, konfigurovať výrobné reťazce a zaradiť do frontu vylepšenia. Kliknite na ľubovoľnú bunku mriežky a zobrazte nastavenia jednotky.',
+      },
+      gridEditorOverlay: {
+        title: 'Editor mriežky jednotiek',
+        body: 'Presuňte dlaždice jednotiek do mriežky a nastavte rozloženie výroby. Prepojte jednotky na vytvorenie efektívnych výrobných reťazcov. Navštívte stránku Tutoriál pre sprievodcu krok za krokom.',
+      },
     },
   },
 }
