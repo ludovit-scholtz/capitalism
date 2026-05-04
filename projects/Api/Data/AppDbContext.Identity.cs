@@ -151,5 +151,32 @@ public sealed partial class AppDbContext
             e.HasIndex(tp => tp.PlayerId);
             e.HasIndex(tp => new { tp.PlayerId, tp.Milestone }).IsUnique();
         });
+
+        modelBuilder.Entity<PlayerAchievementBadge>(e =>
+        {
+            e.HasKey(b => b.Id);
+            e.Property(b => b.BadgeType).HasMaxLength(60);
+            e.HasOne(b => b.Player)
+                .WithMany()
+                .HasForeignKey(b => b.PlayerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            // Enforce uniqueness: one badge type per player.
+            e.HasIndex(b => new { b.PlayerId, b.BadgeType }).IsUnique();
+            e.HasIndex(b => b.PlayerId);
+        });
+
+        modelBuilder.Entity<PlayerRankSnapshot>(e =>
+        {
+            e.HasKey(s => s.Id);
+            e.Property(s => s.WealthUsd).HasPrecision(18, 2);
+            e.Property(s => s.PercentileRank).HasPrecision(6, 2);
+            e.HasOne(s => s.Player)
+                .WithMany()
+                .HasForeignKey(s => s.PlayerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            // Efficient query by (player, tick) — also enforces uniqueness per tick.
+            e.HasIndex(s => new { s.PlayerId, s.SnapshotTick }).IsUnique();
+            e.HasIndex(s => s.PlayerId);
+        });
     }
 }

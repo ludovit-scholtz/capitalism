@@ -150,6 +150,12 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Tax-cycle economic health snapshots for each city.</summary>
     public DbSet<CityEconomicReport> CityEconomicReports => Set<CityEconomicReport>();
 
+    /// <summary>Achievement badges earned by players for reaching milestones.</summary>
+    public DbSet<PlayerAchievementBadge> PlayerAchievementBadges => Set<PlayerAchievementBadge>();
+
+    /// <summary>Weekly leaderboard rank snapshots per player.</summary>
+    public DbSet<PlayerRankSnapshot> PlayerRankSnapshots => Set<PlayerRankSnapshot>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
