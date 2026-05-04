@@ -210,7 +210,7 @@ async function markAllNotificationsRead() {
             class="btn btn-secondary h-9 w-9 p-0 justify-center"
             @click="
               () => {
-                auth.logout()
+                auth.logout({ federated: true })
                 closeMenu()
               }
             "

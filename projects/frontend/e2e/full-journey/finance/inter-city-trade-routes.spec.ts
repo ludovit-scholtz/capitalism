@@ -111,7 +111,7 @@ test.describe('Trade Routes Management View', () => {
     // Only IN_TRANSIT route should be shown
     await expect(page.locator('.tr-row')).toHaveCount(1)
     await expect(page.locator('.tr-badge--in_transit')).toBeVisible()
-    await expect(page.locator('.tr-badge--delivered')).not.toBeVisible()
+    await expect(page.locator('.tr-badge--delivered')).toBeHidden()
   })
 
   test('Route_TradeRoutes_Filter_Completed_ShowsDeliveredAndFailed', async ({ page }) => {

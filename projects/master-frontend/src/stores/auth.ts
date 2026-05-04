@@ -19,6 +19,7 @@ const AUTH_PROVIDER_LOCAL = 'local'
 const AUTH_PROVIDER_BIATEC = 'biatec_oidc'
 const BIATEC_OIDC_AUTHORIZE_URL =
   import.meta.env.VITE_BIATEC_OIDC_AUTHORIZE_URL || 'https://google.biatec.io/authorize'
+const BIATEC_OIDC_END_SESSION_URL = import.meta.env.VITE_BIATEC_OIDC_END_SESSION_URL || ''
 const BIATEC_OIDC_CLIENT_ID = import.meta.env.VITE_BIATEC_OIDC_CLIENT_ID || 'capitalism-master'
 const BIATEC_OIDC_REDIRECT_URI = import.meta.env.VITE_BIATEC_OIDC_REDIRECT_URI
 const BIATEC_OIDC_SCOPE = import.meta.env.VITE_BIATEC_OIDC_SCOPE || 'openid'
@@ -42,6 +43,10 @@ interface BiatecCallbackSession {
   token: string
   expiresAtUtc: string
   redirectPath: string
+}
+
+interface LogoutOptions {
+  federated?: boolean
 }
 
 function generateOidcRandom(length = 32) {
@@ -120,6 +125,34 @@ export const useAuthStore = defineStore('masterAuth', () => {
 
   function clearStoredOidcState() {
     localStorage.removeItem(OIDC_STATE_KEY)
+  }
+
+  function getPostLogoutRedirectUri() {
+    if (typeof window === 'undefined') {
+      return 'http://localhost:5174/login'
+    }
+
+    return `${window.location.origin}/login`
+  }
+
+  function buildBiatecEndSessionUrl(idTokenHint: string | null) {
+    if (!BIATEC_OIDC_END_SESSION_URL || typeof window === 'undefined') {
+      return null
+    }
+
+    try {
+      const logoutUrl = new URL(BIATEC_OIDC_END_SESSION_URL)
+      logoutUrl.searchParams.set('post_logout_redirect_uri', getPostLogoutRedirectUri())
+      logoutUrl.searchParams.set('client_id', BIATEC_OIDC_CLIENT_ID)
+
+      if (idTokenHint) {
+        logoutUrl.searchParams.set('id_token_hint', idTokenHint)
+      }
+
+      return logoutUrl.toString()
+    } catch {
+      return null
+    }
   }
 
   function getStoredOidcState(): OidcStateRecord | null {
@@ -370,7 +403,11 @@ export const useAuthStore = defineStore('masterAuth', () => {
     }
   }
 
-  function logout() {
+  function logout(options: LogoutOptions = {}) {
+    const shouldFederatedLogout = options.federated === true && getStoredAuthProvider() === AUTH_PROVIDER_BIATEC
+    const idTokenHint = token.value
+    const federatedLogoutUrl = shouldFederatedLogout ? buildBiatecEndSessionUrl(idTokenHint) : null
+
     clearRenewalTimer()
     token.value = null
     player.value = null
@@ -381,6 +418,10 @@ export const useAuthStore = defineStore('masterAuth', () => {
     localStorage.removeItem(EXPIRES_KEY)
     localStorage.removeItem(AUTH_PROVIDER_KEY)
     clearStoredOidcState()
+
+    if (federatedLogoutUrl) {
+      window.location.assign(federatedLogoutUrl)
+    }
   }
 
   return {

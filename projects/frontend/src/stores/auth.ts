@@ -6,6 +6,7 @@ import { deepEqual } from '@/lib/utils'
 import type { AccountContextResult, AccountContextType, Player, AuthPayload } from '@/types'
 
 const BIATEC_OIDC_AUTHORIZE_URL = import.meta.env.VITE_BIATEC_OIDC_AUTHORIZE_URL || 'https://google.biatec.io/authorize'
+const BIATEC_OIDC_END_SESSION_URL = import.meta.env.VITE_BIATEC_OIDC_END_SESSION_URL || ''
 const BIATEC_OIDC_CLIENT_ID = import.meta.env.VITE_BIATEC_OIDC_CLIENT_ID || 'capitalism'
 const BIATEC_OIDC_REDIRECT_URI = import.meta.env.VITE_BIATEC_OIDC_REDIRECT_URI
 const BIATEC_OIDC_SCOPE = import.meta.env.VITE_BIATEC_OIDC_SCOPE || 'openid'
@@ -24,6 +25,10 @@ interface OidcPendingState {
   state: string
   nonce: string
   redirectPath: string
+}
+
+interface LogoutOptions {
+  federated?: boolean
 }
 
 const PLAYER_SELECTION = `
@@ -280,6 +285,34 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  function getPostLogoutRedirectUri() {
+    if (typeof window === 'undefined') {
+      return 'http://localhost:5173/login'
+    }
+
+    return `${window.location.origin}/login`
+  }
+
+  function buildBiatecEndSessionUrl(idTokenHint: string | null) {
+    if (!BIATEC_OIDC_END_SESSION_URL || typeof window === 'undefined') {
+      return null
+    }
+
+    try {
+      const logoutUrl = new URL(BIATEC_OIDC_END_SESSION_URL)
+      logoutUrl.searchParams.set('post_logout_redirect_uri', getPostLogoutRedirectUri())
+      logoutUrl.searchParams.set('client_id', BIATEC_OIDC_CLIENT_ID)
+
+      if (idTokenHint) {
+        logoutUrl.searchParams.set('id_token_hint', idTokenHint)
+      }
+
+      return logoutUrl.toString()
+    } catch {
+      return null
+    }
+  }
+
   function getStoredToken() {
     if (typeof localStorage === 'undefined') {
       return null
@@ -522,11 +555,19 @@ export const useAuthStore = defineStore('auth', () => {
     setStoredCityId(cityId)
   }
 
-  function logout() {
+  function logout(options: LogoutOptions = {}) {
+    const shouldFederatedLogout = options.federated === true && getStoredAuthProvider() === AUTH_PROVIDER_BIATEC
+    const idTokenHint = token.value
+    const federatedLogoutUrl = shouldFederatedLogout ? buildBiatecEndSessionUrl(idTokenHint) : null
+
     clearRenewalTimer()
     token.value = null
     player.value = null
     clearStoredSession()
+
+    if (federatedLogoutUrl) {
+      window.location.assign(federatedLogoutUrl)
+    }
   }
 
   return {

@@ -17,7 +17,7 @@ function toggleMenu() {
 }
 
 function logout() {
-  auth.logout()
+  auth.logout({ federated: true })
   closeMenu()
 }
 </script>
