@@ -56,7 +56,7 @@ public static class Program
                 services.AddSingleton<IEnumerable<BotAccount>>(sp =>
                 {
                     var opts = sp.GetRequiredService<IOptions<BotOptions>>().Value;
-                    return BuildBotRoster(opts);
+                    return BotRosterFactory.Build(opts);
                 });
 
                 services.AddSingleton<BotOrchestrator>();
@@ -98,30 +98,5 @@ public static class Program
             logger.LogCritical(ex, "Bot runner terminated with an unhandled error.");
             return 1;
         }
-    }
-
-    // ── Bot roster factory ───────────────────────────────────────────────────
-
-    private static readonly string[] Strategies = ["Trading", "Industrial", "Retail", "Mixed", "Aggressive"];
-
-    private static List<BotAccount> BuildBotRoster(BotOptions options)
-    {
-        var count = Math.Clamp(options.BotCount, 1, 20);
-        var roster = new List<BotAccount>(count);
-
-        for (var i = 1; i <= count; i++)
-        {
-            var strategy = Strategies[(i - 1) % Strategies.Length];
-            var name = $"{options.BotNamePrefix}_{strategy}_{i:D2}";
-            roster.Add(new BotAccount
-            {
-                Index = i,
-                DisplayName = name,
-                Email = $"{name.ToLowerInvariant()}@{options.BotEmailDomain}",
-                Strategy = strategy,
-            });
-        }
-
-        return roster;
     }
 }

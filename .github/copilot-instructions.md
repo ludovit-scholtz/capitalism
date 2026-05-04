@@ -1367,3 +1367,18 @@ Root-cause of an E2E test failure (May 2026, PR #192 / marketing-analytics unaut
 2. **"Log in" (two words) and "login" (one word) are different strings.** `auth.loginRequired` = "Please log in to continue." which requires `/log in/i` or `/please log in/i`, not `/login/i`.
 3. **When testing unauthenticated state, prefer asserting the page-level empty-state message** (e.g. `page.locator('.ca-empty-state')` visible, or `page.getByText(/please log in/i)`). Do not rely on navigation header elements whose text depends on the header implementation.
 4. **Immediately before pushing any new E2E test, run it in isolation** with `CI=true npx playwright test --project=chromium e2e/<spec>.ts --grep "test name"` to verify the selector actually resolves to a visible element.
+
+## Console app test coverage — every new .NET project must have a companion test project
+
+Root-cause of a quality failure (May 2026, PR #236 NPC bot console app):
+- `projects/NPCBot/` was delivered with all implementation code but no unit test project.
+- The acceptance criteria explicitly required "Account creation helper functions", "State query validation", and "Profitability calculation logic" as backend unit tests.
+- The product owner correctly identified the gap and requested test coverage be added.
+
+**Rules to prevent recurrence:**
+1. **Every new .NET console application or library must ship with a companion `<ProjectName>.Tests/` test project in the same PR.** The test project must be a sibling directory and reference the main project.
+2. **Minimum test coverage for a new console app:** pure business logic (model properties, calculation helpers, factory/builder methods, configuration defaults), error handling (exception types, error codes), and happy-path integration scenarios where the app can be exercised in memory.
+3. **Extract testable business logic from `Program.cs` into public static or service classes** (e.g. `BotRosterFactory`, `BotProfitCalculator`) before the PR is submitted. Methods that are `private static` on `Program` cannot be tested directly.
+4. **Test project must include a `GlobalUsings.cs` with `global using Xunit;`** for test attribute discovery — the xunit runner package does NOT auto-generate global using for the `Xunit` namespace in all .NET SDK configurations.
+5. **For console apps with configuration options (`BotOptions`, `AppSettings`), add tests that assert all default values** match the documented defaults and that free/restricted resource lists are correctly seeded.
+6. **Build and run the test project with `dotnet test --configuration Release` before every `report_progress` call.** Do not push console app code without verified passing tests.
