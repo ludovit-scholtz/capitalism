@@ -140,11 +140,13 @@ All three industries are Pro-gated at both backend (`ProOnlyStarterIndustries`) 
 - [ ] Include a "Hall of Fame" panel on the profile page listing the player's highest single-tick revenue, largest single acquisition, highest brand quality ever achieved, and longest consecutive days active.
 - [ ] Allow players to add a short bio (max 160 chars) and a custom profile badge unlocked by specific master-ranking bounty completions, visible on their profile page and on the leaderboard table.
 
-### Company growth and second IPO path (0% complete)
+### Company growth and second IPO path (100% complete)
 
-- [ ] Implement a "New Company IPO" flow accessible from the personal account dashboard after the player's first company has been operational for at least 1 game year (8760 ticks): player configures a new company name, selects raise amount and ownership split (same 25/33/50% tiers as onboarding), and funds the new company bank account via the stock exchange.
-- [ ] Enforce a maximum of 5 player-controlled companies per person account to prevent monopolistic lockout of all available land lots while still enabling meaningful business diversification.
-- [ ] Show the "Start New Company" CTA on the personal account dashboard only when prerequisites are met (first company profitable for ≥ 365 ticks, player balance ≥ $200k), with a tooltip explaining the requirement when the button is locked.
+- [x] Implement a "New Company IPO" flow accessible from the personal account dashboard after the player's first company has been operational for at least 1 game year (8760 ticks): player configures a new company name, selects raise amount and ownership split (same 25/33/50% tiers as onboarding), and funds the new company bank account via the stock exchange.
+- [x] Enforce a maximum of 5 player-controlled companies per person account to prevent monopolistic lockout of all available land lots while still enabling meaningful business diversification.
+- [x] Show the "Start New Company" CTA on the personal account dashboard only when prerequisites are met (first company profitable for ≥ 365 ticks, player balance ≥ $200k), with a tooltip explaining the requirement when the button is locked.
+
+**Shipped (increment 1):** `startAdditionalCompany` GraphQL mutation enforces five prerequisite gates (oldest company ≥ 8 760 ticks, ≥ 365-tick profitability window, personal USD balance ≥ $200 k, < 5 existing companies, valid city). On success it atomically creates the new `Company`, provisions an FX-scaled bank account, debits the player's personal settlement account, records `FounderContribution` + `IpoRaise` ledger entries, and seeds a founder `Shareholding`. The `additionalCompanyPrerequisites` query returns a per-gate eligibility snapshot for the CTA checklist. The frontend `NewCompanyModal.vue` two-step wizard (name+city → IPO tier cards) lives on the personal-account Overview tab of the Dashboard, showing a prerequisite checklist when gates are not met and redirecting to the onboarding flow after a successful launch.
 
 ### City economic health indicators (0% complete)
 

@@ -57,8 +57,6 @@ const balanceAfterIpo = computed(() => {
 
 const lowBalanceWarning = computed(() => balanceAfterIpo.value < 50_000)
 
-const selectedTier = computed(() => ipoTiers.find((t) => t.raiseTarget === selectedIpoRaiseTarget.value) ?? ipoTiers[0])
-
 const totalFunding = computed(() => {
   const fxRate = 1 // All amounts shown in USD; backend converts to local currency.
   return (founderContribution + selectedIpoRaiseTarget.value) * fxRate
@@ -142,7 +140,7 @@ async function launch() {
           <h2 class="text-lg font-bold">{{ t('dashboard.newCompanyWizardTitle') }}</h2>
           <div class="flex items-center gap-3">
             <span class="text-xs text-muted">
-              {{ t('common.step', { step, total: 2 }) || `Step ${step}/2` }}
+              {{ t('common.step', { step, total: 2 }) }}
             </span>
             <button
               class="btn-icon text-muted hover:text-primary transition-colors"

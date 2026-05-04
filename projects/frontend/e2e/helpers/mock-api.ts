@@ -6092,7 +6092,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
-    if (query.includes('cities')) {
+    if (query.includes('cities') && !query.includes('additionalCompanyPrerequisites')) {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
