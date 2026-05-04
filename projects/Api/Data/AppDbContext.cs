@@ -135,6 +135,9 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Per-product seasonal demand multipliers for Q1–Q4.</summary>
     public DbSet<DemandSeasonality> DemandSeasonalities => Set<DemandSeasonality>();
 
+    /// <summary>Scheduled, in-transit, and completed inter-city trade routes.</summary>
+    public DbSet<InterCityTradeRoute> InterCityTradeRoutes => Set<InterCityTradeRoute>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

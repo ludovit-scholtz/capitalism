@@ -154,6 +154,10 @@ async function markAllNotificationsRead() {
           <font-awesome-icon :icon="['fas', 'landmark']" class="mr-2" />
           <span class="inline-block md:hidden">{{ t('nav.banking') }}</span>
         </RouterLink>
+        <RouterLink v-if="auth.isAuthenticated" to="/trade-routes" :title="t('tradeRoutes.nav')" class="nav-link" @click="closeMenu">
+          <font-awesome-icon :icon="['fas', 'route']" class="mr-2" />
+          <span class="inline-block md:hidden">{{ t('tradeRoutes.nav') }}</span>
+        </RouterLink>
         <RouterLink to="/news" :title="t('nav.news')" :aria-label="t('nav.news')" class="nav-link nav-link-badge-host" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'newspaper']" class="mr-2" />
           <span class="inline-block md:hidden">{{ t('nav.news') }}</span>
