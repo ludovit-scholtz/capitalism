@@ -310,6 +310,65 @@ public sealed class BotStateValidatorTests
             Assert.Contains(issue, result.Summary);
     }
 
+    // ── Additional edge-case tests ────────────────────────────────────────────
+
+    [Fact]
+    public void Validate_ReadyBot_Issues_IsEmpty()
+    {
+        // When the bot is fully valid, Issues must be empty (not just Count == 0).
+        var bot = MakeReadyBot();
+        var result = BotStateValidator.Validate(bot);
+        Assert.True(result.IsValid);
+        Assert.Empty(result.Issues);
+    }
+
+    [Fact]
+    public void Validate_TokenExpiredExactly_ReportsTokenIssue()
+    {
+        // A token that expired just now (negative seconds) must be caught.
+        var bot = MakeReadyBot();
+        bot.TokenExpiresAtUtc = DateTime.UtcNow.AddSeconds(-1);
+
+        var result = BotStateValidator.Validate(bot);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Issues, i => i.Contains("expired", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void IsReadyForOperation_AllThreeConditionsMustPass()
+    {
+        // All three conditions must be true simultaneously for the bot to be ready.
+        var bot = MakeReadyBot();
+
+        // Toggle each condition off one at a time and verify the method returns false.
+        bot.IsSkipped = true;
+        Assert.False(BotStateValidator.IsReadyForOperation(bot));
+        bot.IsSkipped = false;
+
+        bot.Token = null;
+        Assert.False(BotStateValidator.IsReadyForOperation(bot));
+        bot.Token = "renewed";
+        bot.TokenExpiresAtUtc = DateTime.UtcNow.AddHours(1);
+
+        bot.Profile = null;
+        Assert.False(BotStateValidator.IsReadyForOperation(bot));
+
+        // Restore all conditions → should be ready.
+        bot.Profile = new PlayerProfile { OnboardingCompletedAtUtc = DateTime.UtcNow.AddDays(-1) };
+        Assert.True(BotStateValidator.IsReadyForOperation(bot));
+    }
+
+    [Fact]
+    public void Validate_IssueListIsImmutable()
+    {
+        // BotStateValidationResult.Issues is IReadOnlyList<string> — cast should fail.
+        var bot = MakeReadyBot();
+        bot.IsSkipped = true;
+
+        var result = BotStateValidator.Validate(bot);
+        Assert.IsNotType<List<string>>(result.Issues);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static BotAccount MakeReadyBot() => new()

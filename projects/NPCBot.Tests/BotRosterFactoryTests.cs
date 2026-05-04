@@ -185,4 +185,35 @@ public sealed class BotRosterFactoryTests
         var bot10 = roster[9]; // index 1-based = 10, list 0-based = 9
         Assert.Contains("_10", bot10.DisplayName);
     }
+
+    [Fact]
+    public void Build_BotIndex1_DisplayName_ContainsD2Format()
+    {
+        // Bot index 1 uses D2 format: "_01" (not "_1").
+        var opts = DefaultOptions();
+        opts.BotCount = 1;
+        var roster = BotRosterFactory.Build(opts);
+        Assert.Contains("_01", roster[0].DisplayName);
+    }
+
+    [Fact]
+    public void Build_NegativeBotCount_ClampedToOne()
+    {
+        // A negative BotCount is an invalid configuration — clamped to 1.
+        var opts = DefaultOptions();
+        opts.BotCount = -5;
+        var roster = BotRosterFactory.Build(opts);
+        Assert.Single(roster);
+    }
+
+    [Fact]
+    public void Build_IndustrialStrategy_IsSecondBotInRoster()
+    {
+        // The Strategies array is ["Trading", "Industrial", "Retail", "Mixed", "Aggressive"].
+        // Bot index 2 → "Industrial". Locking this prevents silent reordering.
+        var opts = DefaultOptions();
+        opts.BotCount = 2;
+        var roster = BotRosterFactory.Build(opts);
+        Assert.Equal("Industrial", roster[1].Strategy);
+    }
 }

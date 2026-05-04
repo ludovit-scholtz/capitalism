@@ -233,4 +233,35 @@ public sealed class BotAccountTests
         bot.PendingRecommendation = null;
         Assert.Null(bot.PendingRecommendation);
     }
+
+    // ── Additional defaults ───────────────────────────────────────────────────
+
+    [Fact]
+    public void Defaults_TokenIsNull()
+    {
+        var bot = new BotAccount();
+        Assert.Null(bot.Token);
+    }
+
+    [Fact]
+    public void Defaults_ProfileIsNull()
+    {
+        var bot = new BotAccount();
+        Assert.Null(bot.Profile);
+    }
+
+    [Fact]
+    public void ProfitDelta_WhenBothZero_IsZero()
+    {
+        var bot = new BotAccount { InitialNetWorth = 0m, CurrentNetWorth = 0m };
+        Assert.Equal(0m, bot.ProfitDelta);
+    }
+
+    [Fact]
+    public void ProfitDelta_MatchesManualDifference()
+    {
+        // ProfitDelta is exactly CurrentNetWorth - InitialNetWorth; verify precision.
+        var bot = new BotAccount { InitialNetWorth = 123_456.78m, CurrentNetWorth = 135_000.00m };
+        Assert.Equal(135_000.00m - 123_456.78m, bot.ProfitDelta);
+    }
 }

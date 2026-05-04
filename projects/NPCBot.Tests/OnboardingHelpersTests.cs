@@ -425,4 +425,69 @@ public sealed class OnboardingHelpersTests
         };
         Assert.False(OnboardingHelpers.ShouldResumeFromShopStep(bot));
     }
+
+    // ── Additional ContainsSuitableType coverage ──────────────────────────────
+
+    [Fact]
+    public void ContainsSuitableType_LongCsv_MatchesTargetInMiddle()
+    {
+        // "MINE,FACTORY,SALES_SHOP,COMMERCIAL" — FACTORY is in the middle.
+        Assert.True(OnboardingHelpers.ContainsSuitableType(
+            "MINE,FACTORY,SALES_SHOP,COMMERCIAL", "FACTORY"));
+    }
+
+    [Fact]
+    public void ContainsSuitableType_LongCsv_MatchesTargetAtEnd()
+    {
+        // "MINE,FACTORY,SALES_SHOP" — SALES_SHOP is at the end.
+        Assert.True(OnboardingHelpers.ContainsSuitableType(
+            "MINE,FACTORY,SALES_SHOP", "SALES_SHOP"));
+    }
+
+    [Fact]
+    public void ContainsSuitableType_LongCsv_DoesNotMatchSubstring()
+    {
+        // "MINE,FACTORY,SALES_SHOP" — "SHOP" is a trailing substring of SALES_SHOP but not a segment.
+        Assert.False(OnboardingHelpers.ContainsSuitableType(
+            "MINE,FACTORY,SALES_SHOP", "SHOP"));
+    }
+
+    // ── Additional PickCheapestAvailableLot coverage ──────────────────────────
+
+    [Fact]
+    public void PickCheapestAvailableLot_TwoOccupiedLots_ReturnsNull()
+    {
+        var lots = new[]
+        {
+            new BuildingLotSummary { Id = "occ1", SuitableTypes = "FACTORY", BuildingId = "bld-001", Price = 50_000m },
+            new BuildingLotSummary { Id = "occ2", SuitableTypes = "FACTORY", BuildingId = "bld-002", Price = 40_000m },
+        };
+        var result = OnboardingHelpers.PickCheapestAvailableLot(lots, "FACTORY");
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void PickCheapestAvailableLot_ManyLots_ReturnsCheapestAvailable()
+    {
+        // 10 lots with one available and the cheapest available is in the middle.
+        var lots = Enumerable.Range(1, 9)
+            .Select(i => new BuildingLotSummary
+            {
+                Id = $"lot-occ-{i:D2}",
+                SuitableTypes = "FACTORY",
+                BuildingId = $"bld-{i:D2}",
+                Price = i * 10_000m,
+            })
+            .Append(new BuildingLotSummary
+            {
+                Id = "lot-free-99",
+                SuitableTypes = "FACTORY",
+                BuildingId = null,
+                Price = 999m, // cheapest
+            })
+            .ToArray();
+        var result = OnboardingHelpers.PickCheapestAvailableLot(lots, "FACTORY");
+        Assert.NotNull(result);
+        Assert.Equal("lot-free-99", result.Id);
+    }
 }

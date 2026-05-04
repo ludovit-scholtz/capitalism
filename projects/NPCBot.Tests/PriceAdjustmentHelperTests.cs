@@ -411,4 +411,44 @@ public sealed class PriceAdjustmentHelperTests
         // Prices must not drop below €0.01 to avoid zero/negative prices on the exchange.
         Assert.Equal(0.01m, PriceAdjustmentHelper.MinimumAllowedPrice);
     }
+
+    // ── Additional coverage ───────────────────────────────────────────────────
+
+    [Fact]
+    public void IsAdjustmentMeaningful_ExactlyOneCentDifference_IsTrue()
+    {
+        // |10.00 − 9.99| = 0.01 — exactly the threshold → meaningful.
+        Assert.True(PriceAdjustmentHelper.IsAdjustmentMeaningful(10.00m, 9.99m));
+    }
+
+    [Fact]
+    public void IsAdjustmentMeaningful_LessThanOneCentDifference_IsFalse()
+    {
+        // |10.00 − 9.999| = 0.001 → sub-cent change → not meaningful.
+        Assert.False(PriceAdjustmentHelper.IsAdjustmentMeaningful(10.00m, 9.999m));
+    }
+
+    [Fact]
+    public void IsAdjustmentMeaningful_SamePriceToTwoDecimalPlaces_IsFalse()
+    {
+        // 45.55 → 45.55: no change → not meaningful.
+        Assert.False(PriceAdjustmentHelper.IsAdjustmentMeaningful(45.55m, 45.55m));
+    }
+
+    [Fact]
+    public void ComputeNewPrice_AtFloor_RemainsAtFloor()
+    {
+        // Already at the minimum price floor: further reduction stays at floor.
+        var floor = PriceAdjustmentHelper.MinimumAllowedPrice;
+        Assert.Equal(floor, PriceAdjustmentHelper.ComputeNewPrice(floor, 0.85m));
+    }
+
+    [Fact]
+    public void SelectAdjustableUnits_EmptyCompanyList_ReturnsEmpty()
+    {
+        var result = PriceAdjustmentHelper
+            .SelectAdjustableUnits(Enumerable.Empty<CompanySummary>())
+            .ToList();
+        Assert.Empty(result);
+    }
 }

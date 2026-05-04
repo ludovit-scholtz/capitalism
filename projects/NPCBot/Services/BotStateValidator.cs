@@ -55,7 +55,7 @@ public static class BotStateValidator
             Summary = issues.Count == 0
                 ? "Bot is ready for operation."
                 : string.Join(" ", issues),
-            Issues = issues,
+            Issues = issues.AsReadOnly(),
         };
     }
 

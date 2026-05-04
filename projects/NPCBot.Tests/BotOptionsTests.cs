@@ -150,4 +150,49 @@ public sealed class BotOptionsTests
             Assert.True(industry == industry.ToUpperInvariant(),
                 $"Industry '{industry}' must be uppercase to match GraphQL enum values.");
     }
+
+    [Fact]
+    public void Defaults_PollIntervalIsExactlySixtySeconds()
+    {
+        // The default poll interval should be exactly 60 seconds so that one bot tick
+        // aligns with approximately one game simulation tick (60 s interval in production).
+        var opts = new BotOptions();
+        Assert.Equal(60, opts.PollIntervalSeconds);
+    }
+
+    [Fact]
+    public void Defaults_TokenRefreshBufferIsExactlyFiveMinutes()
+    {
+        // Proactive re-authentication fires 5 minutes before token expiry by default.
+        // A smaller buffer risks sending requests with an expired token on slow networks.
+        var opts = new BotOptions();
+        Assert.Equal(5, opts.TokenRefreshBufferMinutes);
+    }
+
+    [Fact]
+    public void Defaults_MaxConsecutiveErrorsIsExactlyFive()
+    {
+        // The skip threshold should be exactly 5 so that transient network blips (up to 4
+        // consecutive) do not permanently disable a bot account.
+        var opts = new BotOptions();
+        Assert.Equal(5, opts.MaxConsecutiveErrors);
+    }
+
+    [Fact]
+    public void Defaults_BotEmailDomain_ContainsDotSeparator()
+    {
+        // A valid email domain must have at least one dot so registration does not
+        // fail immediately with a malformed email address error.
+        var opts = new BotOptions();
+        Assert.Contains(".", opts.BotEmailDomain);
+    }
+
+    [Fact]
+    public void Defaults_MinTicksBeforeAdjustmentIsExactlyFive()
+    {
+        // The default minimum is 5 ticks so a bot waits for meaningful profitability
+        // data before making price adjustments.
+        var opts = new BotOptions();
+        Assert.Equal(5, opts.MinTicksBeforeAdjustment);
+    }
 }

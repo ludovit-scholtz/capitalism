@@ -366,4 +366,55 @@ public sealed class BotProfitCalculatorTests
         Assert.Equal(ProfitabilityStatus.Unprofitable,
             BotProfitCalculator.Classify(90_000m, 100_000m));
     }
+
+    // ── Additional coverage ───────────────────────────────────────────────────
+
+    [Fact]
+    public void Classify_ExactlyAtPositiveTwoPercent_IsNeutral()
+    {
+        // +2% is exactly at the upper boundary of the neutral band → Neutral, not Profitable.
+        // deltaPercent = (102 000 − 100 000) / 100 000 = 0.02 exactly.
+        Assert.Equal(ProfitabilityStatus.Neutral,
+            BotProfitCalculator.Classify(102_000m, 100_000m));
+    }
+
+    [Fact]
+    public void Classify_ExactlyAtNegativeTwoPercent_IsNeutral()
+    {
+        // −2% is exactly at the lower boundary of the neutral band → Neutral, not Unprofitable.
+        // deltaPercent = (98 000 − 100 000) / 100 000 = −0.02 exactly.
+        Assert.Equal(ProfitabilityStatus.Neutral,
+            BotProfitCalculator.Classify(98_000m, 100_000m));
+    }
+
+    [Fact]
+    public void ComputeAnnualisedRatePercent_CustomTicksPerYear_ScalesProportionally()
+    {
+        // Verify that doubling ticksPerYear doubles the annualised rate.
+        var rateAt8760 = BotProfitCalculator.ComputeAnnualisedRatePercent(
+            110_000m, 100_000m, 8760, ticksPerYear: 8760);
+        var rateAt17520 = BotProfitCalculator.ComputeAnnualisedRatePercent(
+            110_000m, 100_000m, 8760, ticksPerYear: 17_520);
+        Assert.Equal(rateAt8760 * 2, rateAt17520);
+    }
+
+    [Fact]
+    public void ComputeNetWorth_SingleCompanyWithZeroCash_IsZero()
+    {
+        var profile = new PlayerProfile
+        {
+            Companies = [new CompanySummary { Cash = 0m }],
+        };
+        Assert.Equal(0m, BotProfitCalculator.ComputeNetWorth(profile));
+    }
+
+    [Fact]
+    public void Recommend_WithCustomMinTicks_RespectsParameter()
+    {
+        // Default minTicks = 5; with minTicks = 20 and only 15 elapsed → no action.
+        var rec = BotProfitCalculator.Recommend(
+            80_000m, 100_000m,
+            ticksElapsed: 15, minTicksBeforeAdjustment: 20);
+        Assert.False(rec.ShouldAct, "Should not act before the custom minimum ticks.");
+    }
 }
