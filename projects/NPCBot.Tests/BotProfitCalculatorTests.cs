@@ -349,4 +349,21 @@ public sealed class BotProfitCalculatorTests
         Assert.True(rate > 0m);
         Assert.True(rate > 100m, "Single-tick 10% growth annualises to a very large rate.");
     }
+
+    [Fact]
+    public void SeverelyUnprofitableThresholdPercent_IsNegativeTenPercent()
+    {
+        // The threshold drives which bots get the AggressivePriceReductionFactor.
+        // If this changes, all production bots may behave differently.
+        Assert.Equal(-0.10m, BotProfitCalculator.SeverelyUnprofitableThresholdPercent);
+    }
+
+    [Fact]
+    public void Classify_ExactlyAtSeverelyUnprofitableThreshold_ReturnsUnprofitable()
+    {
+        // –10% is the severe threshold (inclusive) — must still return Unprofitable.
+        // deltaPercent = (90 000 − 100 000) / 100 000 = –0.10 exactly.
+        Assert.Equal(ProfitabilityStatus.Unprofitable,
+            BotProfitCalculator.Classify(90_000m, 100_000m));
+    }
 }

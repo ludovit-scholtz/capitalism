@@ -396,4 +396,19 @@ public sealed class PriceAdjustmentHelperTests
         // 10.005 rounds to 10.01 (AwayFromZero midpoint rounding, not banker's rounding)
         Assert.Equal(10.01m, PriceAdjustmentHelper.ComputeNewPrice(10.005m, 1.0m));
     }
+
+    [Fact]
+    public void PublicSalesUnitType_ConstantValue_IsPublicSalesString()
+    {
+        // This constant drives the unit-type filter. Changing it would cause all bots to
+        // select zero units (or the wrong units) without any compile-time error.
+        Assert.Equal("PUBLIC_SALES", PriceAdjustmentHelper.PublicSalesUnitType);
+    }
+
+    [Fact]
+    public void MinimumAllowedPrice_ConstantValue_IsOneCent()
+    {
+        // Prices must not drop below €0.01 to avoid zero/negative prices on the exchange.
+        Assert.Equal(0.01m, PriceAdjustmentHelper.MinimumAllowedPrice);
+    }
 }

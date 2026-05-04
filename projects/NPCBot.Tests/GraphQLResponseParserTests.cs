@@ -179,4 +179,24 @@ public sealed class GraphQLResponseParserTests
         using var doc = JsonDocument.Parse(json);
         Assert.False(GraphQLResponseParser.HasData(doc.RootElement));
     }
+
+    [Fact]
+    public void HasErrors_ErrorsFieldIsObject_ReturnsFalse()
+    {
+        // Some non-conforming servers may return errors as an object instead of an array.
+        // The parser checks for ValueKind == Array, so a non-array field must return false
+        // rather than throw — defensiveness against malformed responses.
+        const string json = """{"errors":{"message":"unexpected format"},"data":null}""";
+        using var doc = JsonDocument.Parse(json);
+        Assert.False(GraphQLResponseParser.HasErrors(doc.RootElement));
+    }
+
+    [Fact]
+    public void HasData_EmptyDataObject_ReturnsTrue()
+    {
+        // An empty data object `{}` is still a valid data response (e.g. a mutation with no return).
+        const string json = """{"data":{}}""";
+        using var doc = JsonDocument.Parse(json);
+        Assert.True(GraphQLResponseParser.HasData(doc.RootElement));
+    }
 }

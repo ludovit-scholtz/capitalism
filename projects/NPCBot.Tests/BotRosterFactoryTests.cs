@@ -145,4 +145,44 @@ public sealed class BotRosterFactoryTests
         var roster = BotRosterFactory.Build(DefaultOptions());
         Assert.All(roster, b => Assert.Null(b.Token));
     }
+
+    [Fact]
+    public void Build_FirstBot_StrategyIsTrading()
+    {
+        // The Strategies array is ["Trading", "Industrial", "Retail", "Mixed", "Aggressive"].
+        // Bot index 1 uses index 0 → "Trading". Locking this prevents silent reordering
+        // that would change the profile of existing live bots on restart.
+        var opts = DefaultOptions();
+        opts.BotCount = 1;
+        var roster = BotRosterFactory.Build(opts);
+        Assert.Equal("Trading", roster[0].Strategy);
+    }
+
+    [Fact]
+    public void Build_FiveBots_AllFiveStrategiesPresent()
+    {
+        // Exactly 5 bots should produce all 5 distinct strategy names.
+        var opts = DefaultOptions();
+        opts.BotCount = 5;
+        var roster = BotRosterFactory.Build(opts);
+        var strategies = roster.Select(b => b.Strategy).Distinct().ToList();
+        Assert.Equal(5, strategies.Count);
+        Assert.Contains("Trading", strategies);
+        Assert.Contains("Industrial", strategies);
+        Assert.Contains("Retail", strategies);
+        Assert.Contains("Mixed", strategies);
+        Assert.Contains("Aggressive", strategies);
+    }
+
+    [Fact]
+    public void Build_BotIndex10_DisplayName_ContainsTwoDigitIndex()
+    {
+        // Format string is {i:D2}, so index 10 → "10" (2 chars), not "010".
+        // Index 1 → "01". The display name for bot 10 must contain "10" verbatim.
+        var opts = DefaultOptions();
+        opts.BotCount = 10;
+        var roster = BotRosterFactory.Build(opts);
+        var bot10 = roster[9]; // index 1-based = 10, list 0-based = 9
+        Assert.Contains("_10", bot10.DisplayName);
+    }
 }

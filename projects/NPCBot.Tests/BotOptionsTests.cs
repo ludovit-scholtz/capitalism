@@ -121,4 +121,33 @@ public sealed class BotOptionsTests
         Assert.True(opts.MaxConsecutiveErrors >= 2,
             $"MaxConsecutiveErrors should be >= 2 but was {opts.MaxConsecutiveErrors}");
     }
+
+    [Fact]
+    public void SectionName_Constant_IsNpcBot()
+    {
+        // The SectionName constant is used for .NET configuration DI binding
+        // (services.Configure<BotOptions>(config.GetSection(BotOptions.SectionName))).
+        // If it changes, the environment-variable overrides and appsettings.json binding break silently.
+        Assert.Equal("NpcBot", BotOptions.SectionName);
+    }
+
+    [Fact]
+    public void Defaults_BotPassword_IsNonEmpty()
+    {
+        // The default password is a dev placeholder that must be non-empty.
+        // A null/empty password would cause registration to fail immediately.
+        var opts = new BotOptions();
+        Assert.False(string.IsNullOrWhiteSpace(opts.BotPassword));
+    }
+
+    [Fact]
+    public void Defaults_AllowedIndustries_AllEntriesAreUppercase()
+    {
+        // Industry names are compared with SCREAMING_SNAKE_CASE GraphQL enum values.
+        // A lowercase entry would fail the backend INVALID_INDUSTRY validation silently.
+        var opts = new BotOptions();
+        foreach (var industry in opts.AllowedIndustries)
+            Assert.True(industry == industry.ToUpperInvariant(),
+                $"Industry '{industry}' must be uppercase to match GraphQL enum values.");
+    }
 }
