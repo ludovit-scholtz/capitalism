@@ -20,7 +20,7 @@ public sealed partial class Query
     /// </summary>
     [Authorize]
     public async Task<List<TradeRouteResult>> GetMyTradeRoutes(
-        Guid companyId,
+        Guid? companyId,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
@@ -28,21 +28,36 @@ public sealed partial class Query
         var player = await db.Players.FirstOrDefaultAsync(p => p.Id == userId, CancellationToken.None)
             ?? throw new InvalidOperationException("Player not found.");
 
-        // Only allow the player who owns the company or an admin.
-        var company = await db.Companies.FirstOrDefaultAsync(c => c.Id == companyId, CancellationToken.None);
-        if (company is null)
-            throw new GraphQLException(ErrorBuilder.New().SetMessage("Company not found.").SetCode("COMPANY_NOT_FOUND").Build());
-
-        if (company.PlayerId != player.Id && player.Role != PlayerRole.Admin)
-            throw new GraphQLException(ErrorBuilder.New().SetMessage("Access denied.").SetCode("ACCESS_DENIED").Build());
-
-        var routes = await db.InterCityTradeRoutes
+        var routesQuery = db.InterCityTradeRoutes
             .AsNoTracking()
-            .Where(r => r.CompanyId == companyId)
             .Include(r => r.SourceBuilding).ThenInclude(b => b.City)
             .Include(r => r.DestinationBuilding).ThenInclude(b => b.City)
             .Include(r => r.ProductType)
             .Include(r => r.ResourceType)
+            .AsQueryable();
+
+        if (companyId.HasValue)
+        {
+            // Only allow the player who owns the company or an admin.
+            var company = await db.Companies.FirstOrDefaultAsync(c => c.Id == companyId.Value, CancellationToken.None);
+            if (company is null)
+                throw new GraphQLException(ErrorBuilder.New().SetMessage("Company not found.").SetCode("COMPANY_NOT_FOUND").Build());
+
+            if (company.PlayerId != player.Id && player.Role != PlayerRole.Admin)
+                throw new GraphQLException(ErrorBuilder.New().SetMessage("Access denied.").SetCode("ACCESS_DENIED").Build());
+
+            routesQuery = routesQuery.Where(r => r.CompanyId == companyId.Value);
+        }
+        else
+        {
+            var ownCompanyIds = db.Companies
+                .AsNoTracking()
+                .Where(c => c.PlayerId == player.Id)
+                .Select(c => c.Id);
+            routesQuery = routesQuery.Where(r => ownCompanyIds.Contains(r.CompanyId));
+        }
+
+        var routes = await routesQuery
             .OrderByDescending(r => r.CreatedAtUtc)
             .ToListAsync(CancellationToken.None);
 
