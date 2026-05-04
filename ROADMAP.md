@@ -116,11 +116,19 @@ All three industries are Pro-gated at both backend (`ProOnlyStarterIndustries`) 
 - [x] `BuildingSaleOffer` entity, EF migration, and `BuildingAcquisition`/`BuildingSale` ledger categories for full auditability.
 - [x] 14 backend integration tests (mark for sale, unlist, insufficient funds, duplicate offers, ownership transfer, ledger entries, concurrent offers, unauthenticated guard) and 14 Playwright E2E tests covering the full buyer and seller flows.
 
-### Resource depletion and scarcity feedback (0% complete)
+### Resource depletion and scarcity feedback (100% complete)
 
-- [ ] Show a depletion progress bar in the mining unit detail panel: current remaining quantity vs. original deposit quantity, estimated ticks until depletion at current extraction rate, and a warning badge on the dashboard building card when remaining stock falls below 20%.
-- [ ] When a mine's raw material is fully depleted, stop the mining unit output and emit a player notification; display a "Depleted" badge on the building card and a recommended action to purchase a new mining lot.
-- [ ] Seed per-city resource replenishment events: every 8760 ticks (one game year), game engine randomly restores 10–30% of a subset of depleted mine deposits across all cities to simulate geological discovery, with a news event announcing the replenishment so players have opportunity to react.
+- [x] Show a depletion progress bar in the mining unit detail panel: current remaining quantity vs. original deposit quantity, estimated ticks until depletion at current extraction rate, and a warning badge on the dashboard building card when remaining stock falls below 20%.
+- [x] When a mine's raw material is fully depleted, stop the mining unit output and emit a player notification; display a "Depleted" badge on the building card and a recommended action to purchase a new mining lot.
+- [x] Seed per-city resource replenishment events: every 8760 ticks (one game year), game engine randomly restores 20–30% of a subset of depleted mine deposits across all cities to simulate geological discovery, with a news event announcing the replenishment so players have opportunity to react.
+
+**Shipped (May 2026):**
+- Per-tick deduction of `BuildingLot.MaterialQuantity` by the mining unit's extraction rate each tick. `OriginalMaterialQuantity` seeded at initializer time for relative % tracking.
+- Mining output becomes 0 when `MaterialQuantity ≤ 0`; `MineDepletionRecord` entity created for audit; `PlayerNotification` emitted with a deep-link to purchase a new mining lot.
+- `ResourceReplenishmentSchedule` entity tracks per-city replenishment. Every 8760 ticks, 20–30% of fully-depleted lots are randomly restored to 20–30% of original quantity; a `GameNewsEntry` news item is broadcast per city.
+- Frontend `MiningResourceStatusPanel` in the building detail shows deposit progress bar (green/yellow/red), remaining quantity, extraction rate, estimated ticks to depletion, and a "⚠️ Depletion Risk" badge below 20%.
+- Dashboard building card shows a ⚠️ depletion risk badge for mine buildings below the 20% threshold.
+- i18n keys added for all three locales (en/sk/de) under the `mining.*` namespace.
 
 ### Seasonal demand (100% complete)
 

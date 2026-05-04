@@ -252,6 +252,7 @@ public class Program
         builder.Services.AddScoped<ITickPhase, ManufacturingPhase>();
         builder.Services.AddScoped<ITickPhase, OperatingCostPhase>();
         builder.Services.AddScoped<ITickPhase, MiningPhase>();
+        builder.Services.AddScoped<ITickPhase, ResourceReplenishmentPhase>();
         builder.Services.AddScoped<ITickPhase, PurchasingPhase>();
         builder.Services.AddScoped<ITickPhase, TradeRoutePhase>();
         builder.Services.AddScoped<ITickPhase, MediaHouseContentPhase>();

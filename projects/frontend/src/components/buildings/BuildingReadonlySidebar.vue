@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { inject } from 'vue'
+import { inject, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
 import UnitResourceHistoryPanel from '@/components/buildings/UnitResourceHistoryPanel.vue'
 import SupplyChainTab from '@/components/buildings/SupplyChainTab.vue'
 import SeasonalOutlookPanel from '@/components/buildings/SeasonalOutlookPanel.vue'
+import MiningResourceStatusPanel from '@/components/buildings/MiningResourceStatusPanel.vue'
 import type { BuildingUnit } from '@/types'
 import type { ExchangeSortBy } from '@/lib/globalExchange'
 
@@ -89,6 +90,23 @@ const {
   submitPublicSalesInventoryAlertThreshold,
   submitFlushStorage,
 } = bd
+
+/** Mining rate table (units/tick) matching backend GameConstants.MiningRate. */
+function getMiningRateForLevel(level: number): number {
+  if (level <= 1) return 10
+  if (level === 2) return 25
+  if (level === 3) return 50
+  if (level === 4) return 100
+  return 10 * Math.pow(2, Math.max(level - 1, 0))
+}
+
+/** Mining rate per tick for the currently selected MINING unit (null when not a mining unit). */
+const selectedMiningRate = computed<number | null>(() => {
+  if (!selectedCell.value) return null
+  const unit = getUnitAtFrom(activeUnits.value, selectedCell.value.x, selectedCell.value.y) as BuildingUnit | null
+  if (!unit || unit.unitType !== 'MINING') return null
+  return getMiningRateForLevel(unit.level)
+})
 
 function operationalStatusCardClass(status: string): string {
   const normalizedStatus = status.toLowerCase()
@@ -296,7 +314,13 @@ function buildCompetitionPieGradient(entries: CompetitionLegendEntry[]): string 
               </span>
             </div>
           </div>
-          <!-- Unit Upgrade Panel removed from read-only view; it now lives in edit mode only. --></template
+          <!-- Unit Upgrade Panel removed from read-only view; it now lives in edit mode only. -->
+          <!-- Mining Resource Status Panel — shown only for MINING units -->
+          <MiningResourceStatusPanel
+            v-if="building && getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y)?.unitType === 'MINING'"
+            :building="building"
+            :mining-rate-per-tick="selectedMiningRate"
+          /></template
         ><!-- ── Quick Actions tab (PUBLIC_SALES only) ──────────── --><template v-else-if="selectedUnitTab === 'quickActions'"
           ><div class="unit-insight-card mt-0 border-0 pt-0" :aria-label="t('buildingDetail.accessibility.quickActions')">
             <div class="rounded-xl border border-divider bg-surface p-4 sm:p-5">

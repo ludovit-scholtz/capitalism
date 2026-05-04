@@ -296,6 +296,10 @@ public static class LandService
         var mineLotsMissingDeposit = cityLots
             .Where(lot => SupportsBuildingType(lot, BuildingType.Mine)
                 && lot.OwnerCompanyId == null
+                // Exclude depleted lots — they have OriginalMaterialQuantity set, meaning
+                // they previously held a deposit that was intentionally extracted to zero.
+                // Re-assigning them here would bypass the ResourceReplenishmentPhase cycle.
+                && !lot.OriginalMaterialQuantity.HasValue
                 && (lot.ResourceTypeId is null
                     || lot.ResourceType is null
                     || lot.MaterialQuality is null or <= 0m

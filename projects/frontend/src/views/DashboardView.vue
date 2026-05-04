@@ -147,7 +147,7 @@ async function loadDashboardData() {
   const companiesData = await gqlRequest<{ myCompanies: Company[] }>(
     `{ myCompanies {
       id name cash foundedAtUtc
-      buildings { id name type level cityId powerStatus units { id unitType gridX gridY level } }
+      buildings { id name type level cityId powerStatus lotMaterialQuantity lotOriginalMaterialQuantity units { id unitType gridX gridY level } }
     } }`,
   )
 
@@ -201,7 +201,7 @@ onMounted(async () => {
       `{
         myCompanies {
           id name cash foundedAtUtc
-          buildings { id name type level cityId powerStatus units { id unitType gridX gridY level } }
+          buildings { id name type level cityId powerStatus lotMaterialQuantity lotOriginalMaterialQuantity units { id unitType gridX gridY level } }
         }
         gameState {
           currentTick lastTickAtUtc tickIntervalSeconds taxCycleTicks taxRate
@@ -760,6 +760,15 @@ onMounted(async () => {
                     <span class="text-[0.6875rem] text-muted">{{ building.units.length }} units</span>
                     <span v-if="building.powerStatus && building.powerStatus !== 'POWERED'" :class="powerStatusClass(building.powerStatus)" :aria-label="getBuildingPowerLabel(building.powerStatus)">
                       {{ building.powerStatus === 'OFFLINE' ? '❌' : '⚡' }} {{ getBuildingPowerLabel(building.powerStatus) }}
+                    </span>
+                    <!-- Depletion risk badge for mine buildings with < 20% remaining -->
+                    <span
+                      v-if="building.type === 'MINE' && building.lotOriginalMaterialQuantity != null && building.lotOriginalMaterialQuantity > 0 && building.lotMaterialQuantity != null && (building.lotMaterialQuantity / building.lotOriginalMaterialQuantity) < 0.2"
+                      class="depletion-risk-badge inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6rem] font-bold bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-400/30"
+                      :title="t('mining.dashboardBadgeTooltip', { percent: Math.round((building.lotMaterialQuantity / building.lotOriginalMaterialQuantity) * 100) })"
+                      :aria-label="t('mining.depletionRisk')"
+                    >
+                      ⚠️ {{ building.lotMaterialQuantity <= 0 ? t('mining.depleted') : t('mining.depletionRisk') }}
                     </span>
                   </div>
                 </RouterLink>

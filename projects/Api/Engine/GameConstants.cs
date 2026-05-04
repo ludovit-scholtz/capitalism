@@ -297,6 +297,30 @@ public static partial class GameConstants
     public static decimal ResearchBaseQualityBudget(decimal basePrice) =>
         Math.Max(5_000m, basePrice * 1_000m);
 
+    /// <summary>
+    /// Number of game ticks between resource replenishment events (one game year = 8 760 ticks).
+    /// Every this many ticks a fraction of fully-depleted mine lots in each city is partially restored.
+    /// </summary>
+    public const int ReplenishmentIntervalTicks = TicksPerYear;
+
+    /// <summary>Minimum fraction of <see cref="BuildingLot.OriginalMaterialQuantity"/> restored per replenishment event (20%).</summary>
+    public const decimal ReplenishmentMinRestoreFraction = 0.10m;
+
+    /// <summary>Maximum fraction of <see cref="BuildingLot.OriginalMaterialQuantity"/> restored per replenishment event (30%).</summary>
+    public const decimal ReplenishmentMaxRestoreFraction = 0.30m;
+
+    /// <summary>Minimum fraction of depleted lots selected for replenishment per city per cycle (20%).</summary>
+    public const decimal ReplenishmentMinLotFraction = 0.20m;
+
+    /// <summary>Maximum fraction of depleted lots selected for replenishment per city per cycle (30%).</summary>
+    public const decimal ReplenishmentMaxLotFraction = 0.30m;
+
+    /// <summary>
+    /// Depletion risk threshold: a mine lot is flagged as "Depletion Risk" when remaining
+    /// quantity falls below this fraction of the original deposit.
+    /// </summary>
+    public const decimal DepletionRiskThreshold = 0.20m;
+
     /// <summary>Rate at which occupancy adjusts per tick toward equilibrium.</summary>
     public const decimal OccupancyAdjustmentRate = 0.5m;
 

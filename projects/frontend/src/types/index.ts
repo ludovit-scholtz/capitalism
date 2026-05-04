@@ -139,6 +139,8 @@ export interface Building {
   lotMaterialQuality?: number | null
   /** Remaining extractable quantity on the mine lot (null for non-mine lots). */
   lotMaterialQuantity?: number | null
+  /** Original (full) extractable quantity at the time the lot was first tracked (null for non-mine lots). */
+  lotOriginalMaterialQuantity?: number | null
   units: BuildingUnit[]
   pendingConfiguration: BuildingConfigurationPlan | null
 }
