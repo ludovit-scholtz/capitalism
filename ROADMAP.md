@@ -136,11 +136,15 @@ All three industries are Pro-gated at both backend (`ProOnlyStarterIndustries`) 
 - [x] Apply the seasonal multiplier as an additional factor in `PublicSalesPhase` demand calculation alongside salary signal, brand quality, and price index so sales volumes fluctuate naturally during the year without requiring player action.
 - [x] Expose the current season and seasonal demand outlook (next-quarter multiplier) in the public sales unit detail panel so players can plan inventory and pricing strategy ahead of demand peaks.
 
-### In-game tutorials and interactive help (0% complete)
+### In-game tutorials and interactive help (85% complete)
 
-- [ ] Add a `TutorialProgress` entity tracking per-player completion of guided tutorial milestones: first resource sold, first B2B trade, first loan taken, first competitor observed in market intelligence, first brand established.
-- [ ] Render contextual tooltip overlays on the dashboard and building detail views the first time a player encounters a new UI area (e.g., the first time they open a factory's grid editor) with a "Got it" dismiss button that marks that milestone complete and never shows again.
-- [ ] Add a `/tutorial` view accessible from the help menu that lists all tutorial milestones with completion status, points earned per milestone (tied to the master ranking bounty system), and a "Resume" deep-link to the relevant page for incomplete steps.
+- [x] Add a `TutorialProgress` entity tracking per-player completion of guided tutorial milestones: first resource sold, first B2B trade, first loan taken, first competitor observed in market intelligence, first brand established.
+- [x] `getTutorialProgress` GraphQL query returns all 5 milestones with `isCompleted` and `completedAtUtc` for the authenticated player. `markTutorialMilestoneComplete` mutation persists a milestone completion idempotently with full validation.
+- [x] Add a `/tutorial` view accessible from the navigation that lists all 5 tutorial milestones with completion status, bounty points per milestone, a progress bar, and "Resume" deep-links for incomplete steps. View is public (unauthenticated visitors see descriptions but no Resume buttons).
+- [x] `TutorialTooltip.vue` reusable component with fade-in animation, "Got it" dismiss button, Escape-key support, and 30-second auto-dismiss.
+- [x] `useTutorialContext` composable for milestone state management, completion fetching, and completing milestones from any view.
+- [x] All tooltip and tutorial UI strings available in English, Slovak, and German via vue-i18n.
+- [ ] Contextual tooltip overlays on the dashboard and building detail views (first grid-editor open, first building detail visit) using `TutorialTooltip.vue` and `useTutorialContext` — integration deferred to next increment.
 
 ### Player profile and statistics page (0% complete)
 

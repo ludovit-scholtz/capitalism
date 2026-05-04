@@ -1082,6 +1082,8 @@ export type MockState = {
     personalBalanceUsd: number
     balanceRequirementMet: boolean
   } | null
+  /** Tutorial milestone completion state for the current player. */
+  tutorialProgress: Array<{ milestone: string; isCompleted: boolean; completedAtUtc: string | null }>
 }
 
 export interface MockBuildingMarketListing {
@@ -2719,6 +2721,13 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     myBuildingListings: [],
     tradeRoutes: [],
     additionalCompanyPrerequisites: null,
+    tutorialProgress: [
+      { milestone: 'FIRST_RESOURCE_SOLD', isCompleted: false, completedAtUtc: null },
+      { milestone: 'FIRST_B2B_TRADE', isCompleted: false, completedAtUtc: null },
+      { milestone: 'FIRST_LOAN_TAKEN', isCompleted: false, completedAtUtc: null },
+      { milestone: 'FIRST_COMPETITOR_OBSERVED', isCompleted: false, completedAtUtc: null },
+      { milestone: 'FIRST_BRAND_ESTABLISHED', isCompleted: false, completedAtUtc: null },
+    ],
     ...initial,
   }
 
@@ -6784,6 +6793,33 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
     if (query.includes('myTradeRoutes')) {
       return routeJson({ myTradeRoutes: state.tradeRoutes })
+    }
+
+    // ── Tutorial Progress ──────────────────────────────────────────────────────
+    if (query.includes('tutorialProgress') && !query.includes('markTutorialMilestoneComplete')) {
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      if (!player) {
+        return routeJson({ errors: [{ message: 'Not authenticated', extensions: { code: 'UNAUTHORIZED' } }] })
+      }
+      return routeJson({ tutorialProgress: state.tutorialProgress })
+    }
+
+    if (query.includes('markTutorialMilestoneComplete')) {
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      if (!player) {
+        return routeJson({ errors: [{ message: 'Not authenticated', extensions: { code: 'UNAUTHORIZED' } }] })
+      }
+      const milestone: string = body.variables?.input?.milestone ?? ''
+      const existing = state.tutorialProgress.find((m) => m.milestone === milestone)
+      const now = new Date().toISOString()
+      if (existing) {
+        existing.isCompleted = true
+        existing.completedAtUtc = existing.completedAtUtc ?? now
+        return routeJson({ markTutorialMilestoneComplete: { ...existing } })
+      }
+      const newEntry = { milestone, isCompleted: true, completedAtUtc: now }
+      state.tutorialProgress.push(newEntry)
+      return routeJson({ markTutorialMilestoneComplete: { ...newEntry } })
     }
 
     // ── Additional Company IPO ─────────────────────────────────────────────────

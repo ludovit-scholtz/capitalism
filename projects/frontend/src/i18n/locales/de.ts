@@ -63,6 +63,7 @@ export default {
     bankStatement: 'Kontoauszug',
     cities: 'Städte',
     buildingMarket: 'Gebäudemarkt',
+    tutorial: 'Tutorial',
   },
   news: {
     eyebrow: 'Offizieller Feed',
@@ -3215,5 +3216,59 @@ export default {
     viewAvailableLots: 'Verfügbare Parzellen anzeigen',
     depletedDescription: 'Diese Bergbauparzelle wurde vollständig abgebaut.',
     dashboardBadgeTooltip: 'Nur noch {percent}% der Ressource vorhanden. Planen Sie bald eine Ersatzmine.',
+  },
+  tutorial: {
+    title: 'Tutorial',
+    subtitle: 'Absolvieren Sie geführte Meilensteine, meistern Sie Capitalism V und verdienen Sie Bonuspunkte.',
+    progressLabel: '{done}/{total} Meilensteine abgeschlossen',
+    pointsEarned: '{earned}/{total} Punkte verdient',
+    resume: 'Fortsetzen',
+    done: 'Fertig',
+    completedAria: 'Abgeschlossen',
+    pendingAria: 'Ausstehend',
+    authNotice: 'Melden Sie sich an, um Ihren Fortschritt zu verfolgen und Bonuspunkte für jeden Meilenstein zu verdienen.',
+    signIn: 'Anmelden',
+    gotIt: 'Verstanden',
+    milestones: {
+      firstResourceSold: {
+        title: 'Erster Verkauf',
+        desc: 'Richten Sie Ihren Laden ein und tätigen Sie den ersten Verkauf an Verbraucher auf dem Stadtmarkt.',
+        value: 'Erfahren Sie, wie öffentliche Verkäufe funktionieren, und beginnen Sie, ersten Umsatz zu generieren.',
+      },
+      firstB2BTrade: {
+        title: 'Erster B2B-Handel',
+        desc: 'Führen Sie Ihren ersten Unternehmensverkauf über die globale Börse durch.',
+        value: 'Entdecken Sie, wie zwischenbetriebliche Handelsrouten die Lieferkette effizienter machen.',
+      },
+      firstLoanTaken: {
+        title: 'Erster Kredit aufgenommen',
+        desc: 'Besuchen Sie ein Bankgebäude und nehmen Sie Ihren ersten Kredit zur Expansionsfinanzierung auf.',
+        value: 'Verstehen Sie, wie Hebelwirkung und Finanzierung das Wachstum Ihres Imperiums beschleunigen können.',
+      },
+      firstCompetitorObserved: {
+        title: 'Erster Wettbewerber beobachtet',
+        desc: 'Öffnen Sie die Marktintelligenz und schauen Sie sich ein konkurrierendes Unternehmen in Ihrer Stadt an.',
+        value: 'Lernen Sie, Ihre Preise und Strategie mit Konkurrenten auf dem Markt zu vergleichen.',
+      },
+      firstBrandEstablished: {
+        title: 'Erste Marke etabliert',
+        desc: 'Investieren Sie in das Branding Ihres Produkts und erreichen Sie messbares Markenbewusstsein.',
+        value: 'Entdecken Sie, wie Markenqualität die Nachfrage steigert und Premiumpreise ermöglicht.',
+      },
+    },
+    tooltips: {
+      gridEditorIntro: {
+        title: 'Raster-Editor',
+        desc: 'Verschieben Sie Einheitenkacheln, um das Gebäudelayout zu konfigurieren und Produktionsketten zu verbinden.',
+      },
+      buildingControlsIntro: {
+        title: 'Gebäudesteuerung',
+        desc: 'Nutzen Sie diese Steuerelemente zum Upgraden von Einheiten, Anzeigen von Analysen und Verwalten Ihres Gebäudes.',
+      },
+      firstSale: {
+        title: 'An die Öffentlichkeit verkaufen',
+        desc: 'Ihr Laden verkauft pro Tick an Stadtverbraucher. Setzen Sie einen wettbewerbsfähigen Preis.',
+      },
+    },
   },
 }

@@ -2159,3 +2159,11 @@ export interface CreateTradeRoutePayload {
   errorMessage: string | null
   route: TradeRouteResult | null
 }
+
+// ─── Tutorial ────────────────────────────────────────────────────────────────
+
+export interface TutorialMilestoneStatus {
+  milestone: string
+  isCompleted: boolean
+  completedAtUtc: string | null
+}
