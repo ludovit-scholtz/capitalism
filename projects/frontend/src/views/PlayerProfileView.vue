@@ -691,7 +691,7 @@ onMounted(async () => {
           <!-- Export button (authenticated only) -->
           <div v-if="auth.isAuthenticated && (isOwnProfile || auth.player?.role === 'ADMIN')" class="export-container relative">
             <button
-              class="export-stats-btn btn btn-secondary inline-flex items-center gap-1.5 text-sm"
+              class="export-btn export-stats-btn btn btn-secondary inline-flex items-center gap-1.5 text-sm"
               :disabled="exportLoading"
               @click="exportMenuOpen = !exportMenuOpen"
             >
