@@ -10236,7 +10236,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         // The configure-guide in the frontend depends on selectedProduct.basePrice from the
         // FinishOnboarding result to show the player the market benchmark selling price.
         // If this field is ever dropped from the GraphQL response, the guide silently shows
-        // generic text instead of the concrete price ($45 Furniture, $3 Bread, $50 Medicine, $45 Electronics, $80 Construction).
+        // generic text instead of the concrete price ($45 Furniture, $3 Bread, $50 Medicine, $45 Electronics, $80 Construction, $55 Pharmaceuticals, $28 Energy, $20 Logistics).
         var industries = new[]
         {
             ("FURNITURE", "wooden-chair", 45m, false),
@@ -10244,6 +10244,9 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             ("HEALTHCARE", "basic-medicine", 50m, false),
             ("ELECTRONICS", "basic-electronics", 45m, true),
             ("CONSTRUCTION", "residential-block", 80m, true),
+            ("PHARMACEUTICALS", "aspirin", 55m, true),
+            ("ENERGY", "coal-briquette", 28m, true),
+            ("LOGISTICS", "shipping-bag", 20m, true),
         };
 
         foreach (var (industry, slug, expectedBasePrice, requiresPro) in industries)
@@ -11297,6 +11300,668 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             .GetDecimal();
 
         Assert.Equal(80m, returnedBasePrice);
+    }
+
+    // ─── Pharmaceuticals Pro-gating tests ───────────────────────────────────
+
+    [Fact]
+    public async Task StartOnboardingCompany_Pharmaceuticals_AsNonProUser_ReturnsProError()
+    {
+        var token = await RegisterAndGetTokenAsync($"start-pharma-nonpro-{Guid.NewGuid()}@test.com", "NonProPharma");
+        var cityId = await GetCityIdByNameAsync();
+        var lotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Pharma Industrial Zone");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { company { id } }
+            }
+            """,
+            new { input = new { industry = "PHARMACEUTICALS", cityId, companyName = "Pharma Co", factoryLotId = lotId } },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Equal("PRO_SUBSCRIPTION_REQUIRED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task StartOnboardingCompany_Pharmaceuticals_AsProUser_Succeeds()
+    {
+        var email = $"start-pharma-pro-{Guid.NewGuid()}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "ProPharma");
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddDays(30);
+            await db.SaveChangesAsync();
+        }
+
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Pharma Pro Zone");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { company { id name } }
+            }
+            """,
+            new { input = new { industry = "PHARMACEUTICALS", cityId, companyName = "Gold Pharma Co", factoryLotId } },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _), $"Pro Pharmaceuticals start failed: {result}");
+        var company = result.GetProperty("data").GetProperty("startOnboardingCompany").GetProperty("company");
+        Assert.Equal("Gold Pharma Co", company.GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_Pharmaceuticals_AsProUser_Succeeds()
+    {
+        var email = $"finish-pharma-pro-{Guid.NewGuid()}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "FinishPharmaPro");
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddDays(30);
+            await db.SaveChangesAsync();
+        }
+
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Pharma Factory Zone");
+
+        var startResult = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { company { id } }
+            }
+            """,
+            new { input = new { industry = "PHARMACEUTICALS", cityId, companyName = "Aspirin Empire", factoryLotId } },
+            token);
+        Assert.False(startResult.TryGetProperty("errors", out _), $"Start errors: {startResult}");
+
+        var aspirinId = await GetStarterProductIdAsync("PHARMACEUTICALS", "aspirin");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Pharma Shop Zone");
+
+        var finishResult = await ExecuteGraphQlAsync(
+            """
+            mutation FinishOnboarding($input: FinishOnboardingInput!) {
+              finishOnboarding(input: $input) {
+                selectedProduct { id name slug isProOnly basePrice }
+                factory { units { unitType } }
+                salesShop { units { unitType } }
+              }
+            }
+            """,
+            new { input = new { productTypeId = aspirinId, shopLotId } },
+            token);
+
+        Assert.False(finishResult.TryGetProperty("errors", out _), $"Finish errors: {finishResult}");
+        var data = finishResult.GetProperty("data").GetProperty("finishOnboarding");
+        var product = data.GetProperty("selectedProduct");
+        Assert.Equal("aspirin", product.GetProperty("slug").GetString());
+        Assert.True(product.GetProperty("isProOnly").GetBoolean());
+        Assert.Equal(55m, product.GetProperty("basePrice").GetDecimal());
+
+        var factoryUnits = data.GetProperty("factory").GetProperty("units").EnumerateArray().ToList();
+        Assert.Contains(factoryUnits, u => u.GetProperty("unitType").GetString() == "PURCHASE");
+        Assert.Contains(factoryUnits, u => u.GetProperty("unitType").GetString() == "MANUFACTURING");
+
+        var shopUnits = data.GetProperty("salesShop").GetProperty("units").EnumerateArray().ToList();
+        Assert.Contains(shopUnits, u => u.GetProperty("unitType").GetString() == "PUBLIC_SALES");
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_Pharmaceuticals_AsNonProUser_ProductAccessDenied()
+    {
+        var email = $"finish-pharma-nonpro-{Guid.NewGuid()}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "NonProFinishPharma");
+
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Pharma Bypass Zone");
+
+        // Temporarily grant Pro to start onboarding, then revoke before finishing.
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddDays(30);
+            await db.SaveChangesAsync();
+        }
+
+        var startResult = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { company { id } }
+            }
+            """,
+            new { input = new { industry = "PHARMACEUTICALS", cityId, companyName = "Bypass Pharma", factoryLotId } },
+            token);
+        Assert.False(startResult.TryGetProperty("errors", out _), $"Start errors: {startResult}");
+
+        await using (var revokeScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = revokeScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddMinutes(-1);
+            await db.SaveChangesAsync();
+        }
+
+        var aspirinId = await GetStarterProductIdAsync("PHARMACEUTICALS", "aspirin");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Pharma Bypass Shop");
+
+        var finishResult = await ExecuteGraphQlAsync(
+            """
+            mutation FinishOnboarding($input: FinishOnboardingInput!) {
+              finishOnboarding(input: $input) { selectedProduct { slug } }
+            }
+            """,
+            new { input = new { productTypeId = aspirinId, shopLotId } },
+            token);
+
+        Assert.True(finishResult.TryGetProperty("errors", out var finishErrors));
+        Assert.Equal("PRO_SUBSCRIPTION_REQUIRED", finishErrors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task PharmaceuticalsStarterProducts_AllHaveDirectGoldRecipe()
+    {
+        var starterSlugs = new[] { "aspirin", "vitamin-capsule", "antibiotic" };
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            {
+              productTypes(industry: "PHARMACEUTICALS") {
+                slug
+                isProOnly
+                recipes { resourceType { slug } inputProductType { slug } quantity }
+              }
+            }
+            """);
+
+        var products = result.GetProperty("data").GetProperty("productTypes").EnumerateArray()
+            .Where(p => starterSlugs.Contains(p.GetProperty("slug").GetString()))
+            .ToList();
+
+        Assert.Equal(3, products.Count);
+
+        foreach (var product in products)
+        {
+            var slug = product.GetProperty("slug").GetString();
+            Assert.True(product.GetProperty("isProOnly").GetBoolean(), $"{slug} should be Pro-only");
+
+            var recipes = product.GetProperty("recipes").EnumerateArray().ToList();
+            var hasGoldRecipe = recipes.Any(r =>
+                r.TryGetProperty("resourceType", out var rt) &&
+                rt.ValueKind != System.Text.Json.JsonValueKind.Null &&
+                rt.GetProperty("slug").GetString() == "gold");
+
+            Assert.True(hasGoldRecipe, $"{slug} must have a direct gold recipe");
+        }
+    }
+
+    [Fact]
+    public async Task StarterIndustries_IncludesPharmaceuticalsAsProOnly()
+    {
+        var result = await ExecuteGraphQlAsync(
+            "{ starterIndustries { industries proOnlyIndustries } }");
+
+        var payload = result.GetProperty("data").GetProperty("starterIndustries");
+        var industries = payload.GetProperty("industries").EnumerateArray().Select(i => i.GetString()).ToList();
+        var proOnly = payload.GetProperty("proOnlyIndustries").EnumerateArray().Select(i => i.GetString()).ToList();
+
+        Assert.Contains("PHARMACEUTICALS", industries);
+        Assert.Contains("PHARMACEUTICALS", proOnly);
+    }
+
+    // ─── Energy Pro-gating tests ────────────────────────────────────────────
+
+    [Fact]
+    public async Task StartOnboardingCompany_Energy_AsNonProUser_ReturnsProError()
+    {
+        var token = await RegisterAndGetTokenAsync($"start-energy-nonpro-{Guid.NewGuid()}@test.com", "NonProEnergy");
+        var cityId = await GetCityIdByNameAsync();
+        var lotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Energy Industrial Zone");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { company { id } }
+            }
+            """,
+            new { input = new { industry = "ENERGY", cityId, companyName = "Energy Co", factoryLotId = lotId } },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Equal("PRO_SUBSCRIPTION_REQUIRED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task StartOnboardingCompany_Energy_AsProUser_Succeeds()
+    {
+        var email = $"start-energy-pro-{Guid.NewGuid()}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "ProEnergy");
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddDays(30);
+            await db.SaveChangesAsync();
+        }
+
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Energy Pro Zone");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { company { id name } }
+            }
+            """,
+            new { input = new { industry = "ENERGY", cityId, companyName = "Coal Energy Co", factoryLotId } },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _), $"Pro Energy start failed: {result}");
+        var company = result.GetProperty("data").GetProperty("startOnboardingCompany").GetProperty("company");
+        Assert.Equal("Coal Energy Co", company.GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_Energy_AsProUser_Succeeds()
+    {
+        var email = $"finish-energy-pro-{Guid.NewGuid()}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "FinishEnergyPro");
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddDays(30);
+            await db.SaveChangesAsync();
+        }
+
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Energy Factory Zone");
+
+        var startResult = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { company { id } }
+            }
+            """,
+            new { input = new { industry = "ENERGY", cityId, companyName = "Briquette Empire", factoryLotId } },
+            token);
+        Assert.False(startResult.TryGetProperty("errors", out _), $"Start errors: {startResult}");
+
+        var coalBriketteId = await GetStarterProductIdAsync("ENERGY", "coal-briquette");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Energy Shop Zone");
+
+        var finishResult = await ExecuteGraphQlAsync(
+            """
+            mutation FinishOnboarding($input: FinishOnboardingInput!) {
+              finishOnboarding(input: $input) {
+                selectedProduct { id name slug isProOnly basePrice }
+                factory { units { unitType } }
+                salesShop { units { unitType } }
+              }
+            }
+            """,
+            new { input = new { productTypeId = coalBriketteId, shopLotId } },
+            token);
+
+        Assert.False(finishResult.TryGetProperty("errors", out _), $"Finish errors: {finishResult}");
+        var data = finishResult.GetProperty("data").GetProperty("finishOnboarding");
+        var product = data.GetProperty("selectedProduct");
+        Assert.Equal("coal-briquette", product.GetProperty("slug").GetString());
+        Assert.True(product.GetProperty("isProOnly").GetBoolean());
+        Assert.Equal(28m, product.GetProperty("basePrice").GetDecimal());
+
+        var factoryUnits = data.GetProperty("factory").GetProperty("units").EnumerateArray().ToList();
+        Assert.Contains(factoryUnits, u => u.GetProperty("unitType").GetString() == "PURCHASE");
+        Assert.Contains(factoryUnits, u => u.GetProperty("unitType").GetString() == "MANUFACTURING");
+
+        var shopUnits = data.GetProperty("salesShop").GetProperty("units").EnumerateArray().ToList();
+        Assert.Contains(shopUnits, u => u.GetProperty("unitType").GetString() == "PUBLIC_SALES");
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_Energy_AsNonProUser_ProductAccessDenied()
+    {
+        var email = $"finish-energy-nonpro-{Guid.NewGuid()}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "NonProFinishEnergy");
+
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Energy Bypass Zone");
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddDays(30);
+            await db.SaveChangesAsync();
+        }
+
+        var startResult = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { company { id } }
+            }
+            """,
+            new { input = new { industry = "ENERGY", cityId, companyName = "Bypass Energy", factoryLotId } },
+            token);
+        Assert.False(startResult.TryGetProperty("errors", out _), $"Start errors: {startResult}");
+
+        await using (var revokeScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = revokeScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddMinutes(-1);
+            await db.SaveChangesAsync();
+        }
+
+        var coalBriketteId = await GetStarterProductIdAsync("ENERGY", "coal-briquette");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Energy Bypass Shop");
+
+        var finishResult = await ExecuteGraphQlAsync(
+            """
+            mutation FinishOnboarding($input: FinishOnboardingInput!) {
+              finishOnboarding(input: $input) { selectedProduct { slug } }
+            }
+            """,
+            new { input = new { productTypeId = coalBriketteId, shopLotId } },
+            token);
+
+        Assert.True(finishResult.TryGetProperty("errors", out var finishErrors));
+        Assert.Equal("PRO_SUBSCRIPTION_REQUIRED", finishErrors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task EnergyStarterProducts_AllHaveDirectCoalRecipe()
+    {
+        var starterSlugs = new[] { "coal-briquette", "heating-oil", "industrial-fuel" };
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            {
+              productTypes(industry: "ENERGY") {
+                slug
+                isProOnly
+                recipes { resourceType { slug } inputProductType { slug } quantity }
+              }
+            }
+            """);
+
+        var products = result.GetProperty("data").GetProperty("productTypes").EnumerateArray()
+            .Where(p => starterSlugs.Contains(p.GetProperty("slug").GetString()))
+            .ToList();
+
+        Assert.Equal(3, products.Count);
+
+        foreach (var product in products)
+        {
+            var slug = product.GetProperty("slug").GetString();
+            Assert.True(product.GetProperty("isProOnly").GetBoolean(), $"{slug} should be Pro-only");
+
+            var recipes = product.GetProperty("recipes").EnumerateArray().ToList();
+            var hasCoalRecipe = recipes.Any(r =>
+                r.TryGetProperty("resourceType", out var rt) &&
+                rt.ValueKind != System.Text.Json.JsonValueKind.Null &&
+                rt.GetProperty("slug").GetString() == "coal");
+
+            Assert.True(hasCoalRecipe, $"{slug} must have a direct coal recipe");
+        }
+    }
+
+    [Fact]
+    public async Task StarterIndustries_IncludesEnergyAsProOnly()
+    {
+        var result = await ExecuteGraphQlAsync(
+            "{ starterIndustries { industries proOnlyIndustries } }");
+
+        var payload = result.GetProperty("data").GetProperty("starterIndustries");
+        var industries = payload.GetProperty("industries").EnumerateArray().Select(i => i.GetString()).ToList();
+        var proOnly = payload.GetProperty("proOnlyIndustries").EnumerateArray().Select(i => i.GetString()).ToList();
+
+        Assert.Contains("ENERGY", industries);
+        Assert.Contains("ENERGY", proOnly);
+    }
+
+    // ─── Logistics Pro-gating tests ─────────────────────────────────────────
+
+    [Fact]
+    public async Task StartOnboardingCompany_Logistics_AsNonProUser_ReturnsProError()
+    {
+        var token = await RegisterAndGetTokenAsync($"start-logistics-nonpro-{Guid.NewGuid()}@test.com", "NonProLogistics");
+        var cityId = await GetCityIdByNameAsync();
+        var lotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Logistics Industrial Zone");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { company { id } }
+            }
+            """,
+            new { input = new { industry = "LOGISTICS", cityId, companyName = "Logistics Co", factoryLotId = lotId } },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Equal("PRO_SUBSCRIPTION_REQUIRED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task StartOnboardingCompany_Logistics_AsProUser_Succeeds()
+    {
+        var email = $"start-logistics-pro-{Guid.NewGuid()}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "ProLogistics");
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddDays(30);
+            await db.SaveChangesAsync();
+        }
+
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Logistics Pro Zone");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { company { id name } }
+            }
+            """,
+            new { input = new { industry = "LOGISTICS", cityId, companyName = "Cotton Logistics Co", factoryLotId } },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _), $"Pro Logistics start failed: {result}");
+        var company = result.GetProperty("data").GetProperty("startOnboardingCompany").GetProperty("company");
+        Assert.Equal("Cotton Logistics Co", company.GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_Logistics_AsProUser_Succeeds()
+    {
+        var email = $"finish-logistics-pro-{Guid.NewGuid()}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "FinishLogisticsPro");
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddDays(30);
+            await db.SaveChangesAsync();
+        }
+
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Logistics Factory Zone");
+
+        var startResult = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { company { id } }
+            }
+            """,
+            new { input = new { industry = "LOGISTICS", cityId, companyName = "Shipping Empire", factoryLotId } },
+            token);
+        Assert.False(startResult.TryGetProperty("errors", out _), $"Start errors: {startResult}");
+
+        var shippingBagId = await GetStarterProductIdAsync("LOGISTICS", "shipping-bag");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Logistics Shop Zone");
+
+        var finishResult = await ExecuteGraphQlAsync(
+            """
+            mutation FinishOnboarding($input: FinishOnboardingInput!) {
+              finishOnboarding(input: $input) {
+                selectedProduct { id name slug isProOnly basePrice }
+                factory { units { unitType } }
+                salesShop { units { unitType } }
+              }
+            }
+            """,
+            new { input = new { productTypeId = shippingBagId, shopLotId } },
+            token);
+
+        Assert.False(finishResult.TryGetProperty("errors", out _), $"Finish errors: {finishResult}");
+        var data = finishResult.GetProperty("data").GetProperty("finishOnboarding");
+        var product = data.GetProperty("selectedProduct");
+        Assert.Equal("shipping-bag", product.GetProperty("slug").GetString());
+        Assert.True(product.GetProperty("isProOnly").GetBoolean());
+        Assert.Equal(20m, product.GetProperty("basePrice").GetDecimal());
+
+        var factoryUnits = data.GetProperty("factory").GetProperty("units").EnumerateArray().ToList();
+        Assert.Contains(factoryUnits, u => u.GetProperty("unitType").GetString() == "PURCHASE");
+        Assert.Contains(factoryUnits, u => u.GetProperty("unitType").GetString() == "MANUFACTURING");
+
+        var shopUnits = data.GetProperty("salesShop").GetProperty("units").EnumerateArray().ToList();
+        Assert.Contains(shopUnits, u => u.GetProperty("unitType").GetString() == "PUBLIC_SALES");
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_Logistics_AsNonProUser_ProductAccessDenied()
+    {
+        var email = $"finish-logistics-nonpro-{Guid.NewGuid()}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "NonProFinishLogistics");
+
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Logistics Bypass Zone");
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddDays(30);
+            await db.SaveChangesAsync();
+        }
+
+        var startResult = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { company { id } }
+            }
+            """,
+            new { input = new { industry = "LOGISTICS", cityId, companyName = "Bypass Logistics", factoryLotId } },
+            token);
+        Assert.False(startResult.TryGetProperty("errors", out _), $"Start errors: {startResult}");
+
+        await using (var revokeScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = revokeScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            player.ProSubscriptionEndsAtUtc = DateTime.UtcNow.AddMinutes(-1);
+            await db.SaveChangesAsync();
+        }
+
+        var shippingBagId = await GetStarterProductIdAsync("LOGISTICS", "shipping-bag");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Logistics Bypass Shop");
+
+        var finishResult = await ExecuteGraphQlAsync(
+            """
+            mutation FinishOnboarding($input: FinishOnboardingInput!) {
+              finishOnboarding(input: $input) { selectedProduct { slug } }
+            }
+            """,
+            new { input = new { productTypeId = shippingBagId, shopLotId } },
+            token);
+
+        Assert.True(finishResult.TryGetProperty("errors", out var finishErrors));
+        Assert.Equal("PRO_SUBSCRIPTION_REQUIRED", finishErrors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task LogisticsStarterProducts_AllHaveDirectCottonRecipe()
+    {
+        var starterSlugs = new[] { "shipping-bag", "storage-sack", "cargo-pack" };
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            {
+              productTypes(industry: "LOGISTICS") {
+                slug
+                isProOnly
+                recipes { resourceType { slug } inputProductType { slug } quantity }
+              }
+            }
+            """);
+
+        var products = result.GetProperty("data").GetProperty("productTypes").EnumerateArray()
+            .Where(p => starterSlugs.Contains(p.GetProperty("slug").GetString()))
+            .ToList();
+
+        Assert.Equal(3, products.Count);
+
+        foreach (var product in products)
+        {
+            var slug = product.GetProperty("slug").GetString();
+            Assert.True(product.GetProperty("isProOnly").GetBoolean(), $"{slug} should be Pro-only");
+
+            var recipes = product.GetProperty("recipes").EnumerateArray().ToList();
+            var hasCottonRecipe = recipes.Any(r =>
+                r.TryGetProperty("resourceType", out var rt) &&
+                rt.ValueKind != System.Text.Json.JsonValueKind.Null &&
+                rt.GetProperty("slug").GetString() == "cotton");
+
+            Assert.True(hasCottonRecipe, $"{slug} must have a direct cotton recipe");
+        }
+    }
+
+    [Fact]
+    public async Task StarterIndustries_IncludesLogisticsAsProOnly()
+    {
+        var result = await ExecuteGraphQlAsync(
+            "{ starterIndustries { industries proOnlyIndustries } }");
+
+        var payload = result.GetProperty("data").GetProperty("starterIndustries");
+        var industries = payload.GetProperty("industries").EnumerateArray().Select(i => i.GetString()).ToList();
+        var proOnly = payload.GetProperty("proOnlyIndustries").EnumerateArray().Select(i => i.GetString()).ToList();
+
+        Assert.Contains("LOGISTICS", industries);
+        Assert.Contains("LOGISTICS", proOnly);
+    }
+
+    [Fact]
+    public async Task StarterIndustries_AllFiveProIndustriesAreProOnly()
+    {
+        var result = await ExecuteGraphQlAsync(
+            "{ starterIndustries { industries proOnlyIndustries } }");
+
+        var payload = result.GetProperty("data").GetProperty("starterIndustries");
+        var proOnly = payload.GetProperty("proOnlyIndustries").EnumerateArray().Select(i => i.GetString()).ToList();
+
+        // All 5 Pro industries must be present
+        foreach (var proIndustry in new[] { "ELECTRONICS", "CONSTRUCTION", "PHARMACEUTICALS", "ENERGY", "LOGISTICS" })
+        {
+            Assert.Contains(proIndustry, proOnly);
+        }
+
+        // Free industries must NOT be Pro-only
+        foreach (var freeIndustry in new[] { "FURNITURE", "FOOD_PROCESSING", "HEALTHCARE" })
+        {
+            Assert.DoesNotContain(freeIndustry, proOnly);
+        }
     }
 
     [Fact]

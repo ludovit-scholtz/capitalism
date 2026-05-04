@@ -198,19 +198,260 @@ public sealed partial class AppDbInitializer
         await dbContext.SaveChangesAsync();
     }
 
+    /// <summary>
+    /// Idempotent upgrade: ensures the three Pharmaceuticals starter products with direct Gold
+    /// recipes are present.  Databases seeded before the Pharmaceuticals Pro-starter increment
+    /// will not have <c>aspirin</c>, <c>vitamin-capsule</c>, or <c>antibiotic</c>.
+    /// </summary>
+    private async Task EnsurePharmaceuticalsStarterProductsAsync()
+    {
+        var gold = await dbContext.ResourceTypes.FirstOrDefaultAsync(r => r.Slug == "gold");
+        if (gold == null) return;
+
+        var starterSeeds = new[]
+        {
+            (Slug: "aspirin",         Name: "Aspirin",         BasePrice: 55m,  CraftTicks: 3, Output: 10m, Energy: 1.0m, Description: "A starter pharmaceutical tablet synthesised from refined gold compounds. The entry point for any pharmaceutical manufacturer.", UnitName: "Bottle", UnitSymbol: "bottles", GoldQty: 1m),
+            (Slug: "vitamin-capsule", Name: "Vitamin Capsule", BasePrice: 80m,  CraftTicks: 4, Output: 6m,  Energy: 1.2m, Description: "Premium vitamin supplement produced from pure gold compounds. High-margin product for health-conscious markets.",               UnitName: "Pack",   UnitSymbol: "packs",   GoldQty: 1m),
+            (Slug: "antibiotic",      Name: "Antibiotic",      BasePrice: 120m, CraftTicks: 5, Output: 4m,  Energy: 1.5m, Description: "A broad-spectrum antibiotic formulated from concentrated gold catalyst compounds. Maximum margin in any pharmacy product line.",  UnitName: "Box",    UnitSymbol: "boxes",   GoldQty: 2m),
+        };
+
+        foreach (var seed in starterSeeds)
+        {
+            var productId = CreateDeterministicGuid($"product:{seed.Slug}");
+            var existing = await dbContext.ProductTypes
+                .Include(p => p.Recipes)
+                .FirstOrDefaultAsync(p => p.Id == productId);
+
+            if (existing == null)
+            {
+                var labor = ComputeBasicLaborHours(seed.CraftTicks, seed.Energy, 1);
+                var elasticity = DeterminePriceElasticity(Industry.Pharmaceuticals);
+                var product = new ProductType
+                {
+                    Id = productId,
+                    Name = seed.Name,
+                    Slug = seed.Slug,
+                    Industry = Industry.Pharmaceuticals,
+                    BasePrice = seed.BasePrice,
+                    PriceElasticity = elasticity,
+                    BaseCraftTicks = seed.CraftTicks,
+                    OutputQuantity = seed.Output,
+                    EnergyConsumptionMwh = seed.Energy,
+                    BasicLaborHours = labor,
+                    IsProOnly = true,
+                    UnitName = seed.UnitName,
+                    UnitSymbol = seed.UnitSymbol,
+                    Description = seed.Description
+                };
+                dbContext.ProductTypes.Add(product);
+
+                dbContext.ProductRecipes.Add(new ProductRecipe
+                {
+                    Id = CreateDeterministicGuid($"recipe:{seed.Slug}:gold"),
+                    ProductTypeId = productId,
+                    ResourceTypeId = gold.Id,
+                    Quantity = seed.GoldQty
+                });
+            }
+            else
+            {
+                var hasGoldRecipe = existing.Recipes.Any(r => r.ResourceTypeId == gold.Id);
+                if (!hasGoldRecipe)
+                {
+                    dbContext.ProductRecipes.Add(new ProductRecipe
+                    {
+                        Id = CreateDeterministicGuid($"recipe:{seed.Slug}:gold"),
+                        ProductTypeId = productId,
+                        ResourceTypeId = gold.Id,
+                        Quantity = seed.GoldQty
+                    });
+                }
+
+                if (!existing.IsProOnly)
+                {
+                    existing.IsProOnly = true;
+                }
+            }
+        }
+
+        await dbContext.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Idempotent upgrade: ensures the three Energy starter products with direct Coal
+    /// recipes are present.  Databases seeded before the Energy Pro-starter increment
+    /// will not have <c>coal-briquette</c>, <c>heating-oil</c>, or <c>industrial-fuel</c>.
+    /// </summary>
+    private async Task EnsureEnergyStarterProductsAsync()
+    {
+        var coal = await dbContext.ResourceTypes.FirstOrDefaultAsync(r => r.Slug == "coal");
+        if (coal == null) return;
+
+        var starterSeeds = new[]
+        {
+            (Slug: "coal-briquette",  Name: "Coal Briquette",  BasePrice: 28m, CraftTicks: 2, Output: 15m, Energy: 0.8m, Description: "A compressed coal briquette providing consistent heat output for domestic and industrial furnaces. The entry point for any energy producer.", UnitName: "Bag",    UnitSymbol: "bags",    CoalQty: 2m),
+            (Slug: "heating-oil",     Name: "Heating Oil",     BasePrice: 50m, CraftTicks: 3, Output: 8m,  Energy: 1.1m, Description: "Refined heating oil distilled from coal for residential and commercial heating systems. Steady demand across all seasons.",               UnitName: "Barrel", UnitSymbol: "barrels", CoalQty: 3m),
+            (Slug: "industrial-fuel", Name: "Industrial Fuel", BasePrice: 75m, CraftTicks: 4, Output: 5m,  Energy: 1.4m, Description: "High-density industrial fuel refined from premium coal stocks. Powers factories, generators, and heavy machinery.",                       UnitName: "Drum",   UnitSymbol: "drums",   CoalQty: 4m),
+        };
+
+        foreach (var seed in starterSeeds)
+        {
+            var productId = CreateDeterministicGuid($"product:{seed.Slug}");
+            var existing = await dbContext.ProductTypes
+                .Include(p => p.Recipes)
+                .FirstOrDefaultAsync(p => p.Id == productId);
+
+            if (existing == null)
+            {
+                var labor = ComputeBasicLaborHours(seed.CraftTicks, seed.Energy, 1);
+                var elasticity = DeterminePriceElasticity(Industry.Energy);
+                var product = new ProductType
+                {
+                    Id = productId,
+                    Name = seed.Name,
+                    Slug = seed.Slug,
+                    Industry = Industry.Energy,
+                    BasePrice = seed.BasePrice,
+                    PriceElasticity = elasticity,
+                    BaseCraftTicks = seed.CraftTicks,
+                    OutputQuantity = seed.Output,
+                    EnergyConsumptionMwh = seed.Energy,
+                    BasicLaborHours = labor,
+                    IsProOnly = true,
+                    UnitName = seed.UnitName,
+                    UnitSymbol = seed.UnitSymbol,
+                    Description = seed.Description
+                };
+                dbContext.ProductTypes.Add(product);
+
+                dbContext.ProductRecipes.Add(new ProductRecipe
+                {
+                    Id = CreateDeterministicGuid($"recipe:{seed.Slug}:coal"),
+                    ProductTypeId = productId,
+                    ResourceTypeId = coal.Id,
+                    Quantity = seed.CoalQty
+                });
+            }
+            else
+            {
+                var hasCoalRecipe = existing.Recipes.Any(r => r.ResourceTypeId == coal.Id);
+                if (!hasCoalRecipe)
+                {
+                    dbContext.ProductRecipes.Add(new ProductRecipe
+                    {
+                        Id = CreateDeterministicGuid($"recipe:{seed.Slug}:coal"),
+                        ProductTypeId = productId,
+                        ResourceTypeId = coal.Id,
+                        Quantity = seed.CoalQty
+                    });
+                }
+
+                if (!existing.IsProOnly)
+                {
+                    existing.IsProOnly = true;
+                }
+            }
+        }
+
+        await dbContext.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Idempotent upgrade: ensures the three Logistics starter products with direct Cotton
+    /// recipes are present.  Databases seeded before the Logistics Pro-starter increment
+    /// will not have <c>shipping-bag</c>, <c>storage-sack</c>, or <c>cargo-pack</c>.
+    /// </summary>
+    private async Task EnsureLogisticsStarterProductsAsync()
+    {
+        var cotton = await dbContext.ResourceTypes.FirstOrDefaultAsync(r => r.Slug == "cotton");
+        if (cotton == null) return;
+
+        var starterSeeds = new[]
+        {
+            (Slug: "shipping-bag", Name: "Shipping Bag", BasePrice: 20m, CraftTicks: 2, Output: 18m, Energy: 0.6m, Description: "A durable cotton shipping bag for consumer goods distribution. The entry point for any logistics manufacturer.", UnitName: "Bag",  UnitSymbol: "bags",  CottonQty: 1m),
+            (Slug: "storage-sack", Name: "Storage Sack", BasePrice: 35m, CraftTicks: 3, Output: 10m, Energy: 0.9m, Description: "Reinforced cotton storage sack for bulk commodity warehousing. High-volume demand from agricultural and industrial buyers.", UnitName: "Sack", UnitSymbol: "sacks", CottonQty: 2m),
+            (Slug: "cargo-pack",   Name: "Cargo Pack",   BasePrice: 55m, CraftTicks: 4, Output: 6m,  Energy: 1.2m, Description: "Heavy-duty cotton cargo pack built for international shipping and warehouse handling. Premium packaging for high-value goods.",  UnitName: "Pack", UnitSymbol: "packs", CottonQty: 3m),
+        };
+
+        foreach (var seed in starterSeeds)
+        {
+            var productId = CreateDeterministicGuid($"product:{seed.Slug}");
+            var existing = await dbContext.ProductTypes
+                .Include(p => p.Recipes)
+                .FirstOrDefaultAsync(p => p.Id == productId);
+
+            if (existing == null)
+            {
+                var labor = ComputeBasicLaborHours(seed.CraftTicks, seed.Energy, 1);
+                var elasticity = DeterminePriceElasticity(Industry.Logistics);
+                var product = new ProductType
+                {
+                    Id = productId,
+                    Name = seed.Name,
+                    Slug = seed.Slug,
+                    Industry = Industry.Logistics,
+                    BasePrice = seed.BasePrice,
+                    PriceElasticity = elasticity,
+                    BaseCraftTicks = seed.CraftTicks,
+                    OutputQuantity = seed.Output,
+                    EnergyConsumptionMwh = seed.Energy,
+                    BasicLaborHours = labor,
+                    IsProOnly = true,
+                    UnitName = seed.UnitName,
+                    UnitSymbol = seed.UnitSymbol,
+                    Description = seed.Description
+                };
+                dbContext.ProductTypes.Add(product);
+
+                dbContext.ProductRecipes.Add(new ProductRecipe
+                {
+                    Id = CreateDeterministicGuid($"recipe:{seed.Slug}:cotton"),
+                    ProductTypeId = productId,
+                    ResourceTypeId = cotton.Id,
+                    Quantity = seed.CottonQty
+                });
+            }
+            else
+            {
+                var hasCottonRecipe = existing.Recipes.Any(r => r.ResourceTypeId == cotton.Id);
+                if (!hasCottonRecipe)
+                {
+                    dbContext.ProductRecipes.Add(new ProductRecipe
+                    {
+                        Id = CreateDeterministicGuid($"recipe:{seed.Slug}:cotton"),
+                        ProductTypeId = productId,
+                        ResourceTypeId = cotton.Id,
+                        Quantity = seed.CottonQty
+                    });
+                }
+
+                if (!existing.IsProOnly)
+                {
+                    existing.IsProOnly = true;
+                }
+            }
+        }
+
+        await dbContext.SaveChangesAsync();
+    }
+
     private static IReadOnlyList<ProductSeed> GetProductSeeds() =>
     [
         .. GetFurnitureProducts(),
         .. GetFoodProducts(),
         .. GetHealthcareProducts(),
         .. GetElectronicsProducts(),
-        .. GetConstructionProducts()
+        .. GetConstructionProducts(),
+        .. GetPharmaceuticalsProducts(),
+        .. GetEnergyProducts(),
+        .. GetLogisticsProducts()
     ];
 
     private static HashSet<string> DetermineInitialProOnlyProductSlugs(IReadOnlyList<ProductSeed> seeds)
     {
         var proOnlySlugs = seeds
-            .Where(seed => seed.Industry is Industry.Electronics or Industry.Construction)
+            .Where(seed => seed.Industry is Industry.Electronics or Industry.Construction
+                                         or Industry.Pharmaceuticals or Industry.Energy or Industry.Logistics)
             .Select(seed => seed.Slug)
             .ToHashSet(StringComparer.Ordinal);
 
@@ -406,6 +647,66 @@ public sealed partial class AppDbInitializer
         yield return Product("Assembly Pallet", "assembly-pallet", Industry.Construction, 18m, 1, "Transport pallet for factories, warehouses, and supply chains.", "Pallet", "pallets", 12m, 0.4m, ProductIngredient("wood-planks", 3m));
     }
 
+    private static IEnumerable<ProductSeed> GetPharmaceuticalsProducts()
+    {
+        // Starter pharma products — all use Gold directly so they work as
+        // onboarding factory configurations (purchase → manufacture → sell).
+        yield return Product("Aspirin", "aspirin", Industry.Pharmaceuticals, 55m, 3, "A starter pharmaceutical tablet synthesised from refined gold compounds. The entry point for any pharmaceutical manufacturer.", "Bottle", "bottles", 10m, 1.0m, ResourceIngredient("gold", 1m));
+        yield return Product("Vitamin Capsule", "vitamin-capsule", Industry.Pharmaceuticals, 80m, 4, "Premium vitamin supplement produced from pure gold compounds. High-margin product for health-conscious markets.", "Pack", "packs", 6m, 1.2m, ResourceIngredient("gold", 1m));
+        yield return Product("Antibiotic", "antibiotic", Industry.Pharmaceuticals, 120m, 5, "A broad-spectrum antibiotic formulated from concentrated gold catalyst compounds. Maximum margin in any pharmacy product line.", "Box", "boxes", 4m, 1.5m, ResourceIngredient("gold", 2m));
+
+        yield return Product("Analgesic Syrup", "analgesic-syrup", Industry.Pharmaceuticals, 48m, 3, "Liquid pain-relief formulation for pediatric and elderly markets.", "Bottle", "bottles", 10m, 1.0m, ResourceIngredient("gold", 1m));
+        yield return Product("Antiseptic Gel", "antiseptic-gel", Industry.Pharmaceuticals, 40m, 2, "Topical antiseptic gel for wound care and infection prevention.", "Tube", "tubes", 14m, 0.8m, ResourceIngredient("chemical-minerals", 1m));
+        yield return Product("Cough Suppressant", "cough-suppressant", Industry.Pharmaceuticals, 35m, 2, "Over-the-counter cough suppressant with broad retail appeal.", "Bottle", "bottles", 15m, 0.7m, ResourceIngredient("chemical-minerals", 1m));
+        yield return Product("Eye Drops", "eye-drops", Industry.Pharmaceuticals, 45m, 3, "Sterile ophthalmic solution for ocular relief.", "Bottle", "bottles", 12m, 0.9m, ResourceIngredient("chemical-minerals", 1m));
+        yield return Product("Pharmaceutical Capsule", "pharmaceutical-capsule", Industry.Pharmaceuticals, 65m, 4, "Encapsulated active pharmaceutical ingredient for controlled delivery.", "Pack", "packs", 8m, 1.1m, ProductIngredient("aspirin", 2m));
+        yield return Product("Medical Cream", "medical-cream", Industry.Pharmaceuticals, 58m, 3, "Topical therapeutic cream combining antiseptic and analgesic properties.", "Tube", "tubes", 8m, 1.0m, ProductIngredient("antiseptic-gel", 2m), ProductIngredient("analgesic-syrup", 1m));
+        yield return Product("Vaccine Vial", "vaccine-vial", Industry.Pharmaceuticals, 200m, 5, "Refrigerated biological vaccine in single-dose vial format.", "Vial", "vials", 4m, 1.8m, ProductIngredient("antibiotic", 1m), ResourceIngredient("gold", 1m));
+        yield return Product("Insulin Pen", "insulin-pen", Industry.Pharmaceuticals, 150m, 5, "Pre-filled insulin delivery pen for diabetes management.", "Pen", "pens", 4m, 1.7m, ProductIngredient("vitamin-capsule", 2m), ResourceIngredient("gold", 1m));
+        yield return Product("Paracetamol Pack", "paracetamol-pack", Industry.Pharmaceuticals, 30m, 2, "Standard paracetamol blister pack for everyday pain management.", "Pack", "packs", 15m, 0.6m, ResourceIngredient("chemical-minerals", 1m));
+        yield return Product("Diagnostic Kit", "diagnostic-kit", Industry.Pharmaceuticals, 95m, 4, "At-home diagnostic test kit for rapid medical screening.", "Kit", "kits", 6m, 1.3m, ProductIngredient("pharmaceutical-capsule", 1m), ProductIngredient("antiseptic-gel", 2m));
+        yield return Product("Nasal Spray", "nasal-spray", Industry.Pharmaceuticals, 38m, 2, "Saline nasal irrigation spray for allergy and cold relief.", "Bottle", "bottles", 14m, 0.7m, ResourceIngredient("chemical-minerals", 1m));
+    }
+
+    private static IEnumerable<ProductSeed> GetEnergyProducts()
+    {
+        // Starter energy products — all use Coal directly so they work as
+        // onboarding factory configurations (purchase → manufacture → sell).
+        yield return Product("Coal Briquette", "coal-briquette", Industry.Energy, 28m, 2, "A compressed coal briquette providing consistent heat output for domestic and industrial furnaces. The entry point for any energy producer.", "Bag", "bags", 15m, 0.8m, ResourceIngredient("coal", 2m));
+        yield return Product("Heating Oil", "heating-oil", Industry.Energy, 50m, 3, "Refined heating oil distilled from coal for residential and commercial heating systems. Steady demand across all seasons.", "Barrel", "barrels", 8m, 1.1m, ResourceIngredient("coal", 3m));
+        yield return Product("Industrial Fuel", "industrial-fuel", Industry.Energy, 75m, 4, "High-density industrial fuel refined from premium coal stocks. Powers factories, generators, and heavy machinery.", "Drum", "drums", 5m, 1.4m, ResourceIngredient("coal", 4m));
+
+        yield return Product("Coke Block", "coke-block", Industry.Energy, 22m, 2, "Processed coke block used in metallurgy and heat-intensive manufacturing.", "Block", "blocks", 18m, 0.7m, ResourceIngredient("coal", 2m));
+        yield return Product("Charcoal Pack", "charcoal-pack", Industry.Energy, 18m, 1, "Retail charcoal pack for consumer barbecue and heating use.", "Pack", "packs", 20m, 0.5m, ResourceIngredient("coal", 1m));
+        yield return Product("Gas Canister", "gas-canister", Industry.Energy, 40m, 3, "Pressurised gas canister for portable heating and cooking appliances.", "Canister", "canisters", 10m, 1.2m, ResourceIngredient("coal", 2m), ResourceIngredient("iron-ore", 1m));
+        yield return Product("Battery Cell", "battery-cell", Industry.Energy, 35m, 3, "Rechargeable battery cell derived from carbon compounds.", "Cell", "cells", 12m, 1.1m, ResourceIngredient("coal", 1m), ResourceIngredient("chemical-minerals", 1m));
+        yield return Product("Power Pellet", "power-pellet", Industry.Energy, 32m, 2, "High-energy biomass pellet for power stations and district heating.", "Bag", "bags", 14m, 0.9m, ProductIngredient("coal-briquette", 2m));
+        yield return Product("Refined Kerosene", "refined-kerosene", Industry.Energy, 60m, 4, "Aviation-grade kerosene distillate for transport and turbine applications.", "Barrel", "barrels", 6m, 1.3m, ProductIngredient("heating-oil", 1m), ResourceIngredient("coal", 1m));
+        yield return Product("Turbine Oil", "turbine-oil", Industry.Energy, 90m, 5, "Precision-grade turbine lubricant for power generation equipment.", "Drum", "drums", 4m, 1.6m, ProductIngredient("industrial-fuel", 1m), ResourceIngredient("chemical-minerals", 1m));
+        yield return Product("Fuel Rod", "fuel-rod", Industry.Energy, 130m, 5, "High-density fuel rod for industrial boilers and waste-heat recovery.", "Rod", "rods", 3m, 1.9m, ProductIngredient("industrial-fuel", 1m), ProductIngredient("coke-block", 2m));
+        yield return Product("Compressed Gas Bottle", "compressed-gas-bottle", Industry.Energy, 55m, 3, "Compressed industrial gas bottle for welding and cutting operations.", "Bottle", "bottles", 8m, 1.2m, ProductIngredient("gas-canister", 1m), ResourceIngredient("iron-ore", 1m));
+        yield return Product("Energy Tablet", "energy-tablet", Industry.Energy, 24m, 2, "High-caffeine energy supplement tablet produced using coal-derived carbon.", "Pack", "packs", 16m, 0.6m, ProductIngredient("charcoal-pack", 1m));
+    }
+
+    private static IEnumerable<ProductSeed> GetLogisticsProducts()
+    {
+        // Starter logistics products — all use Cotton directly so they work as
+        // onboarding factory configurations (purchase → manufacture → sell).
+        yield return Product("Shipping Bag", "shipping-bag", Industry.Logistics, 20m, 2, "A durable cotton shipping bag for consumer goods distribution. The entry point for any logistics manufacturer.", "Bag", "bags", 18m, 0.6m, ResourceIngredient("cotton", 1m));
+        yield return Product("Storage Sack", "storage-sack", Industry.Logistics, 35m, 3, "Reinforced cotton storage sack for bulk commodity warehousing. High-volume demand from agricultural and industrial buyers.", "Sack", "sacks", 10m, 0.9m, ResourceIngredient("cotton", 2m));
+        yield return Product("Cargo Pack", "cargo-pack", Industry.Logistics, 55m, 4, "Heavy-duty cotton cargo pack built for international shipping and warehouse handling. Premium packaging for high-value goods.", "Pack", "packs", 6m, 1.2m, ResourceIngredient("cotton", 3m));
+
+        yield return Product("Cotton Wrap", "cotton-wrap", Industry.Logistics, 14m, 1, "Protective cotton wrap material for fragile product packaging.", "Roll", "rolls", 24m, 0.4m, ResourceIngredient("cotton", 1m));
+        yield return Product("Padded Envelope", "padded-envelope", Industry.Logistics, 18m, 2, "Cushioned mailing envelope for e-commerce parcels and document dispatch.", "Pack", "packs", 20m, 0.5m, ResourceIngredient("cotton", 1m));
+        yield return Product("Tote Bag", "tote-bag", Industry.Logistics, 22m, 2, "Reusable retail tote bag for consumer goods and branded packaging.", "Bag", "bags", 16m, 0.6m, ResourceIngredient("cotton", 1m));
+        yield return Product("Fabric Label", "fabric-label", Industry.Logistics, 8m, 1, "Woven cotton label for product identification and branding.", "Pack", "packs", 30m, 0.2m, ResourceIngredient("cotton", 0.5m));
+        yield return Product("Insulated Liner", "insulated-liner", Industry.Logistics, 45m, 3, "Thermal insulated cotton liner for cold-chain logistics packaging.", "Piece", "pcs", 8m, 1.0m, ProductIngredient("storage-sack", 1m), ProductIngredient("cotton-wrap", 2m));
+        yield return Product("Pallet Cover", "pallet-cover", Industry.Logistics, 38m, 3, "Stretch cotton cover for pallet wrapping and load protection.", "Piece", "pcs", 10m, 0.8m, ProductIngredient("cotton-wrap", 3m), ProductIngredient("shipping-bag", 1m));
+        yield return Product("Courier Bag", "courier-bag", Industry.Logistics, 42m, 3, "Tamper-evident courier bag for last-mile delivery services.", "Bag", "bags", 10m, 0.9m, ProductIngredient("shipping-bag", 2m));
+        yield return Product("Heavy Duty Sack", "heavy-duty-sack", Industry.Logistics, 65m, 4, "Ultra-reinforced sack for mining, construction, and industrial bulk transport.", "Sack", "sacks", 5m, 1.3m, ProductIngredient("cargo-pack", 1m), ResourceIngredient("cotton", 1m));
+        yield return Product("Flat Pack Box", "flat-pack-box", Industry.Logistics, 28m, 2, "Collapsible flat-pack corrugated box for e-commerce and warehouse shipping.", "Box", "boxes", 14m, 0.7m, ResourceIngredient("cotton", 1m), ResourceIngredient("wood", 1m));
+    }
+
     private static ResourceSeed Resource(string name, string slug, string category, decimal basePrice, decimal weightPerUnit, string unitName, string unitSymbol, string description, string icon, string backgroundColor, string accentColor)
         => new(name, slug, category, basePrice, weightPerUnit, unitName, unitSymbol, description, icon, backgroundColor, accentColor);
 
@@ -432,6 +733,9 @@ public sealed partial class AppDbInitializer
         Industry.Furniture => 0.35m,
         Industry.Electronics => 0.55m,
         Industry.Construction => 0.30m,
+        Industry.Pharmaceuticals => 0.22m,
+        Industry.Energy => 0.40m,
+        Industry.Logistics => 0.50m,
         _ => 0.35m,
     };
 
