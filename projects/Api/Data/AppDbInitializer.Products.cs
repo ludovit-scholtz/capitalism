@@ -657,7 +657,7 @@ public sealed partial class AppDbInitializer
 
         yield return Product("Analgesic Syrup", "analgesic-syrup", Industry.Pharmaceuticals, 48m, 3, "Liquid pain-relief formulation for pediatric and elderly markets.", "Bottle", "bottles", 10m, 1.0m, ResourceIngredient("gold", 1m));
         yield return Product("Antiseptic Gel", "antiseptic-gel", Industry.Pharmaceuticals, 40m, 2, "Topical antiseptic gel for wound care and infection prevention.", "Tube", "tubes", 14m, 0.8m, ResourceIngredient("chemical-minerals", 1m));
-        yield return Product("Cough Syrup", "cough-syrup", Industry.Pharmaceuticals, 35m, 2, "Over-the-counter cough suppressant with broad retail appeal.", "Bottle", "bottles", 15m, 0.7m, ResourceIngredient("chemical-minerals", 1m));
+        yield return Product("Cough Suppressant", "cough-suppressant", Industry.Pharmaceuticals, 35m, 2, "Over-the-counter cough suppressant with broad retail appeal.", "Bottle", "bottles", 15m, 0.7m, ResourceIngredient("chemical-minerals", 1m));
         yield return Product("Eye Drops", "eye-drops", Industry.Pharmaceuticals, 45m, 3, "Sterile ophthalmic solution for ocular relief.", "Bottle", "bottles", 12m, 0.9m, ResourceIngredient("chemical-minerals", 1m));
         yield return Product("Pharmaceutical Capsule", "pharmaceutical-capsule", Industry.Pharmaceuticals, 65m, 4, "Encapsulated active pharmaceutical ingredient for controlled delivery.", "Pack", "packs", 8m, 1.1m, ProductIngredient("aspirin", 2m));
         yield return Product("Medical Cream", "medical-cream", Industry.Pharmaceuticals, 58m, 3, "Topical therapeutic cream combining antiseptic and analgesic properties.", "Tube", "tubes", 8m, 1.0m, ProductIngredient("antiseptic-gel", 2m), ProductIngredient("analgesic-syrup", 1m));
