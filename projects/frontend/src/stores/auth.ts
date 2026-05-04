@@ -17,6 +17,7 @@ const BIATEC_OIDC_ALLOWED_ISSUERS = (import.meta.env.VITE_BIATEC_OIDC_ALLOWED_IS
   .filter((entry: string) => entry.length > 0)
 const TOKEN_RENEW_BEFORE_MS = 60 * 1000
 const OIDC_STATE_KEY = 'biatec_oidc_state'
+const OIDC_LOGOUT_STATE_KEY = 'biatec_oidc_logout_state'
 const AUTH_PROVIDER_KEY = 'auth_provider'
 const AUTH_PROVIDER_LOCAL = 'local'
 const AUTH_PROVIDER_BIATEC = 'biatec_oidc'
@@ -184,6 +185,27 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  function createLogoutState() {
+    const state = createRandomBase64Url()
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem(OIDC_LOGOUT_STATE_KEY, state)
+    }
+    return state
+  }
+
+  function resolveBiatecEndSessionEndpoint() {
+    if (BIATEC_OIDC_END_SESSION_URL) {
+      return BIATEC_OIDC_END_SESSION_URL
+    }
+
+    try {
+      const authorizeUrl = new URL(BIATEC_OIDC_AUTHORIZE_URL)
+      return `${authorizeUrl.origin}/connect/endsession`
+    } catch {
+      return ''
+    }
+  }
+
   function parseJwtPayload(jwt: string): Record<string, unknown> {
     const parts = jwt.split('.')
     if (parts.length !== 3 || !parts[1]) {
@@ -294,14 +316,21 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function buildBiatecEndSessionUrl(idTokenHint: string | null) {
-    if (!BIATEC_OIDC_END_SESSION_URL || typeof window === 'undefined') {
+    if (typeof window === 'undefined') {
       return null
     }
 
     try {
-      const logoutUrl = new URL(BIATEC_OIDC_END_SESSION_URL)
+      const endpoint = resolveBiatecEndSessionEndpoint()
+      if (!endpoint) {
+        return null
+      }
+
+      const logoutUrl = new URL(endpoint)
+      const state = createLogoutState()
       logoutUrl.searchParams.set('post_logout_redirect_uri', getPostLogoutRedirectUri())
       logoutUrl.searchParams.set('client_id', BIATEC_OIDC_CLIENT_ID)
+      logoutUrl.searchParams.set('state', state)
 
       if (idTokenHint) {
         logoutUrl.searchParams.set('id_token_hint', idTokenHint)
