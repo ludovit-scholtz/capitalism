@@ -217,10 +217,7 @@ public sealed class BotOrchestrator
         _logger.LogInformation("─── Periodic Report (tick {Tick}) ───────────────────", _currentTick);
         foreach (var bot in _bots)
         {
-            var status = bot.IsSkipped ? "SKIPPED" :
-                         !bot.HasValidToken ? "NO_TOKEN" :
-                         !bot.OnboardingCompleted ? "ONBOARDING" : "ACTIVE";
-
+            var status = GetBotStatusLabel(bot);
             var profitable = bot.ProfitDelta >= 0 ? "✓" : "✗";
             _logger.LogInformation(
                 "  {Bot}  status={Status}  netWorth={NW:N0}  delta={Delta:+0;-0;0}  {Profitable}",
@@ -228,6 +225,20 @@ public sealed class BotOrchestrator
         }
         _logger.LogInformation("─────────────────────────────────────────────────────");
     }
+
+    /// <summary>
+    /// Returns a human-readable status label for the given bot based on its runtime state.
+    /// <list type="table">
+    ///   <item><term>SKIPPED</term><description>Bot exceeded the consecutive-error limit and is no longer polled.</description></item>
+    ///   <item><term>NO_TOKEN</term><description>Bot has no valid authentication token.</description></item>
+    ///   <item><term>ONBOARDING</term><description>Bot is authenticated but has not yet completed onboarding.</description></item>
+    ///   <item><term>ACTIVE</term><description>Bot is authenticated and fully onboarded.</description></item>
+    /// </list>
+    /// </summary>
+    public static string GetBotStatusLabel(BotAccount bot) =>
+        bot.IsSkipped        ? "SKIPPED" :
+        !bot.HasValidToken   ? "NO_TOKEN" :
+        !bot.OnboardingCompleted ? "ONBOARDING" : "ACTIVE";
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
