@@ -19,6 +19,7 @@ import StarterGuidance from '@/components/dashboard/StarterGuidance.vue'
 import DashboardChatPanel from '@/components/dashboard/DashboardChatPanel.vue'
 import DashboardTabNav from '@/components/dashboard/DashboardTabNav.vue'
 import BuildingHeaderFinancials from '@/components/buildings/BuildingHeaderFinancials.vue'
+import NewCompanyModal from '@/components/dashboard/NewCompanyModal.vue'
 import type { Company, GameState, ScheduledActionSummary, CityPowerBalance, CompanyLedgerSummary, City, BuildingUnitOperationalStatus } from '@/types'
 
 // Module-level cache for city names - cities are static and never change during a session.
@@ -459,6 +460,68 @@ async function createCompany() {
     createCompanyLoading.value = false
   }
 }
+
+// ── Additional Company IPO ────────────────────────────────────────────────────
+interface AdditionalCompanyPrerequisites {
+  allRequirementsMet: boolean
+  companyCount: number
+  underMaxCap: boolean
+  hasExistingCompany: boolean
+  companyAgeTicks: number
+  companyAgeRequirementMet: boolean
+  ticksUntilAgeRequirementMet: number
+  netIncomeInWindow: number
+  profitabilityRequirementMet: boolean
+  personalBalanceUsd: number
+  balanceRequirementMet: boolean
+}
+
+const additionalCompanyPrerequisites = ref<AdditionalCompanyPrerequisites | null>(null)
+const showNewCompanyModal = ref(false)
+const newCompanySuccessMessage = ref<string | null>(null)
+
+/** Available cities for the new company modal (same list loaded with dashboard). */
+const dashboardCities = ref<City[]>([])
+
+async function loadAdditionalCompanyPrerequisites() {
+  if (!auth.isAuthenticated) return
+  try {
+    const data = await gqlRequest<{ additionalCompanyPrerequisites: AdditionalCompanyPrerequisites }>(
+      `{
+        additionalCompanyPrerequisites {
+          allRequirementsMet companyCount underMaxCap hasExistingCompany
+          companyAgeTicks companyAgeRequirementMet ticksUntilAgeRequirementMet
+          netIncomeInWindow profitabilityRequirementMet
+          personalBalanceUsd balanceRequirementMet
+        }
+        cities { id name currencyCode }
+      }`,
+    )
+    additionalCompanyPrerequisites.value = data.additionalCompanyPrerequisites
+    if ((data as { additionalCompanyPrerequisites: AdditionalCompanyPrerequisites; cities?: City[] }).cities?.length) {
+      dashboardCities.value = (data as { additionalCompanyPrerequisites: AdditionalCompanyPrerequisites; cities: City[] }).cities
+    }
+  } catch {
+    // non-critical – silently ignore
+  }
+}
+
+function onNewCompanyLaunched(companyId: string, companyName: string) {
+  newCompanySuccessMessage.value = t('dashboard.newCompanySuccess', { name: companyName })
+  void auth.fetchMe()
+  void loadDashboardData()
+  void loadAdditionalCompanyPrerequisites()
+  // Redirect to onboarding for the new company after a brief delay.
+  setTimeout(() => {
+    router.push(`/onboarding?companyId=${companyId}`)
+  }, 1800)
+}
+
+onMounted(async () => {
+  if (auth.isAuthenticated) {
+    void loadAdditionalCompanyPrerequisites()
+  }
+})
 </script>
 
 <template>
@@ -525,6 +588,57 @@ async function createCompany() {
                 <small class="text-muted">{{ t('dashboard.switchCompanyHint') }}</small>
               </article>
             </div>
+          </div>
+
+          <!-- ── Launch New Company CTA ─────────────────────────────────────── -->
+          <div
+            v-if="additionalCompanyPrerequisites"
+            class="launch-new-company-panel mt-6 p-5 border rounded-xl"
+            :class="additionalCompanyPrerequisites.allRequirementsMet ? 'border-brand/40 bg-brand/5' : 'border-divider bg-card-raised'"
+          >
+            <div class="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <h3 class="text-[0.9375rem] font-bold mb-1">{{ t('dashboard.launchNewCompany') }}</h3>
+                <p class="text-sm text-muted m-0">{{ t('dashboard.launchNewCompanySubtitle') }}</p>
+              </div>
+              <button
+                class="btn launch-new-company-btn"
+                :class="additionalCompanyPrerequisites.allRequirementsMet ? 'btn-primary' : 'btn-secondary opacity-60 cursor-not-allowed'"
+                :disabled="!additionalCompanyPrerequisites.allRequirementsMet"
+                :title="additionalCompanyPrerequisites.allRequirementsMet ? '' : t('dashboard.launchNewCompanyLocked')"
+                @click="additionalCompanyPrerequisites.allRequirementsMet && (showNewCompanyModal = true)"
+              >
+                {{ t('dashboard.launchNewCompanyBtn') }}
+              </button>
+            </div>
+
+            <!-- Prerequisites checklist shown when NOT all met -->
+            <ul
+              v-if="!additionalCompanyPrerequisites.allRequirementsMet"
+              class="nc-prereq-list mt-4 flex flex-col gap-1.5 text-sm list-none p-0 m-0"
+            >
+              <li :class="additionalCompanyPrerequisites.companyAgeRequirementMet ? 'text-good' : 'text-muted'">
+                {{
+                  additionalCompanyPrerequisites.companyAgeRequirementMet
+                    ? t('dashboard.prereqCompanyAgeMet')
+                    : t('dashboard.prereqCompanyAgeNotMet', { ticks: additionalCompanyPrerequisites.ticksUntilAgeRequirementMet })
+                }}
+              </li>
+              <li :class="additionalCompanyPrerequisites.profitabilityRequirementMet ? 'text-good' : 'text-muted'">
+                {{ additionalCompanyPrerequisites.profitabilityRequirementMet ? t('dashboard.prereqProfitabilityMet') : t('dashboard.prereqProfitabilityNotMet') }}
+              </li>
+              <li :class="additionalCompanyPrerequisites.balanceRequirementMet ? 'text-good' : 'text-muted'">
+                {{ additionalCompanyPrerequisites.balanceRequirementMet ? t('dashboard.prereqBalanceMet') : t('dashboard.prereqBalanceNotMet', { required: '200,000', current: Math.floor(additionalCompanyPrerequisites.personalBalanceUsd).toLocaleString() }) }}
+              </li>
+              <li :class="additionalCompanyPrerequisites.underMaxCap ? 'text-good' : 'text-bad'">
+                {{ additionalCompanyPrerequisites.underMaxCap ? t('dashboard.prereqMaxCapMet') : t('dashboard.prereqMaxCapNotMet') }}
+              </li>
+            </ul>
+
+            <!-- Success message after launch -->
+            <p v-if="newCompanySuccessMessage" class="mt-3 p-3 rounded-lg bg-[rgba(34,197,94,0.12)] text-good text-sm" role="status">
+              {{ newCompanySuccessMessage }}
+            </p>
           </div>
         </div>
 
@@ -751,4 +865,13 @@ async function createCompany() {
       </div>
     </template>
   </div>
+
+  <!-- Launch New Company Modal -->
+  <NewCompanyModal
+    :open="showNewCompanyModal"
+    :cities="dashboardCities"
+    :prerequisites="additionalCompanyPrerequisites"
+    @close="showNewCompanyModal = false"
+    @launched="onNewCompanyLaunched"
+  />
 </template>
