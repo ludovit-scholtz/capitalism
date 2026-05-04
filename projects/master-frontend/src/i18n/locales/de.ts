@@ -147,7 +147,8 @@ export default {
     biatecCallbackTitle: 'Biatec-Anmeldung wird abgeschlossen',
     biatecCallbackLoading: 'Deine Sitzung wird geprüft und dein Konto geladen...',
     biatecCallbackSuccess: 'Anmeldung abgeschlossen. Weiterleitung...',
-    biatecCallbackError: 'Biatec-Anmeldung fehlgeschlagen. Bitte kehre zum Login zurück und versuche es erneut.',
+    biatecCallbackError:
+      'Biatec-Anmeldung fehlgeschlagen. Bitte kehre zum Login zurück und versuche es erneut.',
   },
   account: {
     kicker: 'Mein Konto',
