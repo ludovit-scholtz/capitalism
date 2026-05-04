@@ -19,7 +19,7 @@ export const ALL_MILESTONES = [
   MILESTONE_FIRST_BRAND_ESTABLISHED,
 ] as const
 
-// ─── GraphQL ──────────────────────────────────────────────────────────────────
+const TUTORIAL_MILESTONE_SET = new Set<string>(ALL_MILESTONES)
 
 const TUTORIAL_PROGRESS_QUERY = `
   {
@@ -64,9 +64,8 @@ export function useTutorialContext() {
    *  not internal tracking milestones like tooltip-dismissal flags). */
   const completedCount = computed(
     () =>
-      milestones.value.filter(
-        (m) => m.isCompleted && (ALL_MILESTONES as readonly string[]).includes(m.milestone),
-      ).length,
+      milestones.value.filter((m) => m.isCompleted && TUTORIAL_MILESTONE_SET.has(m.milestone))
+        .length,
   )
 
   /** Returns true if the given milestone has been completed. */

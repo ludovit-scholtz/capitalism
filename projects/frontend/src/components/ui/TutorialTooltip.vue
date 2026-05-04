@@ -115,7 +115,6 @@ onUnmounted(() => {
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
   cursor: pointer;
 }
 
