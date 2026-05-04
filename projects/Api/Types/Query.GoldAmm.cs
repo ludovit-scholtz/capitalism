@@ -155,6 +155,60 @@ public sealed partial class Query
     }
 
     /// <summary>
+    /// Returns the most recent gold AMM swap records. Optionally filtered by pool or restricted to
+    /// the authenticated player's own trades. Public pools are visible to everyone; player history
+    /// requires authentication.
+    /// </summary>
+    public async Task<List<GoldAmmTradeInfo>> GoldAmmSwapHistory(
+        string? currencyCode,
+        bool myTradesOnly,
+        int limit,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        Guid? playerId = null;
+        try { playerId = httpContextAccessor.HttpContext?.User.GetRequiredUserId(); }
+        catch { }
+
+        if (myTradesOnly && !playerId.HasValue)
+            throw new GraphQLException(new Error("Authentication required to view personal trade history.", "UNAUTHORIZED"));
+
+        var effectiveLimit = Math.Clamp(limit <= 0 ? 50 : limit, 1, 200);
+        var currency = currencyCode?.ToUpperInvariant();
+
+        var query = db.GoldAmmTradeRecords
+            .AsNoTracking()
+            .Include(r => r.Pool)
+            .AsQueryable();
+
+        if (!string.IsNullOrEmpty(currency))
+            query = query.Where(r => r.CurrencyCode == currency);
+
+        if (myTradesOnly && playerId.HasValue)
+            query = query.Where(r => r.PlayerId == playerId.Value);
+
+        var records = await query
+            .OrderByDescending(r => r.ExecutedAtUtc)
+            .Take(effectiveLimit)
+            .ToListAsync();
+
+        return records.Select(r => new GoldAmmTradeInfo
+        {
+            Id = r.Id,
+            PlayerId = r.PlayerId,
+            PoolId = r.PoolId,
+            Direction = r.Direction,
+            CurrencyCode = r.CurrencyCode,
+            InputAmount = r.InputAmount,
+            OutputAmount = r.OutputAmount,
+            FeeAmount = r.FeeAmount,
+            ImpliedPrice = r.ImpliedPrice,
+            ExecutedAtTick = r.ExecutedAtTick,
+            ExecutedAtUtc = r.ExecutedAtUtc,
+        }).ToList();
+    }
+
+    /// <summary>
     /// Returns the authenticated player's gold balance (total, blocked in pools, available).
     /// </summary>
     [Authorize]

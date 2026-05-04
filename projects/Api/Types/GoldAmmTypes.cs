@@ -95,6 +95,25 @@ public sealed class GoldAmmRemoveLiquidityResult
     public decimal NewGoldBalance { get; set; }
 }
 
+/// <summary>Summary of a single gold AMM swap trade (audit record).</summary>
+public sealed class GoldAmmTradeInfo
+{
+    public Guid Id { get; set; }
+    public Guid PlayerId { get; set; }
+    public Guid PoolId { get; set; }
+    /// <summary>"FIAT_TO_GOLD" (buy gold with fiat) or "GOLD_TO_FIAT" (sell gold for fiat).</summary>
+    public string Direction { get; set; } = string.Empty;
+    public string CurrencyCode { get; set; } = string.Empty;
+    public string CurrencySymbol => Mutation.GetCurrencySymbol(CurrencyCode);
+    public decimal InputAmount { get; set; }
+    public decimal OutputAmount { get; set; }
+    public decimal FeeAmount { get; set; }
+    /// <summary>Implied price of 1 XAU in fiat at the time of the swap.</summary>
+    public decimal ImpliedPrice { get; set; }
+    public long ExecutedAtTick { get; set; }
+    public DateTime ExecutedAtUtc { get; set; }
+}
+
 /// <summary>Player's gold (XAU) balance info.</summary>
 public sealed class GoldBalanceInfo
 {

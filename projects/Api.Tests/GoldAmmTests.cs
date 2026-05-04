@@ -961,4 +961,337 @@ public sealed class GoldAmmTests
     }
 
     #endregion
+
+    #region Validation — currency code and amount
+
+    [Fact]
+    public async Task CreateGoldAmmPool_XauCurrencyCode_ReturnsInvalidCurrencyCodeError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, "xau-reject@test.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var playerId = await GetPlayerIdByEmailAsync(db, "xau-reject@test.com");
+        await SetFiatBalanceAsync(db, playerId, "EUR", 10_000m);
+        await SetGoldBalanceAsync(db, playerId, 5m);
+
+        var result = await ExecuteGraphQlAsync(client,
+            "mutation CreatePool($input: CreateGoldAmmPoolInput!) { createGoldAmmPool(input: $input) { poolId } }",
+            new { input = new { currencyCode = "XAU", fiatAmount = 1_000m, goldAmount = 1m } }, token);
+
+        var error = GetError(result);
+        Assert.NotNull(error);
+        Assert.Equal("INVALID_CURRENCY_CODE", error);
+    }
+
+    [Fact]
+    public async Task CreateGoldAmmPool_TooShortCurrencyCode_ReturnsInvalidCurrencyCodeError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, "shortcode-reject@test.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var playerId = await GetPlayerIdByEmailAsync(db, "shortcode-reject@test.com");
+        await SetFiatBalanceAsync(db, playerId, "EUR", 10_000m);
+        await SetGoldBalanceAsync(db, playerId, 5m);
+
+        var result = await ExecuteGraphQlAsync(client,
+            "mutation CreatePool($input: CreateGoldAmmPoolInput!) { createGoldAmmPool(input: $input) { poolId } }",
+            new { input = new { currencyCode = "EU", fiatAmount = 1_000m, goldAmount = 1m } }, token);
+
+        var error = GetError(result);
+        Assert.NotNull(error);
+        Assert.Equal("INVALID_CURRENCY_CODE", error);
+    }
+
+    [Fact]
+    public async Task CreateGoldAmmPool_ZeroFiatAmount_ReturnsInvalidAmountError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, "zero-fiat@test.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var playerId = await GetPlayerIdByEmailAsync(db, "zero-fiat@test.com");
+        await SetFiatBalanceAsync(db, playerId, "EUR", 10_000m);
+        await SetGoldBalanceAsync(db, playerId, 5m);
+
+        var result = await ExecuteGraphQlAsync(client,
+            "mutation CreatePool($input: CreateGoldAmmPoolInput!) { createGoldAmmPool(input: $input) { poolId } }",
+            new { input = new { currencyCode = "EUR", fiatAmount = 0m, goldAmount = 1m } }, token);
+
+        var error = GetError(result);
+        Assert.NotNull(error);
+        Assert.Equal("INVALID_AMOUNT", error);
+    }
+
+    [Fact]
+    public async Task CreateGoldAmmPool_ZeroGoldAmount_ReturnsInvalidAmountError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, "zero-gold@test.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var playerId = await GetPlayerIdByEmailAsync(db, "zero-gold@test.com");
+        await SetFiatBalanceAsync(db, playerId, "EUR", 10_000m);
+        await SetGoldBalanceAsync(db, playerId, 5m);
+
+        var result = await ExecuteGraphQlAsync(client,
+            "mutation CreatePool($input: CreateGoldAmmPoolInput!) { createGoldAmmPool(input: $input) { poolId } }",
+            new { input = new { currencyCode = "EUR", fiatAmount = 1_000m, goldAmount = 0m } }, token);
+
+        var error = GetError(result);
+        Assert.NotNull(error);
+        Assert.Equal("INVALID_AMOUNT", error);
+    }
+
+    #endregion
+
+    #region AddGoldAmmLiquidity edge cases
+
+    [Fact]
+    public async Task AddGoldAmmLiquidity_SlippageGuard_ReturnsErrorWhenGoldExceedsMax()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, "slippage-add@test.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var playerId = await GetPlayerIdByEmailAsync(db, "slippage-add@test.com");
+        await SetFiatBalanceAsync(db, playerId, "EUR", 20_000m);
+        await SetGoldBalanceAsync(db, playerId, 5m);
+
+        // Create pool: 10k EUR / 5 XAU → price = 2000 EUR/XAU
+        var poolResult = await ExecuteGraphQlAsync(client,
+            "mutation CreatePool($input: CreateGoldAmmPoolInput!) { createGoldAmmPool(input: $input) { poolId } }",
+            new { input = new { currencyCode = "EUR", fiatAmount = 10_000m, goldAmount = 5m } }, token);
+        var poolId = poolResult.GetProperty("data").GetProperty("createGoldAmmPool").GetProperty("poolId").GetString()!;
+
+        await SetFiatBalanceAsync(db, playerId, "EUR", 2_000m);
+        await SetGoldBalanceAsync(db, playerId, 1m);
+
+        // Adding 2000 EUR at ratio 2000 EUR/XAU requires exactly 1 XAU.
+        // Set maxGoldAmount = 0.001 (way below required 1 XAU) to trigger the slippage guard.
+        var addResult = await ExecuteGraphQlAsync(client,
+            "mutation Add($input: AddGoldAmmLiquidityInput!) { addGoldAmmLiquidity(input: $input) { poolId } }",
+            new { input = new { poolId = Guid.Parse(poolId), fiatAmount = 2_000m, maxGoldAmount = 0.001m } }, token);
+
+        var error = GetError(addResult);
+        Assert.NotNull(error);
+        Assert.Equal("SLIPPAGE_EXCEEDED", error);
+    }
+
+    [Fact]
+    public async Task AddGoldAmmLiquidity_Unauthenticated_ReturnsAuthError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, "add-liq-setup@test.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var playerId = await GetPlayerIdByEmailAsync(db, "add-liq-setup@test.com");
+        await SetFiatBalanceAsync(db, playerId, "EUR", 20_000m);
+        await SetGoldBalanceAsync(db, playerId, 10m);
+
+        // Create pool
+        var poolResult = await ExecuteGraphQlAsync(client,
+            "mutation CreatePool($input: CreateGoldAmmPoolInput!) { createGoldAmmPool(input: $input) { poolId } }",
+            new { input = new { currencyCode = "EUR", fiatAmount = 10_000m, goldAmount = 5m } }, token);
+        var poolId = poolResult.GetProperty("data").GetProperty("createGoldAmmPool").GetProperty("poolId").GetString()!;
+
+        // No token → should return auth error
+        var addResult = await ExecuteGraphQlAsync(client,
+            "mutation Add($input: AddGoldAmmLiquidityInput!) { addGoldAmmLiquidity(input: $input) { poolId } }",
+            new { input = new { poolId = Guid.Parse(poolId), fiatAmount = 1_000m, maxGoldAmount = 1m } },
+            token: null);
+
+        // HotChocolate returns an auth error (not necessarily a specific code, but data is null)
+        var data = addResult.GetProperty("data");
+        Assert.True(data.ValueKind == System.Text.Json.JsonValueKind.Null ||
+            addResult.TryGetProperty("errors", out _),
+            "Unauthenticated add liquidity must fail");
+    }
+
+    #endregion
+
+    #region GoldAmmSwapQuote — GOLD_TO_FIAT direction
+
+    [Fact]
+    public async Task GoldAmmSwapQuote_GoldToFiat_ReturnsValidQuote()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, "quote-g2f@test.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var playerId = await GetPlayerIdByEmailAsync(db, "quote-g2f@test.com");
+        await SetFiatBalanceAsync(db, playerId, "EUR", 10_000m);
+        await SetGoldBalanceAsync(db, playerId, 5m);
+
+        // Pool: 10k EUR / 5 XAU → price = 2000 EUR/XAU
+        await ExecuteGraphQlAsync(client,
+            "mutation CreatePool($input: CreateGoldAmmPoolInput!) { createGoldAmmPool(input: $input) { poolId } }",
+            new { input = new { currencyCode = "EUR", fiatAmount = 10_000m, goldAmount = 5m } }, token);
+
+        await SetGoldBalanceAsync(db, playerId, 2m); // wallet gold for the swap
+
+        var quoteResult = await ExecuteGraphQlAsync(client,
+            """
+            query Quote($input: GetGoldAmmSwapQuoteInput!) {
+              goldAmmSwapQuote(input: $input) {
+                direction currencyCode inputAmount outputAmount feeAmount feePercent
+                impliedPrice slippagePercent poolFiatReserve poolGoldReserve availableInputBalance
+              }
+            }
+            """,
+            new { input = new { direction = "GOLD_TO_FIAT", currencyCode = "EUR", amount = 1m } },
+            token);
+
+        Assert.Null(GetError(quoteResult));
+        var q = quoteResult.GetProperty("data").GetProperty("goldAmmSwapQuote");
+
+        Assert.Equal("GOLD_TO_FIAT", q.GetProperty("direction").GetString());
+        Assert.Equal("EUR", q.GetProperty("currencyCode").GetString());
+        Assert.Equal(1m, q.GetProperty("inputAmount").GetDecimal());
+        // With 1% fee: net = 0.99 XAU; newGold = 5 + 0.99 = 5.99; output ≈ 10000 - 50000/5.99
+        Assert.True(q.GetProperty("outputAmount").GetDecimal() > 0m, "Should receive fiat");
+        Assert.True(q.GetProperty("outputAmount").GetDecimal() < 2000m, "Output must be less than naive price (slippage)");
+        Assert.Equal(1m, q.GetProperty("feePercent").GetDecimal());
+        Assert.True(q.GetProperty("availableInputBalance").GetDecimal() >= 0m);
+    }
+
+    #endregion
+
+    #region Multiple swaps — AMM constant maintained
+
+    [Fact]
+    public async Task MultipleSwaps_AmmConstantKMaintained()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, "multi-swap@test.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var playerId = await GetPlayerIdByEmailAsync(db, "multi-swap@test.com");
+        await SetFiatBalanceAsync(db, playerId, "EUR", 50_000m);
+        await SetGoldBalanceAsync(db, playerId, 10m);
+
+        // Pool: 20k EUR / 10 XAU → K ≈ 200000
+        await ExecuteGraphQlAsync(client,
+            "mutation CreatePool($input: CreateGoldAmmPoolInput!) { createGoldAmmPool(input: $input) { poolId } }",
+            new { input = new { currencyCode = "EUR", fiatAmount = 20_000m, goldAmount = 10m } }, token);
+
+        await SetFiatBalanceAsync(db, playerId, "EUR", 30_000m);
+        await SetGoldBalanceAsync(db, playerId, 5m);
+
+        // Execute 3 swaps in alternating directions
+        async Task Swap(string direction, decimal amount)
+        {
+            await ExecuteGraphQlAsync(client,
+                "mutation Swap($input: ExecuteGoldAmmSwapInput!) { executeGoldAmmSwap(input: $input) { tradeId } }",
+                new { input = new { direction, currencyCode = "EUR", amount, minOutputAmount = 0m } },
+                token);
+        }
+
+        await Swap("FIAT_TO_GOLD", 1_000m);
+        await Swap("GOLD_TO_FIAT", 0.5m);
+        await Swap("FIAT_TO_GOLD", 500m);
+
+        // After all swaps, verify pool exists and k = fiat * gold is ≥ original k (fees add to pool)
+        var poolsResult = await ExecuteGraphQlAsync(client, "{ goldAmmPools { currencyCode fiatReserve goldReserve } }");
+        var pool = poolsResult.GetProperty("data").GetProperty("goldAmmPools")[0];
+        var fiatReserve = pool.GetProperty("fiatReserve").GetDecimal();
+        var goldReserve = pool.GetProperty("goldReserve").GetDecimal();
+        var kAfter = fiatReserve * goldReserve;
+
+        // K should be ≥ original (fees accrue to the pool, increasing k)
+        Assert.True(kAfter >= 200_000m, $"k should be ≥ original 200000 after fees accrue. Got k = {kAfter}");
+        Assert.True(goldReserve > 0 && fiatReserve > 0, "Pool reserves must be positive after swaps");
+    }
+
+    #endregion
+
+    #region swapHistory query
+
+    [Fact]
+    public async Task GoldAmmSwapHistory_AfterSwap_ReturnsTradeRecord()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, "swap-history@test.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var playerId = await GetPlayerIdByEmailAsync(db, "swap-history@test.com");
+        await SetFiatBalanceAsync(db, playerId, "EUR", 20_000m);
+        await SetGoldBalanceAsync(db, playerId, 5m);
+
+        // Create pool and execute a swap
+        await ExecuteGraphQlAsync(client,
+            "mutation CreatePool($input: CreateGoldAmmPoolInput!) { createGoldAmmPool(input: $input) { poolId } }",
+            new { input = new { currencyCode = "EUR", fiatAmount = 10_000m, goldAmount = 5m } }, token);
+
+        await SetFiatBalanceAsync(db, playerId, "EUR", 1_000m);
+
+        await ExecuteGraphQlAsync(client,
+            "mutation Swap($input: ExecuteGoldAmmSwapInput!) { executeGoldAmmSwap(input: $input) { tradeId } }",
+            new { input = new { direction = "FIAT_TO_GOLD", currencyCode = "EUR", amount = 500m, minOutputAmount = 0m } },
+            token);
+
+        // Query swap history for this currency
+        var historyResult = await ExecuteGraphQlAsync(client,
+            """
+            query History($currencyCode: String, $myTradesOnly: Boolean!, $limit: Int!) {
+              goldAmmSwapHistory(currencyCode: $currencyCode, myTradesOnly: $myTradesOnly, limit: $limit) {
+                id direction currencyCode inputAmount outputAmount feeAmount impliedPrice executedAtTick
+              }
+            }
+            """,
+            new { currencyCode = "EUR", myTradesOnly = true, limit = 10 },
+            token);
+
+        Assert.Null(GetError(historyResult));
+        var history = historyResult.GetProperty("data").GetProperty("goldAmmSwapHistory");
+        Assert.True(history.GetArrayLength() >= 1, "Should have at least one trade record");
+
+        var trade = history[0];
+        Assert.Equal("FIAT_TO_GOLD", trade.GetProperty("direction").GetString());
+        Assert.Equal("EUR", trade.GetProperty("currencyCode").GetString());
+        Assert.Equal(500m, trade.GetProperty("inputAmount").GetDecimal());
+        Assert.True(trade.GetProperty("outputAmount").GetDecimal() > 0m);
+        Assert.True(trade.GetProperty("feeAmount").GetDecimal() > 0m);
+    }
+
+    [Fact]
+    public async Task GoldAmmSwapHistory_MyTradesOnly_Unauthenticated_ReturnsError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var result = await ExecuteGraphQlAsync(client,
+            """
+            query {
+              goldAmmSwapHistory(myTradesOnly: true, limit: 10) {
+                id direction
+              }
+            }
+            """);
+
+        var error = GetError(result);
+        Assert.NotNull(error);
+        Assert.Equal("UNAUTHORIZED", error);
+    }
+
+    #endregion
 }
