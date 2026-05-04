@@ -113,10 +113,7 @@ public sealed class OnboardingService
         CancellationToken ct)
     {
         var lots = await FetchCityLotsAsync(cityId, ct);
-        var factoryLot = lots
-            .Where(l => l.BuildingId is null && l.SuitableTypes.Contains("FACTORY"))
-            .OrderBy(l => l.Price)
-            .FirstOrDefault()
+        var factoryLot = OnboardingHelpers.PickCheapestAvailableLot(lots, "FACTORY")
             ?? throw new InvalidOperationException($"{bot}: No available factory lot in city {cityId}.");
 
         var companyName = $"{bot.DisplayName} Corp";
@@ -156,18 +153,12 @@ public sealed class OnboardingService
             ?? throw new InvalidOperationException($"{bot}: City ID unknown for shop lot selection.");
 
         var lots = await FetchCityLotsAsync(shopCityId, ct);
-        var shopLot = lots
-            .Where(l => l.BuildingId is null && l.SuitableTypes.Contains("SALES_SHOP"))
-            .OrderBy(l => l.Price)
-            .FirstOrDefault()
+        var shopLot = OnboardingHelpers.PickCheapestAvailableLot(lots, "SALES_SHOP")
             ?? throw new InvalidOperationException($"{bot}: No available shop lot in city {shopCityId}.");
 
         // Pick a starter product for the industry
         var products = await FetchStarterProductsAsync(industry, ct);
-        var product = products
-            .Where(p => !p.IsProOnly)
-            .OrderBy(p => p.BasePrice)
-            .FirstOrDefault()
+        var product = OnboardingHelpers.PickCheapestFreeProduct(products)
             ?? throw new InvalidOperationException($"{bot}: No free starter product for industry {industry}.");
 
         _logger.LogInformation("{Bot} Finishing onboarding — product: {Product}, shop lot: {Lot}",
