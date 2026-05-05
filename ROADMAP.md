@@ -14,6 +14,8 @@ It will use real world map. The game will start in single city and later other c
 - [ ] When in the edit mode, the cancel and store upgrade should be next to each other. Also use some icons there so that users has better UX.
 - [ ] When I click the sell building show only sell building form. Make sure the form is properly designed.
 - [ ] In game dashboard, the number of units count for specific building touches the word Buildings in the navigation. Add some space between the tag and text please.
+- [ ] Do not allow to put on sale building which is used as a collateral for a loan.
+- [ ] Create a workflow to destroy a building. When building is destroyed, return the user 80% of the building property value. Make the property available for purchase again. When bank loan is not paid 3 times, destroy the building and pay any remaining debt from the sale of property to the bank owner.
 
 ### News (0% complete)
 
