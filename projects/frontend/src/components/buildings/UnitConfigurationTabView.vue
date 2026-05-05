@@ -51,7 +51,7 @@ const {
   formatUnitQuantity,
 } = bd
 
-const unitEditTab = ref<'general' | 'production' | 'inventory' | 'sales'>('general')
+const selectedConfigTab = ref<'general' | 'production' | 'inventory' | 'sales'>('general')
 
 const editTabs = computed(() => [
   { key: 'general', label: t('buildingDetail.editTabGeneralSettings') },
@@ -77,8 +77,8 @@ const currentUnit = computed(() => {
         v-for="tab in editTabs"
         :key="tab.key"
         class="unit-tab-btn inline-flex shrink-0 items-center rounded-md border border-transparent px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted transition-colors hover:text-foreground"
-        :class="unitEditTab === tab.key ? 'unit-tab-btn--active border-primary/40 bg-primary/10 text-primary' : 'hover:border-divider hover:bg-surface'"
-        @click="unitEditTab = tab.key as 'general' | 'production' | 'inventory' | 'sales'"
+        :class="selectedConfigTab === tab.key ? 'unit-tab-btn--active border-primary/40 bg-primary/10 text-primary' : 'hover:border-divider hover:bg-surface'"
+        @click="selectedConfigTab = tab.key as 'general' | 'production' | 'inventory' | 'sales'"
       >
         {{ tab.label }}
       </button>
@@ -87,7 +87,7 @@ const currentUnit = computed(() => {
     <div class="unit-detail">
 
       <!-- ── Tab: General Settings ── -->
-      <template v-if="unitEditTab === 'general'">
+      <template v-if="selectedConfigTab === 'general'">
         <h4>{{ t(`buildingDetail.unitTypes.${currentUnit.unitType}`) }}</h4>
         <p class="unit-desc">{{ t(`buildingDetail.unitDescriptions.${currentUnit.unitType}`) }}</p>
         <div class="unit-stats">
@@ -129,7 +129,7 @@ const currentUnit = computed(() => {
       </template>
 
       <!-- ── Tab: Production ── -->
-      <template v-else-if="unitEditTab === 'production'">
+      <template v-else-if="selectedConfigTab === 'production'">
         <BuildingUnitConfigFields />
 
         <!-- Exchange offers panel -->
@@ -199,7 +199,7 @@ const currentUnit = computed(() => {
       </template>
 
       <!-- ── Tab: Inventory ── -->
-      <template v-else-if="unitEditTab === 'inventory'">
+      <template v-else-if="selectedConfigTab === 'inventory'">
         <div v-if="getUnitInventorySummary(currentUnit)" class="unit-insight-card">
           <h5>{{ t('buildingDetail.inventory.title') }}</h5>
           <div class="inventory-summary-grid">
@@ -282,7 +282,7 @@ const currentUnit = computed(() => {
       </template>
 
       <!-- ── Tab: Sales / Upgrade ── -->
-      <template v-else-if="unitEditTab === 'sales'">
+      <template v-else-if="selectedConfigTab === 'sales'">
         <div v-if="isEditing && selectedCellUpgradeInfo !== null" class="unit-insight-card unit-upgrade-panel" :aria-label="t('buildingDetail.accessibility.unitUpgrade')">
           <h5>{{ t('buildingDetail.unitUpgrade.sectionTitle') }}</h5>
 

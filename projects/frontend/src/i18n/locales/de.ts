@@ -1381,9 +1381,9 @@ export default {
     editTabConfig: 'Konfiguration',
     editTabPerformance: 'Leistung',
     editTabMaintenance: 'Wartung',
-    editTabBasicEdit: 'Grundbearbeitung',
-    editTabFinance: 'Finanzen',
-    editTabLayouts: 'Layouts',
+    editTabBasicEdit: 'Grundbearbeitung', // Reserved for future building edit mode top-level tabs
+    editTabFinance: 'Finanzen', // Reserved for future building edit mode top-level tabs
+    editTabLayouts: 'Layouts', // Reserved for future building edit mode top-level tabs
     editTabGeneralSettings: 'Allgemein',
     editTabProduction: 'Produktion',
     editTabInventory: 'Inventar',

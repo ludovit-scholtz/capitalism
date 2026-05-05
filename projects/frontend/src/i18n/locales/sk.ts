@@ -1379,9 +1379,9 @@ export default {
     editTabConfig: 'Konfigurácia',
     editTabPerformance: 'Výkon',
     editTabMaintenance: 'Údržba',
-    editTabBasicEdit: 'Základná úprava',
-    editTabFinance: 'Financie',
-    editTabLayouts: 'Rozloženia',
+    editTabBasicEdit: 'Základná úprava', // Reserved for future building edit mode top-level tabs
+    editTabFinance: 'Financie', // Reserved for future building edit mode top-level tabs
+    editTabLayouts: 'Rozloženia', // Reserved for future building edit mode top-level tabs
     editTabGeneralSettings: 'Všeobecné',
     editTabProduction: 'Produkcia',
     editTabInventory: 'Inventár',
