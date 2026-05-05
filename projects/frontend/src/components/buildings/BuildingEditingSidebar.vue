@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject } from 'vue'
+import { computed, inject, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
 import type { EditableGridUnit } from '@/composables/useBuildingDetail'
@@ -136,6 +136,8 @@ const mineLotQuality = computed(() => {
 const mineLotReserve = computed(() => {
   return building.value?.lotMaterialQuantity ?? null
 })
+
+const editUnitTab = ref<'config' | 'performance' | 'maintenance'>('config')
 </script>
 
 <template>
@@ -163,7 +165,31 @@ const mineLotReserve = computed(() => {
         <h3>{{ t('buildingDetail.unitConfiguration') }}</h3>
         <button class="btn btn-ghost" @click="setReadOnlySelectedCell(null)">{{ t('common.close') }}</button>
       </div>
+
+      <!-- Unit editing tabs -->
+      <nav
+        class="unit-detail-tabs flex flex-nowrap items-center gap-1 overflow-x-auto border-b border-divider bg-bg px-4 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        :aria-label="t('buildingDetail.unitConfiguration')"
+      >
+        <button
+          v-for="tab in [
+            { key: 'config', label: t('buildingDetail.editTabConfig') },
+            { key: 'performance', label: t('buildingDetail.editTabPerformance') },
+            { key: 'maintenance', label: t('buildingDetail.editTabMaintenance') },
+          ]"
+          :key="tab.key"
+          class="unit-tab-btn inline-flex shrink-0 items-center rounded-md border border-transparent px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted transition-colors hover:text-foreground"
+          :class="editUnitTab === tab.key ? 'unit-tab-btn--active border-primary/40 bg-primary/10 text-primary' : 'hover:border-divider hover:bg-surface'"
+          @click="editUnitTab = tab.key as 'config' | 'performance' | 'maintenance'"
+        >
+          {{ tab.label }}
+        </button>
+      </nav>
+
       <div class="unit-detail">
+
+        <!-- ── Tab: Configuration ── -->
+        <template v-if="editUnitTab === 'config'">
         <h4>{{ t(`buildingDetail.unitTypes.${getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.unitType}`) }}</h4>
         <p class="unit-desc">{{ t(`buildingDetail.unitDescriptions.${getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.unitType}`) }}</p>
         <div class="unit-stats">
@@ -639,6 +665,90 @@ const mineLotReserve = computed(() => {
           </template>
         </div>
 
+        <div
+          v-if="selectedPurchaseUnit && 'resourceTypeId' in selectedPurchaseUnit && selectedPurchaseUnit.resourceTypeId && ['EXCHANGE', 'OPTIMAL'].includes(selectedPurchaseUnit.purchaseSource ?? '')"
+          class="unit-insight-card"
+        >
+          <h5>{{ t('buildingDetail.exchange.title') }}</h5>
+          <p class="config-help">{{ t('buildingDetail.exchange.subtitle') }}</p>
+          <p class="config-help exchange-selection-hint">{{ t('buildingDetail.exchange.selectionHint') }}</p>
+          <p class="config-help" v-if="exchangeOffersLoading">{{ t('common.loading') }}</p>
+          <template v-else>
+            <p v-if="allExchangeOffersBlocked" class="config-help exchange-no-valid-offers">
+              {{ t('buildingDetail.exchange.noValidOffers') }}
+            </p>
+            <!-- Logistics trap warning -->
+            <div v-if="logisticsTrapWarning" class="logistics-trap-warning" role="alert">
+              {{
+                t('buildingDetail.exchange.logisticsTrap', {
+                  cheapCity: logisticsTrapWarning.cheaperStickerCityName,
+                  cheapExchange: formatCurrency(logisticsTrapWarning.cheaperStickerExchangePrice),
+                  cheapDelivered: formatCurrency(logisticsTrapWarning.cheaperStickerDeliveredPrice),
+                  bestCity: logisticsTrapWarning.recommendedCityName,
+                  bestDelivered: formatCurrency(logisticsTrapWarning.recommendedDeliveredPrice),
+                })
+              }}
+            </div>
+            <!-- Sort controls -->
+            <div class="exchange-sort-controls" v-if="exchangeOfferItems.length > 1">
+              <span class="exchange-sort-label">{{ t('buildingDetail.exchange.sortBy') }}</span>
+              <button
+                v-for="dim in ['deliveredPrice', 'exchangePrice', 'quality'] as ExchangeSortBy[]"
+                :key="dim"
+                :class="['exchange-sort-btn', { active: exchangeSortBy === dim }]"
+                @click="exchangeSortBy = dim"
+              >
+                {{ t('buildingDetail.exchange.sortOption.' + dim) }}
+              </button>
+            </div>
+            <ul class="exchange-offers-list">
+              <li
+                v-for="offer in exchangeOfferItems"
+                :key="`${offer.cityId}-${offer.resourceTypeId}`"
+                :class="['exchange-offer-item', { 'offer-blocked': offer.blocked, 'offer-best': offer.cityId === bestExchangeOfferCityId }]"
+              >
+                <div class="exchange-offer-header">
+                  <strong>{{ offer.cityName }}</strong>
+                  <span class="offer-best-badge" v-if="offer.cityId === bestExchangeOfferCityId">{{ t('buildingDetail.exchange.bestOffer') }}</span>
+                  <span>{{ t('buildingDetail.exchange.quality', { quality: formatPercent(offer.estimatedQuality) }) }}</span>
+                </div>
+                <div class="exchange-offer-metrics">
+                  <span>{{ t('buildingDetail.exchange.exchangePrice', { price: formatCurrency(offer.exchangePricePerUnit), unit: offer.unitSymbol }) }}</span>
+                  <span>{{ t('buildingDetail.exchange.transit', { price: formatCurrency(offer.transitCostPerUnit), distance: offer.distanceKm }) }}</span>
+                  <span>{{ t('buildingDetail.exchange.deliveredPrice', { price: formatCurrency(offer.deliveredPricePerUnit), unit: offer.unitSymbol }) }}</span>
+                </div>
+                <p v-if="offer.blockedReason === 'maxPrice'" class="offer-blocked-reason">
+                  {{ t('buildingDetail.exchange.blockedMaxPrice', { maxPrice: formatCurrency(selectedPurchaseUnit?.maxPrice ?? 0), unit: offer.unitSymbol }) }}
+                </p>
+                <p v-else-if="offer.blockedReason === 'minQuality'" class="offer-blocked-reason">
+                  {{ t('buildingDetail.exchange.blockedMinQuality', { minQuality: formatPercent(selectedPurchaseUnit?.minQuality ?? 0) }) }}
+                </p>
+              </li>
+            </ul>
+            <!-- Link to Global Exchange -->
+            <RouterLink v-if="selectedPurchaseResourceSlug" :to="{ name: 'exchange', query: { resource: selectedPurchaseResourceSlug, city: building?.cityId } }" class="exchange-view-link">
+              {{ t('buildingDetail.exchange.viewOnExchange') }}
+            </RouterLink>
+          </template>
+        </div>
+
+        <div v-if="getDraftUnitConstructionCostLabel(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))" class="unit-insight-card">
+          <h5>{{ t('buildingDetail.costSummaryTitle') }}</h5>
+          <div class="unit-stats">
+            <span class="stat">
+              {{ t('buildingDetail.unitCost', { cost: getDraftUnitConstructionCostLabel(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)) }) }}
+            </span>
+          </div>
+        </div>
+        <div class="unit-actions" v-if="isEditing">
+          <button class="btn btn-danger btn-sm" @click="removeDraftUnit(selectedCell.x, selectedCell.y)">
+            {{ t('buildingDetail.removeUnit') }}
+          </button>
+        </div>
+        </template>
+
+        <!-- ── Tab: Performance ── -->
+        <template v-else-if="editUnitTab === 'performance'">
         <div v-if="getUnitInventorySummary(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))" class="unit-insight-card">
           <h5>{{ t('buildingDetail.inventory.title') }}</h5>
           <div class="inventory-summary-grid">
@@ -718,88 +828,10 @@ const mineLotReserve = computed(() => {
           :history="selectedUnitResourceHistory"
           @update:selected-item-key="selectedHistoryItemKey = $event"
         />
+        </template>
 
-        <div v-if="getDraftUnitConstructionCostLabel(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))" class="unit-insight-card">
-          <h5>{{ t('buildingDetail.costSummaryTitle') }}</h5>
-          <div class="unit-stats">
-            <span class="stat">
-              {{ t('buildingDetail.unitCost', { cost: getDraftUnitConstructionCostLabel(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)) }) }}
-            </span>
-          </div>
-        </div>
-
-        <div
-          v-if="selectedPurchaseUnit && 'resourceTypeId' in selectedPurchaseUnit && selectedPurchaseUnit.resourceTypeId && ['EXCHANGE', 'OPTIMAL'].includes(selectedPurchaseUnit.purchaseSource ?? '')"
-          class="unit-insight-card"
-        >
-          <h5>{{ t('buildingDetail.exchange.title') }}</h5>
-          <p class="config-help">{{ t('buildingDetail.exchange.subtitle') }}</p>
-          <p class="config-help exchange-selection-hint">{{ t('buildingDetail.exchange.selectionHint') }}</p>
-          <p class="config-help" v-if="exchangeOffersLoading">{{ t('common.loading') }}</p>
-          <template v-else>
-            <p v-if="allExchangeOffersBlocked" class="config-help exchange-no-valid-offers">
-              {{ t('buildingDetail.exchange.noValidOffers') }}
-            </p>
-            <!-- Logistics trap warning -->
-            <div v-if="logisticsTrapWarning" class="logistics-trap-warning" role="alert">
-              {{
-                t('buildingDetail.exchange.logisticsTrap', {
-                  cheapCity: logisticsTrapWarning.cheaperStickerCityName,
-                  cheapExchange: formatCurrency(logisticsTrapWarning.cheaperStickerExchangePrice),
-                  cheapDelivered: formatCurrency(logisticsTrapWarning.cheaperStickerDeliveredPrice),
-                  bestCity: logisticsTrapWarning.recommendedCityName,
-                  bestDelivered: formatCurrency(logisticsTrapWarning.recommendedDeliveredPrice),
-                })
-              }}
-            </div>
-            <!-- Sort controls -->
-            <div class="exchange-sort-controls" v-if="exchangeOfferItems.length > 1">
-              <span class="exchange-sort-label">{{ t('buildingDetail.exchange.sortBy') }}</span>
-              <button
-                v-for="dim in ['deliveredPrice', 'exchangePrice', 'quality'] as ExchangeSortBy[]"
-                :key="dim"
-                :class="['exchange-sort-btn', { active: exchangeSortBy === dim }]"
-                @click="exchangeSortBy = dim"
-              >
-                {{ t('buildingDetail.exchange.sortOption.' + dim) }}
-              </button>
-            </div>
-            <ul class="exchange-offers-list">
-              <li
-                v-for="offer in exchangeOfferItems"
-                :key="`${offer.cityId}-${offer.resourceTypeId}`"
-                :class="['exchange-offer-item', { 'offer-blocked': offer.blocked, 'offer-best': offer.cityId === bestExchangeOfferCityId }]"
-              >
-                <div class="exchange-offer-header">
-                  <strong>{{ offer.cityName }}</strong>
-                  <span class="offer-best-badge" v-if="offer.cityId === bestExchangeOfferCityId">{{ t('buildingDetail.exchange.bestOffer') }}</span>
-                  <span>{{ t('buildingDetail.exchange.quality', { quality: formatPercent(offer.estimatedQuality) }) }}</span>
-                </div>
-                <div class="exchange-offer-metrics">
-                  <span>{{ t('buildingDetail.exchange.exchangePrice', { price: formatCurrency(offer.exchangePricePerUnit), unit: offer.unitSymbol }) }}</span>
-                  <span>{{ t('buildingDetail.exchange.transit', { price: formatCurrency(offer.transitCostPerUnit), distance: offer.distanceKm }) }}</span>
-                  <span>{{ t('buildingDetail.exchange.deliveredPrice', { price: formatCurrency(offer.deliveredPricePerUnit), unit: offer.unitSymbol }) }}</span>
-                </div>
-                <p v-if="offer.blockedReason === 'maxPrice'" class="offer-blocked-reason">
-                  {{ t('buildingDetail.exchange.blockedMaxPrice', { maxPrice: formatCurrency(selectedPurchaseUnit?.maxPrice ?? 0), unit: offer.unitSymbol }) }}
-                </p>
-                <p v-else-if="offer.blockedReason === 'minQuality'" class="offer-blocked-reason">
-                  {{ t('buildingDetail.exchange.blockedMinQuality', { minQuality: formatPercent(selectedPurchaseUnit?.minQuality ?? 0) }) }}
-                </p>
-              </li>
-            </ul>
-            <!-- Link to Global Exchange -->
-            <RouterLink v-if="selectedPurchaseResourceSlug" :to="{ name: 'exchange', query: { resource: selectedPurchaseResourceSlug, city: building?.cityId } }" class="exchange-view-link">
-              {{ t('buildingDetail.exchange.viewOnExchange') }}
-            </RouterLink>
-          </template>
-        </div>
-
-        <div class="unit-actions" v-if="isEditing">
-          <button class="btn btn-danger btn-sm" @click="removeDraftUnit(selectedCell.x, selectedCell.y)">
-            {{ t('buildingDetail.removeUnit') }}
-          </button>
-        </div>
+        <!-- ── Tab: Maintenance ── -->
+        <template v-else-if="editUnitTab === 'maintenance'">
 
         <!-- Unit Upgrade Panel (edit-mode only) -->
         <div v-if="isEditing && selectedCellUpgradeInfo !== null" class="unit-insight-card unit-upgrade-panel" :aria-label="t('buildingDetail.accessibility.unitUpgrade')">
@@ -912,6 +944,8 @@ const mineLotReserve = computed(() => {
             </div>
           </div>
         </div>
+        </template>
+
       </div>
     </div>
   </div>

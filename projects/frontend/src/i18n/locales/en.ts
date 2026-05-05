@@ -1374,6 +1374,12 @@ export default {
     askingPricePlaceholder: 'Enter asking price',
     listForSale: 'List for Sale',
     cancelSale: 'Remove Listing',
+    overviewTab: 'P&L & Statistics',
+    bankAccountTab: 'Bank Account',
+    collateralRestrictionWarning: 'This building is used as loan collateral and cannot be placed for sale.',
+    editTabConfig: 'Configuration',
+    editTabPerformance: 'Performance',
+    editTabMaintenance: 'Maintenance',
     config: {
       inputItem: 'Input Item',
       outputProduct: 'Output Product',

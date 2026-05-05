@@ -5,7 +5,17 @@ import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
 
 const { t } = useI18n()
 const bd = inject(BUILDING_DETAIL_KEY)!
-const { building, showSaleDialog, salePrice, savingSale, openSaleDialog, closeSaleDialog, setBuildingForSale, formatBuildingType } = bd
+const {
+  building,
+  showSaleDialog,
+  salePrice,
+  savingSale,
+  openSaleDialog,
+  closeSaleDialog,
+  setBuildingForSale,
+  formatBuildingType,
+  isBuildingUsedAsCollateral,
+} = bd
 </script>
 
 <template>
@@ -45,37 +55,50 @@ const { building, showSaleDialog, salePrice, savingSale, openSaleDialog, closeSa
       >
         {{ building?.isForSale ? t('buildingDetail.forSale') : t('buildingDetail.notForSale') }}
       </span>
-      <button class="btn btn-secondary btn-sm ml-auto" @click="openSaleDialog">
+      <button class="btn btn-secondary btn-sm ml-auto" :disabled="isBuildingUsedAsCollateral" @click="openSaleDialog">
         {{ building?.isForSale ? t('buildingDetail.editSale') : t('buildingDetail.sellBuilding') }}
       </button>
     </div>
+    <p v-if="isBuildingUsedAsCollateral" class="collateral-warning mt-2 text-xs text-amber-600 dark:text-amber-400">
+      {{ t('buildingDetail.collateralRestrictionWarning') }}
+    </p>
   </div>
 
-  <!-- Sale dialog -->
-  <div v-if="showSaleDialog" class="sale-dialog">
-    <div class="sale-dialog-header">
-      <h3>{{ t('buildingDetail.sellBuilding') }}</h3>
-      <button class="btn btn-ghost" @click="closeSaleDialog">{{ t('common.close') }}</button>
-    </div>
-    <div class="sale-dialog-body">
-      <label class="form-label">{{ t('buildingDetail.askingPrice') }}</label>
-      <input
-        type="number"
-        class="form-input"
-        :placeholder="t('buildingDetail.askingPricePlaceholder')"
-        :value="salePrice"
-        @input="salePrice = isNaN(($event.target as HTMLInputElement).valueAsNumber) ? null : ($event.target as HTMLInputElement).valueAsNumber"
-        min="0"
-        step="1000"
-      />
-      <div class="sale-dialog-actions">
-        <button class="btn btn-primary" :disabled="savingSale || !salePrice || salePrice <= 0" @click="setBuildingForSale(true)">
-          {{ t('buildingDetail.listForSale') }}
-        </button>
-        <button v-if="building?.isForSale" class="btn btn-danger" :disabled="savingSale" @click="setBuildingForSale(false)">
-          {{ t('buildingDetail.cancelSale') }}
-        </button>
+  <!-- Sale dialog modal -->
+  <Teleport to="body">
+    <div
+      v-if="showSaleDialog"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      role="dialog"
+      aria-modal="true"
+      @click.self="closeSaleDialog"
+    >
+      <div class="sale-dialog w-full max-w-md rounded-xl border border-divider bg-card p-6 shadow-xl">
+        <div class="mb-4 flex items-center justify-between">
+          <h3 class="text-lg font-semibold text-foreground">{{ t('buildingDetail.sellBuilding') }}</h3>
+          <button class="btn btn-ghost" @click="closeSaleDialog">{{ t('common.close') }}</button>
+        </div>
+        <div class="sale-dialog-body">
+          <label class="form-label">{{ t('buildingDetail.askingPrice') }}</label>
+          <input
+            type="number"
+            class="form-input"
+            :placeholder="t('buildingDetail.askingPricePlaceholder')"
+            :value="salePrice"
+            @input="salePrice = isNaN(($event.target as HTMLInputElement).valueAsNumber) ? null : ($event.target as HTMLInputElement).valueAsNumber"
+            min="0"
+            step="1000"
+          />
+          <div class="sale-dialog-actions">
+            <button class="btn btn-primary" :disabled="savingSale || !salePrice || salePrice <= 0" @click="setBuildingForSale(true)">
+              {{ t('buildingDetail.listForSale') }}
+            </button>
+            <button v-if="building?.isForSale" class="btn btn-danger" :disabled="savingSale" @click="setBuildingForSale(false)">
+              {{ t('buildingDetail.cancelSale') }}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
+  </Teleport>
 </template>
