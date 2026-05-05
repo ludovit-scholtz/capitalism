@@ -13,6 +13,7 @@ It will use real world map. The game will start in single city and later other c
 - [ ] When in the building edit mode in the unit mode, create tab view. For each tab make sure to use the component. Extract each section to the separate components and show them in tabs. Make sure the design is professional and for the colors and layouts is used the tailwind.
 - [ ] When in the edit mode, the cancel and store upgrade should be next to each other. Also use some icons there so that users has better UX.
 - [ ] When I click the sell building show only sell building form. Make sure the form is properly designed.
+- [ ] In game dashboard, the number of units count for specific building touches the word Buildings in the navigation. Add some space between the tag and text please.
 
 ### News (0% complete)
 
@@ -28,6 +29,12 @@ It will use real world map. The game will start in single city and later other c
 ### Fix city selection (0% complete)
 
 - [ ] When I switch city to city where i dont have any factory, log out and log in later with biatec oidc, i want the context switcher automatically switch to my main city where I have the most factories
+
+### Ranking (0% complete)
+
+- [ ] Add link from game ranking to master ranking
+- [ ] Highlight the active player in the ranking - In both game ranking and master ranking
+- [ ] On ranking page enter, make sure to show the page where player is actively located. For example if player is ranked as 25th make sure to show 3rd page if there is 10 items per page. Do it in both game ranking and master ranking
 
 ### FX Exchange with AMM Liquidity Pools (100% complete)
 
