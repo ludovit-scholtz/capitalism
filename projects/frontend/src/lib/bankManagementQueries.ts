@@ -58,6 +58,8 @@ export const BANK_INFO_QUERY = `
       availableCash
       reserveShortfall
       liquidityStatus
+      pendingDepositInterestRatePercent
+      pendingDepositRateEffectiveTick
     }
   }
 `
@@ -194,6 +196,36 @@ export const INITIATE_BASE_DEPOSIT_MUTATION = `
       availableCash
       reserveShortfall
       liquidityStatus
+    }
+  }
+`
+
+export const UPDATE_BANK_DEPOSIT_RATE_MUTATION = `
+  mutation UpdateBankDepositRate($input: UpdateBankDepositRateInput!) {
+    updateBankDepositRate(input: $input) {
+      bankBuildingId
+      depositInterestRatePercent
+      pendingDepositInterestRatePercent
+      pendingDepositRateEffectiveTick
+      liquidityStatus
+    }
+  }
+`
+
+export const BANK_DEPOSIT_RATE_HISTORY_QUERY = `
+  query BankDepositRateHistory($bankBuildingId: UUID!) {
+    bankDepositRateHistory(bankBuildingId: $bankBuildingId) {
+      id
+      bankBuildingId
+      previousRatePercent
+      newRatePercent
+      effectiveTick
+      effectiveUtc
+      scheduledAtTick
+      scheduledAtUtc
+      affectedDepositCount
+      isApplied
+      changedByPlayerName
     }
   }
 `

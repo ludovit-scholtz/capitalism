@@ -3,7 +3,8 @@ import { useI18n } from 'vue-i18n'
 import { formatCurrency, formatPercent } from '@/lib/loanHelpers'
 import BankLiquidityPanel from '@/components/bank/BankLiquidityPanel.vue'
 import BankManagementTablesPanel from '@/components/bank/BankManagementTablesPanel.vue'
-import type { LoanSummary, BankDepositSummary, BankInfoSummary } from '@/types'
+import BankDepositRatePanel from '@/components/bank/BankDepositRatePanel.vue'
+import type { LoanSummary, BankDepositSummary, BankInfoSummary, BankDepositRateHistorySummary } from '@/types'
 
 const { t } = useI18n()
 
@@ -23,6 +24,12 @@ const props = defineProps<{
   baseDepositLoading: boolean
   baseDepositError: string | null
   baseDepositSuccess: boolean
+  // Dynamic deposit rate props
+  depositRateHistory: BankDepositRateHistorySummary[]
+  depositRateLoading: boolean
+  depositRateError: string | null
+  depositRateSuccess: boolean
+  currentTick: number
 }>()
 
 const emit = defineEmits<{
@@ -30,6 +37,7 @@ const emit = defineEmits<{
   (e: 'update:ratesForm', value: { depositInterestRatePercent: number; lendingInterestRatePercent: number }): void
   (e: 'save-rates'): void
   (e: 'submit-base-deposit'): void
+  (e: 'save-deposit-rate', newRate: number): void
 }>()
 
 function fmt(amount: number) {
@@ -158,6 +166,21 @@ function updateLendingRate(value: number) {
 
   <!-- Liquidity Health Panel -->
   <BankLiquidityPanel v-if="bankInfo.baseCapitalDeposited && bankInfo.liquidityStatus" :bank-info="bankInfo" :currency-code="cityCurrency" />
+
+  <!-- Dynamic Deposit Rate Panel (owner only, bank activated) -->
+  <BankDepositRatePanel
+    v-if="bankInfo.baseCapitalDeposited"
+    :current-rate-percent="bankInfo.depositInterestRatePercent"
+    :pending-rate-percent="bankInfo.pendingDepositInterestRatePercent ?? null"
+    :pending-rate-effective-tick="bankInfo.pendingDepositRateEffectiveTick ?? null"
+    :current-tick="currentTick"
+    :rate-history="depositRateHistory"
+    :loading="depositRateLoading"
+    :error="depositRateError"
+    :success="depositRateSuccess"
+    :deposit-count="bankDeposits.length"
+    @save-deposit-rate="(rate) => emit('save-deposit-rate', rate)"
+  />
 
   <BankManagementTablesPanel
     v-if="bankInfo.baseCapitalDeposited"

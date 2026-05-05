@@ -9,6 +9,7 @@ namespace Api.Engine.Phases;
 /// Processes bank deposit interest payments each tick.
 ///
 /// For each active deposit in each bank building:
+///   - Applies any pending deposit rate change when its effective tick is reached (uniform across all deposits)
 ///   - Calculates the per-tick interest: amount × (rate / 100) / TicksPerYear
 ///   - Transfers interest from the bank company's cash to the depositor company's cash
 ///   - Writes ledger entries for both sides
@@ -56,6 +57,41 @@ public sealed class BankInterestPhase : ITickPhase
         var depositsByBank = deposits
             .GroupBy(d => d.BankBuildingId!.Value)
             .ToDictionary(g => g.Key, g => g.ToList());
+
+        // ── Apply pending deposit rate changes ────────────────────────────────
+        // Load all un-applied rate change records whose effective tick has arrived.
+        var dueRateChanges = await context.Db.BankDepositRateHistories
+            .Where(h => !h.IsApplied && h.EffectiveTick <= context.CurrentTick)
+            .ToListAsync();
+
+        foreach (var rateChange in dueRateChanges)
+        {
+            int affected = 0;
+            if (depositsByBank.TryGetValue(rateChange.BankBuildingId, out var bankDeposits))
+            {
+                // Apply new rate to all active non-owner deposits at this bank
+                foreach (var deposit in bankDeposits)
+                {
+                    if (deposit.IsBaseCapitalDeposit)
+                        continue;
+
+                    deposit.DepositInterestRatePercent = rateChange.NewRatePercent;
+                    affected++;
+                }
+            }
+
+            rateChange.AffectedDepositCount = affected;
+            rateChange.IsApplied = true;
+
+            // Update the building's current rate and clear pending fields
+            var rateBank = bankBuildings.FirstOrDefault(b => b.Id == rateChange.BankBuildingId);
+            if (rateBank is not null)
+            {
+                rateBank.DepositInterestRatePercent = rateChange.NewRatePercent;
+                rateBank.PendingDepositInterestRatePercent = null;
+                rateBank.PendingDepositRateEffectiveTick = null;
+            }
+        }
 
         foreach (var (bankBuildingId, bankDeposits) in depositsByBank)
         {

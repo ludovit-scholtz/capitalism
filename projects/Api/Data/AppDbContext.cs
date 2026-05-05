@@ -156,6 +156,9 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Weekly leaderboard rank snapshots per player.</summary>
     public DbSet<PlayerRankSnapshot> PlayerRankSnapshots => Set<PlayerRankSnapshot>();
 
+    /// <summary>Immutable audit records for bank deposit interest rate changes.</summary>
+    public DbSet<BankDepositRateHistory> BankDepositRateHistories => Set<BankDepositRateHistory>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

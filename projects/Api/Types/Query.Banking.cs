@@ -149,4 +149,53 @@ public sealed partial class Query
 
         return deposits.Select(d => Mutation.MapToDepositSummary(d, bank, d.Company, d.Player)).ToList();
     }
+
+    /// <summary>
+    /// Returns the deposit rate change history for a bank building (owner view only).
+    /// Both applied (historical) and pending (future) entries are returned, ordered newest first.
+    /// </summary>
+    [Authorize]
+    public async Task<IReadOnlyList<BankDepositRateHistorySummary>> GetBankDepositRateHistory(
+        Guid bankBuildingId,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var bank = await db.Buildings
+            .Include(b => b.Company)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(b => b.Id == bankBuildingId && b.Type == BuildingType.Bank);
+
+        if (bank is null || bank.Company.PlayerId != userId)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Bank building not found or you do not own it.")
+                    .SetCode("BANK_NOT_FOUND")
+                    .Build());
+        }
+
+        var entries = await db.BankDepositRateHistories
+            .Include(h => h.ChangedByPlayer)
+            .Where(h => h.BankBuildingId == bankBuildingId)
+            .OrderByDescending(h => h.ScheduledAtTick)
+            .Take(100)
+            .ToListAsync();
+
+        return entries.Select(h => new BankDepositRateHistorySummary
+        {
+            Id = h.Id,
+            BankBuildingId = h.BankBuildingId,
+            PreviousRatePercent = h.PreviousRatePercent,
+            NewRatePercent = h.NewRatePercent,
+            EffectiveTick = h.EffectiveTick,
+            EffectiveUtc = h.EffectiveUtc,
+            ScheduledAtTick = h.ScheduledAtTick,
+            ScheduledAtUtc = h.ScheduledAtUtc,
+            AffectedDepositCount = h.AffectedDepositCount,
+            IsApplied = h.IsApplied,
+            ChangedByPlayerName = h.ChangedByPlayer?.DisplayName ?? string.Empty,
+        }).ToList();
+    }
 }

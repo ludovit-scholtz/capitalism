@@ -6,11 +6,19 @@ import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
 import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
+import { useGameStateStore } from '@/stores/gameState'
 import { deepEqual } from '@/lib/utils'
 import { getActiveCompany } from '@/lib/accountContext'
 import UiStateLoading from '@/components/ui/UiStateLoading.vue'
 import UiStateError from '@/components/ui/UiStateError.vue'
-import type { LoanSummary, BankDepositSummary, BankInfoSummary, Company, PlayerBankAccountSummary } from '@/types'
+import type {
+  LoanSummary,
+  BankDepositSummary,
+  BankInfoSummary,
+  Company,
+  PlayerBankAccountSummary,
+  BankDepositRateHistorySummary,
+} from '@/types'
 import BankCustomerView from '@/components/bank/BankCustomerView.vue'
 import BankManagementTabContent from '@/components/bank/BankManagementTabContent.vue'
 import {
@@ -23,12 +31,15 @@ import {
   MY_DEPOSITS_QUERY,
   MY_LOANS_QUERY,
   INITIATE_BASE_DEPOSIT_MUTATION,
+  UPDATE_BANK_DEPOSIT_RATE_MUTATION,
+  BANK_DEPOSIT_RATE_HISTORY_QUERY,
 } from '@/lib/bankManagementQueries'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const gameStateStore = useGameStateStore()
 const { saveScrollPosition, restoreScrollPosition } = useScrollPreservation()
 
 const bankBuildingId = computed(() => route.params.buildingId as string)
@@ -68,6 +79,12 @@ const baseDepositLoading = ref(false)
 const baseDepositError = ref<string | null>(null)
 const baseDepositSuccess = ref(false)
 
+// Dynamic deposit rate management
+const depositRateHistory = ref<BankDepositRateHistorySummary[]>([])
+const depositRateLoading = ref(false)
+const depositRateError = ref<string | null>(null)
+const depositRateSuccess = ref(false)
+
 async function loadData(isRefresh = false) {
   if (!isRefresh) {
     loading.value = true
@@ -89,13 +106,17 @@ async function loadData(isRefresh = false) {
 
     if (ownerDetected) {
       // Owner view: load full management data
-      const [loansResult, depositsResult] = await Promise.all([
+      const [loansResult, depositsResult, historyResult] = await Promise.all([
         gqlRequest<{ bankLoans: LoanSummary[] }>(BANK_LOANS_QUERY, {
           bankBuildingId: bankBuildingId.value,
         }),
         gqlRequest<{ bankDeposits: BankDepositSummary[] }>(BANK_DEPOSITS_QUERY, {
           id: bankBuildingId.value,
         }),
+        gqlRequest<{ bankDepositRateHistory: BankDepositRateHistorySummary[] }>(
+          BANK_DEPOSIT_RATE_HISTORY_QUERY,
+          { bankBuildingId: bankBuildingId.value },
+        ),
       ])
       const loans = loansResult.bankLoans ?? []
       if (!deepEqual(issuedLoans.value, loans)) {
@@ -104,6 +125,10 @@ async function loadData(isRefresh = false) {
       const deposits = depositsResult.bankDeposits ?? []
       if (!deepEqual(bankDeposits.value, deposits)) {
         bankDeposits.value = deposits
+      }
+      const history = historyResult.bankDepositRateHistory ?? []
+      if (!deepEqual(depositRateHistory.value, history)) {
+        depositRateHistory.value = history
       }
       if (bankInfo.value && !showRatesForm.value) {
         ratesForm.value.depositInterestRatePercent = bankInfo.value.depositInterestRatePercent
@@ -221,6 +246,31 @@ async function submitBaseDeposit() {
 const activeCompany = computed(() => getActiveCompany(auth.player, userCompanies.value))
 const isCompanyAccountActive = computed(() => auth.player?.activeAccountType === 'COMPANY' && !!activeCompany.value)
 const isPersonalAccountActive = computed(() => auth.player?.activeAccountType === 'PERSON')
+
+async function saveDepositRate(newRate: number) {
+  if (!bankBuildingId.value) return
+  depositRateLoading.value = true
+  depositRateError.value = null
+  depositRateSuccess.value = false
+  try {
+    const result = await gqlRequest<{ updateBankDepositRate: BankInfoSummary }>(
+      UPDATE_BANK_DEPOSIT_RATE_MUTATION,
+      { input: { bankBuildingId: bankBuildingId.value, newRatePercent: newRate } },
+    )
+    bankInfo.value = result.updateBankDepositRate
+    depositRateSuccess.value = true
+    // Reload history to show the new pending entry
+    const histResult = await gqlRequest<{ bankDepositRateHistory: BankDepositRateHistorySummary[] }>(
+      BANK_DEPOSIT_RATE_HISTORY_QUERY,
+      { bankBuildingId: bankBuildingId.value },
+    )
+    depositRateHistory.value = histResult.bankDepositRateHistory ?? []
+  } catch (err) {
+    depositRateError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    depositRateLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -269,10 +319,16 @@ const isPersonalAccountActive = computed(() => auth.player?.activeAccountType ==
           :base-deposit-loading="baseDepositLoading"
           :base-deposit-error="baseDepositError"
           :base-deposit-success="baseDepositSuccess"
+          :deposit-rate-history="depositRateHistory"
+          :deposit-rate-loading="depositRateLoading"
+          :deposit-rate-error="depositRateError"
+          :deposit-rate-success="depositRateSuccess"
+          :current-tick="gameStateStore.gameState?.currentTick ?? 0"
           @update:show-rates-form="showRatesForm = $event"
           @update:rates-form="ratesForm = $event"
           @save-rates="saveRates"
           @submit-base-deposit="submitBaseDeposit"
+          @save-deposit-rate="saveDepositRate"
         />
       </template>
 

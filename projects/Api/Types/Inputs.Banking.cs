@@ -63,6 +63,22 @@ public sealed class SetBankRatesInput
     public decimal LendingInterestRatePercent { get; set; }
 }
 
+/// <summary>
+/// Input for scheduling a dynamic deposit interest rate change at a bank.
+/// The new rate is applied uniformly to all active deposits 24 ticks after the mutation is called.
+/// </summary>
+public sealed class UpdateBankDepositRateInput
+{
+    /// <summary>The bank building whose deposit rate is being changed (must be owned by the authenticated player's company).</summary>
+    public Guid BankBuildingId { get; set; }
+
+    /// <summary>
+    /// New annual deposit interest rate (%) to apply to all existing deposits after the 24-tick delay.
+    /// Must be between 0 and 50 (inclusive).
+    /// </summary>
+    public decimal NewRatePercent { get; set; }
+}
+
 /// <summary>Input for funding a building's assigned bank account from company cash.</summary>
 public sealed class FundBuildingBankAccountInput
 {
