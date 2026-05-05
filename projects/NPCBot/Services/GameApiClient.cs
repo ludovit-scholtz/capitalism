@@ -71,7 +71,9 @@ public sealed class GameApiClient
         using var doc = JsonDocument.Parse(body);
         var root = doc.RootElement;
 
-        if (root.TryGetProperty("errors", out var errors))
+        if (root.TryGetProperty("errors", out var errors) &&
+            errors.ValueKind == System.Text.Json.JsonValueKind.Array &&
+            errors.GetArrayLength() > 0)
         {
             var (firstMsg, code) = GraphQLResponseParser.ParseFirstError(errors);
             _logger.LogWarning("GraphQL error [{Code}]: {Message}", code, firstMsg);
