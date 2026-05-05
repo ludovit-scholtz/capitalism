@@ -157,10 +157,23 @@ public sealed class BotOrchestrator
             _logger.LogWarning(ex, "Could not refresh game tick.");
         }
 
+        // Refresh rankings for competitive position tracking (best-effort; failure is non-fatal).
+        List<RankingEntry>? rankings = null;
+        try
+        {
+            rankings = await _accounts.FetchRankingsAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not refresh global rankings.");
+        }
+
         foreach (var bot in _bots)
         {
             if (ct.IsCancellationRequested) break;
             if (bot.IsSkipped) continue;
+            if (rankings is not null)
+                bot.CurrentRank = rankings.Find(r => r.DisplayName == bot.DisplayName)?.Rank;
             await TickBotAsync(bot, ct);
         }
     }
@@ -227,9 +240,10 @@ public sealed class BotOrchestrator
         {
             var status = GetBotStatusLabel(bot);
             var profitable = bot.ProfitDelta >= 0 ? "✓" : "✗";
+            var rankStr = bot.CurrentRank.HasValue ? $"rank={bot.CurrentRank}" : "rank=?";
             _logger.LogInformation(
-                "  {Bot}  status={Status}  netWorth={NW:N0}  delta={Delta:+0;-0;0}  {Profitable}",
-                bot, status, bot.CurrentNetWorth, bot.ProfitDelta, profitable);
+                "  {Bot}  status={Status}  {Rank}  netWorth={NW:N0}  delta={Delta:+0;-0;0}  {Profitable}",
+                bot, status, rankStr, bot.CurrentNetWorth, bot.ProfitDelta, profitable);
         }
         _logger.LogInformation("─────────────────────────────────────────────────────");
     }

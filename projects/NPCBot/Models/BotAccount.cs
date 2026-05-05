@@ -67,6 +67,12 @@ public sealed class BotAccount
     public decimal ProfitDelta => CurrentNetWorth - InitialNetWorth;
 
     /// <summary>
+    /// The bot's current rank in the global leaderboard, as last fetched by the orchestrator.
+    /// Null when rankings have not been fetched yet or the bot's name was not found in the list.
+    /// </summary>
+    public int? CurrentRank { get; set; }
+
+    /// <summary>
     /// The most recent strategy recommendation produced by <see cref="Services.BotProfitCalculator"/>.
     /// Set each tick by the orchestrator; cleared after every application attempt (success or no-op)
     /// to prevent infinite retry loops when no units are adjustable or all changes are sub-cent.

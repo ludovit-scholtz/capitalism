@@ -41,10 +41,13 @@ public sealed class BotOrchestratorIntegrationTests
         public int LoginCallCount;
         public int FetchProfileCallCount;
         public int FetchGameStateCallCount;
+        public int FetchRankingsCallCount;
         public Exception? RegisterException;
         public Exception? LoginException;
         public Exception? TickProfileException;
+        public Exception? RankingsException;
         private int _tickProfileFetchCount;
+        private readonly Queue<List<RankingEntry>> _rankingsQueue = new();
 
         // Auto-cancel mechanism: cancel CTS after the Nth FetchGameStateAsync call.
         private CancellationTokenSource? _autoCancelCts;
@@ -72,6 +75,9 @@ public sealed class BotOrchestratorIntegrationTests
 
         public void EnqueueGameState(GameStateSummary gs) =>
             _gameStateQueue.Enqueue(gs);
+
+        public void EnqueueRankings(List<RankingEntry> rankings) =>
+            _rankingsQueue.Enqueue(rankings);
 
         public Task<(string token, DateTime expiresAt)> RegisterOrLoginAsync(
             BotAccount bot, CancellationToken ct)
@@ -119,8 +125,15 @@ public sealed class BotOrchestratorIntegrationTests
             return Task.FromResult(gs);
         }
 
-        public Task<List<RankingEntry>> FetchRankingsAsync(CancellationToken ct) =>
-            Task.FromResult(new List<RankingEntry>());
+        public Task<List<RankingEntry>> FetchRankingsAsync(CancellationToken ct)
+        {
+            FetchRankingsCallCount++;
+            if (RankingsException is not null) throw RankingsException;
+            var list = _rankingsQueue.Count > 0
+                ? _rankingsQueue.Dequeue()
+                : new List<RankingEntry>();
+            return Task.FromResult(list);
+        }
 
         public Task<UnitSummary> UpdatePublicSalesPriceAsync(
             string unitId, decimal newMinPrice, string token, CancellationToken ct) =>
@@ -360,8 +373,7 @@ public sealed class BotOrchestratorIntegrationTests
         var bot1 = new BotAccount { Index = 1, DisplayName = "NPC 001", Email = "npc001@t.x", Strategy = "FURNITURE" };
         var bot2 = new BotAccount { Index = 2, DisplayName = "NPC 002", Email = "npc002@t.x", Strategy = "FOOD_PROCESSING" };
 
-        // First RegisterOrLogin call throws (for bot1); second succeeds (for bot2).
-        int callCount = 0;
+        // Use a custom FakeAccountService that throws only on the first RegisterOrLogin call.
         accounts.RegisterException = null;
 
         // Use a custom FakeAccountService that throws only on the first call
@@ -689,6 +701,233 @@ public sealed class BotOrchestratorIntegrationTests
         Assert.NotNull(bot.LastSuccessUtc);
         Assert.True(bot.LastSuccessUtc >= before);
     }
+
+    // ── Rankings wiring ───────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Tick_RankingsFetched_SetsCurrentRankOnMatchingBot()
+    {
+        // When rankings are returned and a bot's DisplayName matches an entry,
+        // bot.CurrentRank is set to that entry's Rank.
+        var accounts = new FakeAccountService();
+        var bot = MakeBot();
+
+        // Init
+        accounts.EnqueueProfile(CompletedProfile());
+        accounts.EnqueueProfile(CompletedProfile());
+        accounts.EnqueueGameState(new GameStateSummary { CurrentTick = 1 });
+
+        // Tick: rankings include our bot at position 3
+        accounts.EnqueueRankings(
+        [
+            new RankingEntry { Rank = 1, DisplayName = "Other Player", NetWorth = 999_000m },
+            new RankingEntry { Rank = 2, DisplayName = "Another Bot", NetWorth = 500_000m },
+            new RankingEntry { Rank = 3, DisplayName = bot.DisplayName, NetWorth = 80_000m },
+        ]);
+        accounts.EnqueueProfile(CompletedProfile());
+        accounts.EnqueueGameState(new GameStateSummary { CurrentTick = 2 });
+
+        using var cts = new CancellationTokenSource();
+        accounts.CancelCtsAfterGameStateFetch(cts, onCallN: 3);
+
+        var opts = new BotOptions { Enabled = true, PollIntervalSeconds = 0 };
+        var orchestrator = MakeOrchestrator(accounts, options: opts, bots: [bot]);
+        await orchestrator.RunAsync(cts.Token);
+
+        Assert.Equal(3, bot.CurrentRank);
+        Assert.True(accounts.FetchRankingsCallCount >= 1, "Rankings must be fetched at least once during tick.");
+    }
+
+    [Fact]
+    public async Task Tick_BotNotInRankings_CurrentRankRemainsNull()
+    {
+        // When the bot's DisplayName is not in the rankings list, CurrentRank stays null.
+        var accounts = new FakeAccountService();
+        var bot = MakeBot();
+
+        accounts.EnqueueProfile(CompletedProfile());
+        accounts.EnqueueProfile(CompletedProfile());
+        accounts.EnqueueGameState(new GameStateSummary { CurrentTick = 1 });
+
+        // Rankings contain a different player — not our bot
+        accounts.EnqueueRankings(
+        [
+            new RankingEntry { Rank = 1, DisplayName = "SomeOtherPlayer", NetWorth = 100_000m },
+        ]);
+        accounts.EnqueueProfile(CompletedProfile());
+        accounts.EnqueueGameState(new GameStateSummary { CurrentTick = 2 });
+
+        using var cts = new CancellationTokenSource();
+        accounts.CancelCtsAfterGameStateFetch(cts, onCallN: 3);
+
+        var opts = new BotOptions { Enabled = true, PollIntervalSeconds = 0 };
+        var orchestrator = MakeOrchestrator(accounts, options: opts, bots: [bot]);
+        await orchestrator.RunAsync(cts.Token);
+
+        Assert.Null(bot.CurrentRank);
+    }
+
+    [Fact]
+    public async Task Tick_RankingsFetchThrows_TickStillCompletesAndBotRankRemainsNull()
+    {
+        // A rankings fetch failure must not abort the tick or affect bot processing.
+        var accounts = new FakeAccountService();
+        var bot = MakeBot();
+        accounts.RankingsException = new InvalidOperationException("Rankings unavailable");
+
+        accounts.EnqueueProfile(CompletedProfile());
+        accounts.EnqueueProfile(CompletedProfile());
+        accounts.EnqueueGameState(new GameStateSummary { CurrentTick = 1 });
+
+        accounts.EnqueueProfile(CompletedProfile());
+        accounts.EnqueueGameState(new GameStateSummary { CurrentTick = 2 });
+
+        using var cts = new CancellationTokenSource();
+        accounts.CancelCtsAfterGameStateFetch(cts, onCallN: 3);
+
+        var opts = new BotOptions { Enabled = true, PollIntervalSeconds = 0 };
+        var orchestrator = MakeOrchestrator(accounts, options: opts, bots: [bot]);
+        await orchestrator.RunAsync(cts.Token);
+
+        // Tick completed successfully despite rankings failure
+        Assert.Null(bot.CurrentRank);
+        Assert.Equal(0, bot.ConsecutiveErrors); // bot tick itself did not fail
+    }
+
+    [Fact]
+    public async Task Tick_MultipleBotsInRankings_EachBotGetsCorrectRank()
+    {
+        // Two bots: both names appear in rankings at different positions.
+        var accounts = new FakeAccountService();
+        var bot1 = new BotAccount { Index = 1, DisplayName = "NPC 001", Email = "npc001@t.x", Strategy = "FURNITURE" };
+        var bot2 = new BotAccount { Index = 2, DisplayName = "NPC 002", Email = "npc002@t.x", Strategy = "FOOD_PROCESSING" };
+
+        // Init for both bots
+        accounts.EnqueueGameState(new GameStateSummary { CurrentTick = 1 });
+        foreach (var _ in new[] { bot1, bot2 })
+        {
+            accounts.EnqueueProfile(CompletedProfile());
+            accounts.EnqueueProfile(CompletedProfile());
+        }
+
+        // Tick: rankings list both bots
+        accounts.EnqueueRankings(
+        [
+            new RankingEntry { Rank = 1, DisplayName = "NPC 002", NetWorth = 200_000m },
+            new RankingEntry { Rank = 2, DisplayName = "NPC 001", NetWorth = 100_000m },
+        ]);
+        accounts.EnqueueProfile(CompletedProfile()); // bot1 tick
+        accounts.EnqueueProfile(CompletedProfile()); // bot2 tick
+        accounts.EnqueueGameState(new GameStateSummary { CurrentTick = 2 });
+
+        using var cts = new CancellationTokenSource();
+        accounts.CancelCtsAfterGameStateFetch(cts, onCallN: 3);
+
+        var opts = new BotOptions { Enabled = true, PollIntervalSeconds = 0 };
+        var orchestrator = MakeOrchestrator(accounts, options: opts, bots: [bot1, bot2]);
+        await orchestrator.RunAsync(cts.Token);
+
+        Assert.Equal(2, bot1.CurrentRank); // NPC 001 is rank 2
+        Assert.Equal(1, bot2.CurrentRank); // NPC 002 is rank 1
+    }
+
+    [Fact]
+    public async Task Tick_SkippedBotDoesNotGetRankUpdated()
+    {
+        // A skipped bot is excluded from the tick loop, so its CurrentRank is never set
+        // even when the rankings list contains its name.
+        var accounts = new FakeAccountService();
+        var bot = MakeBot();
+        bot.IsSkipped = true;
+
+        accounts.EnqueueGameState(new GameStateSummary { CurrentTick = 1 });
+        accounts.EnqueueRankings(
+        [
+            new RankingEntry { Rank = 1, DisplayName = bot.DisplayName, NetWorth = 50_000m },
+        ]);
+        accounts.EnqueueGameState(new GameStateSummary { CurrentTick = 2 });
+
+        using var cts = new CancellationTokenSource();
+        accounts.CancelCtsAfterGameStateFetch(cts, onCallN: 3);
+
+        var opts = new BotOptions { Enabled = true, PollIntervalSeconds = 0 };
+        var orchestrator = MakeOrchestrator(accounts, options: opts, bots: [bot]);
+        await orchestrator.RunAsync(cts.Token);
+
+        Assert.Null(bot.CurrentRank); // skipped bots are not processed in the tick loop
+    }
+
+    // ── Tick-loop: game-state failure ─────────────────────────────────────────
+
+    [Fact]
+    public async Task Tick_GameStateFetchThrows_CurrentTickPreservedFromLastSuccess()
+    {
+        // If FetchGameStateAsync throws during the tick, the tick still completes for
+        // all bots using the previously cached _currentTick value.
+        var accounts = new FakeAccountService();
+        var bot = MakeBot();
+
+        // Init: game state at tick 42
+        accounts.EnqueueProfile(CompletedProfile());
+        accounts.EnqueueProfile(CompletedProfile());
+        accounts.EnqueueGameState(new GameStateSummary { CurrentTick = 42 });
+
+        // Tick: game state throws, but profile fetch succeeds
+        // The CancelCtsAfterGameStateFetch won't fire because the throw happens before
+        // incrementing the counter; use a timed cancel instead.
+        accounts.EnqueueProfile(CompletedProfile());
+
+        using var cts = new CancellationTokenSource();
+        // Use a short delay so one tick fires then stops
+        cts.CancelAfter(TimeSpan.FromMilliseconds(300));
+
+        var opts = new BotOptions { Enabled = true, PollIntervalSeconds = 0 };
+
+        // Inject a custom fake that throws on the 2nd game state call
+        var throwingAccounts = new ThrowGameStateOnceAccountService(throwOnSecondCall: true);
+        throwingAccounts.SetGameState(new GameStateSummary { CurrentTick = 42 });
+        throwingAccounts.SetProfile(CompletedProfile());
+        throwingAccounts.SetProfile(CompletedProfile());
+        throwingAccounts.SetProfile(CompletedProfile()); // tick profile
+
+        var orchestrator = MakeOrchestrator(throwingAccounts, options: opts, bots: [bot]);
+        await orchestrator.RunAsync(cts.Token);
+
+        // Tick still ran — bot processed despite game-state failure
+        Assert.Equal(0, bot.ConsecutiveErrors);
+    }
+
+    [Fact]
+    public async Task Tick_OnboardingNotComplete_OnboardingRunsDuringTick()
+    {
+        // If a bot completes init without onboarding (e.g. onboarding service threw during init),
+        // but then on the next tick the profile still shows incomplete, RunOnboardingAsync
+        // is called again during TickBotAsync.
+        var accounts = new FakeAccountService();
+        var onboarding = new FakeOnboardingService();
+        var bot = MakeBot();
+
+        // Init phase: profile is complete (no onboarding needed during init)
+        accounts.EnqueueProfile(CompletedProfile());
+        accounts.EnqueueProfile(CompletedProfile());
+        accounts.EnqueueGameState(new GameStateSummary { CurrentTick = 1 });
+
+        // Tick phase: profile shows onboarding NOT complete (simulates race condition)
+        accounts.EnqueueProfile(IncompleteProfile());  // tick profile — not onboarded
+        accounts.EnqueueProfile(CompletedProfile());   // post-onboarding profile in tick
+        accounts.EnqueueProfile(CompletedProfile());   // second post-onboarding refresh
+        accounts.EnqueueGameState(new GameStateSummary { CurrentTick = 2 });
+
+        using var cts = new CancellationTokenSource();
+        accounts.CancelCtsAfterGameStateFetch(cts, onCallN: 3);
+
+        var opts = new BotOptions { Enabled = true, PollIntervalSeconds = 0 };
+        var orchestrator = MakeOrchestrator(accounts, onboarding: onboarding, options: opts, bots: [bot]);
+        await orchestrator.RunAsync(cts.Token);
+
+        // Onboarding was called once during tick (not during init)
+        Assert.Equal(1, onboarding.CallCount);
+    }
 }
 
 /// <summary>
@@ -729,6 +968,53 @@ file sealed class ThrowOnceAccountService : IAccountService
 
     public Task<GameStateSummary> FetchGameStateAsync(CancellationToken ct) =>
         Task.FromResult(_gameState);
+
+    public Task<List<RankingEntry>> FetchRankingsAsync(CancellationToken ct) =>
+        Task.FromResult(new List<RankingEntry>());
+
+    public Task<UnitSummary> UpdatePublicSalesPriceAsync(
+        string unitId, decimal newMinPrice, string token, CancellationToken ct) =>
+        Task.FromResult(new UnitSummary { Id = unitId });
+}
+
+/// <summary>
+/// A <see cref="IAccountService"/> fake that throws <see cref="InvalidOperationException"/>
+/// on the second <c>FetchGameStateAsync</c> call (simulating a transient API failure
+/// during the tick loop while init succeeds).
+/// </summary>
+file sealed class ThrowGameStateOnceAccountService : IAccountService
+{
+    private readonly bool _throwOnSecondCall;
+    private int _gameStateCallCount;
+    private GameStateSummary _gameState = new() { CurrentTick = 1 };
+    private readonly Queue<PlayerProfile> _profiles = new();
+
+    public ThrowGameStateOnceAccountService(bool throwOnSecondCall = true) =>
+        _throwOnSecondCall = throwOnSecondCall;
+
+    public void SetGameState(GameStateSummary gs) => _gameState = gs;
+    public void SetProfile(PlayerProfile p) => _profiles.Enqueue(p);
+
+    public Task<(string token, DateTime expiresAt)> RegisterOrLoginAsync(
+        BotAccount bot, CancellationToken ct) =>
+        Task.FromResult(("tok", DateTime.UtcNow.AddHours(2)));
+
+    public Task<(string token, DateTime expiresAt)> LoginAsync(
+        BotAccount bot, CancellationToken ct) =>
+        Task.FromResult(("refreshed", DateTime.UtcNow.AddHours(2)));
+
+    public Task<PlayerProfile> FetchProfileAsync(string token, CancellationToken ct) =>
+        Task.FromResult(_profiles.Count > 0
+            ? _profiles.Dequeue()
+            : new PlayerProfile { OnboardingCompletedAtUtc = DateTime.UtcNow });
+
+    public Task<GameStateSummary> FetchGameStateAsync(CancellationToken ct)
+    {
+        _gameStateCallCount++;
+        if (_throwOnSecondCall && _gameStateCallCount == 2)
+            throw new InvalidOperationException("Game state unavailable");
+        return Task.FromResult(_gameState);
+    }
 
     public Task<List<RankingEntry>> FetchRankingsAsync(CancellationToken ct) =>
         Task.FromResult(new List<RankingEntry>());

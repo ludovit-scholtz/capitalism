@@ -264,4 +264,31 @@ public sealed class BotAccountTests
         var bot = new BotAccount { InitialNetWorth = 123_456.78m, CurrentNetWorth = 135_000.00m };
         Assert.Equal(135_000.00m - 123_456.78m, bot.ProfitDelta);
     }
+
+    // ── CurrentRank ───────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Defaults_CurrentRankIsNull()
+    {
+        // A newly created bot has no known leaderboard position.
+        var bot = new BotAccount();
+        Assert.Null(bot.CurrentRank);
+    }
+
+    [Fact]
+    public void CurrentRank_CanBeSetAndRead()
+    {
+        var bot = new BotAccount();
+        bot.CurrentRank = 5;
+        Assert.Equal(5, bot.CurrentRank);
+    }
+
+    [Fact]
+    public void CurrentRank_CanBeResetToNull()
+    {
+        // If rankings become unavailable the orchestrator sets CurrentRank to null.
+        var bot = new BotAccount { CurrentRank = 3 };
+        bot.CurrentRank = null;
+        Assert.Null(bot.CurrentRank);
+    }
 }

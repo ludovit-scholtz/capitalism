@@ -7,9 +7,10 @@ A standalone .NET 10 console application that autonomously manages Capitalism ga
 - **Registers** NPC bot accounts (or logs in if they already exist — idempotent).
 - **Completes the full onboarding flow**: city selection → industry selection → IPO → factory lot → shop lot, with automatic mid-flow resume if interrupted.
 - **Selects the cheapest available lot and product**: pure helper logic picks the lowest-priced available lot matching the required building type, and the cheapest non-Pro starter product.
-- **Periodically polls** each bot's state to verify onboarding is complete, refresh the net worth, and evaluate profitability.
+- **Periodically polls** each bot's state to verify onboarding is complete, refresh the net worth, evaluate profitability, and track leaderboard ranking.
 - **Classifies profitability**: each bot is rated Profitable / Neutral / Unprofitable / Unknown based on a ±2 % neutral band applied to the net-worth delta since tracking started.
 - **Computes an annualised profit rate** (% / yr) and logs it on every tick.
+- **Tracks leaderboard rank**: each tick the orchestrator fetches the global rankings and updates `BotAccount.CurrentRank`; the rank is included in the periodic status log. Ranking fetch failures are non-fatal.
 - **Produces strategy recommendations**: when a bot has run for the minimum required ticks and is losing money, a `StrategyRecommendation` is generated — a mild 5 % price reduction for small losses, an aggressive 15 % cut for losses ≥ 10 %.
 - **State validation**: `BotStateValidator` detects stale bots (no successful operation for N minutes), expired tokens, incomplete onboarding, and at-risk error counts.
 - **Error isolation**: each bot tracks consecutive errors independently; skipped after `MaxConsecutiveErrors` without affecting other bots.
