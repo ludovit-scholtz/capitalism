@@ -4317,7 +4317,10 @@ export function useBuildingDetail() {
         gqlRequest<{ eurFxRates: EurFxRate[] }>(`{ eurFxRates { currencyCode rate } }`),
         gqlRequest<{ myLoans: Array<{ id: string; collateralBuildingId: string | null }> }>(
           `{ myLoans { id collateralBuildingId } }`,
-        ).catch(() => ({ myLoans: [] as Array<{ id: string; collateralBuildingId: string | null }> })),
+        ).catch((err: unknown) => {
+          console.warn('[useBuildingDetail] Failed to load loans for collateral check:', err)
+          return { myLoans: [] as Array<{ id: string; collateralBuildingId: string | null }> }
+        }),
       ])
 
       if (requestId !== activeBuildingLoadRequest) {

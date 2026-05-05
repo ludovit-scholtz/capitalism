@@ -1375,7 +1375,7 @@ export default {
     askingPricePlaceholder: 'Preis eingeben',
     listForSale: 'Zum Verkauf anbieten',
     cancelSale: 'Angebot entfernen',
-    overviewTab: 'GuV & Statistiken',
+    overviewTab: 'GuV und Statistiken',
     bankAccountTab: 'Bankkonto',
     collateralRestrictionWarning: 'Dieses Gebäude wird als Kreditsicherheit verwendet und kann nicht zum Verkauf angeboten werden.',
     editTabConfig: 'Konfiguration',
