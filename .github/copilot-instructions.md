@@ -1428,3 +1428,20 @@ Root-cause of a test authoring error (May 2026, BotAgentLifecycleTests.cs):
 1. **When testing any code path that calls `RunOnboardingAsync`, enqueue 5 profiles for a single-tick run**, not 4. The 4th is consumed by `RunOnboardingAsync` internally; the 5th is the one that sets `InitialNetWorth` in `TickBotAsync`.
 2. **`StrategyRecommendation.NoAction.PriceAdjustmentFactor` is `0`, not `1`.** The `0` signals "no change" and `PriceAdjustmentService` guards against `ShouldAct=false` before reading this field. Do not assert `== 1` on the NoAction sentinel's factor.
 3. **`BotProfitCalculator.ComputeAnnualisedRatePercent` returns a `decimal` with potential fractional drift at tick-year boundaries.** Use `Assert.InRange(rate, 9.9m, 10.1m)` or `Math.Round` comparisons, not exact equality, when the input tick count is exactly a divisor of `ticksPerYear=8760`.
+
+## NPC bot repeated coverage waves — test cross-cutting invariants, not just recently-changed code
+
+Root-cause of repeated "increase test coverage" feedback (May 2026, PR #236 waves 1–10):
+- Each coverage wave targeted tests adjacent to the code changed in that wave, but never systematically audited cross-cutting *contract invariants* that span the entire system:
+  - Roster-level uniqueness invariants (email uniqueness, display-name uniqueness, 1-based sequential Index values across all 20 bots) — these prove the factory is internally consistent, not just that one bot has the right shape.
+  - `IsReadyForOperation` vs `Validate()` divergence — the two validators serve different purposes and deliberately differ on staleness; tests must prove *both* directions to prevent silent drift where one helper becomes staleness-aware by accident.
+  - `GetBotStatusLabel` for edge states (stale-but-ready bot shows ACTIVE, not a new STALE label) — labelling logic has no staleness concept, but adding one by accident would change displayed output.
+  - Constant regression guards (`PriceAdjustmentHelper.PublicSalesUnitType`, `MinimumAllowedPrice`) — a silent rename or value change would disable all price adjustments without breaking any existing test.
+  - Catch-site patterns (`GraphQLException` caught as `Exception` with code pattern match) — verifies the exception hierarchy that `AccountService`'s `when` clause relies on.
+
+**Rules to prevent recurrence:**
+1. **After any coverage wave, audit cross-cutting invariants before declaring done.** For any factory (`BotRosterFactory`), check the FULL roster output (uniqueness, sequence, format) — not just a single bot's fields.
+2. **When two helpers serve similar but NOT identical purposes (e.g., `IsReadyForOperation` vs `Validate()`), always add a test that proves they DIVERGE on the case where they are designed to disagree.** Convergence tests prove they agree; divergence tests prove the different design intents are enforced.
+3. **For any constant used as a guard condition in production code (unit type strings, price floors, timeout values), add a regression test asserting its exact value.** Renaming `"PUBLIC_SALES"` to `"PUBLIC_SALE"` would disable all price adjustments; the constant test makes this immediately visible.
+4. **For any exception class used in a `catch (Exception ex) when (ex is MyException mex && mex.Code == "...")` pattern, add a test that throws through a generic `catch (Exception ex)` handler and verifies the code is preserved.** This proves the inheritance chain works for all callers.
+5. **For any two helpers that should converge for "normal" inputs but diverge for "edge" inputs, add BOTH a convergence test (healthy bot: both agree it is ready) and a divergence test (stale bot: one says ready, other says not healthy).** Convergence alone does not prove the edge case is handled.
