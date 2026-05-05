@@ -740,6 +740,11 @@ const editUnitTab = ref<'config' | 'performance' | 'maintenance'>('config')
             </span>
           </div>
         </div>
+        <div class="unit-actions" v-if="isEditing">
+          <button class="btn btn-danger btn-sm" @click="removeDraftUnit(selectedCell.x, selectedCell.y)">
+            {{ t('buildingDetail.removeUnit') }}
+          </button>
+        </div>
         </template>
 
         <!-- ── Tab: Performance ── -->
@@ -827,11 +832,6 @@ const editUnitTab = ref<'config' | 'performance' | 'maintenance'>('config')
 
         <!-- ── Tab: Maintenance ── -->
         <template v-else-if="editUnitTab === 'maintenance'">
-        <div class="unit-actions" v-if="isEditing">
-          <button class="btn btn-danger btn-sm" @click="removeDraftUnit(selectedCell.x, selectedCell.y)">
-            {{ t('buildingDetail.removeUnit') }}
-          </button>
-        </div>
 
         <!-- Unit Upgrade Panel (edit-mode only) -->
         <div v-if="isEditing && selectedCellUpgradeInfo !== null" class="unit-insight-card unit-upgrade-panel" :aria-label="t('buildingDetail.accessibility.unitUpgrade')">

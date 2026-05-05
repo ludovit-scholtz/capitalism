@@ -73,7 +73,7 @@ const {
       aria-modal="true"
       @click.self="closeSaleDialog"
     >
-      <div class="w-full max-w-md rounded-xl border border-divider bg-card p-6 shadow-xl">
+      <div class="sale-dialog w-full max-w-md rounded-xl border border-divider bg-card p-6 shadow-xl">
         <div class="mb-4 flex items-center justify-between">
           <h3 class="text-lg font-semibold text-foreground">{{ t('buildingDetail.sellBuilding') }}</h3>
           <button class="btn btn-ghost" @click="closeSaleDialog">{{ t('common.close') }}</button>

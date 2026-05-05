@@ -6009,6 +6009,7 @@ test.describe('Building detail upgrades', () => {
 
     // Click the same cell in the planned grid — upgrade panel IS visible
     await getGridCell(plannedSection, 0, 0).click()
+    await clickUnitTab(page, 'Maintenance')
     await expect(page.locator('.unit-upgrade-panel')).toBeVisible()
     await expect(page.locator('.unit-upgrade-panel')).toContainText('Unit Upgrade')
 
@@ -6079,6 +6080,7 @@ test.describe('Building detail upgrades', () => {
     await getGridCell(plannedSection, 0, 0).click()
 
     // Upgrade panel shows before/after stat preview
+    await clickUnitTab(page, 'Maintenance')
     const upgradePanel = page.locator('.unit-upgrade-panel')
     await expect(upgradePanel).toBeVisible()
 
@@ -6165,6 +6167,7 @@ test.describe('Building detail upgrades', () => {
     const plannedSection = getGridSection(page, 'Planned Upgrade')
     await getGridCell(plannedSection, 0, 0).click()
 
+    await clickUnitTab(page, 'Maintenance')
     const upgradePanel = page.locator('.unit-upgrade-panel')
     await expect(upgradePanel).toBeVisible()
 
@@ -17624,6 +17627,7 @@ test.describe('Unit upgrade panel', () => {
     const plannedSection = getGridSection(page, 'Planned Upgrade')
     await getGridCell(plannedSection, 0, 0).click()
 
+    await clickUnitTab(page, 'Maintenance')
     const upgradePanel = page.locator('.unit-upgrade-panel')
     await expect(upgradePanel).toBeVisible()
 
@@ -17668,6 +17672,7 @@ test.describe('Unit upgrade panel', () => {
     const plannedSection2 = getGridSection(page, 'Planned Upgrade')
     await getGridCell(plannedSection2, 0, 0).click()
 
+    await clickUnitTab(page, 'Maintenance')
     const upgradePanel = page.locator('.unit-upgrade-panel')
     await expect(upgradePanel).toBeVisible()
     await expect(upgradePanel.getByRole('button', { name: 'Upgrade Now' })).toBeVisible()
@@ -17707,6 +17712,7 @@ test.describe('Unit upgrade panel', () => {
     const plannedSection3 = getGridSection(page, 'Planned Upgrade')
     await getGridCell(plannedSection3, 0, 0).click()
 
+    await clickUnitTab(page, 'Maintenance')
     const upgradePanel = page.locator('.unit-upgrade-panel')
     await expect(upgradePanel).toBeVisible()
 
@@ -17769,6 +17775,7 @@ test.describe('Unit upgrade panel', () => {
     const plannedSection4 = getGridSection(page, 'Planned Upgrade')
     await getGridCell(plannedSection4, 0, 0).click()
 
+    await clickUnitTab(page, 'Maintenance')
     const upgradePanel = page.locator('.unit-upgrade-panel')
     await expect(upgradePanel).toBeVisible()
 
@@ -17838,6 +17845,7 @@ test.describe('Unit upgrade panel', () => {
     const queuedSection = getGridSection(page, 'Queued Upgrade')
     await getGridCell(queuedSection, 0, 0).click()
 
+    await clickUnitTab(page, 'Maintenance')
     const upgradePanel = page.locator('.unit-upgrade-panel')
     await expect(upgradePanel).toBeVisible()
 
@@ -17872,6 +17880,7 @@ test.describe('Unit upgrade panel', () => {
     const plannedSection6 = getGridSection(page, 'Planned Upgrade')
     await getGridCell(plannedSection6, 0, 0).click()
 
+    await clickUnitTab(page, 'Maintenance')
     const upgradePanel = page.locator('.unit-upgrade-panel')
     await expect(upgradePanel).toBeVisible()
 
@@ -18062,6 +18071,7 @@ test.describe('Unit upgrade panel', () => {
     const plannedSection = getGridSection(page, 'Planned Upgrade')
     await getGridCell(plannedSection, 0, 0).click()
 
+    await clickUnitTab(page, 'Maintenance')
     const upgradePanel = page.locator('.unit-upgrade-panel')
     await expect(upgradePanel).toBeVisible()
 
@@ -18101,6 +18111,7 @@ test.describe('Unit upgrade panel', () => {
     const plannedSection = getGridSection(page, 'Planned Upgrade')
     await getGridCell(plannedSection, 0, 0).click()
 
+    await clickUnitTab(page, 'Maintenance')
     const upgradePanel = page.locator('.unit-upgrade-panel')
     await expect(upgradePanel).toBeVisible()
 
@@ -18148,6 +18159,7 @@ test.describe('Unit upgrade panel', () => {
     const plannedSection = getGridSection(page, 'Planned Upgrade')
     await getGridCell(plannedSection, 0, 0).click()
 
+    await clickUnitTab(page, 'Maintenance')
     const upgradePanel = page.locator('.unit-upgrade-panel')
     await expect(upgradePanel).toBeVisible()
 
@@ -18191,6 +18203,7 @@ test.describe('Unit upgrade panel', () => {
     await page.getByRole('button', { name: 'Edit Building' }).click()
     const plannedSection = getGridSection(page, 'Planned Upgrade')
     await getGridCell(plannedSection, 0, 0).click()
+    await clickUnitTab(page, 'Maintenance')
     const upgradePanel = page.locator('.unit-upgrade-panel')
     await expect(upgradePanel).toBeVisible()
     await upgradePanel.getByRole('button', { name: 'Stage Upgrade' }).click()
@@ -18297,6 +18310,7 @@ test.describe('Unit upgrade panel', () => {
     const plannedSection = getGridSection(page, 'Planned Upgrade')
     await getGridCell(plannedSection, 0, 0).click()
 
+    await clickUnitTab(page, 'Maintenance')
     const upgradePanel = page.locator('.unit-upgrade-panel')
     await expect(upgradePanel).toBeVisible()
 
