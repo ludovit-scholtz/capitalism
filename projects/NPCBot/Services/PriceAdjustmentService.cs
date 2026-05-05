@@ -7,7 +7,7 @@ namespace Capitalism.NPCBot.Services;
 /// Applies strategy price recommendations to a bot's PUBLIC_SALES building units
 /// by calling the <c>updatePublicSalesPrice</c> GraphQL mutation on the game API.
 /// </summary>
-public sealed class PriceAdjustmentService
+public sealed class PriceAdjustmentService : IPriceAdjustmentService
 {
     private readonly AccountService _accounts;
     private readonly ILogger<PriceAdjustmentService> _logger;

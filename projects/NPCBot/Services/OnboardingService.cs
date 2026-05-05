@@ -8,7 +8,7 @@ namespace Capitalism.NPCBot.Services;
 /// IPO → factory lot → shop lot.
 /// Uses <see cref="StartOnboardingCompany"/> followed by <see cref="FinishOnboarding"/>.
 /// </summary>
-public sealed class OnboardingService
+public sealed class OnboardingService : IOnboardingService
 {
     // ── Queries / mutations ───────────────────────────────────────────────────
 

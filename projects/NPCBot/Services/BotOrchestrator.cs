@@ -12,18 +12,18 @@ namespace Capitalism.NPCBot.Services;
 public sealed class BotOrchestrator
 {
     private readonly List<BotAccount> _bots;
-    private readonly AccountService _accounts;
-    private readonly OnboardingService _onboarding;
-    private readonly PriceAdjustmentService _priceAdjustment;
+    private readonly IAccountService _accounts;
+    private readonly IOnboardingService _onboarding;
+    private readonly IPriceAdjustmentService _priceAdjustment;
     private readonly BotOptions _options;
     private readonly ILogger<BotOrchestrator> _logger;
     private long _currentTick;
 
     public BotOrchestrator(
         IEnumerable<BotAccount> bots,
-        AccountService accounts,
-        OnboardingService onboarding,
-        PriceAdjustmentService priceAdjustment,
+        IAccountService accounts,
+        IOnboardingService onboarding,
+        IPriceAdjustmentService priceAdjustment,
         IOptions<BotOptions> options,
         ILogger<BotOrchestrator> logger)
     {
@@ -50,10 +50,18 @@ public sealed class BotOrchestrator
         // Initial pass: authenticate and onboard all bots
         await InitialiseAllBotsAsync(ct);
 
-        // Periodic loop
+        // Periodic loop — catches Task.Delay cancellation to exit cleanly.
         while (!ct.IsCancellationRequested)
         {
-            await Task.Delay(TimeSpan.FromSeconds(_options.PollIntervalSeconds), ct);
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(_options.PollIntervalSeconds), ct);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+
             if (ct.IsCancellationRequested) break;
 
             await TickAllBotsAsync(ct);

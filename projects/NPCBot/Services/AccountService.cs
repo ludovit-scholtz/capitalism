@@ -9,7 +9,7 @@ namespace Capitalism.NPCBot.Services;
 /// Handles NPC bot account registration, authentication, and state queries
 /// against the Capitalism game API.
 /// </summary>
-public sealed class AccountService
+public sealed class AccountService : IAccountService
 {
     private const string MeQuery = """
         {

@@ -49,9 +49,9 @@ public static class Program
                 services.Configure<BotOptions>(ctx.Configuration.GetSection(BotOptions.SectionName));
 
                 services.AddHttpClient<GameApiClient>();
-                services.AddTransient<AccountService>();
-                services.AddTransient<OnboardingService>();
-                services.AddTransient<PriceAdjustmentService>();
+                services.AddTransient<IAccountService, AccountService>();
+                services.AddTransient<IOnboardingService, OnboardingService>();
+                services.AddTransient<IPriceAdjustmentService, PriceAdjustmentService>();
 
                 // Build the bot roster from config
                 services.AddSingleton<IEnumerable<BotAccount>>(sp =>
