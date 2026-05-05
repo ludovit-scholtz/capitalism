@@ -5,7 +5,7 @@ import { formatMoney } from '@/lib/currencyFormat'
 import CurrencyAmount from '@/components/numbers/CurrencyAmount.vue'
 import type { CompanyLedgerSummary, LedgerEntryResult } from '@/types'
 
-const { t, locale } = useI18n()
+const { locale } = useI18n()
 
 const props = defineProps<{
   ledger: CompanyLedgerSummary

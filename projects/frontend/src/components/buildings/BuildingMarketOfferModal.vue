@@ -8,7 +8,7 @@ interface BuyerCompany {
   name: string
 }
 
-const props = defineProps<{
+defineProps<{
   buildingName: string
   offerAmount: number | null
   offerNote: string

@@ -141,6 +141,35 @@ export function useForexData() {
     } catch { /* best-effort */ }
   }
 
+  /** Reload user-specific data (balances, history, bank accounts) silently without triggering the loading spinner. */
+  async function reloadAfterSwap() {
+    if (!auth.isAuthenticated) return
+    try {
+      const [balancesResult, historyResult, bankAccountsResult] = await Promise.all([
+        gqlRequest<{ playerCurrencyBalances: CurrencyBalance[] }>(`query { playerCurrencyBalances { currencyCode currencySymbol balance } }`),
+        gqlRequest<{ forexTradeHistory: ForexTradeHistoryEntry[] }>(`
+          query {
+            forexTradeHistory {
+              id fromCurrencyCode toCurrencyCode fromAmount toAmount feeAmount rate
+              executedAtTick executedAtUtc fromCurrencySymbol toCurrencySymbol
+            }
+          }
+        `),
+        gqlRequest<{ myBankAccounts: PlayerBankAccountSummary[] }>(`
+          query {
+            myBankAccounts {
+              id accountNumber currencyCode currencySymbol balance
+              companyId companyName ownerType ownerDisplayName
+            }
+          }
+        `),
+      ])
+      balances.value = balancesResult.playerCurrencyBalances ?? []
+      history.value = historyResult.forexTradeHistory ?? []
+      myBankAccounts.value = bankAccountsResult.myBankAccounts ?? []
+    } catch { /* best-effort */ }
+  }
+
   function formatAmount(val: number): string {
     return val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })
   }
@@ -152,5 +181,5 @@ export function useForexData() {
 
   function formatTick(tick: number): string { return tick.toLocaleString() }
 
-  return { auth, loading, error, rates, balances, history, myBankAccounts, cities, contextScopedBankAccounts, hasBankAccounts, selectedCity, baseCurrencyCode, baseCurrencySymbol, cityRateBoard, rateUpdateDate, availableCurrencies, toBalances, loadData, reloadBankAccountsSilent, formatAmount, formatRate, formatTick }
+  return { auth, loading, error, rates, balances, history, myBankAccounts, cities, contextScopedBankAccounts, hasBankAccounts, selectedCity, baseCurrencyCode, baseCurrencySymbol, cityRateBoard, rateUpdateDate, availableCurrencies, toBalances, loadData, reloadBankAccountsSilent, reloadAfterSwap, formatAmount, formatRate, formatTick }
 }

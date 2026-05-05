@@ -18,7 +18,7 @@ interface BuyerCompany {
   name: string
 }
 
-const props = defineProps<{
+defineProps<{
   activeTab: 'market' | 'myListings'
   loading: boolean
   error: string | null

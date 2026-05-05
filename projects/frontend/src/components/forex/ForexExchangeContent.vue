@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useForexData } from '@/composables/useForexData'
@@ -13,7 +13,7 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
-const { auth, loading, error, rates, balances, history, contextScopedBankAccounts, hasBankAccounts, selectedCity, baseCurrencyCode, baseCurrencySymbol, cityRateBoard, rateUpdateDate, availableCurrencies, toBalances, loadData, reloadBankAccountsSilent, formatAmount, formatRate, formatTick } = useForexData()
+const { auth, loading, error, rates, balances, history, contextScopedBankAccounts, hasBankAccounts, selectedCity, baseCurrencyCode, baseCurrencySymbol, cityRateBoard, rateUpdateDate, availableCurrencies, toBalances, loadData, reloadBankAccountsSilent, reloadAfterSwap, formatAmount, formatRate, formatTick } = useForexData()
 
 type ForexTab = 'swap' | 'transfer' | 'rates' | 'history' | 'gold'
 
@@ -22,6 +22,11 @@ function parseForexTab(value: unknown): ForexTab {
 }
 
 const activeTab = ref<ForexTab>(parseForexTab(route.query.tab))
+
+const initialToCurrency = computed(() => {
+  const q = route.query.toCurrency
+  return typeof q === 'string' ? q : undefined
+})
 
 onMounted(async () => {
   if (!auth.isAuthenticated) { router.push('/login'); return }
@@ -69,7 +74,9 @@ watch(activeTab, async (tab) => {
             :base-currency-symbol="baseCurrencySymbol"
             :base-currency-code="baseCurrencyCode"
             :to-balances="toBalances"
-            @refresh="loadData()"
+            :initial-to-currency="initialToCurrency"
+            :available-currencies="availableCurrencies"
+            @refresh="reloadAfterSwap()"
           />
 
           <BankAccountTransferPanel v-else-if="activeTab === 'transfer'" :accounts="contextScopedBankAccounts" @transferred="reloadBankAccountsSilent()" />

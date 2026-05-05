@@ -38,6 +38,7 @@ function getIngredientQuantityForSelectedEntry(product: ProductType): number {
   return 0
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function getIngredientUnitForSelectedEntry(product: ProductType): string {
   if (props.selectedResource) return props.selectedResource.unitSymbol
   if (props.selectedProduct) return props.selectedProduct.unitSymbol

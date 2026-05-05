@@ -16,6 +16,8 @@ const props = defineProps<{
   baseCurrencySymbol: string
   baseCurrencyCode: string
   toBalances: CurrencyBalance[]
+  availableCurrencies?: string[]
+  initialToCurrency?: string
 }>()
 
 const emit = defineEmits<{ refresh: [] }>()
@@ -54,6 +56,12 @@ function ensureScopedAccountSelections() {
 }
 
 watch(() => props.contextScopedBankAccounts, () => { ensureScopedAccountSelections() })
+
+watch(() => props.availableCurrencies, (currencies) => {
+  if (props.initialToCurrency && currencies && currencies.includes(props.initialToCurrency)) {
+    toCurrency.value = props.initialToCurrency
+  }
+}, { immediate: true })
 
 const resolvedFromCurrency = computed(() => {
   if (props.hasBankAccounts && fromBankAccountId.value) return findAccountById(fromBankAccountId.value)?.currencyCode ?? fromCurrency.value

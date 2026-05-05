@@ -344,7 +344,7 @@ async function handleRefreshDashboard() {
   await Promise.all([refreshCompanyDerivedData(), loadPendingActions()])
 }
 
-function handleCompanyLaunched(_companyId: string) {
+function handleCompanyLaunched() {
   // Parent refreshes data; actual redirect is handled by the child component
   void loadDashboardData()
   void refreshCompanyDerivedData()
