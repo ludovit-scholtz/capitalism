@@ -49,7 +49,7 @@ public sealed class BotAccount
     /// Uses a 5-minute proactive-refresh buffer (configurable via <c>TokenRefreshBufferMinutes</c>).
     /// </summary>
     public bool IsTokenValid(int bufferMinutes = 5) =>
-        Token is not null &&
+        !string.IsNullOrWhiteSpace(Token) &&
         TokenExpiresAtUtc.HasValue &&
         DateTime.UtcNow < TokenExpiresAtUtc.Value.AddMinutes(-bufferMinutes);
 

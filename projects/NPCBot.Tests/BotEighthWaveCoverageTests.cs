@@ -112,22 +112,10 @@ public sealed class BotEighthWaveCoverageTests
     // Section 2 — PriceAdjustmentService: mixed floor/normal prices
     // ══════════════════════════════════════════════════════════════════════════
 
-    private sealed class FakeHttpHandlerWithCounter(Func<HttpResponseMessage> factory) : HttpMessageHandler
-    {
-        public int CallCount { get; private set; }
-
-        protected override Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage _, CancellationToken __)
-        {
-            CallCount++;
-            return Task.FromResult(factory());
-        }
-    }
-
-    private static (PriceAdjustmentService service, FakeHttpHandlerWithCounter handler)
+    private static (PriceAdjustmentService service, FakeHttpHandler handler)
         CreatePriceAdjustmentService(string unitId, decimal returnedPrice)
     {
-        var handler = new FakeHttpHandlerWithCounter(() =>
+        var handler = new FakeHttpHandler(() =>
         {
             var json = $"{{\"data\":{{\"updatePublicSalesPrice\":{{\"id\":\"{unitId}\",\"unitType\":\"PUBLIC_SALES\",\"minPrice\":{returnedPrice}}}}}}}";
             return new HttpResponseMessage(HttpStatusCode.OK)
@@ -514,8 +502,8 @@ public sealed class BotEighthWaveCoverageTests
     [Fact]
     public void HasValidToken_WhitespaceOnlyToken_ReturnsFalse()
     {
-        // A whitespace-only string is not a valid token (null check uses string.IsNullOrEmpty,
-        // so this tests whitespace which is neither null nor empty).
+        // IsTokenValid now uses !string.IsNullOrWhiteSpace(Token), so a whitespace-only
+        // token is treated as absent and HasValidToken must return false.
         var bot = new BotAccount
         {
             Index = 1,
@@ -526,18 +514,15 @@ public sealed class BotEighthWaveCoverageTests
             TokenExpiresAtUtc = DateTime.UtcNow.AddHours(1),
         };
 
-        // HasValidToken checks `Token is not null && TokenExpiresAtUtc > UtcNow`.
-        // Whitespace token is technically non-null, so HasValidToken=true here — this test
-        // documents the actual behaviour so future changes are deliberate.
-        Assert.True(bot.HasValidToken,
-            "A whitespace token that has not expired is currently treated as HasValidToken=true. " +
-            "This test documents the current behaviour; if the rule changes, update this assertion.");
+        Assert.False(bot.HasValidToken,
+            "A whitespace-only token must not be treated as a valid token.");
     }
 
     [Fact]
     public void HasValidToken_EmptyStringToken_ReturnsFalse()
     {
-        // Empty string token is treated as no token (null-or-empty guard in BotAccount).
+        // IsTokenValid uses !string.IsNullOrWhiteSpace(Token), so an empty string
+        // is equivalent to a null/absent token and HasValidToken must return false.
         var bot = new BotAccount
         {
             Index = 1,
@@ -548,11 +533,7 @@ public sealed class BotEighthWaveCoverageTests
             TokenExpiresAtUtc = DateTime.UtcNow.AddHours(1),
         };
 
-        // `Token is not null` is true for "", but we rely on the `not null` guard only.
-        // Document actual: empty string is NOT null → HasValidToken checks expiry → true.
-        // This verifies the current contract; if empty-string should be invalid, fix BotAccount.
-        Assert.True(bot.HasValidToken,
-            "An empty-string token that has not expired is currently treated as HasValidToken=true. " +
-            "This documents current behaviour.");
+        Assert.False(bot.HasValidToken,
+            "An empty-string token must not be treated as a valid token.");
     }
 }
