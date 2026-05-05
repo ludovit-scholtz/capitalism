@@ -320,8 +320,6 @@ public sealed class MarketIntelligenceTests
         var product = await db.ProductTypes.FirstOrDefaultAsync(p => p.Slug == "wooden-chair");
         Assert.NotNull(product);
 
-        var player = await db.Players.FirstOrDefaultAsync(p => p.Email == $"mi-nobrand-{Guid.NewGuid():N}@test.com");
-
         // Create a company without any Brand rows (no brand quality data)
         var brandlessPlayer = new Player
         {
