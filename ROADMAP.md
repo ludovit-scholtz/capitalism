@@ -36,6 +36,13 @@ It will use real world map. The game will start in single city and later other c
 - [ ] Highlight the active player in the ranking - In both game ranking and master ranking
 - [ ] On ranking page enter, make sure to show the page where player is actively located. For example if player is ranked as 25th make sure to show 3rd page if there is 10 items per page. Do it in both game ranking and master ranking
 
+### Optimize for mobile (0% complete)
+
+- [ ] Make sure the design is smooth on small mobile devices. Mainly the content should be visible without the page scroll to the right.
+- [ ] Make sure the design is smooth on tablet sized screens.
+- [ ] Make sure the design is smooth on Full HD devices
+- [ ] Make sure the design is smooth on 4K screens
+
 ### FX Exchange with AMM Liquidity Pools (100% complete)
 
 **Shipped:** Dynamic FX exchange mechanics with AMM (Automated Market Maker) liquidity pools for gold token (XAU) trading are fully implemented. Players can create fiat/XAU pools seeded with Uniswap v2 LP shares, add or remove liquidity proportionally, and execute constant-product swaps with a 1% fee that accrues to liquidity providers.
