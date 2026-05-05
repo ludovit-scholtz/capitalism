@@ -230,4 +230,172 @@ public sealed class MarketIntelligenceTests
         Assert.Equal(47m, firstSeller.GetProperty("askingPricePerUnit").GetDecimal());
         Assert.True(firstSeller.GetProperty("brandQuality").GetDecimal() > 0m);
     }
+
+    [Fact]
+    public async Task MarketIntelligence_NonExistentCity_ReturnsNull()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var token = await RegisterAndGetTokenAsync(client, $"mi-null-{Guid.NewGuid():N}@test.com", "MI Null Test");
+
+        var nonExistentCityId = Guid.NewGuid();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            query MarketIntelligence($cityId: UUID!) {
+              marketIntelligence(cityId: $cityId) {
+                cityId
+                products {
+                  productName
+                }
+              }
+            }
+            """,
+            new { cityId = nonExistentCityId },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _), "Expected no GraphQL errors.");
+
+        var data = result.GetProperty("data");
+        Assert.True(
+            data.GetProperty("marketIntelligence").ValueKind == JsonValueKind.Null,
+            "Expected null result for non-existent city.");
+    }
+
+    [Fact]
+    public async Task MarketIntelligence_CityWithNoSalesRecords_ReturnsEmptyProductList()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var token = await RegisterAndGetTokenAsync(client, $"mi-empty-{Guid.NewGuid():N}@test.com", "MI Empty Test");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = await db.Cities.FirstOrDefaultAsync(c => c.Name == "Bratislava");
+        Assert.NotNull(city);
+
+        // No PublicSalesRecords are added for this city, so the query should return empty Products.
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            query MarketIntelligence($cityId: UUID!) {
+              marketIntelligence(cityId: $cityId) {
+                cityId
+                cityName
+                products {
+                  productName
+                }
+              }
+            }
+            """,
+            new { cityId = city!.Id },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _), "Expected no GraphQL errors.");
+
+        var mi = result.GetProperty("data").GetProperty("marketIntelligence");
+        Assert.Equal(city.Id.ToString(), mi.GetProperty("cityId").GetString());
+        Assert.Equal("Bratislava", mi.GetProperty("cityName").GetString());
+        Assert.Equal(0, mi.GetProperty("products").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task MarketIntelligence_SellerWithNoBrandData_ReturnsNullBrandQuality()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var token = await RegisterAndGetTokenAsync(client, $"mi-nobrand-{Guid.NewGuid():N}@test.com", "MI NoBrand Test");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = await db.Cities.FirstOrDefaultAsync(c => c.Name == "Bratislava");
+        Assert.NotNull(city);
+
+        var product = await db.ProductTypes.FirstOrDefaultAsync(p => p.Slug == "wooden-chair");
+        Assert.NotNull(product);
+
+        var player = await db.Players.FirstOrDefaultAsync(p => p.Email == $"mi-nobrand-{Guid.NewGuid():N}@test.com");
+
+        // Create a company without any Brand rows (no brand quality data)
+        var brandlessPlayer = new Player
+        {
+            Id = Guid.NewGuid(),
+            Email = $"nobrand-seller-{Guid.NewGuid():N}@test.com",
+            DisplayName = "Brandless Seller",
+            PasswordHash = "mock",
+            Role = PlayerRole.Player,
+            ActiveAccountType = AccountContextType.Person,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.Players.Add(brandlessPlayer);
+
+        var brandlessCompany = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = brandlessPlayer.Id,
+            Name = "No Brand Corp",
+            Cash = 50_000m,
+            FoundedAtUtc = DateTime.UtcNow,
+            FoundedAtTick = 1,
+            TotalSharesIssued = 10_000m,
+            DividendPayoutRatio = 0.1m,
+        };
+        db.Companies.Add(brandlessCompany);
+
+        var currentTick = (await db.GameStates.AsNoTracking().FirstOrDefaultAsync())!.CurrentTick;
+
+        db.PublicSalesRecords.Add(new PublicSalesRecord
+        {
+            Id = Guid.NewGuid(),
+            BuildingUnitId = Guid.NewGuid(),
+            BuildingId = Guid.NewGuid(),
+            CompanyId = brandlessCompany.Id,
+            CityId = city!.Id,
+            ProductTypeId = product!.Id,
+            Tick = currentTick,
+            QuantitySold = 50m,
+            PricePerUnit = 40m,
+            Revenue = 2_000m,
+            Demand = 100m,
+            SalesCapacity = 100m,
+            TrendFactor = 1.0m,
+        });
+
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            query MarketIntelligence($cityId: UUID!) {
+              marketIntelligence(cityId: $cityId) {
+                products {
+                  sellers {
+                    displayName
+                    brandQuality
+                  }
+                }
+              }
+            }
+            """,
+            new { cityId = city.Id },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _), "Expected no GraphQL errors.");
+
+        var products = result.GetProperty("data").GetProperty("marketIntelligence").GetProperty("products");
+        Assert.True(products.GetArrayLength() > 0, "Expected at least one product.");
+
+        var sellers = products[0].GetProperty("sellers");
+        var noBrandSeller = sellers.EnumerateArray()
+            .FirstOrDefault(s => s.GetProperty("displayName").GetString() == "No Brand Corp");
+
+        Assert.False(noBrandSeller.Equals(default(JsonElement)), "Expected 'No Brand Corp' in sellers list.");
+        Assert.Equal(JsonValueKind.Null, noBrandSeller.GetProperty("brandQuality").ValueKind);
+    }
 }

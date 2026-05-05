@@ -20,7 +20,7 @@
     <Compile Remove="PublicSalesPricingModelTests.cs" />
     <Compile Remove="MasterRankingTelemetryTests.cs" />
     <Compile Remove="SupplyChainTests.cs" />
-    <Compile Remove="MarketIntelligenceTests.cs" />
+
     <Compile Remove="PlayerNotificationAndAlertThresholdTests.cs" />
   </ItemGroup>
 
