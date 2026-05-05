@@ -14,6 +14,21 @@ It will use real world map. The game will start in single city and later other c
 - [ ] When in the edit mode, the cancel and store upgrade should be next to each other. Also use some icons there so that users has better UX.
 - [ ] When I click the sell building show only sell building form. Make sure the form is properly designed.
 
+### News (0% complete)
+
+- [ ] Add button to news and changelog to mark all news as read.
+
+### Country flags (0% complete)
+
+- [ ] Add npm library country-flag-icons and use it everywhere where the country flag should be
+- [ ] in /cities the flags are visible
+- [ ] in footer in the language picker the flags are visible. Sync the footer language picker between master and game frontend.
+- [ ] In context switcher make sure flags are visible.
+
+### Fix city selection (0% complete)
+
+- [ ] When I switch city to city where i dont have any factory, log out and log in later with biatec oidc, i want the context switcher automatically switch to my main city where I have the most factories
+
 ### FX Exchange with AMM Liquidity Pools (100% complete)
 
 **Shipped:** Dynamic FX exchange mechanics with AMM (Automated Market Maker) liquidity pools for gold token (XAU) trading are fully implemented. Players can create fiat/XAU pools seeded with Uniswap v2 LP shares, add or remove liquidity proportionally, and execute constant-product swaps with a 1% fee that accrues to liquidity providers.
