@@ -384,6 +384,32 @@ docker-compose logs --no-color --tail=200 postgresmaster masterapi game1
 - **Links are directional and asymmetric.** Setting `linkRight=true` on unit A does NOT require `linkLeft=true` on unit B. The engine treats each flag independently (source pushes resources in that direction). Test data can be asymmetric by design.
 - Root-cause of quality failure (March 2026, PR #40): test data for `StoreBuildingConfiguration_ExpiredProCanKeepExistingLockedProductInPlace` had `linkRight=true` on a MANUFACTURING unit at x=1 with no unit at x=2 — the new validation correctly rejected it, causing CI failure. Fix: remove the orphan link flag from the test data.
 
+## Frontend component refactoring quality gate
+
+When splitting a large Vue component or view into smaller pieces, you must preserve all original functionality. The following patterns are prone to silent regressions and must be verified before pushing:
+
+### URL query param handling
+- **When splitting a view component, audit for `route.query.*` reads.** If the original view reads `route.query.xxx` to pre-populate a form or select a tab, that logic must be carried into the child component that owns the relevant state. Losing the URL query param read silently breaks deep-link navigation.
+- After splitting, verify each URL-based entry point documented in Playwright specs still works end-to-end.
+
+### Reactive state lifetime and v-if
+- **Do not use `v-if="loading"` / `v-else` patterns on parent components that would unmount children holding transient reactive state.** When a loading flag causes a child component to unmount and remount (via `v-if/v-else`), local `ref()` state inside that child (such as a swap result banner) is silently reset.
+- If a parent needs to refresh its data after a child action (e.g., after a form submit), use a "silent reload" path that does NOT set `loading = true` — only toggle loading for the initial page load, not for background refreshes triggered by child events.
+- Pattern: keep two reload functions in composables: `loadData()` (sets `loading = true`, for initial load) and `reloadSilently()` (refreshes data without toggling the loading flag, for post-action refreshes).
+
+### Lint check per extracted file
+- **Run `npm run lint` after extracting each new component file**, not only at the end of all extractions. Unused `const props = defineProps()` assignments (when `props` is never referenced), unused `useI18n()` destructures, and unused function parameters fail CI with `no-unused-vars` errors.
+- The ESLint rule `@typescript-eslint/no-unused-vars` flags destructured variables even when they are not used. Only destructure what you use.
+- The `@vue/eslint-config-typescript` does not configure `argsIgnorePattern: '^_'`, so even `_`-prefixed function parameters are flagged unless suppressed with `// eslint-disable-next-line`.
+
+### E2E test run after each feature refactoring
+- **After refactoring any view with Playwright specs, run the relevant spec before reporting completion:**
+  ```bash
+  cd projects/frontend
+  npx playwright test --project=chromium e2e/full-journey/<feature>/<spec>.ts
+  ```
+- Do not defer E2E validation to the end of all refactoring work. Run specs per feature as you go so failures are small and easy to root-cause.
+
 ## Playwright E2E test quality requirements
 - **Never push code with known failing tests.** If tests fail locally, fix them before pushing. Do not assume CI will behave differently. If there is a legitimate build-cache discrepancy, document it and investigate before pushing.
 - **Strict mode: always scope `getByText` when text may appear in multiple elements.** Use `{ exact: true }` when matching a heading/label string that also appears as a substring in another element (e.g., inside paragraph hints). Alternatively use `page.locator('.step-card').getByText(...)` to scope the locator.
