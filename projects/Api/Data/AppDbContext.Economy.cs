@@ -116,6 +116,9 @@ public sealed partial class AppDbContext
             e.Property(o => o.MinQuality).HasPrecision(5, 4);
             e.HasOne(o => o.ExchangeBuilding).WithMany().HasForeignKey(o => o.ExchangeBuildingId);
             e.HasOne(o => o.Company).WithMany().HasForeignKey(o => o.CompanyId);
+            // Partial-style index: tick context loads only active orders; without this index
+            // the query does a full table scan across the entire historical order book.
+            e.HasIndex(o => o.IsActive);
         });
 
         modelBuilder.Entity<LedgerEntry>(e =>
@@ -134,6 +137,9 @@ public sealed partial class AppDbContext
             e.HasIndex(l => new { l.CompanyId, l.BankAccountId, l.RecordedAtTick });
             // Compound index for category-filtered drill-down queries
             e.HasIndex(l => new { l.CompanyId, l.Category, l.RecordedAtTick });
+            // Index for the tick-engine salary-window query which filters by Category without CompanyId.
+            // Without this, every tick does a full table scan on LedgerEntries to compute recent wages.
+            e.HasIndex(l => new { l.Category, l.RecordedAtTick });
         });
 
         modelBuilder.Entity<PublicSalesRecord>(e =>
@@ -312,6 +318,15 @@ public sealed partial class AppDbContext
             e.Property(r => r.EconomicIndex).HasPrecision(5, 2);
             // Efficient historical lookups per city ordered by cycle.
             e.HasIndex(r => new { r.CityId, r.TaxCycleEnd });
+        });
+
+        modelBuilder.Entity<InterCityTradeRoute>(e =>
+        {
+            e.Property(r => r.Status).HasMaxLength(20);
+            // Compound index for the TradeRoutePhase query that filters in-transit routes
+            // whose arrival tick has been reached.  Without this index the phase performs a
+            // full table scan on every game tick.
+            e.HasIndex(r => new { r.Status, r.ExpectedArrivalTick });
         });
     }
 }

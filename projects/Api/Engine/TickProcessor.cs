@@ -35,11 +35,17 @@ public sealed class TickProcessor(
         gameState.CurrentTick++;
         gameState.LastTickAtUtc = DateTime.UtcNow;
 
+        var ctxSw = Stopwatch.StartNew();
         var context = await BuildContextAsync(gameState, ct);
+        ctxSw.Stop();
+
         var sw = Stopwatch.StartNew();
+        var phaseSw = new Stopwatch();
+        var phaseMs = new Dictionary<string, long>(orderedPhases.Count);
 
         foreach (var phase in orderedPhases)
         {
+            phaseSw.Restart();
             try
             {
                 await phase.ProcessAsync(context);
@@ -47,6 +53,11 @@ public sealed class TickProcessor(
             catch (Exception ex)
             {
                 logger.LogError(ex, "Tick {Tick} – phase {Phase} failed.", gameState.CurrentTick, phase.Name);
+            }
+            finally
+            {
+                phaseSw.Stop();
+                phaseMs[phase.Name] = phaseSw.ElapsedMilliseconds;
             }
         }
 
@@ -82,12 +93,32 @@ public sealed class TickProcessor(
         await db.SaveChangesAsync(ct);
 
         sw.Stop();
-        logger.LogInformation(
-            "Tick {Tick} completed in {ElapsedMs}ms  (buildings={Buildings}, phases={Phases})",
-            gameState.CurrentTick,
-            sw.ElapsedMilliseconds,
-            context.BuildingsById.Count,
-            orderedPhases.Count);
+
+        // Log per-phase breakdown when any phase exceeded the slow-phase threshold,
+        // or when the total tick time is unexpectedly long.
+        const long SlowPhaseThresholdMs = 100;
+        var slowPhases = phaseMs.Where(kv => kv.Value >= SlowPhaseThresholdMs).OrderByDescending(kv => kv.Value).ToList();
+        if (slowPhases.Count > 0 || sw.ElapsedMilliseconds > 500)
+        {
+            var breakdown = string.Join(", ", phaseMs.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Key}={kv.Value}ms"));
+            logger.LogWarning(
+                "Tick {Tick} slow: ctx={CtxMs}ms allPhases={AllPhasesMs}ms total={TotalMs}ms — {Breakdown}",
+                gameState.CurrentTick,
+                ctxSw.ElapsedMilliseconds,
+                sw.ElapsedMilliseconds,
+                ctxSw.ElapsedMilliseconds + sw.ElapsedMilliseconds,
+                breakdown);
+        }
+        else
+        {
+            logger.LogInformation(
+                "Tick {Tick} completed in {ElapsedMs}ms  (ctx={CtxMs}ms, buildings={Buildings}, phases={Phases})",
+                gameState.CurrentTick,
+                ctxSw.ElapsedMilliseconds + sw.ElapsedMilliseconds,
+                ctxSw.ElapsedMilliseconds,
+                context.BuildingsById.Count,
+                orderedPhases.Count);
+        }
 
         return gameState.TickIntervalSeconds;
     }
