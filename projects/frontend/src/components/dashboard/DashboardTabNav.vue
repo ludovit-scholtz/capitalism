@@ -85,7 +85,7 @@ function focusTab(index: number) {
         <span class="tab-label">{{ tab.label }}</span>
         <span
           v-if="tab.badge !== undefined && tab.badge > 0"
-          class="tab-badge inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-[0.6875rem] font-bold text-white"
+          class="tab-badge ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-[0.6875rem] font-bold text-white"
           aria-label="count"
         >
           {{ tab.badge }}

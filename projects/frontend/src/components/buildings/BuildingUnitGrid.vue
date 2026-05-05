@@ -247,10 +247,12 @@ const {
           </p>
         </div>
         <div class="grid-actions">
-          <button class="btn btn-secondary" @click="cancelEditing">
+          <button class="btn btn-secondary inline-flex items-center gap-2" @click="cancelEditing">
+            <span aria-hidden="true">✕</span>
             {{ t('buildingDetail.cancelEditing') }}
           </button>
-          <button class="btn btn-primary" :disabled="saving || !hasDraftChanges" @click="storeConfiguration">
+          <button class="btn btn-primary inline-flex items-center gap-2" :disabled="saving || !hasDraftChanges" @click="storeConfiguration">
+            <span aria-hidden="true">✓</span>
             {{
               saving
                 ? t('common.loading')

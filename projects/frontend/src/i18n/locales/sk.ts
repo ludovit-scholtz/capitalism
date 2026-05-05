@@ -1373,6 +1373,12 @@ export default {
     askingPricePlaceholder: 'Zadajte cenu',
     listForSale: 'Zaradiť na predaj',
     cancelSale: 'Zrušiť inzerát',
+    overviewTab: 'Výsledky & Štatistiky',
+    bankAccountTab: 'Bankový účet',
+    collateralRestrictionWarning: 'Táto budova je použitá ako záložné právo k pôžičke a nemôže byť ponúknutá na predaj.',
+    editTabConfig: 'Konfigurácia',
+    editTabPerformance: 'Výkon',
+    editTabMaintenance: 'Údržba',
     saleFailed: 'Nepodarilo sa aktualizovať stav predaja',
     config: {
       inputItem: 'Vstupná položka',

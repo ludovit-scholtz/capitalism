@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { inject } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, inject } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
 import BuildingFinancialTimelineChart from '@/components/buildings/BuildingFinancialTimelineChart.vue'
 import BuildingBankAccountPanel from '@/components/buildings/BuildingBankAccountPanel.vue'
 
 const { t } = useI18n()
+const route = useRoute()
 const router = useRouter()
 const bd = inject(BUILDING_DETAIL_KEY)!
 const {
@@ -50,6 +51,20 @@ const {
   formatGpsLocation,
   loadBuilding,
 } = bd
+
+const overviewTabs = [
+  { key: 'overview', label: t('buildingDetail.overviewTab') },
+  { key: 'bankAccount', label: t('buildingDetail.bankAccountTab') },
+]
+
+const selectedOverviewTab = computed(() => {
+  const tab = route.query.tab as string | undefined
+  return tab === 'bankAccount' ? 'bankAccount' : 'overview'
+})
+
+function selectOverviewTab(key: string) {
+  router.replace({ query: { ...route.query, tab: key === 'overview' ? undefined : key } })
+}
 </script>
 
 <template>
@@ -198,6 +213,24 @@ const {
         <!-- ── End Building Layouts panel ── -->
       </div>
       <div v-else class="unit-detail building-overview-detail">
+        <!-- Overview tabs nav -->
+        <nav
+          class="unit-detail-tabs flex flex-nowrap items-center gap-1 overflow-x-auto border-b border-divider bg-bg px-4 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          :aria-label="t('buildingDetail.overview.title')"
+        >
+          <button
+            v-for="tab in overviewTabs"
+            :key="tab.key"
+            class="unit-tab-btn inline-flex shrink-0 items-center rounded-md border border-transparent px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted transition-colors hover:text-foreground"
+            :class="selectedOverviewTab === tab.key ? 'unit-tab-btn--active border-primary/40 bg-primary/10 text-primary' : 'hover:border-divider hover:bg-surface'"
+            @click="selectOverviewTab(tab.key)"
+          >
+            {{ tab.label }}
+          </button>
+        </nav>
+
+        <!-- Tab: P&L & Statistics -->
+        <template v-if="selectedOverviewTab === 'overview'">
         <p class="building-overview-name">{{ building?.name }}</p>
         <p class="unit-desc">{{ t('buildingDetail.overview.subtitle', { type: formatBuildingType(building?.type ?? '') }) }}</p>
 
@@ -264,12 +297,15 @@ const {
             {{ t('buildingDetail.overview.showOnMap') }}
           </RouterLink>
         </div>
+        </template>
 
-        <!-- ── Bank account panel ── -->
+        <!-- Tab: Bank Account -->
+        <template v-else-if="selectedOverviewTab === 'bankAccount'">
         <div class="unit-insight-card building-bank-account-card">
           <h5>{{ t('buildingBankAccount.panelTitle') }}</h5>
           <BuildingBankAccountPanel :building-id="building?.id ?? ''" :company-id="building?.companyId ?? ''" :currency-code="cityCurrencyCode" :loading="loading" @updated="loadBuilding" />
         </div>
+        </template>
       </div>
     </div>
   </div>

@@ -353,6 +353,10 @@ export function useBuildingDetail() {
   const showSaleDialog = ref(false)
   const salePrice = ref<number | null>(null)
   const savingSale = ref(false)
+  const myLoans = ref<Array<{ id: string; collateralBuildingId: string | null }>>([])
+  const isBuildingUsedAsCollateral = computed(() =>
+    myLoans.value.some((l) => l.collateralBuildingId === building.value?.id),
+  )
   const cancellingPlan = ref(false)
   const cancelPlanError = ref<string | null>(null)
   const layoutName = ref('')
@@ -4145,7 +4149,7 @@ export function useBuildingDetail() {
       error.value = null
       const preserveDraft = options.preserveDraft === true
 
-      const [companiesData, gameStateData, resourceData, productData, citiesData, fxRatesData] = await Promise.all([
+      const [companiesData, gameStateData, resourceData, productData, citiesData, fxRatesData, loansData] = await Promise.all([
         gqlRequest<{ myCompanies: Company[] }>(
           `{ myCompanies {
             id
@@ -4311,6 +4315,9 @@ export function useBuildingDetail() {
         }`),
         gqlRequest<{ cities: City[] }>(`{ cities { id name currencyCode } }`),
         gqlRequest<{ eurFxRates: EurFxRate[] }>(`{ eurFxRates { currencyCode rate } }`),
+        gqlRequest<{ myLoans: Array<{ id: string; collateralBuildingId: string | null }> }>(
+          `{ myLoans { id collateralBuildingId } }`,
+        ).catch(() => ({ myLoans: [] as Array<{ id: string; collateralBuildingId: string | null }> })),
       ])
 
       if (requestId !== activeBuildingLoadRequest) {
@@ -4330,6 +4337,7 @@ export function useBuildingDetail() {
       if (!deepEqual(eurFxRates.value, fxRatesData.eurFxRates ?? [])) {
         eurFxRates.value = fxRatesData.eurFxRates ?? []
       }
+      myLoans.value = loansData.myLoans ?? []
       const nextPurchaseVendorCompanies: PurchaseVendorCompanyData[] = companiesData.myCompanies.map((company) => ({
         id: company.id,
         name: company.name,
@@ -4881,6 +4889,7 @@ export function useBuildingDetail() {
     openSaleDialog,
     closeSaleDialog,
     setBuildingForSale,
+    isBuildingUsedAsCollateral,
     openRentDialog,
     closeRentDialog,
     saveRentPerSqm,
