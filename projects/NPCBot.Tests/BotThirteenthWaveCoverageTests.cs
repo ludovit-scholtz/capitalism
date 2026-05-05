@@ -181,8 +181,8 @@ public sealed class BotThirteenthWaveCoverageTests
     public async Task AdaptiveRecovery_UnprofitableTick1_ProfitableTick2_AdjustmentCalledOnce()
     {
         const decimal initCash  = 100_000m;
-        const decimal lossCash  = 94_000m;    // –6 % → mild loss → ShouldAct=true
-        const decimal gainCash  = 111_000m;   // +11 % → profitable → ShouldAct=false
+        const decimal lossCash  = 94_000m;    // 100_000 * 0.94 = –6 % → mild loss → ShouldAct=true
+        const decimal gainCash  = 111_000m;   // 100_000 * 1.11 = +11 % → profitable → ShouldAct=false
 
         var accounts = new FakeAccountService();
         var priceAdj = new FakePriceAdjustmentService();
@@ -400,8 +400,8 @@ public sealed class BotThirteenthWaveCoverageTests
     public async Task TwoBots_OneProfitable_OneUnprofitable_PriceAdjustmentCalledOnceForUnprofitable()
     {
         const decimal initCash   = 100_000m;
-        const decimal profitCash = 115_000m; // +15 % → Profitable → no adjustment
-        const decimal lossCash   =  93_000m; // –7 % → Unprofitable (mild) → adjustment
+        const decimal profitCash = 115_000m; // 100_000 * 1.15 = +15 % → Profitable → no adjustment
+        const decimal lossCash   =  93_000m; // 100_000 * 0.93 = –7 % → Unprofitable (mild) → adjustment
 
         var bot1 = new BotAccount { Index = 1, DisplayName = "NPC_Trading_01",    Email = "b1@t", Strategy = "Trading" };
         var bot2 = new BotAccount { Index = 2, DisplayName = "NPC_Industrial_02", Email = "b2@t", Strategy = "Industrial" };
@@ -465,7 +465,7 @@ public sealed class BotThirteenthWaveCoverageTests
     {
         // –9.9 % → mild (within "mild loss" range: –2 % to –10 % exclusive)
         const decimal initial = 100_000m;
-        const decimal current = 90_100m;  // –9.9 %
+        const decimal current = 90_100m;  // 100_000 * 0.901 = –9.9 %
         const int elapsed = 10;
 
         var result = BotProfitCalculator.Recommend(current, initial, elapsed, minTicksBeforeAdjustment: 5);
