@@ -54,35 +54,16 @@ function getProductImage(product: ProductType) {
   return getProductImageUrl(product)
 }
 
+const DEFAULT_INDUSTRY = 'ELECTRONICS'
+
 function getIngredientImage(recipe: ProductType['recipes'][number]) {
   if (recipe.resourceType) return getResourceImageUrl(recipe.resourceType)
   if (recipe.inputProductType) {
     const inputProductType = recipe.inputProductType
     const product = props.products.find((candidate) => candidate.id === inputProductType.id)
-    return getProductImageUrl({ slug: inputProductType.slug, name: inputProductType.name, industry: product?.industry ?? 'ELECTRONICS' })
+    return getProductImageUrl({ slug: inputProductType.slug, name: inputProductType.name, industry: product?.industry ?? DEFAULT_INDUSTRY })
   }
   return null
-}
-
-function getIngredientQuantityForSelectedEntry(product: ProductType): number {
-  if (props.selectedResource) {
-    const recipe = product.recipes.find((candidate) => candidate.resourceType?.id === props.selectedResource?.id)
-    return recipe?.quantity ?? 0
-  }
-  if (props.selectedProduct) {
-    const recipe = product.recipes.find((candidate) => candidate.inputProductType?.id === props.selectedProduct?.id)
-    return recipe?.quantity ?? 0
-  }
-  return 0
-}
-
-function getIngredientUnitForSelectedEntry(product: ProductType): string {
-  if (props.selectedResource) return props.selectedResource.unitSymbol
-  if (props.selectedProduct) {
-    const recipe = product.recipes.find((candidate) => candidate.inputProductType?.id === props.selectedProduct?.id)
-    return recipe?.inputProductType?.unitSymbol ?? props.selectedProduct.unitSymbol
-  }
-  return ''
 }
 
 function getProductAccessText(product: ProductType) {
