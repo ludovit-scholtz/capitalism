@@ -23,6 +23,12 @@ It will use real world map. The game will start in single city and later other c
 
 - [ ] When player creates a bank account at second player bank, make sure the second player (the bank owner) can change the interest rate for deposits. The new rate will be applied in 24 ticks from the time when the bank owner changed the deposit interest rate and is applied to all bank account deposits from all players. At the moment the bank account stick with the interest rate which was set when the account was created. For the loans it works good as every loan is specific contract and can have different interest rate, but for the deposits all bank account interest rate which they receive from the bank must be equal and bank owner must be able to change it. Bank owner cannot change the interest rate for existing loan conract which is correctly implemented now.
 
+### FX Exchange (0% complete)
+
+- [ ] On rates page make sure to show the buy price, mid price and sell price for the rate. 
+- [ ] Make sure to show the rate in the stronger currency. The currency strength is USD,EUR,CNY,GBP,INR,CZK. So when user has selected in the context switcher Prague the CZK currency it will show CZKUSD and CZKEUR numbers. When Vienna and EUR is selected make sure to show rates for EURUSD and CZKEUR. Show the pair also in the rate list as it is common in standard forex.
+- [ ] Collect history for rates and create a chart when user selects in the rates page the specific exchange pair.
+
 ### Country flags (0% complete)
 
 - [ ] Add npm library country-flag-icons and use it everywhere where the country flag should be
