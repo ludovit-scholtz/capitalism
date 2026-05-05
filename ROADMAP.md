@@ -200,6 +200,12 @@ All three industries are Pro-gated at both backend (`ProOnlyStarterIndustries`) 
 
 **Shipped (increment 5):** `ProductPicker.vue` was split so the teleported dropdown panel now lives in `ProductPickerPanel.vue`, reducing the picker parent from 735 lines to 278 lines while preserving the existing `.product-picker-panel` and `.picker-*` DOM hooks used by the UI flow.
 
+**Shipped (increment 7 — view refactoring):** Four large view files were each split into a parent orchestrator + dedicated child component using props/emits, all now under 500 lines:
+- `DashboardView.vue` 921 → 411 lines — `DashboardMainContent.vue` handles all company tabs, create-company flow, and NewCompanyModal.
+- `LedgerView.vue` 860 → 198 lines — `LedgerMainContent.vue` handles the ledger table and drill-down panel.
+- `MarketingAnalyticsView.vue` 817 → 270 lines — `MarketingAnalyticsContent.vue` handles analytics table helpers and CSS.
+- `CityMapView.vue` 744 → 359 lines — `CityMapContent.vue` handles Leaflet map initialisation, lot selection, and all city section sub-components.
+
 **Shipped (increment 6 — tick performance):** Three strategic database indexes were added via EF Core migration `AddTickPerformanceIndexes` to eliminate full-table scans on the hot tick path:
 - `IX_ExchangeOrders_IsActive` — the tick context loads only active orders each tick; previously every tick did a full scan of the entire historical order book.
 - `IX_InterCityTradeRoutes_Status_ExpectedArrivalTick` — `TradeRoutePhase` queries in-transit routes by status and arrival tick; without this index the phase performed a full table scan on every tick.
