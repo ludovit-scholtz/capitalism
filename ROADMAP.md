@@ -19,6 +19,10 @@ It will use real world map. The game will start in single city and later other c
 
 - [ ] Add button to news and changelog to mark all news as read.
 
+### Banks (0% complete)
+
+- [ ] When player creates a bank account at second player bank, make sure the second player (the bank owner) can change the interest rate for deposits. The new rate will be applied in 24 ticks from the time when the bank owner changed the deposit interest rate and is applied to all bank account deposits from all players. At the moment the bank account stick with the interest rate which was set when the account was created. For the loans it works good as every loan is specific contract and can have different interest rate, but for the deposits all bank account interest rate which they receive from the bank must be equal and bank owner must be able to change it. Bank owner cannot change the interest rate for existing loan conract which is correctly implemented now.
+
 ### Country flags (0% complete)
 
 - [ ] Add npm library country-flag-icons and use it everywhere where the country flag should be
