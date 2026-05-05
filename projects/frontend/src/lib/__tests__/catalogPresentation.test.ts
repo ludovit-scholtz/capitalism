@@ -13,6 +13,7 @@ import {
   getResourceImageUrl,
   normalizeCatalogLocale,
 } from '../catalogPresentation'
+import { translateSlug } from '../catalogPresentation.Icons'
 import type { ProductType, Recipe, ResourceType } from '@/types'
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -411,5 +412,57 @@ describe('getProductImageUrl', () => {
     const decoded = decodeURIComponent(url.replace('data:image/svg+xml;utf8,', ''))
     expect(decoded).toContain('<svg')
     expect(decoded).toContain('</svg>')
+  })
+})
+
+// ── translateSlug ─────────────────────────────────────────────────────────────
+
+describe('translateSlug', () => {
+  it('translates a single known Slovak token', () => {
+    expect(translateSlug('chair', 'sk')).toBe('Stolička')
+    expect(translateSlug('bread', 'sk')).toBe('Chlieb')
+    expect(translateSlug('flour', 'sk')).toBe('Múka')
+  })
+
+  it('translates a single known German token', () => {
+    expect(translateSlug('chair', 'de')).toBe('Stuhl')
+    expect(translateSlug('bread', 'de')).toBe('Brot')
+    expect(translateSlug('wood', 'de')).toBe('Holz')
+  })
+
+  it('translates a hyphenated multi-token slug into Slovak', () => {
+    const result = translateSlug('wooden-chair', 'sk')
+    expect(result).toContain('Drevený')
+    expect(result).toContain('Stolička')
+  })
+
+  it('translates a hyphenated multi-token slug into German', () => {
+    const result = translateSlug('wooden-chair', 'de')
+    expect(result).toContain('Holz')
+    expect(result).toContain('Stuhl')
+  })
+
+  it('falls back to capitalized original token for unknown tokens', () => {
+    // 'xyzzy' is not in any translation table
+    expect(translateSlug('xyzzy', 'sk')).toBe('Xyzzy')
+    expect(translateSlug('xyzzy', 'de')).toBe('Xyzzy')
+  })
+
+  it('capitalizes the first letter of each token', () => {
+    const result = translateSlug('wooden-chair', 'sk')
+    result.split(' ').forEach((word) => {
+      expect(word[0]).toBe(word[0]!.toUpperCase())
+    })
+  })
+
+  it('joins multiple tokens with a space', () => {
+    const result = translateSlug('wooden-chair-table', 'sk')
+    const parts = result.split(' ')
+    expect(parts).toHaveLength(3)
+  })
+
+  it('handles single-word slug without hyphens', () => {
+    const result = translateSlug('grain', 'sk')
+    expect(result).toBe('Obilné')
   })
 })
