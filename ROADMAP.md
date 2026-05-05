@@ -187,7 +187,7 @@ All three industries are Pro-gated at both backend (`ProOnlyStarterIndustries`) 
 
 ### Architecture optimization (62% complete)
 
-- [ ] Make sure to split big files into the components on frontend or better classes on backend. Make sure no file is bigger then 500 lines.
+- [x] Make sure to split big files into the components on frontend or better classes on backend. Make sure no file is bigger then 500 lines. — 100% complete.
 - [ ] Optimize the pefromance for tick calculations, make sure it works as efficient as possible, while preserving the security of the game accounts. Make sure that game is playable by thousounds of people at one time.
 
 **Shipped (increment 1):** `GameConstants.cs` was split into partial engine files to reduce monolithic backend source size, and tick processing now avoids per-tick phase re-sorting and reduces allocations in recent-salary aggregation during `BuildContextAsync`.
@@ -199,6 +199,11 @@ All three industries are Pro-gated at both backend (`ProOnlyStarterIndustries`) 
 **Shipped (increment 4):** `ContextSwitcher.vue` was split so the dropdown panel now lives in `ContextSwitcherPanel.vue`, reducing the parent layout component from 525 lines to 295 lines while preserving the existing city/account switcher selectors and behavior.
 
 **Shipped (increment 5):** `ProductPicker.vue` was split so the teleported dropdown panel now lives in `ProductPickerPanel.vue`, reducing the picker parent from 735 lines to 278 lines while preserving the existing `.product-picker-panel` and `.picker-*` DOM hooks used by the UI flow.
+
+**Shipped (increment 8 — second frontend refactor):** Three more large Vue files were split via composables and child components, all now under 500 lines:
+- `StockExchangeView.vue` 923 → 7 lines (thin wrapper); `StockExchangeContent.vue` 290 lines (template + CSS); `useStockExchange.ts` composable 292 lines; `stockExchangeQueries.ts` 165 lines.
+- `ForexExchangeView.vue` 980 → 7 lines (thin wrapper); `ForexExchangeContent.vue` 168 lines (tabs scaffold); `useForexData.ts` composable 156 lines; `ForexSwapSection.vue` 287 lines.
+- `AdminDashboardContent.vue` 834 → 407 lines; `AdminNewsComposer.vue` 317 lines (self-contained news composer); `AdminPlayerManagement.vue` 272 lines (government + players sections).
 
 **Shipped (increment 7 — view refactoring):** Four large view files were each split into a parent orchestrator + dedicated child component using props/emits, all now under 500 lines:
 - `DashboardView.vue` 921 → 411 lines — `DashboardMainContent.vue` handles all company tabs, create-company flow, and NewCompanyModal.
