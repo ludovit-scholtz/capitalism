@@ -38,7 +38,7 @@ function getIngredientQuantityForSelectedEntry(product: ProductType): number {
   return 0
 }
 
-function getIngredientUnitForSelectedEntry(product: ProductType): string {
+function getIngredientUnitForSelectedEntry(): string {
   if (props.selectedResource) return props.selectedResource.unitSymbol
   if (props.selectedProduct) return props.selectedProduct.unitSymbol
   return ''
@@ -85,7 +85,7 @@ function getIngredientUnitForSelectedEntry(product: ProductType): string {
 
           <div class="ingredient-highlight">
             <span class="ingredient-label">{{ t('resourceDetail.ingredientQuantity') }}:</span>
-            <strong>{{ getIngredientQuantityForSelectedEntry(product) }} {{ getIngredientUnitForSelectedEntry(product) }}</strong>
+            <strong>{{ getIngredientQuantityForSelectedEntry(product) }} {{ getIngredientUnitForSelectedEntry() }}</strong>
           </div>
         </div>
       </article>
