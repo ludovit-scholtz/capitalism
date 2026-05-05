@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
 import BuildingBankAccountPanel from '@/components/buildings/BuildingBankAccountPanel.vue'
 import BuildingOverviewTab from '@/components/buildings/BuildingOverviewTab.vue'
+import BuildingBankAccountTab from '@/components/buildings/BuildingBankAccountTab.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -224,10 +225,7 @@ function selectOverviewTab(key: string) {
 
         <!-- Tab: Bank Account -->
         <template v-else-if="selectedOverviewTab === 'bankAccount'">
-          <div class="unit-insight-card building-bank-account-card">
-            <h5>{{ t('buildingBankAccount.panelTitle') }}</h5>
-            <BuildingBankAccountPanel :building-id="building?.id ?? ''" :company-id="building?.companyId ?? ''" :currency-code="cityCurrencyCode" :loading="loading" @updated="loadBuilding" />
-          </div>
+          <BuildingBankAccountTab />
         </template>
       </div>
     </div>
