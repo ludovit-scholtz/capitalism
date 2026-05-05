@@ -76,7 +76,7 @@ function focusTab(index: number) {
         :aria-selected="modelValue === tab.key"
         :tabindex="modelValue === tab.key ? 0 : -1"
         :class="[
-          'tab-btn -mb-px flex whitespace-nowrap border-0 border-b-2 border-transparent bg-transparent px-4 py-2.5 text-sm font-medium text-muted transition-colors max-[480px]:px-3 max-[480px]:py-2 max-[480px]:text-[0.8125rem] hover:text-body focus-visible:rounded-t-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-page',
+          'tab-btn -mb-px flex items-center whitespace-nowrap border-0 border-b-2 border-transparent bg-transparent px-4 py-2.5 text-sm font-medium text-muted transition-colors max-[480px]:px-3 max-[480px]:py-2 max-[480px]:text-[0.8125rem] hover:text-body focus-visible:rounded-t-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-page',
           modelValue === tab.key ? 'tab-btn--active border-b-brand font-semibold text-brand' : '',
         ]"
         @click="selectTab(tab.key)"
@@ -85,7 +85,7 @@ function focusTab(index: number) {
         <span class="tab-label">{{ tab.label }}</span>
         <span
           v-if="tab.badge !== undefined && tab.badge > 0"
-          class="tab-badge ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-[0.6875rem] font-bold text-white"
+          class="tab-badge ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-[0.6875rem] font-bold text-white"
           aria-label="count"
         >
           {{ tab.badge }}

@@ -3,20 +3,17 @@ import { computed, inject } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
-import BuildingFinancialTimelineChart from '@/components/buildings/BuildingFinancialTimelineChart.vue'
 import BuildingBankAccountPanel from '@/components/buildings/BuildingBankAccountPanel.vue'
+import BuildingOverviewTab from '@/components/buildings/BuildingOverviewTab.vue'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const bd = inject(BUILDING_DETAIL_KEY)!
 const {
-  locale,
   building,
   loading,
   isEditing,
-  buildingFinancialTimeline,
-  buildingFinancialTimelineLoading,
   layoutName,
   layoutDescription,
   masterLayouts,
@@ -30,11 +27,7 @@ const {
   overwriteConfirmPending,
   draftConstructionCost,
   projectedCompanyCashAfterApply,
-  buildingOverviewCityName,
   cityCurrencyCode,
-  buildingOverviewMapRoute,
-  buildingFinancialSnapshots,
-  buildingFinancialHasActivity,
   masterConnected,
   masterUserEmail,
   saveLayout,
@@ -44,11 +37,8 @@ const {
   deleteLayout,
   layoutStructureSummary,
   formatCurrency,
-  formatBuildingType,
-  formatGameTickTime,
   getUnitColor,
   getLayoutCellType,
-  formatGpsLocation,
   loadBuilding,
 } = bd
 
@@ -138,7 +128,6 @@ function selectOverviewTab(key: string) {
             <p v-else-if="masterLayoutsError" class="layout-save-error">{{ masterLayoutsError }}</p>
             <div v-else-if="masterLayouts.length > 0" class="layout-list">
               <div v-for="layout in masterLayouts" :key="layout.id ?? layout.name" class="layout-item">
-                <!-- Mini 4×4 grid preview -->
                 <div class="layout-mini-grid" aria-hidden="true">
                   <template v-for="row in 4" :key="row">
                     <template v-for="col in 4" :key="`${row}-${col}`">
@@ -182,7 +171,6 @@ function selectOverviewTab(key: string) {
               </div>
               <div v-if="localLayouts.length > 0" class="layout-list">
                 <div v-for="layout in localLayouts" :key="layout.name" class="layout-item">
-                  <!-- Mini 4×4 grid preview -->
                   <div class="layout-mini-grid" aria-hidden="true">
                     <template v-for="row in 4" :key="row">
                       <template v-for="col in 4" :key="`${row}-${col}`">
@@ -231,80 +219,15 @@ function selectOverviewTab(key: string) {
 
         <!-- Tab: P&L & Statistics -->
         <template v-if="selectedOverviewTab === 'overview'">
-        <p class="building-overview-name">{{ building?.name }}</p>
-        <p class="unit-desc">{{ t('buildingDetail.overview.subtitle', { type: formatBuildingType(building?.type ?? '') }) }}</p>
-
-        <div class="unit-insight-card building-financial-card">
-          <h5>{{ t('buildingDetail.overview.statsTitle') }}</h5>
-          <p
-            v-if="buildingFinancialTimeline"
-            class="config-help"
-            :title="t('buildingDetail.overview.tickWindow', { start: buildingFinancialTimeline.dataFromTick, end: buildingFinancialTimeline.dataToTick })"
-          >
-            {{ formatGameTickTime(buildingFinancialTimeline.dataFromTick, locale) }} – {{ formatGameTickTime(buildingFinancialTimeline.dataToTick, locale) }}
-          </p>
-          <p v-else-if="buildingFinancialTimelineLoading" class="config-help">{{ t('common.loading') }}</p>
-
-          <div class="mi-summary-grid">
-            <div class="mi-metric">
-              <span class="mi-metric-label">{{ t('buildingDetail.overview.sales') }}</span>
-              <strong class="mi-metric-value">{{ formatCurrency(buildingFinancialTimeline?.totalSales ?? 0) }}</strong>
-            </div>
-            <div class="mi-metric">
-              <span class="mi-metric-label">{{ t('buildingDetail.overview.costs') }}</span>
-              <strong class="mi-metric-value">{{ formatCurrency(buildingFinancialTimeline?.totalCosts ?? 0) }}</strong>
-            </div>
-            <div class="mi-metric">
-              <span class="mi-metric-label">{{ t('buildingDetail.overview.profit') }}</span>
-              <strong
-                class="mi-metric-value"
-                :class="{
-                  'building-profit-positive-text': (buildingFinancialTimeline?.totalProfit ?? 0) >= 0,
-                  'building-profit-negative-text': (buildingFinancialTimeline?.totalProfit ?? 0) < 0,
-                }"
-              >
-                {{ formatCurrency(buildingFinancialTimeline?.totalProfit ?? 0) }}
-              </strong>
-            </div>
-          </div>
-
-          <template v-if="buildingFinancialTimeline">
-            <BuildingFinancialTimelineChart v-if="buildingFinancialHasActivity" :timeline="buildingFinancialSnapshots" :currency-code="cityCurrencyCode" />
-
-            <p v-else class="mi-empty-state">
-              {{ t('buildingDetail.overview.noFinancialData') }}
-            </p>
-          </template>
-
-          <p v-else-if="!buildingFinancialTimelineLoading" class="mi-empty-state">
-            {{ t('buildingDetail.overview.loadFailed') }}
-          </p>
-        </div>
-
-        <div class="unit-insight-card building-location-card">
-          <h5>{{ t('buildingDetail.overview.locationTitle') }}</h5>
-          <div class="building-overview-location-grid">
-            <div class="building-overview-location-row">
-              <span class="building-overview-label">{{ t('buildingDetail.overview.city') }}</span>
-              <strong>{{ buildingOverviewCityName }}</strong>
-            </div>
-            <div class="building-overview-location-row">
-              <span class="building-overview-label">{{ t('buildingDetail.overview.gps') }}</span>
-              <strong>{{ formatGpsLocation(building?.latitude, building?.longitude) }}</strong>
-            </div>
-          </div>
-          <RouterLink v-if="buildingOverviewMapRoute" :to="buildingOverviewMapRoute" class="btn btn-secondary btn-sm building-overview-map-link">
-            {{ t('buildingDetail.overview.showOnMap') }}
-          </RouterLink>
-        </div>
+          <BuildingOverviewTab />
         </template>
 
         <!-- Tab: Bank Account -->
         <template v-else-if="selectedOverviewTab === 'bankAccount'">
-        <div class="unit-insight-card building-bank-account-card">
-          <h5>{{ t('buildingBankAccount.panelTitle') }}</h5>
-          <BuildingBankAccountPanel :building-id="building?.id ?? ''" :company-id="building?.companyId ?? ''" :currency-code="cityCurrencyCode" :loading="loading" @updated="loadBuilding" />
-        </div>
+          <div class="unit-insight-card building-bank-account-card">
+            <h5>{{ t('buildingBankAccount.panelTitle') }}</h5>
+            <BuildingBankAccountPanel :building-id="building?.id ?? ''" :company-id="building?.companyId ?? ''" :currency-code="cityCurrencyCode" :loading="loading" @updated="loadBuilding" />
+          </div>
         </template>
       </div>
     </div>
@@ -314,3 +237,4 @@ function selectOverviewTab(key: string) {
 <style scoped src="./BuildingSidebar.shared.css"></style>
 <style scoped src="./BuildingSidebar.analytics.css"></style>
 <style scoped src="./BuildingSidebar.exchange.css"></style>
+
