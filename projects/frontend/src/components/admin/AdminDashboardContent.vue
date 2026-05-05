@@ -1,96 +1,23 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-
-import RichTextEditor from '@/components/admin/RichTextEditor.vue'
-import { createEmptysDraft, NEWS_EDITOR_LOCALES, pickGamesLocalization, upsertsLocalization } from '@/lib/news'
-import { gqlRequest } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
 import { useGameAdminStore } from '@/stores/gameAdmin'
 import { usesStore } from '@/stores/news'
-import type { AccountContextType, GameAdminPlayer, GamesEntry, GamesFeed } from '@/types'
+import AdminNewsComposer from '@/components/admin/AdminNewsComposer.vue'
+import AdminPlayerManagement from '@/components/admin/AdminPlayerManagement.vue'
 
 const { t, locale } = useI18n()
-const router = useRouter()
 const auth = useAuthStore()
 const adminStore = useGameAdminStore()
 const newsStore = usesStore()
 
-const newsEditor = ref(createEmptysDraft())
-const activeLocale = ref<(typeof NEWS_EDITOR_LOCALES)[number]>('en')
-const adminFeed = ref<GamesFeed | null>(null)
-const adminFeedLoading = ref(false)
-const adminFeedError = ref<string | null>(null)
 const globalAdminEmail = ref('')
 const actionError = ref<string | null>(null)
 const actionMessage = ref<string | null>(null)
 const showShippingCosts = ref(false)
 
 const canManageRootFeatures = computed(() => adminStore.session?.isRootAdministrator ?? false)
-const activeLocalization = computed(() => newsEditor.value.localizations.find((localization) => localization.locale === activeLocale.value))
-const latestEntries = computed(() => adminFeed.value?.items ?? [])
-
-async function loadAdminFeed() {
-  adminFeedLoading.value = true
-  adminFeedError.value = null
-
-  try {
-    const data = await gqlRequest<{ gameNewsFeed: GamesFeed }>(
-      `query AdminNewsFeed {
-        gameNewsFeed(includeDrafts: true) {
-          unreadCount
-          items {
-            id
-            entryType
-            status
-            targetServerKey
-            createdByEmail
-            updatedByEmail
-            createdAtUtc
-            updatedAtUtc
-            publishedAtUtc
-            isRead
-            localizations {
-              locale
-              title
-              summary
-              htmlContent
-            }
-          }
-        }
-      }`,
-    )
-
-    adminFeed.value = data.gameNewsFeed
-  } catch (caughtError) {
-    adminFeedError.value = caughtError instanceof Error ? caughtError.message : t('admin.newsLoadFailed')
-  } finally {
-    adminFeedLoading.value = false
-  }
-}
-
-function resetComposer() {
-  newsEditor.value = createEmptysDraft()
-  activeLocale.value = 'en'
-}
-
-function editEntry(entry: GamesEntry) {
-  newsEditor.value = {
-    entryId: entry.id,
-    entryType: entry.entryType,
-    status: entry.status,
-    localizations: entry.localizations.map((localization) => ({ ...localization })),
-  }
-  activeLocale.value = 'en'
-}
-
-function updateLocalization<K extends 'title' | 'summary' | 'htmlContent'>(key: K, value: string) {
-  newsEditor.value = {
-    ...newsEditor.value,
-    localizations: upsertsLocalization(newsEditor.value.localizations, activeLocale.value, { [key]: value }),
-  }
-}
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat(locale.value, {
@@ -101,51 +28,11 @@ function formatCurrency(value: number) {
 }
 
 function formatDate(value: string | null) {
-  if (!value) {
-    return t('common.notAvailable')
-  }
-
+  if (!value) return t('common.notAvailable')
   return new Intl.DateTimeFormat(locale.value, {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value))
-}
-
-function getLocalizedEntry(entry: GamesEntry) {
-  return pickGamesLocalization(entry.localizations, locale.value)
-}
-
-function canEditEntry(entry: GamesEntry) {
-  return entry.targetServerKey !== null || canManageRootFeatures.value || adminStore.session?.hasGlobalAdminRole
-}
-
-async function saveEntry() {
-  actionError.value = null
-  actionMessage.value = null
-
-  try {
-    await adminStore.upsertGamesEntry(newsEditor.value)
-    await Promise.all([loadAdminFeed(), newsStore.fetchUnreadCount()])
-    actionMessage.value = t('admin.newsSaved')
-    resetComposer()
-  } catch (caughtError) {
-    actionError.value = caughtError instanceof Error ? caughtError.message : t('admin.newsSaveFailed')
-  }
-}
-
-async function startImpersonation(playerId: string, accountType: AccountContextType, companyId?: string | null) {
-  actionError.value = null
-  actionMessage.value = null
-
-  try {
-    const authPayload = await adminStore.startImpersonation(playerId, accountType, companyId)
-    auth.applyAuthPayload(authPayload)
-    await Promise.all([adminStore.fetchSession(), newsStore.fetchUnreadCount()])
-    actionMessage.value = t('admin.impersonationStarted')
-    await router.push('/dashboard')
-  } catch (caughtError) {
-    actionError.value = caughtError instanceof Error ? caughtError.message : t('admin.impersonationFailed')
-  }
 }
 
 async function stopImpersonation() {
@@ -159,28 +46,6 @@ async function stopImpersonation() {
     actionMessage.value = t('admin.impersonationStopped')
   } catch (caughtError) {
     actionError.value = caughtError instanceof Error ? caughtError.message : t('admin.impersonationFailed')
-  }
-}
-
-async function toggleInvisible(player: GameAdminPlayer) {
-  actionError.value = null
-
-  try {
-    await adminStore.setPlayerInvisibleInChat(player.id, !player.isInvisibleInChat)
-    actionMessage.value = player.isInvisibleInChat ? t('admin.playerVisible') : t('admin.playerInvisible')
-  } catch (caughtError) {
-    actionError.value = caughtError instanceof Error ? caughtError.message : t('admin.playerVisibilityFailed')
-  }
-}
-
-async function toggleLocalAdmin(player: GameAdminPlayer) {
-  actionError.value = null
-
-  try {
-    await adminStore.setLocalGameAdminRole(player.id, player.role !== 'ADMIN')
-    actionMessage.value = player.role === 'ADMIN' ? t('admin.localAdminRemoved') : t('admin.localAdminGranted')
-  } catch (caughtError) {
-    actionError.value = caughtError instanceof Error ? caughtError.message : t('admin.localAdminFailed')
   }
 }
 
@@ -206,10 +71,6 @@ async function removeGlobalAdmin(email: string) {
     actionError.value = caughtError instanceof Error ? caughtError.message : t('admin.globalAdminFailed')
   }
 }
-
-onMounted(() => {
-  loadAdminFeed()
-})
 </script>
 
 <template>
@@ -307,171 +168,10 @@ onMounted(() => {
     </article>
   </section>
 
-  <section class="admin-grid admin-grid-wide">
-    <article class="card admin-panel admin-panel-wide">
-      <div class="admin-panel-header">
-        <div>
-          <h2>{{ t('admin.governmentTitle') }}</h2>
-          <p>{{ t('admin.governmentBody') }}</p>
-        </div>
-      </div>
-      <div v-if="adminStore.dashboard?.governmentPlayer" class="admin-player-list">
-        <article class="admin-player-card admin-gov-card">
-          <div class="admin-player-topline">
-            <div>
-              <h3>{{ adminStore.dashboard.governmentPlayer.displayName }}</h3>
-              <p>{{ adminStore.dashboard.governmentPlayer.email }}</p>
-            </div>
-            <div class="admin-player-badges">
-              <span class="badge badge-warning">SYSTEM</span>
-            </div>
-          </div>
-          <div class="admin-player-stats">
-            <span>{{ t('admin.personalCash') }}: {{ formatCurrency(adminStore.dashboard.governmentPlayer.personalCash) }}</span>
-            <span>{{ t('admin.companyCash') }}: {{ formatCurrency(adminStore.dashboard.governmentPlayer.totalCompanyCash) }}</span>
-          </div>
-          <div class="admin-player-actions">
-            <button type="button" class="btn btn-primary" @click="startImpersonation(adminStore.dashboard.governmentPlayer.id, 'PERSON')">{{ t('admin.impersonateGovernment') }}</button>
-            <button
-              v-for="company in adminStore.dashboard.governmentPlayer.companies"
-              :key="company.id"
-              type="button"
-              class="admin-company-pill"
-              @click="startImpersonation(adminStore.dashboard.governmentPlayer.id, 'COMPANY', company.id)"
-            >
-              {{ company.name }} · {{ formatCurrency(company.cash) }}
-            </button>
-          </div>
-        </article>
-      </div>
-      <p v-else class="admin-empty-state">{{ t('admin.governmentNotSeeded') }}</p>
-    </article>
-  </section>
+  <AdminPlayerManagement />
 
   <section class="admin-grid admin-grid-wide">
-    <article class="card admin-panel admin-panel-wide">
-      <div class="admin-panel-header">
-        <div>
-          <h2>{{ t('admin.playersTitle') }}</h2>
-          <p>{{ t('admin.playersBody') }}</p>
-        </div>
-      </div>
-      <div class="admin-player-list">
-        <article v-for="player in adminStore.dashboard?.players ?? []" :key="player.id" class="admin-player-card">
-          <div class="admin-player-topline">
-            <div>
-              <h3>{{ player.displayName }}</h3>
-              <p>{{ player.email }}</p>
-            </div>
-            <div class="admin-player-badges">
-              <span class="badge" :class="player.role === 'ADMIN' ? 'badge-primary' : 'badge-success'">{{ player.role }}</span>
-              <span v-if="player.isInvisibleInChat" class="badge badge-warning">{{ t('admin.invisibleLabel') }}</span>
-            </div>
-          </div>
-
-          <div class="admin-player-stats">
-            <span>{{ t('admin.personalCash') }}: {{ formatCurrency(player.personalCash) }}</span>
-            <span>{{ t('admin.companyCash') }}: {{ formatCurrency(player.totalCompanyCash) }}</span>
-            <span>{{ t('admin.lastSeen') }}: {{ formatDate(player.lastLoginAtUtc) }}</span>
-          </div>
-
-          <div class="admin-player-actions">
-            <button type="button" class="btn btn-secondary" @click="startImpersonation(player.id, 'PERSON')">{{ t('admin.impersonatePerson') }}</button>
-            <button type="button" class="btn btn-secondary" @click="toggleInvisible(player)">{{ player.isInvisibleInChat ? t('admin.makeVisible') : t('admin.makeInvisible') }}</button>
-            <button v-if="canManageRootFeatures" type="button" class="btn btn-ghost" @click="toggleLocalAdmin(player)">
-              {{ player.role === 'ADMIN' ? t('admin.removeLocalAdmin') : t('admin.grantLocalAdmin') }}
-            </button>
-          </div>
-
-          <div v-if="player.companies.length > 0" class="admin-company-list">
-            <button v-for="company in player.companies" :key="company.id" type="button" class="admin-company-pill" @click="startImpersonation(player.id, 'COMPANY', company.id)">
-              {{ company.name }} · {{ formatCurrency(company.cash) }}
-            </button>
-          </div>
-        </article>
-      </div>
-    </article>
-
-    <article class="card admin-panel admin-panel-wide">
-      <div class="admin-panel-header">
-        <div>
-          <h2>{{ t('admin.newsComposerTitle') }}</h2>
-          <p>{{ t('admin.newsComposerBody') }}</p>
-        </div>
-        <button type="button" class="btn btn-ghost" @click="resetComposer">{{ t('admin.newEntry') }}</button>
-      </div>
-
-      <div class="admin-composer-grid">
-        <div class="admin-composer-form">
-          <div class="admin-inline-fields">
-            <label class="form-label">
-              {{ t('admin.entryType') }}
-              <select v-model="newsEditor.entryType" class="form-select">
-                <option value="NEWS">{{ t('news.filters') }}</option>
-                <option value="CHANGELOG">{{ t('news.filterChangelog') }}</option>
-              </select>
-            </label>
-            <label class="form-label">
-              {{ t('admin.entryStatus') }}
-              <select v-model="newsEditor.status" class="form-select">
-                <option value="DRAFT">{{ t('admin.statusDraft') }}</option>
-                <option value="PUBLISHED">{{ t('admin.statusPublished') }}</option>
-              </select>
-            </label>
-          </div>
-
-          <div class="locale-tabs">
-            <button
-              v-for="editorLocale in NEWS_EDITOR_LOCALES"
-              :key="editorLocale"
-              type="button"
-              class="locale-tab"
-              :class="{ active: activeLocale === editorLocale }"
-              @click="activeLocale = editorLocale"
-            >
-              {{ editorLocale.toUpperCase() }}
-            </button>
-          </div>
-
-          <label class="form-label">
-            {{ t('admin.entryTitle') }}
-            <input class="form-input" :value="activeLocalization?.title ?? ''" @input="updateLocalization('title', ($event.target as HTMLInputElement).value ?? '')" />
-          </label>
-
-          <label class="form-label">
-            {{ t('admin.entrySummary') }}
-            <textarea class="form-textarea" :value="activeLocalization?.summary ?? ''" @input="updateLocalization('summary', ($event.target as HTMLTextAreaElement).value ?? '')"></textarea>
-          </label>
-
-          <label class="form-label">
-            {{ t('admin.entryContent') }}
-            <RichTextEditor :model-value="activeLocalization?.htmlContent ?? ''" @update:model-value="updateLocalization('htmlContent', $event)" />
-          </label>
-
-          <div class="admin-composer-actions">
-            <button type="button" class="btn btn-primary" @click="saveEntry">{{ t('admin.saveEntry') }}</button>
-          </div>
-        </div>
-
-        <div class="admin-feed-list">
-          <div v-if="adminFeedLoading" class="admin-empty-state">{{ t('common.loading') }}</div>
-          <div v-else-if="adminFeedError" class="admin-empty-state">{{ adminFeedError }}</div>
-          <article v-for="entry in latestEntries" :key="entry.id" class="admin-feed-card">
-            <div class="admin-feed-topline">
-              <span class="badge" :class="entry.status === 'PUBLISHED' ? 'badge-success' : 'badge-warning'">{{ entry.status }}</span>
-              <span class="badge badge-primary">{{ entry.entryType }}</span>
-            </div>
-            <h3>{{ getLocalizedEntry(entry)?.title ?? t('news.untitled') }}</h3>
-            <p>{{ getLocalizedEntry(entry)?.summary }}</p>
-            <div class="admin-feed-meta">
-              <span>{{ formatDate(entry.updatedAtUtc) }}</span>
-              <span>{{ entry.targetServerKey ?? t('admin.globalScope') }}</span>
-            </div>
-            <button type="button" class="btn btn-secondary" :disabled="!canEditEntry(entry)" @click="editEntry(entry)">{{ t('admin.editEntry') }}</button>
-          </article>
-        </div>
-      </div>
-    </article>
+    <AdminNewsComposer />
   </section>
 
   <section v-if="canManageRootFeatures" class="admin-grid admin-grid-wide">
@@ -673,76 +373,7 @@ onMounted(() => {
   font-weight: 700;
 }
 
-.admin-player-list {
-  display: grid;
-  gap: 0.9rem;
-}
-
-.admin-player-card {
-  padding: 1rem;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.admin-gov-card {
-  border-color: rgba(255, 138, 0, 0.35);
-  background: rgba(255, 138, 0, 0.06);
-}
-
-.admin-player-topline {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.admin-player-topline p,
-.admin-player-stats {
-  color: var(--color-text-secondary);
-}
-
-.admin-player-badges {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.admin-player-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  margin: 0.8rem 0;
-  font-size: 0.88rem;
-}
-
-.admin-player-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.admin-company-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.65rem;
-  margin-top: 0.85rem;
-}
-
-.admin-company-pill {
-  padding: 0.55rem 0.8rem;
-  border-radius: 999px;
-  border: 1px solid rgba(0, 71, 255, 0.38);
-  background: rgba(0, 71, 255, 0.12);
-  color: #cddcff;
-}
-
-.admin-composer-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(18rem, 0.75fr);
-  gap: 1rem;
-}
-
-.admin-composer-form {
+.admin-global-admins {
   display: grid;
   gap: 1rem;
 }
@@ -753,73 +384,15 @@ onMounted(() => {
   gap: 1rem;
 }
 
-.locale-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.65rem;
-}
-
-.locale-tab {
-  padding: 0.55rem 0.8rem;
-  border-radius: 999px;
-  border: 1px solid var(--color-border);
-  background: transparent;
-  color: var(--color-text-secondary);
-}
-
-.locale-tab.active {
-  background: rgba(0, 71, 255, 0.18);
-  border-color: rgba(0, 71, 255, 0.45);
-  color: white;
-}
-
-.admin-composer-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.admin-feed-list {
-  display: grid;
-  gap: 0.8rem;
-}
-
-.admin-feed-card {
-  padding: 1rem;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-  background: rgba(255, 255, 255, 0.02);
-  display: grid;
-  gap: 0.6rem;
-}
-
-.admin-feed-topline,
-.admin-feed-meta {
-  display: flex;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-  color: var(--color-text-secondary);
-  font-size: 0.82rem;
-}
-
-.admin-global-admins {
-  display: grid;
-  gap: 1rem;
-}
-
 @media (max-width: 1080px) {
   .admin-metrics,
   .admin-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
-  .admin-composer-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 @media (max-width: 720px) {
   .admin-panel-header,
-  .admin-player-topline,
   .admin-list-item {
     flex-direction: column;
     align-items: stretch;
