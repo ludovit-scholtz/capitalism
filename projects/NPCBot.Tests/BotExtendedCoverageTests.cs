@@ -265,7 +265,8 @@ public sealed class BotExtendedCoverageTests
 
     /// <summary>
     /// A FakeAccountService that cancels a CTS when FetchProfileAsync is called for the
-    /// Nth time.  Used to cancel the CT immediately after a bot's init completes so the
+    /// Nth time or later (the check is <c>&gt;= N</c>, so the CT is cancelled on the Nth call
+    /// itself before returning).  Used to cancel the CT at a predictable point so the
     /// orchestrator foreach guard fires before the next bot starts.
     /// </summary>
     private sealed class CancelAfterProfileFetchService : IAccountService
@@ -389,8 +390,10 @@ public sealed class BotExtendedCoverageTests
 
         // InitialiseBotAsync (onboarding already complete) calls FetchProfileAsync TWICE:
         //   call #1 → onboarding check   (profile returned with OnboardingCompletedAtUtc set)
-        //   call #2 → definitive net worth
-        // After call #2 the CT is cancelled → the foreach guard fires → bot2 is skipped.
+        //   call #2 → definitive net worth  ← CTS is cancelled during this call (>= 2 guard)
+        // The cancellation fires mid-init for bot1's second FetchProfileAsync call.
+        // On the next foreach iteration the CT-guard `if (ct.IsCancellationRequested) break;`
+        // fires before bot2's InitialiseBotAsync is reached, so bot2 never gets a token.
         var accounts = new CancelAfterProfileFetchService(cts, cancelOnCallN: 2);
 
         var bot1 = MakeBot(1);
@@ -440,7 +443,8 @@ public sealed class BotExtendedCoverageTests
     [Fact]
     public void BotProfitCalculator_Classify_TinyPositiveDelta_ReturnsNeutral()
     {
-        // A 0.001% gain is well within the neutral band so the result must still be Neutral.
+        // A 0.001% gain is well within the ±1% (NeutralBandPercent) neutral band so the
+        // result must still be Neutral — not Profitable.
         var status = BotProfitCalculator.Classify(100.001m, 100m);
         Assert.Equal(ProfitabilityStatus.Neutral, status);
     }
