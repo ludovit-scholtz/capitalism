@@ -33,7 +33,13 @@ public static class GraphQLResponseParser
         var code = string.Empty;
         if (first.TryGetProperty("extensions", out var ext) &&
             ext.TryGetProperty("code", out var codeEl))
-            code = codeEl.GetString() ?? string.Empty;
+        {
+            // Defensive: only call GetString() on a JSON string element.
+            // Non-conforming servers may return numeric or boolean codes; fall back to empty string.
+            code = codeEl.ValueKind == JsonValueKind.String
+                ? codeEl.GetString() ?? string.Empty
+                : string.Empty;
+        }
 
         return (message, code);
     }
