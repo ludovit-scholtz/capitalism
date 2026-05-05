@@ -122,6 +122,20 @@ public sealed class Building
     public decimal? LendingInterestRatePercent { get; set; }
 
     /// <summary>
+    /// Pending (future) deposit interest rate (%) scheduled by the bank owner.
+    /// Applied to all active deposits at tick <see cref="PendingDepositRateEffectiveTick"/>.
+    /// Null when no rate change is pending.
+    /// </summary>
+    public decimal? PendingDepositInterestRatePercent { get; set; }
+
+    /// <summary>
+    /// Tick at which <see cref="PendingDepositInterestRatePercent"/> becomes effective.
+    /// The tick processor updates all active deposits at this bank to the new rate on this tick.
+    /// Null when no rate change is pending.
+    /// </summary>
+    public long? PendingDepositRateEffectiveTick { get; set; }
+
+    /// <summary>
     /// Cached total of active deposit-account balances in this bank.
     /// Summed from BankAccount.Balance where BankBuildingId matches and ClosedAtUtc is null.
     /// Updated on each deposit/withdrawal mutation. Only meaningful for BANK buildings.

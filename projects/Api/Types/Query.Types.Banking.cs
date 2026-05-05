@@ -67,6 +67,17 @@ public sealed class BankInfoSummary
     public decimal ReserveShortfall { get; set; }
     /// <summary>Liquidity status: HEALTHY, PRESSURED, or CRITICAL.</summary>
     public string LiquidityStatus { get; set; } = BankLiquidityStatus.Healthy;
+
+    // ── Pending deposit rate change ───────────────────────────────────────────
+
+    /// <summary>
+    /// Pending new deposit rate (%) scheduled by the owner. Null when no rate change is pending.
+    /// Becomes the effective rate for all deposits at <see cref="PendingDepositRateEffectiveTick"/>.
+    /// </summary>
+    public decimal? PendingDepositInterestRatePercent { get; set; }
+
+    /// <summary>Game tick at which <see cref="PendingDepositInterestRatePercent"/> becomes effective. Null when no rate change is pending.</summary>
+    public long? PendingDepositRateEffectiveTick { get; set; }
 }
 
 /// <summary>Liquidity health states for bank buildings.</summary>
@@ -174,4 +185,31 @@ public sealed class CollateralEligibilitySummary
     /// Otherwise it is the collateral building's own city currency.
     /// </summary>
     public string CurrencyCode { get; set; } = "EUR";
+}
+
+/// <summary>Immutable audit record for a bank deposit interest rate change.</summary>
+public sealed class BankDepositRateHistorySummary
+{
+    /// <summary>Record ID.</summary>
+    public Guid Id { get; set; }
+    /// <summary>Bank building whose deposit rate was changed.</summary>
+    public Guid BankBuildingId { get; set; }
+    /// <summary>Annual deposit rate (%) before this change.</summary>
+    public decimal PreviousRatePercent { get; set; }
+    /// <summary>New annual deposit rate (%) applied on <see cref="EffectiveTick"/>.</summary>
+    public decimal NewRatePercent { get; set; }
+    /// <summary>Game tick when the new rate became (or will become) effective.</summary>
+    public long EffectiveTick { get; set; }
+    /// <summary>UTC timestamp when the new rate became (or will become) effective.</summary>
+    public DateTime EffectiveUtc { get; set; }
+    /// <summary>Game tick when this change was scheduled.</summary>
+    public long ScheduledAtTick { get; set; }
+    /// <summary>UTC timestamp when this change was scheduled.</summary>
+    public DateTime ScheduledAtUtc { get; set; }
+    /// <summary>Number of deposits updated when the rate became effective (0 until applied).</summary>
+    public int AffectedDepositCount { get; set; }
+    /// <summary>True when the tick processor has already applied this rate to all deposits.</summary>
+    public bool IsApplied { get; set; }
+    /// <summary>Display name of the player who made the change.</summary>
+    public string ChangedByPlayerName { get; set; } = string.Empty;
 }

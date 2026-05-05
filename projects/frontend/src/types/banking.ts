@@ -118,6 +118,28 @@ export interface BankInfoSummary {
   availableCash: number
   reserveShortfall: number
   liquidityStatus: 'HEALTHY' | 'PRESSURED' | 'CRITICAL'
+  // Pending deposit rate change
+  /** Pending new deposit rate (%) scheduled by the owner. Null when no rate change is pending. */
+  pendingDepositInterestRatePercent: number | null
+  /** Game tick at which pendingDepositInterestRatePercent becomes effective. Null when no rate change is pending. */
+  pendingDepositRateEffectiveTick: number | null
+}
+
+/** An immutable audit record for a bank deposit interest rate change. */
+export interface BankDepositRateHistorySummary {
+  id: string
+  bankBuildingId: string
+  previousRatePercent: number
+  newRatePercent: number
+  effectiveTick: number
+  effectiveUtc: string
+  scheduledAtTick: number
+  scheduledAtUtc: string
+  /** Number of deposits updated when the rate became effective (0 until applied). */
+  affectedDepositCount: number
+  /** True when the tick processor has already applied this rate to all deposits. */
+  isApplied: boolean
+  changedByPlayerName: string
 }
 
 /** FX exchange rate summary returned by the fxRates query. EUR-based (1 EUR = rate units of quoteCurrency). */

@@ -22,6 +22,7 @@ public sealed partial class AppDbContext
             e.Property(b => b.InterestRate).HasPrecision(5, 2);
             e.Property(b => b.DepositInterestRatePercent).HasPrecision(8, 4);
             e.Property(b => b.LendingInterestRatePercent).HasPrecision(8, 4);
+            e.Property(b => b.PendingDepositInterestRatePercent).HasPrecision(8, 4);
             e.Property(b => b.TotalDeposits).HasPrecision(18, 2);
             e.Property(b => b.ConstructionCost).HasPrecision(18, 2);
             e.Property(b => b.SuspendedReason).HasMaxLength(200);
@@ -32,6 +33,18 @@ public sealed partial class AppDbContext
                 .WithOne(plan => plan.Building)
                 .HasForeignKey<BuildingConfigurationPlan>(plan => plan.BuildingId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<BankDepositRateHistory>(e =>
+        {
+            e.HasKey(h => h.Id);
+            e.Property(h => h.PreviousRatePercent).HasPrecision(8, 4);
+            e.Property(h => h.NewRatePercent).HasPrecision(8, 4);
+            e.HasIndex(h => h.BankBuildingId);
+            e.HasIndex(h => new { h.BankBuildingId, h.IsApplied });
+            e.HasIndex(h => h.EffectiveTick);
+            e.HasOne(h => h.BankBuilding).WithMany().HasForeignKey(h => h.BankBuildingId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(h => h.ChangedByPlayer).WithMany().HasForeignKey(h => h.ChangedByPlayerId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<BankAccount>(e =>

@@ -273,6 +273,8 @@ public sealed partial class Mutation
             AvailableCash = availableCash,
             ReserveShortfall = reserveShortfall,
             LiquidityStatus = liquidityStatus,
+            PendingDepositInterestRatePercent = bank.PendingDepositInterestRatePercent,
+            PendingDepositRateEffectiveTick = bank.PendingDepositRateEffectiveTick,
         };
     }
 
