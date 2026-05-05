@@ -1367,3 +1367,81 @@ Root-cause of an E2E test failure (May 2026, PR #192 / marketing-analytics unaut
 2. **"Log in" (two words) and "login" (one word) are different strings.** `auth.loginRequired` = "Please log in to continue." which requires `/log in/i` or `/please log in/i`, not `/login/i`.
 3. **When testing unauthenticated state, prefer asserting the page-level empty-state message** (e.g. `page.locator('.ca-empty-state')` visible, or `page.getByText(/please log in/i)`). Do not rely on navigation header elements whose text depends on the header implementation.
 4. **Immediately before pushing any new E2E test, run it in isolation** with `CI=true npx playwright test --project=chromium e2e/<spec>.ts --grep "test name"` to verify the selector actually resolves to a visible element.
+
+## Console app test coverage — every new .NET project must have a companion test project
+
+Root-cause of a quality failure (May 2026, PR #236 NPC bot console app):
+- `projects/NPCBot/` was delivered with all implementation code but no unit test project.
+- The acceptance criteria explicitly required "Account creation helper functions", "State query validation", and "Profitability calculation logic" as backend unit tests.
+- The product owner correctly identified the gap and requested test coverage be added.
+
+**Rules to prevent recurrence:**
+1. **Every new .NET console application or library must ship with a companion `<ProjectName>.Tests/` test project in the same PR.** The test project must be a sibling directory and reference the main project.
+2. **Minimum test coverage for a new console app:** pure business logic (model properties, calculation helpers, factory/builder methods, configuration defaults), error handling (exception types, error codes), and happy-path integration scenarios where the app can be exercised in memory.
+3. **Extract testable business logic from `Program.cs` into public static or service classes** (e.g. `BotRosterFactory`, `BotProfitCalculator`) before the PR is submitted. Methods that are `private static` on `Program` cannot be tested directly.
+4. **Test project must include a `GlobalUsings.cs` with `global using Xunit;`** for test attribute discovery — the xunit runner package does NOT auto-generate global using for the `Xunit` namespace in all .NET SDK configurations.
+5. **For console apps with configuration options (`BotOptions`, `AppSettings`), add tests that assert all default values** match the documented defaults and that free/restricted resource lists are correctly seeded.
+6. **Build and run the test project with `dotnet test --configuration Release` before every `report_progress` call.** Do not push console app code without verified passing tests.
+
+## NPC bot recommendation-to-action gap — always close the loop from check to change
+
+Root-cause of a recurring quality failure (May 2026, PR #236 NPC bot — repeated "increase test coverage" feedback):
+- The ROADMAP says "check if it is profitable to change the current settings" — each previous iteration implemented **checking** (profitability classification, recommendation generation) but stopped short of **acting** on the recommendation.
+- `BotProfitCalculator.Recommend()` produced a `StrategyRecommendation` with `ShouldAct = true` and a `PriceAdjustmentFactor`, but the orchestrator only logged the recommendation; no mutation was ever sent to the game API.
+- The `updatePublicSalesPrice` GraphQL mutation existed in the game API from the start but was never wired into the bot.
+- This is the same "recommendation without action" anti-pattern that causes repeated "aligned with ROADMAP" feedback.
+
+**Rules to prevent recurrence:**
+1. **When the ROADMAP says "change X", the implementation must call a mutation/API to actually change X** — not just compute and log what should change. Logging a recommendation is NOT completing the item.
+2. **For any recommendation-producing helper (profitability, strategy, risk), always add a companion service that applies the recommendation via the API.** Extract the pure computation into `*Helper` for testability, then wrap the network call in a `*Service`.
+3. **The full loop must be: (1) compute recommendation, (2) store on bot state (`PendingRecommendation`), (3) apply via API mutation, (4) clear `PendingRecommendation` after successful apply.** Steps 3 and 4 are mandatory for ROADMAP alignment.
+4. **When reviewing a "check if it is profitable to change" item, verify that the orchestrator code calls a mutation** — not just that a `StrategyRecommendation` is produced. Search for the actual GraphQL mutation call in the service before declaring the item complete.
+5. **Always test the pure price-computation helper** (`PriceAdjustmentHelper.ComputeNewPrice`, `SelectAdjustableUnits`, `IsAdjustmentMeaningful`) with edge cases: zero price, sub-cent round-trip, no-op identity factor, case-insensitive unit type, null/zero prices excluded.
+6. **Always extract pure status-label logic from the orchestrator as a `public static` method** so it can be unit tested without instantiating the full service. Example: `BotOrchestrator.GetBotStatusLabel(bot)` maps bot state to ACTIVE/ONBOARDING/NO_TOKEN/SKIPPED and has a dedicated `BotOrchestratorTests.cs`. Any orchestrator with similar reporting logic should follow this pattern.
+7. **Do not mark a ROADMAP description as "50 new unit tests" and leave it stale** — always update the description to reflect the accurate test count at the time the PR is finalized. Stale descriptions mislead reviewers into thinking coverage is lower than it is.
+8. **For any service that calls HTTP (GameApiClient, AccountService, PriceAdjustmentService), extract ALL pure JSON-parsing or decision logic into `public static` helpers so they can be unit tested without HTTP.** For example, `GraphQLResponseParser.ParseFirstError(errors)` / `HasErrors(root)` / `HasData(root)` are extracted from `GameApiClient.ExecuteAsync` and tested independently. Similarly, `OnboardingHelpers.ShouldResumeFromShopStep(bot)` is extracted from `OnboardingService` and tested for all cases (null profile, null step, case-insensitive match).
+9. **For any orchestrator method that uses a private tick counter (`_currentTick`), extract the tick-elapsed computation as a `public static` method** (e.g., `BotOrchestrator.ComputeRecommendationForBot(bot, currentTick, minTicks)`) so it can be tested with deterministic tick values without needing a live HTTP client or dependency injection.
+10. **After every "increase test coverage" session, search the source files for any private method that contains a conditional or computation, and ask: "Is this testable without I/O?" If yes, extract it as a `public static` helper before the session ends.**
+11. **Every HTTP-dependent service class (e.g., `AccountService`, `GameApiClient`) must have a dedicated `*Tests.cs` covering all public methods.** Use a `FakeHttpHandler(Func<HttpResponseMessage>)` to stub HTTP responses without real network calls. At minimum cover: success path, non-2xx HTTP status → `InvalidOperationException`, GraphQL `errors` array → `GraphQLException` with correct code, and bearer token attachment/omission in request headers. Failing to add these tests causes repeated "increase test coverage" feedback even after pure helpers are fully tested.
+12. **For any orchestrator that has conditional logic in its tick loop (e.g., "if neutral/profitable do NOT call price adjustment"), always add integration tests proving the negative path (action is NOT taken).** Tests that only verify the positive path (action IS taken) leave a gap. The complementary set must be: (a) ShouldAct=true → service called; (b) ShouldAct=false (neutral) → service NOT called; (c) ShouldAct=false (profitable) → service NOT called.
+13. **For any property set during init and must NOT be overwritten during subsequent ticks (e.g., `TrackingStartTick`, `InitialNetWorth`), add an integration test that runs init + one tick and asserts the property matches the init-time value.** This prevents regressions where future refactoring accidentally resets tracking-baseline properties in the tick loop.
+14. **`bot.PendingRecommendation` semantics:** When `ShouldAct=false` (neutral/profitable), `PendingRecommendation` is set to the `NoAction` recommendation (not null). It is only cleared to `null` after a successful `ApplyAdjustmentAsync` call (when `ShouldAct=true`). Tests must distinguish between "PendingRecommendation is null" (action applied and cleared) and "PendingRecommendation.ShouldAct=false" (no action, last evaluation stored).
+
+## NPC bot orchestrator — RunOnboardingAsync internal profile fetch pattern
+
+Root-cause of a test authoring error (May 2026, BotAgentLifecycleTests.cs):
+- When testing `TickBotAsync` + onboarding-during-tick, the author enqueued only 4 profiles:
+  init-check, init-net-worth, tick-start, tick-post-onboarding.
+- But `RunOnboardingAsync` (line 142) itself calls `FetchProfileAsync` BEFORE `TickBotAsync` calls
+  it again at line 200 to set `InitialNetWorth`.
+- This consumed the 4th profile inside `RunOnboardingAsync`, leaving the queue empty for the
+  critical `InitialNetWorth` assignment, which then silently returned a default.
+
+**Exact profile-fetch sequence when `TickBotAsync` calls `RunOnboardingAsync`:**
+1. `InitialiseBotAsync` line 107 — onboarding check
+2. `InitialiseBotAsync` line 117 — definitive `InitialNetWorth`
+3. `TickBotAsync` line 194 — tick-start profile (incomplete → triggers `RunOnboardingAsync`)
+4. `RunOnboardingAsync` line 142 — post-`RunAsync` profile fetch (updates `bot.Profile`)
+5. `TickBotAsync` line 200 — final post-onboarding profile (sets `InitialNetWorth`)
+
+**Rules to prevent recurrence:**
+1. **When testing any code path that calls `RunOnboardingAsync`, enqueue 5 profiles for a single-tick run**, not 4. The 4th is consumed by `RunOnboardingAsync` internally; the 5th is the one that sets `InitialNetWorth` in `TickBotAsync`.
+2. **`StrategyRecommendation.NoAction.PriceAdjustmentFactor` is `0`, not `1`.** The `0` signals "no change" and `PriceAdjustmentService` guards against `ShouldAct=false` before reading this field. Do not assert `== 1` on the NoAction sentinel's factor.
+3. **`BotProfitCalculator.ComputeAnnualisedRatePercent` returns a `decimal` with potential fractional drift at tick-year boundaries.** Use `Assert.InRange(rate, 9.9m, 10.1m)` or `Math.Round` comparisons, not exact equality, when the input tick count is exactly a divisor of `ticksPerYear=8760`.
+
+## NPC bot repeated coverage waves — test cross-cutting invariants, not just recently-changed code
+
+Root-cause of repeated "increase test coverage" feedback (May 2026, PR #236 waves 1–10):
+- Each coverage wave targeted tests adjacent to the code changed in that wave, but never systematically audited cross-cutting *contract invariants* that span the entire system:
+  - Roster-level uniqueness invariants (email uniqueness, display-name uniqueness, 1-based sequential Index values across all 20 bots) — these prove the factory is internally consistent, not just that one bot has the right shape.
+  - `IsReadyForOperation` vs `Validate()` divergence — the two validators serve different purposes and deliberately differ on staleness; tests must prove *both* directions to prevent silent drift where one helper becomes staleness-aware by accident.
+  - `GetBotStatusLabel` for edge states (stale-but-ready bot shows ACTIVE, not a new STALE label) — labelling logic has no staleness concept, but adding one by accident would change displayed output.
+  - Constant regression guards (`PriceAdjustmentHelper.PublicSalesUnitType`, `MinimumAllowedPrice`) — a silent rename or value change would disable all price adjustments without breaking any existing test.
+  - Catch-site patterns (`GraphQLException` caught as `Exception` with code pattern match) — verifies the exception hierarchy that `AccountService`'s `when` clause relies on.
+
+**Rules to prevent recurrence:**
+1. **After any coverage wave, audit cross-cutting invariants before declaring done.** For any factory (`BotRosterFactory`), check the FULL roster output (uniqueness, sequence, format) — not just a single bot's fields.
+2. **When two helpers serve similar but NOT identical purposes (e.g., `IsReadyForOperation` vs `Validate()`), always add a test that proves they DIVERGE on the case where they are designed to disagree.** Convergence tests prove they agree; divergence tests prove the different design intents are enforced.
+3. **For any constant used as a guard condition in production code (unit type strings, price floors, timeout values), add a regression test asserting its exact value.** Renaming `"PUBLIC_SALES"` to `"PUBLIC_SALE"` would disable all price adjustments; the constant test makes this immediately visible.
+4. **For any exception class used in a `catch (Exception ex) when (ex is MyException mex && mex.Code == "...")` pattern, add a test that throws through a generic `catch (Exception ex)` handler and verifies the code is preserved.** This proves the inheritance chain works for all callers.
+5. **For any two helpers that should converge for "normal" inputs but diverge for "edge" inputs, add BOTH a convergence test (healthy bot: both agree it is ready) and a divergence test (stale bot: one says ready, other says not healthy).** Convergence alone does not prove the edge case is handled.

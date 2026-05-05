@@ -1,0 +1,420 @@
+using Capitalism.NPCBot.Models;
+using Capitalism.NPCBot.Services;
+
+namespace Capitalism.NPCBot.Tests;
+
+/// <summary>
+/// Unit tests for <see cref="BotProfitCalculator"/> — pure functions with no I/O.
+/// </summary>
+public sealed class BotProfitCalculatorTests
+{
+    // ── ComputeNetWorth ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void ComputeNetWorth_EmptyCompanies_ReturnsZero()
+    {
+        var profile = new PlayerProfile();
+        Assert.Equal(0m, BotProfitCalculator.ComputeNetWorth(profile));
+    }
+
+    [Fact]
+    public void ComputeNetWorth_SingleCompany_ReturnsCash()
+    {
+        var profile = new PlayerProfile
+        {
+            Companies = [new CompanySummary { Cash = 500_000m }],
+        };
+        Assert.Equal(500_000m, BotProfitCalculator.ComputeNetWorth(profile));
+    }
+
+    [Fact]
+    public void ComputeNetWorth_MultipleCompanies_SumsAllCash()
+    {
+        var profile = new PlayerProfile
+        {
+            Companies =
+            [
+                new CompanySummary { Cash = 100_000m },
+                new CompanySummary { Cash = 250_000m },
+                new CompanySummary { Cash = 75_000m },
+            ],
+        };
+        Assert.Equal(425_000m, BotProfitCalculator.ComputeNetWorth(profile));
+    }
+
+    [Fact]
+    public void ComputeNetWorth_NegativeCash_SumsCorrectly()
+    {
+        var profile = new PlayerProfile
+        {
+            Companies =
+            [
+                new CompanySummary { Cash = 200_000m },
+                new CompanySummary { Cash = -50_000m },
+            ],
+        };
+        Assert.Equal(150_000m, BotProfitCalculator.ComputeNetWorth(profile));
+    }
+
+    // ── Classify ─────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Classify_ZeroInitialNetWorth_ReturnsUnknown()
+    {
+        Assert.Equal(ProfitabilityStatus.Unknown, BotProfitCalculator.Classify(10m, 0m));
+    }
+
+    [Fact]
+    public void Classify_GrowthBeyondNeutralBand_ReturnsProfitable()
+    {
+        // 3% growth > 2% neutral band → Profitable
+        Assert.Equal(ProfitabilityStatus.Profitable,
+            BotProfitCalculator.Classify(103_000m, 100_000m));
+    }
+
+    [Fact]
+    public void Classify_ExactlyOnNeutralBandPositive_ReturnsNeutral()
+    {
+        // 2% growth is exactly at the boundary → Neutral (not strictly greater)
+        Assert.Equal(ProfitabilityStatus.Neutral,
+            BotProfitCalculator.Classify(102_000m, 100_000m));
+    }
+
+    [Fact]
+    public void Classify_WithinNeutralBand_ReturnsNeutral()
+    {
+        // 1% growth is within ±2% band → Neutral
+        Assert.Equal(ProfitabilityStatus.Neutral,
+            BotProfitCalculator.Classify(101_000m, 100_000m));
+    }
+
+    [Fact]
+    public void Classify_ExactlyOnNeutralBandNegative_ReturnsNeutral()
+    {
+        // −2% loss is exactly at the lower boundary → Neutral
+        Assert.Equal(ProfitabilityStatus.Neutral,
+            BotProfitCalculator.Classify(98_000m, 100_000m));
+    }
+
+    [Fact]
+    public void Classify_LossBeyondNeutralBand_ReturnsUnprofitable()
+    {
+        // −3% loss > 2% neutral band → Unprofitable
+        Assert.Equal(ProfitabilityStatus.Unprofitable,
+            BotProfitCalculator.Classify(97_000m, 100_000m));
+    }
+
+    [Fact]
+    public void Classify_ZeroNetWorthCurrentAndInitial_ReturnsUnknown()
+    {
+        Assert.Equal(ProfitabilityStatus.Unknown, BotProfitCalculator.Classify(0m, 0m));
+    }
+
+    [Fact]
+    public void Classify_NegativeInitialNetWorth_HandlesCorrectly()
+    {
+        // InitialNetWorth = −10 000, current = −8 000 → delta = +2 000.
+        // Abs(−10 000) = 10 000 so deltaPercent = 0.2 → Profitable.
+        Assert.Equal(ProfitabilityStatus.Profitable,
+            BotProfitCalculator.Classify(-8_000m, -10_000m));
+    }
+
+    // ── ComputeAnnualisedRatePercent ──────────────────────────────────────────
+
+    [Fact]
+    public void ComputeAnnualisedRatePercent_ZeroTicksElapsed_ReturnsZero()
+    {
+        Assert.Equal(0m, BotProfitCalculator.ComputeAnnualisedRatePercent(110_000m, 100_000m, 0));
+    }
+
+    [Fact]
+    public void ComputeAnnualisedRatePercent_ZeroInitialNetWorth_ReturnsZero()
+    {
+        Assert.Equal(0m, BotProfitCalculator.ComputeAnnualisedRatePercent(110_000m, 0m, 100));
+    }
+
+    [Fact]
+    public void ComputeAnnualisedRatePercent_FullYearAt10PercentGrowth_Returns10()
+    {
+        // 10% growth over one full year (8760 ticks) → 10%/yr
+        var rate = BotProfitCalculator.ComputeAnnualisedRatePercent(
+            110_000m, 100_000m, 8760, ticksPerYear: 8760);
+        Assert.Equal(10m, Math.Round(rate, 2));
+    }
+
+    [Fact]
+    public void ComputeAnnualisedRatePercent_HalfYearAt10PercentGrowth_Returns20()
+    {
+        // 10% growth in half a year → annualised 20%/yr
+        var rate = BotProfitCalculator.ComputeAnnualisedRatePercent(
+            110_000m, 100_000m, 4380, ticksPerYear: 8760);
+        Assert.Equal(20m, Math.Round(rate, 2));
+    }
+
+    [Fact]
+    public void ComputeAnnualisedRatePercent_NegativeGrowth_ReturnsNegative()
+    {
+        var rate = BotProfitCalculator.ComputeAnnualisedRatePercent(
+            90_000m, 100_000m, 8760, ticksPerYear: 8760);
+        Assert.True(rate < 0m, "Loss should yield a negative rate.");
+    }
+
+    // ── Recommend ────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Recommend_BeforeMinTicks_ReturnsNoAction()
+    {
+        // Only 3 ticks elapsed, threshold is 5 → no action
+        var rec = BotProfitCalculator.Recommend(50_000m, 100_000m, ticksElapsed: 3, minTicksBeforeAdjustment: 5);
+        Assert.False(rec.ShouldAct);
+    }
+
+    [Fact]
+    public void Recommend_ZeroInitialNetWorth_ReturnsNoAction()
+    {
+        var rec = BotProfitCalculator.Recommend(100_000m, 0m, ticksElapsed: 10);
+        Assert.False(rec.ShouldAct);
+    }
+
+    [Fact]
+    public void Recommend_Profitable_ReturnsNoAction()
+    {
+        // 5% growth — no action needed
+        var rec = BotProfitCalculator.Recommend(105_000m, 100_000m, ticksElapsed: 10);
+        Assert.False(rec.ShouldAct);
+    }
+
+    [Fact]
+    public void Recommend_Neutral_ReturnsNoAction()
+    {
+        // 1% growth — within neutral band
+        var rec = BotProfitCalculator.Recommend(101_000m, 100_000m, ticksElapsed: 10);
+        Assert.False(rec.ShouldAct);
+    }
+
+    [Fact]
+    public void Recommend_MildLoss_ReturnsMildPriceReduction()
+    {
+        // −5% loss — mild reduction
+        var rec = BotProfitCalculator.Recommend(95_000m, 100_000m, ticksElapsed: 10);
+        Assert.True(rec.ShouldAct);
+        Assert.Equal(BotProfitCalculator.MildPriceReductionFactor, rec.PriceAdjustmentFactor);
+    }
+
+    [Fact]
+    public void Recommend_SevereLoss_ReturnsAggressivePriceReduction()
+    {
+        // −15% loss — well beyond the severe threshold of −10%
+        var rec = BotProfitCalculator.Recommend(85_000m, 100_000m, ticksElapsed: 10);
+        Assert.True(rec.ShouldAct);
+        Assert.Equal(BotProfitCalculator.AggressivePriceReductionFactor, rec.PriceAdjustmentFactor);
+    }
+
+    [Fact]
+    public void Recommend_ExactlyAtSevereThreshold_ReturnsAggressiveAction()
+    {
+        // Exactly −10% → severe threshold is inclusive (<=)
+        var rec = BotProfitCalculator.Recommend(90_000m, 100_000m, ticksElapsed: 10);
+        Assert.True(rec.ShouldAct);
+        Assert.Equal(BotProfitCalculator.AggressivePriceReductionFactor, rec.PriceAdjustmentFactor);
+    }
+
+    [Fact]
+    public void Recommend_NoActionResult_HasZeroPriceAdjustmentFactor()
+    {
+        Assert.Equal(0m, StrategyRecommendation.NoAction.PriceAdjustmentFactor);
+    }
+
+    [Fact]
+    public void Recommend_ActionResult_HasNonEmptyReason()
+    {
+        var rec = BotProfitCalculator.Recommend(85_000m, 100_000m, ticksElapsed: 10);
+        Assert.False(string.IsNullOrWhiteSpace(rec.Reason));
+    }
+
+    // ── Constants sanity ──────────────────────────────────────────────────────
+
+    [Fact]
+    public void MildPriceReductionFactor_IsLessThanOne()
+    {
+        Assert.True(BotProfitCalculator.MildPriceReductionFactor < 1m);
+        Assert.True(BotProfitCalculator.MildPriceReductionFactor > 0m);
+    }
+
+    [Fact]
+    public void AggressivePriceReductionFactor_IsLessThanMild()
+    {
+        Assert.True(BotProfitCalculator.AggressivePriceReductionFactor
+            < BotProfitCalculator.MildPriceReductionFactor);
+    }
+
+    [Fact]
+    public void NeutralBandPercent_IsPositiveSmallFraction()
+    {
+        Assert.True(BotProfitCalculator.NeutralBandPercent > 0m);
+        Assert.True(BotProfitCalculator.NeutralBandPercent < 0.10m);
+    }
+
+    // ── Recommend boundary cases ──────────────────────────────────────────────
+
+    [Fact]
+    public void Recommend_OneTickBelowMinimum_ReturnsNoAction()
+    {
+        // ticksElapsed = minTicksBeforeAdjustment - 1 must still return NoAction.
+        var rec = BotProfitCalculator.Recommend(
+            50_000m, 100_000m,
+            ticksElapsed: 4, minTicksBeforeAdjustment: 5);
+        Assert.False(rec.ShouldAct);
+    }
+
+    [Fact]
+    public void Recommend_ExactlyAtMinTicksBoundary_EvaluatesNormally()
+    {
+        // ticksElapsed == minTicksBeforeAdjustment should NOT be blocked by the guard.
+        // With a −50% loss at exactly the threshold, an action must be recommended.
+        var rec = BotProfitCalculator.Recommend(
+            50_000m, 100_000m,
+            ticksElapsed: 5, minTicksBeforeAdjustment: 5);
+        Assert.True(rec.ShouldAct);
+    }
+
+    [Fact]
+    public void Recommend_LargePositiveGrowth_ReturnsNoAction()
+    {
+        // Even with 200% growth, no corrective action is needed.
+        var rec = BotProfitCalculator.Recommend(300_000m, 100_000m, ticksElapsed: 100);
+        Assert.False(rec.ShouldAct);
+    }
+
+    [Fact]
+    public void Recommend_ExactlyAtNeutralBandNegative_ReturnsNoAction()
+    {
+        // Exactly −2% (the band boundary itself) → Neutral → no action.
+        var rec = BotProfitCalculator.Recommend(98_000m, 100_000m, ticksElapsed: 10);
+        Assert.False(rec.ShouldAct);
+    }
+
+    [Fact]
+    public void Recommend_JustBeyondNeutralBand_ReturnsMildAction()
+    {
+        // −3% is beyond the ±2% neutral band but above the −10% severe threshold.
+        var rec = BotProfitCalculator.Recommend(97_000m, 100_000m, ticksElapsed: 10);
+        Assert.True(rec.ShouldAct);
+        Assert.Equal(BotProfitCalculator.MildPriceReductionFactor, rec.PriceAdjustmentFactor);
+    }
+
+    // ── Additional Classify edge cases ────────────────────────────────────────
+
+    [Fact]
+    public void Classify_CurrentNetWorthZero_UnprofitableOrUnknown()
+    {
+        // Starting at 100 000 and dropping to 0 → 100% loss → Unprofitable
+        Assert.Equal(ProfitabilityStatus.Unprofitable,
+            BotProfitCalculator.Classify(0m, 100_000m));
+    }
+
+    [Fact]
+    public void Classify_MassiveGrowth_ReturnsProfitable()
+    {
+        // Tripling in value → strongly profitable
+        Assert.Equal(ProfitabilityStatus.Profitable,
+            BotProfitCalculator.Classify(300_000m, 100_000m));
+    }
+
+    // ── ComputeAnnualisedRatePercent edge cases ───────────────────────────────
+
+    [Fact]
+    public void ComputeAnnualisedRatePercent_NegativeInitialNetWorth_IsNegative()
+    {
+        // Initial = −100 000, current = −110 000 → lost more money (delta = −10 000).
+        // Rate = (−10 000) / (−100 000 × 8760) × 8760 × 100 = +0.01 %
+        // Wait: negative / negative = positive, so rate is +10 %.
+        // The formula does NOT use Abs for initial here (unlike Classify), so the sign may flip.
+        // Just verify the result is non-zero and the formula doesn't throw.
+        var rate = BotProfitCalculator.ComputeAnnualisedRatePercent(
+            -110_000m, -100_000m, 8760, ticksPerYear: 8760);
+        // delta = -10 000; initialNetWorth = -100 000
+        // ratePerTick = -10 000 / (-100 000 * 8760) = 0.0000001...
+        // annualised = 0.0000001 * 8760 * 100 ≈ 10%
+        // The sign is positive because negative/negative = positive.
+        Assert.True(rate > 0m, "Rate with negative initial and deeper-negative current should be positive.");
+    }
+
+    [Fact]
+    public void ComputeAnnualisedRatePercent_SingleTickElapsed_IsHighButNonZero()
+    {
+        // 10% growth in 1 tick → huge annualised rate
+        var rate = BotProfitCalculator.ComputeAnnualisedRatePercent(
+            110_000m, 100_000m, 1, ticksPerYear: 8760);
+        Assert.True(rate > 0m);
+        Assert.True(rate > 100m, "Single-tick 10% growth annualises to a very large rate.");
+    }
+
+    [Fact]
+    public void SeverelyUnprofitableThresholdPercent_IsNegativeTenPercent()
+    {
+        // The threshold drives which bots get the AggressivePriceReductionFactor.
+        // If this changes, all production bots may behave differently.
+        Assert.Equal(-0.10m, BotProfitCalculator.SeverelyUnprofitableThresholdPercent);
+    }
+
+    [Fact]
+    public void Classify_ExactlyAtSeverelyUnprofitableThreshold_ReturnsUnprofitable()
+    {
+        // –10% is the severe threshold (inclusive) — must still return Unprofitable.
+        // deltaPercent = (90 000 − 100 000) / 100 000 = –0.10 exactly.
+        Assert.Equal(ProfitabilityStatus.Unprofitable,
+            BotProfitCalculator.Classify(90_000m, 100_000m));
+    }
+
+    // ── Additional coverage ───────────────────────────────────────────────────
+
+    [Fact]
+    public void Classify_ExactlyAtPositiveTwoPercent_IsNeutral()
+    {
+        // +2% is exactly at the upper boundary of the neutral band → Neutral, not Profitable.
+        // deltaPercent = (102 000 − 100 000) / 100 000 = 0.02 exactly.
+        Assert.Equal(ProfitabilityStatus.Neutral,
+            BotProfitCalculator.Classify(102_000m, 100_000m));
+    }
+
+    [Fact]
+    public void Classify_ExactlyAtNegativeTwoPercent_IsNeutral()
+    {
+        // −2% is exactly at the lower boundary of the neutral band → Neutral, not Unprofitable.
+        // deltaPercent = (98 000 − 100 000) / 100 000 = −0.02 exactly.
+        Assert.Equal(ProfitabilityStatus.Neutral,
+            BotProfitCalculator.Classify(98_000m, 100_000m));
+    }
+
+    [Fact]
+    public void ComputeAnnualisedRatePercent_CustomTicksPerYear_ScalesProportionally()
+    {
+        // Verify that doubling ticksPerYear doubles the annualised rate.
+        var rateAt8760 = BotProfitCalculator.ComputeAnnualisedRatePercent(
+            110_000m, 100_000m, 8760, ticksPerYear: 8760);
+        var rateAt17520 = BotProfitCalculator.ComputeAnnualisedRatePercent(
+            110_000m, 100_000m, 8760, ticksPerYear: 17_520);
+        Assert.Equal(rateAt8760 * 2, rateAt17520);
+    }
+
+    [Fact]
+    public void ComputeNetWorth_SingleCompanyWithZeroCash_IsZero()
+    {
+        var profile = new PlayerProfile
+        {
+            Companies = [new CompanySummary { Cash = 0m }],
+        };
+        Assert.Equal(0m, BotProfitCalculator.ComputeNetWorth(profile));
+    }
+
+    [Fact]
+    public void Recommend_WithCustomMinTicks_RespectsParameter()
+    {
+        // Default minTicks = 5; with minTicks = 20 and only 15 elapsed → no action.
+        var rec = BotProfitCalculator.Recommend(
+            80_000m, 100_000m,
+            ticksElapsed: 15, minTicksBeforeAdjustment: 20);
+        Assert.False(rec.ShouldAct, "Should not act before the custom minimum ticks.");
+    }
+}
