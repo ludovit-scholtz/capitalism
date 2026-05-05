@@ -265,17 +265,22 @@ When a unit is being modified, user can still change it. For example, if user up
 
 ## Onboarding
 
-Onboarding process:
-1. User is given $200000 to his personal bank account and he picks the game player name
-2. IPO process: user transfers $50k from personal bank account to business bank account and decides how much money to raise ($800000, $600000, or $400000), varying own shares to 25%, 33%, or 50%. User picks company name.
-3. Player selects the industry type they want to start with. The Furniture, Food processing, or Healthcare.
-4. Player selects the product he wants to produce - Each starting industry allows 3 basic products to be produced.
-5. Then player picks location of first factory. This sets factory layout and user pays all associated costs (property and company layout). Show cost analysis before purchase. Wizard should show important areas, like paying bank account, current bank balance, and pricing/public-sales configuration guidance.
-6. Next the player buys his first sales shop and configures it to set the sales price to public. User pays for the land and sales shop unit layout from the selected company/building bank account - make sure the user has clear information about this.
-7. The player is shown that the time goes on and he makes the profit from his business.
-8. User is asked to create the user account.
+The onboarding wizard is available without prior authentication. Guest progress is held in browser local storage (not on the backend) so new players can explore the full flow risk-free before committing to an account.
 
-Do not require authentication for new unauthenticated users. Do not store progress for these users on backend, but make sure they can see they bought buildings, set up resource chain, and made profit. After that ask them to log in to save progress. If an error occurs (for example lot purchased by someone else or invalid profit outcome), create profile with chosen name and restart wizard with authenticated user, then persist everything.
+Onboarding steps (city-first order):
+1. **City selection** — Player picks their starting city (e.g. Bratislava EUR, Prague CZK, Vienna EUR, Berlin EUR, Warsaw PLN). City choice is first because it fixes starting currency, available lot inventory, salary baseline, and bank-account context for every subsequent step. The selected city is also reflected in the navbar context switcher immediately.
+2. **Player name & personal bank account** — Player picks a display name. The system grants $200 000 USD to a personal bank account. This is the startup capital for the IPO.
+3. **IPO plan** — Player transfers a founder contribution from the personal bank account to the new company bank account, decides how much to raise on the public market ($800 000 / $600 000 / $400 000), and sets founder ownership (25% / 33% / 50%). Player picks company name. After IPO the personal bank account balance is $0.
+4. **Industry selection** — Player picks the business category:
+   - *Free starter industries:* Furniture (Wood), Food Processing (Grain), Healthcare (Chemical Minerals)
+   - *Pro-subscription starter industries:* Electronics (Silicon), Construction (Iron Ore), Pharmaceuticals (Gold), Energy (Coal), Logistics (Cotton). Pro-gated industries show a PRO badge; clicking without subscription shows an upgrade modal.
+   Each industry card explains the fantasy, the first product name and price, and a why-choose tagline.
+5. **Product selection** — Player picks one of three starter products within the chosen industry. Product card shows base price calibrated to the selected city currency.
+6. **Factory lot purchase** — Player picks a lot from the city map or list and purchases the first factory. The wizard auto-configures the starter factory layout (PURCHASE → MANUFACTURING → STORAGE → B2B_SALES) and shows the configured unit chain on the completion screen. Cost analysis is shown before purchase (lot price, remaining balance, pricing guidance).
+7. **Sales shop lot purchase** — Player picks a lot and purchases the first sales shop. The wizard auto-configures the shop layout (PURCHASE → PUBLIC_SALES). Payment is from the company bank account; the UI shows current balance clearly.
+8. **Save progress** — Guest players are prompted to authenticate via Biatec OIDC or native registration. Biatec OIDC requires Google Drive permission (used to create and manage the wallet file). Granting that permission is a required part of this step. On success, all guest-session progress (city, company, factory, shop configuration) is migrated into a persistent player account. If an error occurs during migration (e.g. lot taken by another player), the player is re-authenticated and the wizard resumes from the interrupted step.
+
+Do not require authentication for steps 1–7. Only step 8 triggers authentication. Do not store guest progress on the backend; keep it in browser localStorage only. If the same player resumes after an interruption post-factory purchase, detect the existing onboarding state server-side and skip directly to the shop purchase step.
 
 ## Stock exchange
 
@@ -292,23 +297,6 @@ When sum of ownership for person account and all controlled companies in another
 When sum of ownerships for person account and all controlled companies reaches 90%, person can merge this company into another company. This way all assets owned by the company are moved to the new company and the merged company is closed. Taxes for old company are paid on the tick of merge for old company.
 
 Stock-exchange company details include shareholder list and pie chart.
-
-**Status: 75% complete** (April 2026)
-
-### What was delivered
-- Global stock exchange UI with company listings, share prices, bid/ask spread, shareholder tables, and pie charts.
-- Buy and sell share trading with person account and company account switching.
-- Personal account ledger showing portfolio holdings, available bank-account buying power, tax reserve, and dividend history.
-- Trading controls redesigned using CSS grid for precise vertical alignment across all viewport sizes; input and Buy/Sell buttons share the same grid row guaranteeing identical baseline.
-- Responsive layout: labels hidden on mobile (aria-label covers accessibility), input spans full width, buttons collapse to side-by-side pair.
-- Loading, disabled, validation-error, and success/error feedback states all implemented.
-- Personal tax reserve lifecycle: accumulation on share sell, settlement at year-end TaxPhase.
-- 58 E2E tests covering buy/sell flows, portfolio, dividends, personal ledger, alignment, and authentication states.
-
-### What remains
-- Takeover trigger when combined ownership reaches 50%.
-- Company merge when combined ownership reaches 90%.
-- Share buyback reducing issued share count.
 
 ## Account switching
 
@@ -679,6 +667,236 @@ In the game are basic NPC bots which plays the same way as basic users. They are
 Bots are written in c# as the console apps and on scheduled time once an hour analyze the product what they want to produce and sell, and if they have the capacity to reorganize their factories and sales shops.
 
 Game administrators can start new bot.
+
+## Industries
+
+All eight industries are available on the game server. The three starter (free) industries are unlocked for every player. The five advanced industries require an active Pro subscription.
+
+| Industry | Raw material | Starter products | Subscription |
+|---|---|---|---|
+| Furniture | Wood | Wooden Chair, Wooden Table, Wooden Bed | Free |
+| Food Processing | Grain | Bread, Flour, Porridge | Free |
+| Healthcare | Chemical Minerals | Basic Medicine, Bandages, Vitamins | Free |
+| Electronics | Silicon | Microchip, LED Bulb, Solar Panel | Pro |
+| Construction | Iron Ore | Steel Beam, Concrete Block, Nail Pack | Pro |
+| Pharmaceuticals | Gold | Pain Relief Tablet, Antiseptic, Antibiotic | Pro |
+| Energy | Coal | Electricity Token, Heat Pack, Generator | Pro |
+| Logistics | Cotton | Packaging Box, Rope Coil, Fabric Wrap | Pro |
+
+Each industry has a clearly defined fantasy, a first product the player will produce, and a "why choose this" differentiation. Industry cards in the onboarding wizard display this information to help new players make an informed choice.
+
+## Supply chain visualization
+
+The building detail view contains a **Supply Chain** tab that renders the full upstream and downstream flow of resources for that building.
+
+- Each edge between buildings in the flow diagram shows the transit cost per unit (shipping distance × weight factor × fuel price index).
+- Hovering an edge shows the cost breakdown (km, weight, rate, FX amount).
+- Each building in the diagram shows a health score badge (green / yellow / red) based on whether inventory is flowing, stalled, or depleted.
+- The health score is also shown as a badge in the company dashboard building list so players can triage broken supply chains at a glance without opening each building.
+
+## Market intelligence
+
+The **/market-intelligence** view provides competitive analysis data:
+
+- **Competition pie chart** inside the Public Sales unit detail panel: shows each seller's share of city demand for the current product, updated each tick.
+- **Resource price sparklines** on the global exchange view: per-resource mini charts of the last 50 ticks showing price trend at a glance.
+- Aggregate demand drivers panel: shows which of the five demand signals (salary, brand, quality, trend, price) is dominant for the current product/city combination, with a numeric factor for each.
+- Price recommendation engine: the UI suggests a price band (min / optimal / max) based on market demand, competitor pricing, and the base price benchmark.
+
+## Player notifications and alerts
+
+A bell icon in the navbar shows an unread notification badge.
+
+Notifications are created server-side by game events:
+- Mine resource deposits depleted below a threshold (configurable).
+- Loan approaching maturity.
+- Building construction or upgrade completed.
+- Share price movement beyond a threshold.
+- Competitor building appears in your city.
+
+Players can configure alert thresholds per notification type in account settings. Clicking the bell icon opens the notification panel; notifications are marked read on open.
+
+## City expansion and inter-city trade
+
+The game world contains multiple cities. Cities active at launch:
+
+| City | Currency | Region |
+|---|---|---|
+| Bratislava | EUR | Central Europe |
+| Prague | CZK | Central Europe |
+| Vienna | EUR | Central Europe |
+| Berlin | EUR | Western Europe |
+| Warsaw | PLN | Eastern Europe |
+
+Each city has independent resource abundance, salary levels, fuel price index, population, and economic health. Players can own buildings in multiple cities simultaneously.
+
+### Inter-city trade routes
+
+When a player's purchase unit buys from a B2B seller or global exchange in a different city, a **trade route** is created. Transit takes multiple ticks proportional to GPS distance.
+
+- Transit cost = `distanceKm × weightPerUnit × transitCostRatePerKmPerWeightUnit × fuelPriceIndex`.
+- The transit cost is shown on the purchase unit when the player selects the source seller.
+- Transit costs appear in the company ledger under the "Shipping" category and are visible in the administrator dashboard.
+- Shipping costs are never zero; even intra-city transfers have a minimum transport cost.
+
+The **/cities** overview page lists all active game cities with their population, economic health index, currency, and resource availability summary. Each city links to its interactive Leaflet map.
+
+## Building lifecycle
+
+### Building destruction
+
+A building owner can choose to demolish a building that has no active loans against it. The destruction workflow:
+
+1. Player initiates destruction from the building overview panel.
+2. A 72-tick countdown begins. During this time the building is locked (no unit upgrades, no new purchases).
+3. After 72 ticks the building is removed. The owner receives 80% of the original land purchase price credited back to the building's bank account.
+4. If the owner needs an immediate exit (for example in a forced sale scenario), a forced-sale discount option is offered at 90% of the market appraised value; this completes in 10 ticks but returns 10% less.
+5. A building that is currently used as loan collateral cannot be destroyed until the loan is fully repaid.
+
+### Building secondary market
+
+Buildings can be listed for sale on the in-game building market.
+
+- Owner marks a building "For Sale" and sets an asking price from the building overview panel.
+- A "For Sale" badge is shown on the building card in the dashboard and on the city map.
+- The **/buildings/market** page lists all buildings currently offered for sale, with filters for city, building type, and price range.
+- Interested buyers submit a purchase offer. The seller can accept, counter, or reject the offer.
+- On acceptance, ownership transfers atomically and the payment moves bank-account-to-bank-account. All loans against the building transfer to the new owner unless the loan terms prohibit it.
+- A building used as loan collateral can be listed but not transferred until the collateral is released.
+
+## Resource depletion and scarcity
+
+Mining buildings consume resource deposits over time. Each mine lot has a defined `materialQuantity` (tonnes equivalent) and `materialQuality` (0–100%).
+
+- Every tick a MINING unit extracts a quantity proportional to its level and the current deposit remaining.
+- As the deposit depletes, extraction rate follows a diminishing-returns curve: below 30% remaining the rate drops to 60% of nominal; below 10% it drops to 20%.
+- A `MineDepletionRecord` is written each tick with current remaining quantity.
+- When a deposit falls below 20% remaining, the game creates a player notification and shows a depletion progress bar in the **Mining Resource Status** panel on the building detail view.
+- Once per game year a `ResourceReplenishmentSchedule` event can partially refill depleted deposits (simulating geological timescales compressing). Players are notified when replenishment occurs.
+- Fully depleted mine lots still occupy the map but produce zero output. The owner may demolish the building to free the lot.
+
+## Seasonal demand
+
+Public sales volumes are modified by seasonal demand multipliers. Each product belongs to a demand seasonality category.
+
+- Seasonal multipliers are defined per product category per quarter (Q1 Jan–Mar, Q2 Apr–Jun, Q3 Jul–Sep, Q4 Oct–Nov).
+- Example: winter products (heating, food staples) peak in Q1/Q4; summer products (furniture, outdoor) peak in Q2/Q3.
+- The multiplier is applied in `PublicSalesPhase` on top of the base demand calculation.
+- The public sales unit detail panel shows the current season multiplier and a quarterly demand forecast chart so players can plan inventory.
+
+## In-game tutorials
+
+A guided tutorial system helps new players navigate key game mechanics after onboarding.
+
+- The **TutorialProgress** entity records which milestones each player has completed.
+- The **/tutorial** view shows a checklist of all tutorial milestones with their completion status and links to the relevant in-game view.
+- Contextual **TutorialTooltip** overlays appear on first visit to key pages (factory layout, exchange, bank loan form) explaining the main controls and what to do next.
+- Players can dismiss tooltips permanently or re-open them from the tutorial page.
+- Tutorial milestones include: purchase first resource, configure factory layout, set public sales price, make first sale, create a bank account, swap currencies, and buy shares.
+
+## Player profile and statistics
+
+Every player has a public profile accessible at **/player/:id**.
+
+The profile displays:
+- Display name with Pro badge if active subscription.
+- Join date (in game year).
+- Bio (editable by the player, max 160 chars).
+- Global leaderboard rank and total wealth in USD.
+- Company count, active cities, active building types, and total products sold.
+- Company equity breakdown.
+- **Hall of Fame** panel: highest single-tick revenue, largest single building acquisition price, and highest brand quality ever achieved (with brand name).
+
+Leaderboard rows link directly to the player profile page. A custom profile badge can be unlocked by completing specific master-ranking bounties and is visible on the leaderboard table and profile page.
+
+## Company growth and second IPO
+
+After a player's first company has been operational for at least one game year (8 760 ticks) and meets profitability prerequisites, the player can launch a second company through the **New Company IPO** flow accessible from the personal account dashboard.
+
+Prerequisites to unlock the CTA:
+- First company profitable for ≥ 365 ticks.
+- Personal USD balance ≥ $200 000.
+- Fewer than 5 active player-controlled companies.
+
+The IPO wizard mirrors the onboarding IPO step: player configures name, city, raise amount, and ownership split. On success the new company is provisioned with a bank account, founder shareholding, and ledger entries.
+
+The dashboard CTA shows a prerequisites checklist with a tooltip explaining each locked requirement when gates are not met.
+
+Maximum of **5 player-controlled companies** per person account. This prevents monopolistic lockout of all available lots while still enabling meaningful diversification.
+
+## City economic health
+
+A **City Economic Report** is computed each tax cycle and stored per city. The report aggregates: total salaries paid, total public sales revenue, number of active companies, total power consumption vs. supply, and average product quality index.
+
+An overall **economic health index** (0–100) is derived from these signals: 40% salary weight, 30% revenue, 15% power balance, 15% quality.
+
+The **City Health** mini-dashboard card on the city map page shows:
+- The numerical health index with a traffic-light colour (green ≥ 70, yellow 40–69, red < 40).
+- Sparkline trends for the last 10 tax cycles.
+- Full history accessible via a detail modal.
+
+Cities with a health index ≥ 70 experience +0.5% population growth per tax cycle. Cities below 40 experience −0.2% population erosion. This creates genuine city competition dynamics over long game years.
+
+## FX Exchange rates display
+
+The FX rates page shows all available currency pairs with a three-price display:
+- **Buy price** (ask): the rate a player pays to acquire the foreign currency.
+- **Mid price**: the theoretical mid-market rate used for valuation.
+- **Sell price** (bid): the rate a player receives when selling the foreign currency.
+
+Currency pairs are sorted by currency strength in this order: USD > EUR > CNY > GBP > INR > CZK > PLN.
+
+A **rate history chart** is available for any selected currency pair, showing the last 100 ticks of mid-price movement.
+
+The FX swap UI allows players to select source and destination bank accounts, displays the current balance for each account in the selector, defaults to the swap tab, and shows the converted amount in real time as the player types.
+
+## Country flags
+
+Country flags are displayed using the `country-flag-icons` npm package wherever cities or currencies appear:
+- City list on **/cities** overview page.
+- Footer language picker (shows flag of active locale country).
+- Context switcher city dropdown.
+- City map header.
+
+## Ranking enhancements
+
+- Each player row on the leaderboard links to that player's public profile page.
+- The currently authenticated player's row is highlighted (accent background) for easy self-location.
+- When navigating to the leaderboard, the pagination automatically scrolls to the page containing the current player's entry.
+- A link to the **master ranking** (cross-server, hosted on MasterApi) is shown at the top of the in-game leaderboard page.
+
+## Responsive design
+
+The game UI is designed and tested at four viewport categories:
+- **Mobile** (≤ 480 px): single-column layout, collapsible navigation, touch-optimised tap targets.
+- **Tablet** (481–1024 px): two-column content grids, side-by-side panels where space allows.
+- **Full HD** (1 920 × 1 080): default desktop target; all charts, tables, and grids optimised for this size.
+- **4K** (≥ 2 560 px): constrained max-widths to prevent excessively wide content, upscaled typography where appropriate.
+
+All Playwright E2E tests for player-facing views must include at least a mobile (375 px) and full HD (1 920 × 1 080) viewport assertion.
+
+## Security audits
+
+A security audit is conducted weekly by reviewing the audit log and running a structured threat model against the OWASP Top 10. The audit covers:
+- Whether any API mutation or query allows one player to gain an unfair advantage over another through unvalidated input, object-level authorisation bypass, or race conditions.
+- Whether server-controlled fields (tick counts, prices, balances, ownership) can be overridden by client-supplied input.
+- Findings are documented in `/audits/<YYYY-WW>.md` with risk severity, affected endpoint or component, and a remediation action plan.
+
+## Building destruction and forced exit (planned)
+
+See **Building lifecycle → Building destruction** above.
+
+- [ ] Implement 72-tick destruction countdown with locked-state enforcement.
+- [ ] Implement forced-sale fast exit (10-tick, 10% price discount).
+- [ ] Block destruction and forced sale when collateral loan is active.
+
+## News feed improvements (planned)
+
+- [ ] Add "Mark all as read" button to the news/changelog feed page.
+
+## Banking deposit rate management (planned)
+
+Bank owners can change the deposit interest rate they pay to depositors. The new rate applies with a 24-tick delay so depositors have time to withdraw before the rate change takes effect. The rate change applies uniformly to all deposit accounts held in that bank.
 
 # Technical implementation
 
