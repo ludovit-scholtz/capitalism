@@ -1406,3 +1406,25 @@ Root-cause of a recurring quality failure (May 2026, PR #236 NPC bot — repeate
 12. **For any orchestrator that has conditional logic in its tick loop (e.g., "if neutral/profitable do NOT call price adjustment"), always add integration tests proving the negative path (action is NOT taken).** Tests that only verify the positive path (action IS taken) leave a gap. The complementary set must be: (a) ShouldAct=true → service called; (b) ShouldAct=false (neutral) → service NOT called; (c) ShouldAct=false (profitable) → service NOT called.
 13. **For any property set during init and must NOT be overwritten during subsequent ticks (e.g., `TrackingStartTick`, `InitialNetWorth`), add an integration test that runs init + one tick and asserts the property matches the init-time value.** This prevents regressions where future refactoring accidentally resets tracking-baseline properties in the tick loop.
 14. **`bot.PendingRecommendation` semantics:** When `ShouldAct=false` (neutral/profitable), `PendingRecommendation` is set to the `NoAction` recommendation (not null). It is only cleared to `null` after a successful `ApplyAdjustmentAsync` call (when `ShouldAct=true`). Tests must distinguish between "PendingRecommendation is null" (action applied and cleared) and "PendingRecommendation.ShouldAct=false" (no action, last evaluation stored).
+
+## NPC bot orchestrator — RunOnboardingAsync internal profile fetch pattern
+
+Root-cause of a test authoring error (May 2026, BotAgentLifecycleTests.cs):
+- When testing `TickBotAsync` + onboarding-during-tick, the author enqueued only 4 profiles:
+  init-check, init-net-worth, tick-start, tick-post-onboarding.
+- But `RunOnboardingAsync` (line 142) itself calls `FetchProfileAsync` BEFORE `TickBotAsync` calls
+  it again at line 200 to set `InitialNetWorth`.
+- This consumed the 4th profile inside `RunOnboardingAsync`, leaving the queue empty for the
+  critical `InitialNetWorth` assignment, which then silently returned a default.
+
+**Exact profile-fetch sequence when `TickBotAsync` calls `RunOnboardingAsync`:**
+1. `InitialiseBotAsync` line 107 — onboarding check
+2. `InitialiseBotAsync` line 117 — definitive `InitialNetWorth`
+3. `TickBotAsync` line 194 — tick-start profile (incomplete → triggers `RunOnboardingAsync`)
+4. `RunOnboardingAsync` line 142 — post-`RunAsync` profile fetch (updates `bot.Profile`)
+5. `TickBotAsync` line 200 — final post-onboarding profile (sets `InitialNetWorth`)
+
+**Rules to prevent recurrence:**
+1. **When testing any code path that calls `RunOnboardingAsync`, enqueue 5 profiles for a single-tick run**, not 4. The 4th is consumed by `RunOnboardingAsync` internally; the 5th is the one that sets `InitialNetWorth` in `TickBotAsync`.
+2. **`StrategyRecommendation.NoAction.PriceAdjustmentFactor` is `0`, not `1`.** The `0` signals "no change" and `PriceAdjustmentService` guards against `ShouldAct=false` before reading this field. Do not assert `== 1` on the NoAction sentinel's factor.
+3. **`BotProfitCalculator.ComputeAnnualisedRatePercent` returns a `decimal` with potential fractional drift at tick-year boundaries.** Use `Assert.InRange(rate, 9.9m, 10.1m)` or `Math.Round` comparisons, not exact equality, when the input tick count is exactly a divisor of `ticksPerYear=8760`.
