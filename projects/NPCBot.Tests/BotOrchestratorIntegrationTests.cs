@@ -570,6 +570,223 @@ public sealed class BotOrchestratorIntegrationTests
         Assert.Null(bot.PendingRecommendation);
     }
 
+    // ── Tick-loop: price-adjustment guard (neutral and profitable bots) ──────
+
+    [Fact]
+    public async Task Tick_NeutralBot_PriceAdjustmentServiceNotCalled()
+    {
+        // A neutral bot (within ±2% net-worth change) must NOT trigger a price adjustment.
+        var accounts = new FakeAccountService();
+        var priceAdj = new FakePriceAdjustmentService();
+        var bot = MakeBot();
+
+        // Init: 100 000 net worth
+        var initProfile = CompletedProfile();
+        initProfile.Companies =
+        [
+            new CompanySummary { Id = "c1", Name = "Corp", Cash = 100_000m, Buildings = [] },
+        ];
+        accounts.EnqueueProfile(initProfile);
+        accounts.EnqueueProfile(initProfile); // post-init refresh
+        accounts.EnqueueGameState(new GameStateSummary { CurrentTick = 1 });
+
+        // Tick: +1% (within neutral band of ±2%)
+        var tickProfile = CompletedProfile();
+        tickProfile.Companies =
+        [
+            new CompanySummary { Id = "c1", Name = "Corp", Cash = 101_000m, Buildings = [] },
+        ];
+        accounts.EnqueueProfile(tickProfile);
+        accounts.EnqueueGameState(new GameStateSummary { CurrentTick = 20 }); // 19 ticks elapsed
+
+        using var cts = new CancellationTokenSource();
+        accounts.CancelCtsAfterGameStateFetch(cts, onCallN: 3);
+
+        var opts = new BotOptions { Enabled = true, PollIntervalSeconds = 0, MinTicksBeforeAdjustment = 5 };
+        var orchestrator = MakeOrchestrator(accounts, priceAdj: priceAdj, options: opts, bots: [bot]);
+        await orchestrator.RunAsync(cts.Token);
+
+        Assert.Equal(0, priceAdj.CallCount);
+    }
+
+    [Fact]
+    public async Task Tick_ProfitableBot_PriceAdjustmentServiceNotCalled()
+    {
+        // A profitable bot (+10% gain) must NOT trigger a price adjustment.
+        var accounts = new FakeAccountService();
+        var priceAdj = new FakePriceAdjustmentService();
+        var bot = MakeBot();
+
+        var initProfile = CompletedProfile();
+        initProfile.Companies =
+        [
+            new CompanySummary { Id = "c1", Name = "Corp", Cash = 100_000m, Buildings = [] },
+        ];
+        accounts.EnqueueProfile(initProfile);
+        accounts.EnqueueProfile(initProfile);
+        accounts.EnqueueGameState(new GameStateSummary { CurrentTick = 1 });
+
+        // Tick: +10% gain → Profitable → NoAction → no price adjustment
+        var tickProfile = CompletedProfile();
+        tickProfile.Companies =
+        [
+            new CompanySummary { Id = "c1", Name = "Corp", Cash = 110_000m, Buildings = [] },
+        ];
+        accounts.EnqueueProfile(tickProfile);
+        accounts.EnqueueGameState(new GameStateSummary { CurrentTick = 20 });
+
+        using var cts = new CancellationTokenSource();
+        accounts.CancelCtsAfterGameStateFetch(cts, onCallN: 3);
+
+        var opts = new BotOptions { Enabled = true, PollIntervalSeconds = 0, MinTicksBeforeAdjustment = 5 };
+        var orchestrator = MakeOrchestrator(accounts, priceAdj: priceAdj, options: opts, bots: [bot]);
+        await orchestrator.RunAsync(cts.Token);
+
+        Assert.Equal(0, priceAdj.CallCount);
+    }
+
+    [Fact]
+    public async Task Tick_NeutralBot_PendingRecommendationSetToNoActionNotNull()
+    {
+        // After a neutral tick the PendingRecommendation is still populated (ShouldAct=false);
+        // it is only cleared when an action is taken (ShouldAct=true then applied).
+        var accounts = new FakeAccountService();
+        var bot = MakeBot();
+
+        var initProfile = CompletedProfile();
+        initProfile.Companies =
+        [
+            new CompanySummary { Id = "c1", Name = "Corp", Cash = 100_000m, Buildings = [] },
+        ];
+        accounts.EnqueueProfile(initProfile);
+        accounts.EnqueueProfile(initProfile);
+        accounts.EnqueueGameState(new GameStateSummary { CurrentTick = 1 });
+
+        var tickProfile = CompletedProfile();
+        tickProfile.Companies =
+        [
+            new CompanySummary { Id = "c1", Name = "Corp", Cash = 101_000m, Buildings = [] },
+        ];
+        accounts.EnqueueProfile(tickProfile);
+        accounts.EnqueueGameState(new GameStateSummary { CurrentTick = 20 });
+
+        using var cts = new CancellationTokenSource();
+        accounts.CancelCtsAfterGameStateFetch(cts, onCallN: 3);
+
+        var opts = new BotOptions { Enabled = true, PollIntervalSeconds = 0, MinTicksBeforeAdjustment = 5 };
+        var orchestrator = MakeOrchestrator(accounts, options: opts, bots: [bot]);
+        await orchestrator.RunAsync(cts.Token);
+
+        Assert.NotNull(bot.PendingRecommendation);
+        Assert.False(bot.PendingRecommendation!.ShouldAct);
+    }
+
+    [Fact]
+    public async Task Tick_TrackingStartTickNotOverwrittenDuringTick()
+    {
+        // TrackingStartTick is set during init and must not change during subsequent ticks.
+        var accounts = new FakeAccountService();
+        var bot = MakeBot();
+
+        accounts.EnqueueGameState(new GameStateSummary { CurrentTick = 42 }); // init
+        accounts.EnqueueProfile(CompletedProfile());
+        accounts.EnqueueProfile(CompletedProfile());
+
+        accounts.EnqueueGameState(new GameStateSummary { CurrentTick = 100 }); // tick
+        accounts.EnqueueProfile(CompletedProfile());
+
+        using var cts = new CancellationTokenSource();
+        accounts.CancelCtsAfterGameStateFetch(cts, onCallN: 3);
+
+        var opts = new BotOptions { Enabled = true, PollIntervalSeconds = 0 };
+        var orchestrator = MakeOrchestrator(accounts, options: opts, bots: [bot]);
+        await orchestrator.RunAsync(cts.Token);
+
+        // TrackingStartTick is only set during InitialiseBotAsync (from init game-state tick 42)
+        Assert.Equal(42L, bot.TrackingStartTick);
+    }
+
+    // ── Init: TrackingStartTick is set to the current game tick ──────────────
+
+    [Fact]
+    public async Task Init_SetsTrackingStartTickToCurrentTick()
+    {
+        // After initialization, TrackingStartTick must equal the game tick fetched during init.
+        var accounts = new FakeAccountService();
+        var bot = MakeBot();
+
+        accounts.EnqueueGameState(new GameStateSummary { CurrentTick = 42 });
+        accounts.EnqueueProfile(CompletedProfile());
+        accounts.EnqueueProfile(CompletedProfile());
+
+        using var cts = new CancellationTokenSource();
+        cts.CancelAfter(TimeSpan.FromMilliseconds(300));
+
+        var orchestrator = MakeOrchestrator(
+            accounts,
+            options: new BotOptions { Enabled = true, PollIntervalSeconds = 60 },
+            bots: [bot]);
+        await orchestrator.RunAsync(cts.Token);
+
+        Assert.Equal(42L, bot.TrackingStartTick);
+    }
+
+    // ── Tick: LastSuccessUtc updated on successful tick ───────────────────────
+
+    [Fact]
+    public async Task Tick_SuccessfulTick_UpdatesLastSuccessUtc()
+    {
+        var accounts = new FakeAccountService();
+        var bot = MakeBot();
+        var beforeTest = DateTime.UtcNow.AddSeconds(-1);
+
+        accounts.EnqueueProfile(CompletedProfile());
+        accounts.EnqueueProfile(CompletedProfile());
+        accounts.EnqueueGameState(new GameStateSummary { CurrentTick = 1 });
+
+        accounts.EnqueueProfile(CompletedProfile());
+        accounts.EnqueueGameState(new GameStateSummary { CurrentTick = 2 });
+
+        using var cts = new CancellationTokenSource();
+        accounts.CancelCtsAfterGameStateFetch(cts, onCallN: 3);
+
+        var opts = new BotOptions { Enabled = true, PollIntervalSeconds = 0 };
+        var orchestrator = MakeOrchestrator(accounts, options: opts, bots: [bot]);
+        await orchestrator.RunAsync(cts.Token);
+
+        Assert.NotNull(bot.LastSuccessUtc);
+        Assert.True(bot.LastSuccessUtc >= beforeTest);
+    }
+
+    // ── Init: onboarding exception handling ──────────────────────────────────
+
+    [Fact]
+    public async Task Init_OnboardingThrows_IncrementsConsecutiveErrors()
+    {
+        // When onboarding throws, ConsecutiveErrors must be incremented and the
+        // onboarding service must have been called exactly once.
+        var accounts = new FakeAccountService();
+        var onboarding = new FakeOnboardingService
+        {
+            Exception = new InvalidOperationException("Onboarding server unavailable"),
+        };
+        var bot = MakeBot();
+
+        // First profile fetch returns incomplete → triggers onboarding attempt
+        accounts.EnqueueProfile(IncompleteProfile());
+        accounts.EnqueueGameState(new GameStateSummary { CurrentTick = 1 });
+
+        using var cts = new CancellationTokenSource();
+        cts.CancelAfter(TimeSpan.FromMilliseconds(200));
+
+        var orchestrator = MakeOrchestrator(accounts, onboarding: onboarding, bots: [bot]);
+        await orchestrator.RunAsync(cts.Token);
+
+        Assert.True(bot.ConsecutiveErrors >= 1, "Failed onboarding must increment ConsecutiveErrors.");
+        Assert.Equal(1, onboarding.CallCount);
+        Assert.False(bot.IsSkipped, "Bot must not be skipped after a single failure (MaxConsecutiveErrors = 5).");
+    }
+
     // ── Tick-loop: error handling ─────────────────────────────────────────────
 
     [Fact]
