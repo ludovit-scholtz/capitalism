@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
+import CountryFlag from '@/components/common/CountryFlag.vue'
 
 const { t } = useI18n()
 
@@ -52,22 +53,6 @@ const CITIES_QUERY = `
 `
 
 const TOP_RESOURCES_DISPLAY_LIMIT = 4
-
-const COUNTRY_FLAGS: Record<string, string> = {
-  SK: '🇸🇰',
-  CZ: '🇨🇿',
-  AT: '🇦🇹',
-  US: '🇺🇸',
-  GB: '🇬🇧',
-  CN: '🇨🇳',
-  IN: '🇮🇳',
-  DE: '🇩🇪',
-  PL: '🇵🇱',
-}
-
-function getFlag(countryCode: string): string {
-  return COUNTRY_FLAGS[countryCode] ?? '🌍'
-}
 
 function formatPopulation(population: number): string {
   if (population >= 1_000_000) {
@@ -154,7 +139,7 @@ onMounted(() => {
         <div v-for="city in cities" :key="city.id" class="city-card bg-card border border-divider rounded-xl p-5 hover:border-brand transition-colors">
           <!-- City header -->
           <div class="flex items-center gap-3 mb-4">
-            <span class="text-3xl" :aria-label="city.countryCode">{{ getFlag(city.countryCode) }}</span>
+            <CountryFlag :country-code="city.countryCode" size="lg" :title="city.countryCode" class="city-flag" />
             <div class="flex-1 min-w-0">
               <h2 class="text-lg font-bold truncate">{{ city.name }}</h2>
               <p class="text-[0.78rem] text-muted">{{ city.countryCode }} · {{ city.currencyCode }}</p>

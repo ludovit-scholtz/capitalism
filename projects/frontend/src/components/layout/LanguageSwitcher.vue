@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { SUPPORTED_LOCALES, persistLocale, type SupportedLocale } from '@/i18n'
+import CountryFlag from '@/components/common/CountryFlag.vue'
+import { getLocaleFlagCode } from '@/lib/countryFlags'
 
 const { locale, t } = useI18n()
 
@@ -18,12 +20,18 @@ function setLocale(newLocale: SupportedLocale) {
         v-for="loc in SUPPORTED_LOCALES"
         :key="loc"
         :class="[
-          'language-btn min-w-8 border-0 px-2 py-1 text-center text-xs font-semibold transition-colors',
+          'language-btn inline-flex items-center gap-1.5 border-0 px-2 py-1 text-xs font-semibold transition-colors',
           locale === loc ? 'active bg-brand text-white hover:bg-brand-hover' : 'bg-card-raised text-muted hover:bg-card hover:text-body',
         ]"
         @click="setLocale(loc)"
         :aria-pressed="locale === loc"
       >
+        <CountryFlag
+          v-if="getLocaleFlagCode(loc)"
+          :country-code="getLocaleFlagCode(loc)!"
+          size="sm"
+          :title="t(`languages.${loc}`)"
+        />
         {{ t(`languages.${loc}`) }}
       </button>
     </div>
