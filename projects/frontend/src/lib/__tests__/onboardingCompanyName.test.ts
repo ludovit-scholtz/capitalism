@@ -312,7 +312,7 @@ describe('generateOnboardingCompanyName', () => {
     // Spot-check a few representative words to guard against accidental list swaps
     expect(foodWords).toContain('Harvest')
     expect(foodWords).toContain('Grain')
-    expect(foodWords).toContain('Artisan')
+    expect(foodWords).toContain('Brewer')
   })
 
   it('HEALTHCARE word list contains expected medical words', () => {
@@ -390,15 +390,15 @@ describe('generateOnboardingCompanyName', () => {
 
   it('PHARMACEUTICALS word list contains expected pharma/biotech words', () => {
     const words = industryWords['PHARMACEUTICALS']!
-    expect(words).toContain('Helix')
-    expect(words).toContain('Curative')
-    expect(words).toContain('Medic')
+    expect(words).toContain('Scienta')
+    expect(words).toContain('Pharmex')
+    expect(words).toContain('Clineva')
   })
 
   it('ENERGY word list contains expected energy/power words', () => {
     const words = industryWords['ENERGY']!
     expect(words).toContain('Solaris')
-    expect(words).toContain('Voltaic')
+    expect(words).toContain('Wattcore')
     expect(words).toContain('Kinetic')
   })
 
@@ -436,5 +436,65 @@ describe('generateOnboardingCompanyName', () => {
   it('no businessSuffixes duplicates', () => {
     const unique = new Set(businessSuffixes)
     expect(unique.size).toBe(businessSuffixes.length)
+  })
+
+  it('no word appears in more than one industry word list (cross-industry uniqueness)', () => {
+    const allIndustries = Object.keys(industryWords)
+    const wordToIndustries: Record<string, string[]> = {}
+    for (const industry of allIndustries) {
+      for (const word of industryWords[industry]!) {
+        if (!wordToIndustries[word]) wordToIndustries[word] = []
+        wordToIndustries[word]!.push(industry)
+      }
+    }
+    const duplicates = Object.entries(wordToIndustries).filter(([, inds]) => inds.length > 1)
+    expect(duplicates).toHaveLength(0)
+  })
+
+  it('PHARMACEUTICALS first word appears in the known pharmaceuticals word list (10 calls spot check)', () => {
+    const pharmaWords = industryWords['PHARMACEUTICALS']!
+    resetNameSession('PHARMACEUTICALS:first-word')
+    for (let i = 0; i < 10; i++) {
+      const name = generateOnboardingCompanyName('PHARMACEUTICALS')
+      const firstWord = name.split(' ')[0]!
+      expect(pharmaWords).toContain(firstWord)
+    }
+  })
+
+  it('LOGISTICS first word appears in the known logistics word list (10 calls spot check)', () => {
+    const logisticsWords = industryWords['LOGISTICS']!
+    resetNameSession('LOGISTICS:first-word')
+    for (let i = 0; i < 10; i++) {
+      const name = generateOnboardingCompanyName('LOGISTICS')
+      const firstWord = name.split(' ')[0]!
+      expect(logisticsWords).toContain(firstWord)
+    }
+  })
+
+  it('ELECTRONICS first word appears in the known electronics word list (10 calls spot check)', () => {
+    const electronicsWords = industryWords['ELECTRONICS']!
+    resetNameSession('ELECTRONICS:first-word')
+    for (let i = 0; i < 10; i++) {
+      const name = generateOnboardingCompanyName('ELECTRONICS')
+      const firstWord = name.split(' ')[0]!
+      expect(electronicsWords).toContain(firstWord)
+    }
+  })
+
+  it('FURNITURE word list contains expected wood/craftmanship words', () => {
+    const words = industryWords['FURNITURE']!
+    expect(words).toContain('Oak')
+    expect(words).toContain('Craftwood')
+    expect(words).toContain('Mahogany')
+  })
+
+  it('FURNITURE first word appears in the known furniture word list (10 calls spot check)', () => {
+    const furnitureWords = industryWords['FURNITURE']!
+    resetNameSession('FURNITURE:first-word')
+    for (let i = 0; i < 10; i++) {
+      const name = generateOnboardingCompanyName('FURNITURE')
+      const firstWord = name.split(' ')[0]!
+      expect(furnitureWords).toContain(firstWord)
+    }
   })
 })

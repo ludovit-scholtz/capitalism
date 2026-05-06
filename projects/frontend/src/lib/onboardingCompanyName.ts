@@ -9,13 +9,13 @@ import { uniqueNamesGenerator } from 'unique-names-generator'
 export const industryWords: Record<string, string[]> = {
   FURNITURE: [
     'Oak', 'Timber', 'Cedar', 'Maple', 'Walnut', 'Birch', 'Pine', 'Teak',
-    'Redwood', 'Ironwood', 'Crafted', 'Artisan', 'Heritage', 'Classic', 'Ember',
+    'Redwood', 'Ironwood', 'Crafted', 'Craftwood', 'Laurelwood', 'Classic', 'Cherrywood',
     'Ashwood', 'Elmwood', 'Mahogany', 'Rosewood', 'Sandalwood',
   ],
   FOOD_PROCESSING: [
-    'Harvest', 'Golden', 'Granary', 'Valley', 'Meadow', 'Artisan', 'Heritage',
+    'Harvest', 'Golden', 'Granary', 'Valley', 'Meadow', 'Brewer', 'Savorex',
     'Fresh', 'Prime', 'Grain', 'Sunrise', 'Orchard', 'Bloom', 'Pastoral',
-    'Crofton', 'Millstone', 'Vantage', 'Barley', 'Amber', 'Verdant',
+    'Crofton', 'Millstone', 'Croftsman', 'Barley', 'Amber', 'Verdant',
   ],
   HEALTHCARE: [
     'Vital', 'Nova', 'Remedy', 'Shield', 'Helix', 'Apex', 'Synapse',
@@ -25,23 +25,23 @@ export const industryWords: Record<string, string[]> = {
   ELECTRONICS: [
     'Circuit', 'Silicon', 'Quantum', 'Pixel', 'Pulse', 'Nano', 'Logic',
     'Voltaic', 'CoreTech', 'Axiom', 'Nexon', 'Syntek', 'Byte', 'Lattice',
-    'Photon', 'Hexagon', 'Vertex', 'Primus', 'Orbis', 'Telaris',
+    'Photon', 'Hexagon', 'Vertex', 'Microcore', 'Orbis', 'Telaris',
   ],
   CONSTRUCTION: [
     'Bedrock', 'Summit', 'Keystone', 'Ironclad', 'Pillar', 'Granite',
-    'Crest', 'Foundry', 'Basalt', 'Vantage', 'Stronghold', 'Arcstone',
+    'Crest', 'Foundry', 'Basalt', 'Bulwark', 'Stronghold', 'Arcstone',
     'Trident', 'Rampart', 'Citadel', 'Solida', 'Terrafirm', 'Pinnacle',
     'Masonry', 'Cornerstone',
   ],
   PHARMACEUTICALS: [
-    'Helix', 'Vita', 'Novex', 'Synapse', 'Curative', 'Medic', 'Lumena',
+    'Scienta', 'Vita', 'Novex', 'Biospan', 'Pharmex', 'Clineva', 'Lumena',
     'Apharma', 'Zoria', 'GenoPlex', 'Theravo', 'Biovanta', 'Cellex',
-    'Primus', 'Vitalora', 'Zenova', 'Pharmasol', 'Clinex', 'Medivance',
+    'Therapeutix', 'Vitalora', 'Genexis', 'Pharmasol', 'Clinex', 'Medivance',
     'Revitare',
   ],
   ENERGY: [
-    'Solaris', 'Kinetic', 'Radiant', 'Dynamo', 'Fusion', 'Horizon', 'Ember',
-    'Voltaic', 'Wattex', 'GridTech', 'PowerCo', 'Voltan', 'Lumex',
+    'Solaris', 'Kinetic', 'Radiant', 'Dynamo', 'Fusion', 'Horizon', 'Ignition',
+    'Wattcore', 'Wattex', 'GridTech', 'PowerCo', 'Voltan', 'Lumex',
     'Ampere', 'Therma', 'Photona', 'Polaris', 'Celero', 'Novagen', 'Electra',
   ],
   LOGISTICS: [
