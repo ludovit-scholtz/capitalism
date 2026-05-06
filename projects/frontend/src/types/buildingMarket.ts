@@ -18,6 +18,7 @@ export interface MarketBuilding {
   level: number
   isForSale: boolean
   askingPrice: number | null
+  listedAtUtc: string | null
   city: MarketCity
   company: MarketCompany
 }

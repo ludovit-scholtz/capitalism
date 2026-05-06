@@ -732,4 +732,178 @@ public sealed class BuildingSecondaryMarketTests
         Assert.DoesNotContain(listings.EnumerateArray(), l =>
             l.GetProperty("building").GetProperty("name").GetString() == "PR Factory");
     }
+
+    [Fact]
+    public async Task SetBuildingForSale_SetsListedAtUtc_WhenListing()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "listed-at1@market.test");
+        var (buildingId, _, _) = await SeedOwnerWithBuildingAsync(factory, token);
+
+        var before = DateTime.UtcNow.AddSeconds(-2);
+        await ExecAsync(client,
+            "mutation S($i: SetBuildingForSaleInput!) { setBuildingForSale(input: $i) { id } }",
+            new { i = new { buildingId, isForSale = true, askingPrice = 1_000_000m } },
+            token);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var building = await db.Buildings.FindAsync(buildingId);
+        Assert.NotNull(building!.ListedAtUtc);
+        Assert.True(building.ListedAtUtc.Value > before);
+    }
+
+    [Fact]
+    public async Task SetBuildingForSale_ClearsListedAtUtc_WhenUnlisting()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "listed-at2@market.test");
+        var (buildingId, _, _) = await SeedOwnerWithBuildingAsync(factory, token);
+
+        // First list it
+        await ExecAsync(client,
+            "mutation S($i: SetBuildingForSaleInput!) { setBuildingForSale(input: $i) { id } }",
+            new { i = new { buildingId, isForSale = true, askingPrice = 500_000m } },
+            token);
+
+        // Then unlist
+        await ExecAsync(client,
+            "mutation S($i: SetBuildingForSaleInput!) { setBuildingForSale(input: $i) { id } }",
+            new { i = new { buildingId, isForSale = false, askingPrice = (decimal?)null } },
+            token);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var building = await db.Buildings.FindAsync(buildingId);
+        Assert.Null(building!.ListedAtUtc);
+    }
+
+    [Fact]
+    public async Task SetBuildingForSale_RejectsListing_WhenBuildingIsActiveCollateral()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "collateral1@market.test");
+        var (buildingId, companyId, bankAccountId) = await SeedOwnerWithBuildingAsync(factory, token);
+
+        // Seed an active loan with this building as collateral
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Loans.Add(new Loan
+        {
+            Id = Guid.NewGuid(),
+            LoanOfferId = Guid.NewGuid(),      // not enforced by InMemory
+            BorrowerCompanyId = companyId,
+            BankBuildingId = Guid.NewGuid(),   // not enforced by InMemory
+            LenderCompanyId = Guid.NewGuid(),  // not enforced by InMemory
+            OriginalPrincipal = 500_000m,
+            RemainingPrincipal = 500_000m,
+            AnnualInterestRatePercent = 8m,
+            DurationTicks = 1440L,
+            StartTick = 0L,
+            DueTick = 1440L,
+            NextPaymentTick = 720L,
+            PaymentAmount = 10_000m,
+            TotalPayments = 10,
+            Status = LoanStatus.Active,
+            CollateralBuildingId = buildingId,
+            CollateralAppraisedValue = 1_000_000m,
+            AcceptedAtUtc = DateTime.UtcNow,
+        });
+        await db.SaveChangesAsync();
+
+        var result = await ExecAsync(client,
+            "mutation S($i: SetBuildingForSaleInput!) { setBuildingForSale(input: $i) { id } }",
+            new { i = new { buildingId, isForSale = true, askingPrice = 1_000_000m } },
+            token);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0);
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("BUILDING_IS_COLLATERAL", code);
+    }
+
+    [Fact]
+    public async Task SetBuildingForSale_AllowsListing_WhenPriorLoanIsRepaid()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "collateral2@market.test");
+        var (buildingId, companyId, bankAccountId) = await SeedOwnerWithBuildingAsync(factory, token);
+
+        // Seed a REPAID loan (should not block listing)
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Loans.Add(new Loan
+        {
+            Id = Guid.NewGuid(),
+            LoanOfferId = Guid.NewGuid(),      // not enforced by InMemory
+            BorrowerCompanyId = companyId,
+            BankBuildingId = Guid.NewGuid(),   // not enforced by InMemory
+            LenderCompanyId = Guid.NewGuid(),  // not enforced by InMemory
+            OriginalPrincipal = 500_000m,
+            RemainingPrincipal = 0m,
+            AnnualInterestRatePercent = 8m,
+            DurationTicks = 1440L,
+            StartTick = 0L,
+            DueTick = 1440L,
+            NextPaymentTick = 1440L,
+            PaymentAmount = 10_000m,
+            TotalPayments = 10,
+            Status = LoanStatus.Repaid,
+            CollateralBuildingId = buildingId,
+            CollateralAppraisedValue = 1_000_000m,
+            AcceptedAtUtc = DateTime.UtcNow.AddDays(-30),
+            ClosedAtUtc = DateTime.UtcNow.AddDays(-1),
+        });
+        await db.SaveChangesAsync();
+
+        var result = await ExecAsync(client,
+            "mutation S($i: SetBuildingForSaleInput!) { setBuildingForSale(input: $i) { id isForSale } }",
+            new { i = new { buildingId, isForSale = true, askingPrice = 1_000_000m } },
+            token);
+
+        var bld = result.GetProperty("data").GetProperty("setBuildingForSale");
+        Assert.True(bld.GetProperty("isForSale").GetBoolean());
+    }
+
+    [Fact]
+    public async Task SetBuildingForSale_RejectsListing_WhenAskingPriceIsZero()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "price-zero@market.test");
+        var (buildingId, _, _) = await SeedOwnerWithBuildingAsync(factory, token);
+
+        var result = await ExecAsync(client,
+            "mutation S($i: SetBuildingForSaleInput!) { setBuildingForSale(input: $i) { id } }",
+            new { i = new { buildingId, isForSale = true, askingPrice = 0m } },
+            token);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0);
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("INVALID_ASKING_PRICE", code);
+    }
+
+    [Fact]
+    public async Task SetBuildingForSale_RejectsListing_WhenAskingPriceIsNegative()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "price-neg@market.test");
+        var (buildingId, _, _) = await SeedOwnerWithBuildingAsync(factory, token);
+
+        var result = await ExecAsync(client,
+            "mutation S($i: SetBuildingForSaleInput!) { setBuildingForSale(input: $i) { id } }",
+            new { i = new { buildingId, isForSale = true, askingPrice = -1000m } },
+            token);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0);
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("INVALID_ASKING_PRICE", code);
+    }
 }

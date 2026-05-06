@@ -2,6 +2,7 @@
 import { inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
+import { formatCurrency } from '@/lib/loanHelpers'
 
 const { t } = useI18n()
 const bd = inject(BUILDING_DETAIL_KEY)!
@@ -13,6 +14,8 @@ const {
   openSaleDialog,
   closeSaleDialog,
   setBuildingForSale,
+  estimatedMarketValue,
+  cityCurrencyCode,
   formatBuildingType,
   isBuildingUsedAsCollateral,
 } = bd
@@ -78,23 +81,44 @@ const {
           <h3 class="text-lg font-semibold text-foreground">{{ t('buildingDetail.sellBuilding') }}</h3>
           <button class="btn btn-ghost" @click="closeSaleDialog">{{ t('common.close') }}</button>
         </div>
-        <div class="sale-dialog-body">
-          <label class="form-label">{{ t('buildingDetail.askingPrice') }}</label>
-          <input
-            type="number"
-            class="form-input"
-            :placeholder="t('buildingDetail.askingPricePlaceholder')"
-            :value="salePrice"
-            @input="salePrice = isNaN(($event.target as HTMLInputElement).valueAsNumber) ? null : ($event.target as HTMLInputElement).valueAsNumber"
-            min="0"
-            step="1000"
-          />
-          <div class="sale-dialog-actions">
-            <button class="btn btn-primary" :disabled="savingSale || !salePrice || salePrice <= 0" @click="setBuildingForSale(true)">
+        <div class="sale-dialog-body space-y-4">
+          <!-- Estimated market value reference -->
+          <div
+            v-if="estimatedMarketValue"
+            class="estimated-market-value rounded-lg border border-divider bg-surface px-4 py-3"
+          >
+            <p class="mb-0.5 text-xs text-muted">{{ t('buildingDetail.estimatedMarketValue') }}</p>
+            <p class="estimated-value text-base font-semibold text-foreground">
+              {{ formatCurrency(estimatedMarketValue ?? 0, cityCurrencyCode) }}
+            </p>
+            <p class="mt-0.5 text-xs text-muted">{{ t('buildingDetail.estimatedValueHint') }}</p>
+          </div>
+
+          <div>
+            <label class="form-label">{{ t('buildingDetail.askingPrice') }}</label>
+            <input
+              type="number"
+              class="form-input"
+              :placeholder="t('buildingDetail.askingPricePlaceholder')"
+              :value="salePrice"
+              @input="salePrice = isNaN(($event.target as HTMLInputElement).valueAsNumber) ? null : ($event.target as HTMLInputElement).valueAsNumber"
+              min="1"
+              step="1000"
+            />
+            <p v-if="salePrice !== null && salePrice <= 0" class="mt-1 text-xs text-red-500">
+              {{ t('buildingDetail.askingPriceMustBePositive') }}
+            </p>
+          </div>
+
+          <div class="sale-dialog-actions flex gap-2">
+            <button class="btn btn-primary flex-1" :disabled="savingSale || !salePrice || salePrice <= 0" @click="setBuildingForSale(true)">
               {{ t('buildingDetail.listForSale') }}
             </button>
             <button v-if="building?.isForSale" class="btn btn-danger" :disabled="savingSale" @click="setBuildingForSale(false)">
               {{ t('buildingDetail.cancelSale') }}
+            </button>
+            <button class="btn btn-secondary" :disabled="savingSale" @click="closeSaleDialog">
+              {{ t('common.cancel') }}
             </button>
           </div>
         </div>

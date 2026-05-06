@@ -33,8 +33,36 @@ public sealed partial class Mutation
                     .Build());
         }
 
+        if (input.IsForSale)
+        {
+            // Validate asking price is positive
+            if (!input.AskingPrice.HasValue || input.AskingPrice.Value <= 0m)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("Asking price must be a positive value.")
+                        .SetCode("INVALID_ASKING_PRICE")
+                        .Build());
+            }
+
+            // Prevent listing a building that is pledged as collateral on an active loan
+            var isCollateral = await db.Loans.AnyAsync(l =>
+                l.CollateralBuildingId == input.BuildingId &&
+                (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue || l.Status == LoanStatus.Defaulted));
+
+            if (isCollateral)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("This building is pledged as collateral for an active loan and cannot be listed for sale.")
+                        .SetCode("BUILDING_IS_COLLATERAL")
+                        .Build());
+            }
+        }
+
         building.IsForSale = input.IsForSale;
         building.AskingPrice = input.IsForSale ? input.AskingPrice : null;
+        building.ListedAtUtc = input.IsForSale ? DateTime.UtcNow : null;
 
         await db.SaveChangesAsync();
         return building;

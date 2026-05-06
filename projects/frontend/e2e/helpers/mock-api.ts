@@ -181,6 +181,7 @@ export type MockBuilding = {
   powerConsumption: number
   isForSale: boolean
   askingPrice?: number | null
+  listedAtUtc?: string | null
   pricePerSqm?: number | null
   occupancyPercent?: number | null
   totalAreaSqm?: number | null
@@ -1134,6 +1135,7 @@ export interface MockBuildingMarketListing {
     type: string
     isForSale: boolean
     askingPrice: number | null
+    listedAtUtc: string | null
     level: number
     city: { id: string; name: string; currencyCode: string; countryCode: string }
     company: { id: string; name: string; player: { displayName: string } }
@@ -1158,6 +1160,7 @@ export interface MockBuildingMarketMyListing {
     type: string
     isForSale: boolean
     askingPrice: number | null
+    listedAtUtc: string | null
     level: number
     city: { id: string; name: string; currencyCode: string }
     company: { id: string; name: string }
@@ -4505,11 +4508,12 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
       building.isForSale = input.isForSale
       building.askingPrice = input.isForSale ? input.askingPrice : null
+      building.listedAtUtc = input.isForSale ? new Date().toISOString() : null
 
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { setBuildingForSale: { id: building.id, isForSale: building.isForSale, askingPrice: building.askingPrice } } }),
+        body: JSON.stringify({ data: { setBuildingForSale: { id: building.id, isForSale: building.isForSale, askingPrice: building.askingPrice, listedAtUtc: building.listedAtUtc } } }),
       })
     }
 

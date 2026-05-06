@@ -49,6 +49,9 @@ public sealed class Building
     /// <summary>Asking price if the building is for sale.</summary>
     public decimal? AskingPrice { get; set; }
 
+    /// <summary>UTC timestamp when the building was listed for sale. Null when not listed.</summary>
+    public DateTime? ListedAtUtc { get; set; }
+
     /// <summary>Price per m² for apartment and commercial buildings.</summary>
     public decimal? PricePerSqm { get; set; }
 

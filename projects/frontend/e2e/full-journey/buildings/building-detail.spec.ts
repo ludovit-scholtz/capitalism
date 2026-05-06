@@ -540,6 +540,144 @@ test.describe('Building detail upgrades', () => {
     await expect(page.locator('.meta-pill.for-sale')).toBeVisible()
   })
 
+  test('sell building button is disabled and shows warning when building is active collateral', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-collateral',
+      playerId: player.id,
+      name: 'Collateral Test Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-collateral',
+          companyId: 'company-collateral',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Collateral Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    // Seed an active loan with this building as collateral
+    state.myLoans = [
+      {
+        id: 'loan-collateral-1',
+        loanOfferId: 'offer-1',
+        borrowerCompanyId: 'company-collateral',
+        borrowerCompanyName: 'Collateral Test Co',
+        lenderCompanyId: 'bank-co',
+        lenderCompanyName: 'Big Bank',
+        bankBuildingId: 'bank-building-1',
+        bankBuildingName: 'City Bank',
+        originalPrincipal: 500000,
+        remainingPrincipal: 400000,
+        annualInterestRatePercent: 8,
+        durationTicks: 1440,
+        startTick: 0,
+        dueTick: 1440,
+        nextPaymentTick: 720,
+        paymentAmount: 10000,
+        paymentsMade: 1,
+        totalPayments: 10,
+        status: 'ACTIVE',
+        missedPayments: 0,
+        accumulatedPenalty: 0,
+        acceptedAtUtc: '2026-01-01T00:00:00Z',
+        closedAtUtc: null,
+        collateralBuildingId: 'building-collateral',
+        collateralBuildingName: 'Collateral Factory',
+        collateralAppraisedValue: 1000000,
+      },
+    ]
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-collateral')
+    await expect(page.getByRole('heading', { name: 'Collateral Factory' })).toBeVisible()
+
+    // Sell Building button should be disabled
+    const sellBtn = page.getByRole('button', { name: 'Sell Building' })
+    await expect(sellBtn).toBeVisible()
+    await expect(sellBtn).toBeDisabled()
+
+    // Warning message should be visible
+    await expect(page.locator('.collateral-warning')).toBeVisible()
+  })
+
+  test('sell building dialog validates that asking price must be positive', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-price-validation',
+      playerId: player.id,
+      name: 'Price Validation Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-price-validation',
+          companyId: 'company-price-validation',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Validation Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-price-validation')
+    await expect(page.getByRole('heading', { name: 'Validation Factory' })).toBeVisible()
+
+    // Open sell dialog
+    await page.getByRole('button', { name: 'Sell Building' }).click()
+    await expect(page.locator('.sale-dialog')).toBeVisible()
+
+    // The estimated market value reference should be displayed
+    await expect(page.locator('.estimated-market-value')).toBeVisible()
+
+    // List for Sale button should be disabled when no price entered
+    const listBtn = page.getByRole('button', { name: 'List for Sale' })
+    await expect(listBtn).toBeDisabled()
+
+    // Enter invalid price (zero)
+    await page.locator('.sale-dialog .form-input').fill('0')
+    // The validation error message should appear and button remain disabled
+    await expect(page.locator('.sale-dialog')).toContainText('greater than zero')
+    await expect(listBtn).toBeDisabled()
+
+    // Enter valid price
+    await page.locator('.sale-dialog .form-input').fill('50000')
+    await expect(listBtn).toBeEnabled()
+  })
+
   test('shows building overview stats and opens the city map focused on the building lot', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({
