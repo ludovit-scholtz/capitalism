@@ -17,6 +17,10 @@ public sealed class RegisterInput
     /// <summary>Password (minimum 8 characters).</summary>
     [Required, MinLength(8)]
     public string Password { get; set; } = string.Empty;
+
+    /// <summary>Optional referral code applied during registration. Maximum 20 characters.</summary>
+    [MaxLength(20)]
+    public string? ReferralCode { get; set; }
 }
 
 /// <summary>Input for player login.</summary>

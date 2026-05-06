@@ -283,6 +283,11 @@ export default {
     metricsAria: 'Referral metrics',
     referralCode: 'Referral code',
     registeredUsers: 'Registered users',
+    shareLinksTitle: 'Shareable referral links',
+    shareLinksSubtitle: 'Copy a link and share it with friends. New players who register via your link will receive a 10% discount on in-game purchases.',
+    copyLink: 'Copy link',
+    linkCopied: 'Copied!',
+    serverLoadFailed: 'Could not load game servers. Shareable links are temporarily unavailable.',
   },
   support: {
     title: 'Support Tickets',

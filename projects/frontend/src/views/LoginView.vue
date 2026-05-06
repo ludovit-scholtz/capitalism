@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
+import { useReferralStore } from '@/stores/referral'
 import {
   generatePersonalAccountName,
   resetPersonalNameSession,
@@ -12,6 +13,7 @@ const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
+const referralStore = useReferralStore()
 
 const isRegister = ref(false)
 const email = ref('')
@@ -22,6 +24,8 @@ const requiresConsentRetry = computed(() => route.query.oidc_retry === 'consent'
 const showsDriveAccessHint = computed(
   () => requiresConsentRetry.value && route.query.oidc_reason === 'drive_access',
 )
+
+const hasReferralCode = computed(() => !!referralStore.pendingCode)
 
 // Auto-fill display name when switching to registration mode.
 watch(isRegister, (nowRegister) => {
@@ -41,7 +45,8 @@ async function handleSubmit() {
   formError.value = null
   try {
     if (isRegister.value) {
-      await auth.register(email.value, displayName.value, password.value)
+      await auth.register(email.value, displayName.value, password.value, referralStore.pendingCode)
+      referralStore.clearPendingCode()
     } else {
       await auth.login(email.value, password.value)
     }
@@ -65,6 +70,24 @@ function handleBiatecSignIn() {
         <h1 class="text-2xl font-bold text-body">
           {{ isRegister ? t('auth.registerTitle') : t('auth.loginTitle') }}
         </h1>
+
+        <!-- Referral code banner -->
+        <div
+          v-if="hasReferralCode"
+          class="referral-banner flex items-start gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm"
+          role="status"
+          aria-live="polite"
+        >
+          <span aria-hidden="true" class="mt-0.5 shrink-0 text-base">🎁</span>
+          <div>
+            <p class="font-semibold text-amber-400">{{ t('auth.referralBannerTitle') }}</p>
+            <p class="mt-0.5 text-amber-200/80">
+              {{ t('auth.referralBannerCode') }}:
+              <span class="font-mono font-bold text-amber-300">{{ referralStore.pendingCode }}</span>
+            </p>
+            <p class="mt-1 text-amber-200/70">{{ t('auth.referralBannerDiscount') }}</p>
+          </div>
+        </div>
 
         <form class="flex flex-col gap-5" @submit.prevent="handleSubmit">
           <div
