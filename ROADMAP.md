@@ -34,12 +34,12 @@ It will use real world map. The game will start in single city and later other c
 - [ ] Make sure to show the rate in the stronger currency. The currency strength is USD,EUR,CNY,GBP,INR,CZK. So when user has selected in the context switcher Prague the CZK currency it will show CZKUSD and CZKEUR numbers. When Vienna and EUR is selected make sure to show rates for EURUSD and CZKEUR. Show the pair also in the rate list as it is common in standard forex.
 - [ ] Collect history for rates and create a chart when user selects in the rates page the specific exchange pair.
 
-### Country flags (0% complete)
+### Country flags (100% complete)
 
-- [ ] Add npm library country-flag-icons and use it everywhere where the country flag should be
-- [ ] in /cities the flags are visible
-- [ ] in footer in the language picker the flags are visible. Sync the footer language picker between master and game frontend.
-- [ ] In context switcher make sure flags are visible.
+- [x] Add npm library country-flag-icons and use it everywhere where the country flag should be
+- [x] in /cities the flags are visible
+- [x] in footer in the language picker the flags are visible. Sync the footer language picker between master and game frontend.
+- [x] In context switcher make sure flags are visible.
 
 ### Fix city selection (0% complete)
 
