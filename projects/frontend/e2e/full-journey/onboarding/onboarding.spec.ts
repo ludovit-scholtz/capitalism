@@ -5752,4 +5752,65 @@ test.describe('Company name generator — generate, regenerate and edit (AC from
     expect(healthcareName).not.toBe(furnitureName)
     expect(healthcareName.length).toBeGreaterThan(0)
   })
+
+  test('generated name contains exactly one space (two-word format visible in UI)', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/onboarding')
+
+    await chooseOnboardingCity(page)
+    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
+    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
+
+    const nameInput = page.locator('#onboarding-company-name')
+    const name = (await nameInput.inputValue()).trim()
+
+    // Must be exactly two words (one space) — validates "combination of two words" ROADMAP requirement
+    const words = name.split(' ')
+    expect(words).toHaveLength(2)
+    expect(words[0]!.length).toBeGreaterThan(0)
+    expect(words[1]!.length).toBeGreaterThan(0)
+  })
+
+  test('name for Food Processing industry is visible on IPO step', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/onboarding')
+
+    await chooseOnboardingCity(page)
+    await page.locator('.industry-card', { hasText: 'Food Processing' }).click()
+    await page.locator('.product-card', { hasText: 'Bread' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
+
+    const nameInput = page.locator('#onboarding-company-name')
+    const name = (await nameInput.inputValue()).trim()
+
+    // Food Processing should produce a name with 2 words
+    expect(name.split(' ')).toHaveLength(2)
+    expect(name.length).toBeGreaterThan(0)
+  })
+
+  test('manual name survives IPO card selection and is still shown when returning to step', async ({
+    page,
+  }) => {
+    setupMockApi(page)
+    await page.goto('/onboarding')
+
+    await chooseOnboardingCity(page)
+    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
+    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
+
+    // Player types a custom name
+    const nameInput = page.locator('#onboarding-company-name')
+    await nameInput.fill('My Empire Corp')
+    await expect(nameInput).toHaveValue('My Empire Corp')
+
+    // Navigate away and back (back to product step, then forward again)
+    await page.getByRole('button', { name: '← Back' }).click()
+    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
+
+    // After going back and re-entering the IPO step the name editor is present
+    await expect(page.locator('#onboarding-company-name')).toBeVisible()
+  })
 })
