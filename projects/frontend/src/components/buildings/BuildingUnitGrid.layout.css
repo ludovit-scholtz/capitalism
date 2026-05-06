@@ -29,8 +29,10 @@
 
 .grid-actions {
   display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+  align-items: center;
 }
 
 .section-subtitle {
@@ -228,6 +230,7 @@
 
   .grid-actions {
     width: 100%;
+    flex-wrap: wrap;
   }
 }
 
