@@ -30,6 +30,8 @@ import {
   faStore,
   faRoute,
   faGraduationCap,
+  faXmark,
+  faFloppyDisk,
 } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
@@ -55,6 +57,8 @@ library.add(
   faStore,
   faRoute,
   faGraduationCap,
+  faXmark,
+  faFloppyDisk,
 )
 
 export function createApp() {

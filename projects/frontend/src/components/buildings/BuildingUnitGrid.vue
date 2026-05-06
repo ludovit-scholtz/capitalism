@@ -247,12 +247,12 @@ const {
           </p>
         </div>
         <div class="grid-actions">
-          <button class="btn btn-secondary inline-flex items-center gap-2" @click="cancelEditing">
-            <span aria-hidden="true">✕</span>
+          <button class="btn btn-danger btn-sm inline-flex items-center gap-2" @click="cancelEditing">
+            <font-awesome-icon :icon="['fas', 'xmark']" aria-hidden="true" />
             {{ t('buildingDetail.cancelEditing') }}
           </button>
-          <button class="btn btn-primary inline-flex items-center gap-2" :disabled="saving || !hasDraftChanges" @click="storeConfiguration">
-            <span aria-hidden="true">✓</span>
+          <button class="btn btn-primary btn-sm inline-flex items-center gap-2" :disabled="saving || !hasDraftChanges" @click="storeConfiguration">
+            <font-awesome-icon :icon="['fas', 'floppy-disk']" aria-hidden="true" />
             {{
               saving
                 ? t('common.loading')
