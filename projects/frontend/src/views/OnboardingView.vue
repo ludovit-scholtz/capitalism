@@ -254,20 +254,14 @@ const selectedShopLot = computed(() => cityLots.value.find((lot) => lot.id === s
 /** The current company name — starts as a generated suggestion, can be edited by the player. */
 const companyName = ref('')
 
-/** Derives a fresh suggested name from the current industry and city. */
+/** Derives a fresh suggested name from the current industry. */
 function refreshSuggestedName() {
-  companyName.value = generateOnboardingCompanyName(
-    selectedIndustry.value,
-    selectedCity.value?.name,
-  )
+  companyName.value = generateOnboardingCompanyName(selectedIndustry.value)
 }
 
 /** Generates a new name suggestion without repeating names already shown this session. */
 function regenerateCompanyName() {
-  companyName.value = generateOnboardingCompanyName(
-    selectedIndustry.value,
-    selectedCity.value?.name,
-  )
+  companyName.value = generateOnboardingCompanyName(selectedIndustry.value)
 }
 
 // Auto-refresh the suggested name whenever industry or city changes so the

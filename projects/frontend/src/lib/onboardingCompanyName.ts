@@ -102,18 +102,13 @@ export function resetNameSession(key: string): void {
  * Each call picks a fresh random combination; names already shown in this session are
  * skipped so the player sees distinct suggestions on every regeneration.
  *
+ * The caller is responsible for calling {@link resetNameSession} when the industry or
+ * city changes, so the uniqueness set is cleared for a fresh sequence.
+ *
  * @param industry  - Selected industry key (e.g. 'FURNITURE', 'HEALTHCARE').
- * @param cityName  - Optional city name used as part of the session key.
- * @param _offset   - Kept for backward compatibility; ignored in the random implementation.
  */
-export function generateOnboardingCompanyName(
-  industry: string,
-  cityName?: string | null,
-  _offset = 0,
-): string {
+export function generateOnboardingCompanyName(industry: string): string {
   const words = industryWords[industry] ?? fallbackWords
-  const sessionKey = `${industry}:${cityName ?? ''}`
-  resetNameSession(sessionKey)
 
   // Attempt up to 50 random picks to find a name not yet shown this session.
   let name = ''
@@ -124,6 +119,17 @@ export function generateOnboardingCompanyName(
       style: 'capital',
     })
     if (!_usedNames.has(name)) break
+  }
+
+  // If all 50 attempts produced already-seen names (session near-exhaustion, ~300 combinations),
+  // clear the session and restart so the player always receives a usable suggestion.
+  if (_usedNames.has(name)) {
+    _usedNames = new Set()
+    name = uniqueNamesGenerator({
+      dictionaries: [words, businessSuffixes],
+      separator: ' ',
+      style: 'capital',
+    })
   }
 
   _usedNames.add(name)

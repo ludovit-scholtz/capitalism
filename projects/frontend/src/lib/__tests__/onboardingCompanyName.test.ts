@@ -14,12 +14,12 @@ afterEach(() => {
 
 describe('generateOnboardingCompanyName', () => {
   it('generates a two-word name (word + suffix)', () => {
-    const name = generateOnboardingCompanyName('FURNITURE', 'Bratislava')
+    const name = generateOnboardingCompanyName('FURNITURE')
     expect(name.split(' ')).toHaveLength(2)
   })
 
   it('first word is capitalised', () => {
-    const name = generateOnboardingCompanyName('FURNITURE', 'Bratislava')
+    const name = generateOnboardingCompanyName('FURNITURE')
     const firstWord = name.split(' ')[0]!
     expect(firstWord[0]).toBe(firstWord[0]!.toUpperCase())
   })
@@ -30,7 +30,7 @@ describe('generateOnboardingCompanyName', () => {
   })
 
   it('falls back gracefully for an unknown industry', () => {
-    const name = generateOnboardingCompanyName('UNKNOWN_INDUSTRY', 'Bratislava')
+    const name = generateOnboardingCompanyName('UNKNOWN_INDUSTRY')
     expect(name).toMatch(/\S+ \S+/)
   })
 
@@ -38,7 +38,7 @@ describe('generateOnboardingCompanyName', () => {
     resetNameSession('FURNITURE:Bratislava')
     const names: string[] = []
     for (let i = 0; i < 10; i++) {
-      names.push(generateOnboardingCompanyName('FURNITURE', 'Bratislava'))
+      names.push(generateOnboardingCompanyName('FURNITURE'))
     }
     const unique = new Set(names)
     expect(unique.size).toBeGreaterThanOrEqual(10)
@@ -47,7 +47,7 @@ describe('generateOnboardingCompanyName', () => {
   it('produces 10 distinct names for FOOD_PROCESSING', () => {
     resetNameSession('FOOD_PROCESSING:Prague')
     const names = Array.from({ length: 10 }, () =>
-      generateOnboardingCompanyName('FOOD_PROCESSING', 'Prague'),
+      generateOnboardingCompanyName('FOOD_PROCESSING'),
     )
     expect(new Set(names).size).toBeGreaterThanOrEqual(10)
   })
@@ -55,35 +55,43 @@ describe('generateOnboardingCompanyName', () => {
   it('produces 10 distinct names for HEALTHCARE', () => {
     resetNameSession('HEALTHCARE:Vienna')
     const names = Array.from({ length: 10 }, () =>
-      generateOnboardingCompanyName('HEALTHCARE', 'Vienna'),
+      generateOnboardingCompanyName('HEALTHCARE'),
     )
     expect(new Set(names).size).toBeGreaterThanOrEqual(10)
   })
 
-  it('two successive calls return different names (session prevents immediate repeat)', () => {
+  it('successive calls within a session all return distinct names (uniqueness tracking guaranteed)', () => {
     resetNameSession('FURNITURE:Bratislava')
-    const name1 = generateOnboardingCompanyName('FURNITURE', 'Bratislava')
-    const name2 = generateOnboardingCompanyName('FURNITURE', 'Bratislava')
-    expect(name1).toMatch(/\S+ \S+/)
-    expect(name2).toMatch(/\S+ \S+/)
-    expect(name1).not.toBe(name2)
+    // Generate 15 names and verify they are all unique — session tracking prevents repeats
+    const names: string[] = []
+    for (let i = 0; i < 15; i++) {
+      names.push(generateOnboardingCompanyName('FURNITURE'))
+    }
+    const unique = new Set(names)
+    expect(unique.size).toBe(15)
   })
 
   it('resetNameSession clears used-name set so names from the first session can reappear', () => {
+    // Use a second session for 15 names to prove the reset actually works
     resetNameSession('FURNITURE:Bratislava')
-    const firstSession: string[] = []
-    for (let i = 0; i < 5; i++) {
-      firstSession.push(generateOnboardingCompanyName('FURNITURE', 'Bratislava'))
+    const firstSession = new Set<string>()
+    for (let i = 0; i < 15; i++) {
+      firstSession.add(generateOnboardingCompanyName('FURNITURE'))
     }
-    // Force a key change then restore to simulate industry/city change and return
-    resetNameSession('FURNITURE:Bratislava-temp')
+    // First session must itself be unique (proves tracking works before reset)
+    expect(firstSession.size).toBe(15)
+
+    // Reset — simulate the player navigating back and changing industry then city
+    resetNameSession('OTHER:key')
     resetNameSession('FURNITURE:Bratislava')
-    const secondSession: string[] = []
-    for (let i = 0; i < 5; i++) {
-      secondSession.push(generateOnboardingCompanyName('FURNITURE', 'Bratislava'))
+
+    // After reset the used-set is cleared: generate 15 names from a fresh session
+    const secondSession = new Set<string>()
+    for (let i = 0; i < 15; i++) {
+      secondSession.add(generateOnboardingCompanyName('FURNITURE'))
     }
-    // Second session should also produce 5 unique names (session reset works)
-    expect(new Set(secondSession).size).toBe(5)
+    // Second session must also be duplicate-free (tracking works after reset)
+    expect(secondSession.size).toBe(15)
   })
 
   it('NAME_GENERATOR_CYCLE_LENGTH matches the exported businessSuffixes length', () => {
@@ -97,7 +105,7 @@ describe('generateOnboardingCompanyName', () => {
   it('every generated name ends with a known business suffix', () => {
     resetNameSession('FURNITURE:Bratislava')
     for (let i = 0; i < NAME_GENERATOR_CYCLE_LENGTH; i++) {
-      const name = generateOnboardingCompanyName('FURNITURE', 'Bratislava')
+      const name = generateOnboardingCompanyName('FURNITURE')
       const suffix = name.split(' ').at(-1)
       expect(businessSuffixes).toContain(suffix)
     }
@@ -107,7 +115,7 @@ describe('generateOnboardingCompanyName', () => {
     const industries = ['FURNITURE', 'FOOD_PROCESSING', 'HEALTHCARE']
     const names = industries.map((ind) => {
       resetNameSession(`${ind}:Bratislava`)
-      return generateOnboardingCompanyName(ind, 'Bratislava')
+      return generateOnboardingCompanyName(ind)
     })
     const unique = new Set(names)
     expect(unique.size).toBe(3)
@@ -117,7 +125,7 @@ describe('generateOnboardingCompanyName', () => {
     const proIndustries = ['ELECTRONICS', 'CONSTRUCTION', 'PHARMACEUTICALS', 'ENERGY', 'LOGISTICS']
     for (const ind of proIndustries) {
       resetNameSession(`${ind}:Vienna`)
-      const name = generateOnboardingCompanyName(ind, 'Vienna')
+      const name = generateOnboardingCompanyName(ind)
       expect(name).toMatch(/\S+ \S+/)
     }
   })
@@ -126,7 +134,7 @@ describe('generateOnboardingCompanyName', () => {
     const proIndustries = ['ELECTRONICS', 'CONSTRUCTION', 'PHARMACEUTICALS', 'ENERGY', 'LOGISTICS']
     for (const ind of proIndustries) {
       resetNameSession(`${ind}:Vienna`)
-      const names = Array.from({ length: 10 }, () => generateOnboardingCompanyName(ind, 'Vienna'))
+      const names = Array.from({ length: 10 }, () => generateOnboardingCompanyName(ind))
       expect(new Set(names).size).toBeGreaterThanOrEqual(10)
     }
   })
