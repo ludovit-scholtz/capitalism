@@ -102,6 +102,8 @@ export interface Building {
   powerConsumption: number
   isForSale: boolean
   askingPrice: number | null
+  /** UTC timestamp when the building was listed for sale. Null when not listed. */
+  listedAtUtc: string | null
   pricePerSqm: number | null
   /** Pending rent per m² scheduled by the player; activates at pendingPriceActivationTick. */
   pendingPricePerSqm: number | null

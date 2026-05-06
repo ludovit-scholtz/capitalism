@@ -2144,6 +2144,23 @@ export function useBuildingDetail() {
 
   // ── Building sale ──
 
+  /**
+   * Simple estimated market value based on building level, unit count, and city population index.
+   * Used as a non-binding reference in the sell dialog.
+   */
+  const EMV_BASE_LOT_VALUE = 75_000
+  const EMV_LEVEL_MULTIPLIER_BASE = 1.5
+  const EMV_UNIT_BASE_VALUE = 20_000
+  const EMV_DEFAULT_POPULATION_INDEX = 0.5
+  const estimatedMarketValue = computed(() => {
+    const b = building.value
+    if (!b) return null
+    const levelMultiplier = Math.pow(EMV_LEVEL_MULTIPLIER_BASE, b.level - 1)
+    const unitValue = (b.units?.length ?? 0) * EMV_UNIT_BASE_VALUE
+    const locationMultiplier = 1 + (b.populationIndex ?? EMV_DEFAULT_POPULATION_INDEX) * 0.5
+    return Math.round((EMV_BASE_LOT_VALUE * levelMultiplier + unitValue) * locationMultiplier / 1000) * 1000
+  })
+
   function openSaleDialog() {
     salePrice.value = building.value?.askingPrice ?? null
     showSaleDialog.value = true
@@ -2159,7 +2176,7 @@ export function useBuildingDetail() {
     try {
       await gqlRequest<{ setBuildingForSale: { id: string } }>(
         `mutation SetBuildingForSale($input: SetBuildingForSaleInput!) {
-          setBuildingForSale(input: $input) { id isForSale askingPrice }
+          setBuildingForSale(input: $input) { id isForSale askingPrice listedAtUtc }
         }`,
         {
           input: {
@@ -4168,6 +4185,7 @@ export function useBuildingDetail() {
               powerStatus
               isForSale
               askingPrice
+              listedAtUtc
               pricePerSqm
               pendingPricePerSqm
               pendingPriceActivationTick
@@ -4892,6 +4910,7 @@ export function useBuildingDetail() {
     openSaleDialog,
     closeSaleDialog,
     setBuildingForSale,
+    estimatedMarketValue,
     isBuildingUsedAsCollateral,
     openRentDialog,
     closeRentDialog,
