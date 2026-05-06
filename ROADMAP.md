@@ -18,6 +18,7 @@ It will use real world map. The game will start in single city and later other c
 - [ ] Create a workflow to destroy a building. When building is destroyed, return the user 80% of the building property value. Make the property available for purchase again. When bank loan is not paid set it for sale for the property market price minus 10%. When the debt from missed payments is not paid in 3 game days (72 ticks), destroy the building and pay any remaining debt from the sale of property to the bank owner.
 - [ ] When building is in editation mode, allow copy the configuration of the unit at the building. When user hits ctrl+c or cmd+c on mac, he copies to the clipboard the json config of the unit.
 - [ ] When building is in editation mode, allow paste of the configuration of the unit at the building. When user hits ctrl+v or cmd+v on mac and he has selected the unit, and if the json schema is valid for the unit configuration, apply the configuration to the unit. This copy and paste mechanism will improve the UX of the unit management. For example when user want to expand the factory or if he wants to expand the R&D building.
+- [ ] Allow to paste unit configuration to empty unit space
 
 ### News (0% complete)
 
