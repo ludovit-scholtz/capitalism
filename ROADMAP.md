@@ -6,11 +6,11 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
-### Buildings (0% complete)
+### Buildings (30% complete)
 
-- [ ] Add tab view to building overview. Make the default tab to be shown one with the building P&L and statistics. Add second tab the bank account. Make sure the tabs are properly routed through tab view. Make sure to use the components for each tab please.
-- [ ] When in the building edit mode, create tab view. For each tab make sure to use the component. 
-- [ ] When in the building edit mode in the unit mode, create tab view. For each tab make sure to use the component. Extract each section to the separate components and show them in tabs. Make sure the design is professional and for the colors and layouts is used the tailwind.
+- [x] Add tab view to building overview. Make the default tab to be shown one with the building P&L and statistics. Add second tab the bank account. Make sure the tabs are properly routed through tab view. Make sure to use the components for each tab please.
+- [x] When in the building edit mode, create tab view. For each tab make sure to use the component. 
+- [x] When in the building edit mode in the unit mode, create tab view. For each tab make sure to use the component. Extract each section to the separate components and show them in tabs. Make sure the design is professional and for the colors and layouts is used the tailwind.
 - [ ] When in the edit mode, the cancel and store upgrade should be next to each other. Also use some icons there so that users has better UX.
 - [ ] When I click the sell building show only sell building form. Make sure the form is properly designed.
 - [ ] In game dashboard, the number of units count for specific building touches the word Buildings in the navigation. Add some space between the tag and text please.

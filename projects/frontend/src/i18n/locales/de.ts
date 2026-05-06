@@ -1381,6 +1381,14 @@ export default {
     editTabConfig: 'Konfiguration',
     editTabPerformance: 'Leistung',
     editTabMaintenance: 'Wartung',
+    editTabBasicEdit: 'Grundbearbeitung', // Reserved for future building edit mode top-level tabs
+    editTabFinance: 'Finanzen', // Reserved for future building edit mode top-level tabs
+    editTabLayouts: 'Layouts', // Reserved for future building edit mode top-level tabs
+    editTabGeneralSettings: 'Allgemein',
+    editTabProduction: 'Produktion',
+    editTabInventory: 'Inventar',
+    editTabSales: 'Vertrieb',
+    buildingEditTabs: 'Gebäudebearbeitung',
     saleFailed: 'Verkaufsstatus konnte nicht aktualisiert werden',
     config: {
       inputItem: 'Eingangsartikel',

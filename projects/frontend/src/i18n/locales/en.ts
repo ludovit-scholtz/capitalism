@@ -1380,6 +1380,14 @@ export default {
     editTabConfig: 'Configuration',
     editTabPerformance: 'Performance',
     editTabMaintenance: 'Maintenance',
+    editTabBasicEdit: 'Basic Edit', // Reserved for future building edit mode top-level tabs
+    editTabFinance: 'Finance', // Reserved for future building edit mode top-level tabs
+    editTabLayouts: 'Layouts', // Reserved for future building edit mode top-level tabs
+    editTabGeneralSettings: 'General',
+    editTabProduction: 'Production',
+    editTabInventory: 'Inventory',
+    editTabSales: 'Sales',
+    buildingEditTabs: 'Building Edit',
     config: {
       inputItem: 'Input Item',
       outputProduct: 'Output Product',

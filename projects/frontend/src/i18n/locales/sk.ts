@@ -1379,6 +1379,14 @@ export default {
     editTabConfig: 'Konfigurácia',
     editTabPerformance: 'Výkon',
     editTabMaintenance: 'Údržba',
+    editTabBasicEdit: 'Základná úprava', // Reserved for future building edit mode top-level tabs
+    editTabFinance: 'Financie', // Reserved for future building edit mode top-level tabs
+    editTabLayouts: 'Rozloženia', // Reserved for future building edit mode top-level tabs
+    editTabGeneralSettings: 'Všeobecné',
+    editTabProduction: 'Produkcia',
+    editTabInventory: 'Inventár',
+    editTabSales: 'Predaj',
+    buildingEditTabs: 'Úprava budovy',
     saleFailed: 'Nepodarilo sa aktualizovať stav predaja',
     config: {
       inputItem: 'Vstupná položka',
