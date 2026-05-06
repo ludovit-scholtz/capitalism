@@ -1444,4 +1444,262 @@ public sealed class DashboardPerformanceTests
         Assert.Equal(firstNames, secondNames);
         Assert.Contains("SecondCallCorp", firstNames);
     }
+
+    // ── GetResourceTypes ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// <c>resourceTypes</c> must return all 8 canonical resource types seeded by
+    /// <c>AppDbInitializer</c> — Wood, Iron Ore, Coal, Gold, Chemical Minerals, Cotton, Grain, Silicon.
+    /// </summary>
+    [Fact]
+    public async Task GetResourceTypes_ReturnsAllEightSeededResources()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var cache = factory.Services.GetRequiredService<IMemoryCache>();
+        cache.Remove("resourceTypes_all");
+
+        var result = await ExecuteGraphQlAsync(client, "{ resourceTypes { name slug category } }");
+
+        var types = result.GetProperty("data").GetProperty("resourceTypes")
+            .EnumerateArray().ToList();
+
+        Assert.Equal(8, types.Count);
+
+        var slugs = types.Select(t => t.GetProperty("slug").GetString()!).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var expected in new[] { "wood", "iron-ore", "coal", "gold", "chemical-minerals", "cotton", "grain", "silicon" })
+        {
+            Assert.Contains(expected, slugs);
+        }
+    }
+
+    /// <summary>
+    /// After the first <c>resourceTypes</c> call the <c>resourceTypes_all</c> cache key must be
+    /// populated so subsequent calls can be served without hitting the database.
+    /// </summary>
+    [Fact]
+    public async Task GetResourceTypes_AfterFirstCall_IsCachedInMemory()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var cache = factory.Services.GetRequiredService<IMemoryCache>();
+        cache.Remove("resourceTypes_all");
+
+        await ExecuteGraphQlAsync(client, "{ resourceTypes { name } }");
+
+        var hit = cache.TryGetValue("resourceTypes_all", out List<ResourceType>? cached);
+        Assert.True(hit && cached is not null, "resourceTypes_all cache must be populated after first call.");
+        Assert.Equal(8, cached!.Count);
+    }
+
+    /// <summary>
+    /// A second <c>resourceTypes</c> call must return the same names as the first call,
+    /// served from the <c>resourceTypes_all</c> cache.
+    /// </summary>
+    [Fact]
+    public async Task GetResourceTypes_SecondCall_ReturnsSameDataFromCache()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var cache = factory.Services.GetRequiredService<IMemoryCache>();
+        cache.Remove("resourceTypes_all");
+
+        var first = await ExecuteGraphQlAsync(client, "{ resourceTypes { name slug } }");
+        var second = await ExecuteGraphQlAsync(client, "{ resourceTypes { name slug } }");
+
+        var firstSlugs = first.GetProperty("data").GetProperty("resourceTypes")
+            .EnumerateArray().Select(t => t.GetProperty("slug").GetString()!).OrderBy(s => s).ToList();
+        var secondSlugs = second.GetProperty("data").GetProperty("resourceTypes")
+            .EnumerateArray().Select(t => t.GetProperty("slug").GetString()!).OrderBy(s => s).ToList();
+
+        Assert.Equal(firstSlugs, secondSlugs);
+        Assert.Equal(8, firstSlugs.Count);
+    }
+
+    // ── GetRankings — read-only guard ─────────────────────────────────────────
+
+    /// <summary>
+    /// <c>rankings</c> is a public leaderboard query.  It must never apply
+    /// building configuration plans — a due plan seeded before the query must still
+    /// exist in the database after the query completes.
+    /// </summary>
+    [Fact]
+    public async Task GetRankings_WithDuePlan_DoesNotApplyPlan_ReadOnlyGuard()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var userToken = await RegisterAndGetTokenAsync(client, "rankings-guard-user@test.com", "Rankings Guard");
+        Guid playerId;
+        await using (var s = factory.Services.CreateAsyncScope())
+        {
+            var db = s.ServiceProvider.GetRequiredService<AppDbContext>();
+            playerId = (await db.Players.FirstAsync(p => p.Email == "rankings-guard-user@test.com")).Id;
+        }
+
+        var (buildingId, _) = await SeedCompanyWithDuePlanAsync(factory, playerId, "RankingsGuardCorp", "RankingsGuardFactory");
+
+        // Fire the rankings query.  We use a raw SendAsync so a transient HTTP-level
+        // error from the server does not mask the core assertion (plan still exists).
+        // The goal here is purely to prove the resolver does NOT apply the plan.
+        var request = new HttpRequestMessage(HttpMethod.Post, "/graphql");
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(new { query = "{ rankings { displayName totalWealthUsd } }" }),
+            Encoding.UTF8,
+            "application/json");
+        await client.SendAsync(request);
+
+        Assert.True(
+            await PlanExistsAsync(factory, buildingId),
+            "A due plan must not be applied by the public rankings query.");
+    }
+
+    // ── GetMyCompanies — cache isolation between two players ──────────────────
+
+    /// <summary>
+    /// Two different players must receive isolated per-user cache entries.
+    /// Player A's cached company list must not bleed into Player B's cache entry.
+    /// </summary>
+    [Fact]
+    public async Task GetMyCompanies_TwoPlayers_HaveIsolatedCacheEntries()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var tokenA = await RegisterAndGetTokenAsync(client, "cache-player-a@test.com", "Cache Player A");
+        var tokenB = await RegisterAndGetTokenAsync(client, "cache-player-b@test.com", "Cache Player B");
+
+        Guid playerAId, playerBId;
+        await using (var s = factory.Services.CreateAsyncScope())
+        {
+            var db = s.ServiceProvider.GetRequiredService<AppDbContext>();
+            playerAId = (await db.Players.FirstAsync(p => p.Email == "cache-player-a@test.com")).Id;
+            playerBId = (await db.Players.FirstAsync(p => p.Email == "cache-player-b@test.com")).Id;
+        }
+
+        // Seed one company per player.
+        await using (var s = factory.Services.CreateAsyncScope())
+        {
+            var db = s.ServiceProvider.GetRequiredService<AppDbContext>();
+            var tick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultDeterministicAsync();
+            var bratislava = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+
+            db.Companies.Add(new Company { Id = Guid.NewGuid(), PlayerId = playerAId, Name = "CorpAlpha", FoundedAtUtc = DateTime.UtcNow, FoundedAtTick = tick });
+            db.Companies.Add(new Company { Id = Guid.NewGuid(), PlayerId = playerBId, Name = "CorpBeta", FoundedAtUtc = DateTime.UtcNow, FoundedAtTick = tick });
+            await db.SaveChangesAsync();
+        }
+
+        var cache = factory.Services.GetRequiredService<IMemoryCache>();
+        cache.Remove($"myCompanies_{playerAId}");
+        cache.Remove($"myCompanies_{playerBId}");
+
+        var resultA = await ExecuteGraphQlAsync(client, "{ myCompanies { name } }", token: tokenA);
+        var resultB = await ExecuteGraphQlAsync(client, "{ myCompanies { name } }", token: tokenB);
+
+        var namesA = resultA.GetProperty("data").GetProperty("myCompanies")
+            .EnumerateArray().Select(c => c.GetProperty("name").GetString()!).ToList();
+        var namesB = resultB.GetProperty("data").GetProperty("myCompanies")
+            .EnumerateArray().Select(c => c.GetProperty("name").GetString()!).ToList();
+
+        Assert.Contains("CorpAlpha", namesA);
+        Assert.DoesNotContain("CorpBeta", namesA);
+
+        Assert.Contains("CorpBeta", namesB);
+        Assert.DoesNotContain("CorpAlpha", namesB);
+
+        // Verify the cache holds two separate entries keyed by player ID.
+        Assert.True(cache.TryGetValue($"myCompanies_{playerAId}", out _), "Cache must have an entry for player A.");
+        Assert.True(cache.TryGetValue($"myCompanies_{playerBId}", out _), "Cache must have an entry for player B.");
+    }
+
+    // ── GetProductTypes ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// <c>productTypes</c> without an industry filter must return all seeded products,
+    /// including at least the three starter-industry products (Wooden Chair, Bread, Basic Medicine).
+    /// </summary>
+    [Fact]
+    public async Task GetProductTypes_WithoutFilter_ReturnsAllSeededStarterProducts()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var result = await ExecuteGraphQlAsync(client, "{ productTypes { name industry slug } }");
+
+        var products = result.GetProperty("data").GetProperty("productTypes")
+            .EnumerateArray().ToList();
+
+        Assert.True(products.Count >= 3, "At least 3 starter products must be seeded.");
+
+        var names = products.Select(p => p.GetProperty("name").GetString()!).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("Wooden Chair", names);
+        Assert.Contains("Bread", names);
+        Assert.Contains("Basic Medicine", names);
+    }
+
+    /// <summary>
+    /// <c>productTypes(industry: "FURNITURE")</c> must return only products in the
+    /// FURNITURE industry — no products from FOOD_PROCESSING or HEALTHCARE must appear.
+    /// </summary>
+    [Fact]
+    public async Task GetProductTypes_WithFurnitureFilter_ReturnsOnlyFurnitureProducts()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            "query PT($industry: String) { productTypes(industry: $industry) { name industry } }",
+            variables: new { industry = "FURNITURE" });
+
+        var products = result.GetProperty("data").GetProperty("productTypes")
+            .EnumerateArray().ToList();
+
+        Assert.True(products.Count > 0, "FURNITURE industry must have at least one product.");
+
+        foreach (var p in products)
+        {
+            Assert.Equal("FURNITURE", p.GetProperty("industry").GetString());
+        }
+
+        var names = products.Select(p => p.GetProperty("name").GetString()!).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Bread", names);
+        Assert.DoesNotContain("Basic Medicine", names);
+    }
+
+    // ── GetCityLots — public access ───────────────────────────────────────────
+
+    /// <summary>
+    /// <c>cityLots(cityId)</c> is a public query — an unauthenticated call for Bratislava
+    /// must return lots without an authorisation error.
+    /// </summary>
+    [Fact]
+    public async Task GetCityLots_Bratislava_IsPublic_DoesNotRequireAuthentication()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        Guid bratislavaId;
+        await using (var s = factory.Services.CreateAsyncScope())
+        {
+            var db = s.ServiceProvider.GetRequiredService<AppDbContext>();
+            bratislavaId = (await db.Cities.FirstAsync(c => c.Name == "Bratislava")).Id;
+        }
+
+        // Unauthenticated — no token attached.
+        var result = await ExecuteGraphQlAsync(
+            client,
+            "query Lots($cityId: UUID!) { cityLots(cityId: $cityId) { id price suitableTypes } }",
+            variables: new { cityId = bratislavaId });
+
+        var lots = result.GetProperty("data").GetProperty("cityLots").EnumerateArray().ToList();
+        Assert.True(lots.Count > 0, "Bratislava must have at least one purchasable lot seeded.");
+
+        // Verify no auth error is present.
+        var hasErrors = result.TryGetProperty("errors", out var errors) && errors.GetArrayLength() > 0;
+        Assert.False(hasErrors, "cityLots must not return GraphQL errors for an unauthenticated request.");
+    }
 }
