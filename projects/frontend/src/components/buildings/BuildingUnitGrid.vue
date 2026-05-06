@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { inject } from 'vue'
+import { inject, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
 import DiagonalConnector from '@/components/buildings/DiagonalConnector.vue'
@@ -74,7 +74,40 @@ const {
   getGridCellAriaLabel,
   getFillBucket,
   gridIndexes,
+  clipboardMessage,
+  clipboardMessageType,
+  copySelectedUnit,
+  pasteToSelectedUnit,
 } = bd
+
+function handleKeydown(event: KeyboardEvent) {
+  if (!isEditing.value) return
+
+  // Do not capture shortcuts when the user is typing in a form field
+  const target = event.target as HTMLElement
+  if (
+    target.tagName === 'INPUT' ||
+    target.tagName === 'TEXTAREA' ||
+    target.tagName === 'SELECT' ||
+    (target as HTMLElement).isContentEditable
+  ) {
+    return
+  }
+
+  const isCopy = (event.ctrlKey || event.metaKey) && event.key === 'c'
+  const isPaste = (event.ctrlKey || event.metaKey) && event.key === 'v'
+
+  if (isCopy && selectedCell.value) {
+    event.preventDefault()
+    copySelectedUnit()
+  } else if (isPaste && selectedCell.value) {
+    event.preventDefault()
+    pasteToSelectedUnit()
+  }
+}
+
+onMounted(() => document.addEventListener('keydown', handleKeydown))
+onUnmounted(() => document.removeEventListener('keydown', handleKeydown))
 </script>
 
 <template>
@@ -270,6 +303,18 @@ const {
         <button class="btn btn-ghost btn-sm" @click="saveError = null">{{ t('common.close') }}</button>
       </div>
 
+      <!-- Unit copy/paste clipboard feedback -->
+      <div
+        v-if="clipboardMessage"
+        class="clipboard-message"
+        :class="clipboardMessageType === 'success' ? 'clipboard-message-success' : 'clipboard-message-error'"
+        role="status"
+        aria-live="polite"
+      >
+        <span class="clipboard-message-icon" aria-hidden="true">{{ clipboardMessageType === 'success' ? '✓' : '⚠' }}</span>
+        {{ clipboardMessage }}
+      </div>
+
       <div class="upgrade-summary">
         <span class="upgrade-summary-pill" :title="'Tick #' + currentTick">{{ t('buildingDetail.currentTickLabel', { time: formatGameTickTime(currentTick, locale) }) }}</span>
         <span class="upgrade-summary-pill" :title="draftTotalTicks + ' ticks'">{{ t('buildingDetail.totalUpgradeTicks', { time: formatTickDuration(draftTotalTicks, locale) }) }}</span>
@@ -349,6 +394,7 @@ const {
                     : {}
                 "
                 :aria-label="getGridCellAriaLabel(getUnitAtFrom(plannedUnits, x, y))"
+                :title="getUnitAtFrom(plannedUnits, x, y) ? t('buildingDetail.clipboard.cellTooltip') : undefined"
                 @click="clickDraftCell(x, y)"
               >
                 <template v-if="getUnitAtFrom(plannedUnits, x, y)">
