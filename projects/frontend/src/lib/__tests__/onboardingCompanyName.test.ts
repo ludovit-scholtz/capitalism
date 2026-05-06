@@ -216,4 +216,55 @@ describe('generateOnboardingCompanyName', () => {
       expect(name).toMatch(/^\S+ \S+$/)
     }
   })
+
+  it('calling resetNameSession with the same key twice does NOT clear the used-name set (no-op)', () => {
+    // Reset to a known state and generate 5 names
+    resetNameSession('FURNITURE:same-key-test')
+    const firstBatch: string[] = []
+    for (let i = 0; i < 5; i++) {
+      firstBatch.push(generateOnboardingCompanyName('FURNITURE'))
+    }
+    expect(new Set(firstBatch).size).toBe(5)
+
+    // Calling resetNameSession with the SAME key is a no-op; the used-name set is preserved
+    resetNameSession('FURNITURE:same-key-test')
+
+    // Next 5 names must also be distinct from the first 5 (session still tracking)
+    const secondBatch: string[] = []
+    for (let i = 0; i < 5; i++) {
+      secondBatch.push(generateOnboardingCompanyName('FURNITURE'))
+    }
+    expect(new Set(secondBatch).size).toBe(5)
+
+    // No overlap between first and second batch (session tracking was NOT reset)
+    const combined = new Set([...firstBatch, ...secondBatch])
+    expect(combined.size).toBe(10)
+  })
+
+  it('generated name first word belongs to the industry word list (spot-check 5 calls)', () => {
+    // furniture words from the source file
+    const furnitureWords = [
+      'Oak', 'Timber', 'Cedar', 'Maple', 'Walnut', 'Birch', 'Pine', 'Teak',
+      'Redwood', 'Ironwood', 'Crafted', 'Artisan', 'Heritage', 'Classic', 'Ember',
+      'Ashwood', 'Elmwood', 'Mahogany', 'Rosewood', 'Sandalwood',
+    ]
+    resetNameSession('FURNITURE:wordlist')
+    for (let i = 0; i < 5; i++) {
+      const name = generateOnboardingCompanyName('FURNITURE')
+      const firstWord = name.split(' ')[0]!
+      expect(furnitureWords).toContain(firstWord)
+    }
+  })
+
+  it('generated name second word belongs to the businessSuffixes list', () => {
+    const healthcareIndustries = ['HEALTHCARE', 'FOOD_PROCESSING', 'FURNITURE']
+    for (const ind of healthcareIndustries) {
+      resetNameSession(`${ind}:suffix-check`)
+      for (let i = 0; i < 5; i++) {
+        const name = generateOnboardingCompanyName(ind)
+        const secondWord = name.split(' ')[1]!
+        expect(businessSuffixes).toContain(secondWord)
+      }
+    }
+  })
 })

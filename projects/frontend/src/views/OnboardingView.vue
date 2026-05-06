@@ -1379,7 +1379,7 @@ watch(visibleIndustries, () => {
           </article>
           <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
             <span class="text-muted text-xs">{{ t('onboarding.personalCash') }}</span
-            ><strong>{{ formatCurrency(remainingPersonalCash, 'USD') }}</strong>
+            ><strong>{{ formatCurrency(remainingPersonalCash * cityUsdFxRate) }}</strong>
           </article>
         </div>
         <div class="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">

@@ -5813,4 +5813,46 @@ test.describe('Company name generator — generate, regenerate and edit (AC from
     // After going back and re-entering the IPO step the name editor is present
     await expect(page.locator('#onboarding-company-name')).toBeVisible()
   })
+
+  test('Healthcare industry generates a valid two-word name on IPO step', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/onboarding')
+
+    await chooseOnboardingCity(page)
+    await page.locator('.industry-card', { hasText: 'Healthcare' }).click()
+    await page.locator('.product-card', { hasText: 'Basic Medicine' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
+
+    const nameInput = page.locator('#onboarding-company-name')
+    const name = (await nameInput.inputValue()).trim()
+
+    // Healthcare should produce a two-word professional name
+    const words = name.split(' ')
+    expect(words).toHaveLength(2)
+    expect(words[0]!.length).toBeGreaterThan(0)
+    expect(words[1]!.length).toBeGreaterThan(0)
+    // First word should be capitalised
+    expect(words[0]![0]).toBe(words[0]![0]!.toUpperCase())
+  })
+
+  test('founder contribution and personal cash cards show the same currency on IPO step', async ({
+    page,
+  }) => {
+    setupMockApi(page)
+    await page.goto('/onboarding')
+
+    await chooseOnboardingCity(page) // defaults to Bratislava (EUR)
+    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
+    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
+
+    const budgetCards = page.locator('.budget-card')
+
+    // Founder contribution card shows EUR (€) for Bratislava
+    await expect(budgetCards.nth(0)).toContainText('€')
+
+    // Personal cash card must also show EUR (€), not USD ($)
+    await expect(budgetCards.nth(1)).toContainText('€')
+    await expect(budgetCards.nth(1)).not.toContainText('$')
+  })
 })
