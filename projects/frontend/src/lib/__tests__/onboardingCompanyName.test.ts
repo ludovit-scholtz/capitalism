@@ -244,12 +244,8 @@ describe('generateOnboardingCompanyName', () => {
   })
 
   it('generated name first word belongs to the industry word list (spot-check 5 calls)', () => {
-    // furniture words from the source file
-    const furnitureWords = [
-      'Oak', 'Timber', 'Cedar', 'Maple', 'Walnut', 'Birch', 'Pine', 'Teak',
-      'Redwood', 'Ironwood', 'Crafted', 'Artisan', 'Heritage', 'Classic', 'Ember',
-      'Ashwood', 'Elmwood', 'Mahogany', 'Rosewood', 'Sandalwood',
-    ]
+    // Use the exported industryWords to stay in sync with the source list
+    const furnitureWords = industryWords['FURNITURE']!
     resetNameSession('FURNITURE:wordlist')
     for (let i = 0; i < 5; i++) {
       const name = generateOnboardingCompanyName('FURNITURE')
