@@ -280,6 +280,11 @@ export default {
     metricsAria: 'Metriky odporúčaní',
     referralCode: 'Odporúčací kód',
     registeredUsers: 'Registrovaní používatelia',
+    shareLinksTitle: 'Zdieľateľné odporúčacie odkazy',
+    shareLinksSubtitle: 'Skopírujte odkaz a zdieľajte ho s priateľmi. Noví hráči, ktorí sa zaregistrujú cez váš odkaz, dostanú 10% zľavu na nákupy v hre.',
+    copyLink: 'Kopírovať odkaz',
+    linkCopied: 'Skopírované!',
+    serverLoadFailed: 'Nepodarilo sa načítať herné servery. Zdieľateľné odkazy sú dočasne nedostupné.',
   },
   support: {
     title: 'Tikety podpory',

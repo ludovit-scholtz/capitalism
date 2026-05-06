@@ -1,3 +1,5 @@
+using System.Text;
+using System.Text.Json;
 using Api.Utilities;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.FileProviders;
@@ -10,6 +12,35 @@ namespace Api.Tests.Infrastructure;
 /// </summary>
 internal static class TestHelpers
 {
+    /// <summary>
+    /// Executes a GraphQL request against the test HTTP client and returns the
+    /// deserialised <see cref="JsonElement"/> response body.
+    /// Can be used by any test class that holds an <see cref="HttpClient"/> from a
+    /// <see cref="ApiWebApplicationFactory"/> without duplicating the helper.
+    /// </summary>
+    public static async Task<JsonElement> ExecuteGraphQlAsync(
+        HttpClient client, string query, object? variables = null, string? token = null)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/graphql");
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(new { query, variables }),
+            Encoding.UTF8,
+            "application/json");
+
+        if (token is not null)
+        {
+            request.Headers.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        }
+
+        var response = await client.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+        if (!response.IsSuccessStatusCode)
+            throw new Exception($"HTTP {(int)response.StatusCode}: {body}");
+
+        return JsonSerializer.Deserialize<JsonElement>(body);
+    }
+
     /// <summary>
     /// Creates an <see cref="NbsExchangeRateService"/> that always uses fallback rates
     /// (no real HTTP calls) so tests are deterministic and do not depend on external services.

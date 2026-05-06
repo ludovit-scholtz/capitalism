@@ -495,11 +495,15 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function register(email: string, displayName: string, password: string) {
+  async function register(email: string, displayName: string, password: string, referralCode?: string | null) {
     loading.value = true
     error.value = null
     try {
-      const data = await gqlMasterRequest<{ register: MasterSessionPayload }>(MASTER_REGISTER_MUTATION, { input: { email, displayName, password } })
+      const input: Record<string, string> = { email, displayName, password }
+      if (referralCode) {
+        input.referralCode = referralCode
+      }
+      const data = await gqlMasterRequest<{ register: MasterSessionPayload }>(MASTER_REGISTER_MUTATION, { input })
       player.value = null
       applyStoredSession(data.register.token, data.register.expiresAtUtc)
       await fetchCurrentPlayer()

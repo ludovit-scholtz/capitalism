@@ -14,6 +14,7 @@ import {
   type ReferralDashboardRow,
 } from '@/lib/referrals'
 import { useAuthStore } from '@/stores/auth'
+import { fetchGameServers, type GameServerSummary } from '@/lib/masterApi'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -25,6 +26,8 @@ const hasReferralProfile = ref(false)
 const hasAppliedCode = ref(false)
 const notice = ref('')
 const errorMessage = ref('')
+const gameServers = ref<GameServerSummary[]>([])
+const copiedLink = ref<string | null>(null)
 
 const totalStats = computed(() => {
   return rows.value.reduce(
@@ -56,6 +59,50 @@ const navItems = computed(() => {
 })
 
 const earnedGoldTokens = computed(() => calculateReferralGoldTokens(rows.value))
+
+/** Returns a shareable referral link for a given code and game server. */
+function buildReferralLink(code: string, frontendUrl: string): string {
+  const base = frontendUrl.replace(/\/$/, '')
+  return `${base}/?ref=${code}`
+}
+
+/** Returns the composite key used to track which link has been copied. */
+function getCopiedKey(code: string, frontendUrl: string): string {
+  return `${code}::${frontendUrl}`
+}
+
+/** Copies a referral link to clipboard and shows feedback. */
+async function copyLink(code: string, frontendUrl: string) {
+  const link = buildReferralLink(code, frontendUrl)
+  const key = getCopiedKey(code, frontendUrl)
+  const setAndClear = () => {
+    copiedLink.value = key
+    setTimeout(() => {
+      if (copiedLink.value === key) {
+        copiedLink.value = null
+      }
+    }, 2000)
+  }
+  try {
+    await navigator.clipboard.writeText(link)
+    setAndClear()
+  } catch {
+    // Fallback for browsers that block clipboard API
+    const el = document.createElement('textarea')
+    el.value = link
+    el.style.position = 'fixed'
+    el.style.opacity = '0'
+    document.body.appendChild(el)
+    el.select()
+    document.execCommand('copy')
+    document.body.removeChild(el)
+    setAndClear()
+  }
+}
+
+function isCopied(code: string, frontendUrl: string): boolean {
+  return copiedLink.value === getCopiedKey(code, frontendUrl)
+}
 
 function reloadDashboard() {
   if (!auth.player?.email) {
@@ -100,6 +147,13 @@ onMounted(async () => {
   }
 
   reloadDashboard()
+
+  // Load game servers for shareable links
+  try {
+    gameServers.value = await fetchGameServers()
+  } catch {
+    errorMessage.value = t('referralDashboard.serverLoadFailed')
+  }
 })
 </script>
 
@@ -205,6 +259,37 @@ onMounted(async () => {
               {{ t('referralDashboard.createAnotherCode') }}
             </button>
           </div>
+
+          <!-- Shareable referral links section -->
+          <section
+            v-if="codes.length > 0 && gameServers.length > 0"
+            class="referral-links-section grid gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-paper)] p-4"
+            aria-label="Shareable referral links"
+          >
+            <h3 class="text-base font-semibold">{{ t('referralDashboard.shareLinksTitle') }}</h3>
+            <p class="text-sm text-[var(--color-muted)]">{{ t('referralDashboard.shareLinksSubtitle') }}</p>
+            <div class="grid gap-3">
+              <div v-for="code in codes" :key="code" class="grid gap-2">
+                <p class="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
+                  {{ t('referralDashboard.referralCode') }}: <span class="font-mono text-[var(--color-ink)]">{{ code }}</span>
+                </p>
+                <div v-for="server in gameServers" :key="server.id" class="flex items-center gap-2">
+                  <span class="min-w-0 flex-1 truncate rounded-lg border border-[var(--color-border)] bg-[var(--color-paper-strong)] px-3 py-2 font-mono text-xs text-[var(--color-muted)]">
+                    {{ buildReferralLink(code, server.frontendUrl) }}
+                  </span>
+                  <button
+                    type="button"
+                    class="copy-link-btn shrink-0 rounded-lg border border-[var(--color-border)] px-3 py-2 text-xs font-semibold transition-colors"
+                    :class="isCopied(code, server.frontendUrl) ? 'border-green-500/40 bg-green-500/10 text-green-700' : 'bg-white hover:bg-[var(--color-paper-strong)]'"
+                    :aria-label="t('referralDashboard.copyLink')"
+                    @click="copyLink(code, server.frontendUrl)"
+                  >
+                    {{ isCopied(code, server.frontendUrl) ? t('referralDashboard.linkCopied') : t('referralDashboard.copyLink') }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
 
           <p v-if="notice" class="success text-[#245f3d]" role="status">{{ notice }}</p>
           <p v-if="errorMessage" class="error text-[#b0432c]" role="alert">{{ errorMessage }}</p>

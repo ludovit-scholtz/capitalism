@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Text.RegularExpressions;
 using Api.Configuration;
 using Api.Data;
 using Api.Data.Entities;
@@ -18,6 +19,8 @@ namespace Api.Types;
 
 public sealed partial class Mutation
 {
+    /// <summary>Compiled regex for validating alphanumeric referral codes.</summary>
+    private static readonly Regex ReferralCodePattern = new(@"^[A-Z0-9]+$", RegexOptions.Compiled);
     /// <summary>Registers a new player account and returns an auth token.</summary>
     public async Task<AuthPayload> Register(
         RegisterInput input,
@@ -44,7 +47,8 @@ public sealed partial class Mutation
             DisplayName = input.DisplayName.Trim(),
             Role = PlayerRole.Player,
             ActiveAccountType = AccountContextType.Person,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = DateTime.UtcNow,
+            AppliedReferralCode = NormalizeReferralCode(input.ReferralCode)
         };
 
         var hasher = new PasswordHasher<Player>();
@@ -188,5 +192,23 @@ public sealed partial class Mutation
             MasterRankingBountyCodes.LoginToGame,
             playerEmail,
             uniqueScopeKey: $"{MasterRankingBountyCodes.LoginToGame}:{playerEmail}:{today}:{normalizedServerKey}");
+    }
+
+    /// <summary>Normalizes and validates a referral code from user input.</summary>
+    private static string? NormalizeReferralCode(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return null;
+        }
+
+        var normalized = raw.Trim().ToUpperInvariant();
+        // Allow alphanumeric characters only, 4-20 chars
+        if (normalized.Length < 4 || normalized.Length > 20 || !ReferralCodePattern.IsMatch(normalized))
+        {
+            return null;
+        }
+
+        return normalized;
     }
 }

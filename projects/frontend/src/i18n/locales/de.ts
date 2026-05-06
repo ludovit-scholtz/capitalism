@@ -246,6 +246,9 @@ export default {
     oidcCallbackTitle: 'Anmeldung wird abgeschlossen',
     oidcCallbackLoading: 'Ihr Biatec-Token wird geprüft und Ihr Spielprofil geladen…',
     oidcCallbackFailed: 'Die Biatec-Anmeldung ist fehlgeschlagen. Bitte versuchen Sie es erneut.',
+    referralBannerTitle: 'Sie wurden eingeladen!',
+    referralBannerCode: 'Empfehlungscode',
+    referralBannerDiscount: 'Jetzt registrieren und 10% Rabatt auf In-Game-Käufe erhalten.',
   },
   onboarding: {
     title: 'Starten Sie Ihr Imperium',

@@ -6,7 +6,7 @@ test.describe('Home page', () => {
     setupMockApi(page, { servers: [] })
     await page.goto('/')
 
-    await expect(page.locator('.hero-title')).toContainText('CAPITALISM')
+    await expect(page.locator('.hero-title')).toContainText('Capitalism')
     await expect(page.getByRole('heading', { name: 'Leaderboard' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Game Servers' }).first()).toBeVisible()
   })

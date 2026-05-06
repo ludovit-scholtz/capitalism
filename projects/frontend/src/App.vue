@@ -11,6 +11,7 @@ import { usesStore } from '@/stores/news'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useGameAdminStore } from '@/stores/gameAdmin'
 import { useChatStore } from '@/stores/chat'
+import { useReferralStore } from '@/stores/referral'
 
 const { t } = useI18n()
 const { isOffline, updateAvailable, acceptUpdate } = usePwa()
@@ -20,10 +21,14 @@ const newsStore = usesStore()
 const notificationsStore = useNotificationsStore()
 const gameAdminStore = useGameAdminStore()
 const chatStore = useChatStore()
+const referralStore = useReferralStore()
 gameStateStore.start()
 
 onMounted(() => {
   auth.initFromStorage()
+  // Capture referral code from URL before potentially redirecting
+  referralStore.initFromUrl()
+  referralStore.initFromStorage()
   if (auth.token) {
     void auth.fetchMe()
     void newsStore.fetchUnreadCount()

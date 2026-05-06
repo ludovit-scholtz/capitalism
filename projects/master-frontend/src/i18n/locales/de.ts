@@ -284,6 +284,11 @@ export default {
     metricsAria: 'Empfehlungsmetriken',
     referralCode: 'Empfehlungscode',
     registeredUsers: 'Registrierte Nutzer',
+    shareLinksTitle: 'Teilbare Empfehlungslinks',
+    shareLinksSubtitle: 'Kopieren Sie einen Link und teilen Sie ihn mit Freunden. Neue Spieler, die sich über Ihren Link registrieren, erhalten 10% Rabatt auf In-Game-Käufe.',
+    copyLink: 'Link kopieren',
+    linkCopied: 'Kopiert!',
+    serverLoadFailed: 'Spielserver konnten nicht geladen werden. Teilbare Links sind vorübergehend nicht verfügbar.',
   },
   support: {
     title: 'Support-Tickets',

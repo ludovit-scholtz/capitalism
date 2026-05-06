@@ -89,6 +89,14 @@ public sealed class Player
     [MaxLength(160)]
     public string? Bio { get; set; }
 
+    /// <summary>
+    /// Referral code that was applied when this player registered.
+    /// Null if the player registered without a referral code.
+    /// Once set, cannot be changed.
+    /// </summary>
+    [MaxLength(20)]
+    public string? AppliedReferralCode { get; set; }
+
     /// <summary>Companies owned by this player.</summary>
     public ICollection<Company> Companies { get; set; } = new List<Company>();
 
