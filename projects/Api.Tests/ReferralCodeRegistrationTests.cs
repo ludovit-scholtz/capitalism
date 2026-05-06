@@ -1,4 +1,3 @@
-using System.Text;
 using System.Text.Json;
 using Api.Data;
 using Api.Tests.Infrastructure;
@@ -16,29 +15,6 @@ namespace Api.Tests;
 /// </summary>
 public sealed class ReferralCodeRegistrationTests
 {
-    private static async Task<JsonElement> ExecuteGraphQlAsync(
-        HttpClient client, string query, object? variables = null, string? token = null)
-    {
-        var request = new HttpRequestMessage(HttpMethod.Post, "/graphql");
-        request.Content = new StringContent(
-            JsonSerializer.Serialize(new { query, variables }),
-            Encoding.UTF8,
-            "application/json");
-
-        if (token is not null)
-        {
-            request.Headers.Authorization =
-                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-        }
-
-        var response = await client.SendAsync(request);
-        var body = await response.Content.ReadAsStringAsync();
-        if (!response.IsSuccessStatusCode)
-            throw new Exception($"HTTP {(int)response.StatusCode}: {body}");
-
-        return JsonSerializer.Deserialize<JsonElement>(body);
-    }
-
     private static readonly string RegisterMutation = """
         mutation Register($input: RegisterInput!) {
           register(input: $input) {
@@ -58,7 +34,7 @@ public sealed class ReferralCodeRegistrationTests
         await using var factory = new ApiWebApplicationFactory();
         var client = factory.CreateClient();
 
-        var result = await ExecuteGraphQlAsync(
+        var result = await TestHelpers.ExecuteGraphQlAsync(
             client,
             RegisterMutation,
             new { input = new { email = "noref@example.com", displayName = "No Ref", password = "TestPass123!" } });
@@ -83,7 +59,7 @@ public sealed class ReferralCodeRegistrationTests
         await using var factory = new ApiWebApplicationFactory();
         var client = factory.CreateClient();
 
-        var result = await ExecuteGraphQlAsync(
+        var result = await TestHelpers.ExecuteGraphQlAsync(
             client,
             RegisterMutation,
             new
@@ -117,7 +93,7 @@ public sealed class ReferralCodeRegistrationTests
         await using var factory = new ApiWebApplicationFactory();
         var client = factory.CreateClient();
 
-        var result = await ExecuteGraphQlAsync(
+        var result = await TestHelpers.ExecuteGraphQlAsync(
             client,
             RegisterMutation,
             new
@@ -145,7 +121,7 @@ public sealed class ReferralCodeRegistrationTests
         await using var factory = new ApiWebApplicationFactory();
         var client = factory.CreateClient();
 
-        var result = await ExecuteGraphQlAsync(
+        var result = await TestHelpers.ExecuteGraphQlAsync(
             client,
             RegisterMutation,
             new
@@ -173,7 +149,7 @@ public sealed class ReferralCodeRegistrationTests
         await using var factory = new ApiWebApplicationFactory();
         var client = factory.CreateClient();
 
-        var result = await ExecuteGraphQlAsync(
+        var result = await TestHelpers.ExecuteGraphQlAsync(
             client,
             RegisterMutation,
             new
@@ -201,7 +177,7 @@ public sealed class ReferralCodeRegistrationTests
         await using var factory = new ApiWebApplicationFactory();
         var client = factory.CreateClient();
 
-        var result = await ExecuteGraphQlAsync(
+        var result = await TestHelpers.ExecuteGraphQlAsync(
             client,
             RegisterMutation,
             new
@@ -229,7 +205,7 @@ public sealed class ReferralCodeRegistrationTests
         await using var factory = new ApiWebApplicationFactory();
         var client = factory.CreateClient();
 
-        var result = await ExecuteGraphQlAsync(
+        var result = await TestHelpers.ExecuteGraphQlAsync(
             client,
             RegisterMutation,
             new
@@ -257,7 +233,7 @@ public sealed class ReferralCodeRegistrationTests
         await using var factory = new ApiWebApplicationFactory();
         var client = factory.CreateClient();
 
-        var result = await ExecuteGraphQlAsync(
+        var result = await TestHelpers.ExecuteGraphQlAsync(
             client,
             RegisterMutation,
             new
@@ -285,7 +261,7 @@ public sealed class ReferralCodeRegistrationTests
         await using var factory = new ApiWebApplicationFactory();
         var client = factory.CreateClient();
 
-        var result = await ExecuteGraphQlAsync(
+        var result = await TestHelpers.ExecuteGraphQlAsync(
             client,
             RegisterMutation,
             new
@@ -314,7 +290,7 @@ public sealed class ReferralCodeRegistrationTests
         var client = factory.CreateClient();
 
         // Register with a code
-        var regResult = await ExecuteGraphQlAsync(
+        var regResult = await TestHelpers.ExecuteGraphQlAsync(
             client,
             RegisterMutation,
             new
@@ -331,7 +307,7 @@ public sealed class ReferralCodeRegistrationTests
         var token = regResult.GetProperty("data").GetProperty("register").GetProperty("token").GetString()!;
 
         // Query `me`
-        var meResult = await ExecuteGraphQlAsync(
+        var meResult = await TestHelpers.ExecuteGraphQlAsync(
             client,
             "{ me { id appliedReferralCode } }",
             token: token);
