@@ -57,6 +57,13 @@ public sealed class DashboardPerformanceTests
     }
 
     /// <summary>
+    /// Generates a deterministic-style 16-digit account number from the current timestamp.
+    /// Uses modulo 10^15 so the raw value is always ≤ 15 digits; D16 left-pads to exactly 16.
+    /// </summary>
+    private static string GenerateTestAccountNumber() =>
+        (DateTime.UtcNow.Ticks % 1_000_000_000_000_000L).ToString("D16");
+
+    /// <summary>
     /// Seed helper: creates a company, building, and an already-due plan
     /// directly in the database without going through the GraphQL mutation path.
     /// Returns the building ID and current tick.
@@ -88,7 +95,7 @@ public sealed class DashboardPerformanceTests
         db.BankAccounts.Add(new BankAccount
         {
             Id = Guid.NewGuid(),
-            AccountNumber = (DateTime.UtcNow.Ticks % 10_000_000_000_000_000L).ToString("D16"),
+            AccountNumber = GenerateTestAccountNumber(),
             CompanyId = company.Id,
             CurrencyCode = "EUR",
             Balance = 500_000m,

@@ -1471,3 +1471,22 @@ Root-cause of repeated "increase test coverage" feedback (May 2026, PR #236 wave
 3. **For any constant used as a guard condition in production code (unit type strings, price floors, timeout values), add a regression test asserting its exact value.** Renaming `"PUBLIC_SALES"` to `"PUBLIC_SALE"` would disable all price adjustments; the constant test makes this immediately visible.
 4. **For any exception class used in a `catch (Exception ex) when (ex is MyException mex && mex.Code == "...")` pattern, add a test that throws through a generic `catch (Exception ex)` handler and verifies the code is preserved.** This proves the inheritance chain works for all callers.
 5. **For any two helpers that should converge for "normal" inputs but diverge for "edge" inputs, add BOTH a convergence test (healthy bot: both agree it is ready) and a divergence test (stale bot: one says ready, other says not healthy).** Convergence alone does not prove the edge case is handled.
+
+## Write-on-read bottleneck — read resolvers must never call SaveChangesAsync
+
+Root-cause of a multi-second dashboard load regression (May 2026, PR #optimize-dashboard-performance):
+- `GetMyCompanies`, `GetGameState`, and `GetCity` all called `BuildingConfigurationService.ApplyDuePlansAsync` + `db.SaveChangesAsync()` inside read-only GraphQL resolvers.
+- With 50+ concurrent players, every `/dashboard` page load triggered a full-table write scan of `BuildingConfigurationPlans` across **all** players, not just the authenticated user.
+- `GetGameState` and `GetCity` are public queries (no auth required), so anonymous visitors also triggered the write bottleneck.
+- Fix: removed `ApplyDuePlansAsync` + `SaveChangesAsync` from all three resolvers. Plan application is now exclusively owned by `BuildingUpgradePhase` in the tick engine.
+- Added `AsNoTracking()` to `GetGameState` and `GetCity` to prevent EF from pinning read-only entity graphs.
+- Added per-user 5-second `IMemoryCache` to `GetMyCompanies` and 8-second cache to `GetGameState` to throttle burst concurrent reads.
+
+**Rules to prevent recurrence:**
+1. **GraphQL query resolvers (any method on the `Query` type) must never call `db.SaveChangesAsync()` or any method that writes to the database.** Writes in read paths block the entire table for the duration, causing multi-second latency for all concurrent users.
+2. **`BuildingConfigurationService.ApplyDuePlansAsync` is owned exclusively by `BuildingUpgradePhase` in the tick engine.** No other call site is permitted. If you find a new call site, it must be removed immediately.
+3. **Always add `AsNoTracking()` to EF Core queries in read resolvers.** Without it, EF pins loaded entities in the change tracker for the lifetime of the DbContext scope, increasing memory pressure and risking accidental writes from other code paths sharing the same scope.
+4. **When adding a new GraphQL query resolver, verify it contains no writes** by grepping for `SaveChangesAsync`, `Add(`, `Remove(`, `Update(` and `ApplyDuePlansAsync` in the resolver method body. The read resolver must contain only `await db.Entity.AsNoTracking().Where(...).ToListAsync()` patterns.
+5. **Test the invariant with a dedicated regression test**: seed a due plan, fire the read query via HTTP, then assert the plan still exists in the DB afterward. This test catches any future regression where a write sneaks back into the read path.
+6. **For `Assert.True(currentTick >= 0)` in tests**: the game state is initialized with `CurrentTick = 0` in fresh InMemory databases. Any test asserting `currentTick > 0` (strictly positive) will fail because the initial tick is zero. Use `>= 0` for generic tick sanity checks.
+7. **For test helpers generating account numbers with `DateTime.UtcNow.Ticks % N`**: use `N = 1_000_000_000_000_000L` (10^15) so the result is ≤ 15 digits, then `.ToString("D16")` pads to exactly 16 characters without risk of overflow. Extract into a `GenerateTestAccountNumber()` helper to avoid duplication.
