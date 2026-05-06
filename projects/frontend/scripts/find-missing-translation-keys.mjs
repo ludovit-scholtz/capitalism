@@ -7,7 +7,7 @@ import ts from 'typescript'
 const localeDir = path.resolve(process.cwd(), 'src/i18n/locales')
 const localeFiles = ['en.ts', 'sk.ts', 'de.ts']
 const cjsRequire = createRequire(import.meta.url)
-const allowedSharedValues = new Set(['Capitalism V', 'English', 'Slovenčina', 'Deutsch', 'N/A', 'Forex', 'Chat', 'Pro', 'Cloud', 'MW', 'XAU'])
+const allowedSharedValues = new Set(['Capitalism 5', 'English', 'Slovenčina', 'Deutsch', 'N/A', 'Forex', 'Chat', 'Pro', 'Cloud', 'MW', 'XAU'])
 const ignoredUntranslatedKeys = new Set(['admin.globalAdminPlaceholder', 'buildingDetail.sourcingComparison.distanceKm'])
 
 function isPlainObject(value) {

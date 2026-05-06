@@ -19,7 +19,7 @@ using Microsoft.IdentityModel.Tokens;
 namespace Api.Tests;
 
 /// <summary>
-/// Integration tests for the Capitalism V GraphQL API.
+/// Integration tests for the Capitalism 5 GraphQL API.
 /// Tests cover authentication, game data queries, company management, and onboarding flow.
 /// </summary>
 public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFactory>
@@ -390,7 +390,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var response = await _client.GetAsync("/");
         response.EnsureSuccessStatusCode();
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("Capitalism V Game API", body.GetProperty("name").GetString());
+        Assert.Equal("Capitalism 5 Game API", body.GetProperty("name").GetString());
     }
 
     [Fact]

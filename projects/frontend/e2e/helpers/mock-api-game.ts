@@ -1,5 +1,5 @@
 /**
- * Shared GraphQL API mock for Capitalism V Playwright tests.
+ * Shared GraphQL API mock for Capitalism 5 Playwright tests.
  *
  * Usage:
  *   import { setupMockApi, makePlayer } from './helpers/mock-api'
@@ -331,8 +331,32 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         cash: 500000,
         foundedAtUtc: new Date().toISOString(),
         buildings: [
-          { id: `building-factory-${Date.now()}`, companyId: '', cityId: input.cityId, type: 'FACTORY', name: `${input.companyName} Factory`, latitude: 48.15, longitude: 17.11, level: 1, powerConsumption: 2, isForSale: false, units: [] },
-          { id: `building-shop-${Date.now()}`, companyId: '', cityId: input.cityId, type: 'SALES_SHOP', name: `${input.companyName} Shop`, latitude: 48.15, longitude: 17.11, level: 1, powerConsumption: 1, isForSale: false, units: [] },
+          {
+            id: `building-factory-${Date.now()}`,
+            companyId: '',
+            cityId: input.cityId,
+            type: 'FACTORY',
+            name: `${input.companyName} Factory`,
+            latitude: 48.15,
+            longitude: 17.11,
+            level: 1,
+            powerConsumption: 2,
+            isForSale: false,
+            units: [],
+          },
+          {
+            id: `building-shop-${Date.now()}`,
+            companyId: '',
+            cityId: input.cityId,
+            type: 'SALES_SHOP',
+            name: `${input.companyName} Shop`,
+            latitude: 48.15,
+            longitude: 17.11,
+            level: 1,
+            powerConsumption: 1,
+            isForSale: false,
+            units: [],
+          },
         ],
       }
       player.companies.push(company)

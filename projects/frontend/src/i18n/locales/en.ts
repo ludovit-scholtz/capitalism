@@ -1,6 +1,6 @@
 export default {
   common: {
-    appName: 'Capitalism V',
+    appName: 'Capitalism 5',
     loading: 'Loading...',
     tryAgain: 'Try again',
     cancel: 'Cancel',
@@ -203,7 +203,7 @@ export default {
     closeChat: 'Close chat',
   },
   home: {
-    heroTitle: 'Capitalism V',
+    heroTitle: 'Capitalism 5',
     heroDescription: 'Build your business empire. Mine resources, manufacture products, and dominate the market in this multiplayer economic strategy game.',
     getStarted: 'Get Started',
     startOnboarding: 'Start Your Empire',
@@ -238,8 +238,7 @@ export default {
     loginToAccess: 'Log in to access',
     loginRequired: 'Please log in to continue.',
     loginWithBiatec: 'Sign in with google',
-    oidcRetryDriveAccessHint:
-      'Google Drive file creation access is required for the Biatec wallet setup. Start Google sign-in again and allow the Drive permission to finish authentication.',
+    oidcRetryDriveAccessHint: 'Google Drive file creation access is required for the Biatec wallet setup. Start Google sign-in again and allow the Drive permission to finish authentication.',
     oidcCallbackTitle: 'Completing sign in',
     oidcCallbackLoading: 'We are verifying your Biatec token and loading your game profile…',
     oidcCallbackFailed: 'Biatec sign-in failed. Please try again.',
@@ -412,8 +411,7 @@ export default {
     guestShopPlaceholder: 'Your Shop',
     guestSaveTitle: 'Save Your Progress',
     guestSaveSubtitle: 'Sign in with google to lock in your choices and launch your company for real.',
-    guestSaveDriveAccessNotice:
-      'Google Drive file creation access is required here so Biatec can create the wallet file used to secure your account progress.',
+    guestSaveDriveAccessNotice: 'Google Drive file creation access is required here so Biatec can create the wallet file used to secure your account progress.',
     guestSaveKeepsLabel: 'You keep:',
     guestSaveKeepsCompany: 'Your company name',
     guestSaveKeepsCity: 'Your starter city',
@@ -1390,13 +1388,11 @@ export default {
     estimatedMarketValue: 'Estimated Market Value',
     estimatedValueHint: 'Reference estimate based on building improvements and city location.',
     askingPriceMustBePositive: 'Asking price must be greater than zero.',
-    askingPriceHighWarning:
-      'Warning: asking price exceeds 150% of the estimated market value. This may deter buyers.',
+    askingPriceHighWarning: 'Warning: asking price exceeds 150% of the estimated market value. This may deter buyers.',
     overviewTab: 'P&L & Statistics',
     bankAccountTab: 'Bank Account',
     collateralRestrictionWarning: 'This building is used as loan collateral and cannot be placed for sale.',
-    collateralBlockedByLoans:
-      'Blocked by {count} active loan(s) using this building as collateral. Repay or settle these loans first.',
+    collateralBlockedByLoans: 'Blocked by {count} active loan(s) using this building as collateral. Repay or settle these loans first.',
     destroyedBadge: 'Destroyed',
     destroyedHint: 'This building was foreclosed and destroyed after a loan default.',
     editTabConfig: 'Configuration',
@@ -3381,7 +3377,7 @@ export default {
   },
   tutorial: {
     title: 'Tutorial',
-    subtitle: 'Complete guided milestones to master Capitalism V and earn bounty points.',
+    subtitle: 'Complete guided milestones to master Capitalism 5 and earn bounty points.',
     progressLabel: '{done}/{total} milestones completed',
     pointsEarned: '{earned}/{total} pts earned',
     resume: 'Resume',

@@ -21,7 +21,7 @@ test.describe('Home page', () => {
   test('shows hero section with Get Started link when not authenticated', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/')
-    await expect(page.getByRole('heading', { name: 'Capitalism V' }).first()).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Capitalism 5' }).first()).toBeVisible()
     const getStartedLink = page.getByRole('link', { name: 'Get Started' })
     await expect(getStartedLink).toBeVisible()
     await expect(getStartedLink).toHaveAttribute('href', '/onboarding')
@@ -115,7 +115,7 @@ test.describe('Header navigation', () => {
     setupMockApi(page)
     await page.goto('/login')
     await page
-      .getByRole('link', { name: /CAPITALISM V/i })
+      .getByRole('link', { name: /Capitalism 5/i })
       .first()
       .click()
     await expect(page).toHaveURL(/\/$/)

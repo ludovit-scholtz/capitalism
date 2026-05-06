@@ -1,5 +1,5 @@
 /**
- * Shared GraphQL API mock for Capitalism V Playwright tests.
+ * Shared GraphQL API mock for Capitalism 5 Playwright tests.
  *
  * Usage:
  *   import { setupMockApi, makePlayer } from './helpers/mock-api'
@@ -2658,7 +2658,7 @@ export function makeFxRateHistory(
   quoteCurrencyCode: string,
   baseMidRate: number,
   count = 20,
-  startTick = 1
+  startTick = 1,
 ): Array<{
   baseCurrencyCode: string
   quoteCurrencyCode: string
@@ -5619,11 +5619,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         responseData.myPendingActions = (player?.companies ?? [])
           .flatMap((company) =>
             company.buildings
-              .filter(
-                (building) =>
-                  building.pendingConfiguration != null &&
-                  building.pendingConfiguration.appliesAtTick > currentTick,
-              )
+              .filter((building) => building.pendingConfiguration != null && building.pendingConfiguration.appliesAtTick > currentTick)
               .map((building) => ({
                 id: building.pendingConfiguration!.id,
                 actionType: 'BUILDING_UPGRADE',
@@ -6047,9 +6043,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const name = (player?.displayName ?? 'Player').replace(/\s+/g, '_')
       const fileName = `${name}_Stats_${dateStr}.${format === 'HTML' ? 'html' : 'csv'}`
       // Return a minimal base64-encoded stub (a single CSV line).
-      const content = format === 'HTML'
-        ? `<html><body><h1>${player?.displayName ?? 'Player'} Stats</h1></body></html>`
-        : `Player,${player?.displayName ?? 'Player'}\nExported,${dateStr}`
+      const content = format === 'HTML' ? `<html><body><h1>${player?.displayName ?? 'Player'} Stats</h1></body></html>` : `Player,${player?.displayName ?? 'Player'}\nExported,${dateStr}`
       const contentBase64 = btoa(content)
       return route.fulfill({
         status: 200,
@@ -6338,9 +6332,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const vars = body.variables as { quoteCurrencyCode?: string; ticksBack?: number } | undefined
       const quoteCurrency = vars?.quoteCurrencyCode ?? ''
       const ticksBack = vars?.ticksBack ?? 100
-      const matching = state.fxRateHistorySnapshots
-        .filter((s) => s.quoteCurrencyCode === quoteCurrency)
-        .slice(-ticksBack)
+      const matching = state.fxRateHistorySnapshots.filter((s) => s.quoteCurrencyCode === quoteCurrency).slice(-ticksBack)
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -6566,9 +6558,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       if (!player) return routeJsonError('Player not found', 'PLAYER_NOT_FOUND')
 
       // Handle personal bank account statement (PERSON-type account keyed by accountId)
-      const personalAccount = accountId
-        ? state.myBankAccounts.find((acc) => acc.id === accountId && (acc.ownerType === 'PERSON' || acc.companyId === null))
-        : null
+      const personalAccount = accountId ? state.myBankAccounts.find((acc) => acc.id === accountId && (acc.ownerType === 'PERSON' || acc.companyId === null)) : null
       if (personalAccount) {
         const allRows = state.personalBankStatementRows
         const rows = allRows.slice(offset, offset + limit)
@@ -6879,9 +6869,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     if (query.includes('goldAmmSwapHistory')) {
       const variables = body.variables as { currencyCode?: string; myTradesOnly?: boolean; limit?: number } | undefined
       const currency = variables?.currencyCode
-      const mockHistory = (state.goldAmmSwapHistory ?? []).filter(
-        (h) => !currency || h.currencyCode === currency,
-      )
+      const mockHistory = (state.goldAmmSwapHistory ?? []).filter((h) => !currency || h.currencyCode === currency)
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -7104,7 +7092,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       }
       // Create new company
       const newCompanyId = `company-ipo-${Date.now()}`
-      const newCompany: typeof player.companies[0] = {
+      const newCompany: (typeof player.companies)[0] = {
         id: newCompanyId,
         playerId: player.id,
         name: companyName,
