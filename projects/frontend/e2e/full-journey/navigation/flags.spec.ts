@@ -19,7 +19,7 @@ test.describe('Country flag icons', () => {
       const cards = page.locator('.city-card')
       const count = await cards.count()
       for (let i = 0; i < count; i++) {
-        const flag = cards.nth(i).locator('[role="img"]').first()
+        const flag = cards.nth(i).locator('.country-flag[role="img"]').first()
         await expect(flag).toBeVisible()
       }
     })
@@ -32,7 +32,7 @@ test.describe('Country flag icons', () => {
       const card = page.locator('.city-card', { hasText: 'Bratislava' })
       await expect(card).toBeVisible()
       // The flag element should have aria-label containing country code
-      const flag = card.locator('[role="img"]').first()
+      const flag = card.locator('.country-flag[role="img"]').first()
       await expect(flag).toBeVisible()
       await expect(flag).toHaveAttribute('aria-label', /SK/i)
     })
@@ -44,7 +44,7 @@ test.describe('Country flag icons', () => {
 
       const card = page.locator('.city-card', { hasText: 'Prague' })
       await expect(card).toBeVisible()
-      const flag = card.locator('[role="img"]').first()
+      const flag = card.locator('.country-flag[role="img"]').first()
       await expect(flag).toHaveAttribute('aria-label', /CZ/i)
     })
 
@@ -55,7 +55,7 @@ test.describe('Country flag icons', () => {
 
       const card = page.locator('.city-card', { hasText: 'Vienna' })
       await expect(card).toBeVisible()
-      const flag = card.locator('[role="img"]').first()
+      const flag = card.locator('.country-flag[role="img"]').first()
       await expect(flag).toHaveAttribute('aria-label', /AT/i)
     })
 
@@ -91,7 +91,7 @@ test.describe('Country flag icons', () => {
       expect(count).toBeGreaterThanOrEqual(3)
 
       for (let i = 0; i < count; i++) {
-        const flag = buttons.nth(i).locator('[role="img"]').first()
+        const flag = buttons.nth(i).locator('.country-flag[role="img"]').first()
         await expect(flag).toBeVisible()
       }
     })
@@ -103,7 +103,7 @@ test.describe('Country flag icons', () => {
       const switcher = page.locator('.language-switcher').first()
       // English is always the first language button (locale=en → GB flag)
       const enButton = switcher.locator('.language-btn').nth(0)
-      const flag = enButton.locator('[role="img"]').first()
+      const flag = enButton.locator('.country-flag[role="img"]').first()
       await expect(flag).toBeVisible()
       // Flag title should contain the English language name
       await expect(flag).toHaveAttribute('title', /English/i)
@@ -116,7 +116,7 @@ test.describe('Country flag icons', () => {
       const switcher = page.locator('.language-switcher').first()
       // Slovak is always the second language button (locale=sk → SK flag)
       const skButton = switcher.locator('.language-btn').nth(1)
-      const flag = skButton.locator('[role="img"]').first()
+      const flag = skButton.locator('.country-flag[role="img"]').first()
       await expect(flag).toBeVisible()
       // Flag has an SVG child proving real SVG flag renders
       await expect(skButton.locator('.country-flag svg')).toBeVisible()
@@ -129,7 +129,7 @@ test.describe('Country flag icons', () => {
       const switcher = page.locator('.language-switcher').first()
       // German is always the third language button (locale=de → DE flag)
       const deButton = switcher.locator('.language-btn').nth(2)
-      const flag = deButton.locator('[role="img"]').first()
+      const flag = deButton.locator('.country-flag[role="img"]').first()
       await expect(flag).toBeVisible()
       // Flag title should contain the German language name
       await expect(flag).toHaveAttribute('title', /Deutsch/i)
@@ -159,7 +159,7 @@ test.describe('Country flag icons', () => {
       // The context switcher trigger should contain a flag image
       const trigger = page.locator('.ctx-trigger')
       await expect(trigger).toBeVisible()
-      const flag = trigger.locator('[role="img"]').first()
+      const flag = trigger.locator('.country-flag[role="img"]').first()
       await expect(flag).toBeVisible()
     })
 
@@ -193,7 +193,7 @@ test.describe('Country flag icons', () => {
       expect(count).toBeGreaterThanOrEqual(3)
 
       for (let i = 0; i < count; i++) {
-        const flag = cityOptions.nth(i).locator('[role="img"]').first()
+        const flag = cityOptions.nth(i).locator('.country-flag[role="img"]').first()
         await expect(flag).toBeVisible()
       }
     })
@@ -211,7 +211,7 @@ test.describe('Country flag icons', () => {
       await page.goto('/cities')
 
       await expect(page.locator('.city-card').first()).toBeVisible()
-      const flag = page.locator('.city-card').first().locator('[role="img"]').first()
+      const flag = page.locator('.city-card').first().locator('.country-flag[role="img"]').first()
       await expect(flag).toBeVisible()
     })
 
@@ -231,7 +231,7 @@ test.describe('Country flag icons', () => {
 
       // Each button should have a flag
       for (let i = 0; i < count; i++) {
-        const flag = buttons.nth(i).locator('[role="img"]').first()
+        const flag = buttons.nth(i).locator('.country-flag[role="img"]').first()
         await expect(flag).toBeVisible()
       }
     })

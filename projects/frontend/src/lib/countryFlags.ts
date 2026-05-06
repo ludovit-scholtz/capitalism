@@ -7,41 +7,36 @@
  * Flags are inline SVGs so they render without any additional HTTP requests
  * and work reliably across all platforms (including Windows where emoji flag
  * support is limited).
+ *
+ * Pre-loaded country codes:
+ * - Active seeded cities:  SK, CZ, AT
+ * - Language-switcher:     GB (English), SK (Slovak), DE (German), FR (French)
+ * - Anticipated future cities referenced in the roadmap: CN, DE, IN, PL, US
  */
 import {
   AT,
-  AE,
-  BR,
   CN,
   CZ,
   DE,
   FR,
   GB,
   IN,
-  JP,
   PL,
-  RU,
   SK,
-  SG,
   US,
 } from 'country-flag-icons/string/3x2'
 
 /** Pre-loaded SVG strings keyed by ISO 3166-1 alpha-2 country code (upper-case). */
 export const FLAG_SVG_MAP: Record<string, string> = {
   AT,
-  AE,
-  BR,
   CN,
   CZ,
   DE,
   FR,
   GB,
   IN,
-  JP,
   PL,
-  RU,
   SK,
-  SG,
   US,
 }
 

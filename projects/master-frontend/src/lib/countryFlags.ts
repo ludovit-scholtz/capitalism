@@ -3,6 +3,11 @@
  *
  * Imports flag SVG strings from the `country-flag-icons` package and exposes
  * a lookup function for use in Vue components (e.g. LanguageSwitcher).
+ *
+ * Pre-loaded country codes:
+ * - Active seeded cities:  SK, CZ, AT
+ * - Language-switcher:     GB (English), SK (Slovak), DE (German), FR (French)
+ * - Anticipated future cities referenced in the roadmap: CN, DE, IN, PL, US
  */
 import {
   AT,

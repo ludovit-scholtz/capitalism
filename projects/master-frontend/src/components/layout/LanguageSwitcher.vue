@@ -7,6 +7,12 @@ import { getLocaleFlagCode } from '@/lib/countryFlags'
 const { locale, t } = useI18n()
 const supportedLocales = ['en', 'sk', 'de'] as const
 
+/** Pairs of [locale, flagCountryCode] for all supported locales. */
+const localeFlagEntries = supportedLocales.map((loc) => ({
+  loc,
+  flagCode: getLocaleFlagCode(loc),
+}))
+
 function handleLocaleChange(nextLocale: (typeof supportedLocales)[number]) {
   setLocale(nextLocale)
 }
@@ -20,24 +26,24 @@ function handleLocaleChange(nextLocale: (typeof supportedLocales)[number]) {
       :aria-label="t('languageSwitcher.label')"
     >
       <button
-        v-for="localeCode in supportedLocales"
-        :key="localeCode"
+        v-for="entry in localeFlagEntries"
+        :key="entry.loc"
         :class="[
           'language-btn inline-flex items-center gap-1.5 border-0 px-2 py-1 text-xs font-semibold transition-colors',
-          locale === localeCode
+          locale === entry.loc
             ? 'active bg-brand text-white hover:bg-brand-hover'
             : 'bg-card-raised text-muted hover:bg-card hover:text-body',
         ]"
-        :aria-pressed="locale === localeCode"
-        @click="handleLocaleChange(localeCode)"
+        :aria-pressed="locale === entry.loc"
+        @click="handleLocaleChange(entry.loc)"
       >
         <CountryFlag
-          v-if="getLocaleFlagCode(localeCode)"
-          :country-code="getLocaleFlagCode(localeCode)!"
+          v-if="entry.flagCode"
+          :country-code="entry.flagCode"
           size="sm"
-          :title="t(`languages.${localeCode}`)"
+          :title="t(`languages.${entry.loc}`)"
         />
-        {{ t(`languages.${localeCode}`) }}
+        {{ t(`languages.${entry.loc}`) }}
       </button>
     </div>
   </div>
