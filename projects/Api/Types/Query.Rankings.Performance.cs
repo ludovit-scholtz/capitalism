@@ -292,6 +292,11 @@ public sealed partial class Query
     }
 
     /// <summary>Gets the current game state (tick, tax info).</summary>
+    /// <remarks>
+    /// Read-only query — building configuration plans are applied exclusively by the tick engine.
+    /// Calling <c>ApplyDuePlansAsync</c> here would trigger a full-table write on every dashboard
+    /// load, which is the root cause of multi-second load times with 50+ active players.
+    /// </remarks>
     public async Task<GameState?> GetGameState([Service] AppDbContext db, [Service] IMemoryCache cache)
     {
         // Use a very short cache to reduce DB reads when multiple panels request game state
@@ -302,14 +307,11 @@ public sealed partial class Query
             return cached;
         }
 
-        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync();
+        var gameState = await db.GameStates.AsNoTracking().FirstOrDefaultDeterministicAsync();
         if (gameState is null)
         {
             return null;
         }
-
-        await BuildingConfigurationService.ApplyDuePlansAsync(db, gameState.CurrentTick);
-        await db.SaveChangesAsync();
 
         cache.Set(key, gameState, TimeSpan.FromSeconds(8));
         return gameState;

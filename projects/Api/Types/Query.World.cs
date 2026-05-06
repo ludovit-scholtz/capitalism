@@ -2,9 +2,7 @@ using System.Security.Claims;
 using Api.Configuration;
 using Api.Data;
 using Api.Data.Entities;
-using Api.Engine;
 using Api.Security;
-using Api.Utilities;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -39,16 +37,13 @@ public sealed partial class Query
     }
 
     /// <summary>Gets a specific city by ID.</summary>
+    /// <remarks>
+    /// Read-only query — building configuration plans are applied exclusively by the tick engine.
+    /// </remarks>
     public async Task<City?> GetCity(Guid id, [Service] AppDbContext db)
     {
-        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync();
-        if (gameState is not null)
-        {
-            await BuildingConfigurationService.ApplyDuePlansAsync(db, gameState.CurrentTick);
-            await db.SaveChangesAsync();
-        }
-
         return await db.Cities
+            .AsNoTracking()
             .Include(c => c.Resources)
             .ThenInclude(r => r.ResourceType)
             .Include(c => c.Buildings)
