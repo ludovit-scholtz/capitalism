@@ -147,9 +147,12 @@ describe('personalAccountName', () => {
   it('no word in the generated name contains spaces (all words are single tokens)', () => {
     for (let i = 0; i < 20; i++) {
       const name = generatePersonalAccountName()
-      for (const word of name.split(' ')) {
-        expect(word.includes(' ')).toBe(false)
+      const parts = name.split(' ')
+      expect(parts).toHaveLength(3)
+      for (const word of parts) {
+        // Each token must be non-empty and have no leading/trailing whitespace
         expect(word.length).toBeGreaterThan(0)
+        expect(word.trim()).toBe(word)
       }
     }
   })

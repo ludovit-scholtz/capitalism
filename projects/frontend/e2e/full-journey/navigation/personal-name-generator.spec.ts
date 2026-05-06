@@ -164,9 +164,9 @@ test.describe('Rankings – display name shown', () => {
     player.onboardingCompletedAtUtc = '2024-01-01T00:00:00Z'
     setupMockApi(page, { players: [player] })
     await page.goto('/leaderboard')
-    // Verify the 3-word personal alias is visible, not an email address
+    // Verify the 3-word personal alias is visible in the rankings
     await expect(page.locator('.rank-card').getByText('Caius Julius Caesar')).toBeVisible()
-    // Email must NOT appear in the visible ranking row
-    await expect(page.locator('.rank-card', { hasText: 'Caius Julius Caesar' }).getByText(player.email)).not.toBeVisible()
+    // Email must NOT appear anywhere in any rank card (rankings show alias, not email)
+    await expect(page.locator('.rank-card').getByText(player.email)).not.toBeVisible()
   })
 })
