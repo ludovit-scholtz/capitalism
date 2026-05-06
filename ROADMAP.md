@@ -9,8 +9,8 @@ It will use real world map. The game will start in single city and later other c
 ### Onboarding
 
 - [ ] Before user first sign in to the game make sure to fill in the referal code. Show link (and allow copy on one click) in the master frontend in the referal section where users can refer user for the game server. When user comes to this link, make sure the referal code is stored in the pinia state, and stored to the user account when he first logs in. Before user logs in, show him that he is using specific referal code and he will get 10% discount for in game purchases.
-- [ ] Create better Company name generator. Find npm package with the word list, and do a proper name generation with the combination of two words. Make sure the company names sounds great.
-- [ ] Create name generator for personal account name. Find npm package with the names wordlist and do a combination of the Firstname, Middlename and Last name. Allow players to change the personal account name later. In ranking show the personal account name, not the oidc name please. In the form to change name, tell people not to use the real name.
+- [x] Create better Company name generator. Find npm package with the word list, and do a proper name generation with the combination of two words. Make sure the company names sounds great.
+- [x] Create name generator for personal account name. Find npm package with the names wordlist and do a combination of the Firstname, Middlename and Last name. Allow players to change the personal account name later. In ranking show the personal account name, not the oidc name please. In the form to change name, tell people not to use the real name.
 
 ### Buildings (40% complete)
 
