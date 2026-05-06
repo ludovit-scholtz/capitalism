@@ -1025,4 +1025,423 @@ public sealed class DashboardPerformanceTests
         Assert.True(hasErrors || mcIsNullOrMissing,
             "Unauthenticated combined query: errors must be present or myCompanies must be null/absent.");
     }
+
+    // ── GetMyCompanies — include chain correctness ────────────────────────────
+
+    /// <summary>
+    /// <c>myCompanies</c> must return company buildings and their units.
+    /// This proves the multi-level Include chain
+    /// <c>Buildings → Units</c> still works after the <c>AsNoTracking()</c> + <c>AsSplitQuery()</c>
+    /// refactor.
+    /// </summary>
+    [Fact]
+    public async Task GetMyCompanies_IncludesBuildingsAndUnitsInResponse()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var userToken = await RegisterAndGetTokenAsync(client, "includes-buildings-user@test.com", "Includes Buildings");
+
+        Guid playerId;
+        await using (var s = factory.Services.CreateAsyncScope())
+        {
+            var db = s.ServiceProvider.GetRequiredService<AppDbContext>();
+            playerId = (await db.Players.FirstAsync(p => p.Email == "includes-buildings-user@test.com")).Id;
+        }
+
+        // Seed a company with a building that has one unit.
+        await using (var s = factory.Services.CreateAsyncScope())
+        {
+            var db = s.ServiceProvider.GetRequiredService<AppDbContext>();
+            var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+            var tick = await db.GameStates.AsNoTracking()
+                .Select(gs => gs.CurrentTick).FirstOrDefaultDeterministicAsync();
+
+            var company = new Company
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = playerId,
+                Name = "IncludesTestCorp",
+                FoundedAtUtc = DateTime.UtcNow,
+                FoundedAtTick = tick,
+            };
+            db.Companies.Add(company);
+            db.BankAccounts.Add(new BankAccount
+            {
+                Id = Guid.NewGuid(),
+                AccountNumber = GenerateTestAccountNumber(),
+                CompanyId = company.Id,
+                CurrencyCode = "EUR",
+                Balance = 100_000m,
+                CreatedAtUtc = DateTime.UtcNow,
+            });
+
+            var building = new Building
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                CityId = city.Id,
+                Type = BuildingType.Factory,
+                Name = "IncludesTestFactory",
+                Level = 1,
+            };
+            db.Buildings.Add(building);
+
+            db.BuildingUnits.Add(new BuildingUnit
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = building.Id,
+                UnitType = "MANUFACTURING",
+                GridX = 0,
+                GridY = 0,
+                Level = 1,
+            });
+
+            await db.SaveChangesAsync();
+        }
+
+        var cache = factory.Services.GetRequiredService<IMemoryCache>();
+        cache.Remove($"myCompanies_{playerId}");
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            "{ myCompanies { id name buildings { id name units { id unitType gridX gridY } } } }",
+            token: userToken);
+
+        var companies = result.GetProperty("data").GetProperty("myCompanies").EnumerateArray().ToList();
+        var corp = companies.FirstOrDefault(c => c.GetProperty("name").GetString() == "IncludesTestCorp");
+
+        Assert.NotEqual(default, corp);
+        var buildings = corp.GetProperty("buildings").EnumerateArray().ToList();
+        Assert.Single(buildings);
+        Assert.Equal("IncludesTestFactory", buildings[0].GetProperty("name").GetString());
+
+        var units = buildings[0].GetProperty("units").EnumerateArray().ToList();
+        Assert.Single(units);
+        Assert.Equal("MANUFACTURING", units[0].GetProperty("unitType").GetString());
+    }
+
+    // ── GetCities — ordering guarantee ───────────────────────────────────────
+
+    /// <summary>
+    /// <c>cities</c> must be ordered by <c>Population ASC, Name ASC</c>.
+    /// Bratislava (pop 475 000) must appear before Prague (pop 1 350 000) which must appear
+    /// before Vienna (pop 1 900 000) — proving <c>OrderBy(c =&gt; c.Population)</c> is enforced.
+    /// </summary>
+    [Fact]
+    public async Task GetCities_OrderedByPopulationAscending()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var cache = factory.Services.GetRequiredService<IMemoryCache>();
+        cache.Remove("cities_all");
+
+        var result = await ExecuteGraphQlAsync(client, "{ cities { name population } }");
+
+        var cities = result.GetProperty("data").GetProperty("cities")
+            .EnumerateArray()
+            .Select(c => (name: c.GetProperty("name").GetString()!, pop: c.GetProperty("population").GetInt64()))
+            .ToList();
+
+        // Locate the three reference cities by name; all three must be present.
+        var bratislava = cities.FindIndex(c => c.name == "Bratislava");
+        var prague = cities.FindIndex(c => c.name == "Prague");
+        var vienna = cities.FindIndex(c => c.name == "Vienna");
+
+        Assert.True(bratislava >= 0, "Bratislava must be in the cities list.");
+        Assert.True(prague >= 0, "Prague must be in the cities list.");
+        Assert.True(vienna >= 0, "Vienna must be in the cities list.");
+
+        // Bratislava has the lowest population among the three starter cities;
+        // it must appear before Prague and Vienna in the population-ordered list.
+        Assert.True(bratislava < prague, "Bratislava (475 000) must appear before Prague (1 350 000).");
+        Assert.True(bratislava < vienna, "Bratislava (475 000) must appear before Vienna (1 900 000).");
+        Assert.True(prague < vienna, "Prague (1 350 000) must appear before Vienna (1 900 000).");
+
+        // Sanity: the returned list itself must be non-descending by population.
+        var populations = cities.Select(c => c.pop).ToList();
+        for (var i = 1; i < populations.Count; i++)
+        {
+            Assert.True(populations[i] >= populations[i - 1],
+                $"City at index {i} has population {populations[i]} which is less than " +
+                $"city at index {i - 1} with population {populations[i - 1]} — ordering violated.");
+        }
+    }
+
+    // ── GetCity — resource include chain ─────────────────────────────────────
+
+    /// <summary>
+    /// <c>city(id)</c> for Bratislava must return the city's seeded resources with their
+    /// resource type data.  This validates the <c>Include(c =&gt; c.Resources).ThenInclude(r =&gt; r.ResourceType)</c>
+    /// chain still works after the <c>AsNoTracking()</c> + <c>AsSplitQuery()</c> refactor.
+    /// </summary>
+    [Fact]
+    public async Task GetCity_Bratislava_IncludesSeededResources()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        Guid bratislavaId;
+        await using (var s = factory.Services.CreateAsyncScope())
+        {
+            var db = s.ServiceProvider.GetRequiredService<AppDbContext>();
+            bratislavaId = (await db.Cities.FirstAsync(c => c.Name == "Bratislava")).Id;
+        }
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            "query GetCity($id: UUID!) { city(id: $id) { id name resources { abundance resourceType { name slug } } } }",
+            variables: new { id = bratislavaId });
+
+        var city = result.GetProperty("data").GetProperty("city");
+        Assert.NotEqual(JsonValueKind.Null, city.ValueKind);
+        Assert.Equal("Bratislava", city.GetProperty("name").GetString());
+
+        var resources = city.GetProperty("resources").EnumerateArray().ToList();
+        Assert.True(resources.Count > 0, "Bratislava must have at least one seeded resource.");
+
+        // All resources must include nested resource-type data (the ThenInclude chain).
+        foreach (var resource in resources)
+        {
+            var rt = resource.GetProperty("resourceType");
+            Assert.NotEqual(JsonValueKind.Null, rt.ValueKind);
+            Assert.False(string.IsNullOrEmpty(rt.GetProperty("slug").GetString()),
+                "Resource type slug must not be null or empty.");
+        }
+    }
+
+    // ── GetCity — Bratislava explicit coverage ────────────────────────────────
+
+    /// <summary>
+    /// Bratislava must be returned correctly by <c>city(id)</c> with EUR currency and
+    /// correct population.  Explicit coverage for the third starter city alongside
+    /// <see cref="GetCity_PragueCity_ReturnsCzkCurrency"/> and
+    /// <see cref="GetCity_ViennaCity_ReturnsEurCurrency"/>.
+    /// </summary>
+    [Fact]
+    public async Task GetCity_Bratislava_ReturnsEurCurrencyAndCorrectPopulation()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        Guid bratislavaId;
+        await using (var s = factory.Services.CreateAsyncScope())
+        {
+            var db = s.ServiceProvider.GetRequiredService<AppDbContext>();
+            bratislavaId = (await db.Cities.FirstAsync(c => c.Name == "Bratislava")).Id;
+        }
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            "query GetCity($id: UUID!) { city(id: $id) { id name currencyCode population } }",
+            variables: new { id = bratislavaId });
+
+        var city = result.GetProperty("data").GetProperty("city");
+        Assert.NotEqual(JsonValueKind.Null, city.ValueKind);
+        Assert.Equal("Bratislava", city.GetProperty("name").GetString());
+        Assert.Equal("EUR", city.GetProperty("currencyCode").GetString());
+        Assert.Equal(475_000L, city.GetProperty("population").GetInt64());
+    }
+
+    // ── GetMyCompanies — future plan not applied ──────────────────────────────
+
+    /// <summary>
+    /// A building configuration plan due at a FUTURE tick must also remain in the database
+    /// after a <c>myCompanies</c> query.  The write-on-read fix must not selectively apply
+    /// plans — no plans are ever applied inside a read resolver.
+    /// </summary>
+    [Fact]
+    public async Task GetMyCompanies_WithFuturePlan_PlanNotApplied()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var userToken = await RegisterAndGetTokenAsync(client, "future-plan-user@test.com", "Future Plan");
+
+        Guid playerId;
+        await using (var s = factory.Services.CreateAsyncScope())
+        {
+            var db = s.ServiceProvider.GetRequiredService<AppDbContext>();
+            playerId = (await db.Players.FirstAsync(p => p.Email == "future-plan-user@test.com")).Id;
+        }
+
+        // Seed a plan due 1000 ticks in the future.
+        Guid buildingId;
+        await using (var s = factory.Services.CreateAsyncScope())
+        {
+            var db = s.ServiceProvider.GetRequiredService<AppDbContext>();
+            var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+            var currentTick = await db.GameStates.AsNoTracking()
+                .Select(gs => gs.CurrentTick).FirstOrDefaultDeterministicAsync();
+
+            var company = new Company
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = playerId,
+                Name = "FuturePlanCorp",
+                FoundedAtUtc = DateTime.UtcNow,
+                FoundedAtTick = currentTick,
+            };
+            db.Companies.Add(company);
+
+            var building = new Building
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                CityId = city.Id,
+                Type = BuildingType.Factory,
+                Name = "FuturePlanFactory",
+                Level = 1,
+            };
+            buildingId = building.Id;
+            db.Buildings.Add(building);
+
+            // Future plan — 1 000 ticks ahead of current tick.
+            db.BuildingConfigurationPlans.Add(new BuildingConfigurationPlan
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = building.Id,
+                AppliesAtTick = currentTick + 1_000,
+                SubmittedAtTick = currentTick,
+                SubmittedAtUtc = DateTime.UtcNow,
+                TotalTicksRequired = 1_000,
+            });
+
+            await db.SaveChangesAsync();
+        }
+
+        var cache = factory.Services.GetRequiredService<IMemoryCache>();
+        cache.Remove($"myCompanies_{playerId}");
+
+        // Fire the read query — the future plan must remain untouched.
+        await ExecuteGraphQlAsync(client, "{ myCompanies { id name } }", token: userToken);
+
+        Assert.True(
+            await PlanExistsAsync(factory, buildingId),
+            "A future plan must not be removed by a myCompanies read query.");
+    }
+
+    // ── GetGameState — specific field coverage ────────────────────────────────
+
+    /// <summary>
+    /// <c>gameState</c> must return both <c>currentTick</c> and <c>taxCycleTicks</c> so
+    /// the frontend can compute the next tax boundary without an additional request.
+    /// </summary>
+    [Fact]
+    public async Task GetGameState_ReturnsTaxCycleTicksAndCurrentTickFields()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var cache = factory.Services.GetRequiredService<IMemoryCache>();
+        cache.Remove("gameState_singleton");
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            "{ gameState { currentTick taxCycleTicks } }");
+
+        var gs = result.GetProperty("data").GetProperty("gameState");
+        Assert.NotEqual(JsonValueKind.Null, gs.ValueKind);
+
+        var currentTick = gs.GetProperty("currentTick").GetInt64();
+        var taxCycleTicks = gs.GetProperty("taxCycleTicks").GetInt64();
+
+        Assert.True(currentTick >= 0, "currentTick must be non-negative.");
+        Assert.True(taxCycleTicks > 0, "taxCycleTicks must be positive.");
+    }
+
+    // ── GetCities — second call returns cached list ───────────────────────────
+
+    /// <summary>
+    /// The second call to <c>cities</c> must return data consistent with the first call,
+    /// served from the <c>cities_all</c> cache.  Both calls must return the same city names.
+    /// </summary>
+    [Fact]
+    public async Task GetCities_SecondCall_ReturnsSameDataFromCache()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var cache = factory.Services.GetRequiredService<IMemoryCache>();
+        cache.Remove("cities_all");
+
+        var first = await ExecuteGraphQlAsync(client, "{ cities { name } }");
+        var second = await ExecuteGraphQlAsync(client, "{ cities { name } }");
+
+        var firstNames = first.GetProperty("data").GetProperty("cities")
+            .EnumerateArray().Select(c => c.GetProperty("name").GetString()!).OrderBy(n => n).ToList();
+        var secondNames = second.GetProperty("data").GetProperty("cities")
+            .EnumerateArray().Select(c => c.GetProperty("name").GetString()!).OrderBy(n => n).ToList();
+
+        Assert.Equal(firstNames, secondNames);
+        Assert.True(firstNames.Count >= 3, "At least three cities must be returned on both calls.");
+
+        // Confirm the cache is still populated after the second call.
+        var cacheHit = cache.TryGetValue("cities_all", out List<City>? cached);
+        Assert.True(cacheHit && cached is not null, "cities_all cache must be populated after second call.");
+    }
+
+    // ── GetMyCompanies — second call returns cached list ─────────────────────
+
+    /// <summary>
+    /// A second <c>myCompanies</c> call for the same player must return the same company names
+    /// as the first call.  The per-user cache must serve the second call without hitting the DB.
+    /// </summary>
+    [Fact]
+    public async Task GetMyCompanies_SecondCall_ReturnsSameCompaniesFromCache()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var userToken = await RegisterAndGetTokenAsync(client, "cache-second-call@test.com", "Cache Second Call");
+
+        Guid playerId;
+        await using (var s = factory.Services.CreateAsyncScope())
+        {
+            var db = s.ServiceProvider.GetRequiredService<AppDbContext>();
+            playerId = (await db.Players.FirstAsync(p => p.Email == "cache-second-call@test.com")).Id;
+        }
+
+        await using (var s = factory.Services.CreateAsyncScope())
+        {
+            var db = s.ServiceProvider.GetRequiredService<AppDbContext>();
+            var tick = await db.GameStates.AsNoTracking()
+                .Select(gs => gs.CurrentTick).FirstOrDefaultDeterministicAsync();
+
+            var co = new Company
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = playerId,
+                Name = "SecondCallCorp",
+                FoundedAtUtc = DateTime.UtcNow,
+                FoundedAtTick = tick,
+            };
+            db.Companies.Add(co);
+            db.BankAccounts.Add(new BankAccount
+            {
+                Id = Guid.NewGuid(),
+                AccountNumber = GenerateTestAccountNumber(),
+                CompanyId = co.Id,
+                CurrencyCode = "EUR",
+                Balance = 1_000m,
+                CreatedAtUtc = DateTime.UtcNow,
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var cache = factory.Services.GetRequiredService<IMemoryCache>();
+        cache.Remove($"myCompanies_{playerId}");
+
+        var first = await ExecuteGraphQlAsync(client, "{ myCompanies { name } }", token: userToken);
+        var second = await ExecuteGraphQlAsync(client, "{ myCompanies { name } }", token: userToken);
+
+        var firstNames = first.GetProperty("data").GetProperty("myCompanies")
+            .EnumerateArray().Select(c => c.GetProperty("name").GetString()!).OrderBy(n => n).ToList();
+        var secondNames = second.GetProperty("data").GetProperty("myCompanies")
+            .EnumerateArray().Select(c => c.GetProperty("name").GetString()!).OrderBy(n => n).ToList();
+
+        Assert.Equal(firstNames, secondNames);
+        Assert.Contains("SecondCallCorp", firstNames);
+    }
 }
