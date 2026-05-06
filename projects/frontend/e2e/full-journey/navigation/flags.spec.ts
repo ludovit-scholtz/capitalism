@@ -284,7 +284,12 @@ test.describe('Country flag icons', () => {
   // ──────────────────────────────────────────────────
 
   test.describe('All city flags', () => {
+    // Bratislava (SK), Prague (CZ), and Vienna (AT) have individual assertions above.
+    // This block covers all 8 seeded cities including those three for completeness.
     const cityFlagCases = [
+      { name: 'Bratislava', code: 'SK' },
+      { name: 'Prague', code: 'CZ' },
+      { name: 'Vienna', code: 'AT' },
       { name: 'New York', code: 'US' },
       { name: 'London', code: 'GB' },
       { name: 'Beijing', code: 'CN' },
