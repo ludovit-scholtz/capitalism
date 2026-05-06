@@ -257,8 +257,8 @@ describe('generateOnboardingCompanyName', () => {
   })
 
   it('generated name second word belongs to the businessSuffixes list', () => {
-    const healthcareIndustries = ['HEALTHCARE', 'FOOD_PROCESSING', 'FURNITURE']
-    for (const ind of healthcareIndustries) {
+    const starterIndustries = ['HEALTHCARE', 'FOOD_PROCESSING', 'FURNITURE']
+    for (const ind of starterIndustries) {
       resetNameSession(`${ind}:suffix-check`)
       for (let i = 0; i < 5; i++) {
         const name = generateOnboardingCompanyName(ind)

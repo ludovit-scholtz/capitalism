@@ -5831,7 +5831,7 @@ test.describe('Company name generator — generate, regenerate and edit (AC from
     expect(words).toHaveLength(2)
     expect(words[0]!.length).toBeGreaterThan(0)
     expect(words[1]!.length).toBeGreaterThan(0)
-    // First word should be capitalised
+    // First word should be capitalized
     expect(words[0]![0]).toBe(words[0]![0]!.toUpperCase())
   })
 
