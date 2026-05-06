@@ -198,6 +198,46 @@ public sealed partial class Query
         return result;
     }
 
+    /// <summary>
+    /// Returns historical FX rate snapshots for a given EUR-based currency pair.
+    /// Returns up to <paramref name="ticksBack"/> most recent snapshots, ordered oldest-first.
+    /// Public query — no authentication required.
+    /// </summary>
+    /// <param name="quoteCurrencyCode">ISO 4217 quote currency code (e.g. "CZK", "USD").</param>
+    /// <param name="ticksBack">How many recent ticks to return. Defaults to 100, capped at 1000.</param>
+    public async Task<List<FxRateSnapshot>> GetFxRateHistory(
+        string quoteCurrencyCode,
+        int? ticksBack,
+        [Service] AppDbContext db)
+    {
+        if (string.IsNullOrWhiteSpace(quoteCurrencyCode) || quoteCurrencyCode.Length != 3)
+            throw new GraphQLException(new Error("Quote currency code must be a 3-letter ISO code.", "INVALID_CURRENCY_CODE"));
+
+        var limit = Math.Clamp(ticksBack ?? 100, 1, 1_000);
+        var code = quoteCurrencyCode.ToUpperInvariant();
+
+        var snapshots = await db.FxRateHistories
+            .AsNoTracking()
+            .Where(h => h.BaseCurrencyCode == EurCurrencyCode && h.QuoteCurrencyCode == code)
+            .OrderByDescending(h => h.GameTick)
+            .Take(limit)
+            .ToListAsync();
+
+        return snapshots
+            .OrderBy(h => h.GameTick)
+            .Select(h => new FxRateSnapshot
+            {
+                BaseCurrencyCode = h.BaseCurrencyCode,
+                QuoteCurrencyCode = h.QuoteCurrencyCode,
+                MidRate = h.MidRate,
+                BuyRate = h.BuyRate,
+                SellRate = h.SellRate,
+                GameTick = h.GameTick,
+                CapturedAtUtc = h.CapturedAtUtc
+            })
+            .ToList();
+    }
+
     internal static async Task<decimal> ComputeForexRateAsync(AppDbContext db, string fromCode, string toCode)
     {
         if (fromCode == toCode)

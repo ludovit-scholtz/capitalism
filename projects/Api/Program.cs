@@ -269,6 +269,7 @@ public class Program
         builder.Services.AddScoped<ITickPhase, EconomicReportPhase>();
         builder.Services.AddScoped<ITickPhase, MarketReportPhase>();
         builder.Services.AddScoped<ITickPhase, RankHistoryPhase>();
+        builder.Services.AddScoped<ITickPhase, FxRateHistoryPhase>();
         builder.Services.AddHostedService<GameTickHostedService>();
         builder.Services.AddHostedService<MasterServerRegistrationHostedService>();
         builder.Services.AddHostedService<MarketReportPublisherHostedService>();

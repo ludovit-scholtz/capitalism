@@ -133,9 +133,20 @@ public sealed class ForexTradeHistoryEntry
 /// </summary>
 public sealed class EurFxRate
 {
+    private const decimal SpreadHalfPercent = 0.005m;
+
     /// <summary>ISO 4217 currency code of the quote currency.</summary>
     public string CurrencyCode { get; set; } = string.Empty;
 
     /// <summary>How many units of this currency equal 1 EUR (e.g. 25.20 for CZK, 1.08 for USD).</summary>
     public decimal Rate { get; set; }
+
+    /// <summary>Mid-market rate (same as Rate for backwards compatibility).</summary>
+    public decimal MidRate => Rate;
+
+    /// <summary>Buy rate (ask): slightly worse for buyer, +0.5% from mid.</summary>
+    public decimal BuyRate => Math.Round(Rate * (1m + SpreadHalfPercent), 6);
+
+    /// <summary>Sell rate (bid): slightly better for seller, -0.5% from mid.</summary>
+    public decimal SellRate => Math.Round(Rate * (1m - SpreadHalfPercent), 6);
 }

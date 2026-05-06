@@ -114,6 +114,9 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Persisted foreign exchange rates fetched from the NBS daily CSV feed.</summary>
     public DbSet<FxRate> FxRates => Set<FxRate>();
 
+    /// <summary>Historical FX rate snapshots captured at each tick for charting purposes.</summary>
+    public DbSet<FxRateHistory> FxRateHistories => Set<FxRateHistory>();
+
     /// <summary>Completed forex currency swap audit trail.</summary>
     public DbSet<ForexTradeRecord> ForexTradeRecords => Set<ForexTradeRecord>();
 
