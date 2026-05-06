@@ -326,7 +326,18 @@ const visualsByIndustry: Record<string, { background: string; accent: string }> 
 }
 const defaultProductVisual = { background: '#8B5A2B', accent: '#D4A373' }
 
+// Full-slug overrides for cases where word-by-word translation breaks grammatical gender agreement.
+const slugTranslationOverrides: Record<Exclude<SupportedLocale, 'en'>, Record<string, string>> = {
+  sk: {
+    'wooden-bed': 'Drevená posteľ',
+    'wooden-chair': 'Drevená stolička',
+  },
+  de: {},
+}
+
 export function translateSlug(slug: string, locale: Exclude<SupportedLocale, 'en'>): string {
+  const override = slugTranslationOverrides[locale][slug]
+  if (override) return override
   return slug
     .split('-')
     .map((token) => tokenTranslations[locale][token] ?? token)
@@ -406,16 +417,13 @@ function sanitizeHexColor(value: string): string {
 }
 
 function escapeSvgText(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 function hashValue(value: string): string {
   let hash = 0
   for (let index = 0; index < value.length; index += 1) {
-    hash = ((hash << 5) - hash) + value.charCodeAt(index)
+    hash = (hash << 5) - hash + value.charCodeAt(index)
     hash |= 0
   }
 
