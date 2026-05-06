@@ -51,13 +51,12 @@ const {
   formatUnitQuantity,
 } = bd
 
-const selectedConfigTab = ref<'general' | 'production' | 'inventory' | 'sales'>('general')
+const selectedConfigTab = ref<'config' | 'performance' | 'maintenance'>('config')
 
 const editTabs = computed(() => [
-  { key: 'general', label: t('buildingDetail.editTabGeneralSettings') },
-  { key: 'production', label: t('buildingDetail.editTabProduction') },
-  { key: 'inventory', label: t('buildingDetail.editTabInventory') },
-  { key: 'sales', label: t('buildingDetail.editTabSales') },
+  { key: 'config', label: t('buildingDetail.editTabConfig') },
+  { key: 'performance', label: t('buildingDetail.editTabPerformance') },
+  { key: 'maintenance', label: t('buildingDetail.editTabMaintenance') },
 ])
 
 const currentUnit = computed(() => {
@@ -78,7 +77,7 @@ const currentUnit = computed(() => {
         :key="tab.key"
         class="unit-tab-btn inline-flex shrink-0 items-center rounded-md border border-transparent px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted transition-colors hover:text-foreground"
         :class="selectedConfigTab === tab.key ? 'unit-tab-btn--active border-primary/40 bg-primary/10 text-primary' : 'hover:border-divider hover:bg-surface'"
-        @click="selectedConfigTab = tab.key as 'general' | 'production' | 'inventory' | 'sales'"
+        @click="selectedConfigTab = tab.key as 'config' | 'performance' | 'maintenance'"
       >
         {{ tab.label }}
       </button>
@@ -87,7 +86,7 @@ const currentUnit = computed(() => {
     <div class="unit-detail">
 
       <!-- ── Tab: General Settings ── -->
-      <template v-if="selectedConfigTab === 'general'">
+      <template v-if="selectedConfigTab === 'config'">
         <h4>{{ t(`buildingDetail.unitTypes.${currentUnit.unitType}`) }}</h4>
         <p class="unit-desc">{{ t(`buildingDetail.unitDescriptions.${currentUnit.unitType}`) }}</p>
         <div class="unit-stats">
@@ -115,24 +114,11 @@ const currentUnit = computed(() => {
           <span v-if="currentUnit.linkDownLeft" class="link-badge">{{ t('buildingDetail.linkDownLeft') }}</span>
           <span v-if="currentUnit.linkDownRight" class="link-badge">{{ t('buildingDetail.linkDownRight') }}</span>
         </div>
-        <div v-if="getDraftUnitConstructionCostLabel(currentUnit)" class="unit-insight-card">
-          <h5>{{ t('buildingDetail.costSummaryTitle') }}</h5>
-          <div class="unit-stats">
-            <span class="stat">{{ t('buildingDetail.unitCost', { cost: getDraftUnitConstructionCostLabel(currentUnit) }) }}</span>
-          </div>
-        </div>
-        <div class="unit-actions" v-if="isEditing">
-          <button class="btn btn-danger btn-sm" @click="removeDraftUnit(selectedCell.x, selectedCell.y)">
-            {{ t('buildingDetail.removeUnit') }}
-          </button>
-        </div>
-      </template>
 
-      <!-- ── Tab: Production ── -->
-      <template v-else-if="selectedConfigTab === 'production'">
+        <!-- Unit-specific configuration (shown on default tab so settings are immediately visible) -->
         <BuildingUnitConfigFields />
 
-        <!-- Exchange offers panel -->
+        <!-- Exchange offers panel — shown on General tab when PURCHASE unit has EXCHANGE/OPTIMAL source -->
         <div
           v-if="selectedPurchaseUnit && 'resourceTypeId' in selectedPurchaseUnit && selectedPurchaseUnit.resourceTypeId && ['EXCHANGE', 'OPTIMAL'].includes(selectedPurchaseUnit.purchaseSource ?? '')"
           class="unit-insight-card"
@@ -196,10 +182,23 @@ const currentUnit = computed(() => {
             </RouterLink>
           </template>
         </div>
+
+        <div v-if="getDraftUnitConstructionCostLabel(currentUnit)" class="unit-insight-card">
+          <h5>{{ t('buildingDetail.costSummaryTitle') }}</h5>
+          <div class="unit-stats">
+            <span class="stat">{{ t('buildingDetail.unitCost', { cost: getDraftUnitConstructionCostLabel(currentUnit) }) }}</span>
+          </div>
+        </div>
+        <div class="unit-actions" v-if="isEditing">
+          <button class="btn btn-danger btn-sm" @click="removeDraftUnit(selectedCell.x, selectedCell.y)">
+            {{ t('buildingDetail.removeUnit') }}
+          </button>
+        </div>
       </template>
 
+      <!-- ── Tab: Production (future use) ── -->
       <!-- ── Tab: Inventory ── -->
-      <template v-else-if="selectedConfigTab === 'inventory'">
+      <template v-else-if="selectedConfigTab === 'performance'">
         <div v-if="getUnitInventorySummary(currentUnit)" class="unit-insight-card">
           <h5>{{ t('buildingDetail.inventory.title') }}</h5>
           <div class="inventory-summary-grid">
@@ -282,7 +281,7 @@ const currentUnit = computed(() => {
       </template>
 
       <!-- ── Tab: Sales / Upgrade ── -->
-      <template v-else-if="selectedConfigTab === 'sales'">
+      <template v-else-if="selectedConfigTab === 'maintenance'">
         <div v-if="isEditing && selectedCellUpgradeInfo !== null" class="unit-insight-card unit-upgrade-panel" :aria-label="t('buildingDetail.accessibility.unitUpgrade')">
           <h5>{{ t('buildingDetail.unitUpgrade.sectionTitle') }}</h5>
 
