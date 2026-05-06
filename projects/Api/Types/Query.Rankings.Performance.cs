@@ -12,21 +12,32 @@ namespace Api.Types;
 public sealed partial class Query
 {
     /// <summary>Gets the current player's companies with their buildings.</summary>
+    /// <remarks>
+    /// This is a read-only query — building configuration plans are applied exclusively
+    /// by the tick engine's <see cref="Engine.Phases.BuildingUpgradePhase"/>, not on demand
+    /// during dashboard reads.  Keeping this path write-free ensures fast (&lt;100 ms) initial
+    /// dashboard load times even with many concurrent players.
+    /// </remarks>
     [Authorize]
     public async Task<List<Company>> GetMyCompanies(
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] IMemoryCache cache)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
-        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync();
-        if (gameState is not null)
+        var cacheKey = $"myCompanies_{userId}";
+        if (cache.TryGetValue(cacheKey, out List<Company>? cached) && cached is not null)
         {
-            await BuildingConfigurationService.ApplyDuePlansAsync(db, gameState.CurrentTick);
-            await db.SaveChangesAsync();
+            // The cached list was produced with AsNoTracking(), so entities are plain POCOs
+            // with no DbContext reference.  HotChocolate only reads the list for serialisation
+            // — it never mutates the collection — making the shared reference safe under
+            // concurrent requests for the same user.
+            return cached;
         }
 
-        return await db.Companies
+        var companies = await db.Companies
+            .AsNoTracking()
             .Include(c => c.Buildings)
             .ThenInclude(b => b.Units)
             .Include(c => c.Buildings)
@@ -39,6 +50,9 @@ public sealed partial class Query
             .Where(c => c.PlayerId == userId)
             .OrderBy(c => c.Name)
             .ToListAsync();
+
+        cache.Set(cacheKey, companies, TimeSpan.FromSeconds(5));
+        return companies;
     }
 
     /// <summary>
