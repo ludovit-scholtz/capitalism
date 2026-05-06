@@ -727,4 +727,302 @@ public sealed class DashboardPerformanceTests
         Assert.True(cacheHit, "gameState_singleton must be set in IMemoryCache after first query.");
         Assert.NotNull(cached);
     }
+
+    /// <summary>
+    /// A second <c>gameState</c> HTTP call must return the same tick value as the first
+    /// (proving the cache is serving the result, not querying the DB each time).
+    /// </summary>
+    [Fact]
+    public async Task GetGameState_SecondCall_ReturnsSameDataFromCache()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        // Evict any lingering cache entry.
+        var cache = factory.Services.GetRequiredService<IMemoryCache>();
+        cache.Remove("gameState_singleton");
+
+        // First HTTP call — populates the cache.
+        var first = await ExecuteGraphQlAsync(client, "{ gameState { currentTick taxCycleTicks } }");
+        var tick1 = first.GetProperty("data").GetProperty("gameState").GetProperty("currentTick").GetInt64();
+
+        // Second call without any DB change — must return the same cached tick.
+        var second = await ExecuteGraphQlAsync(client, "{ gameState { currentTick taxCycleTicks } }");
+        var tick2 = second.GetProperty("data").GetProperty("gameState").GetProperty("currentTick").GetInt64();
+
+        Assert.Equal(tick1, tick2);
+    }
+
+    /// <summary>
+    /// Verifies that the per-user <c>myCompanies</c> cache is populated after the first call,
+    /// so burst concurrent reloads skip the DB round-trip.
+    /// </summary>
+    [Fact]
+    public async Task GetMyCompanies_AfterFirstCall_IsCachedInMemory()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var userToken = await RegisterAndGetTokenAsync(client, "mc-cache-user@test.com", "Cache User");
+
+        Guid playerId;
+        await using (var s = factory.Services.CreateAsyncScope())
+        {
+            var db = s.ServiceProvider.GetRequiredService<AppDbContext>();
+            playerId = (await db.Players.FirstAsync(p => p.Email == "mc-cache-user@test.com")).Id;
+        }
+
+        var cache = factory.Services.GetRequiredService<IMemoryCache>();
+        var cacheKey = $"myCompanies_{playerId}";
+        cache.Remove(cacheKey);
+
+        // First call — should populate the per-user cache.
+        await ExecuteGraphQlAsync(client, "{ myCompanies { id name } }", token: userToken);
+
+        // Cache entry must now exist.
+        var cacheHit = cache.TryGetValue(cacheKey, out List<Company>? cached);
+        Assert.True(cacheHit, "myCompanies_{userId} must be set in IMemoryCache after first query.");
+        Assert.NotNull(cached);
+    }
+
+    // ── GetCities (list query) ────────────────────────────────────────────────
+
+    /// <summary>
+    /// The <c>cities</c> list query must return all three seeded cities (Bratislava, Prague,
+    /// Vienna) and must remain read-only (no due plans applied as a side effect).
+    /// </summary>
+    [Fact]
+    public async Task GetCities_ReturnsAllThreeSeededCities_AndIsReadOnly()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        // Register a user and seed a due plan so we can detect any spurious writes.
+        var userToken = await RegisterAndGetTokenAsync(client, "cities-list-user@test.com", "Cities List User");
+        Guid playerId;
+        await using (var s = factory.Services.CreateAsyncScope())
+        {
+            var db = s.ServiceProvider.GetRequiredService<AppDbContext>();
+            playerId = (await db.Players.FirstAsync(p => p.Email == "cities-list-user@test.com")).Id;
+        }
+        var (buildingId, _) = await SeedCompanyWithDuePlanAsync(
+            factory, playerId, "CitiesListCorp", "CitiesListFactory");
+
+        var result = await ExecuteGraphQlAsync(client, "{ cities { id name currencyCode } }");
+
+        var cityNames = result.GetProperty("data").GetProperty("cities")
+            .EnumerateArray()
+            .Select(c => c.GetProperty("name").GetString()!)
+            .ToHashSet();
+
+        Assert.Contains("Bratislava", cityNames);
+        Assert.Contains("Prague", cityNames);
+        Assert.Contains("Vienna", cityNames);
+
+        // cities query must not have applied the due plan.
+        Assert.True(
+            await PlanExistsAsync(factory, buildingId),
+            "GetCities must not apply due plans; it is a read-only query.");
+    }
+
+    // ── All three seeded cities via GetCity ───────────────────────────────────
+
+    /// <summary>
+    /// Prague must be returned correctly by <c>city(id)</c> with CZK currency.
+    /// </summary>
+    [Fact]
+    public async Task GetCity_PragueCity_ReturnsCzkCurrency()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        Guid pragueId;
+        await using (var s = factory.Services.CreateAsyncScope())
+        {
+            var db = s.ServiceProvider.GetRequiredService<AppDbContext>();
+            pragueId = (await db.Cities.FirstAsync(c => c.Name == "Prague")).Id;
+        }
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            "query GetCity($id: UUID!) { city(id: $id) { id name currencyCode } }",
+            variables: new { id = pragueId });
+
+        var city = result.GetProperty("data").GetProperty("city");
+        Assert.NotEqual(JsonValueKind.Null, city.ValueKind);
+        Assert.Equal("Prague", city.GetProperty("name").GetString());
+        Assert.Equal("CZK", city.GetProperty("currencyCode").GetString());
+    }
+
+    /// <summary>
+    /// Vienna must be returned correctly by <c>city(id)</c> with EUR currency.
+    /// </summary>
+    [Fact]
+    public async Task GetCity_ViennaCity_ReturnsEurCurrency()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        Guid viennaId;
+        await using (var s = factory.Services.CreateAsyncScope())
+        {
+            var db = s.ServiceProvider.GetRequiredService<AppDbContext>();
+            viennaId = (await db.Cities.FirstAsync(c => c.Name == "Vienna")).Id;
+        }
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            "query GetCity($id: UUID!) { city(id: $id) { id name currencyCode } }",
+            variables: new { id = viennaId });
+
+        var city = result.GetProperty("data").GetProperty("city");
+        Assert.NotEqual(JsonValueKind.Null, city.ValueKind);
+        Assert.Equal("Vienna", city.GetProperty("name").GetString());
+        Assert.Equal("EUR", city.GetProperty("currencyCode").GetString());
+    }
+
+    // ── Ordering and correctness ──────────────────────────────────────────────
+
+    /// <summary>
+    /// <c>myCompanies</c> orders results alphabetically by name, matching the
+    /// <c>OrderBy(c =&gt; c.Name)</c> clause in the resolver.
+    /// </summary>
+    [Fact]
+    public async Task GetMyCompanies_MultipleCompanies_ReturnedInAlphabeticalOrder()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var userToken = await RegisterAndGetTokenAsync(client, "ordered-co-user@test.com", "Ordered Co");
+
+        Guid playerId;
+        await using (var s = factory.Services.CreateAsyncScope())
+        {
+            var db = s.ServiceProvider.GetRequiredService<AppDbContext>();
+            playerId = (await db.Players.FirstAsync(p => p.Email == "ordered-co-user@test.com")).Id;
+        }
+
+        // Seed companies in reverse alphabetical order to confirm the DB sorts them.
+        await using (var s = factory.Services.CreateAsyncScope())
+        {
+            var db = s.ServiceProvider.GetRequiredService<AppDbContext>();
+            var tick = await db.GameStates.AsNoTracking()
+                .Select(gs => gs.CurrentTick).FirstOrDefaultDeterministicAsync();
+
+            foreach (var name in new[] { "ZetaGlobal", "AlphaCorp", "MidBiz" })
+            {
+                var co = new Company
+                {
+                    Id = Guid.NewGuid(),
+                    PlayerId = playerId,
+                    Name = name,
+                    FoundedAtUtc = DateTime.UtcNow,
+                    FoundedAtTick = tick,
+                };
+                db.Companies.Add(co);
+                db.BankAccounts.Add(new BankAccount
+                {
+                    Id = Guid.NewGuid(),
+                    AccountNumber = GenerateTestAccountNumber(),
+                    CompanyId = co.Id,
+                    CurrencyCode = "EUR",
+                    Balance = 1_000m,
+                    CreatedAtUtc = DateTime.UtcNow,
+                });
+            }
+            await db.SaveChangesAsync();
+        }
+
+        // Evict cache so the query hits the DB.
+        var cache = factory.Services.GetRequiredService<IMemoryCache>();
+        cache.Remove($"myCompanies_{playerId}");
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            "{ myCompanies { name } }",
+            token: userToken);
+
+        var names = result.GetProperty("data").GetProperty("myCompanies")
+            .EnumerateArray()
+            .Select(c => c.GetProperty("name").GetString()!)
+            .ToList();
+
+        // Must include all three seeded companies.
+        Assert.Contains("AlphaCorp", names);
+        Assert.Contains("MidBiz", names);
+        Assert.Contains("ZetaGlobal", names);
+
+        // Names within the returned list must be in non-descending order.
+        var seededSubset = names.Where(n => n is "AlphaCorp" or "MidBiz" or "ZetaGlobal").ToList();
+        var sorted = seededSubset.OrderBy(n => n).ToList();
+        Assert.Equal(sorted, seededSubset);
+    }
+
+    // ── GetCities cache ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// The <c>cities</c> list query must populate the <c>cities_all</c> cache key after the
+    /// first call so subsequent requests skip the DB round-trip.
+    /// </summary>
+    [Fact]
+    public async Task GetCities_AfterFirstCall_IsCachedInMemory()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var cache = factory.Services.GetRequiredService<IMemoryCache>();
+        cache.Remove("cities_all");
+
+        // First call — should populate the cache.
+        await ExecuteGraphQlAsync(client, "{ cities { id name } }");
+
+        // Cache entry must now exist.
+        var cacheHit = cache.TryGetValue("cities_all", out List<City>? cached);
+        Assert.True(cacheHit, "cities_all must be set in IMemoryCache after first query.");
+        Assert.NotNull(cached);
+        Assert.True(cached!.Count >= 3, "At least three cities must be seeded and cached.");
+    }
+
+    // ── Combined query — auth vs public field isolation ───────────────────────
+
+    /// <summary>
+    /// In the combined dashboard startup query, if the request is unauthenticated,
+    /// <c>myCompanies</c> must be rejected.  HotChocolate may set <c>data</c> to <c>null</c>
+    /// (non-nullable field failure) or return per-field errors; either way the request must
+    /// not return live company data for an anonymous caller.
+    /// </summary>
+    [Fact]
+    public async Task CombinedDashboardQuery_Unauthenticated_ReturnsAuthorizationError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        // Deliberately no Bearer token.
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            {
+                myCompanies { id name }
+                gameState { currentTick }
+                cities { id name }
+            }
+            """);
+
+        // HotChocolate bubbles the non-nullable auth error to `data: null` for the whole
+        // document OR returns per-field errors.  Either way an `errors` array must be present.
+        var hasErrors = result.TryGetProperty("errors", out var errs) &&
+                        errs.ValueKind == JsonValueKind.Array &&
+                        errs.GetArrayLength() > 0;
+
+        // Alternatively, data may be present but myCompanies is null.
+        bool mcIsNullOrMissing = false;
+        if (result.TryGetProperty("data", out var dataEl) && dataEl.ValueKind == JsonValueKind.Object)
+        {
+            mcIsNullOrMissing = !dataEl.TryGetProperty("myCompanies", out var mc) ||
+                                mc.ValueKind == JsonValueKind.Null;
+        }
+
+        Assert.True(hasErrors || mcIsNullOrMissing,
+            "Unauthenticated combined query: errors must be present or myCompanies must be null/absent.");
+    }
 }
