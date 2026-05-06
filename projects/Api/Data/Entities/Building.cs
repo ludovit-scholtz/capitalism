@@ -220,6 +220,13 @@ public sealed class Building
     /// </summary>
     public decimal FuelReserveMwh { get; set; } = 0m;
 
+    /// <summary>
+    /// UTC timestamp when the building was destroyed (loan default foreclosure).
+    /// Null when the building is still standing.
+    /// When set, the building is inoperative and shows a "Destroyed" status.
+    /// </summary>
+    public DateTime? DestroyedAtUtc { get; set; }
+
     /// <summary>Units installed in this building's 4x4 grid.</summary>
     public ICollection<BuildingUnit> Units { get; set; } = [];
 

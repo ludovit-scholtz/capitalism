@@ -228,6 +228,8 @@ export type MockBuilding = {
   lotResourceTypeId?: string | null
   /** Mine deposit material quality 0..1 (MINE only). Null for non-mine buildings. */
   lotMaterialQuality?: number | null
+  /** UTC timestamp when building was destroyed (by loan default); null for active buildings. */
+  destroyedAtUtc?: string | null
   units: MockBuildingUnit[]
   pendingConfiguration: MockBuildingConfigurationPlan | null
 }

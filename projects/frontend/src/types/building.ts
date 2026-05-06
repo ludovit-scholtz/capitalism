@@ -158,6 +158,8 @@ export interface Building {
   lotMaterialQuantity?: number | null
   /** Original (full) extractable quantity at the time the lot was first tracked (null for non-mine lots). */
   lotOriginalMaterialQuantity?: number | null
+  /** UTC timestamp when the building was destroyed by loan default foreclosure. Null when still standing. */
+  destroyedAtUtc: string | null
   units: BuildingUnit[]
   pendingConfiguration: BuildingConfigurationPlan | null
 }
@@ -223,6 +225,7 @@ export interface BuildingLot {
     constructionCost: number
     isForSale: boolean
     askingPrice: number | null
+    destroyedAtUtc: string | null
   } | null
   /** Raw material available for extraction — null when no resource on this lot */
   resourceType: { id: string; name: string; slug: string } | null

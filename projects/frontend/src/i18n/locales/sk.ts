@@ -1376,9 +1376,15 @@ export default {
     estimatedMarketValue: 'Odhadovaná trhová hodnota',
     estimatedValueHint: 'Referenčný odhad na základe vylepšení budovy a polohy mesta.',
     askingPriceMustBePositive: 'Požadovaná cena musí byť väčšia ako nula.',
+    askingPriceHighWarning:
+      'Upozornenie: požadovaná cena presahuje 150% odhadovanej trhovej hodnoty. Môže to odradiť kupcov.',
     overviewTab: 'Výsledky a štatistiky',
     bankAccountTab: 'Bankový účet',
     collateralRestrictionWarning: 'Táto budova je použitá ako záložné právo k pôžičke a nemôže byť ponúknutá na predaj.',
+    collateralBlockedByLoans:
+      'Zablokované {count} aktívnou pôžičkou (pôžičkami), ktoré používajú túto budovu ako zábezpeku. Najprv splaťte tieto pôžičky.',
+    destroyedBadge: 'Zničená',
+    destroyedHint: 'Táto budova bola zabavená a zničená po nesplatení pôžičky.',
     editTabConfig: 'Konfigurácia',
     editTabPerformance: 'Výkon',
     editTabMaintenance: 'Údržba',

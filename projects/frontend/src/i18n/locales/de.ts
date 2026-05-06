@@ -1378,9 +1378,15 @@ export default {
     estimatedMarketValue: 'Geschätzter Marktwert',
     estimatedValueHint: 'Referenzschätzung basierend auf Gebäudeverbesserungen und Stadtlage.',
     askingPriceMustBePositive: 'Der Angebotspreis muss größer als null sein.',
+    askingPriceHighWarning:
+      'Warnung: Der Angebotspreis übersteigt 150% des geschätzten Marktwerts. Dies könnte Käufer abschrecken.',
     overviewTab: 'GuV und Statistiken',
     bankAccountTab: 'Bankkonto',
     collateralRestrictionWarning: 'Dieses Gebäude wird als Kreditsicherheit verwendet und kann nicht zum Verkauf angeboten werden.',
+    collateralBlockedByLoans:
+      'Blockiert durch {count} aktiven Kredit(e), der dieses Gebäude als Sicherheit nutzt. Begleichen Sie diese Kredite zuerst.',
+    destroyedBadge: 'Zerstört',
+    destroyedHint: 'Dieses Gebäude wurde nach einem Kreditausfall zwangsvollstreckt und zerstört.',
     editTabConfig: 'Konfiguration',
     editTabPerformance: 'Leistung',
     editTabMaintenance: 'Wartung',

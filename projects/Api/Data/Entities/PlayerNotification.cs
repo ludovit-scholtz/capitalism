@@ -49,4 +49,5 @@ public static class PlayerNotificationType
     public const string BuildingSoldSuccessfully = "BUILDING_SOLD_SUCCESSFULLY";
     public const string MineFullyDepleted = "MINE_FULLY_DEPLETED";
     public const string MineReplenished = "MINE_REPLENISHED";
+    public const string BuildingDestroyedByDefault = "BUILDING_DESTROYED_BY_DEFAULT";
 }
