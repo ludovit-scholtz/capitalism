@@ -167,6 +167,6 @@ test.describe('Rankings – display name shown', () => {
     // Verify the 3-word personal alias is visible in the rankings
     await expect(page.locator('.rank-card').getByText('Caius Julius Caesar')).toBeVisible()
     // Email must NOT appear anywhere in any rank card (rankings show alias, not email)
-    await expect(page.locator('.rank-card').getByText(player.email)).not.toBeVisible()
+    await expect(page.locator('.rank-card').getByText(player.email)).toBeHidden()
   })
 })
