@@ -274,6 +274,8 @@ test.describe('Gold token admin — global admin', () => {
     await loginAs(page, state, admin, 'token-admin')
     await page.goto('/')
 
-    await expect(page.getByRole('link', { name: /Game admin dashboard/i })).toBeVisible()
+    // Two links with this name exist on the page (AppHeader nav-link + ViewSubnav subnav-link).
+    // Use .first() to avoid strict-mode violation while still confirming the link is present.
+    await expect(page.getByRole('link', { name: /Game admin dashboard/i }).first()).toBeVisible()
   })
 })

@@ -236,4 +236,111 @@ test.describe('Country flag icons', () => {
       }
     })
   })
+
+  // ──────────────────────────────────────────────────
+  // Language switcher active state
+  // ──────────────────────────────────────────────────
+
+  test.describe('Language switcher active state', () => {
+    test('active language button has aria-pressed=true', async ({ page }) => {
+      setupMockApi(page)
+      await page.goto('/')
+
+      const switcher = page.locator('.language-switcher').first()
+      await expect(switcher).toBeVisible()
+
+      // Default locale is English – the EN button should have aria-pressed="true"
+      const enButton = switcher.locator('.language-btn').nth(0)
+      await expect(enButton).toHaveAttribute('aria-pressed', 'true')
+
+      // Other buttons should not be pressed
+      const skButton = switcher.locator('.language-btn').nth(1)
+      await expect(skButton).toHaveAttribute('aria-pressed', 'false')
+    })
+
+    test('clicking a language button makes it active', async ({ page }) => {
+      await page.addInitScript(() => {
+        localStorage.removeItem('app_locale')
+      })
+      setupMockApi(page)
+      await page.goto('/')
+
+      const switcher = page.locator('.language-switcher').first()
+      await expect(switcher).toBeVisible()
+
+      // Click German (third button)
+      const deButton = switcher.locator('.language-btn').nth(2)
+      await deButton.click()
+      await expect(deButton).toHaveAttribute('aria-pressed', 'true')
+
+      // EN should no longer be pressed
+      const enButton = switcher.locator('.language-btn').nth(0)
+      await expect(enButton).toHaveAttribute('aria-pressed', 'false')
+    })
+  })
+
+  // ──────────────────────────────────────────────────
+  // Expanded city coverage – all default cities
+  // ──────────────────────────────────────────────────
+
+  test.describe('All city flags', () => {
+    const cityFlagCases = [
+      { name: 'New York', code: 'US' },
+      { name: 'London', code: 'GB' },
+      { name: 'Beijing', code: 'CN' },
+      { name: 'Delhi', code: 'IN' },
+      { name: 'Berlin', code: 'DE' },
+    ]
+
+    for (const { name, code } of cityFlagCases) {
+      test(`${name} card shows ${code} flag`, async ({ page }) => {
+        const state = setupMockApi(page)
+        state.cities = makeDefaultCities()
+        await page.goto('/cities')
+
+        const card = page.locator('.city-card', { hasText: name })
+        await expect(card).toBeVisible()
+        const flag = card.locator('.country-flag[role="img"]').first()
+        await expect(flag).toHaveAttribute('aria-label', new RegExp(code, 'i'))
+      })
+    }
+  })
+
+  // ──────────────────────────────────────────────────
+  // Fallback badge for unknown country codes
+  // ──────────────────────────────────────────────────
+
+  test.describe('Flag fallback', () => {
+    test('unknown country code renders text fallback badge instead of SVG', async ({ page }) => {
+      const state = setupMockApi(page)
+      // Inject a city with an unknown country code
+      state.cities = [
+        {
+          id: 'city-zz',
+          name: 'ZZCity',
+          countryCode: 'ZZ',
+          currencyCode: 'EUR',
+          latitude: 0,
+          longitude: 0,
+          population: 1000,
+          averageRentPerSqm: 10,
+          baseSalaryPerManhour: 10,
+          resources: [],
+        },
+      ]
+      await page.goto('/cities')
+
+      const card = page.locator('.city-card', { hasText: 'ZZCity' })
+      await expect(card).toBeVisible()
+
+      // Fallback renders a text badge (country-flag--fallback class)
+      const fallback = card.locator('.country-flag--fallback')
+      await expect(fallback).toBeVisible()
+      await expect(fallback).toContainText('ZZ')
+
+      // No SVG should be inside the fallback span
+      const svg = card.locator('.country-flag svg')
+      await expect(svg).toHaveCount(0)
+    })
+  })
 })
