@@ -61,6 +61,38 @@ const router = createRouter({
       component: () => import('@/views/TradeRoutesView.vue'),
     },
     { path: '/tutorial', name: 'tutorial', component: () => import('@/views/TutorialView.vue') },
+    {
+      path: '/operations',
+      component: () => import('@/views/OperationsDashboardView.vue'),
+      children: [
+        { path: '', redirect: '/operations/statistics' },
+        {
+          path: 'statistics',
+          name: 'operations-statistics',
+          component: () => import('@/views/OperationsStatisticsView.vue'),
+        },
+        {
+          path: 'news',
+          name: 'operations-news',
+          component: () => import('@/views/OperationsNewsView.vue'),
+        },
+        {
+          path: 'players',
+          name: 'operations-players',
+          component: () => import('@/views/OperationsPlayersView.vue'),
+        },
+        {
+          path: 'players/:id',
+          name: 'operations-player-detail',
+          component: () => import('@/views/OperationsPlayerDetailView.vue'),
+        },
+        {
+          path: 'analytics',
+          name: 'operations-analytics',
+          component: () => import('@/views/OperationsAnalyticsView.vue'),
+        },
+      ],
+    },
   ],
   scrollBehavior() {
     return { top: 0 }

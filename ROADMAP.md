@@ -6,13 +6,15 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
-### Operations Dashboard (0% complete)
+### Operations Dashboard (80% complete)
 
-- [ ] Organize Operations Dashboard to level 2 menu, add proper routing, and create components
-- [ ] Fix News & changelog publisher style. The form is stretched along the whole list of news items. Create multiple pages for this like it is in the ticket support system.
-- [ ] Players & intervention tools - Make sure to show the table of the users and on user detail page show the actions
-- [ ] Create page for the game statistics where in one columns will be items that distributes the money such as the public sales buildings, the rent, IPOs, or other money distribution sections. In the other column will be where people are paying money - taxes, fx fees, labour costs, energy, research, stock exchange fees or others..
-- [ ] Create admin page with detailed statistic for every product. Do it in table. Make sure the table is exportable sortable and filterable. In the table will be the product insights such as the aggregated costs of materials, energy, labor to build the product, number of products produced, sold, market size, saturation, marketing, and research details.
+- [x] Organize Operations Dashboard to level 2 menu, add proper routing, and create components
+- [x] Fix News & changelog publisher style. The form is stretched along the whole list of news items. Create multiple pages for this like it is in the ticket support system.
+- [x] Players & intervention tools - Make sure to show the table of the users and on user detail page show the actions
+- [x] Create page for the game statistics where in one columns will be items that distributes the money such as the public sales buildings, the rent, IPOs, or other money distribution sections. In the other column will be where people are paying money - taxes, fx fees, labour costs, energy, research, stock exchange fees or others..
+- [x] Create admin page with detailed statistic for every product. Do it in table. Make sure the table is exportable sortable and filterable. In the table will be the product insights such as the aggregated costs of materials, energy, labor to build the product, number of products produced, sold, market size, saturation, marketing, and research details.
+- [ ] Backend: Wire `operationsStatistics` query to real LedgerEntry aggregations for live money flow data
+- [ ] Backend: Wire `adminProductAnalytics` query to real ProductionRecord/PublicSalesRecord aggregations
 
 ### Stock exchange (0% complete)
 

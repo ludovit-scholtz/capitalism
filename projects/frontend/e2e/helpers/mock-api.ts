@@ -7292,6 +7292,111 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    if (query.includes('operationsStatistics')) {
+      const accessFailure = getAdminAccessFailure(false)
+      if (accessFailure) {
+        return routeJsonError(accessFailure.message, accessFailure.code)
+      }
+      const playerCount = state.players.filter((p) => p.email !== 'government@capitalism.game').length
+      const companyCount = state.players.flatMap((p) => p.companies).length
+      const buildingCount = state.players.flatMap((p) => p.companies).reduce((sum, c) => sum + (c.buildings?.length ?? 0), 0)
+      return routeJson({
+        operationsStatistics: {
+          currentTick: state.gameState.currentTick,
+          windowTicks: 100,
+          totalInflow: 450000,
+          totalOutflow: 280000,
+          netFlow: 170000,
+          totalPlayerCount: playerCount,
+          totalCompanyCount: companyCount,
+          totalBuildingCount: buildingCount,
+          inflowItems: [
+            { category: 'PUBLIC_SALES', label: 'Public Sales Revenue', amount: 320000, percentage: 71.1, entryCount: 48 },
+            { category: 'RENT', label: 'Rent Income', amount: 80000, percentage: 17.8, entryCount: 12 },
+            { category: 'IPO', label: 'IPO Raises', amount: 50000, percentage: 11.1, entryCount: 3 },
+          ],
+          outflowItems: [
+            { category: 'LABOR', label: 'Labor Costs', amount: 120000, percentage: 42.9, entryCount: 60 },
+            { category: 'ENERGY', label: 'Energy Costs', amount: 85000, percentage: 30.4, entryCount: 40 },
+            { category: 'TAX', label: 'Taxes Paid', amount: 55000, percentage: 19.6, entryCount: 20 },
+            { category: 'MARKETING', label: 'Marketing Spend', amount: 20000, percentage: 7.1, entryCount: 15 },
+          ],
+        },
+      })
+    }
+
+    if (query.includes('adminProductAnalytics')) {
+      const accessFailure = getAdminAccessFailure(false)
+      if (accessFailure) {
+        return routeJsonError(accessFailure.message, accessFailure.code)
+      }
+      return routeJson({
+        adminProductAnalytics: {
+          currentTick: state.gameState.currentTick,
+          windowTicks: 100,
+          rows: [
+            {
+              productTypeId: 'prod-wooden-chair',
+              productName: 'Wooden Chair',
+              industry: 'FURNITURE',
+              basePrice: 45,
+              totalProduced: 1200,
+              activeManufacturerCount: 3,
+              totalSold: 980,
+              totalRevenue: 49000,
+              avgSellingPrice: 50,
+              activeSellerCount: 4,
+              activeCityCount: 2,
+              totalMaterialCost: 8000,
+              totalLaborCost: 6000,
+              totalEnergyCost: 3000,
+              totalCost: 17000,
+              marketSaturation: 45.5,
+              totalMarketingSpend: 2000,
+            },
+            {
+              productTypeId: 'prod-bread',
+              productName: 'Bread',
+              industry: 'FOOD_PROCESSING',
+              basePrice: 3,
+              totalProduced: 5000,
+              activeManufacturerCount: 2,
+              totalSold: 4800,
+              totalRevenue: 14400,
+              avgSellingPrice: 3,
+              activeSellerCount: 3,
+              activeCityCount: 1,
+              totalMaterialCost: 3000,
+              totalLaborCost: 2000,
+              totalEnergyCost: 1000,
+              totalCost: 6000,
+              marketSaturation: 62.0,
+              totalMarketingSpend: 500,
+            },
+            {
+              productTypeId: 'prod-medicine',
+              productName: 'Basic Medicine',
+              industry: 'HEALTHCARE',
+              basePrice: 50,
+              totalProduced: 800,
+              activeManufacturerCount: 1,
+              totalSold: 750,
+              totalRevenue: 37500,
+              avgSellingPrice: 50,
+              activeSellerCount: 2,
+              activeCityCount: 1,
+              totalMaterialCost: 10000,
+              totalLaborCost: 5000,
+              totalEnergyCost: 2500,
+              totalCost: 17500,
+              marketSaturation: 28.3,
+              totalMarketingSpend: 1200,
+            },
+          ],
+        },
+      })
+    }
+
     if (query.includes('startAdminImpersonation')) {
       const accessFailure = getAdminAccessFailure(false)
       if (accessFailure) {
