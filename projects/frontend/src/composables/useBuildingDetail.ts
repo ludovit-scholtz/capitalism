@@ -351,17 +351,23 @@ export function useBuildingDetail() {
   const quickInventoryThresholdSaving = ref(false)
   const quickInventoryThresholdSuccess = ref(false)
   const quickInventoryThresholdError = ref<string | null>(null)
-  const showSaleDialog = ref(false)
-  const salePrice = ref<number | null>(null)
-  const savingSale = ref(false)
   const myLoans = ref<
     Array<{ id: string; collateralBuildingId: string | null; originalPrincipal: number; status: string }>
   >([])
   const isBuildingUsedAsCollateral = computed(() =>
-    myLoans.value.some((l) => l.collateralBuildingId === building.value?.id),
+    myLoans.value.some(
+      (l) =>
+        l.collateralBuildingId === building.value?.id &&
+        (l.status === 'ACTIVE' || l.status === 'OVERDUE'),
+    ),
   )
   const collateralLoanCount = computed(
-    () => myLoans.value.filter((l) => l.collateralBuildingId === building.value?.id).length,
+    () =>
+      myLoans.value.filter(
+        (l) =>
+          l.collateralBuildingId === building.value?.id &&
+          (l.status === 'ACTIVE' || l.status === 'OVERDUE'),
+      ).length,
   )
   const cancellingPlan = ref(false)
   const cancelPlanError = ref<string | null>(null)
@@ -2171,40 +2177,6 @@ export function useBuildingDetail() {
     const locationMultiplier = 1 + (b.populationIndex ?? EMV_DEFAULT_POPULATION_INDEX) * 0.5
     return Math.round((EMV_BASE_LOT_VALUE * levelMultiplier + unitValue) * locationMultiplier / 1000) * 1000
   })
-
-  function openSaleDialog() {
-    salePrice.value = building.value?.askingPrice ?? null
-    showSaleDialog.value = true
-  }
-
-  function closeSaleDialog() {
-    showSaleDialog.value = false
-  }
-
-  async function setBuildingForSale(forSale: boolean) {
-    if (!building.value || savingSale.value) return
-    savingSale.value = true
-    try {
-      await gqlRequest<{ setBuildingForSale: { id: string } }>(
-        `mutation SetBuildingForSale($input: SetBuildingForSaleInput!) {
-          setBuildingForSale(input: $input) { id isForSale askingPrice listedAtUtc }
-        }`,
-        {
-          input: {
-            buildingId: building.value.id,
-            isForSale: forSale,
-            askingPrice: forSale ? salePrice.value : null,
-          },
-        },
-      )
-      showSaleDialog.value = false
-      await loadBuilding()
-    } catch (reason: unknown) {
-      error.value = reason instanceof Error ? reason.message : t('buildingDetail.saleFailed')
-    } finally {
-      savingSale.value = false
-    }
-  }
 
   // ── Rent management (APARTMENT / COMMERCIAL) ──
 
@@ -4878,9 +4850,6 @@ export function useBuildingDetail() {
     quickInventoryThresholdSaving,
     quickInventoryThresholdSuccess,
     quickInventoryThresholdError,
-    showSaleDialog,
-    salePrice,
-    savingSale,
     cancellingPlan,
     cancelPlanError,
     layoutName,
@@ -5049,9 +5018,6 @@ export function useBuildingDetail() {
     cancelPlan,
     getLinkedUnits,
     isUnitReverting,
-    openSaleDialog,
-    closeSaleDialog,
-    setBuildingForSale,
     estimatedMarketValue,
     isBuildingUsedAsCollateral,
     collateralLoanCount,
