@@ -37,8 +37,33 @@ public sealed partial class Query
             .Where(e => e.RecordedAtTick >= windowStart)
             .ToListAsync(httpContextAccessor.HttpContext.RequestAborted);
 
+        var forexFeeAggregate = await db.ForexTradeRecords
+            .AsNoTracking()
+            .Where(t => t.ExecutedAtTick >= windowStart)
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Total = g.Sum(t => t.FeeAmount),
+                Count = g.Count(),
+            })
+            .FirstOrDefaultAsync(httpContextAccessor.HttpContext.RequestAborted);
+
+        var goldAmmFeeAggregate = await db.GoldAmmTradeRecords
+            .AsNoTracking()
+            .Where(t => t.ExecutedAtTick >= windowStart)
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Total = g.Sum(t => t.FeeAmount),
+                Count = g.Count(),
+            })
+            .FirstOrDefaultAsync(httpContextAccessor.HttpContext.RequestAborted);
+
+        var fxFeeAmount = (forexFeeAggregate?.Total ?? 0m) + (goldAmmFeeAggregate?.Total ?? 0m);
+        var fxFeeEntryCount = (forexFeeAggregate?.Count ?? 0) + (goldAmmFeeAggregate?.Count ?? 0);
+
         var inflowItems = BuildInflowItems(entries);
-        var outflowItems = BuildOutflowItems(entries);
+        var outflowItems = BuildOutflowItems(entries, fxFeeAmount, fxFeeEntryCount);
 
         var totalInflow = inflowItems.Sum(i => i.Amount);
         var totalOutflow = outflowItems.Sum(i => i.Amount);
@@ -99,6 +124,8 @@ public sealed partial class Query
         // Load product types.
         var productTypes = await db.ProductTypes
             .AsNoTracking()
+            .OrderBy(pt => pt.Industry)
+            .ThenBy(pt => pt.Name)
             .ToListAsync(httpContextAccessor.HttpContext.RequestAborted);
 
         // Load production history per product in window.
@@ -265,13 +292,17 @@ public sealed partial class Query
         return [.. result.OrderByDescending(x => x.Amount)];
     }
 
-    private static List<OperationsMoneyFlowItem> BuildOutflowItems(List<LedgerEntry> entries)
+    private static List<OperationsMoneyFlowItem> BuildOutflowItems(
+        List<LedgerEntry> entries,
+        decimal fxFeeAmount,
+        int fxFeeEntryCount)
     {
         var outflowCategories = new Dictionary<string, (string Label, string[] Categories)>
         {
             ["LABOR"] = ("Labor Costs", [LedgerCategory.LaborCost]),
             ["TAX"] = ("Tax Payments", [LedgerCategory.Tax]),
             ["ENERGY"] = ("Energy Costs", [LedgerCategory.EnergyCost]),
+            ["RESEARCH"] = ("Research & Upgrades", [LedgerCategory.UnitUpgrade]),
             ["PURCHASING"] = ("Raw Material Purchasing", [LedgerCategory.PurchasingCost]),
             ["MARKETING"] = ("Marketing Spend", [LedgerCategory.Marketing]),
             ["SHIPPING"] = ("Shipping & Logistics", [LedgerCategory.ShippingCost]),
@@ -299,6 +330,18 @@ public sealed partial class Query
                 EntryCount = matching.Count,
             });
         }
+
+        if (fxFeeAmount > 0m && fxFeeEntryCount > 0)
+        {
+            result.Add(new OperationsMoneyFlowItem
+            {
+                Category = "FX_FEES",
+                Label = "FX Fees",
+                Amount = decimal.Round(fxFeeAmount, 2),
+                EntryCount = fxFeeEntryCount,
+            });
+        }
+
         return [.. result.OrderByDescending(x => x.Amount)];
     }
 }
