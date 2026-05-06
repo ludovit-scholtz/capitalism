@@ -406,7 +406,7 @@ test.describe('Onboarding wizard', () => {
     await page.locator('.industry-card', { hasText: 'Furniture' }).click()
     await page.locator('.product-card').first().click()
     await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
-    await expect(page.locator('.budget-card', { hasText: 'Personal cash after contribution' })).toContainText('$0')
+    await expect(page.locator('.budget-card', { hasText: 'Personal cash after contribution' })).toContainText('€0')
 
     const growthIpoCard = page.locator('.ipo-card', { hasText: 'Growth IPO' })
     await expect(growthIpoCard).toContainText('€370,370.37')
@@ -5923,5 +5923,74 @@ test.describe('Company name generator — generate, regenerate and edit (AC from
     expect(words).toHaveLength(2)
     expect(words[0]!.length).toBeGreaterThan(0)
     expect(words[1]!.length).toBeGreaterThan(0)
+  })
+
+  test('custom company name entered by player is submitted to the backend and reflected in factory name on completion', async ({
+    page,
+  }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.goto('/onboarding')
+
+    await page.locator('.city-card', { hasText: 'Bratislava' }).click()
+    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
+    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
+
+    // Clear the auto-generated name and type a custom one
+    const nameInput = page.locator('#onboarding-company-name')
+    await nameInput.clear()
+    await nameInput.fill('Stellar Ventures')
+
+    // Select an IPO plan to proceed
+    await page.locator('.ipo-card', { hasText: 'Starter IPO' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
+
+    // Purchase the factory lot
+    await page.getByRole('button', { name: 'List View' }).click()
+    await page.getByRole('button', { name: /Factory Site B1/i }).click()
+    await page.getByRole('button', { name: 'Purchase First Factory' }).click()
+
+    // Purchase the shop lot
+    await expect(page.getByRole('heading', { name: 'Choose Your First Shop Lot' })).toBeVisible()
+    await page.getByRole('button', { name: 'List View' }).click()
+    await page.getByRole('button', { name: /High Street Retail Space/i }).click()
+    await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
+
+    // On completion, the factory name should include our custom company name
+    await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
+    // The factory achievement card uses "Stellar Ventures Factory" as the name (from mock: input.companyName + " Factory")
+    await expect(page.locator('.completion-achievements')).toContainText('Stellar Ventures')
+  })
+
+  test('company name is pre-populated from the generated suggestion (not empty) when IPO step first appears', async ({
+    page,
+  }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.goto('/onboarding')
+    await page.locator('.city-card', { hasText: 'Bratislava' }).click()
+    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
+    await page.locator('.product-card').first().click()
+    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
+
+    // The name input must be non-empty — a suggestion is always pre-filled
+    const nameInput = page.locator('#onboarding-company-name')
+    const value = (await nameInput.inputValue()).trim()
+    expect(value.length).toBeGreaterThan(0)
+
+    // Must be two words
+    const words = value.split(' ')
+    expect(words).toHaveLength(2)
   })
 })

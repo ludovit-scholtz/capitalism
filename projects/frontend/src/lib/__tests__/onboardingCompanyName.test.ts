@@ -380,4 +380,61 @@ describe('generateOnboardingCompanyName', () => {
       expect(fallbackWords).toContain(firstWord)
     }
   })
+
+  it('CONSTRUCTION word list contains expected building/materials words', () => {
+    const words = industryWords['CONSTRUCTION']!
+    expect(words).toContain('Bedrock')
+    expect(words).toContain('Granite')
+    expect(words).toContain('Keystone')
+  })
+
+  it('PHARMACEUTICALS word list contains expected pharma/biotech words', () => {
+    const words = industryWords['PHARMACEUTICALS']!
+    expect(words).toContain('Helix')
+    expect(words).toContain('Curative')
+    expect(words).toContain('Medic')
+  })
+
+  it('ENERGY word list contains expected energy/power words', () => {
+    const words = industryWords['ENERGY']!
+    expect(words).toContain('Solaris')
+    expect(words).toContain('Voltaic')
+    expect(words).toContain('Kinetic')
+  })
+
+  it('LOGISTICS word list contains expected logistics/transport words', () => {
+    const words = industryWords['LOGISTICS']!
+    expect(words).toContain('Meridian')
+    expect(words).toContain('Convoy')
+    expect(words).toContain('Swift')
+  })
+
+  it('CONSTRUCTION first word appears in the known construction word list (10 calls spot check)', () => {
+    const constructionWords = industryWords['CONSTRUCTION']!
+    resetNameSession('CONSTRUCTION:first-word')
+    for (let i = 0; i < 10; i++) {
+      const name = generateOnboardingCompanyName('CONSTRUCTION')
+      const firstWord = name.split(' ')[0]!
+      expect(constructionWords).toContain(firstWord)
+    }
+  })
+
+  it('ENERGY first word appears in the known energy word list (10 calls spot check)', () => {
+    const energyWords = industryWords['ENERGY']!
+    resetNameSession('ENERGY:first-word')
+    for (let i = 0; i < 10; i++) {
+      const name = generateOnboardingCompanyName('ENERGY')
+      const firstWord = name.split(' ')[0]!
+      expect(energyWords).toContain(firstWord)
+    }
+  })
+
+  it('businessSuffixes list has exactly 15 entries', () => {
+    expect(businessSuffixes.length).toBe(15)
+  })
+
+  it('no businessSuffixes duplicates', () => {
+    const unique = new Set(businessSuffixes)
+    expect(unique.size).toBe(businessSuffixes.length)
+  })
 })
