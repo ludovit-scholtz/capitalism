@@ -233,11 +233,13 @@ All three industries are Pro-gated at both backend (`ProOnlyStarterIndustries`) 
 
 **Shipped:** `EconomicReportPhase` (Order=1050) computes per-city economic index each tax cycle (0.4×salary + 0.3×revenue + 0.15×power + 0.15×quality scores). Index ≥70 → +0.5% population growth, 40-69 → neutral, <40 → −0.2% erosion. GraphQL queries `getCityEconomicReport` and `cityEconomicHistory` expose data. `HealthIndicatorsPanel.vue` renders SVG score ring, traffic-light status badge, 2×2 metrics grid, sparkline trend, and detail modal with full history. 15 backend integration tests and 8 E2E tests shipped.
 
-### Dashboard speed
+### Dashboard speed — 100% complete
 
-- [ ] When I go to /dashboard it takes few seconds to load with few players in the game server. Make sure it is optimized well and takes less then 100ms to load.
+- [x] When I go to /dashboard it takes few seconds to load with few players in the game server. Make sure it is optimized well and takes less then 100ms to load. — 100% complete.
 
 **Shipped (increment 1):** Dashboard initial load now batches critical startup data (`myCompanies`, `gameState`, `myPendingActions`, and `cities`) into one GraphQL request and renders immediately, while non-critical derived analytics (city power, ledgers, unit status, building financial summaries) hydrate asynchronously in the background and only for the active company context.
+
+**Shipped (increment 2 — performance optimization):** Eliminated the root-cause backend bottleneck: `GetMyCompanies` GraphQL resolver was calling `BuildingConfigurationService.ApplyDuePlansAsync` on every dashboard read — a write path that loads **all** pending building-configuration plans across **all** players and calls `SaveChangesAsync`. With 50+ active players and hundreds of buildings this caused multi-second dashboard loads. Fixes applied: (1) `GetMyCompanies` is now fully read-only — plan application is the exclusive responsibility of `BuildingUpgradePhase` in the tick engine; (2) `AsNoTracking()` added so EF does not track read-only query results; (3) per-user 5-second `IMemoryCache` entry added to throttle burst concurrent requests from the same player (e.g. rapid page reloads); (4) frontend `performance.now()` timing added to `DashboardView` so load times are observable in browser DevTools console (`[Dashboard] Initial load: Xms`). A dedicated regression test (`DashboardPerformanceTests`) verifies the read-only invariant: a due plan must remain in the DB after a `myCompanies` query, and must only be deleted after `TickProcessor.ProcessTickAsync` runs.
 
 ### Bots
 

@@ -101,6 +101,8 @@ onMounted(async () => {
     return
   }
 
+  const _loadStart = performance.now()
+
   try {
     if (!auth.player) {
       await auth.fetchMe()
@@ -154,6 +156,10 @@ onMounted(async () => {
 
     // Show dashboard immediately after critical payload arrives.
     loading.value = false
+
+    // Performance monitoring: log time from navigation start to first interactive render.
+    const _loadMs = Math.round(performance.now() - _loadStart)
+    console.debug(`[Dashboard] Initial load: ${_loadMs}ms`)
 
     // Delay tooltip 1 s so the initial render is complete before showing overlay
     setTimeout(() => {
