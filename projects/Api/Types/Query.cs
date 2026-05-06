@@ -1,7 +1,7 @@
 namespace Api.Types;
 
 /// <summary>
-/// GraphQL query type for the Capitalism V game.
+/// GraphQL query type for the Capitalism 5 game.
 /// Provides read access to game data including players, cities, resources, products, and buildings.
 /// Split across multiple partial files, one per domain:
 /// <list type="bullet">

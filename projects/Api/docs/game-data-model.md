@@ -1,4 +1,4 @@
-# Capitalism V — Game Data Model
+# Capitalism 5 — Game Data Model
 
 ## Entity Relationship Overview
 

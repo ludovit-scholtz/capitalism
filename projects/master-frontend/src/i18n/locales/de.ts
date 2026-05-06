@@ -1,7 +1,7 @@
 export default {
   common: {
     backToPortal: 'Zurück zum Portal',
-    allRightsReserved: '© {year} Capitalism HQ. Alle Rechte vorbehalten.',
+    allRightsReserved: '© {year} Kapitalismus HQ. Alle Rechte vorbehalten.',
     loading: 'Lade...',
     refresh: 'Aktualisieren',
     apply: 'Anwenden',
@@ -53,8 +53,8 @@ export default {
     de: 'DE',
   },
   home: {
-    title: 'CAPITALISM V',
-    eyebrow: 'Capitalism Network',
+    title: 'Kapitalismus 5',
+    eyebrow: 'Kapitalismus Network',
     heroText:
       'Kostenlos spielbares Play-to-Earn-Marktsimulationsspiel - baue dein Wirtschaftsreich auf, konkurriere in der globalen Rangliste und entdecke das Wirtschaftsökosystem.',
     accountFallback: 'Konto',
@@ -80,7 +80,7 @@ export default {
       claimed: 'Eingelöst',
       copy: 'Einmal im Master-Portal einlösen und 3 Monate Pro erhalten. Die Spiel-Clients zeigen danach nur den resultierenden Pro-Status.',
       benefit1: 'Wird zu aktiver Pro-Zeit hinzugefügt statt sie zu ersetzen.',
-      benefit2: 'Schaltet die gemeinsame Pro-Stufe für alle Capitalism-Welten frei.',
+      benefit2: 'Schaltet die gemeinsame Pro-Stufe für alle Kapitalismus-Welten frei.',
       benefit3: 'Ist an deine Master-Identität gebunden, nicht an einen einzelnen Shard.',
       claimButton: 'Startup-Paket einlösen',
       claiming: 'Wird eingelöst...',
@@ -133,7 +133,7 @@ export default {
     signInWithBiatec: 'Mit Google authentifizieren',
     createAccount: 'Konto erstellen',
     signInSub: 'Greife auf dein Pro-Abonnement und Serververzeichnis zu.',
-    createSub: 'Tritt dem Capitalism Network bei und verfolge dein Abonnement.',
+    createSub: 'Tritt dem Kapitalismus Network bei und verfolge dein Abonnement.',
     email: 'E-Mail',
     displayName: 'Anzeigename',
     displayNamePlaceholder: 'Dein Name in der Simulation',
@@ -155,7 +155,7 @@ export default {
   account: {
     kicker: 'Mein Konto',
     title: 'Goldguthaben',
-    subtitle: 'Dein tokenisiertes Gold im Capitalism Network.',
+    subtitle: 'Dein tokenisiertes Gold im Kapitalismus Network.',
     loading: 'Dein Goldkonto wird geladen...',
     loadError: 'Goldkonto konnte nicht geladen werden.',
     retry: 'Erneut versuchen',
@@ -163,14 +163,14 @@ export default {
     ratio: '1 Gold-Token = 1 Gramm echtes Gold',
     zeroTitle: 'Du hast noch kein Gold',
     zeroCopy:
-      'Baue in der Spielwelt Golderz ab, handle an der Börse oder verdiene es durch wirtschaftliche Aktivität auf beliebigen Capitalism-Servern. Dein serverübergreifendes Guthaben wird hier gespeichert.',
+      'Baue in der Spielwelt Golderz ab, handle an der Börse oder verdiene es durch wirtschaftliche Aktivität auf beliebigen Kapitalismus-Servern. Dein serverübergreifendes Guthaben wird hier gespeichert.',
     whatIsTitle: 'Was ist tokenisiertes Gold?',
     fact1Title: '1 Token = 1 Gramm physisches Gold.',
     fact1Body:
       'Jeder Token in deinem Konto ist durch reales Gold gedeckt und besitzt auch außerhalb des Spiels einen inneren Wert.',
     fact2Title: 'Serverübergreifender Vermögenswert.',
     fact2Body:
-      'Dein Goldguthaben liegt auf dem Master-Server, nicht auf einem einzelnen Spiel-Shard. Es bleibt in allen Capitalism-Welten erhalten.',
+      'Dein Goldguthaben liegt auf dem Master-Server, nicht auf einem einzelnen Spiel-Shard. Es bleibt in allen Kapitalismus-Welten erhalten.',
     fact3Title: 'Auf der FX-Börse handeln.',
     fact3Body:
       'Nutze die Ingame-AMM-Pools für Swaps zwischen Stadtwährungen und Gold oder stelle Liquidität bereit, um Gebühren zu verdienen.',

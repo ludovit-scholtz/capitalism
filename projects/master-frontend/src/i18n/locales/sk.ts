@@ -1,7 +1,7 @@
 export default {
   common: {
     backToPortal: 'Späť na portál',
-    allRightsReserved: '© {year} Capitalism HQ. Všetky práva vyhradené.',
+    allRightsReserved: '© {year} Kapitalizmus HQ. Všetky práva vyhradené.',
     loading: 'Načítavam...',
     refresh: 'Obnoviť',
     apply: 'Použiť',
@@ -53,8 +53,8 @@ export default {
     de: 'DE',
   },
   home: {
-    title: 'CAPITALISM V',
-    eyebrow: 'Capitalism Network',
+    title: 'Kapitalizmus 5',
+    eyebrow: 'Kapitalizmus Network',
     heroText:
       'Hra zadarmo s modelom play-to-earn, ekonomická simulácia - buduj svoje podnikateľské impérium, súťaž v globálnom rebríčku a objav ekonomický ekosystém.',
     accountFallback: 'Účet',
@@ -80,7 +80,7 @@ export default {
       claimed: 'Uplatnené',
       copy: 'Uplatni raz v master portáli a získaj 3 mesiace Pro. Herné klienty potom zobrazia výsledný Pro status.',
       benefit1: 'Pripočíta sa k aktívnemu Pro času namiesto jeho nahradenia.',
-      benefit2: 'Odomkne spoločnú Pro úroveň pre všetky svety Capitalism.',
+      benefit2: 'Odomkne spoločnú Pro úroveň pre všetky svety Kapitalizmus.',
       benefit3: 'Je viazaný na tvoju master identitu, nie na jeden shard.',
       claimButton: 'Uplatniť Startup balíček',
       claiming: 'Uplatňujem...',
@@ -132,7 +132,7 @@ export default {
     signInWithBiatec: 'Autentifikovať cez Google',
     createAccount: 'Vytvoriť účet',
     signInSub: 'Prístup k Pro predplatnému a adresáru serverov.',
-    createSub: 'Pridaj sa do Capitalism Network a sleduj svoje predplatné.',
+    createSub: 'Pridaj sa do Kapitalizmus Network a sleduj svoje predplatné.',
     email: 'Email',
     displayName: 'Zobrazované meno',
     displayNamePlaceholder: 'Tvoje meno v simulácii',
@@ -153,7 +153,7 @@ export default {
   account: {
     kicker: 'Môj účet',
     title: 'Zostatok zlata',
-    subtitle: 'Tvoje tokenizované zlato v Capitalism Network.',
+    subtitle: 'Tvoje tokenizované zlato v Kapitalizmus Network.',
     loading: 'Načítavam tvoj zlatý účet...',
     loadError: 'Nepodarilo sa načítať zlatý účet.',
     retry: 'Skúsiť znova',
@@ -161,13 +161,13 @@ export default {
     ratio: '1 zlatý token = 1 gram reálneho zlata',
     zeroTitle: 'Zatiaľ nemáš žiadne zlato',
     zeroCopy:
-      'Ťaž zlatú rudu v hre, obchoduj na burze alebo ju získaj ekonomickou aktivitou na ľubovoľnom serveri Capitalism. Tvoj medziserverový zostatok je uložený tu.',
+      'Ťaž zlatú rudu v hre, obchoduj na burze alebo ju získaj ekonomickou aktivitou na ľubovoľnom serveri Kapitalizmus. Tvoj medziserverový zostatok je uložený tu.',
     whatIsTitle: 'Čo je tokenizované zlato?',
     fact1Title: '1 token = 1 gram fyzického zlata.',
     fact1Body: 'Každý token v tvojom účte je krytý reálnym zlatom a má hodnotu aj mimo hry.',
     fact2Title: 'Aktívum naprieč servermi.',
     fact2Body:
-      'Tvoj zostatok zlata je uložený na master serveri, nie na jednom hernom sharde. Zostáva tvoj vo všetkých svetoch Capitalism.',
+      'Tvoj zostatok zlata je uložený na master serveri, nie na jednom hernom sharde. Zostáva tvoj vo všetkých svetoch Kapitalizmus.',
     fact3Title: 'Obchoduj na FX burze.',
     fact3Body:
       'Použi herné AMM pooly na swap medzi mestskými menami a zlatom alebo poskytni likviditu a získaj poplatkové odmeny.',

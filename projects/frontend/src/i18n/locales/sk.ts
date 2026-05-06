@@ -1,6 +1,6 @@
 export default {
   common: {
-    appName: 'Capitalism V',
+    appName: 'Kapitalizmus 5',
     loading: 'Na\u010d\u00edtavam...',
     tryAgain: 'Sk\u00fasi\u0165 znova',
     cancel: 'Zru\u0161i\u0165',
@@ -12,7 +12,7 @@ export default {
     login: 'Prihl\u00e1si\u0165',
     submit: 'Odosla\u0165',
     close: 'Zavrie\u0165',
-    allRightsReserved: '\u00a9 {year} Capitalism sro. V\u0161etky pr\u00e1va vyhraden\u00e9.',
+    allRightsReserved: '\u00a9 {year} Kapitalizmus sro. V\u0161etky pr\u00e1va vyhraden\u00e9.',
     confirm: 'Potvrdi\u0165',
     level: '\u00darove\u0148',
     notAvailable: 'N/A',
@@ -202,7 +202,7 @@ export default {
     closeChat: 'Zatvoriť chat',
   },
   home: {
-    heroTitle: 'Capitalism V',
+    heroTitle: 'Kapitalizmus 5',
     heroDescription: 'Vybudujte svoje obchodn\u00e9 imp\u00e9rium. \u0164a\u017ete suroviny, vyr\u00e1bajte produkty a ovl\u00e1dnite trh.',
     getStarted: 'Za\u010da\u0165',
     startOnboarding: 'Zalo\u017ei\u0165 imp\u00e9rium',
@@ -411,8 +411,7 @@ export default {
     guestShopPlaceholder: 'Váš obchod',
     guestSaveTitle: 'Uložte si pokrok',
     guestSaveSubtitle: 'Prihláste sa cez Google, aby ste si uložili výber a spustili firmu naostro.',
-    guestSaveDriveAccessNotice:
-      'Tu je potrebné povoliť vytváranie súborov v Google Drive, aby Biatec mohol vytvoriť wallet súbor, ktorý zabezpečí uložený postup vo vašom účte.',
+    guestSaveDriveAccessNotice: 'Tu je potrebné povoliť vytváranie súborov v Google Drive, aby Biatec mohol vytvoriť wallet súbor, ktorý zabezpečí uložený postup vo vašom účte.',
     guestSaveKeepsLabel: 'Uchovávate si:',
     guestSaveKeepsCompany: 'Názov vašej spoločnosti',
     guestSaveKeepsCity: 'Vaše štartovacie mesto',
@@ -1389,13 +1388,11 @@ export default {
     estimatedMarketValue: 'Odhadovaná trhová hodnota',
     estimatedValueHint: 'Referenčný odhad na základe vylepšení budovy a polohy mesta.',
     askingPriceMustBePositive: 'Požadovaná cena musí byť väčšia ako nula.',
-    askingPriceHighWarning:
-      'Upozornenie: požadovaná cena presahuje 150% odhadovanej trhovej hodnoty. Môže to odradiť kupcov.',
+    askingPriceHighWarning: 'Upozornenie: požadovaná cena presahuje 150% odhadovanej trhovej hodnoty. Môže to odradiť kupcov.',
     overviewTab: 'Výsledky a štatistiky',
     bankAccountTab: 'Bankový účet',
     collateralRestrictionWarning: 'Táto budova je použitá ako záložné právo k pôžičke a nemôže byť ponúknutá na predaj.',
-    collateralBlockedByLoans:
-      'Zablokované {count} aktívnou pôžičkou (pôžičkami), ktoré používajú túto budovu ako zábezpeku. Najprv splaťte tieto pôžičky.',
+    collateralBlockedByLoans: 'Zablokované {count} aktívnou pôžičkou (pôžičkami), ktoré používajú túto budovu ako zábezpeku. Najprv splaťte tieto pôžičky.',
     destroyedBadge: 'Zničená',
     destroyedHint: 'Táto budova bola zabavená a zničená po nesplatení pôžičky.',
     editTabConfig: 'Konfigurácia',
@@ -3369,7 +3366,7 @@ export default {
   },
   tutorial: {
     title: 'Tutoriál',
-    subtitle: 'Plňte riadené míľniky, zvládnite Capitalism V a získajte odmeny.',
+    subtitle: 'Plňte riadené míľniky, zvládnite Kapitalizmus 5 a získajte odmeny.',
     progressLabel: '{done}/{total} míľnikov dokončených',
     pointsEarned: '{earned}/{total} bodov získaných',
     resume: 'Pokračovať',

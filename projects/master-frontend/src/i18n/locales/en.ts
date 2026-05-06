@@ -53,7 +53,7 @@ export default {
     de: 'DE',
   },
   home: {
-    title: 'CAPITALISM V',
+    title: 'Capitalism 5',
     eyebrow: 'Capitalism Network',
     heroText:
       'Free to play, play to earn, market simulation game - Build your business empire, compete on the global leaderboard, and discover the economic ecosystem.',

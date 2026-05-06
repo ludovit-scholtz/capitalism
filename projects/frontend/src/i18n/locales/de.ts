@@ -1,6 +1,6 @@
 export default {
   common: {
-    appName: 'Capitalism V',
+    appName: 'Kapitalismus 5',
     loading: 'Laden...',
     tryAgain: 'Erneut versuchen',
     cancel: 'Abbrechen',
@@ -12,7 +12,7 @@ export default {
     login: 'Anmelden',
     submit: 'Absenden',
     close: 'Schlie\u00dfen',
-    allRightsReserved: '\u00a9 {year} Capitalism sro. Alle Rechte vorbehalten.',
+    allRightsReserved: '\u00a9 {year} Kapitalismus sro. Alle Rechte vorbehalten.',
     confirm: 'Best\u00e4tigen',
     level: 'Stufe',
     notAvailable: 'N/V',
@@ -202,7 +202,7 @@ export default {
     closeChat: 'Chat schließen',
   },
   home: {
-    heroTitle: 'Capitalism V',
+    heroTitle: 'Kapitalismus 5',
     heroDescription: 'Bauen Sie Ihr Gesch\u00e4ftsimperium auf. Rohstoffe abbauen, Produkte herstellen und den Markt beherrschen.',
     getStarted: 'Loslegen',
     startOnboarding: 'Imperium gr\u00fcnden',
@@ -412,8 +412,7 @@ export default {
     guestShopPlaceholder: 'Ihr Laden',
     guestSaveTitle: 'Fortschritt speichern',
     guestSaveSubtitle: 'Melden Sie sich mit Google an, um Ihre Auswahl zu sichern und Ihr Unternehmen richtig zu starten.',
-    guestSaveDriveAccessNotice:
-      'Hier muss das Erstellen von Dateien in Google Drive erlaubt werden, damit Biatec die Wallet-Datei anlegen kann, die Ihren gespeicherten Kontofortschritt absichert.',
+    guestSaveDriveAccessNotice: 'Hier muss das Erstellen von Dateien in Google Drive erlaubt werden, damit Biatec die Wallet-Datei anlegen kann, die Ihren gespeicherten Kontofortschritt absichert.',
     guestSaveKeepsLabel: 'Sie behalten:',
     guestSaveKeepsCompany: 'Ihr Unternehmensname',
     guestSaveKeepsCity: 'Ihre Startstadt',
@@ -878,7 +877,7 @@ export default {
     forexGuideTopicGoldLiquidity: 'Gold-AMM-Liquiditaet hinzufuegen, Pool erstellen, Liquiditaet entfernen',
     forexGuideStepSwapOverviewTitle: 'Schritt 1 - Swap-Tab zuerst korrekt einordnen',
     forexGuideStepSwapOverviewBody:
-      'Beginnen Sie jede Forex-Sitzung mit der Kontrolle von Kontokontext und Waehrungsrichtung, bevor Sie einen Betrag eingeben. In Capitalism entscheidet der konkrete Source- und Destination-Account ueber die Ausfuehrung, daher ist dieser Schritt Ihr wichtigster Fehlerfilter. Pruefen Sie, ob Sie im richtigen Owner-Kontext handeln (persoenlich oder Firma), ob auf dem Quellkonto genug verfuegbar ist und ob die Zielwaehrung zum naechsten Gameplay-Schritt passt. Wer diesen Check ueberspringt, erhaelt oft einen formal gueltigen Quote, scheitert danach aber bei Aktienkauf, Gebaeudekauf oder Kreditaktionen. Ziel ist Genauigkeit statt Tempo: richtiges Konto, richtige Richtung, richtiger Zweck. Dieses Bild zeigt, wie man den Swap-Bereich als Treasury-Konsole nutzt und dadurch teure Folgefehler vermeidet.',
+      'Beginnen Sie jede Forex-Sitzung mit der Kontrolle von Kontokontext und Waehrungsrichtung, bevor Sie einen Betrag eingeben. In Kapitalismus entscheidet der konkrete Source- und Destination-Account ueber die Ausfuehrung, daher ist dieser Schritt Ihr wichtigster Fehlerfilter. Pruefen Sie, ob Sie im richtigen Owner-Kontext handeln (persoenlich oder Firma), ob auf dem Quellkonto genug verfuegbar ist und ob die Zielwaehrung zum naechsten Gameplay-Schritt passt. Wer diesen Check ueberspringt, erhaelt oft einen formal gueltigen Quote, scheitert danach aber bei Aktienkauf, Gebaeudekauf oder Kreditaktionen. Ziel ist Genauigkeit statt Tempo: richtiges Konto, richtige Richtung, richtiger Zweck. Dieses Bild zeigt, wie man den Swap-Bereich als Treasury-Konsole nutzt und dadurch teure Folgefehler vermeidet.',
     forexGuideStepSwapExecutionTitle: 'Schritt 2 - Quote holen und Swap mit Gebuehrenkontrolle bestaetigen',
     forexGuideStepSwapExecutionBody:
       'Nach Eingabe des Betrags immer zuerst den Quote abrufen und die Bestaetigungskarte komplett lesen. Dort sehen Sie Kurs, Gebuehr und den erwarteten Empfangswert in der Zielwaehrung. Vergleichen Sie diesen Wert mit dem naechsten Ziel, etwa USD fuer Stock Trades oder Stadtwaehrung fuer Building-Kaeufe. Ist der Auszahlungswert zu niedrig, passen Sie den Betrag an, statt blind zu bestaetigen. Nach Ausfuehrung kontrollieren Sie Success-Banner und beide neuen Kontostaende, damit Settlement und Kontozuordnung eindeutig bestaetigt sind. Dieser Ablauf ist eine kurze, aber entscheidende Checkliste: Kurs akzeptiert, Gebuehr verstanden, Output ausreichend, Salden geprueft. So wird Forex von spontanem Klicken zu reproduzierbarer Kapitalsteuerung, die spaetere Fehltransaktionen deutlich reduziert.',
@@ -1391,13 +1390,11 @@ export default {
     estimatedMarketValue: 'Geschätzter Marktwert',
     estimatedValueHint: 'Referenzschätzung basierend auf Gebäudeverbesserungen und Stadtlage.',
     askingPriceMustBePositive: 'Der Angebotspreis muss größer als null sein.',
-    askingPriceHighWarning:
-      'Warnung: Der Angebotspreis übersteigt 150% des geschätzten Marktwerts. Dies könnte Käufer abschrecken.',
+    askingPriceHighWarning: 'Warnung: Der Angebotspreis übersteigt 150% des geschätzten Marktwerts. Dies könnte Käufer abschrecken.',
     overviewTab: 'GuV und Statistiken',
     bankAccountTab: 'Bankkonto',
     collateralRestrictionWarning: 'Dieses Gebäude wird als Kreditsicherheit verwendet und kann nicht zum Verkauf angeboten werden.',
-    collateralBlockedByLoans:
-      'Blockiert durch {count} aktiven Kredit(e), der dieses Gebäude als Sicherheit nutzt. Begleichen Sie diese Kredite zuerst.',
+    collateralBlockedByLoans: 'Blockiert durch {count} aktiven Kredit(e), der dieses Gebäude als Sicherheit nutzt. Begleichen Sie diese Kredite zuerst.',
     destroyedBadge: 'Zerstört',
     destroyedHint: 'Dieses Gebäude wurde nach einem Kreditausfall zwangsvollstreckt und zerstört.',
     editTabConfig: 'Konfiguration',
@@ -3383,7 +3380,7 @@ export default {
   },
   tutorial: {
     title: 'Tutorial',
-    subtitle: 'Absolvieren Sie geführte Meilensteine, meistern Sie Capitalism V und verdienen Sie Bonuspunkte.',
+    subtitle: 'Absolvieren Sie geführte Meilensteine, meistern Sie Kapitalismus 5 und verdienen Sie Bonuspunkte.',
     progressLabel: '{done}/{total} Meilensteine abgeschlossen',
     pointsEarned: '{earned}/{total} Punkte verdient',
     resume: 'Fortsetzen',

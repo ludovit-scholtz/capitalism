@@ -1,4 +1,4 @@
-# Capitalism V — GraphQL API Reference
+# Capitalism 5 — GraphQL API Reference
 
 ## Endpoint
 `POST /graphql`

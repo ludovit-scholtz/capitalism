@@ -96,7 +96,7 @@ async function markAllNotificationsRead() {
     <div class="container flex items-center gap-8 h-16">
       <!-- Logo -->
       <RouterLink to="/" class="logo-link shrink-0" @click="closeMenu">
-        <span class="logo-text">CAPITALISM V</span>
+        <span class="logo-text">{{ t('home.heroTitle') }}</span>
       </RouterLink>
 
       <!-- Mobile menu toggle -->
@@ -282,6 +282,7 @@ async function markAllNotificationsRead() {
     system-ui,
     -apple-system,
     sans-serif;
+  text-transform: uppercase;
 }
 
 /* ── Navigation links ─────────────────────────────────────────────────────── */

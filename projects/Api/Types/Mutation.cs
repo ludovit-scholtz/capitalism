@@ -16,7 +16,7 @@ using Microsoft.IdentityModel.Tokens;
 namespace Api.Types;
 
 /// <summary>
-/// GraphQL mutation type for the Capitalism V game.
+/// GraphQL mutation type for the Capitalism 5 game.
 /// Handles authentication, admin, company management, onboarding, building configuration, and market actions.
 /// Split across multiple partial files, one per domain:
 /// <list type="bullet">

@@ -283,7 +283,7 @@ public class Program
 
         app.MapGet("/", () => Results.Ok(new
         {
-            name = "Capitalism V Game API",
+            name = "Capitalism 5 Game API",
             graphql = "/graphql",
             health = "/healthz"
         }));
