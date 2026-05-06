@@ -27,6 +27,7 @@ const router = createRouter({
     { path: '/encyclopedia/resources/:slug', name: 'encyclopedia-detail', component: () => import('@/views/ResourceDetailView.vue') },
     { path: '/buy-building/:companyId', name: 'buy-building', component: () => import('@/views/BuyBuildingView.vue') },
     { path: '/building/:id', name: 'building-detail', component: () => import('@/views/BuildingDetailView.vue') },
+    { path: '/building/:id/sell', name: 'sell-building', component: () => import('@/views/SellBuildingView.vue') },
     { path: '/city/:id', name: 'city-map', component: () => import('@/views/CityMapView.vue') },
     { path: '/ledger/:companyId', name: 'ledger', component: () => import('@/views/LedgerView.vue') },
     { path: '/company/:companyId/settings', name: 'company-settings', component: () => import('@/views/CompanySettingsView.vue') },

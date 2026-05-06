@@ -906,4 +906,94 @@ public sealed class BuildingSecondaryMarketTests
         var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
         Assert.Equal("INVALID_ASKING_PRICE", code);
     }
+
+    [Fact]
+    public async Task SetBuildingForSale_AllowsListing_WhenLoanIsDefaulted()
+    {
+        // Defaulted loans must NOT block listing — the player may need to sell the
+        // building to repay a defaulted debt. Only Active and Overdue loans block.
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "defaulted-collateral@market.test");
+        var (buildingId, companyId, _) = await SeedOwnerWithBuildingAsync(factory, token);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Loans.Add(new Loan
+        {
+            Id = Guid.NewGuid(),
+            LoanOfferId = Guid.NewGuid(),
+            BorrowerCompanyId = companyId,
+            BankBuildingId = Guid.NewGuid(),
+            LenderCompanyId = Guid.NewGuid(),
+            OriginalPrincipal = 500_000m,
+            RemainingPrincipal = 500_000m,
+            AnnualInterestRatePercent = 8m,
+            DurationTicks = 1440L,
+            StartTick = 0L,
+            DueTick = 1440L,
+            NextPaymentTick = 1440L,
+            PaymentAmount = 10_000m,
+            TotalPayments = 10,
+            Status = LoanStatus.Defaulted,
+            CollateralBuildingId = buildingId,
+            CollateralAppraisedValue = 1_000_000m,
+            AcceptedAtUtc = DateTime.UtcNow.AddDays(-60),
+        });
+        await db.SaveChangesAsync();
+
+        var result = await ExecAsync(client,
+            "mutation S($i: SetBuildingForSaleInput!) { setBuildingForSale(input: $i) { id isForSale } }",
+            new { i = new { buildingId, isForSale = true, askingPrice = 1_000_000m } },
+            token);
+
+        var bld = result.GetProperty("data").GetProperty("setBuildingForSale");
+        Assert.True(bld.GetProperty("isForSale").GetBoolean());
+    }
+
+    [Fact]
+    public async Task SetBuildingForSale_RejectsListing_WhenBuildingIsOverdueCollateral()
+    {
+        // Overdue loans (past due but not yet defaulted) must block listing,
+        // same as Active loans.
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "overdue-collateral@market.test");
+        var (buildingId, companyId, _) = await SeedOwnerWithBuildingAsync(factory, token);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Loans.Add(new Loan
+        {
+            Id = Guid.NewGuid(),
+            LoanOfferId = Guid.NewGuid(),
+            BorrowerCompanyId = companyId,
+            BankBuildingId = Guid.NewGuid(),
+            LenderCompanyId = Guid.NewGuid(),
+            OriginalPrincipal = 500_000m,
+            RemainingPrincipal = 500_000m,
+            AnnualInterestRatePercent = 8m,
+            DurationTicks = 1440L,
+            StartTick = 0L,
+            DueTick = 1440L,
+            NextPaymentTick = 1440L,
+            PaymentAmount = 10_000m,
+            TotalPayments = 10,
+            Status = LoanStatus.Overdue,
+            CollateralBuildingId = buildingId,
+            CollateralAppraisedValue = 1_000_000m,
+            AcceptedAtUtc = DateTime.UtcNow.AddDays(-10),
+        });
+        await db.SaveChangesAsync();
+
+        var result = await ExecAsync(client,
+            "mutation S($i: SetBuildingForSaleInput!) { setBuildingForSale(input: $i) { id } }",
+            new { i = new { buildingId, isForSale = true, askingPrice = 1_000_000m } },
+            token);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0);
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("BUILDING_IS_COLLATERAL", code);
+    }
 }

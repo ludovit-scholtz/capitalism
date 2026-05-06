@@ -489,7 +489,7 @@ test.describe('Building detail upgrades', () => {
     await expect(page.getByText('Manufacturing unit at (1, 0) is not linked to a storage or sales output.')).toBeVisible()
   })
 
-  test('shows sell building dialog and updates sale status', async ({ page }) => {
+  test('shows sell building form and updates sale status', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({
       id: 'company-s',
@@ -524,20 +524,20 @@ test.describe('Building detail upgrades', () => {
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
     }, `token-${player.id}`)
 
-    await page.goto('/building/building-sell')
-    await expect(page.getByRole('heading', { name: 'Selling Factory' })).toBeVisible()
-    await expect(page.getByText('Not For Sale')).toBeVisible()
+    // Navigate directly to the sell page for the building
+    await page.goto('/building/building-sell/sell')
 
-    // Click sell button
-    await page.getByRole('button', { name: 'Sell Building' }).click()
-    await expect(page.getByText('Asking Price')).toBeVisible()
+    // Should show building name, type and "Not For Sale" badge
+    await expect(page.locator('.building-summary-name')).toContainText('Selling Factory')
+    await expect(page.getByText('Not For Sale')).toBeVisible()
+    await expect(page.locator('#asking-price')).toBeVisible()
 
     // Fill in price and list for sale
-    await page.locator('.sale-dialog .form-input').fill('100000')
-    await page.getByRole('button', { name: 'List for Sale' }).click()
+    await page.locator('#asking-price').fill('100000')
+    await page.locator('.list-for-sale-btn').click()
 
-    // Should update to show "For Sale" in the meta pill
-    await expect(page.locator('.meta-pill.for-sale')).toBeVisible()
+    // Should show success confirmation
+    await expect(page.locator('.sell-success')).toBeVisible()
   })
 
   test('sell building button is disabled and shows warning when building is active collateral', async ({ page }) => {
@@ -618,7 +618,7 @@ test.describe('Building detail upgrades', () => {
     await expect(page.locator('.collateral-warning')).toBeVisible()
   })
 
-  test('sell building dialog validates that asking price must be positive', async ({ page }) => {
+  test('sell building form validates that asking price must be positive', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({
       id: 'company-price-validation',
@@ -653,28 +653,25 @@ test.describe('Building detail upgrades', () => {
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
     }, `token-${player.id}`)
 
-    await page.goto('/building/building-price-validation')
-    await expect(page.getByRole('heading', { name: 'Validation Factory' })).toBeVisible()
+    // Navigate directly to the dedicated sell page
+    await page.goto('/building/building-price-validation/sell')
+    await expect(page.locator('.building-summary-name')).toContainText('Validation Factory')
 
-    // Open sell dialog
-    await page.getByRole('button', { name: 'Sell Building' }).click()
-    await expect(page.locator('.sale-dialog')).toBeVisible()
-
-    // The estimated market value reference should be displayed
-    await expect(page.locator('.estimated-market-value')).toBeVisible()
+    // The estimated market value card should be displayed
+    await expect(page.locator('.estimated-value-card')).toBeVisible()
 
     // List for Sale button should be disabled when no price entered
-    const listBtn = page.getByRole('button', { name: 'List for Sale' })
+    const listBtn = page.locator('.list-for-sale-btn')
     await expect(listBtn).toBeDisabled()
 
     // Enter invalid price (zero)
-    await page.locator('.sale-dialog .form-input').fill('0')
+    await page.locator('#asking-price').fill('0')
     // The validation error message should appear and button remain disabled
-    await expect(page.locator('.sale-dialog')).toContainText('greater than zero')
+    await expect(page.locator('.sell-form-section')).toContainText('greater than zero')
     await expect(listBtn).toBeDisabled()
 
     // Enter valid price
-    await page.locator('.sale-dialog .form-input').fill('50000')
+    await page.locator('#asking-price').fill('50000')
     await expect(listBtn).toBeEnabled()
   })
 
@@ -22932,7 +22929,7 @@ test.describe('Supply chain tab', () => {
     await expect(page.locator('.unit-detail-tabs').getByRole('button', { name: 'Supply Chain' })).toBeHidden()
   })
 
-  test('sell building dialog shows 150% market value price warning', async ({ page }) => {
+  test('sell building form shows 150% market value price warning', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({
       id: 'company-price-warn',
@@ -22967,23 +22964,20 @@ test.describe('Supply chain tab', () => {
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
     }, `token-${player.id}`)
 
-    await page.goto('/building/building-price-warn')
-    await expect(page.getByRole('heading', { name: 'Warning Factory' })).toBeVisible()
+    // Navigate directly to the dedicated sell page
+    await page.goto('/building/building-price-warn/sell')
+    await expect(page.locator('.building-summary-name')).toContainText('Warning Factory')
 
-    // Open sell dialog
-    await page.getByRole('button', { name: 'Sell Building' }).click()
-    await expect(page.locator('.sale-dialog')).toBeVisible()
-
-    // The estimated market value reference should be displayed
-    await expect(page.locator('.estimated-market-value')).toBeVisible()
+    // The estimated market value card should be displayed
+    await expect(page.locator('.estimated-value-card')).toBeVisible()
 
     // Enter a price higher than 150% of estimated market value (default mock market value is 75000)
     // 75000 * 1.5 = 112500; entering 200000 should trigger the warning
-    await page.locator('.sale-dialog .form-input').fill('200000')
+    await page.locator('#asking-price').fill('200000')
     await expect(page.locator('.price-high-warning')).toBeVisible()
 
     // The List for Sale button should still be enabled (it's a warning, not an error)
-    await expect(page.getByRole('button', { name: 'List for Sale' })).toBeEnabled()
+    await expect(page.locator('.list-for-sale-btn')).toBeEnabled()
   })
 
   test('collateral warning shows loan count when building is blocked by active loan', async ({ page }) => {
@@ -23106,5 +23100,131 @@ test.describe('Supply chain tab', () => {
 
     // Sell Building button should NOT be visible for destroyed buildings
     await expect(page.getByRole('button', { name: 'Sell Building' })).toBeHidden()
+  })
+
+  test('sell form shows cancel listing section when building is already listed', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-already-listed',
+      playerId: player.id,
+      name: 'Already Listed Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-already-listed',
+          companyId: 'company-already-listed',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Listed Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 2,
+          powerConsumption: 2,
+          isForSale: true,
+          askingPrice: 250000,
+          listedAtUtc: '2026-04-01T00:00:00Z',
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-already-listed/sell')
+
+    // Should show "For Sale" badge
+    await expect(page.getByText('For Sale')).toBeVisible()
+
+    // The cancel listing section should be visible (building already listed)
+    await expect(page.locator('.cancel-listing-btn')).toBeVisible()
+
+    // The "Update Asking Price" heading should be shown (not "Set Asking Price")
+    await expect(page.getByRole('heading', { name: 'Update Asking Price' })).toBeVisible()
+
+    // The "Update Listing" button should be shown
+    await expect(page.locator('.list-for-sale-btn')).toContainText('Update Listing')
+  })
+
+  test('defaulted loan does not show collateral warning on building header', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-defaulted',
+      playerId: player.id,
+      name: 'Defaulted Loan Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-defaulted',
+          companyId: 'company-defaulted',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Defaulted Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    // Seed a DEFAULTED loan — should not block the sell button
+    state.myLoans = [
+      {
+        id: 'loan-defaulted',
+        loanOfferId: 'offer-1',
+        borrowerCompanyId: 'company-defaulted',
+        lenderCompanyName: 'Big Bank',
+        bankBuildingId: 'bank-building-1',
+        bankBuildingName: 'City Bank',
+        originalPrincipal: 500000,
+        remainingPrincipal: 500000,
+        annualInterestRatePercent: 8,
+        durationTicks: 1440,
+        startTick: 0,
+        dueTick: 1440,
+        nextPaymentTick: 1440,
+        paymentAmount: 10000,
+        paymentsMade: 0,
+        totalPayments: 10,
+        status: 'DEFAULTED',
+        missedPayments: 5,
+        accumulatedPenalty: 50000,
+        acceptedAtUtc: '2026-01-01T00:00:00Z',
+        closedAtUtc: null,
+        collateralBuildingId: 'building-defaulted',
+        collateralBuildingName: 'Defaulted Factory',
+        collateralAppraisedValue: 1000000,
+      },
+    ]
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-defaulted')
+    await expect(page.getByRole('heading', { name: 'Defaulted Factory' })).toBeVisible()
+
+    // Sell Building button should be ENABLED (defaulted loan does not block)
+    await expect(page.getByRole('button', { name: 'Sell Building' })).toBeEnabled()
+
+    // The collateral warning should NOT appear for defaulted loans
+    await expect(page.locator('.collateral-warning')).toBeHidden()
   })
 })

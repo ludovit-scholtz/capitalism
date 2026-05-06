@@ -45,10 +45,11 @@ public sealed partial class Mutation
                         .Build());
             }
 
-            // Prevent listing a building that is pledged as collateral on an active loan
+            // Prevent listing a building that is pledged as collateral on an active or overdue loan.
+            // Defaulted loans are excluded: a building with a defaulted loan must be sold to repay the debt.
             var isCollateral = await db.Loans.AnyAsync(l =>
                 l.CollateralBuildingId == input.BuildingId &&
-                (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue || l.Status == LoanStatus.Defaulted));
+                (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue));
 
             if (isCollateral)
             {
