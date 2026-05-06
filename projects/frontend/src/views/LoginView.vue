@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
+import {
+  generatePersonalAccountName,
+  resetPersonalNameSession,
+} from '@/lib/personalAccountName'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -18,6 +22,20 @@ const requiresConsentRetry = computed(() => route.query.oidc_retry === 'consent'
 const showsDriveAccessHint = computed(
   () => requiresConsentRetry.value && route.query.oidc_reason === 'drive_access',
 )
+
+// Auto-fill display name when switching to registration mode.
+watch(isRegister, (nowRegister) => {
+  if (nowRegister && !displayName.value) {
+    displayName.value = generatePersonalAccountName()
+  }
+  if (!nowRegister) {
+    resetPersonalNameSession()
+  }
+})
+
+function handleGenerateName() {
+  displayName.value = generatePersonalAccountName()
+}
 
 async function handleSubmit() {
   formError.value = null
@@ -66,9 +84,33 @@ function handleBiatecSignIn() {
             <input id="email" v-model="email" type="email" required autocomplete="email" class="form-input" />
           </div>
 
-          <div v-if="isRegister" class="flex flex-col gap-1.5">
-            <label for="displayName" class="text-sm font-medium text-muted">{{ t('auth.displayName') }}</label>
-            <input id="displayName" v-model="displayName" type="text" required autocomplete="name" class="form-input" />
+          <div v-if="isRegister" class="flex flex-col gap-2">
+            <label for="displayName" class="text-sm font-medium text-muted">
+              {{ t('auth.displayNameGenerated') }}
+            </label>
+            <div class="flex gap-2">
+              <input
+                id="displayName"
+                v-model="displayName"
+                type="text"
+                required
+                autocomplete="off"
+                class="form-input flex-1"
+                :placeholder="t('auth.displayNamePlaceholder')"
+              />
+              <button
+                type="button"
+                class="btn btn-secondary shrink-0 px-3 text-xs"
+                :title="t('auth.displayNameGenerateAnother')"
+                @click="handleGenerateName"
+              >
+                🎲
+              </button>
+            </div>
+            <p class="personal-name-warning text-xs text-amber-400">
+              {{ t('auth.displayNameRealNameWarning') }}
+            </p>
+            <p class="text-xs text-muted">{{ t('auth.displayNameHint') }}</p>
           </div>
 
           <div class="flex flex-col gap-1.5">
@@ -104,3 +146,4 @@ function handleBiatecSignIn() {
     </section>
   </main>
 </template>
+

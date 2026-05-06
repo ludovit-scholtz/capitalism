@@ -272,4 +272,136 @@ public sealed class PlayerProfileTests
         Assert.True(rank2 >= 1, "Rank must be positive.");
         Assert.NotEqual(rank1, rank2);
     }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // updateDisplayName mutation tests
+    // ──────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task UpdateDisplayName_Unauthenticated_ReturnsAuthError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var result = await ExecAsync(client,
+            "mutation UDN($dn: String!) { updateDisplayName(input: { displayName: $dn }) { playerId displayName } }",
+            new { dn = "New Name" });
+
+        Assert.True(result.TryGetProperty("errors", out _), "Expected auth error for unauthenticated updateDisplayName.");
+    }
+
+    [Fact]
+    public async Task UpdateDisplayName_ValidName_PersistsAndVisibleOnProfile()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "dn-update@test.com", "Original Name");
+        var playerId = await GetPlayerIdAsync(client, token);
+
+        const string NewName = "Aurelius Victor Fontaine";
+        var mutResult = await ExecAsync(client,
+            "mutation UDN($dn: String!) { updateDisplayName(input: { displayName: $dn }) { playerId displayName } }",
+            new { dn = NewName },
+            token);
+
+        var payload = mutResult.GetProperty("data").GetProperty("updateDisplayName");
+        Assert.Equal(NewName, payload.GetProperty("displayName").GetString());
+
+        // Verify profile query reflects the updated name.
+        var profileResult = await ExecAsync(client, ProfileQuery, new { playerId });
+        var profileName = profileResult.GetProperty("data").GetProperty("playerProfile").GetProperty("displayName").GetString();
+        Assert.Equal(NewName, profileName);
+    }
+
+    [Fact]
+    public async Task UpdateDisplayName_EmptyName_ReturnsDisplayNameRequiredError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "dn-empty@test.com", "Some Name");
+
+        var result = await ExecAsync(client,
+            "mutation UDN($dn: String!) { updateDisplayName(input: { displayName: $dn }) { displayName } }",
+            new { dn = "   " },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors), "Expected an error for empty display name.");
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("DISPLAY_NAME_REQUIRED", code);
+    }
+
+    [Fact]
+    public async Task UpdateDisplayName_TooLong_ReturnsDisplayNameTooLongError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "dn-toolong@test.com", "Short Name");
+
+        var longName = new string('A', 101);
+        var result = await ExecAsync(client,
+            "mutation UDN($dn: String!) { updateDisplayName(input: { displayName: $dn }) { displayName } }",
+            new { dn = longName },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors), "Expected an error for too-long display name.");
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("DISPLAY_NAME_TOO_LONG", code);
+    }
+
+    [Fact]
+    public async Task UpdateDisplayName_Exactly100Chars_Succeeds()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "dn-exact100@test.com", "Start Name");
+
+        var exactName = new string('B', 100);
+        var result = await ExecAsync(client,
+            "mutation UDN($dn: String!) { updateDisplayName(input: { displayName: $dn }) { displayName } }",
+            new { dn = exactName },
+            token);
+
+        var payload = result.GetProperty("data").GetProperty("updateDisplayName");
+        Assert.Equal(exactName, payload.GetProperty("displayName").GetString());
+    }
+
+    [Fact]
+    public async Task UpdateDisplayName_PlayerCannotUpdateAnotherPlayersName()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token1 = await RegisterAsync(client, "dn-player1@test.com", "Player One");
+        var token2 = await RegisterAsync(client, "dn-player2@test.com", "Player Two");
+        var id2 = await GetPlayerIdAsync(client, token2);
+
+        // Player 1 updates their OWN name — this must succeed.
+        var result = await ExecAsync(client,
+            "mutation UDN($dn: String!) { updateDisplayName(input: { displayName: $dn }) { playerId displayName } }",
+            new { dn = "New Player One Name" },
+            token1);
+
+        var payload = result.GetProperty("data").GetProperty("updateDisplayName");
+        Assert.Equal("New Player One Name", payload.GetProperty("displayName").GetString());
+
+        // Verify Player Two's name was NOT changed.
+        var profile2 = await ExecAsync(client, ProfileQuery, new { playerId = id2 });
+        var name2 = profile2.GetProperty("data").GetProperty("playerProfile").GetProperty("displayName").GetString();
+        Assert.Equal("Player Two", name2);
+    }
+
+    [Fact]
+    public async Task UpdateDisplayName_LeadingTrailingWhitespaceTrimmed()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "dn-trim@test.com", "Untrimmed Name");
+
+        var result = await ExecAsync(client,
+            "mutation UDN($dn: String!) { updateDisplayName(input: { displayName: $dn }) { displayName } }",
+            new { dn = "  Trimmed Name  " },
+            token);
+
+        var payload = result.GetProperty("data").GetProperty("updateDisplayName");
+        Assert.Equal("Trimmed Name", payload.GetProperty("displayName").GetString());
+    }
 }

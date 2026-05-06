@@ -6019,6 +6019,68 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    // updatePlayerBio mutation
+    if (query.includes('updatePlayerBio') && !query.includes('playerProfile')) {
+      if (!state.currentUserId) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Not authenticated.' }] }),
+        })
+      }
+      const bio = (body.variables?.bio as string | null) ?? null
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            updatePlayerBio: {
+              playerId: state.currentUserId,
+              bio,
+            },
+          },
+        }),
+      })
+    }
+
+    // updateDisplayName mutation
+    if (query.includes('updateDisplayName')) {
+      if (!state.currentUserId) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Not authenticated.' }] }),
+        })
+      }
+      const displayName = (body.variables?.displayName as string | undefined)?.trim() ?? ''
+      if (!displayName) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [{ message: 'Display name is required.', extensions: { code: 'DISPLAY_NAME_REQUIRED' } }],
+          }),
+        })
+      }
+      // Persist the updated name in the mock state
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      if (player) {
+        player.displayName = displayName
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            updateDisplayName: {
+              playerId: state.currentUserId,
+              displayName,
+            },
+          },
+        }),
+      })
+    }
+
     if (query.includes('playerRankHistory')) {
       const targetPlayerId = body.variables?.playerId as string | undefined
       const snapshots = (targetPlayerId ? state.playerRankSnapshots[targetPlayerId] : null) ?? []
