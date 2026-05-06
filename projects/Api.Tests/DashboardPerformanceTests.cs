@@ -7,6 +7,7 @@ using Api.Engine;
 using Api.Tests.Infrastructure;
 using Api.Utilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -431,5 +432,299 @@ public sealed class DashboardPerformanceTests
         Assert.False(
             await PlanExistsAsync(factory, buildingId),
             "BuildingUpgradePhase in the tick engine must apply and remove due plans.");
+    }
+
+    // ── Authentication / isolation ────────────────────────────────────────────
+
+    /// <summary>
+    /// <c>myCompanies</c> is decorated with [Authorize] — an unauthenticated request must be
+    /// rejected with a GraphQL authorization error, not silently return an empty list.
+    /// </summary>
+    [Fact]
+    public async Task GetMyCompanies_Unauthenticated_ReturnsAuthorizationError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        // No Bearer token — deliberately unauthenticated.
+        var result = await ExecuteGraphQlAsync(
+            client,
+            "{ myCompanies { id name } }");
+
+        // HotChocolate returns either data=null with an errors array, or a top-level errors
+        // object — both are valid.  Either way, `myCompanies` must not return real data.
+        var hasErrors = result.TryGetProperty("errors", out var errors) &&
+                        errors.ValueKind == JsonValueKind.Array &&
+                        errors.GetArrayLength() > 0;
+
+        bool companiesIsNull = false;
+        if (result.TryGetProperty("data", out var dataEl))
+        {
+            if (dataEl.ValueKind == JsonValueKind.Object
+                && dataEl.TryGetProperty("myCompanies", out var mc))
+            {
+                companiesIsNull = mc.ValueKind == JsonValueKind.Null;
+            }
+            else
+            {
+                companiesIsNull = dataEl.ValueKind == JsonValueKind.Null;
+            }
+        }
+
+        Assert.True(hasErrors || companiesIsNull,
+            "An unauthenticated myCompanies request must be rejected.");
+    }
+
+    /// <summary>
+    /// A player with three companies must see all three returned by <c>myCompanies</c>.
+    /// Ensures the WHERE clause filters correctly and that the query doesn't crash under
+    /// moderate data volume.
+    /// </summary>
+    [Fact]
+    public async Task GetMyCompanies_WithMultipleCompanies_ReturnsAllOwnedCompanies()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var userToken = await RegisterAndGetTokenAsync(client, "multi-co-user@test.com", "Multi Co User");
+
+        Guid playerId;
+        await using (var s = factory.Services.CreateAsyncScope())
+        {
+            var db = s.ServiceProvider.GetRequiredService<AppDbContext>();
+            playerId = (await db.Players.FirstAsync(p => p.Email == "multi-co-user@test.com")).Id;
+        }
+
+        // Seed three extra companies directly (on top of any existing ones).
+        await using (var s = factory.Services.CreateAsyncScope())
+        {
+            var db = s.ServiceProvider.GetRequiredService<AppDbContext>();
+            var currentTick = await db.GameStates.AsNoTracking()
+                .Select(gs => gs.CurrentTick)
+                .FirstOrDefaultDeterministicAsync();
+
+            foreach (var name in new[] { "AlphaInc", "BetaCorp", "GammaLtd" })
+            {
+                var company = new Company
+                {
+                    Id = Guid.NewGuid(),
+                    PlayerId = playerId,
+                    Name = name,
+                    FoundedAtUtc = DateTime.UtcNow,
+                    FoundedAtTick = currentTick,
+                };
+                db.Companies.Add(company);
+                db.BankAccounts.Add(new BankAccount
+                {
+                    Id = Guid.NewGuid(),
+                    AccountNumber = GenerateTestAccountNumber(),
+                    CompanyId = company.Id,
+                    CurrencyCode = "EUR",
+                    Balance = 10_000m,
+                    CreatedAtUtc = DateTime.UtcNow,
+                });
+            }
+
+            await db.SaveChangesAsync();
+        }
+
+        // Invalidate the per-user cache so we hit the DB.
+        var cache = factory.Services.GetRequiredService<IMemoryCache>();
+        cache.Remove($"myCompanies_{playerId}");
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            "{ myCompanies { id name } }",
+            token: userToken);
+
+        var companies = result.GetProperty("data").GetProperty("myCompanies")
+            .EnumerateArray()
+            .Select(c => c.GetProperty("name").GetString())
+            .ToList();
+
+        Assert.Contains("AlphaInc", companies);
+        Assert.Contains("BetaCorp", companies);
+        Assert.Contains("GammaLtd", companies);
+    }
+
+    /// <summary>
+    /// Verifies that Player A's <c>myCompanies</c> query does NOT apply Player B's due plans.
+    /// Cross-player data isolation is a correctness requirement for multi-player games.
+    /// </summary>
+    [Fact]
+    public async Task GetMyCompanies_OtherPlayersDuePlans_AreNotAffected()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        // Register two separate players.
+        var tokenA = await RegisterAndGetTokenAsync(client, "isolation-a@test.com", "Player A");
+        var tokenB = await RegisterAndGetTokenAsync(client, "isolation-b@test.com", "Player B");
+
+        Guid playerBId;
+        await using (var s = factory.Services.CreateAsyncScope())
+        {
+            var db = s.ServiceProvider.GetRequiredService<AppDbContext>();
+            playerBId = (await db.Players.FirstAsync(p => p.Email == "isolation-b@test.com")).Id;
+        }
+
+        // Seed a due plan belonging to Player B.
+        var (buildingBId, _) = await SeedCompanyWithDuePlanAsync(
+            factory, playerBId, "PlayerBCorp", "PlayerBFactory");
+
+        // Player A runs myCompanies.
+        await ExecuteGraphQlAsync(
+            client,
+            "{ myCompanies { id buildings { id } } }",
+            token: tokenA);
+
+        // Player B's plan must still exist — Player A's query must not have touched it.
+        Assert.True(
+            await PlanExistsAsync(factory, buildingBId),
+            "Player A's myCompanies query must NOT apply Player B's due plans.");
+    }
+
+    /// <summary>
+    /// A company with multiple simultaneously-due plans must have ALL plans intact
+    /// after a <c>myCompanies</c> query — not just the first one.
+    /// </summary>
+    [Fact]
+    public async Task GetMyCompanies_WithMultipleDuePlans_NoneAreApplied()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var userToken = await RegisterAndGetTokenAsync(client, "multi-plan-user@test.com", "Multi Plan User");
+
+        Guid playerId;
+        await using (var s = factory.Services.CreateAsyncScope())
+        {
+            var db = s.ServiceProvider.GetRequiredService<AppDbContext>();
+            playerId = (await db.Players.FirstAsync(p => p.Email == "multi-plan-user@test.com")).Id;
+        }
+
+        // Seed the first building (uses the shared helper which creates one plan).
+        var (building1Id, currentTick) = await SeedCompanyWithDuePlanAsync(
+            factory, playerId, "MultiPlanCorp", "MultiPlanFactory1");
+
+        // Seed a second due plan on a different building under the same company.
+        Guid building2Id;
+        await using (var s = factory.Services.CreateAsyncScope())
+        {
+            var db = s.ServiceProvider.GetRequiredService<AppDbContext>();
+            var company = await db.Companies.FirstAsync(c => c.Name == "MultiPlanCorp");
+            var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+
+            var building2 = new Building
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                CityId = city.Id,
+                Type = BuildingType.Factory,
+                Name = "MultiPlanFactory2",
+                Level = 1,
+            };
+            db.Buildings.Add(building2);
+            db.BuildingConfigurationPlans.Add(new BuildingConfigurationPlan
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = building2.Id,
+                AppliesAtTick = currentTick,
+                SubmittedAtTick = currentTick,
+                SubmittedAtUtc = DateTime.UtcNow,
+                TotalTicksRequired = 0,
+            });
+            await db.SaveChangesAsync();
+            building2Id = building2.Id;
+        }
+
+        // Query myCompanies — both plans must survive.
+        await ExecuteGraphQlAsync(
+            client,
+            "{ myCompanies { buildings { id pendingConfiguration { id } } } }",
+            token: userToken);
+
+        Assert.True(await PlanExistsAsync(factory, building1Id),
+            "Plan for building 1 must NOT be applied by myCompanies query.");
+        Assert.True(await PlanExistsAsync(factory, building2Id),
+            "Plan for building 2 must NOT be applied by myCompanies query.");
+    }
+
+    // ── GetCity content ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Verifies the <c>city(id)</c> resolver returns correct, populated city data —
+    /// name, population, resources — proving the <c>AsNoTracking</c> + <c>AsSplitQuery</c>
+    /// refactor did not break the Include chain.
+    /// </summary>
+    [Fact]
+    public async Task GetCity_ReturnsCorrectCityData()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        Guid bratislavaId;
+        await using (var s = factory.Services.CreateAsyncScope())
+        {
+            var db = s.ServiceProvider.GetRequiredService<AppDbContext>();
+            bratislavaId = (await db.Cities.FirstAsync(c => c.Name == "Bratislava")).Id;
+        }
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            "query GetCity($id: UUID!) { city(id: $id) { id name population currencyCode } }",
+            variables: new { id = bratislavaId });
+
+        var city = result.GetProperty("data").GetProperty("city");
+        Assert.NotEqual(JsonValueKind.Null, city.ValueKind);
+        Assert.Equal("Bratislava", city.GetProperty("name").GetString());
+        Assert.True(city.GetProperty("population").GetInt64() > 0, "Bratislava population must be positive");
+        Assert.Equal("EUR", city.GetProperty("currencyCode").GetString());
+    }
+
+    /// <summary>
+    /// Querying a non-existent city ID must return a null result without throwing or
+    /// triggering any write path.
+    /// </summary>
+    [Fact]
+    public async Task GetCity_NonExistentId_ReturnsNull()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var missingId = Guid.NewGuid();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            "query GetCity($id: UUID!) { city(id: $id) { id name } }",
+            variables: new { id = missingId });
+
+        var cityValue = result.GetProperty("data").GetProperty("city");
+        Assert.Equal(JsonValueKind.Null, cityValue.ValueKind);
+    }
+
+    // ── Cache behaviour ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Verifies the <c>gameState</c> 8-second cache is actually populated after the first
+    /// call so that rapid subsequent requests skip the DB round-trip.
+    /// </summary>
+    [Fact]
+    public async Task GetGameState_AfterFirstCall_IsCachedInMemory()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        // Evict any lingering cache entry from other tests.
+        var cache = factory.Services.GetRequiredService<IMemoryCache>();
+        cache.Remove("gameState_singleton");
+
+        // First call — should populate the cache.
+        await ExecuteGraphQlAsync(client, "{ gameState { currentTick } }");
+
+        // Inspect the cache directly.
+        var cacheHit = cache.TryGetValue("gameState_singleton", out GameState? cached);
+        Assert.True(cacheHit, "gameState_singleton must be set in IMemoryCache after first query.");
+        Assert.NotNull(cached);
     }
 }
