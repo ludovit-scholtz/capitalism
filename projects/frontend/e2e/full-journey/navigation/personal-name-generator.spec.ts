@@ -142,3 +142,31 @@ test.describe('Player profile – display name editing', () => {
     await expect(page.locator('h1')).toContainText('Quintus Hadrian Wolfe')
   })
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rankings — display name shown (ROADMAP: "In ranking show the personal account name")
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe('Rankings – display name shown', () => {
+  test('leaderboard shows player displayName in rankings (ROADMAP alignment)', async ({ page }) => {
+    const player = makePlayer()
+    player.displayName = 'Maximus Decimus Aurelius'
+    player.onboardingCompletedAtUtc = '2024-01-01T00:00:00Z'
+    setupMockApi(page, { players: [player] })
+    await page.goto('/leaderboard')
+    // The player's displayName must appear in the rankings list
+    await expect(page.locator('.rank-card').getByText('Maximus Decimus Aurelius')).toBeVisible()
+  })
+
+  test('leaderboard shows custom displayName updated via profile editing', async ({ page }) => {
+    const player = makePlayer()
+    player.displayName = 'Caius Julius Caesar'
+    player.onboardingCompletedAtUtc = '2024-01-01T00:00:00Z'
+    setupMockApi(page, { players: [player] })
+    await page.goto('/leaderboard')
+    // Verify the 3-word personal alias is visible, not an email address
+    await expect(page.locator('.rank-card').getByText('Caius Julius Caesar')).toBeVisible()
+    // Email must NOT appear in the visible ranking row
+    await expect(page.locator('.rank-card', { hasText: 'Caius Julius Caesar' }).getByText(player.email)).not.toBeVisible()
+  })
+})

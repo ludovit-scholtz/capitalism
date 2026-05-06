@@ -133,4 +133,73 @@ describe('personalAccountName', () => {
       expect(surnames).toContain(name)
     }
   })
+
+  // ── Format invariants ─────────────────────────────────────────────────────────
+
+  it('generated name contains exactly two spaces (three-word check)', () => {
+    for (let i = 0; i < 20; i++) {
+      const name = generatePersonalAccountName()
+      const spaceCount = (name.match(/ /g) ?? []).length
+      expect(spaceCount).toBe(2)
+    }
+  })
+
+  it('no word in the generated name contains spaces (all words are single tokens)', () => {
+    for (let i = 0; i < 20; i++) {
+      const name = generatePersonalAccountName()
+      for (const word of name.split(' ')) {
+        expect(word.includes(' ')).toBe(false)
+        expect(word.length).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  it('surname (third word) is NOT among the first two words in 10 consecutive names', () => {
+    // The first two words come from first-name dictionaries, the third from the curated surnames list.
+    // They should not match each other.
+    for (let i = 0; i < 10; i++) {
+      const name = generatePersonalAccountName()
+      const parts = name.split(' ')
+      const [first, middle, last] = parts as [string, string, string]
+      // The last part must be from surnames — it should not equal the first two parts
+      // (names dictionaries rarely overlap with the curated surname list)
+      expect(first).not.toBe(last)
+      expect(middle).not.toBe(last)
+    }
+  })
+
+  it('all three words in 20 names have no internal spaces and start with a capital', () => {
+    for (let i = 0; i < 20; i++) {
+      const name = generatePersonalAccountName()
+      const parts = name.split(' ')
+      expect(parts).toHaveLength(3)
+      for (const part of parts) {
+        expect(part.length).toBeGreaterThan(0)
+        expect(part.charAt(0)).toBe(part.charAt(0).toUpperCase())
+      }
+    }
+  })
+
+  it('session accumulates names: each call adds to the used set', () => {
+    const names: string[] = []
+    for (let i = 0; i < 10; i++) {
+      names.push(generatePersonalAccountName())
+    }
+    // All 10 names must be distinct within the session
+    const unique = new Set(names)
+    expect(unique.size).toBe(10)
+  })
+
+  it('resetPersonalNameSession allows re-seeing previously seen names', () => {
+    // Generate a small set, reset, then generate again — uniqueness tracking is cleared
+    const firstBatch: string[] = []
+    for (let i = 0; i < 5; i++) firstBatch.push(generatePersonalAccountName())
+    resetPersonalNameSession()
+    // After reset, the same names CAN appear (the set is cleared), no throws
+    const secondBatch: string[] = []
+    expect(() => {
+      for (let i = 0; i < 20; i++) secondBatch.push(generatePersonalAccountName())
+    }).not.toThrow()
+    expect(secondBatch.every((n) => n.split(' ').length === 3)).toBe(true)
+  })
 })

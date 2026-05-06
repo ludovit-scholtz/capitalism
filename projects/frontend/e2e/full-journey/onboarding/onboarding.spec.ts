@@ -186,7 +186,7 @@ test.describe('Authentication', () => {
 
     // Fill form
     await page.getByLabel('Email').fill('new@test.com')
-    await page.getByLabel('Display Name').fill('New Player')
+    await page.locator('#displayName').fill('New Player')
     await page.getByLabel('Password').fill('TestPass1!')
 
     // Submit
@@ -229,7 +229,7 @@ test.describe('Authentication', () => {
     // Switch to register
     await page.getByRole('button', { name: 'Create Account' }).click()
     await expect(page.getByRole('heading', { name: 'Create Account' })).toBeVisible()
-    await expect(page.getByLabel('Display Name')).toBeVisible()
+    await expect(page.locator('#displayName')).toBeVisible()
 
     // Switch back to login
     await page.getByRole('button', { name: 'Sign In', exact: true }).click()
@@ -1276,7 +1276,7 @@ test.describe('Full onboarding journey', () => {
     // Register
     await page.getByRole('button', { name: 'Create Account' }).click()
     await page.getByLabel('Email').fill('journey@test.com')
-    await page.getByLabel('Display Name').fill('Journey Player')
+    await page.locator('#displayName').fill('Journey Player')
     await page.getByLabel('Password').fill('TestPass1!')
     await page.getByRole('button', { name: 'Create Account' }).first().click()
     await page.waitForURL('/')
