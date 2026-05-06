@@ -249,3 +249,45 @@
     align-items: flex-start;
   }
 }
+
+/* ── Unit copy/paste clipboard feedback ───────────────────────────────────── */
+
+.clipboard-message {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  margin-bottom: 0.75rem;
+  border-radius: var(--radius-md, 8px);
+  font-size: 0.875rem;
+  line-height: 1.4;
+  animation: clipboard-fade-in 0.15s ease;
+}
+
+.clipboard-message-success {
+  border: 1px solid rgba(22, 163, 74, 0.35);
+  background: rgba(22, 163, 74, 0.08);
+  color: #16a34a;
+}
+
+.clipboard-message-error {
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  background: rgba(220, 38, 38, 0.08);
+  color: #dc2626;
+}
+
+.clipboard-message-icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+
+@keyframes clipboard-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

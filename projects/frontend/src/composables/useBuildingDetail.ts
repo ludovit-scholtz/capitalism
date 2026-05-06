@@ -48,6 +48,7 @@ import { formatTickDuration, formatGameTickTime } from '@/lib/gameTime'
 import { getUnitResourceHistoryItemKey, type UnitResourceHistoryItemOption } from '@/lib/unitResourceHistory'
 import { buildPurchaseVendorOptions, collectSameCityVendorItemKeys, getPurchaseSelectorItemKey, sortPurchaseSelectorItems } from '@/lib/purchaseSelector'
 import { getSalesUnitProductOptions } from '@/lib/salesUnitProductPicker'
+import { serializeUnitConfig, deserializeUnitConfig } from '@/lib/unitClipboard'
 import type {
   Building,
   BuildingConfigurationPlanRemoval,
@@ -379,6 +380,11 @@ export function useBuildingDetail() {
   const masterConnected = computed(() => isMasterConnected())
   const masterUserEmail = computed(() => auth.player?.email ?? '')
   const selectedHistoryItemKey = ref<string | null>(null)
+
+  // Unit copy/paste clipboard state
+  const clipboardMessage = ref<string | null>(null)
+  const clipboardMessageType = ref<'success' | 'error'>('success')
+  let _clipboardMessageTimer: ReturnType<typeof setTimeout> | null = null
 
   const { saveScrollPosition, restoreScrollPosition } = useScrollPreservation()
 
@@ -3199,6 +3205,120 @@ export function useBuildingDetail() {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Unit copy/paste (Ctrl+C / Ctrl+V)
+  // ---------------------------------------------------------------------------
+
+  function showClipboardMessage(message: string, type: 'success' | 'error', durationMs = 3000) {
+    if (_clipboardMessageTimer !== null) {
+      clearTimeout(_clipboardMessageTimer)
+    }
+    clipboardMessage.value = message
+    clipboardMessageType.value = type
+    _clipboardMessageTimer = setTimeout(() => {
+      clipboardMessage.value = null
+      _clipboardMessageTimer = null
+    }, durationMs)
+  }
+
+  /**
+   * Copy the selected draft unit's configuration to the system clipboard as JSON.
+   * Only configurable (non-structural) fields are copied.
+   * No-op when not in editing mode or no cell is selected.
+   */
+  async function copySelectedUnit(): Promise<void> {
+    if (!isEditing.value || !selectedCell.value) return
+    const unit = getDraftUnitAt(selectedCell.value.x, selectedCell.value.y)
+    if (!unit) {
+      showClipboardMessage(t('buildingDetail.clipboard.noUnitToCopy'), 'error')
+      return
+    }
+    try {
+      const json = serializeUnitConfig(unit)
+      await navigator.clipboard.writeText(json)
+      showClipboardMessage(t('buildingDetail.clipboard.copySuccess'), 'success')
+    } catch {
+      showClipboardMessage(t('buildingDetail.clipboard.copyFailed'), 'error')
+    }
+  }
+
+  /**
+   * Paste a previously copied unit configuration onto the selected draft unit.
+   * Only works when the target unit is the same type as the copied unit.
+   * No-op when not in editing mode, no cell is selected, or the selected cell is empty.
+   */
+  async function pasteToSelectedUnit(): Promise<void> {
+    if (!isEditing.value || !selectedCell.value) return
+    const targetUnit = getDraftUnitAt(selectedCell.value.x, selectedCell.value.y)
+    if (!targetUnit) {
+      showClipboardMessage(t('buildingDetail.clipboard.noUnitToPaste'), 'error')
+      return
+    }
+
+    let text: string
+    try {
+      text = await navigator.clipboard.readText()
+    } catch {
+      showClipboardMessage(t('buildingDetail.clipboard.readFailed'), 'error')
+      return
+    }
+
+    const result = deserializeUnitConfig(text, targetUnit.unitType)
+
+    if (!result.ok) {
+      switch (result.error) {
+        case 'EMPTY':
+          showClipboardMessage(t('buildingDetail.clipboard.empty'), 'error')
+          break
+        case 'INVALID_JSON':
+          showClipboardMessage(t('buildingDetail.clipboard.invalidFormat'), 'error')
+          break
+        case 'SCHEMA_MISMATCH':
+          showClipboardMessage(t('buildingDetail.clipboard.schemaMismatch'), 'error')
+          break
+        case 'INCOMPATIBLE_TYPE': {
+          // Safely extract the source unitType from the raw JSON for a better error message
+          let sourceUnitType = ''
+          try {
+            const raw = JSON.parse(text) as Record<string, unknown>
+            if (typeof raw['unitType'] === 'string') sourceUnitType = raw['unitType']
+          } catch {
+            // ignore
+          }
+          const fromLabel = sourceUnitType ? t(`buildingDetail.unitTypes.${sourceUnitType}`) : ''
+          const toLabel = t(`buildingDetail.unitTypes.${targetUnit.unitType}`)
+          showClipboardMessage(
+            fromLabel
+              ? t('buildingDetail.clipboard.incompatibleType', { from: fromLabel, to: toLabel })
+              : t('buildingDetail.clipboard.schemaMismatch'),
+            'error',
+          )
+          break
+        }
+      }
+      return
+    }
+
+    // Apply all configurable fields from the clipboard to the target unit
+    const { config } = result
+    targetUnit.resourceTypeId = config.resourceTypeId
+    targetUnit.productTypeId = config.productTypeId
+    targetUnit.minPrice = config.minPrice
+    targetUnit.maxPrice = config.maxPrice
+    targetUnit.purchaseSource = config.purchaseSource
+    targetUnit.saleVisibility = config.saleVisibility
+    targetUnit.budget = config.budget
+    targetUnit.mediaHouseBuildingId = config.mediaHouseBuildingId
+    targetUnit.minQuality = config.minQuality
+    targetUnit.brandScope = config.brandScope
+    targetUnit.vendorLockCompanyId = config.vendorLockCompanyId
+    targetUnit.lockedCityId = config.lockedCityId
+    targetUnit.industryCategory = config.industryCategory
+    targetUnit.lowInventoryAlertThreshold = config.lowInventoryAlertThreshold
+
+    showClipboardMessage(t('buildingDetail.clipboard.pasteSuccess'), 'success')
+  }
+
   async function loadUnitInventorySummaries(requestId?: number) {
     if (!auth.token) {
       if (requestId == null || requestId === activeBuildingLoadRequest) {
@@ -4775,6 +4895,8 @@ export function useBuildingDetail() {
     layoutDeleteError,
     overwriteConfirmPending,
     selectedHistoryItemKey,
+    clipboardMessage,
+    clipboardMessageType,
     showRentDialog,
     newRentPerSqm,
     savingRent,
@@ -4974,6 +5096,8 @@ export function useBuildingDetail() {
     isCellUnderUpgrade,
     toggleStagedUpgrade,
     updateSelectedUnitConfig,
+    copySelectedUnit,
+    pasteToSelectedUnit,
     formatCurrency,
     formatBuildingType,
     formatTickDuration,
