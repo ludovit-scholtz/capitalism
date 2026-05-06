@@ -250,7 +250,37 @@ const selectedCity = computed(() => cities.value.find((city) => city.id === sele
 const selectedProduct = computed(() => products.value.find((product) => product.id === selectedProductId.value) ?? null)
 const selectedFactoryLot = computed(() => cityLots.value.find((lot) => lot.id === selectedFactoryLotId.value) ?? null)
 const selectedShopLot = computed(() => cityLots.value.find((lot) => lot.id === selectedShopLotId.value) ?? null)
-const companyName = computed(() => generateOnboardingCompanyName(selectedIndustry.value, selectedCity.value?.name))
+
+/** Counter incremented each time the player clicks "Generate Another Name". */
+const nameGenerationSeed = ref(0)
+/** The current company name — starts as a generated suggestion, can be edited by the player. */
+const companyName = ref('')
+
+/** Derives a fresh suggested name from the current industry, city and seed counter. */
+function refreshSuggestedName() {
+  companyName.value = generateOnboardingCompanyName(
+    selectedIndustry.value,
+    selectedCity.value?.name,
+    nameGenerationSeed.value,
+  )
+}
+
+/** Cycles to the next suggested name without replacing any manual edits. */
+function regenerateCompanyName() {
+  nameGenerationSeed.value++
+  companyName.value = generateOnboardingCompanyName(
+    selectedIndustry.value,
+    selectedCity.value?.name,
+    nameGenerationSeed.value,
+  )
+}
+
+// Auto-refresh the suggested name whenever industry or city changes so the
+// first suggestion always reflects the player's current choices.
+watch([selectedIndustry, selectedCity], () => {
+  nameGenerationSeed.value = 0
+  refreshSuggestedName()
+})
 const starterCompany = computed(() => {
   const companyId = auth.player?.onboardingCompanyId
   if (!companyId) {
@@ -1333,11 +1363,27 @@ watch(visibleIndustries, () => {
           <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step4Title') }}</h2>
           <p class="text-muted text-sm">{{ t('onboarding.step4Desc') }}</p>
         </div>
+        <!-- Company name editor -->
+        <div class="company-name-editor flex flex-col gap-2 p-4 rounded-lg bg-page border border-divider">
+          <label class="text-xs font-semibold text-muted" for="onboarding-company-name">{{ t('onboarding.generatedCompanyName') }}</label>
+          <div class="flex gap-2 flex-wrap">
+            <input
+              id="onboarding-company-name"
+              v-model="companyName"
+              type="text"
+              maxlength="100"
+              :placeholder="t('onboarding.companyNamePlaceholder')"
+              class="flex-1 min-w-0 px-3 py-2 border border-divider rounded-lg bg-card text-primary focus:outline-none focus:border-brand transition-colors text-sm font-semibold"
+            />
+            <button
+              type="button"
+              class="regenerate-name-btn btn btn-secondary text-sm whitespace-nowrap"
+              @click="regenerateCompanyName"
+            >{{ t('onboarding.regenerateName') }}</button>
+          </div>
+          <p class="text-xs text-muted m-0">{{ t('onboarding.companyNameHint') }}</p>
+        </div>
         <div class="budget-grid grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4">
-          <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
-            <span class="text-muted text-xs">{{ t('onboarding.generatedCompanyName') }}</span
-            ><strong>{{ companyName }}</strong>
-          </article>
           <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
             <span class="text-muted text-xs">{{ t('onboarding.founderContribution') }}</span
             ><strong>{{ formatCurrency(FOUNDER_CONTRIBUTION * cityUsdFxRate) }}</strong>

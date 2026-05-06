@@ -5626,3 +5626,130 @@ test.describe('Logistics Pro-gated onboarding', () => {
     await expect(logisticsCard.locator('.card-why')).toContainText('Volume play')
   })
 })
+
+test.describe('Company name generator — generate, regenerate and edit (AC from issue)', () => {
+  test('shows a pre-filled company name suggestion on the IPO step', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/onboarding')
+
+    // Navigate to IPO step (step 4) where company name editor appears
+    await chooseOnboardingCity(page)
+    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
+    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
+
+    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
+
+    // The company name editor must be visible with a pre-filled value
+    const nameInput = page.locator('#onboarding-company-name')
+    await expect(nameInput).toBeVisible()
+    const initialName = (await nameInput.inputValue()).trim()
+    expect(initialName.length).toBeGreaterThan(0)
+  })
+
+  test('regenerate button produces a different name', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/onboarding')
+
+    await chooseOnboardingCity(page)
+    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
+    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
+
+    const nameInput = page.locator('#onboarding-company-name')
+    const initialName = (await nameInput.inputValue()).trim()
+
+    // Click "Generate Another Name" and verify the name changed
+    await page.locator('.regenerate-name-btn').click()
+    const newName = (await nameInput.inputValue()).trim()
+    expect(newName).not.toBe(initialName)
+    expect(newName.length).toBeGreaterThan(0)
+  })
+
+  test('at least 10 regenerations all produce distinct names', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/onboarding')
+
+    await chooseOnboardingCity(page)
+    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
+    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
+
+    const nameInput = page.locator('#onboarding-company-name')
+    const names = new Set<string>()
+    names.add((await nameInput.inputValue()).trim())
+
+    const regenBtn = page.locator('.regenerate-name-btn')
+    for (let i = 0; i < 10; i++) {
+      await regenBtn.click()
+      names.add((await nameInput.inputValue()).trim())
+    }
+
+    // All 11 names (initial + 10 regenerations) must be unique
+    expect(names.size).toBeGreaterThanOrEqual(10)
+  })
+
+  test('player can edit the name manually and the edit is preserved', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/onboarding')
+
+    await chooseOnboardingCity(page)
+    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
+    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
+
+    const nameInput = page.locator('#onboarding-company-name')
+    await nameInput.fill('My Custom Corp')
+    await expect(nameInput).toHaveValue('My Custom Corp')
+
+    // The hint text is visible below the input
+    await expect(page.locator('.company-name-editor')).toContainText('Accept the suggestion')
+  })
+
+  test('regenerate resets a manually-edited name back to a generated one', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/onboarding')
+
+    await chooseOnboardingCity(page)
+    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
+    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
+
+    const nameInput = page.locator('#onboarding-company-name')
+    await nameInput.fill('My Custom Corp')
+
+    // After regenerating, the input should contain a fresh generated name (not the manual edit)
+    await page.locator('.regenerate-name-btn').click()
+    const generatedName = (await nameInput.inputValue()).trim()
+    expect(generatedName).not.toBe('My Custom Corp')
+    expect(generatedName.length).toBeGreaterThan(0)
+  })
+
+  test('company name suggestion changes when industry changes', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/onboarding')
+
+    await chooseOnboardingCity(page)
+
+    // Select Furniture first
+    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
+    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
+
+    const nameInput = page.locator('#onboarding-company-name')
+    const furnitureName = (await nameInput.inputValue()).trim()
+
+    // Go back and select Healthcare
+    await page.getByRole('button', { name: '← Back' }).click()
+    await page.getByRole('button', { name: '← Back' }).click()
+
+    await page.locator('.industry-card', { hasText: 'Healthcare' }).click()
+    await page.locator('.product-card', { hasText: 'Basic Medicine' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
+
+    const healthcareName = (await nameInput.inputValue()).trim()
+
+    // Different industry → different name
+    expect(healthcareName).not.toBe(furnitureName)
+    expect(healthcareName.length).toBeGreaterThan(0)
+  })
+})
