@@ -2,12 +2,17 @@ import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
-import type { City, FxRate, ForexTradeHistoryEntry, CurrencyBalance, PlayerBankAccountSummary } from '@/types'
+import type { City, FxRate, ForexTradeHistoryEntry, CurrencyBalance, PlayerBankAccountSummary, FxRateSnapshot } from '@/types'
+
+/** ±0.5% spread applied around the mid rate for buy/sell display. */
+const SPREAD_HALF = 0.005
 
 interface CityRateRow {
   targetCode: string
   targetSymbol: string
   rate: number
+  buyRate: number
+  sellRate: number
   afterFeeRate: number
   rateDate: string
 }
@@ -23,6 +28,8 @@ export function useForexData() {
   const history = ref<ForexTradeHistoryEntry[]>([])
   const myBankAccounts = ref<PlayerBankAccountSummary[]>([])
   const cities = ref<City[]>([])
+  const rateHistory = ref<FxRateSnapshot[]>([])
+  const rateHistoryLoading = ref(false)
 
   const isCompanyContext = computed(() => auth.player?.activeAccountType === 'COMPANY' && !!auth.player?.activeCompanyId)
   const contextScopedBankAccounts = computed(() => {
@@ -62,7 +69,15 @@ export function useForexData() {
         const crossRate = targetEurRate / baseEurRate
         const symbol = code === 'EUR' ? '€' : (rates.value.find((r) => r.quoteCurrencyCode === code)?.quoteCurrencySymbol ?? code)
         const rateEntry = rates.value.find((r) => r.quoteCurrencyCode === code)
-        return { targetCode: code, targetSymbol: symbol, rate: crossRate, afterFeeRate: crossRate * 0.99, rateDate: rateEntry?.rateDate ?? '' }
+        return {
+          targetCode: code,
+          targetSymbol: symbol,
+          rate: crossRate,
+          buyRate: crossRate * (1 + SPREAD_HALF),
+          sellRate: crossRate * (1 - SPREAD_HALF),
+          afterFeeRate: crossRate * 0.99,
+          rateDate: rateEntry?.rateDate ?? '',
+        }
       })
       .sort((a, b) => a.targetCode.localeCompare(b.targetCode))
   })
@@ -131,6 +146,29 @@ export function useForexData() {
     }
   }
 
+  /**
+   * Loads FX rate history snapshots for a given currency pair.
+   * @param quoteCurrencyCode The quote currency (e.g. "CZK", "USD")
+   * @param ticksBack How many recent ticks to include (default 100, max 1000)
+   */
+  async function loadRateHistory(quoteCurrencyCode: string, ticksBack = 100) {
+    rateHistoryLoading.value = true
+    try {
+      const result = await gqlRequest<{ fxRateHistory: FxRateSnapshot[] }>(`
+        query GetFxRateHistory($quoteCurrencyCode: String!, $ticksBack: Int) {
+          fxRateHistory(quoteCurrencyCode: $quoteCurrencyCode, ticksBack: $ticksBack) {
+            baseCurrencyCode quoteCurrencyCode midRate buyRate sellRate gameTick capturedAtUtc
+          }
+        }
+      `, { quoteCurrencyCode, ticksBack })
+      rateHistory.value = result.fxRateHistory ?? []
+    } catch {
+      rateHistory.value = []
+    } finally {
+      rateHistoryLoading.value = false
+    }
+  }
+
   async function reloadBankAccountsSilent() {
     if (!auth.isAuthenticated) return
     try {
@@ -181,5 +219,13 @@ export function useForexData() {
 
   function formatTick(tick: number): string { return tick.toLocaleString() }
 
-  return { auth, loading, error, rates, balances, history, myBankAccounts, cities, contextScopedBankAccounts, hasBankAccounts, selectedCity, baseCurrencyCode, baseCurrencySymbol, cityRateBoard, rateUpdateDate, availableCurrencies, toBalances, loadData, reloadBankAccountsSilent, reloadAfterSwap, formatAmount, formatRate, formatTick }
+  return {
+    auth, loading, error, rates, balances, history, myBankAccounts, cities,
+    rateHistory, rateHistoryLoading,
+    contextScopedBankAccounts, hasBankAccounts,
+    selectedCity, baseCurrencyCode, baseCurrencySymbol,
+    cityRateBoard, rateUpdateDate, availableCurrencies, toBalances,
+    loadData, reloadBankAccountsSilent, reloadAfterSwap, loadRateHistory,
+    formatAmount, formatRate, formatTick,
+  }
 }

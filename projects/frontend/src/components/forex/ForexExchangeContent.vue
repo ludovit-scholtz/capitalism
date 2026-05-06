@@ -4,16 +4,18 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useForexData } from '@/composables/useForexData'
 import ForexSwapSection from '@/components/forex/ForexSwapSection.vue'
+import FxRateChart from '@/components/forex/FxRateChart.vue'
 import GoldAmmSection from '@/components/forex/GoldAmmSection.vue'
 import BankAccountTransferPanel from '@/components/banking/BankAccountTransferPanel.vue'
 import UiStateLoading from '@/components/ui/UiStateLoading.vue'
 import UiStateError from '@/components/ui/UiStateError.vue'
+import { buildEurPairList, formatPairLabel } from '@/lib/fxPairFormatter'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
-const { auth, loading, error, rates, balances, history, contextScopedBankAccounts, hasBankAccounts, selectedCity, baseCurrencyCode, baseCurrencySymbol, cityRateBoard, rateUpdateDate, availableCurrencies, toBalances, loadData, reloadBankAccountsSilent, reloadAfterSwap, formatAmount, formatRate, formatTick } = useForexData()
+const { auth, loading, error, rates, balances, history, contextScopedBankAccounts, hasBankAccounts, selectedCity, baseCurrencyCode, baseCurrencySymbol, cityRateBoard, rateUpdateDate, availableCurrencies, toBalances, loadData, reloadBankAccountsSilent, reloadAfterSwap, formatAmount, formatRate, formatTick, rateHistory, rateHistoryLoading, loadRateHistory } = useForexData()
 
 type ForexTab = 'swap' | 'transfer' | 'rates' | 'history' | 'gold'
 
@@ -39,6 +41,38 @@ watch(activeTab, async (tab) => {
   if (tab === 'swap') delete nextQuery.tab
   else nextQuery.tab = tab
   await router.replace({ query: nextQuery })
+})
+
+// ── Chart state ────────────────────────────────────────────────────────────
+const availablePairs = computed(() => buildEurPairList(availableCurrencies.value))
+const selectedPair = ref('EUR/CZK')
+const selectedTicksBack = ref(100)
+
+const tickRangeOptions = [
+  { value: 24, label: '24h' },
+  { value: 168, label: '7d' },
+  { value: 720, label: '30d' },
+]
+
+watch([selectedPair, selectedTicksBack, availablePairs], async ([pair, ticks, pairs]) => {
+  if (pairs.length === 0) return
+  // Extract quote currency from pair label (e.g. EUR/CZK → CZK)
+  const quote = pair.split('/')[1]
+  if (!quote) return
+  // Ensure selected pair is valid after rates load
+  if (!pairs.includes(pair) && pairs.length > 0) {
+    selectedPair.value = pairs[0]!
+    return
+  }
+  await loadRateHistory(quote, ticks)
+}, { immediate: false })
+
+watch(activeTab, async (tab) => {
+  if (tab !== 'rates') return
+  const pair = selectedPair.value
+  const quote = pair.split('/')[1]
+  if (!quote) return
+  await loadRateHistory(quote, selectedTicksBack.value)
 })
 </script>
 
@@ -98,6 +132,31 @@ watch(activeTab, async (tab) => {
                   <div class="text-subtle">{{ t('forex.rateSourceNote') }}</div>
                 </div>
               </div>
+
+              <!-- Rate history chart ─────────────────────────────────── -->
+              <div class="rates-chart-section rounded-xl border border-divider bg-surface p-4">
+                <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+                  <div class="flex flex-col gap-1">
+                    <span class="text-xs font-semibold uppercase tracking-wide text-muted">{{ t('forex.rateChartPair') }}</span>
+                    <select v-model="selectedPair" class="chart-pair-selector rounded border border-divider bg-card px-2 py-1 text-sm text-body" :aria-label="t('forex.rateChartPairAriaLabel')">
+                      <option v-for="pair in availablePairs" :key="pair" :value="pair">{{ pair }}</option>
+                    </select>
+                  </div>
+                  <div class="flex gap-1">
+                    <button
+                      v-for="opt in tickRangeOptions"
+                      :key="opt.value"
+                      class="tick-range-btn rounded border px-3 py-1 text-xs font-semibold transition-colors"
+                      :class="selectedTicksBack === opt.value ? 'border-brand bg-brand/10 text-brand' : 'border-divider bg-card text-muted hover:border-brand/50'"
+                      @click="selectedTicksBack = opt.value"
+                    >{{ opt.label }}</button>
+                  </div>
+                </div>
+                <div v-if="rateHistoryLoading" class="flex items-center justify-center py-8 text-sm text-muted">{{ t('common.loading') }}</div>
+                <FxRateChart v-else :snapshots="rateHistory" :pair-label="selectedPair" />
+              </div>
+
+              <!-- Rate table ─────────────────────────────────────────── -->
               <div>
                 <p class="mb-3 text-sm text-muted">{{ t('forex.rateTableIntro', { base: `1 ${baseCurrencySymbol} ${baseCurrencyCode}` }) }}</p>
                 <div class="overflow-x-auto">
@@ -105,7 +164,9 @@ watch(activeTab, async (tab) => {
                     <thead>
                       <tr>
                         <th class="text-left px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider">{{ t('forex.rateTableCurrency') }}</th>
+                        <th class="text-right px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider hidden sm:table-cell">{{ t('forex.rateTableBuyRate') }}</th>
                         <th class="text-right px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider">{{ t('forex.rateTableMidRate') }}</th>
+                        <th class="text-right px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider hidden sm:table-cell">{{ t('forex.rateTableSellRate') }}</th>
                         <th class="text-right px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider">{{ t('forex.rateTableAfterFee') }}</th>
                       </tr>
                     </thead>
@@ -114,10 +175,12 @@ watch(activeTab, async (tab) => {
                         <td class="px-3 py-3 align-middle">
                           <div class="flex items-center gap-2">
                             <span class="min-w-[2rem] text-base font-bold text-brand">{{ row.targetSymbol }}</span>
-                            <span class="font-semibold text-body">{{ row.targetCode }}</span>
+                            <span class="rate-pair-label text-xs text-muted">{{ formatPairLabel(baseCurrencyCode, row.targetCode) }}</span>
                           </div>
                         </td>
+                        <td class="px-3 py-3 text-right font-mono text-success align-middle hidden sm:table-cell">{{ formatRate(row.buyRate) }}</td>
                         <td class="px-3 py-3 text-right font-mono font-semibold text-body align-middle">{{ formatRate(row.rate) }}</td>
+                        <td class="px-3 py-3 text-right font-mono text-danger align-middle hidden sm:table-cell">{{ formatRate(row.sellRate) }}</td>
                         <td class="px-3 py-3 text-right font-mono text-muted align-middle"><span class="text-sm">{{ formatRate(row.afterFeeRate) }}</span><span class="ml-1 text-xs text-subtle">-1%</span></td>
                       </tr>
                     </tbody>

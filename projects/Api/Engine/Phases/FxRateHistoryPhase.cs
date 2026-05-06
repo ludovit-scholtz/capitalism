@@ -61,22 +61,18 @@ public sealed class FxRateHistoryPhase : ITickPhase
 
         db.FxRateHistories.AddRange(snapshots);
 
-        // Prune oldest records per pair to keep the rolling window bounded.
+        // Prune oldest records to keep the rolling window bounded.
         // We only prune when the tick count is a multiple of 100 to avoid per-tick DB reads.
+        // Use a single bulk-delete across all pairs rather than N per-pair queries.
         if (tick % 100 == 0)
         {
-            foreach (var rate in currentRates)
-            {
-                var cutoff = tick - MaxRecordsPerPair;
-                var old = await db.FxRateHistories
-                    .Where(h => h.BaseCurrencyCode == "EUR"
-                        && h.QuoteCurrencyCode == rate.QuoteCurrencyCode
-                        && h.GameTick < cutoff)
-                    .ToListAsync(ct);
+            var cutoff = tick - MaxRecordsPerPair;
+            var oldRecords = await db.FxRateHistories
+                .Where(h => h.BaseCurrencyCode == "EUR" && h.GameTick < cutoff)
+                .ToListAsync(ct);
 
-                if (old.Count > 0)
-                    db.FxRateHistories.RemoveRange(old);
-            }
+            if (oldRecords.Count > 0)
+                db.FxRateHistories.RemoveRange(oldRecords);
         }
     }
 }
