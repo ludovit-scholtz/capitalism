@@ -17,6 +17,7 @@
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
+    "country-flag-icons": "^1.6.17",
     "easymde": "^2.20.0",
     "pinia": "^3.0.4",
     "vue": "^3.5.29",

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import CountryFlag from '@/components/common/CountryFlag.vue'
 import type { AccountOption } from '@/lib/accountContext'
 import type { City } from '@/types'
 
@@ -10,7 +11,6 @@ defineProps<{
   accountOptions: AccountOption[]
   switchingKey: string | null
   formatCurrency: (value: number) => string
-  ccLabel: (code: string) => string
 }>()
 
 const emit = defineEmits<{
@@ -38,7 +38,7 @@ const { t } = useI18n()
         :aria-checked="city.id === selectedCityId"
         @click="emit('selectCity', city.id)"
       >
-        <span class="ctx-cc-badge" aria-hidden="true">{{ ccLabel(city.countryCode) }}</span>
+        <CountryFlag :country-code="city.countryCode" size="sm" :title="city.countryCode" aria-hidden="true" />
         <span class="ctx-city-info">
           <span class="ctx-city-option-name">{{ city.name }}</span>
           <span class="ctx-city-option-meta">{{ city.currencyCode }}</span>

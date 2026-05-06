@@ -134,9 +134,13 @@ test.describe('Login page', () => {
     setupMockApi(page)
     await page.goto('/login')
 
+    // window.location.href navigation to the OIDC endpoint is captured as a request.
+    // Route intercept aborts the navigation so the test stays on the login page.
+    await page.route('https://google.biatec.io/**', (route) => route.abort())
+
     const [request] = await Promise.all([
       page.waitForRequest((req) => req.url().startsWith('https://google.biatec.io/authorize')),
-      page.getByRole('button', { name: 'Sign in with Biatec' }).click(),
+      page.getByRole('button', { name: 'Authenticate using Google' }).click(),
     ])
 
     const url = new URL(request.url())

@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import ContextSwitcherPanel from '@/components/layout/ContextSwitcherPanel.vue'
+import CountryFlag from '@/components/common/CountryFlag.vue'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
 import { buildAccountOptions, getActiveAccountName, type AccountOption } from '@/lib/accountContext'
@@ -44,11 +45,6 @@ function deriveMostUsedCityId(): string | null {
 }
 
 // ── City helpers ──────────────────────────────────────────────────────────────
-
-/** Normalise 2-letter country code for display (upper-case, max 2 chars). */
-function ccLabel(code: string): string {
-  return code.toUpperCase().slice(0, 2)
-}
 
 async function loadCities() {
   try {
@@ -181,7 +177,14 @@ defineExpose({ closePanel })
     <button type="button" class="ctx-trigger" :aria-expanded="isOpen" aria-haspopup="menu" :aria-label="`${selectedCity?.name ?? '…'} · ${activeAccountName}`" @click="togglePanel">
       <!-- City segment -->
       <span class="ctx-city-seg">
-        <span class="ctx-cc-badge" aria-hidden="true">{{ selectedCity ? ccLabel(selectedCity.countryCode) : '??' }}</span>
+        <CountryFlag
+          v-if="selectedCity"
+          :country-code="selectedCity.countryCode"
+          size="sm"
+          :title="selectedCity.countryCode"
+          aria-hidden="true"
+        />
+        <span v-else class="ctx-cc-badge" aria-hidden="true">??</span>
         <span class="ctx-city-name">{{ selectedCity?.name ?? '…' }}</span>
       </span>
 
@@ -208,7 +211,6 @@ defineExpose({ closePanel })
       :account-options="accountOptions"
       :switching-key="switchingKey"
       :format-currency="formatCurrency"
-      :cc-label="ccLabel"
       @select-city="selectCity"
       @switch-account="handleSwitchAccount"
     />
