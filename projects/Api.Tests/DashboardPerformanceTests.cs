@@ -1126,7 +1126,7 @@ public sealed class DashboardPerformanceTests
     /// <summary>
     /// <c>cities</c> must be ordered by <c>Population ASC, Name ASC</c>.
     /// Bratislava (pop 475 000) must appear before Prague (pop 1 350 000) which must appear
-    /// before Vienna (pop 1 900 000) — proving <c>OrderBy(c =&gt; c.Population)</c> is enforced.
+    /// before Vienna (pop 1 900 000) — proving <c>OrderBy(c => c.Population)</c> is enforced.
     /// </summary>
     [Fact]
     public async Task GetCities_OrderedByPopulationAscending()
@@ -1173,7 +1173,7 @@ public sealed class DashboardPerformanceTests
 
     /// <summary>
     /// <c>city(id)</c> for Bratislava must return the city's seeded resources with their
-    /// resource type data.  This validates the <c>Include(c =&gt; c.Resources).ThenInclude(r =&gt; r.ResourceType)</c>
+    /// resource type data.  This validates the <c>Include(c => c.Resources).ThenInclude(r => r.ResourceType)</c>
     /// chain still works after the <c>AsNoTracking()</c> + <c>AsSplitQuery()</c> refactor.
     /// </summary>
     [Fact]
