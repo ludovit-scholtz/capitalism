@@ -35,6 +35,7 @@ import {
   faLock,
   faSkull,
   faTriangleExclamation,
+  faChartLine,
 } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
@@ -65,6 +66,7 @@ library.add(
   faLock,
   faSkull,
   faTriangleExclamation,
+  faChartLine,
 )
 
 export function createApp() {

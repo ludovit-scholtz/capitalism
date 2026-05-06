@@ -184,6 +184,10 @@ async function markAllNotificationsRead() {
           <font-awesome-icon :icon="['fas', 'shield-halved']" class="mr-2" />
           <span class="inline-block md:hidden">{{ t('nav.admin') }}</span>
         </RouterLink>
+        <RouterLink v-if="session?.canAccessAdminDashboard" to="/operations" :title="t('nav.operations')" :aria-label="t('nav.operations')" class="nav-link" @click="closeMenu">
+          <font-awesome-icon :icon="['fas', 'chart-line']" class="mr-2" />
+          <span class="inline-block md:hidden">{{ t('nav.operations') }}</span>
+        </RouterLink>
       </nav>
 
       <!-- Right-side actions -->
