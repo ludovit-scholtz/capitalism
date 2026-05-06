@@ -97,7 +97,7 @@ async function submitListing() {
       input: { buildingId: building.value.id, isForSale: true, askingPrice: salePrice.value },
     })
     saveSuccess.value = true
-    setTimeout(() => router.push(`/building/${building.value!.id}`), 1500)
+    await router.push(`/building/${building.value!.id}`)
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
     if (msg.includes('BUILDING_IS_COLLATERAL')) {
@@ -121,7 +121,7 @@ async function cancelListing() {
       input: { buildingId: building.value.id, isForSale: false, askingPrice: null },
     })
     saveSuccess.value = true
-    setTimeout(() => router.push(`/building/${building.value!.id}`), 1500)
+    await router.push(`/building/${building.value!.id}`)
   } catch (err) {
     saveError.value = t('buildingDetail.saleFailed')
     console.error('[SellBuildingView] Failed to cancel listing:', err)
@@ -132,6 +132,11 @@ async function cancelListing() {
 
 function formatBuildingType(type: string) {
   return type.replace(/_/g, ' ')
+}
+
+function onPriceInput(event: Event) {
+  const inp = event.target as HTMLInputElement
+  salePrice.value = isNaN(inp.valueAsNumber) ? null : inp.valueAsNumber
 }
 
 const estimatedMarketValue = computed(() => {
@@ -281,11 +286,7 @@ onMounted(loadData)
             min="1"
             step="1000"
             :disabled="saving"
-            @input="
-              salePrice = isNaN(($event.target as HTMLInputElement).valueAsNumber)
-                ? null
-                : ($event.target as HTMLInputElement).valueAsNumber
-            "
+            @input="onPriceInput"
           />
           <!-- Validation messages -->
           <p v-if="salePrice !== null && salePrice <= 0" class="mt-1 text-xs text-red-500">
