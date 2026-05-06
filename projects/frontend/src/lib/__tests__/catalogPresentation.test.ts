@@ -181,8 +181,8 @@ describe('getLocalizedProductName', () => {
 
   it('translates product slug tokens into Slovak', () => {
     const result = getLocalizedProductName(makeProduct({ name: 'Wooden Chair', slug: 'wooden-chair' }), 'sk')
-    expect(result).toContain('Drevený')
-    expect(result).toContain('Stolička')
+    expect(result).toContain('Drevená')
+    expect(result).toContain('stolička')
   })
 
   it('translates product slug tokens into German', () => {
@@ -432,8 +432,8 @@ describe('translateSlug', () => {
 
   it('translates a hyphenated multi-token slug into Slovak', () => {
     const result = translateSlug('wooden-chair', 'sk')
-    expect(result).toContain('Drevený')
-    expect(result).toContain('Stolička')
+    expect(result).toContain('Drevená')
+    expect(result).toContain('stolička')
   })
 
   it('translates a hyphenated multi-token slug into German', () => {
@@ -448,8 +448,9 @@ describe('translateSlug', () => {
     expect(translateSlug('xyzzy', 'de')).toBe('Xyzzy')
   })
 
-  it('capitalizes the first letter of each token', () => {
-    const result = translateSlug('wooden-chair', 'sk')
+  it('capitalizes the first letter of each token (word-by-word path)', () => {
+    // wooden-table uses the word-by-word path (no gender-agreement override needed for stôl)
+    const result = translateSlug('wooden-table', 'sk')
     result.split(' ').forEach((word) => {
       expect(word[0]).toBe(word[0]!.toUpperCase())
     })
