@@ -6,6 +6,12 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
+### Onboarding
+
+- [ ] Before user first sign in to the game make sure to fill in the referal code. Show link (and allow copy on one click) in the master frontend in the referal section where users can refer user for the game server. When user comes to this link, make sure the referal code is stored in the pinia state, and stored to the user account when he first logs in. Before user logs in, show him that he is using specific referal code and he will get 10% discount for in game purchases.
+- [ ] Create better Company name generator. Find npm package with the word list, and do a proper name generation with the combination of two words. Make sure the company names sounds great.
+- [ ] Create name generator for personal account name. Find npm package with the names wordlist and do a combination of the Firstname, Middlename and Last name. Allow players to change the personal account name later. In ranking show the personal account name, not the oidc name please. In the form to change name, tell people not to use the real name.
+
 ### Buildings (40% complete)
 
 - [x] Add tab view to building overview. Make the default tab to be shown one with the building P&L and statistics. Add second tab the bank account. Make sure the tabs are properly routed through tab view. Make sure to use the components for each tab please.
@@ -23,6 +29,7 @@ It will use real world map. The game will start in single city and later other c
 ### News (0% complete)
 
 - [ ] Add button to news and changelog to mark all news as read.
+- [ ] Changelog.csv news are not imported to the database. Make sure that after every restart every changelog news item is imported. If any error occurs during the import log it and skip the import of that one item. Do it more resilient to errors.
 
 ### Banks (50% complete)
 
@@ -197,6 +204,7 @@ All three industries are Pro-gated at both backend (`ProOnlyStarterIndustries`) 
 - [x] `useTutorialContext` composable for milestone state management, completion fetching, and completing milestones from any view.
 - [x] All tooltip and tutorial UI strings available in English, Slovak, and German via vue-i18n.
 - [ ] Contextual tooltip overlays on the dashboard and building detail views (first grid-editor open, first building detail visit) using `TutorialTooltip.vue` and `useTutorialContext` — integration deferred to next increment.
+- [ ] The tutorials does not grant the points to the master ranking at the moment. Create bounty in the master ranking for every tutorial. Make sure that the tutorial bounties are counted only once per lifetime per user. Make sure the tutorial is marked as completed if the bounty is awarded.
 
 ### Player profile and statistics page (60% complete)
 
