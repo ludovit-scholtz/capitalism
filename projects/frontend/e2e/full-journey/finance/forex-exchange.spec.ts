@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { setupMockApi, makePlayer } from '../../helpers/mock-api'
+import { setupMockApi, makePlayer, makeFxRateHistory } from '../../helpers/mock-api'
 import type { MockGoldAmmPool } from '../../helpers/mock-api'
 
 // ── Forex Exchange page ───────────────────────────────────────────────────────
@@ -1201,5 +1201,128 @@ test.describe('Forex Exchange page', () => {
     // Success message appears (rendered outside the collapsed showCreateForm block)
     await expect(page.locator('[aria-label="Add Liquidity"]').locator('[role="status"]')).toBeVisible()
     await expect(page.locator('[aria-label="Add Liquidity"]').locator('[role="status"]')).toContainText('Liquidity pool created')
+  })
+})
+
+// ── FX Rate History Chart tests ───────────────────────────────────────────────
+
+test.describe('FX Rate History Chart on Rate List tab', () => {
+  function setupChartTab(page: Parameters<typeof setupMockApi>[0], withHistory = true) {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    if (withHistory) {
+      state.fxRateHistorySnapshots = makeFxRateHistory('CZK', 25.19, 20, 1)
+    }
+    return { player, state }
+  }
+
+  test('shows rate chart section on Rate List tab', async ({ page }) => {
+    const { player } = setupChartTab(page)
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex?tab=rates')
+    await expect(page.locator('.rates-chart-section')).toBeVisible()
+  })
+
+  test('shows chart legend with buy, mid, sell labels', async ({ page }) => {
+    const { player } = setupChartTab(page)
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex?tab=rates')
+    await expect(page.locator('.chart-legend')).toBeVisible()
+    await expect(page.locator('.legend-buy')).toBeVisible()
+    await expect(page.locator('.legend-mid')).toBeVisible()
+    await expect(page.locator('.legend-sell')).toBeVisible()
+  })
+
+  test('shows pair selector with EUR/CZK option', async ({ page }) => {
+    const { player } = setupChartTab(page)
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex?tab=rates')
+    const selector = page.locator('.chart-pair-selector')
+    await expect(selector).toBeVisible()
+    await expect(selector).toContainText('EUR/CZK')
+  })
+
+  test('shows time range buttons (24h, 7d, 30d)', async ({ page }) => {
+    const { player } = setupChartTab(page)
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex?tab=rates')
+    await expect(page.getByRole('button', { name: '24h' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '7d' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '30d' })).toBeVisible()
+  })
+
+  test('shows empty state message when no history data available', async ({ page }) => {
+    const { player } = setupChartTab(page, false)
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex?tab=rates')
+    await expect(page.locator('.chart-empty')).toBeVisible()
+  })
+
+  test('rate table shows buy, mid and sell column headers', async ({ page }) => {
+    const { player } = setupChartTab(page)
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex?tab=rates')
+    const table = page.locator('.rates-table')
+    await expect(table).toBeVisible()
+    await expect(table.getByText('Mid rate')).toBeVisible()
+    await expect(table.locator('thead').getByText('Buy')).toBeVisible()
+    await expect(table.locator('thead').getByText('Sell')).toBeVisible()
+  })
+
+  test('rate table shows pair label (EUR/CZK) in currency column', async ({ page }) => {
+    const { player } = setupChartTab(page)
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex?tab=rates')
+    const table = page.locator('.rates-table')
+    await expect(table).toBeVisible()
+    await expect(table.locator('.rate-pair-label').first()).toContainText('EUR/')
+  })
+
+  test('chart SVG renders polylines when data is seeded', async ({ page }) => {
+    const { player } = setupChartTab(page)
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex?tab=rates')
+    const svg = page.locator('.chart-svg')
+    await expect(svg).toBeVisible()
+    const polylines = svg.locator('polyline')
+    await expect(polylines).not.toHaveCount(0)
+  })
+
+  test('rate chart section is visible on mobile viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
+    const { player } = setupChartTab(page)
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex?tab=rates')
+    await expect(page.locator('.rates-chart-section')).toBeVisible()
+    await expect(page.locator('.chart-pair-selector')).toBeVisible()
   })
 })

@@ -925,6 +925,16 @@ export type MockState = {
   unitLastTickMovement: Record<string, { lastTickInflow: number; lastTickOutflow: number }>
   /** FX rates returned by the fxRates query. Keyed by quoteCurrencyCode. */
   fxRates: MockFxRate[]
+  /** Historical FX rate snapshots returned by the fxRateHistory query. */
+  fxRateHistorySnapshots: {
+    baseCurrencyCode: string
+    quoteCurrencyCode: string
+    midRate: number
+    buyRate: number
+    sellRate: number
+    gameTick: number
+    capturedAtUtc: string
+  }[]
   /** Player currency balances (non-EUR). Populated by executeForexSwap. */
   playerCurrencyBalances: { currencyCode: string; currencySymbol: string; balance: number }[]
   /** Forex trade history entries for the authenticated player. */
@@ -2640,6 +2650,45 @@ export function makeDefaultFxRates(): MockFxRate[] {
 }
 
 /**
+ * Builds a list of FX rate history snapshots for E2E tests.
+ * Returns `count` ticks of buy/mid/sell snapshots for the given currency pair,
+ * with a slight random walk applied to mid so lines move naturally in the chart.
+ */
+export function makeFxRateHistory(
+  quoteCurrencyCode: string,
+  baseMidRate: number,
+  count = 20,
+  startTick = 1
+): Array<{
+  baseCurrencyCode: string
+  quoteCurrencyCode: string
+  midRate: number
+  buyRate: number
+  sellRate: number
+  gameTick: number
+  capturedAtUtc: string
+}> {
+  const SPREAD = 0.005
+  const snapshots = []
+  let mid = baseMidRate
+  const base = new Date('2026-01-01T00:00:00Z').getTime()
+  for (let i = 0; i < count; i++) {
+    // small drift: ±0.2% per step
+    mid = mid * (1 + (Math.random() - 0.5) * 0.004)
+    snapshots.push({
+      baseCurrencyCode: 'EUR',
+      quoteCurrencyCode,
+      midRate: Math.round(mid * 10000) / 10000,
+      buyRate: Math.round(mid * (1 + SPREAD) * 10000) / 10000,
+      sellRate: Math.round(mid * (1 - SPREAD) * 10000) / 10000,
+      gameTick: startTick + i,
+      capturedAtUtc: new Date(base + i * 3600 * 1000).toISOString(),
+    })
+  }
+  return snapshots
+}
+
+/**
  * Returns 3 default government-owned media houses (NEWSPAPER, RADIO, TV) for a city.
  * Used as the fallback when `state.cityMediaHouses[cityId]` is not set.
  */
@@ -2749,6 +2798,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     forceBuildingConfigError: null,
     unitLastTickMovement: {},
     fxRates: makeDefaultFxRates(),
+    fxRateHistorySnapshots: [],
     playerCurrencyBalances: [],
     forexTradeHistory: [],
     bankStatementRows: {},
@@ -6276,11 +6326,25 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
-    if (query.includes('fxRates')) {
+    if (query.includes('fxRates') && !query.includes('fxRateHistory')) {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { fxRates: state.fxRates } }),
+      })
+    }
+
+    if (query.includes('fxRateHistory')) {
+      const vars = body.variables as { quoteCurrencyCode?: string; ticksBack?: number } | undefined
+      const quoteCurrency = vars?.quoteCurrencyCode ?? ''
+      const ticksBack = vars?.ticksBack ?? 100
+      const matching = state.fxRateHistorySnapshots
+        .filter((s) => s.quoteCurrencyCode === quoteCurrency)
+        .slice(-ticksBack)
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { fxRateHistory: matching } }),
       })
     }
 
@@ -6363,7 +6427,17 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
     if (query.includes('eurFxRates') && !query.includes('executeForexSwap') && !query.includes('forexTradeHistory')) {
       // Public endpoint — no auth required
-      const eurRates = [{ currencyCode: 'EUR', rate: 1 }, ...(state.fxRates ?? []).map((r) => ({ currencyCode: r.quoteCurrencyCode, rate: r.rate }))]
+      const SPREAD = 0.005
+      const eurRates = [
+        { currencyCode: 'EUR', rate: 1, midRate: 1, buyRate: 1, sellRate: 1 },
+        ...(state.fxRates ?? []).map((r) => ({
+          currencyCode: r.quoteCurrencyCode,
+          rate: r.rate,
+          midRate: r.rate,
+          buyRate: r.rate * (1 + SPREAD),
+          sellRate: r.rate * (1 - SPREAD),
+        })),
+      ]
       return route.fulfill({
         status: 200,
         contentType: 'application/json',

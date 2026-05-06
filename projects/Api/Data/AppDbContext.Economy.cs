@@ -211,6 +211,18 @@ public sealed partial class AppDbContext
             e.HasIndex(r => new { r.BaseCurrencyCode, r.QuoteCurrencyCode, r.RateDate });
         });
 
+        modelBuilder.Entity<FxRateHistory>(e =>
+        {
+            e.HasKey(h => h.Id);
+            e.Property(h => h.BaseCurrencyCode).HasMaxLength(3);
+            e.Property(h => h.QuoteCurrencyCode).HasMaxLength(3);
+            e.Property(h => h.MidRate).HasPrecision(18, 6);
+            e.Property(h => h.BuyRate).HasPrecision(18, 6);
+            e.Property(h => h.SellRate).HasPrecision(18, 6);
+            e.HasIndex(h => new { h.BaseCurrencyCode, h.QuoteCurrencyCode, h.GameTick });
+            e.HasIndex(h => h.GameTick);
+        });
+
         modelBuilder.Entity<AdminActionAuditLog>(e =>
         {
             e.HasKey(log => log.Id);

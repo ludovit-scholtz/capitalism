@@ -299,6 +299,26 @@ export interface GoldBalanceInfo {
 export interface EurFxRate {
   currencyCode: string
   rate: number
+  /** Mid-market rate (same as rate). */
+  midRate?: number
+  /** Buy rate (ask): slightly worse for the buyer than mid rate. */
+  buyRate?: number
+  /** Sell rate (bid): slightly better for the seller than mid rate. */
+  sellRate?: number
+}
+
+/**
+ * A single historical FX rate snapshot captured at one game tick.
+ * Used to render buy/mid/sell charting in the FX rates tab.
+ */
+export interface FxRateSnapshot {
+  baseCurrencyCode: string
+  quoteCurrencyCode: string
+  midRate: number
+  buyRate: number
+  sellRate: number
+  gameTick: number
+  capturedAtUtc: string
 }
 
 // ── Bank Statement types ──────────────────────────────────────────────────────
