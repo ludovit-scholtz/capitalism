@@ -1,20 +1,65 @@
+import { uniqueNamesGenerator } from 'unique-names-generator'
+
 /**
- * Industry-themed word lists for the first part of generated company names.
- * Each industry has 10+ words for sufficient variety across 10+ regenerations.
+ * Industry-themed first-word lists for professional company name generation.
+ * Uses the unique-names-generator package for the combination engine, with
+ * hand-curated thematic words per industry for an economic simulation context.
  */
 const industryWords: Record<string, string[]> = {
-  FURNITURE: ['Oak', 'Timber', 'Cedar', 'Maple', 'Walnut', 'Birch', 'Crafted', 'Pine', 'Teak', 'Redwood', 'Ironwood', 'Ember'],
-  FOOD_PROCESSING: ['Harvest', 'Golden', 'Granary', 'Valley', 'Meadow', 'Artisan', 'Heritage', 'Fresh', 'Prime', 'Grain', 'Sunrise', 'Orchard'],
-  HEALTHCARE: ['Vital', 'Nova', 'Remedy', 'Shield', 'Helix', 'Apex', 'Synapse', 'BioNex', 'Medus', 'Curative', 'Lumina', 'ClareMed'],
-  ELECTRONICS: ['Circuit', 'Silicon', 'Quantum', 'Pixel', 'Axion', 'Pulse', 'Syntek', 'Nano', 'Logic', 'Nexon', 'CoreTech', 'Voltaic'],
-  CONSTRUCTION: ['Bedrock', 'Summit', 'Keystone', 'Ironclad', 'Pillar', 'Arcstone', 'Granite', 'Crest', 'Foundry', 'Basalt', 'Vantage', 'Stronghold'],
-  PHARMACEUTICALS: ['Helix', 'BioNex', 'Vita', 'Novex', 'Synapse', 'Curative', 'Shield', 'Medic', 'Lumena', 'Apharma', 'Zoria', 'GenoPlex'],
-  ENERGY: ['Solaris', 'Voltan', 'Kinetic', 'Radiant', 'Dynamo', 'Fusion', 'Horizon', 'PowerCo', 'GridTech', 'Wattex', 'Ember', 'Voltaic'],
-  LOGISTICS: ['Meridian', 'Nexus', 'Convoy', 'Pathfin', 'Cargotek', 'Swift', 'TransMax', 'Linker', 'Freightco', 'Relay', 'FluxNet', 'Harborcroft'],
+  FURNITURE: [
+    'Oak', 'Timber', 'Cedar', 'Maple', 'Walnut', 'Birch', 'Pine', 'Teak',
+    'Redwood', 'Ironwood', 'Crafted', 'Artisan', 'Heritage', 'Classic', 'Ember',
+    'Ashwood', 'Elmwood', 'Mahogany', 'Rosewood', 'Sandalwood',
+  ],
+  FOOD_PROCESSING: [
+    'Harvest', 'Golden', 'Granary', 'Valley', 'Meadow', 'Artisan', 'Heritage',
+    'Fresh', 'Prime', 'Grain', 'Sunrise', 'Orchard', 'Bloom', 'Pastoral',
+    'Crofton', 'Millstone', 'Vantage', 'Barley', 'Amber', 'Verdant',
+  ],
+  HEALTHCARE: [
+    'Vital', 'Nova', 'Remedy', 'Shield', 'Helix', 'Apex', 'Synapse',
+    'Curative', 'Lumina', 'Medic', 'Regen', 'Clarity', 'Salus', 'Biovance',
+    'Correx', 'Nuvarix', 'Lifespan', 'Vitalix', 'Pharmax', 'Zenova',
+  ],
+  ELECTRONICS: [
+    'Circuit', 'Silicon', 'Quantum', 'Pixel', 'Pulse', 'Nano', 'Logic',
+    'Voltaic', 'CoreTech', 'Axiom', 'Nexon', 'Syntek', 'Byte', 'Lattice',
+    'Photon', 'Hexagon', 'Vertex', 'Primus', 'Orbis', 'Telaris',
+  ],
+  CONSTRUCTION: [
+    'Bedrock', 'Summit', 'Keystone', 'Ironclad', 'Pillar', 'Granite',
+    'Crest', 'Foundry', 'Basalt', 'Vantage', 'Stronghold', 'Arcstone',
+    'Trident', 'Rampart', 'Citadel', 'Solida', 'Terrafirm', 'Pinnacle',
+    'Masonry', 'Cornerstone',
+  ],
+  PHARMACEUTICALS: [
+    'Helix', 'Vita', 'Novex', 'Synapse', 'Curative', 'Medic', 'Lumena',
+    'Apharma', 'Zoria', 'GenoPlex', 'Theravo', 'Biovanta', 'Cellex',
+    'Primus', 'Vitalora', 'Zenova', 'Pharmasol', 'Clinex', 'Medivance',
+    'Revitare',
+  ],
+  ENERGY: [
+    'Solaris', 'Kinetic', 'Radiant', 'Dynamo', 'Fusion', 'Horizon', 'Ember',
+    'Voltaic', 'Wattex', 'GridTech', 'PowerCo', 'Voltan', 'Lumex',
+    'Ampere', 'Therma', 'Photona', 'Polaris', 'Celero', 'Novagen', 'Electra',
+  ],
+  LOGISTICS: [
+    'Meridian', 'Nexus', 'Convoy', 'Swift', 'Relay', 'FluxNet', 'TransMax',
+    'Harborcroft', 'Cargotek', 'Linker', 'Freightco', 'Pathfinder', 'Vectus',
+    'Transito', 'Velocity', 'Expedio', 'Bridgeport', 'Portside', 'Xpedite',
+    'Trailblazer',
+  ],
 }
 
-/** Business-type suffixes shared across all industries. */
-const businessSuffixes = [
+/** Fallback word list for unknown industries. */
+const fallbackWords = [
+  'Prime', 'Atlas', 'Summit', 'Nexus', 'Apex', 'Vanguard', 'Pinnacle',
+  'Core', 'Titan', 'Zenith', 'Crest', 'Orion', 'Solace', 'Fortis',
+  'Verdant', 'Axiom', 'Crestline', 'Triton', 'Halcyon', 'Meridian',
+]
+
+/** Business-type second words shared across all industries — professional and economy-simulation themed. */
+export const businessSuffixes = [
   'Industries',
   'Ventures',
   'Capital',
@@ -27,41 +72,60 @@ const businessSuffixes = [
   'Partners',
   'Collective',
   'House',
+  'Enterprises',
+  'Trading',
+  'Global',
 ]
 
-function hashSeed(value: string): number {
-  let hash = 0
-  for (const char of value) {
-    hash = (hash * 31 + char.charCodeAt(0)) >>> 0
+/** Total number of distinct suffixes; used by tests to verify full coverage. */
+export const NAME_GENERATOR_CYCLE_LENGTH = businessSuffixes.length
+
+// Session state: track names already shown to avoid repeats within one regeneration session.
+let _sessionKey = ''
+let _usedNames = new Set<string>()
+
+/**
+ * Resets the in-session uniqueness tracker when the player changes their industry or city,
+ * so the next call to {@link generateOnboardingCompanyName} starts fresh.
+ */
+export function resetNameSession(key: string): void {
+  if (key !== _sessionKey) {
+    _sessionKey = key
+    _usedNames = new Set()
   }
-  return hash
 }
 
 /**
- * Generates a professional two-word company name suitable for an economic simulation game.
+ * Generates a professional two-word company name using the `unique-names-generator`
+ * package with curated industry-specific word lists for an economic simulation game.
  *
- * @param industry - The selected industry key (e.g. 'FURNITURE', 'HEALTHCARE').
- * @param cityName - Optional city name used to diversify the base seed.
- * @param offset   - Regeneration counter; increment to get a different name for the same inputs.
- *                   Defaults to 0 (first suggestion). Values 0–11 always produce distinct names.
+ * Each call picks a fresh random combination; names already shown in this session are
+ * skipped so the player sees distinct suggestions on every regeneration.
+ *
+ * @param industry  - Selected industry key (e.g. 'FURNITURE', 'HEALTHCARE').
+ * @param cityName  - Optional city name used as part of the session key.
+ * @param _offset   - Kept for backward compatibility; ignored in the random implementation.
  */
-export function generateOnboardingCompanyName(industry: string, cityName?: string | null, offset = 0): string {
-  const normalizedIndustry = industry || 'GENERAL'
-  const normalizedCity = cityName?.trim() || 'Capital'
-  const baseSeed = hashSeed(`${normalizedIndustry}:${normalizedCity}`)
+export function generateOnboardingCompanyName(
+  industry: string,
+  cityName?: string | null,
+  _offset = 0,
+): string {
+  const words = industryWords[industry] ?? fallbackWords
+  const sessionKey = `${industry}:${cityName ?? ''}`
+  resetNameSession(sessionKey)
 
-  const words = industryWords[normalizedIndustry] ?? ['Prime', 'Atlas', 'Summit', 'Nexus', 'Apex', 'Vanguard', 'Pinnacle', 'Core', 'Axion', 'Titan', 'Zenith', 'Crest']
+  // Attempt up to 50 random picks to find a name not yet shown this session.
+  let name = ''
+  for (let i = 0; i < 50; i++) {
+    name = uniqueNamesGenerator({
+      dictionaries: [words, businessSuffixes],
+      separator: ' ',
+      style: 'capital',
+    })
+    if (!_usedNames.has(name)) break
+  }
 
-  // Use the offset to step through both lists independently so each regeneration gives
-  // a fresh combination and all businessSuffixes are eventually used.
-  const wordIndex = (baseSeed + offset) % words.length
-  const suffixIndex = (baseSeed + offset * 3 + 7) % businessSuffixes.length
-
-  const word = words[wordIndex] ?? words[0]!
-  const suffix = businessSuffixes[suffixIndex] ?? businessSuffixes[0]!
-
-  return `${word} ${suffix}`
+  _usedNames.add(name)
+  return name
 }
-
-/** Total number of distinct names the generator can produce for any single industry/city pair. */
-export const NAME_GENERATOR_CYCLE_LENGTH = businessSuffixes.length

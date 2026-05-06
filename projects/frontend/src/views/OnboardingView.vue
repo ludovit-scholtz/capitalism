@@ -24,7 +24,7 @@ import OnboardingUnitChain from '@/components/onboarding/OnboardingUnitChain.vue
 import { useAuthStore } from '@/stores/auth'
 import { useTickCountdown } from '@/composables/useTickCountdown'
 import { formatMoney } from '@/lib/currencyFormat'
-import { generateOnboardingCompanyName } from '@/lib/onboardingCompanyName'
+import { generateOnboardingCompanyName, resetNameSession } from '@/lib/onboardingCompanyName'
 import type { BuildingLot, City, EurFxRate, FirstSaleMission, GameState, OnboardingResult, OnboardingStartResult, ProductType } from '@/types'
 
 const { t, locale } = useI18n()
@@ -251,34 +251,29 @@ const selectedProduct = computed(() => products.value.find((product) => product.
 const selectedFactoryLot = computed(() => cityLots.value.find((lot) => lot.id === selectedFactoryLotId.value) ?? null)
 const selectedShopLot = computed(() => cityLots.value.find((lot) => lot.id === selectedShopLotId.value) ?? null)
 
-/** Counter incremented each time the player clicks "Generate Another Name". */
-const nameGenerationSeed = ref(0)
 /** The current company name — starts as a generated suggestion, can be edited by the player. */
 const companyName = ref('')
 
-/** Derives a fresh suggested name from the current industry, city and seed counter. */
+/** Derives a fresh suggested name from the current industry and city. */
 function refreshSuggestedName() {
   companyName.value = generateOnboardingCompanyName(
     selectedIndustry.value,
     selectedCity.value?.name,
-    nameGenerationSeed.value,
   )
 }
 
-/** Cycles to the next suggested name without replacing any manual edits. */
+/** Generates a new name suggestion without repeating names already shown this session. */
 function regenerateCompanyName() {
-  nameGenerationSeed.value++
   companyName.value = generateOnboardingCompanyName(
     selectedIndustry.value,
     selectedCity.value?.name,
-    nameGenerationSeed.value,
   )
 }
 
 // Auto-refresh the suggested name whenever industry or city changes so the
 // first suggestion always reflects the player's current choices.
-watch([selectedIndustry, selectedCity], () => {
-  nameGenerationSeed.value = 0
+watch([selectedIndustry, selectedCity], ([newIndustry, newCity]) => {
+  resetNameSession(`${newIndustry}:${newCity?.name ?? ''}`)
   refreshSuggestedName()
 })
 const starterCompany = computed(() => {
