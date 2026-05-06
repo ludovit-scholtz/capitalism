@@ -4,8 +4,9 @@ import { uniqueNamesGenerator } from 'unique-names-generator'
  * Industry-themed first-word lists for professional company name generation.
  * Uses the unique-names-generator package for the combination engine, with
  * hand-curated thematic words per industry for an economic simulation context.
+ * Exported for testing and introspection.
  */
-const industryWords: Record<string, string[]> = {
+export const industryWords: Record<string, string[]> = {
   FURNITURE: [
     'Oak', 'Timber', 'Cedar', 'Maple', 'Walnut', 'Birch', 'Pine', 'Teak',
     'Redwood', 'Ironwood', 'Crafted', 'Artisan', 'Heritage', 'Classic', 'Ember',
@@ -51,8 +52,8 @@ const industryWords: Record<string, string[]> = {
   ],
 }
 
-/** Fallback word list for unknown industries. */
-const fallbackWords = [
+/** Fallback word list for unknown industries. Exported for testing. */
+export const fallbackWords = [
   'Prime', 'Atlas', 'Summit', 'Nexus', 'Apex', 'Vanguard', 'Pinnacle',
   'Core', 'Titan', 'Zenith', 'Crest', 'Orion', 'Solace', 'Fortis',
   'Verdant', 'Axiom', 'Crestline', 'Triton', 'Halcyon', 'Meridian',

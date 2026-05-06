@@ -5855,4 +5855,73 @@ test.describe('Company name generator — generate, regenerate and edit (AC from
     await expect(budgetCards.nth(1)).toContainText('€')
     await expect(budgetCards.nth(1)).not.toContainText('$')
   })
+
+  test('Prague (CZK) city shows CZK currency symbol on both IPO budget cards', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/onboarding')
+
+    await chooseOnboardingCity(page, 'Prague') // CZK city
+    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
+    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
+
+    const budgetCards = page.locator('.budget-card')
+
+    // Both cards must show a CZK-derived amount — no dollar sign
+    await expect(budgetCards.nth(0)).not.toContainText('$')
+    await expect(budgetCards.nth(1)).not.toContainText('$')
+
+    // The company name editor must still be present when Prague is selected
+    await expect(page.locator('#onboarding-company-name')).toBeVisible()
+  })
+
+  test('Vienna (EUR) city shows EUR currency on both IPO budget cards', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/onboarding')
+
+    await chooseOnboardingCity(page, 'Vienna') // EUR city, different from Bratislava
+    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
+    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
+
+    const budgetCards = page.locator('.budget-card')
+
+    // Vienna is EUR like Bratislava — both cards show €
+    await expect(budgetCards.nth(0)).toContainText('€')
+    await expect(budgetCards.nth(1)).toContainText('€')
+    await expect(budgetCards.nth(1)).not.toContainText('$')
+  })
+
+  test('company name hint text is visible below the name input on IPO step', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/onboarding')
+
+    await chooseOnboardingCity(page)
+    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
+    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
+
+    // The hint text instructs the player how to use the company name field
+    await expect(page.locator('.company-name-editor')).toContainText('Accept the suggestion')
+    await expect(page.locator('.company-name-editor')).toContainText('type your own name')
+  })
+
+  test('name with Prague (CZK) city produces a two-word name', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/onboarding')
+
+    await chooseOnboardingCity(page, 'Prague')
+    await page.locator('.industry-card', { hasText: 'Healthcare' }).click()
+    await page.locator('.product-card', { hasText: 'Basic Medicine' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
+
+    const nameInput = page.locator('#onboarding-company-name')
+    const name = (await nameInput.inputValue()).trim()
+
+    // Name must be two words even when Prague (CZK) is the selected city
+    const words = name.split(' ')
+    expect(words).toHaveLength(2)
+    expect(words[0]!.length).toBeGreaterThan(0)
+    expect(words[1]!.length).toBeGreaterThan(0)
+  })
 })

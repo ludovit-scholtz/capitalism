@@ -3,7 +3,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   NAME_GENERATOR_CYCLE_LENGTH,
   businessSuffixes,
+  fallbackWords,
   generateOnboardingCompanyName,
+  industryWords,
   resetNameSession,
 } from '../onboardingCompanyName'
 
@@ -265,6 +267,117 @@ describe('generateOnboardingCompanyName', () => {
         const secondWord = name.split(' ')[1]!
         expect(businessSuffixes).toContain(secondWord)
       }
+    }
+  })
+
+  // ---------- Word list quality tests ----------
+
+  it('each industry has exactly 20 first-words in its word list', () => {
+    const allIndustries = [
+      'FURNITURE', 'FOOD_PROCESSING', 'HEALTHCARE',
+      'ELECTRONICS', 'CONSTRUCTION', 'PHARMACEUTICALS', 'ENERGY', 'LOGISTICS',
+    ]
+    for (const ind of allIndustries) {
+      expect(industryWords[ind]).toBeDefined()
+      expect(industryWords[ind]!.length).toBe(20)
+    }
+  })
+
+  it('fallbackWords list has at least 15 entries', () => {
+    expect(fallbackWords.length).toBeGreaterThanOrEqual(15)
+  })
+
+  it('all industryWords entries start with an uppercase letter', () => {
+    for (const [ind, words] of Object.entries(industryWords)) {
+      for (const word of words) {
+        expect(word[0]).toBe(word[0]!.toUpperCase(), `${ind} word "${word}" does not start uppercase`)
+        expect(word.length).toBeGreaterThanOrEqual(2)
+      }
+    }
+  })
+
+  it('all businessSuffixes start with an uppercase letter and are at least 3 chars', () => {
+    for (const suffix of businessSuffixes) {
+      expect(suffix[0]).toBe(suffix[0]!.toUpperCase())
+      expect(suffix.length).toBeGreaterThanOrEqual(3)
+    }
+  })
+
+  it('there are exactly 8 industries defined in industryWords', () => {
+    expect(Object.keys(industryWords).length).toBe(8)
+  })
+
+  it('FOOD_PROCESSING word list contains expected food/agriculture words', () => {
+    const foodWords = industryWords['FOOD_PROCESSING']!
+    // Spot-check a few representative words to guard against accidental list swaps
+    expect(foodWords).toContain('Harvest')
+    expect(foodWords).toContain('Grain')
+    expect(foodWords).toContain('Artisan')
+  })
+
+  it('HEALTHCARE word list contains expected medical words', () => {
+    const healthWords = industryWords['HEALTHCARE']!
+    expect(healthWords).toContain('Vital')
+    expect(healthWords).toContain('Medic')
+    expect(healthWords).toContain('Helix')
+  })
+
+  it('ELECTRONICS word list contains expected tech words', () => {
+    const techWords = industryWords['ELECTRONICS']!
+    expect(techWords).toContain('Circuit')
+    expect(techWords).toContain('Silicon')
+    expect(techWords).toContain('Quantum')
+  })
+
+  it('no word list contains duplicate entries', () => {
+    for (const [ind, words] of Object.entries(industryWords)) {
+      const unique = new Set(words)
+      expect(unique.size).toBe(words.length, `${ind} word list has duplicates`)
+    }
+    const uniqueSuffixes = new Set(businessSuffixes)
+    expect(uniqueSuffixes.size).toBe(businessSuffixes.length)
+  })
+
+  it('total possible combinations per industry is at least 200 (20 words × 10+ suffixes)', () => {
+    const combinations = 20 * NAME_GENERATOR_CYCLE_LENGTH
+    expect(combinations).toBeGreaterThanOrEqual(200)
+  })
+
+  it('50 consecutive names from FURNITURE are all distinct', () => {
+    resetNameSession('FURNITURE:50-distinct')
+    const names = new Set<string>()
+    for (let i = 0; i < 50; i++) {
+      names.add(generateOnboardingCompanyName('FURNITURE'))
+    }
+    expect(names.size).toBe(50)
+  })
+
+  it('FOOD_PROCESSING first word appears in the known food word list (10 calls spot check)', () => {
+    const foodWords = industryWords['FOOD_PROCESSING']!
+    resetNameSession('FOOD_PROCESSING:first-word')
+    for (let i = 0; i < 10; i++) {
+      const name = generateOnboardingCompanyName('FOOD_PROCESSING')
+      const firstWord = name.split(' ')[0]!
+      expect(foodWords).toContain(firstWord)
+    }
+  })
+
+  it('HEALTHCARE first word appears in the known healthcare word list (10 calls spot check)', () => {
+    const healthWords = industryWords['HEALTHCARE']!
+    resetNameSession('HEALTHCARE:first-word')
+    for (let i = 0; i < 10; i++) {
+      const name = generateOnboardingCompanyName('HEALTHCARE')
+      const firstWord = name.split(' ')[0]!
+      expect(healthWords).toContain(firstWord)
+    }
+  })
+
+  it('fallback words are used for an unknown industry (first word in fallbackWords)', () => {
+    resetNameSession('UNKNOWN:fallback-word')
+    for (let i = 0; i < 5; i++) {
+      const name = generateOnboardingCompanyName('UNKNOWN_INDUSTRY_XYZ')
+      const firstWord = name.split(' ')[0]!
+      expect(fallbackWords).toContain(firstWord)
     }
   })
 })
