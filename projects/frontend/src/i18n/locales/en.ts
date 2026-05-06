@@ -1377,9 +1377,15 @@ export default {
     estimatedMarketValue: 'Estimated Market Value',
     estimatedValueHint: 'Reference estimate based on building improvements and city location.',
     askingPriceMustBePositive: 'Asking price must be greater than zero.',
+    askingPriceHighWarning:
+      'Warning: asking price exceeds 150% of the estimated market value. This may deter buyers.',
     overviewTab: 'P&L & Statistics',
     bankAccountTab: 'Bank Account',
     collateralRestrictionWarning: 'This building is used as loan collateral and cannot be placed for sale.',
+    collateralBlockedByLoans:
+      'Blocked by {count} active loan(s) using this building as collateral. Repay or settle these loans first.',
+    destroyedBadge: 'Destroyed',
+    destroyedHint: 'This building was foreclosed and destroyed after a loan default.',
     editTabConfig: 'Configuration',
     editTabPerformance: 'Performance',
     editTabMaintenance: 'Maintenance',

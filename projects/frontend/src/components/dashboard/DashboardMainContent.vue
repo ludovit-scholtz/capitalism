@@ -462,6 +462,14 @@ onMounted(() => {
               <div class="flex flex-col items-end gap-0.5">
                 <span class="bg-brand text-white px-2 py-0.5 rounded text-[0.6875rem] font-bold">Lv.{{ building.level }}</span>
                 <span class="text-[0.6875rem] text-muted">{{ building.units.length }} units</span>
+                <!-- Destroyed badge -->
+                <span
+                  v-if="building.destroyedAtUtc"
+                  class="destroyed-badge inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6rem] font-bold bg-red-500/20 text-red-700 dark:text-red-400 border border-red-400/30"
+                  :title="t('buildingDetail.destroyedHint')"
+                >
+                  ☠️ {{ t('buildingDetail.destroyedBadge') }}
+                </span>
                 <span v-if="building.powerStatus && building.powerStatus !== 'POWERED'" :class="powerStatusClass(building.powerStatus)" :aria-label="getBuildingPowerLabel(building.powerStatus)">
                   {{ building.powerStatus === 'OFFLINE' ? '❌' : '⚡' }} {{ getBuildingPowerLabel(building.powerStatus) }}
                 </span>

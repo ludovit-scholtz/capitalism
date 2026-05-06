@@ -353,9 +353,14 @@ export function useBuildingDetail() {
   const showSaleDialog = ref(false)
   const salePrice = ref<number | null>(null)
   const savingSale = ref(false)
-  const myLoans = ref<Array<{ id: string; collateralBuildingId: string | null }>>([])
+  const myLoans = ref<
+    Array<{ id: string; collateralBuildingId: string | null; originalPrincipal: number; status: string }>
+  >([])
   const isBuildingUsedAsCollateral = computed(() =>
     myLoans.value.some((l) => l.collateralBuildingId === building.value?.id),
+  )
+  const collateralLoanCount = computed(
+    () => myLoans.value.filter((l) => l.collateralBuildingId === building.value?.id).length,
   )
   const cancellingPlan = ref(false)
   const cancelPlanError = ref<string | null>(null)
@@ -4201,6 +4206,7 @@ export function useBuildingDetail() {
               isGovernmentOwned
               isSuspendedForFunds
               suspendedReason
+              destroyedAtUtc
               dispatchTargetPercent
               fuelReserveMwh
               cityReferenceRentPerSqm
@@ -4333,12 +4339,26 @@ export function useBuildingDetail() {
         }`),
         gqlRequest<{ cities: City[] }>(`{ cities { id name currencyCode } }`),
         gqlRequest<{ eurFxRates: EurFxRate[] }>(`{ eurFxRates { currencyCode rate } }`),
-        gqlRequest<{ myLoans: Array<{ id: string; collateralBuildingId: string | null }> }>(
-          `{ myLoans { id collateralBuildingId } }`,
-        ).catch((err: unknown) => {
-          console.warn('[useBuildingDetail] Failed to load loans for collateral check:', err)
-          return { myLoans: [] as Array<{ id: string; collateralBuildingId: string | null }> }
-        }),
+        gqlRequest<{
+          myLoans: Array<{
+            id: string
+            collateralBuildingId: string | null
+            originalPrincipal: number
+            status: string
+          }>
+        }>(`{ myLoans { id collateralBuildingId originalPrincipal status } }`).catch(
+          (err: unknown) => {
+            console.warn('[useBuildingDetail] Failed to load loans for collateral check:', err)
+            return {
+              myLoans: [] as Array<{
+                id: string
+                collateralBuildingId: string | null
+                originalPrincipal: number
+                status: string
+              }>,
+            }
+          },
+        ),
       ])
 
       if (requestId !== activeBuildingLoadRequest) {
@@ -4912,6 +4932,7 @@ export function useBuildingDetail() {
     setBuildingForSale,
     estimatedMarketValue,
     isBuildingUsedAsCollateral,
+    collateralLoanCount,
     openRentDialog,
     closeRentDialog,
     saveRentPerSqm,

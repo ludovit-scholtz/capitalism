@@ -239,7 +239,21 @@ public sealed class LoanRepaymentPhase : ITickPhase
             if (loan.Status == LoanStatus.Defaulted)
             {
                 loan.ClosedAtUtc = DateTime.UtcNow;
+                loan.DefaultedAtTick = context.CurrentTick;
                 // Capacity remains locked (lender is owed money but capacity was consumed).
+
+                // Auto-list collateral building for sale at (1 − ForeclosureAutoListDiscount) of appraised value.
+                if (loan.CollateralBuildingId.HasValue && loan.CollateralAppraisedValue.HasValue)
+                {
+                    var collateralBuilding = context.Db.Buildings
+                        .FirstOrDefault(b => b.Id == loan.CollateralBuildingId.Value && !b.IsForSale && b.DestroyedAtUtc == null);
+                    if (collateralBuilding is not null)
+                    {
+                        collateralBuilding.IsForSale = true;
+                        collateralBuilding.AskingPrice = decimal.Round(loan.CollateralAppraisedValue.Value * (1m - GameConstants.ForeclosureAutoListDiscount), 2, MidpointRounding.AwayFromZero);
+                        collateralBuilding.ListedAtUtc = DateTime.UtcNow;
+                    }
+                }
             }
         }
     }

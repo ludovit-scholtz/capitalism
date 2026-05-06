@@ -383,4 +383,24 @@ public static partial class GameConstants
         Data.Entities.BuildingType.Commercial => DefaultCommercialTotalAreaSqm,
         _ => null
     };
+
+    // ── Building foreclosure / destruction ───────────────────────────────────
+
+    /// <summary>
+    /// Number of ticks a defaulted loan's collateral building stays listed for sale
+    /// before it is automatically destroyed (3 game days × 24 ticks/day = 72 ticks).
+    /// </summary>
+    public const long ForeclosureWindowTicks = 72L;
+
+    /// <summary>
+    /// Fraction of the collateral's appraised value refunded to the owner's company
+    /// settlement bank account when the building is destroyed after foreclosure.
+    /// </summary>
+    public const decimal ForeclosureRefundFraction = 0.80m;
+
+    /// <summary>
+    /// Auto-listing discount applied to a collateral building when a loan defaults.
+    /// The building is listed at <c>(1 − ForeclosureAutoListDiscount) × appraisedValue</c>.
+    /// </summary>
+    public const decimal ForeclosureAutoListDiscount = 0.10m;
 }

@@ -32,6 +32,9 @@ import {
   faGraduationCap,
   faXmark,
   faFloppyDisk,
+  faLock,
+  faSkull,
+  faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
@@ -59,6 +62,9 @@ library.add(
   faGraduationCap,
   faXmark,
   faFloppyDisk,
+  faLock,
+  faSkull,
+  faTriangleExclamation,
 )
 
 export function createApp() {

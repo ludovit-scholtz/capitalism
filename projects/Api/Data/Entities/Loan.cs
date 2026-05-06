@@ -97,6 +97,13 @@ public sealed class Loan
     /// <summary>UTC timestamp when the loan was fully repaid or defaulted.</summary>
     public DateTime? ClosedAtUtc { get; set; }
 
+    /// <summary>
+    /// Tick at which the loan transitioned to DEFAULTED status.
+    /// Used to calculate the 72-tick (3 game-day) foreclosure countdown for collateral buildings.
+    /// Null for loans that have not defaulted.
+    /// </summary>
+    public long? DefaultedAtTick { get; set; }
+
     // ── Collateral ─────────────────────────────────────────────────────────────────
 
     /// <summary>

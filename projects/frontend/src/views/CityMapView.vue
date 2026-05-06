@@ -114,7 +114,7 @@ async function fetchData() {
             populationIndex basePrice price suitableTypes
             ownerCompanyId buildingId
             ownerCompany { id name }
-            building { id name type isUnderConstruction constructionCompletesAtTick constructionCost isForSale askingPrice }
+            building { id name type isUnderConstruction constructionCompletesAtTick constructionCost isForSale askingPrice destroyedAtUtc }
             resourceType { id name slug }
             materialQuality materialQuantity
           }

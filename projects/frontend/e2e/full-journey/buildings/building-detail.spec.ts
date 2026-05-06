@@ -22931,4 +22931,180 @@ test.describe('Supply chain tab', () => {
     // Supply Chain tab must NOT be visible for a shop
     await expect(page.locator('.unit-detail-tabs').getByRole('button', { name: 'Supply Chain' })).toBeHidden()
   })
+
+  test('sell building dialog shows 150% market value price warning', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-price-warn',
+      playerId: player.id,
+      name: 'Price Warning Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-price-warn',
+          companyId: 'company-price-warn',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Warning Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-price-warn')
+    await expect(page.getByRole('heading', { name: 'Warning Factory' })).toBeVisible()
+
+    // Open sell dialog
+    await page.getByRole('button', { name: 'Sell Building' }).click()
+    await expect(page.locator('.sale-dialog')).toBeVisible()
+
+    // The estimated market value reference should be displayed
+    await expect(page.locator('.estimated-market-value')).toBeVisible()
+
+    // Enter a price higher than 150% of estimated market value (default mock market value is 75000)
+    // 75000 * 1.5 = 112500; entering 200000 should trigger the warning
+    await page.locator('.sale-dialog .form-input').fill('200000')
+    await expect(page.locator('.price-high-warning')).toBeVisible()
+
+    // The List for Sale button should still be enabled (it's a warning, not an error)
+    await expect(page.getByRole('button', { name: 'List for Sale' })).toBeEnabled()
+  })
+
+  test('collateral warning shows loan count when building is blocked by active loan', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-collateral-count',
+      playerId: player.id,
+      name: 'Collateral Count Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-collateral-count',
+          companyId: 'company-collateral-count',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Blocked Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.myLoans = [
+      {
+        id: 'loan-blocked-1',
+        loanOfferId: 'offer-1',
+        borrowerCompanyId: 'company-collateral-count',
+        borrowerCompanyName: 'Collateral Count Co',
+        lenderCompanyId: 'bank-co',
+        lenderCompanyName: 'Big Bank',
+        bankBuildingId: 'bank-building-1',
+        bankBuildingName: 'City Bank',
+        originalPrincipal: 500000,
+        remainingPrincipal: 400000,
+        annualInterestRatePercent: 8,
+        durationTicks: 1440,
+        startTick: 0,
+        dueTick: 1440,
+        nextPaymentTick: 720,
+        paymentAmount: 10000,
+        paymentsMade: 1,
+        totalPayments: 10,
+        status: 'ACTIVE',
+        missedPayments: 0,
+        accumulatedPenalty: 0,
+        acceptedAtUtc: '2026-01-01T00:00:00Z',
+        closedAtUtc: null,
+        collateralBuildingId: 'building-collateral-count',
+        collateralBuildingName: 'Blocked Factory',
+        collateralAppraisedValue: 1000000,
+      },
+    ]
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-collateral-count')
+    await expect(page.getByRole('heading', { name: 'Blocked Factory' })).toBeVisible()
+
+    // Sell Building button should be disabled
+    await expect(page.getByRole('button', { name: 'Sell Building' })).toBeDisabled()
+
+    // The collateral warning should now mention loan count
+    await expect(page.locator('.collateral-warning')).toBeVisible()
+    await expect(page.locator('.collateral-warning')).toContainText('1')
+  })
+
+  test('destroyed building shows destroyed badge and no sell button', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-destroyed',
+      playerId: player.id,
+      name: 'Destroyed Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-destroyed',
+          companyId: 'company-destroyed',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Destroyed Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          destroyedAtUtc: '2026-05-01T00:00:00Z',
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-destroyed')
+    await expect(page.getByRole('heading', { name: 'Destroyed Factory' })).toBeVisible()
+
+    // Destroyed badge should be visible
+    await expect(page.locator('.destroyed-badge')).toBeVisible()
+
+    // Sell Building button should NOT be visible for destroyed buildings
+    await expect(page.getByRole('button', { name: 'Sell Building' })).toBeHidden()
+  })
 })
