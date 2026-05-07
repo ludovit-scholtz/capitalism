@@ -160,6 +160,8 @@ export interface Building {
   lotOriginalMaterialQuantity?: number | null
   /** UTC timestamp when the building was destroyed by loan default foreclosure. Null when still standing. */
   destroyedAtUtc: string | null
+  /** True when at least one DEFAULTED loan uses this building as collateral. */
+  hasDefaultedCollateralLoan?: boolean
   units: BuildingUnit[]
   pendingConfiguration: BuildingConfigurationPlan | null
 }
@@ -226,6 +228,7 @@ export interface BuildingLot {
     isForSale: boolean
     askingPrice: number | null
     destroyedAtUtc: string | null
+    hasDefaultedCollateralLoan?: boolean
   } | null
   /** Raw material available for extraction — null when no resource on this lot */
   resourceType: { id: string; name: string; slug: string } | null

@@ -352,7 +352,13 @@ export function useBuildingDetail() {
   const quickInventoryThresholdSuccess = ref(false)
   const quickInventoryThresholdError = ref<string | null>(null)
   const myLoans = ref<
-    Array<{ id: string; collateralBuildingId: string | null; originalPrincipal: number; status: string }>
+    Array<{
+      id: string
+      collateralBuildingId: string | null
+      originalPrincipal: number
+      status: string
+      defaultedAtTick: number | null
+    }>
   >([])
   const isBuildingUsedAsCollateral = computed(() =>
     myLoans.value.some(
@@ -369,6 +375,27 @@ export function useBuildingDetail() {
           (l.status === 'ACTIVE' || l.status === 'OVERDUE'),
       ).length,
   )
+  /** The first defaulted loan that has this building as collateral, or null. */
+  const defaultedCollateralLoan = computed(
+    () =>
+      myLoans.value.find(
+        (l) => l.collateralBuildingId === building.value?.id && l.status === 'DEFAULTED',
+      ) ?? null,
+  )
+  /** True when any loan backed by this building is in DEFAULTED status. */
+  const isLoanDefaulted = computed(() => defaultedCollateralLoan.value !== null)
+  /**
+   * Number of ticks remaining until the building is automatically destroyed.
+   * Returns null when the building is not in default or already destroyed.
+   * 72 = GameConstants.ForeclosureWindowTicks (3 game days).
+   */
+  const FORECLOSURE_WINDOW_TICKS = 72
+  const ticksUntilDestruction = computed<number | null>(() => {
+    const loan = defaultedCollateralLoan.value
+    if (!loan || loan.defaultedAtTick === null || building.value?.destroyedAtUtc) return null
+    const remaining = loan.defaultedAtTick + FORECLOSURE_WINDOW_TICKS - currentTick.value
+    return Math.max(0, remaining)
+  })
   const cancellingPlan = ref(false)
   const cancelPlanError = ref<string | null>(null)
   const layoutName = ref('')
@@ -4437,8 +4464,9 @@ export function useBuildingDetail() {
             collateralBuildingId: string | null
             originalPrincipal: number
             status: string
+            defaultedAtTick: number | null
           }>
-        }>(`{ myLoans { id collateralBuildingId originalPrincipal status } }`).catch(
+        }>(`{ myLoans { id collateralBuildingId originalPrincipal status defaultedAtTick } }`).catch(
           (err: unknown) => {
             console.warn('[useBuildingDetail] Failed to load loans for collateral check:', err)
             return {
@@ -4447,6 +4475,7 @@ export function useBuildingDetail() {
                 collateralBuildingId: string | null
                 originalPrincipal: number
                 status: string
+                defaultedAtTick: number | null
               }>,
             }
           },
@@ -5021,6 +5050,9 @@ export function useBuildingDetail() {
     estimatedMarketValue,
     isBuildingUsedAsCollateral,
     collateralLoanCount,
+    isLoanDefaulted,
+    defaultedCollateralLoan,
+    ticksUntilDestruction,
     openRentDialog,
     closeRentDialog,
     saveRentPerSqm,

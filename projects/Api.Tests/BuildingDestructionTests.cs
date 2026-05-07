@@ -484,6 +484,41 @@ public sealed class BuildingDestructionTests
     }
 
     [Fact]
+    public async Task BuildingDestruction_CreatesDestructionRecord_WithCorrectFields()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        factory.CreateClient();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var (db, _, company, building, _, loanOffer) = await SeedBaseAsync(scope);
+
+        var appraisedValue = 500_000m;
+        var defaultedAtTick = 300L;
+        building.IsForSale = true;
+        building.AskingPrice = 450_000m;
+        building.ListedAtUtc = DateTime.UtcNow.AddDays(-4);
+
+        await AddDefaultedLoanAsync(db, company, building, loanOffer, appraisedValue, defaultedAtTick);
+
+        var gs = await db.GameStates.FindAsync(1);
+        gs!.CurrentTick = defaultedAtTick + BuildingDestructionPhase.ForeclosureWindowTicks;
+        await db.SaveChangesAsync();
+
+        var processor = CreateProcessor(scope);
+        await processor.ProcessTickAsync();
+
+        var record = await db.BuildingDestructionRecords
+            .FirstOrDefaultAsync(r => r.BuildingId == building.Id);
+        Assert.NotNull(record);
+        Assert.Equal(building.Id, record.BuildingId);
+        Assert.Equal(appraisedValue, record.OriginalPropertyValue);
+        // Compensation = 80% of appraised value
+        Assert.Equal(appraisedValue * 0.80m, record.CompensationPaid);
+        Assert.Equal(BuildingDestructionReason.GracePeriodExpired, record.DestructionReason);
+        // Tick count is stored as the tick AFTER the processor increments.
+        Assert.True(record.DestructionTickCount > defaultedAtTick);
+    }
+
+    [Fact]
     public async Task BuildingDestructionPhase_ComputeRefund_ReturnsEightyPercentOfAppraisedValue()
     {
         // 80% of 1,200,000 = 960,000

@@ -39,6 +39,9 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Buildings placed on the game map.</summary>
     public DbSet<Building> Buildings => Set<Building>();
 
+    /// <summary>Audit records for automatically destroyed buildings (loan default foreclosure).</summary>
+    public DbSet<BuildingDestructionRecord> BuildingDestructionRecords => Set<BuildingDestructionRecord>();
+
     /// <summary>Units within building 4x4 grids.</summary>
     public DbSet<BuildingUnit> BuildingUnits => Set<BuildingUnit>();
 
