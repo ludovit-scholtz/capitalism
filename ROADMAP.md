@@ -45,11 +45,13 @@ It will use real world map. The game will start in single city and later other c
 - [x] Add button to news and changelog to mark all news as read.
 - [x] Changelog.csv news are not imported to the database. Make sure that after every restart every changelog news item is imported. If any error occurs during the import log it and skip the import of that one item. Do it more resilient to errors.
 
-### Banks (100% complete)
+### Banks (50% complete)
 
 - [x] Investigate why bank statement latest row does not equal to current balance on the bank account. Perhaps it is related to the loan payments as I do not see the loan received nor any of the loans currently on the bank account statement.
 - [x] When bank loan is not paid set it for sale for the property market price minus 10%. When the debt from missed payments is not paid in 3 game days (72 ticks), destroy the building and pay any remaining debt from the sale of property to the bank owner.
 - [x] When bank loan is not paid, make sure to notify user using the notifications that he has pending debt to the bank. When user goes to the bank, make sure the pending debt amount is clearly visible and also pending time until the building in the collateral will be destroyed.
+- [ ] When bank loan is unpaid and building goes for sale, make sure to put it on sale in proper currency. When builing in Prague which costs 10M CZK is collateralized in USD bank, the collateral amount is correctly calculated and allows to lend 300k USD. However when unpaid loan is hit, make sure to sell it not for 300k USD but for 10M CZK. After the building is sold on market make sure to settle the loan payments in correct currency - make sure to do the swap if required.
+- [ ] When there is unpaid loan and building is put on sale, user can cancel the sale of the building. Do not allow user to cancel sale of the building which is collateralized for loan and loan has missed payments.
 
 ### FX Exchange (100% complete)
 
