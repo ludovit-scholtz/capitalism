@@ -9,7 +9,7 @@ import GoldAmmSection from '@/components/forex/GoldAmmSection.vue'
 import BankAccountTransferPanel from '@/components/banking/BankAccountTransferPanel.vue'
 import UiStateLoading from '@/components/ui/UiStateLoading.vue'
 import UiStateError from '@/components/ui/UiStateError.vue'
-import { buildEurPairList, formatPairLabel } from '@/lib/fxPairFormatter'
+import { buildEurPairList, extractQuoteCurrencyFromEurPair } from '@/lib/fxPairFormatter'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -45,7 +45,7 @@ watch(activeTab, async (tab) => {
 
 // ── Chart state ────────────────────────────────────────────────────────────
 const availablePairs = computed(() => buildEurPairList(availableCurrencies.value))
-const selectedPair = ref('EUR/CZK')
+const selectedPair = ref('CZKEUR')
 const selectedTicksBack = ref(100)
 
 const tickRangeOptions = [
@@ -56,8 +56,7 @@ const tickRangeOptions = [
 
 watch([selectedPair, selectedTicksBack, availablePairs], async ([pair, ticks, pairs]) => {
   if (pairs.length === 0) return
-  // Extract quote currency from pair label (e.g. EUR/CZK → CZK)
-  const quote = pair.split('/')[1]
+  const quote = extractQuoteCurrencyFromEurPair(pair)
   if (!quote) return
   // Ensure selected pair is valid after rates load
   if (!pairs.includes(pair) && pairs.length > 0) {
@@ -70,7 +69,7 @@ watch([selectedPair, selectedTicksBack, availablePairs], async ([pair, ticks, pa
 watch(activeTab, async (tab) => {
   if (tab !== 'rates') return
   const pair = selectedPair.value
-  const quote = pair.split('/')[1]
+  const quote = extractQuoteCurrencyFromEurPair(pair)
   if (!quote) return
   await loadRateHistory(quote, selectedTicksBack.value)
 })
@@ -163,10 +162,10 @@ watch(activeTab, async (tab) => {
                   <table class="rates-table w-full border-collapse text-sm">
                     <thead>
                       <tr>
-                        <th class="text-left px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider">{{ t('forex.rateTableCurrency') }}</th>
-                        <th class="text-right px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider hidden sm:table-cell">{{ t('forex.rateTableBuyRate') }}</th>
-                        <th class="text-right px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider">{{ t('forex.rateTableMidRate') }}</th>
-                        <th class="text-right px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider hidden sm:table-cell">{{ t('forex.rateTableSellRate') }}</th>
+                        <th class="text-left px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider">{{ t('forex.rateListPair') }}</th>
+                        <th class="text-right px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider hidden sm:table-cell" :title="t('forex.rateTableBuyTooltip')">{{ t('forex.rateTableBuyRate') }}</th>
+                        <th class="text-right px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider" :title="t('forex.rateTableMidTooltip')">{{ t('forex.rateTableMidRate') }}</th>
+                        <th class="text-right px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider hidden sm:table-cell" :title="t('forex.rateTableSellTooltip')">{{ t('forex.rateTableSellRate') }}</th>
                         <th class="text-right px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider">{{ t('forex.rateTableAfterFee') }}</th>
                       </tr>
                     </thead>
@@ -175,11 +174,25 @@ watch(activeTab, async (tab) => {
                         <td class="px-3 py-3 align-middle">
                           <div class="flex items-center gap-2">
                             <span class="min-w-[2rem] text-base font-bold text-brand">{{ row.targetSymbol }}</span>
-                            <span class="rate-pair-label text-xs text-muted">{{ formatPairLabel(baseCurrencyCode, row.targetCode) }}</span>
+                            <span class="rate-pair-label text-xs font-semibold tracking-wide text-muted">{{ row.pairLabel }}</span>
+                          </div>
+                          <div class="mt-2 grid grid-cols-3 gap-2 text-xs sm:hidden">
+                            <div class="rounded border border-divider bg-card-raised px-1.5 py-1 text-right">
+                              <div class="text-[10px] uppercase tracking-wide text-success">{{ t('forex.rateTableBuyRate') }}</div>
+                              <div class="font-mono text-success">{{ formatRate(row.buyRate) }}</div>
+                            </div>
+                            <div class="rounded border border-divider bg-card-raised px-1.5 py-1 text-right">
+                              <div class="text-[10px] uppercase tracking-wide text-body">{{ t('forex.rateTableMidRate') }}</div>
+                              <div class="font-mono font-semibold text-body">{{ formatRate(row.midRate) }}</div>
+                            </div>
+                            <div class="rounded border border-divider bg-card-raised px-1.5 py-1 text-right">
+                              <div class="text-[10px] uppercase tracking-wide text-danger">{{ t('forex.rateTableSellRate') }}</div>
+                              <div class="font-mono text-danger">{{ formatRate(row.sellRate) }}</div>
+                            </div>
                           </div>
                         </td>
                         <td class="px-3 py-3 text-right font-mono text-success align-middle hidden sm:table-cell">{{ formatRate(row.buyRate) }}</td>
-                        <td class="px-3 py-3 text-right font-mono font-semibold text-body align-middle">{{ formatRate(row.rate) }}</td>
+                        <td class="px-3 py-3 text-right font-mono font-semibold text-body align-middle">{{ formatRate(row.midRate) }}</td>
                         <td class="px-3 py-3 text-right font-mono text-danger align-middle hidden sm:table-cell">{{ formatRate(row.sellRate) }}</td>
                         <td class="px-3 py-3 text-right font-mono text-muted align-middle"><span class="text-sm">{{ formatRate(row.afterFeeRate) }}</span><span class="ml-1 text-xs text-subtle">-1%</span></td>
                       </tr>

@@ -2,15 +2,17 @@ import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
+import { formatPairLabel, pairWeaker, pairStronger } from '@/lib/fxPairFormatter'
 import type { City, FxRate, ForexTradeHistoryEntry, CurrencyBalance, PlayerBankAccountSummary, FxRateSnapshot } from '@/types'
 
 /** ±0.5% spread applied around the mid rate for buy/sell display. */
 const SPREAD_HALF = 0.005
 
 interface CityRateRow {
+  pairLabel: string
   targetCode: string
   targetSymbol: string
-  rate: number
+  midRate: number
   buyRate: number
   sellRate: number
   afterFeeRate: number
@@ -59,23 +61,26 @@ export function useForexData() {
 
   const cityRateBoard = computed<CityRateRow[]>(() => {
     const base = baseCurrencyCode.value
-    const baseEurRate = eurRatesMap.value[base] ?? 1
     const allCodes = new Set<string>(['EUR'])
     rates.value.forEach((r) => allCodes.add(r.quoteCurrencyCode))
     return Array.from(allCodes)
       .filter((code) => code !== base)
       .map((code) => {
-        const targetEurRate = eurRatesMap.value[code] ?? 1
-        const crossRate = targetEurRate / baseEurRate
+        const weak = pairWeaker(base, code)
+        const strong = pairStronger(base, code)
+        const weakEurRate = eurRatesMap.value[weak] ?? 1
+        const strongEurRate = eurRatesMap.value[strong] ?? 1
+        const pairMidRate = strongEurRate / weakEurRate
         const symbol = code === 'EUR' ? '€' : (rates.value.find((r) => r.quoteCurrencyCode === code)?.quoteCurrencySymbol ?? code)
         const rateEntry = rates.value.find((r) => r.quoteCurrencyCode === code)
         return {
+          pairLabel: formatPairLabel(base, code),
           targetCode: code,
           targetSymbol: symbol,
-          rate: crossRate,
-          buyRate: crossRate * (1 + SPREAD_HALF),
-          sellRate: crossRate * (1 - SPREAD_HALF),
-          afterFeeRate: crossRate * 0.99,
+          midRate: pairMidRate,
+          buyRate: pairMidRate * (1 + SPREAD_HALF),
+          sellRate: pairMidRate * (1 - SPREAD_HALF),
+          afterFeeRate: pairMidRate * 0.99,
           rateDate: rateEntry?.rateDate ?? '',
         }
       })
