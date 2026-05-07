@@ -139,7 +139,7 @@ public sealed partial class Mutation
 
         var company = await db.Companies.FirstOrDefaultAsync(
             c => c.Id == input.CompanyId && c.PlayerId == userId);
-        var referralDiscountRate = await GetPersistedReferralDiscountRateAsync(db, userId, httpContextAccessor.HttpContext!.RequestAborted);
+        var referralDiscountRate = await GetReferralDiscountRateIfRegisteredAsync(db, userId, httpContextAccessor.HttpContext!.RequestAborted);
 
         if (company is null)
         {

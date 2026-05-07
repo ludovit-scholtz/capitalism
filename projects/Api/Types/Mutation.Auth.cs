@@ -20,6 +20,10 @@ namespace Api.Types;
 
 public sealed partial class Mutation
 {
+    private const int ReferralCodeLength = 8;
+    private const int MaxReferralCodeGenerationAttempts = 20;
+    private const string ReferralCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
     /// <summary>Compiled regex for validating alphanumeric referral codes.</summary>
     private static readonly Regex ReferralCodePattern = new(@"^[A-Z0-9]+$", RegexOptions.Compiled);
     /// <summary>Registers a new player account and returns an auth token.</summary>
@@ -139,7 +143,7 @@ public sealed partial class Mutation
             return existing;
         }
 
-        var generatedCode = await GenerateUniqueReferralCodeAsync(db, 8, httpContextAccessor.HttpContext.RequestAborted);
+        var generatedCode = await GenerateUniqueReferralCodeAsync(db, ReferralCodeLength, httpContextAccessor.HttpContext.RequestAborted);
         db.ReferralCodes.Add(new ReferralCode
         {
             Id = Guid.NewGuid(),
@@ -252,15 +256,14 @@ public sealed partial class Mutation
         int length,
         CancellationToken cancellationToken)
     {
-        const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         var buffer = new byte[length];
-        for (var attempt = 0; attempt < 20; attempt++)
+        for (var attempt = 0; attempt < MaxReferralCodeGenerationAttempts; attempt++)
         {
             RandomNumberGenerator.Fill(buffer);
             var codeChars = new char[length];
             for (var index = 0; index < length; index++)
             {
-                codeChars[index] = alphabet[buffer[index] % alphabet.Length];
+                codeChars[index] = ReferralCodeAlphabet[buffer[index] % ReferralCodeAlphabet.Length];
             }
 
             var candidate = new string(codeChars);
