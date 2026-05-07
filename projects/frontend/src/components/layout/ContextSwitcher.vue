@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import ContextSwitcherPanel from '@/components/layout/ContextSwitcherPanel.vue'
 import CountryFlag from '@/components/common/CountryFlag.vue'
+import { selectMainCity } from '@/lib/cityContext'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
 import { buildAccountOptions, getActiveAccountName, type AccountOption } from '@/lib/accountContext'
@@ -23,27 +24,6 @@ const isOpen = ref(false)
 const switchingKey = ref<string | null>(null)
 const cities = ref<City[]>([])
 
-function deriveMostUsedCityId(): string | null {
-  const cityUsage = new Map<string, number>()
-  for (const company of auth.player?.companies ?? []) {
-    for (const building of company.buildings ?? []) {
-      cityUsage.set(building.cityId, (cityUsage.get(building.cityId) ?? 0) + 1)
-    }
-  }
-  if (cityUsage.size === 0) {
-    return auth.player?.onboardingCityId ?? null
-  }
-  let bestCityId: string | null = null
-  let bestCount = -1
-  for (const [cityId, count] of cityUsage.entries()) {
-    if (count > bestCount) {
-      bestCount = count
-      bestCityId = cityId
-    }
-  }
-  return bestCityId
-}
-
 // ── City helpers ──────────────────────────────────────────────────────────────
 
 async function loadCities() {
@@ -55,8 +35,8 @@ async function loadCities() {
     if (cities.value.length > 0) {
       const activeCity = selectedCityId.value ? cities.value.find((city) => city.id === selectedCityId.value) : null
       if (!activeCity) {
-        const preferredCityId = deriveMostUsedCityId()
-        const preferredCity = preferredCityId ? cities.value.find((city) => city.id === preferredCityId) : null
+        const buildings = auth.player?.companies.flatMap((company) => company.buildings ?? []) ?? []
+        const preferredCity = selectMainCity(cities.value, buildings)
         const fallbackCity = preferredCity ?? cities.value[0]
         if (fallbackCity) {
           auth.switchCity(fallbackCity.id)

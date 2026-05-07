@@ -253,6 +253,7 @@ export default {
     oidcCallbackTitle: 'Dokončovanie prihlásenia',
     oidcCallbackLoading: 'Overujeme váš Biatec token a načítavame herný profil…',
     oidcCallbackFailed: 'Prihlásenie cez Biatec zlyhalo. Skúste to znova.',
+    autoSwitchedToMainCity: 'Prepnuté na {city} — vaše hlavné mesto.',
     referralBannerTitle: 'Boli ste pozvaní!',
     referralBannerCode: 'Referral kód',
     referralBannerDiscount: 'Zaregistrujte sa teraz a získajte 10% zľavu na nákupy v hre.',
