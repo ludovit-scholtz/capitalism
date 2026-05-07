@@ -34,9 +34,9 @@ export default defineConfig(({ isSsrBuild }) => ({
               globPatterns: ['**/*.{js,css,html,ico,svg,woff2}'],
             },
             manifest: {
-              name: 'Events Platform',
-              short_name: 'Events',
-              description: 'Discover and explore events in your community.',
+              name: 'Capitalism 5',
+              short_name: 'Capitalism',
+              description: 'A business simulation game. Build a business empire and become a tycoon!',
               theme_color: '#0047FF',
               background_color: '#0D1117',
               display: 'standalone',
@@ -45,15 +45,15 @@ export default defineConfig(({ isSsrBuild }) => ({
               lang: 'en',
               icons: [
                 {
-                  src: '/pwa-192x192.svg',
+                  src: '/android-chrome-192x192.png',
                   sizes: '192x192',
-                  type: 'image/svg+xml',
+                  type: 'image/png',
                   purpose: 'any',
                 },
                 {
-                  src: '/pwa-512x512.svg',
+                  src: '/android-chrome-512x512.png',
                   sizes: '512x512',
-                  type: 'image/svg+xml',
+                  type: 'image/png',
                   purpose: 'any maskable',
                 },
               ],
