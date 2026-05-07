@@ -158,7 +158,15 @@ img {
 }
 
 .container {
+  width: 100%;
+  max-width: min(100%, 1600px);
   margin: 0 auto;
+}
+
+@media (min-width: 2560px) {
+  html {
+    font-size: 17px;
+  }
 }
 
 .btn {

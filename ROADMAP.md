@@ -80,12 +80,12 @@ It will use real world map. The game will start in single city and later other c
 - [x] Highlight the active player in the ranking - In both game ranking and master ranking
 - [x] On ranking page enter, make sure to show the page where player is actively located. For example if player is ranked as 25th make sure to show 3rd page if there is 10 items per page. Do it in both game ranking and master ranking
 
-### Optimize for mobile (0% complete)
+### Optimize for mobile (75% complete)
 
-- [ ] Make sure the design is smooth on small mobile devices. Mainly the content should be visible without the page scroll to the right.
+- [x] Make sure the design is smooth on small mobile devices. Mainly the content should be visible without the page scroll to the right.
 - [ ] Make sure the design is smooth on tablet sized screens.
-- [ ] Make sure the design is smooth on Full HD devices
-- [ ] Make sure the design is smooth on 4K screens
+- [x] Make sure the design is smooth on Full HD devices
+- [x] Make sure the design is smooth on 4K screens
 
 ### FX Exchange with AMM Liquidity Pools (100% complete)
 

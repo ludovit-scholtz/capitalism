@@ -111,7 +111,7 @@ function categoryIcon(cat: string): string {
           <th class="text-left px-3 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider bg-card whitespace-nowrap hidden sm:table-cell">
             {{ t('bankStatement.columns.tick') }}
           </th>
-          <th class="text-left px-3 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider bg-card">
+          <th class="statement-sticky-col text-left px-3 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider bg-card">
             {{ t('bankStatement.columns.description') }}
           </th>
           <th class="text-left px-3 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider bg-card">
@@ -141,7 +141,7 @@ function categoryIcon(cat: string): string {
           <td class="border-b border-divider px-3 py-2.5 text-xs text-muted tabular-nums align-middle hidden sm:table-cell">
             {{ row.recordedAtTick }}
           </td>
-          <td class="border-b border-divider px-3 py-2.5 align-middle max-w-[280px]">
+          <td class="statement-sticky-col border-b border-divider px-3 py-2.5 align-middle max-w-[280px]">
             <div class="text-body font-medium">{{ row.description || '—' }}</div>
             <div v-if="row.buildingName" class="description-sub text-xs text-muted mt-0.5">🏭 {{ row.buildingName }}</div>
           </td>
@@ -188,3 +188,16 @@ function categoryIcon(cat: string): string {
     </div>
   </div>
 </template>
+
+<style scoped>
+.statement-sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--color-surface);
+}
+
+thead .statement-sticky-col {
+  z-index: 2;
+}
+</style>

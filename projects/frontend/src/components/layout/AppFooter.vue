@@ -7,9 +7,11 @@ const { t } = useI18n()
 
 <template>
   <footer class="bg-card border-t border-divider mt-auto">
-    <div class="container flex items-center justify-between h-12 text-sm text-muted">
-      <p>{{ t('common.allRightsReserved', { year: new Date().getFullYear() }) }}</p>
-      <LanguageSwitcher />
+    <div class="container flex flex-wrap items-center justify-between gap-2 py-2 text-sm text-muted sm:h-12 sm:flex-nowrap sm:py-0">
+      <p class="text-xs sm:text-sm">{{ t('common.allRightsReserved', { year: new Date().getFullYear() }) }}</p>
+      <div class="w-full sm:w-auto flex justify-end">
+        <LanguageSwitcher />
+      </div>
     </div>
   </footer>
 </template>

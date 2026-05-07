@@ -65,6 +65,12 @@ export default {
     cities: 'Mestá',
     buildingMarket: 'Trh budov',
     tutorial: 'Tutoriál',
+    mobileMenuLabel: 'Sekcie mobilného menu',
+    sectionMain: 'Hlavné',
+    sectionEconomy: 'Ekonomika',
+    sectionBuild: 'Budovanie',
+    sectionSocial: 'Sociálne',
+    sectionAdmin: 'Administrácia',
   },
   news: {
     eyebrow: 'Oficiálny feed',

@@ -578,6 +578,9 @@ async function confirmPurchase() {
   border-radius: 12px;
   padding: 1.25rem;
   flex-shrink: 0;
+  align-self: start;
+  position: sticky;
+  top: 80px;
 }
 
 .detail-header {
@@ -1323,6 +1326,7 @@ async function confirmPurchase() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-height: 44px;
   padding: 0.5rem 1rem;
   border-radius: 8px;
   font-weight: 600;
@@ -1356,5 +1360,22 @@ async function confirmPurchase() {
   background: transparent;
   color: var(--color-accent, #3b82f6);
   border: 1px solid var(--color-accent, #3b82f6);
+}
+
+@media (max-width: 768px) {
+  .detail-panel {
+    position: fixed;
+    left: 0.5rem;
+    right: 0.5rem;
+    bottom: 0.5rem;
+    width: auto;
+    min-width: 0;
+    max-height: min(68vh, 42rem);
+    border-radius: 14px 14px 10px 10px;
+    z-index: 140;
+    box-shadow: 0 -14px 40px rgba(0, 0, 0, 0.45);
+    padding-bottom: calc(1.1rem + env(safe-area-inset-bottom, 0px));
+    -webkit-overflow-scrolling: touch;
+  }
 }
 </style>

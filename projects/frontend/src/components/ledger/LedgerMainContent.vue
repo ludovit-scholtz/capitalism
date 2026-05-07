@@ -652,6 +652,19 @@ function formatGameTime(value: string): string {
   font-weight: 600;
   font-size: 0.8125rem;
 }
+.drill-table th:first-child,
+.drill-table td:first-child,
+.buildings-table th:first-child,
+.buildings-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--color-surface);
+}
+.drill-table thead th:first-child,
+.buildings-table thead th:first-child {
+  z-index: 2;
+}
 .buildings-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
