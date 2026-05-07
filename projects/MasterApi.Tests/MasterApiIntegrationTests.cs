@@ -876,6 +876,23 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
         }
 
         [Fact]
+        public void ChangelogCsvImporter_ParseCsvWithDiagnostics_ReportsMalformedRows()
+        {
+            const string csv = """
+                id;date;en;sk;de
+                not-a-guid;2026-03-01T09:00:00Z;Broken id;;;
+                11111111-2222-3333-4444-555555555555;not-a-date;Broken date;;;
+                22222222-3333-4444-5555-666666666666;2026-03-01T09:00:00Z;;;
+                33333333-4444-5555-6666-777777777777;2026-03-01T09:00:00Z;Valid row;;
+                """;
+
+            var result = MasterApi.Data.ChangelogCsvImporter.ParseCsvWithDiagnostics(csv);
+
+            Assert.Single(result.Rows);
+            Assert.Equal(3, result.Failures.Count);
+        }
+
+        [Fact]
         public void ChangelogCsvImporter_ParseCsv_SkipsRowsWithEmptyEnglishText()
         {
             const string csv = """
@@ -1008,6 +1025,35 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
             var totalEntries = await db.GameNewsEntries.CountAsync(
                 e => e.Id == Guid.Parse("c0ffee00-1234-5678-9abc-def012345678"));
             Assert.Equal(1, totalEntries);
+        }
+
+        [Fact]
+        public async Task ChangelogCsvImporter_ImportWithDiagnosticsAsync_ReportsDuplicateRows()
+        {
+            await using var factory = new MasterApi.Tests.Infrastructure.MasterApiWebApplicationFactory(
+                $"import-diagnostics-{Guid.NewGuid():N}");
+
+            using var scope = factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<MasterApi.Data.MasterDbContext>();
+            await db.Database.EnsureCreatedAsync();
+
+            const string csv = """
+                id;date;en;sk;de
+                c0ffee00-1234-5678-9abc-def012345678;2026-03-01T09:00:00Z;Initial entry.;Prvý záznam.;Erster Eintrag.
+                """;
+
+            var rows = MasterApi.Data.ChangelogCsvImporter.ParseCsv(csv);
+            var importer = new MasterApi.Data.ChangelogCsvImporter(db);
+
+            var first = await importer.ImportWithDiagnosticsAsync(rows);
+            var second = await importer.ImportWithDiagnosticsAsync(rows);
+
+            Assert.Equal(1, first.ImportedCount);
+            Assert.Equal(0, first.DuplicateCount);
+            Assert.Equal(0, first.FailedCount);
+            Assert.Equal(0, second.ImportedCount);
+            Assert.Equal(1, second.DuplicateCount);
+            Assert.Equal(0, second.FailedCount);
         }
 
         [Fact]
@@ -1427,6 +1473,118 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
 
                                     Assert.Equal(beforeUnreadCount - 1, afterUnreadCount);
                                     Assert.True(createdAfter.GetProperty("isRead").GetBoolean());
+                                }
+
+                                [Fact]
+                                public async Task MarkAllGameNewsRead_ClearsAllUnreadCountForPlayerAndServer()
+                                {
+                                    async Task<string> CreatePublishedNewsAsync(string title)
+                                    {
+                                        var result = await GraphQlAsync(
+                                            """
+                                            mutation Upsert($input: UpsertGameNewsEntryInput!) {
+                                              upsertGameNewsEntry(input: $input) {
+                                                id
+                                              }
+                                            }
+                                            """,
+                                            new
+                                            {
+                                                input = new
+                                                {
+                                                    registrationKey = "test-registration-key",
+                                                    serverKey = "capitalism-local",
+                                                    requesterEmail = "admin@events.local",
+                                                    entryType = "NEWS",
+                                                    status = "PUBLISHED",
+                                                    localizations = new[]
+                                                    {
+                                                        new
+                                                        {
+                                                            locale = "en",
+                                                            title,
+                                                            summary = "Summary",
+                                                            htmlContent = "<p>Body</p>",
+                                                        }
+                                                    }
+                                                }
+                                            });
+
+                                        return Assert.IsType<string>(result.GetProperty("data").GetProperty("upsertGameNewsEntry").GetProperty("id").GetString());
+                                    }
+
+                                    var firstEntryId = await CreatePublishedNewsAsync("Shard update A");
+                                    var secondEntryId = await CreatePublishedNewsAsync("Shard update B");
+
+                                    var beforeRead = await GraphQlAsync(
+                                        """
+                                        query Feed($input: GetGameNewsFeedInput!) {
+                                          gameNewsFeed(input: $input) {
+                                            unreadCount
+                                            items { id isRead }
+                                          }
+                                        }
+                                        """,
+                                        new
+                                        {
+                                            input = new
+                                            {
+                                                registrationKey = "test-registration-key",
+                                                serverKey = "capitalism-local",
+                                                playerEmail = "reader@example.com",
+                                                includeDrafts = false,
+                                                limit = 50,
+                                            }
+                                        });
+
+                                    var beforeUnread = beforeRead.GetProperty("data").GetProperty("gameNewsFeed").GetProperty("unreadCount").GetInt32();
+                                    Assert.True(beforeUnread >= 2);
+
+                                    var markAllResult = await GraphQlAsync(
+                                        """
+                                        mutation MarkAll($input: MarkAllGameNewsReadInput!) {
+                                          markAllGameNewsRead(input: $input)
+                                        }
+                                        """,
+                                        new
+                                        {
+                                            input = new
+                                            {
+                                                registrationKey = "test-registration-key",
+                                                serverKey = "capitalism-local",
+                                                playerEmail = "reader@example.com",
+                                            }
+                                        });
+
+                                    Assert.False(markAllResult.TryGetProperty("errors", out _));
+                                    Assert.Equal(beforeUnread, markAllResult.GetProperty("data").GetProperty("markAllGameNewsRead").GetInt32());
+
+                                    var afterRead = await GraphQlAsync(
+                                        """
+                                        query Feed($input: GetGameNewsFeedInput!) {
+                                          gameNewsFeed(input: $input) {
+                                            unreadCount
+                                            items { id isRead }
+                                          }
+                                        }
+                                        """,
+                                        new
+                                        {
+                                            input = new
+                                            {
+                                                registrationKey = "test-registration-key",
+                                                serverKey = "capitalism-local",
+                                                playerEmail = "reader@example.com",
+                                                includeDrafts = false,
+                                                limit = 50,
+                                            }
+                                        });
+
+                                    var afterFeed = afterRead.GetProperty("data").GetProperty("gameNewsFeed");
+                                    Assert.Equal(0, afterFeed.GetProperty("unreadCount").GetInt32());
+                                    var afterItems = afterFeed.GetProperty("items").EnumerateArray().ToList();
+                                    Assert.True(afterItems.Single(item => item.GetProperty("id").GetString() == firstEntryId).GetProperty("isRead").GetBoolean());
+                                    Assert.True(afterItems.Single(item => item.GetProperty("id").GetString() == secondEntryId).GetProperty("isRead").GetBoolean());
                                 }
 
                                 [Fact]

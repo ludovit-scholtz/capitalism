@@ -91,4 +91,51 @@ describe('usesStore', () => {
     expect(store.feed?.items[1]?.isRead).toBe(false)
     expect(store.unreadCount).toBe(1)
   })
+
+  it('markAllRead marks all entries as read and clears unread count', async () => {
+    gqlRequestMock.mockResolvedValueOnce({
+      markAllGameNewsRead: 2,
+    })
+
+    const store = usesStore()
+    store.feed = {
+      unreadCount: 2,
+      items: [
+        {
+          id: 'entry-1',
+          entryType: 'NEWS',
+          status: 'PUBLISHED',
+          targetServerKey: null,
+          createdByEmail: null,
+          updatedByEmail: null,
+          createdAtUtc: '2026-01-01T00:00:00Z',
+          updatedAtUtc: '2026-01-01T00:00:00Z',
+          publishedAtUtc: '2026-01-01T00:00:00Z',
+          isRead: false,
+          localizations: [],
+        },
+        {
+          id: 'entry-2',
+          entryType: 'CHANGELOG',
+          status: 'PUBLISHED',
+          targetServerKey: null,
+          createdByEmail: null,
+          updatedByEmail: null,
+          createdAtUtc: '2026-01-01T00:00:00Z',
+          updatedAtUtc: '2026-01-01T00:00:00Z',
+          publishedAtUtc: '2026-01-01T00:00:00Z',
+          isRead: false,
+          localizations: [],
+        },
+      ],
+    }
+    store.unreadCount = 2
+
+    const changed = await store.markAllRead()
+
+    expect(changed).toBe(2)
+    expect(gqlRequestMock).toHaveBeenCalledWith(expect.stringContaining('mutation MarkAllGameNewsRead'))
+    expect(store.feed?.items.every((entry) => entry.isRead)).toBe(true)
+    expect(store.unreadCount).toBe(0)
+  })
 })

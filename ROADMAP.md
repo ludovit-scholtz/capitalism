@@ -40,10 +40,10 @@ It will use real world map. The game will start in single city and later other c
 - [ ] When building is in editation mode, allow paste of the configuration of the unit at the building. When user hits ctrl+v or cmd+v on mac and he has selected the unit, and if the json schema is valid for the unit configuration, apply the configuration to the unit. This copy and paste mechanism will improve the UX of the unit management. For example when user want to expand the factory or if he wants to expand the R&D building.
 - [ ] Allow to paste unit configuration to empty unit space
 
-### News (0% complete)
+### News (100% complete)
 
-- [ ] Add button to news and changelog to mark all news as read.
-- [ ] Changelog.csv news are not imported to the database. Make sure that after every restart every changelog news item is imported. If any error occurs during the import log it and skip the import of that one item. Do it more resilient to errors.
+- [x] Add button to news and changelog to mark all news as read.
+- [x] Changelog.csv news are not imported to the database. Make sure that after every restart every changelog news item is imported. If any error occurs during the import log it and skip the import of that one item. Do it more resilient to errors.
 
 ### Banks (50% complete)
 

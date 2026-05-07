@@ -14,6 +14,9 @@ const newsStore = usesStore()
 
 const filter = ref<'ALL' | 'NEWS' | 'CHANGELOG' | 'MARKET_REPORT'>('ALL')
 const viewError = ref<string | null>(null)
+const actionMessage = ref<string | null>(null)
+const actionError = ref<string | null>(null)
+const markAllLoading = ref(false)
 const currentPage = ref(1)
 const pageSize = 10
 
@@ -49,6 +52,7 @@ const pageTo = computed(() => Math.min(currentPage.value * pageSize, filteredEnt
 
 const canGoPrev = computed(() => currentPage.value > 1)
 const canGoNext = computed(() => currentPage.value < totalPages.value)
+const hasUnreadEntries = computed(() => (newsStore.feed?.items ?? []).some((entry) => entry.status === 'PUBLISHED' && !entry.isRead))
 
 function goToPrevPage() {
   if (!canGoPrev.value) {
@@ -120,24 +124,43 @@ function entryTypePillClass(entryType: string): string {
 
 async function loadFeed() {
   viewError.value = null
+  actionError.value = null
   currentPage.value = 1
 
   try {
     const feed = await newsStore.fetchFeed(false)
     if (auth.isAuthenticated) {
       const unreadEntryIds = feed.items.filter((entry) => entry.status === 'PUBLISHED' && !entry.isRead).map((entry) => entry.id)
-
-      // Capture unread state BEFORE markRead so the "" badge stays
-      // visible for the duration of the page visit even after the
-      // background mark-read call updates the store.
       initiallyUnreadIds.value = new Set(unreadEntryIds)
-
-      if (unreadEntryIds.length > 0) {
-        await newsStore.markRead(unreadEntryIds)
-      }
+    } else {
+      initiallyUnreadIds.value = new Set()
     }
   } catch (caughtError) {
     viewError.value = caughtError instanceof Error ? caughtError.message : t('news.loadFailed')
+  }
+}
+
+async function onClickMarkAllRead() {
+  actionMessage.value = null
+  actionError.value = null
+
+  if (!auth.isAuthenticated || !hasUnreadEntries.value || markAllLoading.value) {
+    return
+  }
+
+  if (!window.confirm(t('news.markAllReadConfirm'))) {
+    return
+  }
+
+  markAllLoading.value = true
+  try {
+    await newsStore.markAllRead()
+    initiallyUnreadIds.value = new Set()
+    actionMessage.value = t('news.markAllReadSuccess')
+  } catch (caughtError) {
+    actionError.value = caughtError instanceof Error ? caughtError.message : t('news.markAllReadFailed')
+  } finally {
+    markAllLoading.value = false
   }
 }
 
@@ -213,11 +236,26 @@ const onClickFilterMarketReport = () => {
             📊 {{ t('news.filterMarketReport') }}
           </button>
         </div>
+        <button
+          type="button"
+          class="btn btn-secondary news-mark-all-read-btn w-fit"
+          :disabled="!auth.isAuthenticated || !hasUnreadEntries || markAllLoading || newsStore.loading"
+          @click="onClickMarkAllRead"
+        >
+          {{ markAllLoading ? t('common.loading') : t('news.markAllRead') }}
+        </button>
       </div>
     </section>
 
     <!-- Content -->
     <section class="container pt-8">
+      <div v-if="actionError" class="state-card state-card-error mb-5 p-4 rounded-2xl border border-[rgba(248,113,113,0.5)] bg-card" role="alert">
+        {{ actionError }}
+      </div>
+      <div v-else-if="actionMessage" class="state-card mb-5 p-4 rounded-2xl border border-[rgba(34,197,94,0.5)] bg-card" role="status">
+        {{ actionMessage }}
+      </div>
+
       <!-- Loading -->
       <div v-if="newsStore.loading" class="state-card p-6 rounded-2xl border border-divider bg-card grid gap-4">
         <p>{{ t('common.loading') }}</p>

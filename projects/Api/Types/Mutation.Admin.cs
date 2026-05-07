@@ -166,4 +166,25 @@ public sealed partial class Mutation
         await masterGameAdministrationService.MarkGameNewsReadAsync(playerEmail, input.EntryIds, httpContextAccessor.HttpContext.RequestAborted);
         return true;
     }
+
+    [Authorize]
+    public async Task<int> MarkAllGameNewsRead(
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] IMasterGameAdministrationService masterGameAdministrationService)
+    {
+        var effectiveUserId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+        var playerEmail = await db.Players
+            .AsNoTracking()
+            .Where(player => player.Id == effectiveUserId)
+            .Select(player => player.Email)
+            .FirstOrDefaultAsync(httpContextAccessor.HttpContext.RequestAborted)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Player not found.")
+                    .SetCode("PLAYER_NOT_FOUND")
+                    .Build());
+
+        return await masterGameAdministrationService.MarkAllGameNewsReadAsync(playerEmail, httpContextAccessor.HttpContext.RequestAborted);
+    }
 }

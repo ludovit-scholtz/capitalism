@@ -107,6 +107,29 @@ export const usesStore = defineStore('news', () => {
     return true
   }
 
+  async function markAllRead() {
+    const data = await gqlRequest<{ markAllGameNewsRead: number }>(
+      `mutation MarkAllGameNewsRead {
+        markAllGameNewsRead
+      }`,
+    )
+
+    const changed = data.markAllGameNewsRead ?? 0
+
+    if (feed.value) {
+      feed.value = {
+        ...feed.value,
+        items: feed.value.items.map((entry) => ({
+          ...entry,
+          isRead: true,
+        })),
+      }
+    }
+
+    unreadCount.value = 0
+    return changed
+  }
+
   function clear() {
     feed.value = null
     unreadCount.value = 0
@@ -122,6 +145,7 @@ export const usesStore = defineStore('news', () => {
     fetchFeed,
     fetchUnreadCount,
     markRead,
+    markAllRead,
     clear,
   }
 })

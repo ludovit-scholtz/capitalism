@@ -16,6 +16,26 @@ public sealed class ChangelogCsvRow
     public required string De { get; init; }
 }
 
+public sealed class ChangelogCsvParseFailure
+{
+    public required int LineNumber { get; init; }
+    public required string Reason { get; init; }
+}
+
+public sealed class ChangelogCsvParseResult
+{
+    public required IReadOnlyList<ChangelogCsvRow> Rows { get; init; }
+    public required IReadOnlyList<ChangelogCsvParseFailure> Failures { get; init; }
+}
+
+public sealed class ChangelogCsvImportResult
+{
+    public required int ImportedCount { get; init; }
+    public required int DuplicateCount { get; init; }
+    public required int FailedCount { get; init; }
+    public required IReadOnlyList<(Guid EntryId, string Error)> Failures { get; init; }
+}
+
 /// <summary>
 /// Parses CHANGELOG.csv and imports entries into the database without creating duplicates.
 /// </summary>
@@ -34,7 +54,13 @@ public sealed class ChangelogCsvImporter(MasterDbContext db)
     /// </summary>
     public static IReadOnlyList<ChangelogCsvRow> ParseCsv(string csvContent)
     {
+        return ParseCsvWithDiagnostics(csvContent).Rows;
+    }
+
+    public static ChangelogCsvParseResult ParseCsvWithDiagnostics(string csvContent)
+    {
         var rows = new List<ChangelogCsvRow>();
+        var failures = new List<ChangelogCsvParseFailure>();
 
         var lines = csvContent
             .ReplaceLineEndings("\n")
@@ -48,9 +74,17 @@ public sealed class ChangelogCsvImporter(MasterDbContext db)
 
             // Split on the first four semicolons only; remaining semicolons belong to field text.
             var parts = line.Split(';', 5);
-            if (parts.Length < 3) continue;
+            if (parts.Length < 3)
+            {
+                failures.Add(new ChangelogCsvParseFailure { LineNumber = i + 1, Reason = "Not enough columns." });
+                continue;
+            }
 
-            if (!Guid.TryParse(parts[0].Trim(), out var id)) continue;
+            if (!Guid.TryParse(parts[0].Trim(), out var id))
+            {
+                failures.Add(new ChangelogCsvParseFailure { LineNumber = i + 1, Reason = "Invalid GUID." });
+                continue;
+            }
 
             if (!DateTime.TryParse(
                     parts[1].Trim(),
@@ -58,11 +92,16 @@ public sealed class ChangelogCsvImporter(MasterDbContext db)
                     DateTimeStyles.RoundtripKind,
                     out var date))
             {
+                failures.Add(new ChangelogCsvParseFailure { LineNumber = i + 1, Reason = "Invalid date." });
                 continue;
             }
 
             var en = parts.Length > 2 ? parts[2].Trim() : string.Empty;
-            if (string.IsNullOrWhiteSpace(en)) continue;
+            if (string.IsNullOrWhiteSpace(en))
+            {
+                failures.Add(new ChangelogCsvParseFailure { LineNumber = i + 1, Reason = "Missing English text." });
+                continue;
+            }
 
             var sk = parts.Length > 3 ? parts[3].Trim() : string.Empty;
             var de = parts.Length > 4 ? parts[4].Trim() : string.Empty;
@@ -77,7 +116,11 @@ public sealed class ChangelogCsvImporter(MasterDbContext db)
             });
         }
 
-        return rows;
+        return new ChangelogCsvParseResult
+        {
+            Rows = rows,
+            Failures = failures,
+        };
     }
 
     /// <summary>
@@ -87,21 +130,54 @@ public sealed class ChangelogCsvImporter(MasterDbContext db)
     /// <returns>The number of newly inserted entries.</returns>
     public async Task<int> ImportAsync(IReadOnlyList<ChangelogCsvRow> rows, CancellationToken ct = default)
     {
+        return (await ImportWithDiagnosticsAsync(rows, ct)).ImportedCount;
+    }
+
+    public async Task<ChangelogCsvImportResult> ImportWithDiagnosticsAsync(IReadOnlyList<ChangelogCsvRow> rows, CancellationToken ct = default)
+    {
         int imported = 0;
+        int duplicates = 0;
+        var failures = new List<(Guid EntryId, string Error)>();
 
         foreach (var row in rows)
         {
             if (await db.GameNewsEntries.AnyAsync(e => e.Id == row.Id, ct))
             {
+                duplicates++;
                 continue;
             }
 
-            db.GameNewsEntries.Add(CreateEntry(row));
-            await db.SaveChangesAsync(ct);
-            imported++;
+            try
+            {
+                db.GameNewsEntries.Add(CreateEntry(row));
+                await db.SaveChangesAsync(ct);
+                imported++;
+            }
+            catch (Exception ex) when (!IsCriticalException(ex))
+            {
+                failures.Add((row.Id, ex.ToString()));
+                db.ChangeTracker.Clear();
+            }
         }
 
-        return imported;
+        return new ChangelogCsvImportResult
+        {
+            ImportedCount = imported,
+            DuplicateCount = duplicates,
+            FailedCount = failures.Count,
+            Failures = failures,
+        };
+    }
+
+    private static bool IsCriticalException(Exception ex)
+    {
+        return ex is OutOfMemoryException
+            or StackOverflowException
+            or AccessViolationException
+            or AppDomainUnloadedException
+            or BadImageFormatException
+            or CannotUnloadAppDomainException
+            or InvalidProgramException;
     }
 
     private static GameNewsEntry CreateEntry(ChangelogCsvRow row)
