@@ -2,23 +2,19 @@
  * FX currency pair formatting utilities.
  *
  * Conventions:
- * - A "pair" is always rendered as BASE/QUOTE (e.g. EUR/CZK, EUR/USD).
- * - Stronger currencies appear on the left (EUR > USD > GBP > ...).
- * - The "local" (weaker) currency appears on the right as the quote.
+ * - A "pair" is rendered as WEAKER+STRONGER (e.g. CZKUSD, CZKEUR).
+ * - Stronger currencies follow roadmap hierarchy: USD > EUR > CNY > GBP > INR > CZK.
+ * - No slash separator is used in the pair code.
  */
 
 /** Canonical ranking of strong/global currencies: lower index = stronger. */
 const CURRENCY_STRENGTH: Record<string, number> = {
-  EUR: 0,
-  USD: 1,
-  GBP: 2,
-  JPY: 3,
-  CHF: 4,
-  CNY: 5,
-  INR: 6,
-  CZK: 7,
-  PLN: 8,
-  HUF: 9,
+  USD: 0,
+  EUR: 1,
+  CNY: 2,
+  GBP: 3,
+  INR: 4,
+  CZK: 5,
 }
 
 /**
@@ -30,38 +26,38 @@ export function currencyStrength(code: string): number {
 }
 
 /**
- * Returns true if `base` is the stronger (left-side) currency relative to `quote`.
+ * Returns true if `base` is stronger than `quote`.
  */
 export function isStrongerThan(base: string, quote: string): boolean {
   return currencyStrength(base) < currencyStrength(quote)
 }
 
 /**
- * Returns a canonical pair label: the stronger currency is always on the left.
- * E.g. formatPairLabel('CZK', 'EUR') → 'EUR/CZK'
+ * Returns canonical pair code as WEAKER+STRONGER (no separator).
+ * E.g. formatPairLabel('CZK', 'EUR') → 'CZKEUR'
  */
 export function formatPairLabel(codeA: string, codeB: string): string {
   const a = codeA.toUpperCase()
   const b = codeB.toUpperCase()
-  return isStrongerThan(a, b) ? `${a}/${b}` : `${b}/${a}`
+  return isStrongerThan(a, b) ? `${b}${a}` : `${a}${b}`
 }
 
 /**
- * Returns the canonical base currency for a pair (the stronger one).
+ * Returns weaker currency for a pair.
  */
 export function pairBase(codeA: string, codeB: string): string {
   const a = codeA.toUpperCase()
   const b = codeB.toUpperCase()
-  return isStrongerThan(a, b) ? a : b
+  return isStrongerThan(a, b) ? b : a
 }
 
 /**
- * Returns the canonical quote currency for a pair (the weaker one).
+ * Returns stronger currency for a pair.
  */
 export function pairQuote(codeA: string, codeB: string): string {
   const a = codeA.toUpperCase()
   const b = codeB.toUpperCase()
-  return isStrongerThan(a, b) ? b : a
+  return isStrongerThan(a, b) ? a : b
 }
 
 /**
@@ -76,17 +72,16 @@ export function buildEurPairList(currencyCodes: string[]): string[] {
 }
 
 /**
- * Converts a EUR-based exchange rate to the display rate for a canonical pair label.
+ * Converts a EUR-based exchange rate to the display rate for a canonical pair code.
  *
  * **Important:** `eurToQuoteRate` must always express units of quote currency per 1 EUR
  * (e.g. 25.19 for EUR/CZK meaning "1 EUR = 25.19 CZK").
  *
- * - If the pair base is EUR (e.g. 'EUR/CZK'), the rate is returned unchanged.
- * - If the pair base is not EUR (e.g. 'USD/EUR'), the rate is inverted.
+ * - If the pair is EUR/USD, the rate is returned unchanged.
+ * - If the pair is CZK/EUR (represented as "CZKEUR"), the rate is inverted.
  */
 export function rateForPair(pairLabel: string, eurToQuoteRate: number): number {
-  const [base] = pairLabel.split('/')
-  if (base?.toUpperCase() === 'EUR') return eurToQuoteRate
-  // If the base is NOT EUR (e.g. USD/EUR), invert the rate.
+  const base = pairLabel.slice(0, 3).toUpperCase()
+  if (base === 'EUR') return eurToQuoteRate
   return eurToQuoteRate > 0 ? 1 / eurToQuoteRate : 0
 }
