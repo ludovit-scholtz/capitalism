@@ -118,7 +118,6 @@ public sealed class BuildingDestructionPhase : ITickPhase
                 DestructionReason = BuildingDestructionReason.GracePeriodExpired,
                 CreatedAtUtc = DateTime.UtcNow,
             });
-            loan.CollateralBuildingId = null;
 
             // Emit player notification.
             if (borrowerCompany is not null)
