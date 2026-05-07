@@ -3,6 +3,7 @@ using Api.Data;
 using Api.Data.Entities;
 using Api.Engine;
 using Api.Tests.Infrastructure;
+using Capitalism.Shared.Referrals;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -473,7 +474,10 @@ public sealed class ReferralCodeRegistrationTests
         {
             Assert.NotNull(purchase.BuildingId);
             var lotPrice = lotsByBuildingId[purchase.BuildingId!.Value];
-            var expectedDiscountedPrice = decimal.Round(-lotPrice * 0.9m, 2, MidpointRounding.AwayFromZero);
+            var expectedDiscountedPrice = decimal.Round(
+                -lotPrice * (1m - ReferralProgramConstants.PurchaseDiscountRate),
+                2,
+                MidpointRounding.AwayFromZero);
             Assert.Equal(expectedDiscountedPrice, purchase.Amount);
         }
 

@@ -168,11 +168,6 @@ public sealed partial class Mutation
 
         var currentTick = (await db.GameStates.AsNoTracking().FirstOrDefaultDeterministicAsync())?.CurrentTick ?? 0;
         var constructionCost = applyConstructionDelay ? Engine.GameConstants.ConstructionCost(buildingType) : 0m;
-        if (purchaseDiscountRate < 0m || purchaseDiscountRate > 1m)
-        {
-            throw new InvalidOperationException("purchaseDiscountRate must be a decimal fraction between 0 and 1.");
-        }
-
         var effectiveDiscountRate = decimal.Clamp(purchaseDiscountRate, 0m, ReferralProgramConstants.PurchaseDiscountRate);
         var discountedLotPrice = decimal.Round(lot.Price * (1m - effectiveDiscountRate), 2, MidpointRounding.AwayFromZero);
         var discountedConstructionCost = decimal.Round(constructionCost * (1m - effectiveDiscountRate), 2, MidpointRounding.AwayFromZero);
