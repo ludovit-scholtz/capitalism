@@ -155,7 +155,7 @@ public sealed class ChangelogCsvImporter(MasterDbContext db)
             }
             catch (Exception ex) when (!IsCriticalException(ex))
             {
-                failures.Add((row.Id, ex.Message));
+                failures.Add((row.Id, ex.ToString()));
                 db.ChangeTracker.Clear();
             }
         }

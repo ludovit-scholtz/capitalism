@@ -241,7 +241,8 @@ public sealed partial class Mutation
             .ToListAsync();
 
         var now = DateTime.UtcNow;
-        var unreadEntryIds = validEntryIds.Except(existingReadEntryIds).ToList();
+        var existingReadEntryIdSet = existingReadEntryIds.ToHashSet();
+        var unreadEntryIds = validEntryIds.Where(entryId => !existingReadEntryIdSet.Contains(entryId)).ToList();
         foreach (var entryId in unreadEntryIds)
         {
             db.GameNewsReadReceipts.Add(new GameNewsReadReceipt
