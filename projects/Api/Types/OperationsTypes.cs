@@ -63,6 +63,8 @@ public sealed class AdminProductAnalyticsRow
     public Guid ProductTypeId { get; set; }
     public string ProductName { get; set; } = string.Empty;
     public string Industry { get; set; } = string.Empty;
+    public Guid? CompanyId { get; set; }
+    public string? CompanyName { get; set; }
     public decimal BasePrice { get; set; }
 
     // ── Production ────────────────────────────────────────────────────────
@@ -78,6 +80,10 @@ public sealed class AdminProductAnalyticsRow
     public decimal TotalRevenue { get; set; }
     /// <summary>Average selling price per unit across all shops.</summary>
     public decimal? AvgSellingPrice { get; set; }
+    /// <summary>Average market price per unit across all public sales records in the window.</summary>
+    public decimal? AvgMarketPrice { get; set; }
+    /// <summary>Total demand volume in the window, used as market-size proxy.</summary>
+    public decimal MarketSize { get; set; }
     /// <summary>Number of active public-sales units selling this product.</summary>
     public int ActiveSellerCount { get; set; }
 
@@ -96,8 +102,20 @@ public sealed class AdminProductAnalyticsRow
     public decimal MarketSaturation { get; set; }
     /// <summary>Total marketing spend on brands associated with this product.</summary>
     public decimal TotalMarketingSpend { get; set; }
+    /// <summary>Total research spend associated with this product.</summary>
+    public decimal TotalResearchSpend { get; set; }
     /// <summary>Number of cities where this product is actively sold.</summary>
     public int ActiveCityCount { get; set; }
+}
+
+/// <summary>Optional filters for adminProductAnalytics.</summary>
+public sealed class AdminProductAnalyticsInput
+{
+    public Guid? CompanyId { get; set; }
+    public Guid? ProductTypeId { get; set; }
+    public Guid? CityId { get; set; }
+    /// <summary>Window size in ticks; clamped to 1..720 (30 days).</summary>
+    public int? WindowTicks { get; set; }
 }
 
 /// <summary>Result returned by the adminProductAnalytics query.</summary>

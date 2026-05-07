@@ -3,12 +3,15 @@ using Api.Data.Entities;
 using Api.Security;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Api.Types;
 
 public sealed partial class Query
 {
     private const int OperationsWindowTicks = 100;
+    private const int ProductAnalyticsMaxWindowTicks = 720;
+    private static readonly TimeSpan ProductAnalyticsCacheDuration = TimeSpan.FromMinutes(5);
 
     /// <summary>
     /// Returns aggregated operations statistics for the admin Operations Dashboard:
@@ -107,65 +110,116 @@ public sealed partial class Query
     /// </summary>
     [Authorize]
     public async Task<AdminProductAnalyticsResult> GetAdminProductAnalytics(
+        AdminProductAnalyticsInput? input,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor,
-        [Service] GameAdminAuthorizationService gameAdminAuthorizationService)
+        [Service] GameAdminAuthorizationService gameAdminAuthorizationService,
+        [Service] IMemoryCache cache)
     {
-        var principal = httpContextAccessor.HttpContext!.User;
-        await gameAdminAuthorizationService.RequireAdminDashboardAccessAsync(db, principal, httpContextAccessor.HttpContext!.RequestAborted);
+        var httpContext = httpContextAccessor.HttpContext
+            ?? throw new InvalidOperationException("HTTP context is required for admin product analytics.");
+        var ct = httpContext.RequestAborted;
+        var principal = httpContext.User;
+        await gameAdminAuthorizationService.RequireAdminDashboardAccessAsync(db, principal, ct);
 
         var currentTick = await db.GameStates
             .AsNoTracking()
             .Select(s => s.CurrentTick)
-            .FirstOrDefaultAsync(httpContextAccessor.HttpContext.RequestAborted);
+            .FirstOrDefaultAsync(ct);
 
-        var windowStart = Math.Max(0L, currentTick - OperationsWindowTicks);
+        var windowTicks = Math.Clamp(input?.WindowTicks ?? ProductAnalyticsMaxWindowTicks, 1, ProductAnalyticsMaxWindowTicks);
+        var windowStart = Math.Max(0L, currentTick - windowTicks);
+        var companyId = input?.CompanyId;
+        var productTypeId = input?.ProductTypeId;
+        var cityId = input?.CityId;
+
+        var cacheKey = $"admin-product-analytics:{currentTick}:{windowTicks}:{companyId}:{productTypeId}:{cityId}";
+        if (cache.TryGetValue<AdminProductAnalyticsResult>(cacheKey, out var cached) && cached is not null)
+        {
+            return cached;
+        }
 
         // Load product types.
-        var productTypes = await db.ProductTypes
-            .AsNoTracking()
+        var productTypesQuery = db.ProductTypes.AsNoTracking();
+        if (productTypeId.HasValue)
+        {
+            productTypesQuery = productTypesQuery.Where(pt => pt.Id == productTypeId.Value);
+        }
+
+        var productTypes = await productTypesQuery
             .OrderBy(pt => pt.Industry)
             .ThenBy(pt => pt.Name)
-            .ToListAsync(httpContextAccessor.HttpContext.RequestAborted);
+            .ToListAsync(ct);
+
+        var selectedCompany = companyId.HasValue
+            ? await db.Companies.AsNoTracking()
+                .Where(c => c.Id == companyId.Value)
+                .Select(c => c.Name)
+                .FirstOrDefaultAsync(ct)
+            : null;
 
         // Load production history per product in window.
-        var productionByProduct = await db.BuildingUnitResourceHistories
-            .AsNoTracking()
-            .Where(h => h.Tick >= windowStart && h.ProductTypeId.HasValue)
-            .GroupBy(h => h.ProductTypeId!.Value)
-            .Select(g => new
+        var productionByProduct = await (
+            from h in db.BuildingUnitResourceHistories.AsNoTracking()
+            join b in db.Buildings.AsNoTracking() on h.BuildingId equals b.Id
+            where h.Tick >= windowStart
+                  && h.ProductTypeId.HasValue
+                  && (!productTypeId.HasValue || h.ProductTypeId == productTypeId.Value)
+                  && (!companyId.HasValue || b.CompanyId == companyId.Value)
+                  && (!cityId.HasValue || b.CityId == cityId.Value)
+            group h by h.ProductTypeId!.Value
+            into g
+            select new
             {
                 ProductTypeId = g.Key,
                 TotalProduced = g.Sum(h => h.ProducedQuantity),
                 ManufacturerCount = g.Select(h => h.BuildingUnitId).Distinct().Count(),
             })
-            .ToListAsync(httpContextAccessor.HttpContext.RequestAborted);
+            .ToListAsync(ct);
 
         // Load public sales per product in window.
         var salesByProduct = await db.PublicSalesRecords
             .AsNoTracking()
-            .Where(r => r.Tick >= windowStart && r.ProductTypeId.HasValue)
+            .Where(r => r.Tick >= windowStart
+                && r.ProductTypeId.HasValue
+                && (!productTypeId.HasValue || r.ProductTypeId == productTypeId.Value)
+                && (!companyId.HasValue || r.CompanyId == companyId.Value)
+                && (!cityId.HasValue || r.CityId == cityId.Value))
             .GroupBy(r => r.ProductTypeId!.Value)
             .Select(g => new
             {
                 ProductTypeId = g.Key,
                 TotalSold = g.Sum(r => r.QuantitySold),
                 TotalRevenue = g.Sum(r => r.Revenue),
+                MarketSize = g.Sum(r => r.Demand),
                 SellerCount = g.Select(r => r.BuildingUnitId).Distinct().Count(),
                 CityCount = g.Select(r => r.CityId).Distinct().Count(),
                 AvgPrice = g.Sum(r => r.QuantitySold) > 0m
                     ? g.Sum(r => r.Revenue) / g.Sum(r => r.QuantitySold)
                     : (decimal?)null,
             })
-            .ToListAsync(httpContextAccessor.HttpContext.RequestAborted);
+            .ToListAsync(ct);
 
-        // Load costs by product from ledger (using ProductTypeId linkage).
-        var costsByProduct = await db.LedgerEntries
+        var filteredLedgerEntries = db.LedgerEntries
             .AsNoTracking()
             .Where(e => e.RecordedAtTick >= windowStart && e.ProductTypeId.HasValue
-                && (e.Category == LedgerCategory.LaborCost
-                    || e.Category == LedgerCategory.EnergyCost
-                    || e.Category == LedgerCategory.PurchasingCost))
+                && (!productTypeId.HasValue || e.ProductTypeId == productTypeId.Value)
+                && (!companyId.HasValue || e.CompanyId == companyId.Value))
+            .AsQueryable();
+
+        if (cityId.HasValue)
+        {
+            filteredLedgerEntries = from e in filteredLedgerEntries
+                                    join b in db.Buildings.AsNoTracking() on e.BuildingId equals b.Id
+                                    where b.CityId == cityId.Value
+                                    select e;
+        }
+
+        // Load costs by product from ledger (using ProductTypeId linkage).
+        var costsByProduct = await filteredLedgerEntries
+            .Where(e => e.Category == LedgerCategory.LaborCost
+                || e.Category == LedgerCategory.EnergyCost
+                || e.Category == LedgerCategory.PurchasingCost)
             .GroupBy(e => new { e.ProductTypeId, e.Category })
             .Select(g => new
             {
@@ -173,34 +227,47 @@ public sealed partial class Query
                 g.Key.Category,
                 Amount = g.Sum(e => Math.Abs(e.Amount)),
             })
-            .ToListAsync(httpContextAccessor.HttpContext.RequestAborted);
+            .ToListAsync(ct);
 
         // Load marketing spend per product in window.
-        var marketingByProduct = await db.LedgerEntries
-            .AsNoTracking()
-            .Where(e => e.RecordedAtTick >= windowStart && e.ProductTypeId.HasValue
-                && e.Category == LedgerCategory.Marketing)
+        var marketingByProduct = await filteredLedgerEntries
+            .Where(e => e.Category == LedgerCategory.Marketing)
             .GroupBy(e => e.ProductTypeId!.Value)
             .Select(g => new { ProductTypeId = g.Key, Total = g.Sum(e => Math.Abs(e.Amount)) })
-            .ToListAsync(httpContextAccessor.HttpContext.RequestAborted);
+            .ToListAsync(ct);
 
-        // Load active seller count for saturation (current, not windowed).
-        var activeSellersByProduct = await db.BuildingUnits
-            .AsNoTracking()
-            .Where(u => u.UnitType == UnitType.PublicSales && u.ProductTypeId.HasValue)
-            .GroupBy(u => u.ProductTypeId!.Value)
-            .Select(g => new { ProductTypeId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.ProductTypeId, x => x.Count, httpContextAccessor.HttpContext.RequestAborted);
+        // Load research spend per product in window.
+        var researchByProduct = await filteredLedgerEntries
+            .Where(e => e.Category == LedgerCategory.UnitUpgrade)
+            .GroupBy(e => e.ProductTypeId!.Value)
+            .Select(g => new { ProductTypeId = g.Key, Total = g.Sum(e => Math.Abs(e.Amount)) })
+            .ToListAsync(ct);
+
+        // Load active seller count for saturation under the same optional company/city/product filters.
+        var activeSellersByProduct = await (
+            from u in db.BuildingUnits.AsNoTracking()
+            join b in db.Buildings.AsNoTracking() on u.BuildingId equals b.Id
+            where u.UnitType == UnitType.PublicSales
+                  && u.ProductTypeId.HasValue
+                  && (!productTypeId.HasValue || u.ProductTypeId == productTypeId.Value)
+                  && (!companyId.HasValue || b.CompanyId == companyId.Value)
+                  && (!cityId.HasValue || b.CityId == cityId.Value)
+            group u by u.ProductTypeId!.Value
+            into g
+            select new { ProductTypeId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.ProductTypeId, x => x.Count, ct);
 
         var productionLookup = productionByProduct.ToDictionary(x => x.ProductTypeId);
         var salesLookup = salesByProduct.ToDictionary(x => x.ProductTypeId);
         var marketingLookup = marketingByProduct.ToDictionary(x => x.ProductTypeId, x => x.Total);
+        var researchLookup = researchByProduct.ToDictionary(x => x.ProductTypeId, x => x.Total);
 
         var rows = productTypes.Select(pt =>
         {
             productionLookup.TryGetValue(pt.Id, out var prod);
             salesLookup.TryGetValue(pt.Id, out var sales);
             marketingLookup.TryGetValue(pt.Id, out var marketing);
+            researchLookup.TryGetValue(pt.Id, out var research);
             activeSellersByProduct.TryGetValue(pt.Id, out var activeSellers);
 
             var laborCost = costsByProduct
@@ -213,19 +280,12 @@ public sealed partial class Query
                 .Where(c => c.ProductTypeId == pt.Id && c.Category == LedgerCategory.PurchasingCost)
                 .Sum(c => c.Amount);
 
-            // Market saturation: rough heuristic — ratio of active sellers to estimated city demand.
-            // Uses base price as a proxy; higher base price → lower natural demand.
+            var marketSize = Math.Max(0m, sales?.MarketSize ?? 0m);
+            var totalSold = Math.Max(0m, sales?.TotalSold ?? 0m);
             var saturation = 0m;
-            if (activeSellers > 0 && pt.BasePrice > 0m)
+            if (marketSize > 0m)
             {
-                // Rough city demand constant; each seller can serve ~20 units/tick at level 1.
-                const decimal approxUnitsPerSellerPerTick = 20m;
-                var estimatedSupply = activeSellers * approxUnitsPerSellerPerTick;
-                // Math.Max(1, ...) ensures we do not divide by zero for zero-sales products.
-                // When no sales occurred, saturation equals the estimated supply contribution alone,
-                // which correctly flags the product as potentially over-supplied.
-                var demandProxy = Math.Max(1m, sales?.TotalSold ?? 0m);
-                saturation = Math.Clamp(decimal.Round(estimatedSupply / (demandProxy + estimatedSupply) * 100m, 1), 0m, 100m);
+                saturation = Math.Clamp(decimal.Round(totalSold / marketSize * 100m, 1), 0m, 100m);
             }
 
             return new AdminProductAnalyticsRow
@@ -233,13 +293,17 @@ public sealed partial class Query
                 ProductTypeId = pt.Id,
                 ProductName = pt.Name,
                 Industry = pt.Industry,
+                CompanyId = companyId,
+                CompanyName = selectedCompany,
                 BasePrice = pt.BasePrice,
                 TotalProduced = prod?.TotalProduced ?? 0m,
                 ActiveManufacturerCount = prod?.ManufacturerCount ?? 0,
-                TotalSold = sales?.TotalSold ?? 0m,
+                TotalSold = totalSold,
                 TotalRevenue = sales?.TotalRevenue ?? 0m,
                 AvgSellingPrice = sales?.AvgPrice,
-                ActiveSellerCount = sales?.SellerCount ?? 0,
+                AvgMarketPrice = sales?.AvgPrice,
+                MarketSize = marketSize,
+                ActiveSellerCount = activeSellers,
                 ActiveCityCount = sales?.CityCount ?? 0,
                 TotalMaterialCost = materialCost,
                 TotalLaborCost = laborCost,
@@ -247,15 +311,19 @@ public sealed partial class Query
                 TotalCost = materialCost + laborCost + energyCost,
                 MarketSaturation = saturation,
                 TotalMarketingSpend = marketing,
+                TotalResearchSpend = research,
             };
         }).ToList();
 
-        return new AdminProductAnalyticsResult
+        var result = new AdminProductAnalyticsResult
         {
-            WindowTicks = OperationsWindowTicks,
+            WindowTicks = windowTicks,
             CurrentTick = currentTick,
             Rows = rows,
         };
+
+        cache.Set(cacheKey, result, ProductAnalyticsCacheDuration);
+        return result;
     }
 
     private static List<OperationsMoneyFlowItem> BuildInflowItems(List<LedgerEntry> entries)
