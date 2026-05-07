@@ -17,7 +17,7 @@ public sealed partial class Query
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
-        var governmentCompanyIds = await GetGovernmentCompanyIdsAsync(db);
+        var governmentCompanyIds = await GovernmentCompanyQueries.GetGovernmentCompanyIdsAsync(db);
         var companies = await db.Companies
             .AsNoTracking()
             .Include(company => company.BankAccounts)
@@ -114,7 +114,7 @@ public sealed partial class Query
         Guid companyId,
         [Service] AppDbContext db)
     {
-        var governmentCompanyIds = await GetGovernmentCompanyIdsAsync(db);
+        var governmentCompanyIds = await GovernmentCompanyQueries.GetGovernmentCompanyIdsAsync(db);
         var companies = await db.Companies
             .AsNoTracking()
             .Include(company => company.BankAccounts)
@@ -207,7 +207,7 @@ public sealed partial class Query
         Guid companyId,
         [Service] AppDbContext db)
     {
-        var governmentCompanyIds = await GetGovernmentCompanyIdsAsync(db);
+        var governmentCompanyIds = await GovernmentCompanyQueries.GetGovernmentCompanyIdsAsync(db);
         if (governmentCompanyIds.Contains(companyId))
         {
             return null;
@@ -280,11 +280,4 @@ public sealed partial class Query
         var baseEquityByCompany = SharePriceCalculator.ComputeBaseEquityByCompany(companies, buildings, lots, inventories);
         return SharePriceCalculator.ComputeQuotedSharePriceByCompany(companies, baseEquityByCompany, shareholdings);
     }
-
-    private static async Task<HashSet<Guid>> GetGovernmentCompanyIdsAsync(AppDbContext db)
-        => await db.Companies
-            .AsNoTracking()
-            .Where(company => company.Player.Email == GovernmentActorConstants.GovernmentEmail)
-            .Select(company => company.Id)
-            .ToHashSetAsync();
 }

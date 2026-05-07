@@ -11,6 +11,8 @@
 
 import type { Page } from '@playwright/test'
 
+export const GOVERNMENT_PLAYER_EMAIL = 'government@capitalism.game'
+
 export type MockPlayer = {
   id: string
   email: string
@@ -1295,7 +1297,7 @@ function computeMockSharePrice(company: MockCompany) {
 
 function isGovernmentCompany(state: MockState, company: MockCompany) {
   const owner = state.players.find((player) => player.id === company.playerId)
-  return owner?.email === 'government@capitalism.game'
+  return owner?.email === GOVERNMENT_PLAYER_EMAIL
 }
 
 function getPlayerControlledCompanyIds(state: MockState, playerId: string) {

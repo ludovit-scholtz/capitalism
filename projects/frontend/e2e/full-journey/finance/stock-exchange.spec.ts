@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { makePlayer, restoreMockSession, setupMockApi, type MockCompany } from '../../helpers/mock-api'
+import { GOVERNMENT_PLAYER_EMAIL, makePlayer, restoreMockSession, setupMockApi, type MockCompany } from '../../helpers/mock-api'
 
 async function authenticateViaLocalStorage(page: Page, token: string) {
   await restoreMockSession(page, token)
@@ -164,7 +164,7 @@ test.describe('Stock exchange', () => {
     })
     const government = makePlayer({
       id: 'player-gov',
-      email: 'government@capitalism.game',
+      email: GOVERNMENT_PLAYER_EMAIL,
       displayName: 'Government',
       companies: [
         {

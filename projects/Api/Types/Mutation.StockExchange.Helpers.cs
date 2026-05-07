@@ -56,11 +56,7 @@ public sealed partial class Mutation
                 4,
                 MidpointRounding.AwayFromZero));
 
-        var governmentCompanyIds = await db.Companies
-            .AsNoTracking()
-            .Where(company => company.Player.Email == GovernmentActorConstants.GovernmentEmail)
-            .Select(company => company.Id)
-            .ToHashSetAsync();
+        var governmentCompanyIds = await GovernmentCompanyQueries.GetGovernmentCompanyIdsAsync(db);
 
         return (companies, shareholdings, sharePricesUsd, governmentCompanyIds);
     }
