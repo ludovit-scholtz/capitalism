@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
 import { formatCurrency } from '@/lib/loanHelpers'
+import { computeEstimatedMarketValue, isAskingPriceTooHigh } from '@/lib/sellBuilding'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -43,11 +44,6 @@ const saving = ref(false)
 const saveError = ref<string | null>(null)
 const saveSuccess = ref(false)
 const isListing = ref(true)
-
-const EMV_BASE_LOT_VALUE = 75_000
-const EMV_LEVEL_MULTIPLIER_BASE = 1.5
-const EMV_UNIT_BASE_VALUE = 20_000
-const EMV_DEFAULT_POPULATION_INDEX = 0.5
 
 const DATA_QUERY = `
   {
@@ -142,15 +138,16 @@ function onPriceInput(event: Event) {
 const estimatedMarketValue = computed(() => {
   const b = building.value
   if (!b) return null
-  const levelMultiplier = Math.pow(EMV_LEVEL_MULTIPLIER_BASE, b.level - 1)
-  const unitValue = (b.units?.length ?? 0) * EMV_UNIT_BASE_VALUE
-  const locationMultiplier = 1 + (b.populationIndex ?? EMV_DEFAULT_POPULATION_INDEX) * 0.5
-  return Math.round(((EMV_BASE_LOT_VALUE * levelMultiplier + unitValue) * locationMultiplier) / 1000) * 1000
+  return computeEstimatedMarketValue({
+    level: b.level,
+    unitCount: b.units?.length ?? 0,
+    populationIndex: b.populationIndex,
+  })
 })
 
 const isPriceHigh = computed(() => {
   if (!salePrice.value || !estimatedMarketValue.value) return false
-  return salePrice.value > estimatedMarketValue.value * 1.5
+  return isAskingPriceTooHigh(salePrice.value, estimatedMarketValue.value)
 })
 
 const cityName = computed(() => {
