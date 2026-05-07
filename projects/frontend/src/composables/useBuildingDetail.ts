@@ -3243,16 +3243,13 @@ export function useBuildingDetail() {
 
   /**
    * Paste a previously copied unit configuration onto the selected draft unit.
-   * Only works when the target unit is the same type as the copied unit.
-   * No-op when not in editing mode, no cell is selected, or the selected cell is empty.
+   * When pasting onto an occupied unit, the target type must match the copied type.
+   * When pasting onto an empty slot, a new unit of the copied type is placed first
+   * (provided that unit type is allowed in this building), then the config is applied.
+   * No-op when not in editing mode or no cell is selected.
    */
   async function pasteToSelectedUnit(): Promise<void> {
     if (!isEditing.value || !selectedCell.value) return
-    const targetUnit = getDraftUnitAt(selectedCell.value.x, selectedCell.value.y)
-    if (!targetUnit) {
-      showClipboardMessage(t('buildingDetail.clipboard.noUnitToPaste'), 'error')
-      return
-    }
 
     let text: string
     try {
@@ -3262,6 +3259,53 @@ export function useBuildingDetail() {
       return
     }
 
+    const targetUnit = getDraftUnitAt(selectedCell.value.x, selectedCell.value.y)
+
+    if (!targetUnit) {
+      // Paste to empty slot: deserialize without type restriction, then place a new unit
+      const result = deserializeUnitConfig(text)
+      if (!result.ok) {
+        switch (result.error) {
+          case 'EMPTY':
+            showClipboardMessage(t('buildingDetail.clipboard.empty'), 'error')
+            break
+          case 'INVALID_JSON':
+            showClipboardMessage(t('buildingDetail.clipboard.invalidFormat'), 'error')
+            break
+          default:
+            showClipboardMessage(t('buildingDetail.clipboard.schemaMismatch'), 'error')
+            break
+        }
+        return
+      }
+
+      // Check whether the clipboard unit type is allowed in this building
+      if (!allowedUnits.value.includes(result.config.unitType)) {
+        showClipboardMessage(
+          t('buildingDetail.clipboard.unitTypeNotAllowed', {
+            type: t(`buildingDetail.unitTypes.${result.config.unitType}`),
+          }),
+          'error',
+        )
+        return
+      }
+
+      // Place a new unit of the correct type, then apply the copied config to it
+      placeUnit(result.config.unitType)
+      const newUnit = getDraftUnitAt(selectedCell.value.x, selectedCell.value.y)
+      if (newUnit) {
+        applyConfigToUnit(newUnit, result.config)
+      }
+      showClipboardMessage(
+        t('buildingDetail.clipboard.pasteEmptySuccess', {
+          type: t(`buildingDetail.unitTypes.${result.config.unitType}`),
+        }),
+        'success',
+      )
+      return
+    }
+
+    // Paste to occupied unit: the clipboard type must match the target type
     const result = deserializeUnitConfig(text, targetUnit.unitType)
 
     if (!result.ok) {
@@ -3298,24 +3342,26 @@ export function useBuildingDetail() {
       return
     }
 
-    // Apply all configurable fields from the clipboard to the target unit
-    const { config } = result
-    targetUnit.resourceTypeId = config.resourceTypeId
-    targetUnit.productTypeId = config.productTypeId
-    targetUnit.minPrice = config.minPrice
-    targetUnit.maxPrice = config.maxPrice
-    targetUnit.purchaseSource = config.purchaseSource
-    targetUnit.saleVisibility = config.saleVisibility
-    targetUnit.budget = config.budget
-    targetUnit.mediaHouseBuildingId = config.mediaHouseBuildingId
-    targetUnit.minQuality = config.minQuality
-    targetUnit.brandScope = config.brandScope
-    targetUnit.vendorLockCompanyId = config.vendorLockCompanyId
-    targetUnit.lockedCityId = config.lockedCityId
-    targetUnit.industryCategory = config.industryCategory
-    targetUnit.lowInventoryAlertThreshold = config.lowInventoryAlertThreshold
-
+    applyConfigToUnit(targetUnit, result.config)
     showClipboardMessage(t('buildingDetail.clipboard.pasteSuccess'), 'success')
+  }
+
+  /** Apply all clipboard-configurable fields from `config` onto `unit`. */
+  function applyConfigToUnit(unit: EditableGridUnit, config: import('@/lib/unitClipboard').UnitClipboardConfig): void {
+    unit.resourceTypeId = config.resourceTypeId
+    unit.productTypeId = config.productTypeId
+    unit.minPrice = config.minPrice
+    unit.maxPrice = config.maxPrice
+    unit.purchaseSource = config.purchaseSource
+    unit.saleVisibility = config.saleVisibility
+    unit.budget = config.budget
+    unit.mediaHouseBuildingId = config.mediaHouseBuildingId
+    unit.minQuality = config.minQuality
+    unit.brandScope = config.brandScope
+    unit.vendorLockCompanyId = config.vendorLockCompanyId
+    unit.lockedCityId = config.lockedCityId
+    unit.industryCategory = config.industryCategory
+    unit.lowInventoryAlertThreshold = config.lowInventoryAlertThreshold
   }
 
   async function loadUnitInventorySummaries(requestId?: number) {
