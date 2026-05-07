@@ -2,7 +2,7 @@ import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
-import { formatPairLabel, pairBase, pairQuote } from '@/lib/fxPairFormatter'
+import { formatPairLabel, pairWeaker, pairStronger } from '@/lib/fxPairFormatter'
 import type { City, FxRate, ForexTradeHistoryEntry, CurrencyBalance, PlayerBankAccountSummary, FxRateSnapshot } from '@/types'
 
 /** ±0.5% spread applied around the mid rate for buy/sell display. */
@@ -66,8 +66,8 @@ export function useForexData() {
     return Array.from(allCodes)
       .filter((code) => code !== base)
       .map((code) => {
-        const weak = pairBase(base, code)
-        const strong = pairQuote(base, code)
+        const weak = pairWeaker(base, code)
+        const strong = pairStronger(base, code)
         const weakEurRate = eurRatesMap.value[weak] ?? 1
         const strongEurRate = eurRatesMap.value[strong] ?? 1
         const pairMidRate = strongEurRate / weakEurRate

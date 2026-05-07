@@ -3,8 +3,8 @@ import {
   currencyStrength,
   isStrongerThan,
   formatPairLabel,
-  pairBase,
-  pairQuote,
+  pairWeaker,
+  pairStronger,
   buildEurPairList,
   rateForPair,
   extractQuoteCurrencyFromEurPair,
@@ -80,23 +80,23 @@ describe('fxPairFormatter', () => {
     })
   })
 
-  describe('pairBase', () => {
+  describe('pairWeaker', () => {
     it('returns weaker currency for EUR/CZK pair', () => {
-      expect(pairBase('CZK', 'EUR')).toBe('CZK')
+      expect(pairWeaker('CZK', 'EUR')).toBe('CZK')
     })
 
     it('returns EUR when paired with USD (EUR is weaker)', () => {
-      expect(pairBase('USD', 'EUR')).toBe('EUR')
+      expect(pairWeaker('USD', 'EUR')).toBe('EUR')
     })
   })
 
-  describe('pairQuote', () => {
+  describe('pairStronger', () => {
     it('returns stronger currency for CZK/EUR pair', () => {
-      expect(pairQuote('EUR', 'CZK')).toBe('EUR')
+      expect(pairStronger('EUR', 'CZK')).toBe('EUR')
     })
 
     it('returns USD for EUR/USD pair (USD stronger)', () => {
-      expect(pairQuote('EUR', 'USD')).toBe('USD')
+      expect(pairStronger('EUR', 'USD')).toBe('USD')
     })
   })
 

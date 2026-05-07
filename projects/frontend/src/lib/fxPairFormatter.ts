@@ -33,7 +33,7 @@ export function isStrongerThan(base: string, quote: string): boolean {
 }
 
 /**
- * Returns canonical pair code as WEAKER+STRONGER (no separator).
+ * Returns canonical pair code as WEAKER then STRONGER (no separator).
  * E.g. formatPairLabel('CZK', 'EUR') → 'CZKEUR'
  */
 export function formatPairLabel(codeA: string, codeB: string): string {
@@ -45,7 +45,7 @@ export function formatPairLabel(codeA: string, codeB: string): string {
 /**
  * Returns weaker currency for a pair.
  */
-export function pairBase(codeA: string, codeB: string): string {
+export function pairWeaker(codeA: string, codeB: string): string {
   const a = codeA.toUpperCase()
   const b = codeB.toUpperCase()
   return isStrongerThan(a, b) ? b : a
@@ -54,7 +54,7 @@ export function pairBase(codeA: string, codeB: string): string {
 /**
  * Returns stronger currency for a pair.
  */
-export function pairQuote(codeA: string, codeB: string): string {
+export function pairStronger(codeA: string, codeB: string): string {
   const a = codeA.toUpperCase()
   const b = codeB.toUpperCase()
   return isStrongerThan(a, b) ? a : b
