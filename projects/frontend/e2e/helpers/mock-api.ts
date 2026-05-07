@@ -5973,6 +5973,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             totalWealth,
             totalWealthUsd,
             companyCount: p.companies.length,
+            badgeTypes: (state.playerBadges[p.id] ?? []).slice(0, 3).map((badge) => badge.badgeType),
           }
         })
         .sort((a, b) => b.totalWealthUsd - a.totalWealthUsd)
@@ -6148,13 +6149,14 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
-    if (query.includes('playerRankHistory')) {
+    if (query.includes('playerRankHistory') || query.includes('rankHistory')) {
       const targetPlayerId = body.variables?.playerId as string | undefined
       const snapshots = (targetPlayerId ? state.playerRankSnapshots[targetPlayerId] : null) ?? []
+      const responseField = query.includes('rankHistory') ? 'rankHistory' : 'playerRankHistory'
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { playerRankHistory: snapshots } }),
+        body: JSON.stringify({ data: { [responseField]: snapshots } }),
       })
     }
 

@@ -32,8 +32,37 @@ public sealed class TelemetryBountyPhase(
             .ToDictionary(
                 kv => kv.Key,
                 kv => playersById.TryGetValue(kv.Value.PlayerId, out var email) ? email : null);
+        var playerIdByCompanyId = context.CompaniesById
+            .ToDictionary(kv => kv.Key, kv => kv.Value.PlayerId);
 
         var tasks = new List<Task>();
+        var pendingBadgesByPlayer = new Dictionary<Guid, HashSet<string>>();
+
+        void QueueBounty(string bountyCode, Guid playerId, string? email)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return;
+            }
+
+            tasks.Add(telemetry.ReportEventAsync(
+                bountyCode,
+                email,
+                uniqueScopeKey: $"{bountyCode}:{email}:{today}:{serverKey}"));
+
+            var badgeType = BadgeType.FromBountyCode(bountyCode);
+            if (string.IsNullOrWhiteSpace(badgeType))
+            {
+                return;
+            }
+
+            if (!pendingBadgesByPlayer.TryGetValue(playerId, out var playerBadges))
+            {
+                playerBadges = new HashSet<string>(StringComparer.Ordinal);
+                pendingBadgesByPlayer[playerId] = playerBadges;
+            }
+            playerBadges.Add(badgeType);
+        }
 
         // ── MANUFACTURER ────────────────────────────────────────────────────────
         // Companies that had any manufacturing output this tick.
@@ -62,12 +91,11 @@ public sealed class TelemetryBountyPhase(
 
         foreach (var companyId in manufacturerCompanyIds)
         {
-            if (playerEmailByCompanyId.TryGetValue(companyId, out var email) && email is not null)
+            if (playerIdByCompanyId.TryGetValue(companyId, out var playerId)
+                && playerEmailByCompanyId.TryGetValue(companyId, out var email)
+                && email is not null)
             {
-                tasks.Add(telemetry.ReportEventAsync(
-                    MasterRankingBountyCodes.Manufacturer,
-                    email,
-                    uniqueScopeKey: $"{MasterRankingBountyCodes.Manufacturer}:{email}:{today}:{serverKey}"));
+                QueueBounty(MasterRankingBountyCodes.Manufacturer, playerId, email);
             }
         }
 
@@ -97,12 +125,11 @@ public sealed class TelemetryBountyPhase(
 
         foreach (var companyId in wholesalerCompanyIds)
         {
-            if (playerEmailByCompanyId.TryGetValue(companyId, out var email) && email is not null)
+            if (playerIdByCompanyId.TryGetValue(companyId, out var playerId)
+                && playerEmailByCompanyId.TryGetValue(companyId, out var email)
+                && email is not null)
             {
-                tasks.Add(telemetry.ReportEventAsync(
-                    MasterRankingBountyCodes.Wholesaler,
-                    email,
-                    uniqueScopeKey: $"{MasterRankingBountyCodes.Wholesaler}:{email}:{today}:{serverKey}"));
+                QueueBounty(MasterRankingBountyCodes.Wholesaler, playerId, email);
             }
         }
 
@@ -114,12 +141,11 @@ public sealed class TelemetryBountyPhase(
 
         foreach (var companyId in researcherCompanyIds)
         {
-            if (playerEmailByCompanyId.TryGetValue(companyId, out var email) && email is not null)
+            if (playerIdByCompanyId.TryGetValue(companyId, out var playerId)
+                && playerEmailByCompanyId.TryGetValue(companyId, out var email)
+                && email is not null)
             {
-                tasks.Add(telemetry.ReportEventAsync(
-                    MasterRankingBountyCodes.Researcher,
-                    email,
-                    uniqueScopeKey: $"{MasterRankingBountyCodes.Researcher}:{email}:{today}:{serverKey}"));
+                QueueBounty(MasterRankingBountyCodes.Researcher, playerId, email);
             }
         }
 
@@ -136,13 +162,11 @@ public sealed class TelemetryBountyPhase(
             foreach (var building in buildings)
             {
                 if (building.OccupancyPercent is > 0
+                    && playerIdByCompanyId.TryGetValue(building.CompanyId, out var playerId)
                     && playerEmailByCompanyId.TryGetValue(building.CompanyId, out var email)
                     && email is not null)
                 {
-                    tasks.Add(telemetry.ReportEventAsync(
-                        MasterRankingBountyCodes.RealEstateMagnate,
-                        email,
-                        uniqueScopeKey: $"{MasterRankingBountyCodes.RealEstateMagnate}:{email}:{today}:{serverKey}"));
+                    QueueBounty(MasterRankingBountyCodes.RealEstateMagnate, playerId, email);
                 }
             }
         }
@@ -154,13 +178,11 @@ public sealed class TelemetryBountyPhase(
             foreach (var building in mediaBuildings)
             {
                 if (building.ContentBudgetPerTick is > 0
+                    && playerIdByCompanyId.TryGetValue(building.CompanyId, out var playerId)
                     && playerEmailByCompanyId.TryGetValue(building.CompanyId, out var email)
                     && email is not null)
                 {
-                    tasks.Add(telemetry.ReportEventAsync(
-                        MasterRankingBountyCodes.MediaOwner,
-                        email,
-                        uniqueScopeKey: $"{MasterRankingBountyCodes.MediaOwner}:{email}:{today}:{serverKey}"));
+                    QueueBounty(MasterRankingBountyCodes.MediaOwner, playerId, email);
                 }
             }
         }
@@ -171,13 +193,11 @@ public sealed class TelemetryBountyPhase(
         {
             if (outputMw > 0
                 && context.BuildingsById.TryGetValue(plantBuildingId, out var plantBuilding)
+                && playerIdByCompanyId.TryGetValue(plantBuilding.CompanyId, out var playerId)
                 && playerEmailByCompanyId.TryGetValue(plantBuilding.CompanyId, out var email)
                 && email is not null)
             {
-                tasks.Add(telemetry.ReportEventAsync(
-                    MasterRankingBountyCodes.EnergyTrader,
-                    email,
-                    uniqueScopeKey: $"{MasterRankingBountyCodes.EnergyTrader}:{email}:{today}:{serverKey}"));
+                QueueBounty(MasterRankingBountyCodes.EnergyTrader, playerId, email);
             }
         }
 
@@ -197,13 +217,11 @@ public sealed class TelemetryBountyPhase(
             foreach (var building in bankBuildings)
             {
                 if (externalDepositBankIds.Contains(building.Id)
+                    && playerIdByCompanyId.TryGetValue(building.CompanyId, out var playerId)
                     && playerEmailByCompanyId.TryGetValue(building.CompanyId, out var email)
                     && email is not null)
                 {
-                    tasks.Add(telemetry.ReportEventAsync(
-                        MasterRankingBountyCodes.Banker,
-                        email,
-                        uniqueScopeKey: $"{MasterRankingBountyCodes.Banker}:{email}:{today}:{serverKey}"));
+                    QueueBounty(MasterRankingBountyCodes.Banker, playerId, email);
                 }
             }
         }
@@ -219,13 +237,11 @@ public sealed class TelemetryBountyPhase(
         foreach (var buildingId in lenderBuildingIds)
         {
             if (context.BuildingsById.TryGetValue(buildingId, out var lenderBuilding)
+                && playerIdByCompanyId.TryGetValue(lenderBuilding.CompanyId, out var playerId)
                 && playerEmailByCompanyId.TryGetValue(lenderBuilding.CompanyId, out var email)
                 && email is not null)
             {
-                tasks.Add(telemetry.ReportEventAsync(
-                    MasterRankingBountyCodes.Lender,
-                    email,
-                    uniqueScopeKey: $"{MasterRankingBountyCodes.Lender}:{email}:{today}:{serverKey}"));
+                QueueBounty(MasterRankingBountyCodes.Lender, playerId, email);
             }
         }
 
@@ -242,13 +258,11 @@ public sealed class TelemetryBountyPhase(
                 .MaxBy(x => x.Setting.SalaryMultiplier);
 
             if (bestEntry.Setting.SalaryMultiplier > 1m
+                && playerIdByCompanyId.TryGetValue(bestEntry.CompanyId, out var playerId)
                 && playerEmailByCompanyId.TryGetValue(bestEntry.CompanyId, out var email)
                 && email is not null)
             {
-                tasks.Add(telemetry.ReportEventAsync(
-                    MasterRankingBountyCodes.GoodEmployer,
-                    email,
-                    uniqueScopeKey: $"{MasterRankingBountyCodes.GoodEmployer}:{email}:{today}:{serverKey}"));
+                QueueBounty(MasterRankingBountyCodes.GoodEmployer, playerId, email);
             }
         }
 
@@ -264,12 +278,11 @@ public sealed class TelemetryBountyPhase(
 
         foreach (var companyId in dividendCompanyIds)
         {
-            if (playerEmailByCompanyId.TryGetValue(companyId, out var email) && email is not null)
+            if (playerIdByCompanyId.TryGetValue(companyId, out var playerId)
+                && playerEmailByCompanyId.TryGetValue(companyId, out var email)
+                && email is not null)
             {
-                tasks.Add(telemetry.ReportEventAsync(
-                    MasterRankingBountyCodes.DividendsMaster,
-                    email,
-                    uniqueScopeKey: $"{MasterRankingBountyCodes.DividendsMaster}:{email}:{today}:{serverKey}"));
+                QueueBounty(MasterRankingBountyCodes.DividendsMaster, playerId, email);
             }
         }
 
@@ -290,12 +303,43 @@ public sealed class TelemetryBountyPhase(
 
         foreach (var entry in top10Companies)
         {
-            if (playerEmailByCompanyId.TryGetValue(entry.Company.Id, out var email) && email is not null)
+            if (playerIdByCompanyId.TryGetValue(entry.Company.Id, out var playerId)
+                && playerEmailByCompanyId.TryGetValue(entry.Company.Id, out var email)
+                && email is not null)
             {
-                tasks.Add(telemetry.ReportEventAsync(
-                    MasterRankingBountyCodes.CompanyMaster,
-                    email,
-                    uniqueScopeKey: $"{MasterRankingBountyCodes.CompanyMaster}:{email}:{today}:{serverKey}"));
+                QueueBounty(MasterRankingBountyCodes.CompanyMaster, playerId, email);
+            }
+        }
+
+        if (pendingBadgesByPlayer.Count > 0)
+        {
+            var playerIds = pendingBadgesByPlayer.Keys.ToList();
+            var existingBadges = await context.Db.PlayerAchievementBadges
+                .Where(b => playerIds.Contains(b.PlayerId))
+                .Select(b => new { b.PlayerId, b.BadgeType })
+                .ToListAsync();
+
+            var existingSet = existingBadges
+                .ToHashSet();
+
+            foreach (var (playerId, badgeTypes) in pendingBadgesByPlayer)
+            {
+                foreach (var badgeType in badgeTypes)
+                {
+                    if (existingSet.Contains(new { PlayerId = playerId, BadgeType = badgeType }))
+                    {
+                        continue;
+                    }
+
+                    context.Db.PlayerAchievementBadges.Add(new PlayerAchievementBadge
+                    {
+                        Id = Guid.NewGuid(),
+                        PlayerId = playerId,
+                        BadgeType = badgeType,
+                        UnlockedAtUtc = DateTime.UtcNow,
+                        UnlockedAtTick = context.CurrentTick,
+                    });
+                }
             }
         }
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { getProfileBadgeIcon, profileBadgeCatalog } from '@/lib/profileBadges'
 
 const { t } = useI18n()
 
@@ -46,22 +47,6 @@ const rarityEmoji = (rarity: string) => {
   }
 }
 
-const badgeIcon = (badgeType: string) => {
-  const icons: Record<string, string> = {
-    FIRST_MILLION: '💰',
-    MONOPOLIST: '🏛️',
-    MASTER_TRADER: '📈',
-    POWER_MAGNATE: '⚡',
-    CITY_PIONEER: '🌆',
-    EXPORT_CHAMPION: '🚢',
-    INDUSTRY_LEADER: '🏭',
-    MARKET_DOMINATOR: '👑',
-    RANK_CLIMBER: '🚀',
-    LEGENDARY_TYCOON: '💎',
-  }
-  return icons[badgeType] ?? '🏅'
-}
-
 const badgeLabel = (badgeType: string) =>
   t(`playerProfile.badges.${badgeType}`, badgeType.replace(/_/g, ' '))
 
@@ -73,15 +58,36 @@ function formatUnlockDate(utc: string): string {
   })
 }
 
-const sortedBadges = computed(() =>
-  [...props.badges].sort((a, b) => {
+const sortedBadges = computed(() => {
+  const earned = [...props.badges].sort((a, b) => {
     const rarityOrder = { LEGENDARY: 0, EPIC: 1, RARE: 2, COMMON: 3 }
     const ra = rarityOrder[a.rarity as keyof typeof rarityOrder] ?? 4
     const rb = rarityOrder[b.rarity as keyof typeof rarityOrder] ?? 4
     if (ra !== rb) return ra - rb
     return new Date(a.unlockedAtUtc).getTime() - new Date(b.unlockedAtUtc).getTime()
-  }),
-)
+  })
+
+  const earnedByType = new Map(earned.map((badge) => [badge.badgeType, badge]))
+  const locked = profileBadgeCatalog
+    .filter((item) => !earnedByType.has(item.badgeType))
+    .map((item) => ({
+      id: `locked-${item.badgeType}`,
+      badgeType: item.badgeType,
+      rarity: 'LOCKED',
+      unlockCondition: t(
+        `playerProfile.badgeUnlockConditions.${item.badgeType}`,
+        t('playerProfile.badgeLockedHint'),
+      ),
+      unlockedAtUtc: '',
+      unlockedAtTick: 0,
+      locked: true,
+    }))
+
+  return [
+    ...earned.map((badge) => ({ ...badge, locked: false })),
+    ...locked,
+  ]
+})
 </script>
 
 <template>
@@ -92,35 +98,33 @@ const sortedBadges = computed(() =>
     </div>
 
     <!-- Empty state -->
-    <div v-else-if="!badges.length" class="badge-empty-state">
-      <span class="badge-empty-icon" aria-hidden="true">🏅</span>
-      <p>{{ t('playerProfile.noBadges') }}</p>
-    </div>
-
     <!-- Badge grid -->
     <div v-else class="badge-grid" role="list" :aria-label="t('playerProfile.badgeGridLabel')">
       <div
         v-for="badge in sortedBadges"
         :key="badge.id"
         class="badge-card"
-        :class="rarityClass(badge.rarity)"
+        :class="[badge.locked ? 'badge-locked' : rarityClass(badge.rarity)]"
         role="listitem"
-        :aria-label="`${badgeLabel(badge.badgeType)} (${badge.rarity})`"
+        :aria-label="`${badgeLabel(badge.badgeType)} (${badge.locked ? t('playerProfile.locked') : badge.rarity})`"
       >
         <!-- Tooltip wrapper -->
         <div class="badge-tooltip-anchor">
-          <div class="badge-icon" aria-hidden="true">{{ badgeIcon(badge.badgeType) }}</div>
+          <div class="badge-icon" aria-hidden="true">{{ getProfileBadgeIcon(badge.badgeType) }}</div>
           <div class="badge-name">{{ badgeLabel(badge.badgeType) }}</div>
-          <div class="badge-rarity-label">{{ rarityEmoji(badge.rarity) }} {{ badge.rarity }}</div>
+          <div class="badge-rarity-label">
+            <template v-if="badge.locked">🔒 {{ t('playerProfile.locked') }}</template>
+            <template v-else>{{ rarityEmoji(badge.rarity) }} {{ badge.rarity }}</template>
+          </div>
 
           <!-- Tooltip -->
           <div class="badge-tooltip" role="tooltip">
             <strong>{{ badgeLabel(badge.badgeType) }}</strong>
             <p class="badge-tooltip-condition">{{ badge.unlockCondition }}</p>
-            <p class="badge-tooltip-date">
+            <p v-if="!badge.locked" class="badge-tooltip-date">
               {{ t('playerProfile.unlockedOn') }}: {{ formatUnlockDate(badge.unlockedAtUtc) }}
             </p>
-            <p class="badge-tooltip-tick">
+            <p v-if="!badge.locked" class="badge-tooltip-tick">
               {{ t('playerProfile.atTick') }}: {{ badge.unlockedAtTick.toLocaleString() }}
             </p>
           </div>
@@ -129,7 +133,7 @@ const sortedBadges = computed(() =>
     </div>
 
     <!-- Badge count summary -->
-    <p v-if="badges.length > 0" class="badge-summary">
+    <p class="badge-summary">
       {{ t('playerProfile.badgeCount', { count: badges.length }) }}
     </p>
   </div>
@@ -190,10 +194,16 @@ const sortedBadges = computed(() =>
 }
 
 .badge-icon {
-  font-size: 36px;
+  font-size: 48px;
   margin-bottom: 6px;
   display: block;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+.badge-locked {
+  background: linear-gradient(135deg, #161b22 0%, #0f1319 100%);
+  border-color: #374151;
+  opacity: 0.7;
 }
 
 .badge-name {

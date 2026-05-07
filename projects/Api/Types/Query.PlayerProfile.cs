@@ -73,6 +73,42 @@ public sealed partial class Query
             PositionChange = s.PositionChange,
         }).ToList();
     }
+
+    /// <summary>
+    /// Returns rank history records for the selected player and a tick window.
+    /// </summary>
+    public async Task<List<PlayerRankSnapshotResult>> GetRankHistory(
+        Guid playerId,
+        int ticksBack = MaxRankHistorySnapshots,
+        [Service] AppDbContext? db = null)
+    {
+        if (db is null) return [];
+
+        var clampedTicksBack = Math.Clamp(ticksBack, 1, MaxRankHistorySnapshots);
+        var currentTick = await db.GameStates
+            .AsNoTracking()
+            .Select(gs => gs.CurrentTick)
+            .FirstOrDefaultDeterministicAsync();
+        var minTick = Math.Max(0, currentTick - clampedTicksBack);
+
+        var snapshots = await db.PlayerRankSnapshots
+            .AsNoTracking()
+            .Where(s => s.PlayerId == playerId && s.SnapshotTick >= minTick)
+            .OrderBy(s => s.SnapshotTick)
+            .ToListAsync();
+
+        return snapshots.Select(s => new PlayerRankSnapshotResult
+        {
+            Id = s.Id,
+            PlayerId = s.PlayerId,
+            SnapshotTick = s.SnapshotTick,
+            SnapshotUtc = s.SnapshotUtc,
+            LeaderboardRank = s.LeaderboardRank,
+            WealthUsd = s.WealthUsd,
+            PercentileRank = s.PercentileRank,
+            PositionChange = s.PositionChange,
+        }).ToList();
+    }
 }
 
 // ── Result DTOs ──────────────────────────────────────────────────────────────

@@ -99,6 +99,17 @@ public sealed partial class Mutation
     }
 
     /// <summary>
+    /// Alias for internal bounty hooks and automation paths.
+    /// Keeps badge awarding idempotent through the same unlock workflow.
+    /// </summary>
+    [Authorize]
+    public Task<PlayerBadgeResult> AwardProfileBadge(
+        UnlockPlayerBadgeInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor) =>
+        UnlockPlayerBadge(input, db, httpContextAccessor);
+
+    /// <summary>
     /// Generates a statistics export for the player (CSV text or HTML report).
     /// Players can only export their own stats; admins can export any player's stats.
     /// </summary>

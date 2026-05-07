@@ -399,6 +399,46 @@ public sealed class PlayerAchievementsTests
         Assert.Equal(3, snapshots.GetArrayLength());
     }
 
+    [Fact]
+    public async Task RankHistory_TicksBackFilter_ReturnsOnlyRecentWindow()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var playerResult = await ExecAsync(client,
+            "mutation R($i: RegisterInput!) { register(input: $i) { token player { id } } }",
+            new { i = new { email = "rank-window@test.com", displayName = "Window Player", password = "TestPass123!" } });
+        var playerId = Guid.Parse(playerResult.GetProperty("data").GetProperty("register").GetProperty("player").GetProperty("id").GetString()!);
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var gs = await db.GameStates.FirstAsync();
+            gs.CurrentTick = 1_000;
+            db.PlayerRankSnapshots.AddRange(
+                new PlayerRankSnapshot { Id = Guid.NewGuid(), PlayerId = playerId, SnapshotTick = 600, LeaderboardRank = 4, WealthUsd = 10_000m, PercentileRank = 60m },
+                new PlayerRankSnapshot { Id = Guid.NewGuid(), PlayerId = playerId, SnapshotTick = 980, LeaderboardRank = 2, WealthUsd = 20_000m, PercentileRank = 80m });
+            await db.SaveChangesAsync();
+        }
+
+        var result = await ExecAsync(client,
+            "query Q($id: UUID!, $ticksBack: Int!) { rankHistory(playerId: $id, ticksBack: $ticksBack) { snapshotTick } }",
+            new { id = playerId, ticksBack = 30 });
+
+        var snapshots = result.GetProperty("data").GetProperty("rankHistory");
+        Assert.Equal(1, snapshots.GetArrayLength());
+        Assert.Equal(980L, snapshots[0].GetProperty("snapshotTick").GetInt64());
+    }
+
+    [Fact]
+    public void BadgeType_FromBountyCode_MapsKnownCodes()
+    {
+        Assert.Equal(BadgeType.FirstB2BTrade, BadgeType.FromBountyCode(Capitalism.Shared.Ranking.MasterRankingBountyCodes.Wholesaler));
+        Assert.Equal(BadgeType.BankBaron, BadgeType.FromBountyCode(Capitalism.Shared.Ranking.MasterRankingBountyCodes.Banker));
+        Assert.Equal(BadgeType.LoanMaster, BadgeType.FromBountyCode(Capitalism.Shared.Ranking.MasterRankingBountyCodes.Lender));
+        Assert.Null(BadgeType.FromBountyCode("UNKNOWN"));
+    }
+
     // ── Tests: Statistics export ─────────────────────────────────────────────
 
     [Fact]
@@ -577,12 +617,13 @@ public sealed class PlayerAchievementsTests
         var p2Id = Guid.Parse(p2Result.GetProperty("data").GetProperty("register").GetProperty("player").GetProperty("id").GetString()!);
 
         // ProcessTickAsync increments CurrentTick before running phases.
-        // Set to snapshotTick-1 so the processor advances it to snapshotTick.
-        const long snapshotTick = 1_008L;
+        // Set to tax-cycle boundary on increment.
+        const long snapshotTick = 10L;
         await using (var scope = factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var gs = await db.GameStates.FirstAsync();
+            gs.TaxCycleTicks = 10;
             gs.CurrentTick = snapshotTick - 1;
             await db.SaveChangesAsync();
         }
@@ -595,7 +636,7 @@ public sealed class PlayerAchievementsTests
             await tickProcessor.ProcessTickAsync(CancellationToken.None);
         }
 
-        // Both players should have a snapshot at tick 1008.
+        // Both players should have a snapshot at tax-cycle boundary tick.
         await using (var scope = factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -623,12 +664,13 @@ public sealed class PlayerAchievementsTests
         var p1Id = Guid.Parse(p1Result.GetProperty("data").GetProperty("register").GetProperty("player").GetProperty("id").GetString()!);
 
         // ProcessTickAsync increments CurrentTick before running phases.
-        // Set to snapshotTick-2 so the processor advances it to snapshotTick-1 (non-interval).
+        // Set to a non tax-cycle tick after increment.
         await using (var scope = factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var gs = await db.GameStates.FirstAsync();
-            gs.CurrentTick = 1006L; // becomes 1007 after increment — not a multiple of 1008
+            gs.TaxCycleTicks = 10;
+            gs.CurrentTick = 8L; // becomes 9 after increment — not divisible by tax cycle
             await db.SaveChangesAsync();
         }
 

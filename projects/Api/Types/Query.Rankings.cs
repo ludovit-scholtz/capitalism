@@ -51,6 +51,17 @@ public sealed partial class Query
             .Include(i => i.ProductType)
             .ToListAsync();
         var shareholdings = await db.Shareholdings.ToListAsync();
+        var badges = await db.PlayerAchievementBadges
+            .AsNoTracking()
+            .Where(badge => playerIds.Contains(badge.PlayerId))
+            .OrderByDescending(badge => badge.UnlockedAtUtc)
+            .Select(badge => new { badge.PlayerId, badge.BadgeType })
+            .ToListAsync();
+        var badgeTypesByPlayer = badges
+            .GroupBy(badge => badge.PlayerId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(badge => badge.BadgeType).Distinct().Take(3).ToList());
 
         var sharePriceByCompany = BuildQuotedSharePriceLookup(companies, buildings, lots, inventories, shareholdings);
         var companyCurrencyCodeById = companies.ToDictionary(
@@ -101,7 +112,8 @@ public sealed partial class Query
                     SharesValue = sharesValue,
                     TotalWealth = decimal.Round(personalCashUsd + sharesValue, 4, MidpointRounding.AwayFromZero),
                     TotalWealthUsd = decimal.Round(personalCashUsd + sharesValue, 4, MidpointRounding.AwayFromZero),
-                    CompanyCount = companies.Count(c => c.PlayerId == p.Id)
+                    CompanyCount = companies.Count(c => c.PlayerId == p.Id),
+                    BadgeTypes = badgeTypesByPlayer.GetValueOrDefault(p.Id, [])
                 };
             })
             .OrderByDescending(r => r.TotalWealthUsd)

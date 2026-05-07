@@ -20,8 +20,8 @@ const props = defineProps<{
 
 // ── Reactive state ──────────────────────────────────────────────────────────
 
-type TimeFilter = 30 | 90 | 365
-const selectedFilter = ref<TimeFilter>(365)
+type TimeFilter = 7 | 30 | 'all'
+const selectedFilter = ref<TimeFilter>('all')
 
 const tooltip = ref<{
   visible: boolean
@@ -61,8 +61,9 @@ onBeforeUnmount(() => {
 const filteredSnapshots = computed<RankSnapshot[]>(() => {
   const all = [...props.snapshots].sort((a, b) => a.snapshotTick - b.snapshotTick)
   if (all.length === 0) return []
+  if (selectedFilter.value === 'all') return all
   const maxTick = all[all.length - 1]!.snapshotTick
-  const minTick = maxTick - selectedFilter.value * 144 // 144 ticks ≈ 1 game day
+  const minTick = maxTick - selectedFilter.value
   return all.filter((s) => s.snapshotTick >= minTick)
 })
 
@@ -211,9 +212,9 @@ function formatWealth(usd: number): string {
 }
 
 const filters: { label: string; value: TimeFilter }[] = [
+  { label: '7d', value: 7 },
   { label: '30d', value: 30 },
-  { label: '90d', value: 90 },
-  { label: '365d', value: 365 },
+  { label: t('playerProfile.allTime'), value: 'all' },
 ]
 </script>
 

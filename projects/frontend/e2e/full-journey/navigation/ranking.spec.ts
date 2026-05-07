@@ -54,4 +54,25 @@ test.describe('Ranking page', () => {
     await expect(page).toHaveURL(/\/(ranking|leaderboard)$/)
     await expect(page.locator('.rank-card[aria-current="true"]')).toHaveCount(0)
   })
+
+  test('shows player badge icon in leaderboard row when player has earned a badge', async ({ page }) => {
+    const players = makeRankedPlayers(5)
+    const featuredPlayer = players[0]!
+    const state = setupMockApi(page, { players })
+    state.playerBadges[featuredPlayer.id] = [
+      {
+        id: 'badge-1',
+        badgeType: 'FIRST_B2B_TRADE',
+        rarity: 'COMMON',
+        unlockCondition: 'Complete your first B2B wholesale trade.',
+        unlockedAtUtc: '2026-01-01T00:00:00Z',
+        unlockedAtTick: 100,
+      },
+    ]
+
+    await page.goto('/ranking')
+
+    const row = page.locator('.rank-card', { hasText: featuredPlayer.displayName }).first()
+    await expect(row.locator('.player-badge-icon')).toBeVisible()
+  })
 })
