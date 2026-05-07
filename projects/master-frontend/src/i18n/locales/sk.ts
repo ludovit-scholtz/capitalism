@@ -386,6 +386,8 @@ export default {
     pageLabel: 'Strana {page}',
     previousPage: 'Predchádzajúca',
     nextPage: 'Ďalšia',
+    youBadge: 'Vy',
+    activePlayerRowAria: 'Riadok vášho poradia',
     noRows: 'Filtru nevyhovujú žiadne riadky rebríčka.',
     loadError: 'Nepodarilo sa načítať údaje rebríčka.',
   },

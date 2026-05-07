@@ -9,6 +9,48 @@ import {
 } from './helpers/mock-api'
 
 test.describe('Ranking pages', () => {
+  test('auto-opens page containing current player and highlights row', async ({ page }) => {
+    const player = makePlayer({
+      id: 'rank-player-25',
+      email: 'rank25@example.com',
+      displayName: 'Rank Twenty Five',
+    })
+
+    const rankingLeaderboard = Array.from({ length: 30 }, (_, index) => ({
+      playerId: `rank-player-${index + 1}`,
+      displayName: `Rank Player ${index + 1}`,
+      totalPoints: 1000 - index * 10,
+      globalRank: index + 1,
+      rankMovement: 0,
+    }))
+    rankingLeaderboard[24] = {
+      playerId: player.id,
+      displayName: player.displayName,
+      totalPoints: 750,
+      globalRank: 25,
+      rankMovement: 1,
+    }
+
+    const state = setupMockApi(page, {
+      rankingLeaderboard,
+      rankingSummary: {
+        totalPoints: 750,
+        globalRank: 25,
+        previousGlobalRank: 26,
+        rankMovement: 1,
+        updatedAtUtc: '2026-05-01T00:00:00.000Z',
+      },
+    })
+    await loginAs(page, state, player)
+
+    await page.goto('/ranking')
+    await expect(page).toHaveURL(/\/ranking\?page=3/)
+    await expect(page.getByText('Page 3')).toBeVisible()
+    const playerRow = page.locator('tr', { hasText: 'Rank Twenty Five' })
+    await expect(playerRow).toHaveAttribute('aria-current', 'true')
+    await expect(playerRow).toContainText('You')
+  })
+
   test('player can view ranking dashboard and bounty history', async ({ page }) => {
     const player = makePlayer({
       id: 'rank-player-1',

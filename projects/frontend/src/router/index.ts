@@ -11,7 +11,12 @@ const router = createRouter({
     { path: '/dashboard', name: 'dashboard', component: () => import('@/views/DashboardView.vue') },
     { path: '/news', name: 'news', component: () => import('@/views/NewsView.vue') },
     { path: '/admin', name: 'admin-dashboard', component: () => import('@/views/GameAdminDashboardView.vue') },
-    { path: '/leaderboard', name: 'leaderboard', component: () => import('@/views/LeaderboardView.vue') },
+    {
+      path: '/leaderboard',
+      name: 'leaderboard',
+      alias: '/ranking',
+      component: () => import('@/views/LeaderboardView.vue'),
+    },
     { path: '/player/:id', name: 'player-profile', component: () => import('@/views/PlayerProfileView.vue') },
     { path: '/cities', name: 'cities', component: () => import('@/views/CitiesView.vue') },
     { path: '/buildings/market', name: 'building-market', component: () => import('@/views/BuildingMarketView.vue') },

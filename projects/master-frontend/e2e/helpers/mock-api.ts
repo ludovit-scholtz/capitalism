@@ -794,10 +794,17 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
     }
 
     if (query.includes('rankingLeaderboard')) {
+      const vars = body.variables as { limit?: number; offset?: number } | undefined
+      const offset = Math.max(0, vars?.offset ?? 0)
+      const limit = Math.max(1, vars?.limit ?? 100)
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { rankingLeaderboard: state.rankingLeaderboard } }),
+        body: JSON.stringify({
+          data: {
+            rankingLeaderboard: state.rankingLeaderboard.slice(offset, offset + limit),
+          },
+        }),
       })
       return
     }
