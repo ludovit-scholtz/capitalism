@@ -47,8 +47,8 @@ public sealed partial class Mutation
         var account = !string.IsNullOrEmpty(input.TradeAccountType)
         ? await ResolveRequestedTradingAccountAsync(db, player, input.TradeAccountType, input.TradeAccountCompanyId)
         : await ResolveActiveTradingAccountAsync(db, player, httpContextAccessor.HttpContext!.User);
-        var (companies, shareholdings, sharePrices) = await LoadSharePricingSnapshotAsync(db);
-        if (IsGovernmentCompany(account.Company))
+        var (companies, shareholdings, sharePrices, governmentCompanyIds) = await LoadSharePricingSnapshotAsync(db);
+        if (IsGovernmentCompany(governmentCompanyIds, account.Company))
         {
             throw CreateGovernmentSharesNotTradeableException();
         }
@@ -58,7 +58,7 @@ public sealed partial class Mutation
                     .SetMessage("Company not found.")
                     .SetCode("COMPANY_NOT_FOUND")
                     .Build());
-        if (IsGovernmentCompany(targetCompany))
+        if (IsGovernmentCompany(governmentCompanyIds, targetCompany))
         {
             throw CreateGovernmentSharesNotTradeableException();
         }
@@ -230,8 +230,8 @@ public sealed partial class Mutation
         var account = !string.IsNullOrEmpty(input.TradeAccountType)
         ? await ResolveRequestedTradingAccountAsync(db, player, input.TradeAccountType, input.TradeAccountCompanyId)
         : await ResolveActiveTradingAccountAsync(db, player, httpContextAccessor.HttpContext!.User);
-        var (companies, shareholdings, sharePrices) = await LoadSharePricingSnapshotAsync(db);
-        if (IsGovernmentCompany(account.Company))
+        var (companies, shareholdings, sharePrices, governmentCompanyIds) = await LoadSharePricingSnapshotAsync(db);
+        if (IsGovernmentCompany(governmentCompanyIds, account.Company))
         {
             throw CreateGovernmentSharesNotTradeableException();
         }
@@ -241,7 +241,7 @@ public sealed partial class Mutation
                     .SetMessage("Company not found.")
                     .SetCode("COMPANY_NOT_FOUND")
                     .Build());
-        if (IsGovernmentCompany(targetCompany))
+        if (IsGovernmentCompany(governmentCompanyIds, targetCompany))
         {
             throw CreateGovernmentSharesNotTradeableException();
         }

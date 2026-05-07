@@ -18,11 +18,10 @@ namespace Api.Types;
 /// </summary>
 public sealed partial class Mutation
 {
-    private static async Task<(List<Company> Companies, List<Shareholding> Shareholdings, Dictionary<Guid, decimal> SharePrices)> LoadSharePricingSnapshotAsync(AppDbContext db)
+    private static async Task<(List<Company> Companies, List<Shareholding> Shareholdings, Dictionary<Guid, decimal> SharePrices, HashSet<Guid> GovernmentCompanyIds)> LoadSharePricingSnapshotAsync(AppDbContext db)
     {
         var companies = await db.Companies
             .Include(company => company.BankAccounts)
-            .Include(company => company.Player)
             .ToListAsync();
         var buildings = await db.Buildings
             .Include(building => building.City)
@@ -57,15 +56,17 @@ public sealed partial class Mutation
                 4,
                 MidpointRounding.AwayFromZero));
 
-        return (companies, shareholdings, sharePricesUsd);
+        var governmentCompanyIds = await db.Companies
+            .AsNoTracking()
+            .Where(company => company.Player.Email == GovernmentActorConstants.GovernmentEmail)
+            .Select(company => company.Id)
+            .ToHashSetAsync();
+
+        return (companies, shareholdings, sharePricesUsd, governmentCompanyIds);
     }
 
-    private static bool IsGovernmentCompany(Company? company)
-        => company is not null
-           && string.Equals(
-               company.Player?.Email,
-               GovernmentActorConstants.GovernmentEmail,
-               StringComparison.OrdinalIgnoreCase);
+    private static bool IsGovernmentCompany(HashSet<Guid> governmentCompanyIds, Company? company)
+        => company is not null && governmentCompanyIds.Contains(company.Id);
 
     private static GraphQLException CreateGovernmentSharesNotTradeableException()
         => new(
