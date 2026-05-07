@@ -16,9 +16,9 @@ It will use real world map. The game will start in single city and later other c
 - [x] Backend: Wire `operationsStatistics` query to real LedgerEntry aggregations for live money flow data
 - [x] Backend: Wire `adminProductAnalytics` query to real ProductionRecord/PublicSalesRecord aggregations
 
-### Stock exchange (0% complete)
+### Stock exchange (100% complete)
 
-- [ ] Do not show the government in the stock market. Do not allow players to trade government company stocks.
+- [x] Do not show the government in the stock market. Do not allow players to trade government company stocks.
 
 ### Onboarding (20% complete)
 

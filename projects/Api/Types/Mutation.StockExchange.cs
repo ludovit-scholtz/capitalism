@@ -44,16 +44,24 @@ public sealed partial class Mutation
                     .SetCode("PLAYER_NOT_FOUND")
                     .Build());
 
-    var account = !string.IsNullOrEmpty(input.TradeAccountType)
+        var account = !string.IsNullOrEmpty(input.TradeAccountType)
         ? await ResolveRequestedTradingAccountAsync(db, player, input.TradeAccountType, input.TradeAccountCompanyId)
         : await ResolveActiveTradingAccountAsync(db, player, httpContextAccessor.HttpContext!.User);
         var (companies, shareholdings, sharePrices) = await LoadSharePricingSnapshotAsync(db);
+        if (IsGovernmentCompany(account.Company))
+        {
+            throw CreateGovernmentSharesNotTradeableException();
+        }
         var targetCompany = companies.FirstOrDefault(company => company.Id == input.CompanyId)
             ?? throw new GraphQLException(
                 ErrorBuilder.New()
                     .SetMessage("Company not found.")
                     .SetCode("COMPANY_NOT_FOUND")
                     .Build());
+        if (IsGovernmentCompany(targetCompany))
+        {
+            throw CreateGovernmentSharesNotTradeableException();
+        }
 
         var shareCount = decimal.Round(input.ShareCount, 4, MidpointRounding.AwayFromZero);
         var publicFloatShares = SharePriceCalculator.ComputePublicFloat(targetCompany, shareholdings.Where(holding => holding.CompanyId == targetCompany.Id));
@@ -219,16 +227,24 @@ public sealed partial class Mutation
                     .SetCode("PLAYER_NOT_FOUND")
                     .Build());
 
-    var account = !string.IsNullOrEmpty(input.TradeAccountType)
+        var account = !string.IsNullOrEmpty(input.TradeAccountType)
         ? await ResolveRequestedTradingAccountAsync(db, player, input.TradeAccountType, input.TradeAccountCompanyId)
         : await ResolveActiveTradingAccountAsync(db, player, httpContextAccessor.HttpContext!.User);
         var (companies, shareholdings, sharePrices) = await LoadSharePricingSnapshotAsync(db);
+        if (IsGovernmentCompany(account.Company))
+        {
+            throw CreateGovernmentSharesNotTradeableException();
+        }
         var targetCompany = companies.FirstOrDefault(company => company.Id == input.CompanyId)
             ?? throw new GraphQLException(
                 ErrorBuilder.New()
                     .SetMessage("Company not found.")
                     .SetCode("COMPANY_NOT_FOUND")
                     .Build());
+        if (IsGovernmentCompany(targetCompany))
+        {
+            throw CreateGovernmentSharesNotTradeableException();
+        }
 
         var shareCount = decimal.Round(input.ShareCount, 4, MidpointRounding.AwayFromZero);
         var holding = shareholdings.FirstOrDefault(candidate =>

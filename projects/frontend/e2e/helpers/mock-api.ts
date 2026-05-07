@@ -1293,6 +1293,11 @@ function computeMockSharePrice(company: MockCompany) {
   return Number(Math.max((company.cash + getCompanyAssetBaseValue(company)) / getCompanyTotalShares(company), 1).toFixed(2))
 }
 
+function isGovernmentCompany(state: MockState, company: MockCompany) {
+  const owner = state.players.find((player) => player.id === company.playerId)
+  return owner?.email === 'government@capitalism.game'
+}
+
 function getPlayerControlledCompanyIds(state: MockState, playerId: string) {
   return new Set(
     state.players
@@ -3927,6 +3932,13 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       if (!player || !company) {
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Company not found or not authenticated.' }] }) })
       }
+      if (isGovernmentCompany(state, company)) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Government company shares cannot be traded on the stock exchange.', extensions: { code: 'GOVERNMENT_SHARES_NOT_TRADEABLE' } }] }),
+        })
+      }
 
       const shareCount = Number(input?.shareCount ?? 0)
       const publicFloatShares = getPublicFloatShares(state, company)
@@ -4040,6 +4052,13 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
       if (!player || !company) {
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Company not found or not authenticated.' }] }) })
+      }
+      if (isGovernmentCompany(state, company)) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Government company shares cannot be traded on the stock exchange.', extensions: { code: 'GOVERNMENT_SHARES_NOT_TRADEABLE' } }] }),
+        })
       }
 
       const shareCount = Number(input?.shareCount ?? 0)
@@ -5715,7 +5734,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         .filter((holding) => holding.ownerPlayerId === player.id && holding.shareCount > 0)
         .map((holding) => {
           const company = state.players.flatMap((candidate) => candidate.companies).find((candidate) => candidate.id === holding.companyId)
-          if (!company) {
+          if (!company || isGovernmentCompany(state, company)) {
             return null
           }
 
@@ -5758,6 +5777,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const player = state.players.find((candidate) => candidate.id === state.currentUserId)
       const listings = state.players
         .flatMap((candidate) => candidate.companies)
+        .filter((company) => !isGovernmentCompany(state, company))
         .map((company) => {
           const playerOwnedShares = player
             ? state.shareholdings.filter((holding) => holding.companyId === company.id && holding.ownerPlayerId === player.id).reduce((total, holding) => total + holding.shareCount, 0)

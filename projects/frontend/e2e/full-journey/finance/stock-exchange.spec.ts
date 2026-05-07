@@ -139,6 +139,66 @@ test.describe('Stock exchange', () => {
     await expect(rivalRow).toContainText('0.0%')
   })
 
+  test('stock listings hide the government company', async ({ page }) => {
+    const player = makePlayer({
+      personalCash: 150000,
+      companies: [makeControlledCompany()],
+    })
+    const rival = makePlayer({
+      id: 'player-2',
+      email: 'rival-gov@test.com',
+      displayName: 'Rival Owner',
+      companies: [
+        {
+          id: 'company-rival',
+          playerId: 'player-2',
+          name: 'Rival Foods',
+          cash: 800000,
+          totalSharesIssued: 10000,
+          dividendPayoutRatio: 0.35,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          foundedAtTick: 42,
+          buildings: [],
+        },
+      ],
+    })
+    const government = makePlayer({
+      id: 'player-gov',
+      email: 'government@capitalism.game',
+      displayName: 'Government',
+      companies: [
+        {
+          id: 'company-gov',
+          playerId: 'player-gov',
+          name: 'Government',
+          cash: 5_000_000,
+          totalSharesIssued: 10000,
+          dividendPayoutRatio: 0.2,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          foundedAtTick: 1,
+          buildings: [],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, {
+      players: [player, rival, government],
+      shareholdings: [
+        { companyId: 'company-home', ownerPlayerId: 'player-1', ownerCompanyId: null, shareCount: 10000 },
+        { companyId: 'company-rival', ownerPlayerId: 'player-2', ownerCompanyId: null, shareCount: 5000 },
+        { companyId: 'company-gov', ownerPlayerId: 'player-gov', ownerCompanyId: null, shareCount: 10000 },
+      ],
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/stocks')
+
+    await expect(page.locator('tr.listing-row', { hasText: 'Rival Foods' })).toBeVisible()
+    await expect(page.locator('tr.listing-row', { hasText: 'Government' })).toHaveCount(0)
+  })
+
   test('table filter narrows listed companies by name', async ({ page }) => {
     const player = makePlayer({
       personalCash: 100000,

@@ -22,6 +22,7 @@ public sealed partial class Mutation
     {
         var companies = await db.Companies
             .Include(company => company.BankAccounts)
+            .Include(company => company.Player)
             .ToListAsync();
         var buildings = await db.Buildings
             .Include(building => building.City)
@@ -58,6 +59,20 @@ public sealed partial class Mutation
 
         return (companies, shareholdings, sharePricesUsd);
     }
+
+    private static bool IsGovernmentCompany(Company? company)
+        => company is not null
+           && string.Equals(
+               company.Player?.Email,
+               GovernmentActorConstants.GovernmentEmail,
+               StringComparison.OrdinalIgnoreCase);
+
+    private static GraphQLException CreateGovernmentSharesNotTradeableException()
+        => new(
+            ErrorBuilder.New()
+                .SetMessage("Government company shares cannot be traded on the stock exchange.")
+                .SetCode("GOVERNMENT_SHARES_NOT_TRADEABLE")
+                .Build());
 
     private static async Task<BankAccount> ResolveTradeSettlementBankAccountAsync(
         AppDbContext db,

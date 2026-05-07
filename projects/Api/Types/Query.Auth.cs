@@ -79,6 +79,11 @@ public sealed partial class Query
             .Include(inventory => inventory.ProductType)
             .ToListAsync();
         var shareholdings = await db.Shareholdings.AsNoTracking().ToListAsync();
+        var governmentCompanyIds = await db.Companies
+            .AsNoTracking()
+            .Where(company => company.Player.Email == GovernmentActorConstants.GovernmentEmail)
+            .Select(company => company.Id)
+            .ToHashSetAsync();
         var localSharePriceByCompany = BuildQuotedSharePriceLookup(companies, buildings, lots, inventories, shareholdings);
         var companyCurrencyCodeById = companies.ToDictionary(
             company => company.Id,
@@ -105,7 +110,10 @@ public sealed partial class Query
         var personalEurRatesByCode = await BuildEurRatesLookupAsync(db, personalCurrencies);
 
         var portfolio = shareholdings
-            .Where(holding => holding.OwnerPlayerId == userId && holding.ShareCount > 0m)
+            .Where(holding =>
+                holding.OwnerPlayerId == userId
+                && holding.ShareCount > 0m
+                && !governmentCompanyIds.Contains(holding.CompanyId))
             .Select(holding =>
             {
                 var company = companiesById[holding.CompanyId];
