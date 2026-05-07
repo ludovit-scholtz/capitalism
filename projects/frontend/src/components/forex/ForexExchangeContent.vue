@@ -9,7 +9,7 @@ import GoldAmmSection from '@/components/forex/GoldAmmSection.vue'
 import BankAccountTransferPanel from '@/components/banking/BankAccountTransferPanel.vue'
 import UiStateLoading from '@/components/ui/UiStateLoading.vue'
 import UiStateError from '@/components/ui/UiStateError.vue'
-import { buildEurPairList } from '@/lib/fxPairFormatter'
+import { buildEurPairList, extractQuoteCurrencyFromEurPair } from '@/lib/fxPairFormatter'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -56,7 +56,7 @@ const tickRangeOptions = [
 
 watch([selectedPair, selectedTicksBack, availablePairs], async ([pair, ticks, pairs]) => {
   if (pairs.length === 0) return
-  const quote = pair.startsWith('EUR') ? pair.slice(3) : pair.slice(0, 3)
+  const quote = extractQuoteCurrencyFromEurPair(pair)
   if (!quote) return
   // Ensure selected pair is valid after rates load
   if (!pairs.includes(pair) && pairs.length > 0) {
@@ -69,7 +69,7 @@ watch([selectedPair, selectedTicksBack, availablePairs], async ([pair, ticks, pa
 watch(activeTab, async (tab) => {
   if (tab !== 'rates') return
   const pair = selectedPair.value
-  const quote = pair.startsWith('EUR') ? pair.slice(3) : pair.slice(0, 3)
+  const quote = extractQuoteCurrencyFromEurPair(pair)
   if (!quote) return
   await loadRateHistory(quote, selectedTicksBack.value)
 })

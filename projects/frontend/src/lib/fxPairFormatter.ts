@@ -77,11 +77,23 @@ export function buildEurPairList(currencyCodes: string[]): string[] {
  * **Important:** `eurToQuoteRate` must always express units of quote currency per 1 EUR
  * (e.g. 25.19 for EUR/CZK meaning "1 EUR = 25.19 CZK").
  *
- * - If the pair is EUR/USD, the rate is returned unchanged.
- * - If the pair is CZK/EUR (represented as "CZKEUR"), the rate is inverted.
+ * - If the pair code starts with EUR (e.g. "EURUSD"), the rate is returned unchanged.
+ * - If the pair code starts with a non-EUR currency (e.g. "CZKEUR"), the rate is inverted.
  */
 export function rateForPair(pairLabel: string, eurToQuoteRate: number): number {
   const base = pairLabel.slice(0, 3).toUpperCase()
   if (base === 'EUR') return eurToQuoteRate
   return eurToQuoteRate > 0 ? 1 / eurToQuoteRate : 0
+}
+
+/**
+ * Extracts the non-EUR quote currency from a compact EUR pair code.
+ * Supports "EURUSD" -> "USD" and "CZKEUR" -> "CZK".
+ */
+export function extractQuoteCurrencyFromEurPair(pairLabel: string): string | null {
+  const normalized = pairLabel.toUpperCase()
+  if (normalized.length !== 6) return null
+  if (normalized.startsWith('EUR')) return normalized.slice(3)
+  if (normalized.endsWith('EUR')) return normalized.slice(0, 3)
+  return null
 }

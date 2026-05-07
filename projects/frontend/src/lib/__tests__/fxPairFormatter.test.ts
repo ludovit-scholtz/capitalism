@@ -7,6 +7,7 @@ import {
   pairQuote,
   buildEurPairList,
   rateForPair,
+  extractQuoteCurrencyFromEurPair,
 } from '../fxPairFormatter'
 
 describe('fxPairFormatter', () => {
@@ -143,6 +144,21 @@ describe('fxPairFormatter', () => {
     it('inverts rate when pair starts with stronger non-EUR currency too', () => {
       const result = rateForPair('USDEUR', 1.08)
       expect(result).toBeCloseTo(1 / 1.08, 5)
+    })
+  })
+
+  describe('extractQuoteCurrencyFromEurPair', () => {
+    it('returns USD for EURUSD', () => {
+      expect(extractQuoteCurrencyFromEurPair('EURUSD')).toBe('USD')
+    })
+
+    it('returns CZK for CZKEUR', () => {
+      expect(extractQuoteCurrencyFromEurPair('CZKEUR')).toBe('CZK')
+    })
+
+    it('returns null for invalid pair code', () => {
+      expect(extractQuoteCurrencyFromEurPair('USDJPY')).toBeNull()
+      expect(extractQuoteCurrencyFromEurPair('EURUS')).toBeNull()
     })
   })
 })

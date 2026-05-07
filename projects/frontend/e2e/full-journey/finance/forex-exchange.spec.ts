@@ -1289,7 +1289,7 @@ test.describe('FX Rate History Chart on Rate List tab', () => {
     await expect(table.locator('thead').getByText('Sell')).toBeVisible()
   })
 
-  test('rate table shows pair label in compact forex format (CZKEUR)', async ({ page }) => {
+  test('rate table shows compact weaker-first forex pairs without slash formatting', async ({ page }) => {
     const { player } = setupChartTab(page)
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
@@ -1299,6 +1299,8 @@ test.describe('FX Rate History Chart on Rate List tab', () => {
     const table = page.locator('.rates-table')
     await expect(table).toBeVisible()
     await expect(table.locator('.rate-pair-label').filter({ hasText: 'CZKEUR' })).toHaveCount(1)
+    await expect(table.locator('.rate-pair-label').filter({ hasText: 'EURUSD' })).toHaveCount(1)
+    await expect(table.locator('.rate-pair-label').filter({ hasText: '/' })).toHaveCount(0)
   })
 
   test('mobile rates table stacks buy, mid, and sell values inside each pair row', async ({ page }) => {
