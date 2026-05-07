@@ -37393,6 +37393,40 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     }
 
     [Fact]
+    public async Task MarkAllGameNewsRead_RequiresAuthentication()
+    {
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation {
+              markAllGameNewsRead
+            }
+            """);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        var errorCode = errors.EnumerateArray()
+            .Select(error => error.TryGetProperty("extensions", out var ext) &&
+                        ext.TryGetProperty("code", out var code) ? code.GetString() : null)
+            .FirstOrDefault(code => code is not null);
+        Assert.Equal("AUTH_NOT_AUTHENTICATED", errorCode);
+    }
+
+    [Fact]
+    public async Task MarkAllGameNewsRead_ReturnsZeroWhenMasterNotConfigured()
+    {
+        var token = await RegisterAndGetTokenAsync($"news-markall-{Guid.NewGuid():N}@test.com", "News Reader");
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation {
+              markAllGameNewsRead
+            }
+            """,
+            token: token);
+
+        Assert.False(result.TryGetProperty("errors", out _));
+        Assert.Equal(0, result.GetProperty("data").GetProperty("markAllGameNewsRead").GetInt32());
+    }
+
+    [Fact]
     public async Task GameNewsFeed_DoesNotSwallowOperationCanceledException()
     {
         // The fallback should NOT catch OperationCanceledException so that

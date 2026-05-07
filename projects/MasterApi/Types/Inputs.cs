@@ -176,6 +176,11 @@ public sealed class MarkGameNewsReadInput : MasterServerServiceInput
     public List<Guid> EntryIds { get; set; } = [];
 }
 
+public sealed class MarkAllGameNewsReadInput : MasterServerServiceInput
+{
+    public string PlayerEmail { get; set; } = string.Empty;
+}
+
 public sealed class UpsertGameNewsEntryInput : MasterServerServiceInput
 {
     public Guid? EntryId { get; set; }

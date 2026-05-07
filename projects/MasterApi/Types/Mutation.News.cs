@@ -186,41 +186,75 @@ public sealed partial class Mutation
             return true;
         }
 
+        await MarkEntriesReadAsync(db, input.ServerKey, Query.NormalizeEmail(input.PlayerEmail, "INVALID_PLAYER_EMAIL"), input.EntryIds);
+        return true;
+    }
+
+    public async Task<int> MarkAllGameNewsRead(
+        [Service] MasterDbContext db,
+        [Service] IOptions<MasterServerOptions> masterServerOptions,
+        MarkAllGameNewsReadInput? input = null)
+    {
+        input ??= new MarkAllGameNewsReadInput();
+        Query.EnsureServiceAccess(input, masterServerOptions);
         var playerEmail = Query.NormalizeEmail(input.PlayerEmail, "INVALID_PLAYER_EMAIL");
-        var validEntryIds = await db.GameNewsEntries
+
+        var allPublishedEntryIds = await db.GameNewsEntries
             .AsNoTracking()
-            .Where(entry => input.EntryIds.Contains(entry.Id))
             .Where(entry => entry.Status == GameNewsEntryStatus.Published)
             .Where(entry => entry.TargetServerKey == null || entry.TargetServerKey == input.ServerKey)
             .Select(entry => entry.Id)
             .ToListAsync();
 
+        return await MarkEntriesReadAsync(db, input.ServerKey, playerEmail, allPublishedEntryIds);
+    }
+
+    private static async Task<int> MarkEntriesReadAsync(
+        MasterDbContext db,
+        string serverKey,
+        string playerEmail,
+        IReadOnlyCollection<Guid> candidateEntryIds)
+    {
+        if (candidateEntryIds.Count == 0)
+        {
+            return 0;
+        }
+
+        var validEntryIds = await db.GameNewsEntries
+            .AsNoTracking()
+            .Where(entry => candidateEntryIds.Contains(entry.Id))
+            .Where(entry => entry.Status == GameNewsEntryStatus.Published)
+            .Where(entry => entry.TargetServerKey == null || entry.TargetServerKey == serverKey)
+            .Select(entry => entry.Id)
+            .ToListAsync();
+
         if (validEntryIds.Count == 0)
         {
-            return true;
+            return 0;
         }
 
         var existingReadEntryIds = await db.GameNewsReadReceipts
             .AsNoTracking()
-            .Where(receipt => receipt.PlayerEmail == playerEmail && receipt.ServerKey == input.ServerKey)
+            .Where(receipt => receipt.PlayerEmail == playerEmail && receipt.ServerKey == serverKey)
             .Where(receipt => validEntryIds.Contains(receipt.GameNewsEntryId))
             .Select(receipt => receipt.GameNewsEntryId)
             .ToListAsync();
 
         var now = DateTime.UtcNow;
-        foreach (var entryId in validEntryIds.Except(existingReadEntryIds))
+        var unreadEntryIds = validEntryIds.Except(existingReadEntryIds).ToList();
+        foreach (var entryId in unreadEntryIds)
         {
             db.GameNewsReadReceipts.Add(new GameNewsReadReceipt
             {
                 Id = Guid.NewGuid(),
                 GameNewsEntryId = entryId,
                 PlayerEmail = playerEmail,
-                ServerKey = input.ServerKey,
+                ServerKey = serverKey,
                 ReadAtUtc = now,
             });
         }
 
         await db.SaveChangesAsync();
-        return true;
+        return unreadEntryIds.Count;
     }
 }

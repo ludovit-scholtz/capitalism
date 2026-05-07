@@ -19,6 +19,8 @@ public interface IMasterGameAdministrationService
     Task<GameNewsFeedResult> GetGameNewsFeedAsync(string? playerEmail, bool includeDrafts, string? requesterEmail, CancellationToken cancellationToken = default);
 
     Task MarkGameNewsReadAsync(string playerEmail, IReadOnlyCollection<Guid> entryIds, CancellationToken cancellationToken = default);
+    
+    Task<int> MarkAllGameNewsReadAsync(string playerEmail, CancellationToken cancellationToken = default);
 
     Task<GameNewsEntryResult> UpsertGameNewsEntryAsync(
         string requesterEmail,
@@ -244,6 +246,33 @@ public sealed class MasterGameAdministrationService(
             },
             cancellationToken);
     }
+    
+    public async Task<int> MarkAllGameNewsReadAsync(
+        string playerEmail,
+        CancellationToken cancellationToken = default)
+    {
+        if (!options.Value.IsConfigured())
+        {
+            return 0;
+        }
+
+        var payload = await SendGraphQlAsync<MarkAllGameNewsReadResponse>(
+            """
+            mutation MarkAllRead($input: MarkAllGameNewsReadInput!) {
+              markAllGameNewsRead(input: $input)
+            }
+            """,
+            new
+            {
+                input = BuildServiceInput(new
+                {
+                    playerEmail,
+                })
+            },
+            cancellationToken);
+
+        return payload.MarkAllGameNewsRead;
+    }
 
     public async Task<GameNewsEntryResult> UpsertGameNewsEntryAsync(
         string requesterEmail,
@@ -415,6 +444,11 @@ public sealed class MasterGameAdministrationService(
     private sealed class MarkGameNewsReadResponse
     {
         public bool MarkGameNewsRead { get; init; }
+    }
+    
+    private sealed class MarkAllGameNewsReadResponse
+    {
+        public int MarkAllGameNewsRead { get; init; }
     }
 
     private sealed class UpsertGameNewsEntryResponse

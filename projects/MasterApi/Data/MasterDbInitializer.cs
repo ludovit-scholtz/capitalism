@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace MasterApi.Data;
 
-public sealed class MasterDbInitializer(MasterDbContext db)
+public sealed class MasterDbInitializer(MasterDbContext db, ILogger<MasterDbInitializer> logger)
 {
     private static readonly Guid GameAdministrationLaunchEntryId = Guid.Parse("4f31a5d8-4fdf-4d98-9f35-3d8d4f4e5c10");
     private static readonly Guid DirectionalLinksEntryId = Guid.Parse("1a6641d2-4e89-4087-81c5-bbcd0f45ca31");
@@ -182,11 +182,32 @@ public sealed class MasterDbInitializer(MasterDbContext db)
     private async Task ImportChangelogCsvAsync(CancellationToken cancellationToken)
     {
         var csvContent = TryReadChangelogCsv();
-        if (csvContent is null) return;
+        if (csvContent is null)
+        {
+            logger.LogInformation("CHANGELOG.csv was not found. Skipping changelog import.");
+            return;
+        }
 
-        var rows = ChangelogCsvImporter.ParseCsv(csvContent);
+        var parseResult = ChangelogCsvImporter.ParseCsvWithDiagnostics(csvContent);
+        foreach (var parseFailure in parseResult.Failures)
+        {
+            logger.LogWarning("Skipping malformed CHANGELOG.csv row {LineNumber}: {Reason}", parseFailure.LineNumber, parseFailure.Reason);
+        }
+
         var importer = new ChangelogCsvImporter(db);
-        await importer.ImportAsync(rows, cancellationToken);
+        var importResult = await importer.ImportWithDiagnosticsAsync(parseResult.Rows, cancellationToken);
+
+        foreach (var failure in importResult.Failures)
+        {
+            logger.LogError("Failed to import CHANGELOG.csv entry {EntryId}: {Error}", failure.EntryId, failure.Error);
+        }
+
+        logger.LogInformation(
+            "CHANGELOG.csv import finished. Imported: {ImportedCount}, duplicates skipped: {DuplicateCount}, failed: {FailedCount}, malformed rows skipped: {MalformedCount}",
+            importResult.ImportedCount,
+            importResult.DuplicateCount,
+            importResult.FailedCount,
+            parseResult.Failures.Count);
     }
 
     /// <summary>

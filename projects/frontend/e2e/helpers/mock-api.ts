@@ -7052,6 +7052,32 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       return routeJson({ markGameNewsRead: true })
     }
 
+    if (query.includes('markAllGameNewsRead')) {
+      if (!state.currentUserId) {
+        return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      }
+
+      const unreadEntries = state.gameNewsEntries.filter(
+        (entry) =>
+          entry.status === 'PUBLISHED' &&
+          (entry.targetServerKey === null || entry.targetServerKey === state.serverKey) &&
+          !entry.readByPlayerIds.includes(state.currentUserId ?? ''),
+      )
+
+      if (unreadEntries.length > 0) {
+        state.gameNewsEntries = state.gameNewsEntries.map((entry) =>
+          unreadEntries.some((candidate) => candidate.id === entry.id)
+            ? {
+                ...entry,
+                readByPlayerIds: [...entry.readByPlayerIds, state.currentUserId!],
+              }
+            : entry,
+        )
+      }
+
+      return routeJson({ markAllGameNewsRead: unreadEntries.length })
+    }
+
     if (query.includes('gameNewsFeed')) {
       const includeDrafts = Boolean(body.variables?.includeDrafts ?? query.includes('includeDrafts: true'))
       const visibleEntries = state.gameNewsEntries
