@@ -38,10 +38,13 @@ export interface GameAdminPlayer {
   displayName: string
   role: PlayerRole
   isInvisibleInChat: boolean
+  createdAtUtc?: string
   lastLoginAtUtc: string | null
   personalCash: number
   totalCompanyCash: number
+  totalCompanyEquity?: number
   companyCount: number
+  cityNames?: string[]
   companies: GameAdminCompany[]
 }
 

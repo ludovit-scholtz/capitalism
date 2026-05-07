@@ -10,6 +10,8 @@ public sealed class OperationsStatisticsResult
 
     public int WindowTicks { get; set; } = 100;
 
+    public string Range { get; set; } = OperationsStatisticsRange.Last7Days;
+
     /// <summary>Money inflow items (revenue sources).</summary>
     public List<OperationsMoneyFlowItem> InflowItems { get; set; } = [];
 
@@ -33,6 +35,19 @@ public sealed class OperationsStatisticsResult
 
     /// <summary>Total building count.</summary>
     public int TotalBuildingCount { get; set; }
+}
+
+public static class OperationsStatisticsRange
+{
+    public const string Last24Hours = "LAST_24_HOURS";
+    public const string Last7Days = "LAST_7_DAYS";
+    public const string Last30Days = "LAST_30_DAYS";
+    public const string AllTime = "ALL_TIME";
+}
+
+public sealed class OperationsStatisticsInput
+{
+    public string Range { get; set; } = OperationsStatisticsRange.Last7Days;
 }
 
 /// <summary>One money flow line item in the operations statistics view.</summary>
@@ -106,6 +121,10 @@ public sealed class AdminProductAnalyticsRow
     public decimal TotalResearchSpend { get; set; }
     /// <summary>Number of cities where this product is actively sold.</summary>
     public int ActiveCityCount { get; set; }
+    /// <summary>Average marketing reach/brand traction score (0–100).</summary>
+    public decimal MarketingScore { get; set; }
+    /// <summary>Average research/product-quality score (0–100).</summary>
+    public decimal ResearchScore { get; set; }
 }
 
 /// <summary>Optional filters for adminProductAnalytics.</summary>

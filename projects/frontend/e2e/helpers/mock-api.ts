@@ -12,6 +12,7 @@
 import type { Page } from '@playwright/test'
 
 export const GOVERNMENT_PLAYER_EMAIL = 'government@capitalism.game'
+const MOCK_BUILDING_BASE_VALUE = 75_000
 
 export type MockPlayer = {
   id: string
@@ -2909,10 +2910,26 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     displayName: player.displayName,
     role: player.role,
     isInvisibleInChat: player.isInvisibleInChat ?? false,
+    createdAtUtc: player.createdAtUtc,
     lastLoginAtUtc: player.lastLoginAtUtc,
     personalCash: player.personalCash,
     totalCompanyCash: Number(player.companies.reduce((total, company) => total + company.cash, 0).toFixed(2)),
+    totalCompanyEquity: Number(
+      (
+        player.companies.reduce((total, company) => total + company.cash, 0)
+        + player.companies.reduce((total, company) => total + company.buildings.length * MOCK_BUILDING_BASE_VALUE, 0)
+      ).toFixed(2),
+    ),
     companyCount: player.companies.length,
+    cityNames: [
+      ...new Set(
+        player.companies.flatMap((company) =>
+          company.buildings
+            .map((building) => state.cities.find((city) => city.id === building.cityId)?.name ?? '')
+            .filter((name) => !!name),
+        ),
+      ),
+    ],
     companies: player.companies.map((company) => ({
       id: company.id,
       name: company.name,
@@ -7435,12 +7452,14 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       if (accessFailure) {
         return routeJsonError(accessFailure.message, accessFailure.code)
       }
+      const selectedRange = body?.variables?.input?.range ?? 'LAST_7_DAYS'
       const playerCount = state.players.filter((p) => p.email !== 'government@capitalism.game').length
       const companyCount = state.players.flatMap((p) => p.companies).length
       const buildingCount = state.players.flatMap((p) => p.companies).reduce((sum, c) => sum + (c.buildings?.length ?? 0), 0)
       return routeJson({
         operationsStatistics: {
           currentTick: state.gameState.currentTick,
+          range: selectedRange,
           windowTicks: 100,
           totalInflow: 450000,
           totalOutflow: 280000,
@@ -7483,6 +7502,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               totalSold: 980,
               totalRevenue: 49000,
               avgSellingPrice: 50,
+              marketSize: 1400,
               activeSellerCount: 4,
               activeCityCount: 2,
               totalMaterialCost: 8000,
@@ -7491,6 +7511,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               totalCost: 17000,
               marketSaturation: 45.5,
               totalMarketingSpend: 2000,
+              totalResearchSpend: 1500,
+              marketingScore: 62.5,
+              researchScore: 48.0,
             },
             {
               productTypeId: 'prod-bread',
@@ -7502,6 +7525,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               totalSold: 4800,
               totalRevenue: 14400,
               avgSellingPrice: 3,
+              marketSize: 5300,
               activeSellerCount: 3,
               activeCityCount: 1,
               totalMaterialCost: 3000,
@@ -7510,6 +7534,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               totalCost: 6000,
               marketSaturation: 62.0,
               totalMarketingSpend: 500,
+              totalResearchSpend: 250,
+              marketingScore: 34.0,
+              researchScore: 22.0,
             },
             {
               productTypeId: 'prod-medicine',
@@ -7521,6 +7548,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               totalSold: 750,
               totalRevenue: 37500,
               avgSellingPrice: 50,
+              marketSize: 950,
               activeSellerCount: 2,
               activeCityCount: 1,
               totalMaterialCost: 10000,
@@ -7529,6 +7557,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               totalCost: 17500,
               marketSaturation: 28.3,
               totalMarketingSpend: 1200,
+              totalResearchSpend: 2200,
+              marketingScore: 58.0,
+              researchScore: 71.0,
             },
           ],
         },

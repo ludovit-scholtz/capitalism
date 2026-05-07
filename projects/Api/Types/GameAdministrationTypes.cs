@@ -152,13 +152,19 @@ public sealed class GameAdminPlayerSummary
 
     public bool IsInvisibleInChat { get; set; }
 
+    public DateTime CreatedAtUtc { get; set; }
+
     public DateTime? LastLoginAtUtc { get; set; }
 
     public decimal PersonalCash { get; set; }
 
     public decimal TotalCompanyCash { get; set; }
 
+    public decimal TotalCompanyEquity { get; set; }
+
     public int CompanyCount { get; set; }
+
+    public List<string> CityNames { get; set; } = [];
 
     public List<GameAdminCompanySummary> Companies { get; set; } = [];
 }

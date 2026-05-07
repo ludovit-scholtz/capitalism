@@ -32,6 +32,7 @@ export default defineConfig(({ isSsrBuild }) => ({
             injectManifest: {
               // Glob patterns for assets to precache (app shell).
               globPatterns: ['**/*.{js,css,html,ico,svg,woff2}'],
+              rollupFormat: 'iife',
             },
             manifest: {
               name: 'Capitalism 5',
