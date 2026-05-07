@@ -1,5 +1,7 @@
 using System.Text.Json;
 using Api.Data;
+using Api.Data.Entities;
+using Api.Engine;
 using Api.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +22,20 @@ public sealed class ReferralCodeRegistrationTests
           register(input: $input) {
             token
             player { id email appliedReferralCode }
+          }
+        }
+        """;
+
+    private static readonly string GenerateReferralCodeMutation = """
+        mutation GenerateReferralCode {
+          generateReferralCode
+        }
+        """;
+
+    private static readonly string CompleteOnboardingMutation = """
+        mutation CompleteOnboarding($input: OnboardingInput!) {
+          completeOnboarding(input: $input) {
+            company { id }
           }
         }
         """;
@@ -314,5 +330,212 @@ public sealed class ReferralCodeRegistrationTests
 
         var mePlayer = meResult.GetProperty("data").GetProperty("me");
         Assert.Equal("MYCODE01", mePlayer.GetProperty("appliedReferralCode").GetString());
+    }
+
+    [Fact]
+    public async Task GenerateReferralCode_IsIdempotentForSamePlayer_AndUniqueAcrossPlayers()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var firstRegister = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            RegisterMutation,
+            new
+            {
+                input = new
+                {
+                    email = "ref-owner-1@example.com",
+                    displayName = "Ref Owner 1",
+                    password = "TestPass123!"
+                }
+            });
+        var firstToken = firstRegister.GetProperty("data").GetProperty("register").GetProperty("token").GetString()!;
+
+        var firstCodeResult = await TestHelpers.ExecuteGraphQlAsync(client, GenerateReferralCodeMutation, token: firstToken);
+        var firstCode = firstCodeResult.GetProperty("data").GetProperty("generateReferralCode").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(firstCode));
+
+        var secondCodeResult = await TestHelpers.ExecuteGraphQlAsync(client, GenerateReferralCodeMutation, token: firstToken);
+        var secondCode = secondCodeResult.GetProperty("data").GetProperty("generateReferralCode").GetString();
+        Assert.Equal(firstCode, secondCode);
+
+        var secondRegister = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            RegisterMutation,
+            new
+            {
+                input = new
+                {
+                    email = "ref-owner-2@example.com",
+                    displayName = "Ref Owner 2",
+                    password = "TestPass123!"
+                }
+            });
+        var secondToken = secondRegister.GetProperty("data").GetProperty("register").GetProperty("token").GetString()!;
+
+        var thirdCodeResult = await TestHelpers.ExecuteGraphQlAsync(client, GenerateReferralCodeMutation, token: secondToken);
+        var thirdCode = thirdCodeResult.GetProperty("data").GetProperty("generateReferralCode").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(thirdCode));
+        Assert.NotEqual(firstCode, thirdCode);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(2, await db.ReferralCodes.CountAsync());
+    }
+
+    [Fact]
+    public async Task CompleteOnboarding_WithReferralCode_AppliesDiscountAndCreatesReferralRegistration()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var ownerRegister = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            RegisterMutation,
+            new
+            {
+                input = new
+                {
+                    email = "ref-owner-onboarding@example.com",
+                    displayName = "Ref Owner Onboarding",
+                    password = "TestPass123!"
+                }
+            });
+        var ownerToken = ownerRegister.GetProperty("data").GetProperty("register").GetProperty("token").GetString()!;
+        var generatedCodeResult = await TestHelpers.ExecuteGraphQlAsync(client, GenerateReferralCodeMutation, token: ownerToken);
+        var generatedCode = generatedCodeResult.GetProperty("data").GetProperty("generateReferralCode").GetString()!;
+
+        var inviteeRegister = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            RegisterMutation,
+            new
+            {
+                input = new
+                {
+                    email = "referred-onboarding@example.com",
+                    displayName = "Referred Onboarding",
+                    password = "TestPass123!",
+                    referralCode = generatedCode
+                }
+            });
+        var inviteeToken = inviteeRegister.GetProperty("data").GetProperty("register").GetProperty("token").GetString()!;
+        var inviteeId = Guid.Parse(inviteeRegister.GetProperty("data").GetProperty("register").GetProperty("player").GetProperty("id").GetString()!);
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var cityId = await db.Cities
+                .AsNoTracking()
+                .OrderBy(city => city.Population)
+                .Select(city => city.Id)
+                .FirstAsync();
+            var productId = await db.ProductTypes
+                .AsNoTracking()
+                .Where(product => product.Slug == "wooden-chair")
+                .Select(product => product.Id)
+                .FirstAsync();
+
+            await TestHelpers.ExecuteGraphQlAsync(
+                client,
+                CompleteOnboardingMutation,
+                new
+                {
+                    input = new
+                    {
+                        industry = Industry.Furniture,
+                        cityId,
+                        productTypeId = productId,
+                        companyName = "Referral Discount Co",
+                    }
+                },
+                token: inviteeToken);
+        }
+
+        await using var verificationScope = factory.Services.CreateAsyncScope();
+        var verificationDb = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var company = await verificationDb.Companies
+            .AsNoTracking()
+            .Where(candidate => candidate.PlayerId == inviteeId)
+            .Select(candidate => new { candidate.Id, candidate.Name })
+            .FirstAsync();
+        var lotsByBuildingId = await verificationDb.BuildingLots
+            .AsNoTracking()
+            .Where(lot => lot.OwnerCompanyId == company.Id)
+            .ToDictionaryAsync(lot => lot.BuildingId!.Value, lot => lot.Price);
+        var propertyPurchases = await verificationDb.LedgerEntries
+            .AsNoTracking()
+            .Where(entry => entry.CompanyId == company.Id && entry.Category == LedgerCategory.PropertyPurchase)
+            .ToListAsync();
+        Assert.Equal(2, propertyPurchases.Count);
+
+        foreach (var purchase in propertyPurchases)
+        {
+            Assert.NotNull(purchase.BuildingId);
+            var lotPrice = lotsByBuildingId[purchase.BuildingId!.Value];
+            var expectedDiscountedPrice = decimal.Round(-lotPrice * 0.9m, 2, MidpointRounding.AwayFromZero);
+            Assert.Equal(expectedDiscountedPrice, purchase.Amount);
+        }
+
+        var registration = await verificationDb.ReferralRegistrations
+            .AsNoTracking()
+            .FirstOrDefaultAsync(candidate => candidate.ReferredPlayerId == inviteeId);
+        Assert.NotNull(registration);
+
+        var referralCode = await verificationDb.ReferralCodes.AsNoTracking().FirstAsync(candidate => candidate.Code == generatedCode);
+        Assert.Equal(1, referralCode.UsageCount);
+    }
+
+    [Fact]
+    public async Task CompleteOnboarding_WithUnknownReferralCode_ReturnsReferralCodeInvalidError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var inviteeRegister = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            RegisterMutation,
+            new
+            {
+                input = new
+                {
+                    email = "referred-invalid-code@example.com",
+                    displayName = "Referred Invalid",
+                    password = "TestPass123!",
+                    referralCode = "UNKNOWN99"
+                }
+            });
+        var inviteeToken = inviteeRegister.GetProperty("data").GetProperty("register").GetProperty("token").GetString()!;
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var cityId = await db.Cities
+            .AsNoTracking()
+            .OrderBy(city => city.Population)
+            .Select(city => city.Id)
+            .FirstAsync();
+        var productId = await db.ProductTypes
+            .AsNoTracking()
+            .Where(product => product.Slug == "wooden-chair")
+            .Select(product => product.Id)
+            .FirstAsync();
+
+        var result = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            CompleteOnboardingMutation,
+            new
+            {
+                input = new
+                {
+                    industry = Industry.Furniture,
+                    cityId,
+                    productTypeId = productId,
+                    companyName = "Invalid Ref Co",
+                }
+            },
+            token: inviteeToken);
+
+        var errorCode = result.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("REFERRAL_CODE_INVALID", errorCode);
     }
 }

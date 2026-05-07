@@ -34,6 +34,7 @@ export type MockPlayer = {
   onboardingFactoryLotId: string | null
   onboardingShopBuildingId: string | null
   onboardingFirstSaleCompletedAtUtc: string | null
+  appliedReferralCode: string | null
   proSubscriptionEndsAtUtc: string | null
   dividendPayments: MockDividendPayment[]
   stockTrades: MockPersonTradeRecord[]
@@ -1909,6 +1910,7 @@ export function makePlayer(overrides?: Partial<MockPlayer>): MockPlayer {
     onboardingFactoryLotId: null,
     onboardingShopBuildingId: null,
     onboardingFirstSaleCompletedAtUtc: null,
+    appliedReferralCode: null,
     proSubscriptionEndsAtUtc: null,
     dividendPayments: [],
     stockTrades: [],
@@ -3039,6 +3041,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         createdAtUtc: new Date().toISOString(),
         lastLoginAtUtc: null,
         personalCash: PERSONAL_STARTING_CASH,
+        personalTaxReserve: 0,
         activeAccountType: 'PERSON',
         activeCompanyId: null,
         onboardingCompletedAtUtc: null,
@@ -3049,8 +3052,13 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         onboardingFactoryLotId: null,
         onboardingShopBuildingId: null,
         onboardingFirstSaleCompletedAtUtc: null,
+        appliedReferralCode:
+          typeof input?.referralCode === 'string' && /^[A-Za-z0-9]{4,20}$/.test(input.referralCode.trim())
+            ? input.referralCode.trim().toUpperCase()
+            : null,
         proSubscriptionEndsAtUtc: null,
         dividendPayments: [],
+        stockTrades: [],
         companies: [],
       }
       state.players.push(newPlayer)

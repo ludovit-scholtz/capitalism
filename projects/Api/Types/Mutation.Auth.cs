@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Cryptography;
 using System.Security.Claims;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -117,6 +118,40 @@ public sealed partial class Mutation
         };
     }
 
+    /// <summary>
+    /// Generates a unique referral code for the authenticated player.
+    /// Returns the existing code if one is already assigned.
+    /// </summary>
+    [Authorize]
+    public async Task<string> GenerateReferralCode(
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+        var existing = await db.ReferralCodes
+            .AsNoTracking()
+            .Where(code => code.CreatorPlayerId == userId)
+            .Select(code => code.Code)
+            .FirstOrDefaultDeterministicAsync();
+
+        if (!string.IsNullOrWhiteSpace(existing))
+        {
+            return existing;
+        }
+
+        var generatedCode = await GenerateUniqueReferralCodeAsync(db, 8, httpContextAccessor.HttpContext.RequestAborted);
+        db.ReferralCodes.Add(new ReferralCode
+        {
+            Id = Guid.NewGuid(),
+            Code = generatedCode,
+            CreatorPlayerId = userId,
+            CreatedAtUtc = DateTime.UtcNow,
+            UsageCount = 0
+        });
+        await db.SaveChangesAsync(httpContextAccessor.HttpContext.RequestAborted);
+        return generatedCode;
+    }
+
     [Authorize]
     public async Task<AuthPayload> StartAdminImpersonation(
         StartAdminImpersonationInput input,
@@ -210,5 +245,38 @@ public sealed partial class Mutation
         }
 
         return normalized;
+    }
+
+    private static async Task<string> GenerateUniqueReferralCodeAsync(
+        AppDbContext db,
+        int length,
+        CancellationToken cancellationToken)
+    {
+        const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        var buffer = new byte[length];
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            RandomNumberGenerator.Fill(buffer);
+            var codeChars = new char[length];
+            for (var index = 0; index < length; index++)
+            {
+                codeChars[index] = alphabet[buffer[index] % alphabet.Length];
+            }
+
+            var candidate = new string(codeChars);
+            var exists = await db.ReferralCodes
+                .AsNoTracking()
+                .AnyAsync(code => code.Code == candidate, cancellationToken);
+            if (!exists)
+            {
+                return candidate;
+            }
+        }
+
+        throw new GraphQLException(
+            ErrorBuilder.New()
+                .SetMessage("Unable to generate a unique referral code. Please retry.")
+                .SetCode("REFERRAL_CODE_GENERATION_FAILED")
+                .Build());
     }
 }

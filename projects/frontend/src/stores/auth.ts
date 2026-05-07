@@ -63,6 +63,7 @@ const PLAYER_SELECTION = `
   onboardingFactoryLotId
   onboardingShopBuildingId
   onboardingFirstSaleCompletedAtUtc
+  appliedReferralCode
   proSubscriptionEndsAtUtc
   companies {
     id

@@ -102,6 +102,7 @@ public sealed partial class Mutation
         }
 
         var onboardingCityId = player.OnboardingCityId!.Value;
+        var referralDiscountRate = await EnsureReferralRegistrationAndGetDiscountRateAsync(db, player, httpContextAccessor.HttpContext!.RequestAborted);
 
         // Look up the FX rate for the onboarding city's currency to normalize starter prices.
         var onboardingCityCurrencyCode = await db.Cities
@@ -119,7 +120,8 @@ public sealed partial class Mutation
             $"{company.Name} Shop",
             Engine.GameConstants.PowerDemandMw(BuildingType.SalesShop, 1),
             nowUtc,
-            onboardingCityId);
+            onboardingCityId,
+            purchaseDiscountRate: referralDiscountRate);
 
         ConfigureStarterFactory(db, factory, product, starterResourceId.Value, finishFxRate);
         AddStarterShop(db, company.Id, shop.Id, product, finishFxRate);
