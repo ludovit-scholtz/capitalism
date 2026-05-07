@@ -286,7 +286,8 @@ public sealed class LoanRepaymentPhase : ITickPhase
             var bankBuildingName = context.BuildingsById.TryGetValue(loan.BankBuildingId, out var bankBuilding)
                 ? bankBuilding.Name
                 : "Bank";
-            var collateralBuildingName = context.BuildingsById.TryGetValue(loan.CollateralBuildingId ?? Guid.Empty, out var collateral)
+            var collateralBuildingName = loan.CollateralBuildingId.HasValue
+                && context.BuildingsById.TryGetValue(loan.CollateralBuildingId.Value, out var collateral)
                 ? collateral.Name
                 : "Collateral building";
             var ticksRemaining = Math.Max(0L, (loan.DefaultedAtTick ?? context.CurrentTick) + ForeclosureWindowTicks - context.CurrentTick);

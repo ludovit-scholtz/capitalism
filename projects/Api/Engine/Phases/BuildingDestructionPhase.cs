@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Api.Engine.Phases;
 
 /// <summary>
-/// Handles the building destruction lifecycle for loan-defaulted collateral buildings.
+/// Handles the building destruction lifecycle for overdue/defaulted collateral buildings.
 ///
 /// When a loan defaults and its collateral building is auto-listed for sale, the building
 /// has <see cref="GameConstants.ForeclosureWindowTicks"/> ticks (3 game days = 72 ticks) to be sold.
@@ -28,7 +28,7 @@ public sealed class BuildingDestructionPhase : ITickPhase
 
     public async Task ProcessAsync(TickContext context)
     {
-        // Find defaulted loans with collateral buildings that have passed the foreclosure window.
+        // Find overdue/defaulted loans with collateral buildings that have passed the foreclosure window.
         var foreclosureDeadline = context.CurrentTick - GameConstants.ForeclosureWindowTicks;
         var overdueDefaultedLoans = await context.Db.Loans
             .Where(l => (l.Status == LoanStatus.Overdue || l.Status == LoanStatus.Defaulted)
