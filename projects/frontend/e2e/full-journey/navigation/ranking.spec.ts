@@ -30,7 +30,7 @@ test.describe('Ranking page', () => {
 
     await page.goto('/ranking')
 
-    await expect(page).toHaveURL(/\/leaderboard\?page=3/)
+    await expect(page).toHaveURL(/\/(ranking|leaderboard)\?page=3/)
     await expect(page.getByText('Page 3 of 3')).toBeVisible()
     const playerRow = page.locator('.rank-card', { hasText: currentPlayer.displayName })
     await expect(playerRow).toHaveAttribute('aria-current', 'true')

@@ -16,20 +16,25 @@ test.describe('Ranking pages', () => {
       displayName: 'Rank Twenty Five',
     })
 
-    const rankingLeaderboard = Array.from({ length: 30 }, (_, index) => ({
-      playerId: `rank-player-${index + 1}`,
-      displayName: `Rank Player ${index + 1}`,
-      totalPoints: 1000 - index * 10,
-      globalRank: index + 1,
-      rankMovement: 0,
-    }))
-    rankingLeaderboard[24] = {
-      playerId: player.id,
-      displayName: player.displayName,
-      totalPoints: 750,
-      globalRank: 25,
-      rankMovement: 1,
-    }
+    const rankingLeaderboard = Array.from({ length: 30 }, (_, index) => {
+      if (index === 24) {
+        return {
+          playerId: player.id,
+          displayName: player.displayName,
+          totalPoints: 750,
+          globalRank: 25,
+          rankMovement: 1,
+        }
+      }
+
+      return {
+        playerId: `rank-player-${index + 1}`,
+        displayName: `Rank Player ${index + 1}`,
+        totalPoints: 1000 - index * 10,
+        globalRank: index + 1,
+        rankMovement: 0,
+      }
+    })
 
     const state = setupMockApi(page, {
       rankingLeaderboard,
