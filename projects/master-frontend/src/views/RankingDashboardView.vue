@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import {
   fetchMyRankingSummary,
   fetchRankingLeaderboard,
@@ -8,18 +9,21 @@ import {
   type RankingSummaryInfo,
 } from '@/lib/masterApi'
 import { useAuthStore } from '@/stores/auth'
+import { calculateRankPage, isActivePlayer } from '@/lib/ranking'
 import ViewJumbotron from '@/components/layout/ViewJumbotron.vue'
 import ViewSubnav from '@/components/layout/ViewSubnav.vue'
 
 const auth = useAuthStore()
 const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
 
 const loading = ref(false)
 const errorMessage = ref('')
 const summary = ref<RankingSummaryInfo | null>(null)
 const leaderboard = ref<RankingLeaderboardEntryInfo[]>([])
 const currentPage = ref(1)
-const pageSize = ref(25)
+const pageSize = ref(10)
 const nameFilter = ref('')
 
 const pageSizeOptions = [10, 25, 50]
@@ -36,6 +40,7 @@ const navItems = computed(() => {
 const hasPreviousPage = computed(() => currentPage.value > 1)
 const hasNextPage = computed(() => leaderboard.value.length === pageSize.value)
 const currentOffset = computed(() => (currentPage.value - 1) * pageSize.value)
+const currentPlayerId = computed(() => auth.player?.id ?? null)
 
 const filteredLeaderboard = computed(() => {
   const filter = nameFilter.value.trim().toLowerCase()
@@ -91,21 +96,49 @@ async function loadData() {
   }
 }
 
+function parsePageQuery(value: unknown): number {
+  const raw = Array.isArray(value) ? value[0] : value
+  const parsed = Number.parseInt(String(raw ?? ''), 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1
+}
+
+async function persistPageQuery() {
+  await router.replace({
+    query: {
+      ...route.query,
+      page: currentPage.value > 1 ? String(currentPage.value) : undefined,
+    },
+  })
+}
+
 async function changePage(page: number) {
   if (page < 1 || page === currentPage.value) {
     return
   }
 
   currentPage.value = page
+  await persistPageQuery()
   await loadData()
 }
 
 async function handlePageSizeChange() {
   currentPage.value = 1
+  await persistPageQuery()
   await loadData()
 }
 
 onMounted(async () => {
+  currentPage.value = parsePageQuery(route.query.page)
+  const hasExplicitPage = route.query.page !== undefined
+  if (!hasExplicitPage && auth.token) {
+    try {
+      summary.value = await fetchMyRankingSummary(auth.token)
+      currentPage.value = calculateRankPage(summary.value?.globalRank, pageSize.value)
+    } catch {
+      currentPage.value = 1
+    }
+  }
+  await persistPageQuery()
   await loadData()
 })
 </script>
@@ -219,9 +252,27 @@ onMounted(async () => {
                 v-for="entry in filteredLeaderboard"
                 :key="entry.playerId"
                 class="border-t border-divider/70"
+                :class="{
+                  'bg-blue-50 dark:bg-blue-900/30 font-semibold ring-1 ring-inset ring-blue-400 border-l-4 border-l-blue-500':
+                    isActivePlayer(entry.playerId, currentPlayerId),
+                }"
+                :aria-current="isActivePlayer(entry.playerId, currentPlayerId) ? 'true' : undefined"
+                :aria-label="
+                  isActivePlayer(entry.playerId, currentPlayerId)
+                    ? t('rankingDashboard.activePlayerRowAria')
+                    : undefined
+                "
               >
                 <td class="px-5 py-3 font-semibold">#{{ entry.globalRank }}</td>
-                <td class="px-5 py-3">{{ entry.displayName }}</td>
+                <td class="px-5 py-3">
+                  {{ entry.displayName }}
+                  <span
+                    v-if="isActivePlayer(entry.playerId, currentPlayerId)"
+                    class="ml-2 rounded bg-blue-100 px-1.5 py-0.5 text-xs font-semibold text-blue-700"
+                  >
+                    {{ t('rankingDashboard.youBadge') }}
+                  </span>
+                </td>
                 <td class="px-5 py-3">{{ formatPoints(entry.totalPoints) }}</td>
                 <td class="px-5 py-3" :class="movementClass(entry.rankMovement)">
                   {{ movementLabel(entry.rankMovement) }}

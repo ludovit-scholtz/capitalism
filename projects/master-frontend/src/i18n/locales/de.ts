@@ -392,6 +392,8 @@ export default {
     pageLabel: 'Seite {page}',
     previousPage: 'Zurück',
     nextPage: 'Weiter',
+    youBadge: 'Sie',
+    activePlayerRowAria: 'Ihre Ranglistenzeile',
     noRows: 'Keine Ranglistenzeilen entsprechen deinem Filter.',
     loadError: 'Ranglistendaten konnten nicht geladen werden.',
   },

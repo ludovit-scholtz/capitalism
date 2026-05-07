@@ -10,6 +10,7 @@ import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { deepEqual } from '@/lib/utils'
 import { formatInGameTime } from '@/lib/gameTime'
 import { formatCompactMoney } from '@/lib/currencyFormat'
+import { calculateRankPage, isActivePlayer } from '@/lib/ranking'
 import type { PlayerRanking, CompanyRanking } from '@/types'
 
 const { t, locale } = useI18n()
@@ -26,6 +27,9 @@ const companyLoading = ref(false)
 const playerError = ref<string | null>(null)
 const companyError = ref<string | null>(null)
 const companyRankingsLoaded = ref(false)
+const itemsPerPage = 10
+const masterPortalUrl = import.meta.env.VITE_MASTER_WEB_URL || 'http://localhost:5174'
+const masterRankingUrl = `${masterPortalUrl}/ranking`
 
 function getInitialTab(): 'players' | 'companies' {
   const queryTab = route.query.tab
@@ -34,6 +38,7 @@ function getInitialTab(): 'players' | 'companies' {
 }
 
 const activeTab = ref<'players' | 'companies'>(getInitialTab())
+const currentPage = ref(1)
 
 const PLAYER_RANKINGS_QUERY = `
   {
@@ -112,6 +117,12 @@ onMounted(async () => {
     void auth.fetchMe()
   }
   await Promise.allSettled([fetchPlayerRankings(), fetchCompanyRankings()])
+  currentPage.value = parsePageQuery(route.query.page)
+  if (route.query.page === undefined) {
+    setPageToActivePlayer()
+  }
+  clampCurrentPage()
+  await persistRankingQuery()
 })
 
 useTickRefresh(async () => {
@@ -121,12 +132,23 @@ useTickRefresh(async () => {
 })
 
 watch(activeTab, (tab: 'players' | 'companies') => {
-  // Persist the active tab in the URL so back/forward navigation and page reloads restore context
-  void router.replace({ query: { ...route.query, tab: tab === 'players' ? undefined : tab } })
   if (tab === 'companies' && !companyRankingsLoaded.value && !companyLoading.value) {
     void fetchCompanyRankings()
   }
+  if (route.query.page === undefined) {
+    setPageToActivePlayer()
+  }
+  clampCurrentPage()
+  void persistRankingQuery()
 })
+
+watch(
+  () => route.query.page,
+  (queryPage) => {
+    currentPage.value = parsePageQuery(queryPage)
+    clampCurrentPage()
+  },
+)
 
 function retryActiveTab() {
   if (activeTab.value === 'companies') {
@@ -140,11 +162,11 @@ function formatWealth(value: number, currencyCode = 'USD'): string {
   return formatCompactMoney(value, currencyCode, locale.value)
 }
 
-function rankBadge(index: number): string {
-  if (index === 0) return '🥇'
-  if (index === 1) return '🥈'
-  if (index === 2) return '🥉'
-  return `${index + 1}`
+function rankBadge(rankNumber: number): string {
+  if (rankNumber === 1) return '🥇'
+  if (rankNumber === 2) return '🥈'
+  if (rankNumber === 3) return '🥉'
+  return `${rankNumber}`
 }
 
 const currentPlayerId = computed(() => auth.player?.id ?? null)
@@ -156,18 +178,81 @@ const currentGameTime = computed(() => {
 
 function getRankClasses(index: number, ownerId: string | null) {
   return {
-    'border-l-4 border-l-[#ffd700]': index === 0,
-    'border-l-4 border-l-[#c0c0c0]': index === 1,
-    'border-l-4 border-l-[#cd7f32]': index === 2,
-    'border-[color:var(--color-secondary)]': ownerId === currentPlayerId.value,
+    'border-l-4 border-l-[#ffd700]': index === 1,
+    'border-l-4 border-l-[#c0c0c0]': index === 2,
+    'border-l-4 border-l-[#cd7f32]': index === 3,
+    'bg-blue-50/90 dark:bg-blue-900/30 font-semibold ring-1 ring-blue-400 border-l-4 border-l-blue-500':
+      isActivePlayer(ownerId, currentPlayerId.value),
   }
 }
 
 function getRankGradient(index: number): string | undefined {
-  if (index === 0) return 'background: linear-gradient(90deg, rgba(255,215,0,0.06) 0%, var(--color-surface) 40%)'
-  if (index === 1) return 'background: linear-gradient(90deg, rgba(192,192,192,0.06) 0%, var(--color-surface) 40%)'
-  if (index === 2) return 'background: linear-gradient(90deg, rgba(205,127,50,0.06) 0%, var(--color-surface) 40%)'
+  if (index === 1) return 'background: linear-gradient(90deg, rgba(255,215,0,0.06) 0%, var(--color-surface) 40%)'
+  if (index === 2) return 'background: linear-gradient(90deg, rgba(192,192,192,0.06) 0%, var(--color-surface) 40%)'
+  if (index === 3) return 'background: linear-gradient(90deg, rgba(205,127,50,0.06) 0%, var(--color-surface) 40%)'
   return undefined
+}
+
+const hasPreviousPage = computed(() => currentPage.value > 1)
+const allRowsForActiveTab = computed(() =>
+  activeTab.value === 'companies' ? companyRankings.value : rankings.value,
+)
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(allRowsForActiveTab.value.length / itemsPerPage)),
+)
+const pageStartIndex = computed(() => (currentPage.value - 1) * itemsPerPage)
+const pagedRankings = computed(() =>
+  rankings.value.slice(pageStartIndex.value, pageStartIndex.value + itemsPerPage),
+)
+const pagedCompanyRankings = computed(() =>
+  companyRankings.value.slice(pageStartIndex.value, pageStartIndex.value + itemsPerPage),
+)
+const hasNextPage = computed(() => currentPage.value < totalPages.value)
+
+function parsePageQuery(value: unknown): number {
+  const raw = Array.isArray(value) ? value[0] : value
+  const parsed = Number.parseInt(String(raw ?? ''), 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1
+}
+
+function clampCurrentPage() {
+  if (currentPage.value > totalPages.value) {
+    currentPage.value = totalPages.value
+  }
+  if (currentPage.value < 1) {
+    currentPage.value = 1
+  }
+}
+
+function getActivePlayerRank(): number | null {
+  const ownerRows =
+    activeTab.value === 'companies'
+      ? companyRankings.value.map((entry) => entry.playerId)
+      : rankings.value.map((entry) => entry.playerId)
+  const index = ownerRows.findIndex((id) => isActivePlayer(id, currentPlayerId.value))
+  return index >= 0 ? index + 1 : null
+}
+
+function setPageToActivePlayer() {
+  currentPage.value = calculateRankPage(getActivePlayerRank(), itemsPerPage)
+}
+
+async function persistRankingQuery() {
+  await router.replace({
+    query: {
+      ...route.query,
+      tab: activeTab.value === 'players' ? undefined : activeTab.value,
+      page: currentPage.value > 1 ? String(currentPage.value) : undefined,
+    },
+  })
+}
+
+async function changePage(nextPage: number) {
+  if (nextPage < 1 || nextPage > totalPages.value || nextPage === currentPage.value) {
+    return
+  }
+  currentPage.value = nextPage
+  await persistRankingQuery()
 }
 </script>
 
@@ -229,6 +314,18 @@ function getRankGradient(index: number): string | undefined {
         </button>
       </div>
 
+      <div class="max-w-[800px] mx-auto mb-6 flex justify-end">
+        <a
+          class="btn btn-secondary"
+          :href="masterRankingUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Open global master ranking in a new tab"
+        >
+          🏆 {{ t('leaderboard.viewMasterRanking') }}
+        </a>
+      </div>
+
       <!-- Player rankings tab -->
       <template v-if="activeTab === 'players'">
         <div v-if="playerLoading" class="flex flex-col items-center gap-3 py-12 text-center">
@@ -253,20 +350,22 @@ function getRankGradient(index: number): string | undefined {
 
         <div v-else class="flex flex-col gap-3 max-w-[800px] mx-auto mb-12">
           <div
-            v-for="(rank, index) in rankings"
+            v-for="(rank, index) in pagedRankings"
             :key="rank.playerId"
             class="rank-card flex items-center flex-wrap sm:flex-nowrap gap-4 bg-card border border-divider rounded-xl p-4 md:p-5 hover:border-brand transition-colors"
-            :class="getRankClasses(index, rank.playerId)"
-            :style="getRankGradient(index)"
+            :class="getRankClasses(pageStartIndex + index + 1, rank.playerId)"
+            :style="getRankGradient(pageStartIndex + index + 1)"
+            :aria-current="isActivePlayer(rank.playerId, currentPlayerId) ? 'true' : undefined"
+            :aria-label="isActivePlayer(rank.playerId, currentPlayerId) ? t('leaderboard.activePlayerRowAria') : undefined"
           >
             <div class="text-2xl font-extrabold min-w-[2.5rem] text-center text-brand leading-none">
-              {{ rankBadge(index) }}
+              {{ rankBadge(pageStartIndex + index + 1) }}
             </div>
             <div class="flex-1 min-w-0">
               <div class="text-base font-bold flex items-center gap-2 whitespace-nowrap overflow-hidden text-ellipsis">
                 {{ rank.displayName }}
                 <span
-                  v-if="rank.playerId === currentPlayerId"
+                  v-if="isActivePlayer(rank.playerId, currentPlayerId)"
                   class="you-badge text-[0.6875rem] font-bold bg-[color:var(--color-secondary)] text-black px-[0.4rem] py-[0.1rem] rounded-full tracking-[0.04em] uppercase shrink-0"
                 >{{ t('leaderboard.you') }}</span>
               </div>
@@ -318,20 +417,22 @@ function getRankGradient(index: number): string | undefined {
 
         <div v-else class="flex flex-col gap-3 max-w-[800px] mx-auto mb-12">
           <div
-            v-for="(rank, index) in companyRankings"
+            v-for="(rank, index) in pagedCompanyRankings"
             :key="rank.companyId"
             class="rank-card flex items-center flex-wrap sm:flex-nowrap gap-4 bg-card border border-divider rounded-xl p-4 md:p-5 hover:border-brand transition-colors"
-            :class="getRankClasses(index, rank.playerId)"
-            :style="getRankGradient(index)"
+            :class="getRankClasses(pageStartIndex + index + 1, rank.playerId)"
+            :style="getRankGradient(pageStartIndex + index + 1)"
+            :aria-current="isActivePlayer(rank.playerId, currentPlayerId) ? 'true' : undefined"
+            :aria-label="isActivePlayer(rank.playerId, currentPlayerId) ? t('leaderboard.activePlayerRowAria') : undefined"
           >
             <div class="text-2xl font-extrabold min-w-[2.5rem] text-center text-brand leading-none">
-              {{ rankBadge(index) }}
+              {{ rankBadge(pageStartIndex + index + 1) }}
             </div>
             <div class="flex-1 min-w-0">
               <div class="text-base font-bold flex items-center gap-2 whitespace-nowrap overflow-hidden text-ellipsis">
                 {{ rank.companyName }}
                 <span
-                  v-if="rank.playerId === currentPlayerId"
+                  v-if="isActivePlayer(rank.playerId, currentPlayerId)"
                   class="you-badge text-[0.6875rem] font-bold bg-[color:var(--color-secondary)] text-black px-[0.4rem] py-[0.1rem] rounded-full tracking-[0.04em] uppercase shrink-0"
                 >{{ t('leaderboard.you') }}</span>
               </div>
@@ -361,6 +462,31 @@ function getRankGradient(index: number): string | undefined {
           </div>
         </div>
       </template>
+
+      <div
+        v-if="!playerLoading && !companyLoading && !playerError && !companyError && allRowsForActiveTab.length > 0"
+        class="max-w-[800px] mx-auto mb-8 flex flex-wrap items-center justify-between gap-3"
+      >
+        <p class="text-sm text-muted">{{ t('leaderboard.pageLabel', { page: currentPage, pages: totalPages }) }}</p>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            :disabled="!hasPreviousPage"
+            @click="changePage(currentPage - 1)"
+          >
+            {{ t('leaderboard.previousPage') }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-secondary"
+            :disabled="!hasNextPage"
+            @click="changePage(currentPage + 1)"
+          >
+            {{ t('leaderboard.nextPage') }}
+          </button>
+        </div>
+      </div>
 
       <!-- How it works -->
       <div class="max-w-[800px] mx-auto bg-card border border-divider rounded-xl p-6">

@@ -389,6 +389,8 @@ export default {
     pageLabel: 'Page {page}',
     previousPage: 'Previous',
     nextPage: 'Next',
+    youBadge: 'You',
+    activePlayerRowAria: 'Your ranking row',
     noRows: 'No leaderboard rows match your filter.',
     loadError: 'Failed to load ranking data.',
   },
