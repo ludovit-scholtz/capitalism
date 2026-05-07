@@ -13,6 +13,22 @@ namespace Api.Types;
 [ExtendObjectType<Building>]
 public sealed class BuildingTypeExtensions
 {
+    /// <summary>
+    /// Location quality score derived from the linked lot (1.0 = city baseline).
+    /// Returned as null when the building has no linked lot.
+    /// </summary>
+    public async Task<decimal?> GetPopulationIndex(
+        [Parent] Building building,
+        [Service] AppDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var lot = await db.BuildingLots
+            .AsNoTracking()
+            .FirstOrDefaultAsync(l => l.BuildingId == building.Id, cancellationToken);
+
+        return lot?.PopulationIndex;
+    }
+
     public async Task<Guid?> GetLotResourceTypeId(
         [Parent] Building building,
         [Service] AppDbContext db,
