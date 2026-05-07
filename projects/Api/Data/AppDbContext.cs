@@ -45,6 +45,12 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Units within building 4x4 grids.</summary>
     public DbSet<BuildingUnit> BuildingUnits => Set<BuildingUnit>();
 
+    /// <summary>Configurable advertising units inside media house buildings.</summary>
+    public DbSet<MediaHouseUnit> MediaHouseUnits => Set<MediaHouseUnit>();
+
+    /// <summary>Per-tick records of media-house brand-quality boosts.</summary>
+    public DbSet<BrandQualityRecord> BrandQualityRecords => Set<BrandQualityRecord>();
+
     /// <summary>Queued building configuration upgrades.</summary>
     public DbSet<BuildingConfigurationPlan> BuildingConfigurationPlans => Set<BuildingConfigurationPlan>();
 

@@ -417,3 +417,29 @@ export interface MediaHouseAnalyticsResult {
   strategyRating: string
   strategyTip: string
 }
+
+export interface MediaHouseBoostHistoryPoint {
+  tick: number
+  boost: number
+}
+
+export interface MediaHouseUnitState {
+  id: string
+  targetCompanyId: string
+  targetCompanyName: string
+  mediaType: string
+  campaignBudgetPerTick: number
+  brandQualityBoostPerTick: number
+  isActive: boolean
+  laborCostPerTick: number
+  energyCostPerTick: number
+}
+
+export interface MediaHouseStatsResult {
+  buildingId: string
+  currentBoostDelivered: number
+  campaignCostThisTaxCycle: number
+  estimatedSalesImpact: number
+  boostHistory: MediaHouseBoostHistoryPoint[]
+  units: MediaHouseUnitState[]
+}

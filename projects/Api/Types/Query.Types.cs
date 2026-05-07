@@ -195,3 +195,35 @@ public sealed class ReferralProgramSummary
     /// <summary>Flat referral discount percentage available to referred players.</summary>
     public decimal DiscountRate { get; set; }
 }
+
+/// <summary>Tick-level boost datapoint for media-house campaign charts.</summary>
+public sealed class MediaHouseBoostHistoryPoint
+{
+    public long Tick { get; set; }
+    public decimal Boost { get; set; }
+}
+
+/// <summary>Current media-house campaign unit settings.</summary>
+public sealed class MediaHouseUnitState
+{
+    public Guid Id { get; set; }
+    public Guid TargetCompanyId { get; set; }
+    public string TargetCompanyName { get; set; } = string.Empty;
+    public string MediaType { get; set; } = string.Empty;
+    public decimal CampaignBudgetPerTick { get; set; }
+    public decimal BrandQualityBoostPerTick { get; set; }
+    public bool IsActive { get; set; }
+    public decimal LaborCostPerTick { get; set; }
+    public decimal EnergyCostPerTick { get; set; }
+}
+
+/// <summary>Aggregated campaign statistics for one media-house building.</summary>
+public sealed class MediaHouseStatsResult
+{
+    public Guid BuildingId { get; set; }
+    public decimal CurrentBoostDelivered { get; set; }
+    public decimal CampaignCostThisTaxCycle { get; set; }
+    public decimal EstimatedSalesImpact { get; set; }
+    public List<MediaHouseBoostHistoryPoint> BoostHistory { get; set; } = [];
+    public List<MediaHouseUnitState> Units { get; set; } = [];
+}

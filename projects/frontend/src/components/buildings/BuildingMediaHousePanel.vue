@@ -20,7 +20,18 @@ const {
   mediaHouseUpgradeSuccess,
   mediaHouseAnalytics,
   mediaHouseAnalyticsLoading,
+  mediaHouseStats,
+  mediaHouseStatsLoading,
+  ownedCompanies,
+  mediaHouseTargetCompanyId,
+  mediaHouseUnitMediaType,
+  mediaHouseCampaignBudgetPerTick,
+  mediaHouseUnitActive,
+  savingMediaHouseUnit,
+  mediaHouseUnitError,
+  mediaHouseUnitSuccess,
   upgradeMediaHouse,
+  saveMediaHouseUnitConfig,
   formatCurrency,
 } = bd
 
@@ -60,6 +71,11 @@ const strategyRatingColor = computed(() => {
   if (r === 'COMPETITIVE') return 'text-emerald-600 dark:text-emerald-400'
   if (r === 'GROWING') return 'text-sky-600 dark:text-sky-400'
   return 'text-muted'
+})
+
+const mediaHouseBoostChartMax = computed(() => {
+  const values = mediaHouseStats.value?.boostHistory.map((entry) => entry.boost) ?? []
+  return Math.max(...values, 1)
 })
 </script>
 
@@ -123,6 +139,85 @@ const strategyRatingColor = computed(() => {
         class="media-house-strategy-tip mt-3 rounded-lg border border-divider bg-surface px-3 py-2.5 text-sm text-muted"
       >
         {{ mediaHouseAnalytics.strategyTip }}
+      </div>
+    </div>
+
+    <div class="media-house-unit-config-section rounded-xl border border-divider bg-card p-4 sm:p-5">
+      <h3 class="media-house-section-title mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
+        {{ t('mediaHouse.unitConfigTitle') }}
+      </h3>
+      <div class="grid gap-3 md:grid-cols-2">
+        <label class="flex flex-col gap-1 text-sm">
+          <span class="text-muted">{{ t('mediaHouse.configMediaType') }}</span>
+          <select v-model="mediaHouseUnitMediaType" class="form-input">
+            <option value="NEWSPAPER">📰 NEWSPAPER</option>
+            <option value="RADIO">📻 RADIO</option>
+            <option value="TV">📺 TV</option>
+          </select>
+        </label>
+        <label class="flex flex-col gap-1 text-sm">
+          <span class="text-muted">{{ t('mediaHouse.configTargetCompany') }}</span>
+          <select v-model="mediaHouseTargetCompanyId" class="form-input">
+            <option v-for="company in ownedCompanies" :key="company.id" :value="company.id">{{ company.name }}</option>
+          </select>
+        </label>
+      </div>
+      <label class="mt-3 flex flex-col gap-1 text-sm">
+        <span class="text-muted">{{ t('mediaHouse.configCampaignBudget') }}</span>
+        <input
+          v-model.number="mediaHouseCampaignBudgetPerTick"
+          type="range"
+          min="0"
+          max="5000"
+          step="50"
+          class="w-full"
+        />
+        <span class="text-xs text-foreground">{{ formatCurrency(mediaHouseCampaignBudgetPerTick) }} / {{ t('mediaHouse.perTick') }}</span>
+      </label>
+      <label class="mt-3 inline-flex items-center gap-2 text-sm text-foreground">
+        <input v-model="mediaHouseUnitActive" type="checkbox" />
+        {{ t('mediaHouse.configIsActive') }}
+      </label>
+      <p v-if="mediaHouseUnitError" class="mt-2 rounded-md border border-red-300/50 bg-red-500/10 px-2.5 py-2 text-xs text-red-700 dark:text-red-300">
+        {{ mediaHouseUnitError }}
+      </p>
+      <p v-if="mediaHouseUnitSuccess" class="mt-2 rounded-md border border-emerald-300/50 bg-emerald-500/10 px-2.5 py-2 text-xs text-emerald-800 dark:text-emerald-300">
+        {{ t('mediaHouse.unitConfigSaved') }}
+      </p>
+      <button class="btn btn-primary mt-3" :disabled="savingMediaHouseUnit" @click="saveMediaHouseUnitConfig">
+        {{ savingMediaHouseUnit ? t('common.saving') : t('mediaHouse.saveUnitConfigBtn') }}
+      </button>
+    </div>
+
+    <div class="media-house-stats-tab rounded-xl border border-divider bg-card p-4 sm:p-5">
+      <h3 class="media-house-section-title mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
+        {{ t('mediaHouse.statsTabTitle') }}
+      </h3>
+      <div v-if="mediaHouseStatsLoading" class="text-sm text-muted">{{ t('common.loading') }}</div>
+      <div v-else-if="mediaHouseStats" class="grid gap-4 md:grid-cols-2">
+        <div class="rounded-lg border border-divider bg-surface p-3">
+          <div class="text-xs uppercase tracking-wide text-muted">{{ t('mediaHouse.currentBoostDelivered') }}</div>
+          <div class="text-lg font-semibold text-foreground">{{ mediaHouseStats.currentBoostDelivered.toFixed(2) }}</div>
+          <div class="mt-2 h-2 overflow-hidden rounded-full bg-border">
+            <div class="h-full bg-emerald-500" :style="{ width: `${Math.min(100, mediaHouseStats.currentBoostDelivered * 100)}%` }" />
+          </div>
+        </div>
+        <div class="rounded-lg border border-divider bg-surface p-3">
+          <div class="text-xs uppercase tracking-wide text-muted">{{ t('mediaHouse.campaignSpendThisCycle') }}</div>
+          <div class="text-lg font-semibold text-foreground">{{ formatCurrency(mediaHouseStats.campaignCostThisTaxCycle) }}</div>
+          <div class="mt-1 text-xs text-muted">
+            {{ t('mediaHouse.estimatedSalesImpact') }}: {{ formatCurrency(mediaHouseStats.estimatedSalesImpact) }}
+          </div>
+        </div>
+      </div>
+      <div v-if="mediaHouseStats && mediaHouseStats.boostHistory.length > 0" class="mt-3 flex h-12 items-end gap-0.5 overflow-hidden rounded-md border border-divider bg-surface px-2 py-1.5">
+        <div
+          v-for="(entry, i) in mediaHouseStats.boostHistory.slice(-30)"
+          :key="i"
+          class="flex-1 rounded-sm bg-primary/60"
+          :style="{ height: Math.max(4, (entry.boost / mediaHouseBoostChartMax) * 100) + '%' }"
+          :title="`Tick ${entry.tick}: ${entry.boost.toFixed(2)}`"
+        />
       </div>
     </div>
 

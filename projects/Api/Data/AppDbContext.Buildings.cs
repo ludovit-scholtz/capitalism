@@ -28,6 +28,10 @@ public sealed partial class AppDbContext
             e.Property(b => b.SuspendedReason).HasMaxLength(200);
             e.HasOne(b => b.Company).WithMany(c => c.Buildings).HasForeignKey(b => b.CompanyId);
             e.HasOne(b => b.City).WithMany(c => c.Buildings).HasForeignKey(b => b.CityId);
+            e.HasMany(b => b.MediaHouseUnits)
+                .WithOne(unit => unit.Building)
+                .HasForeignKey(unit => unit.BuildingId)
+                .OnDelete(DeleteBehavior.Cascade);
             e.HasOne(b => b.BankAccount).WithMany().HasForeignKey(b => b.BankAccountId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(b => b.PendingConfiguration)
                 .WithOne(plan => plan.Building)
@@ -81,6 +85,51 @@ public sealed partial class AppDbContext
             e.Property(u => u.MinQuality).HasPrecision(5, 4);
             e.HasOne(u => u.Building).WithMany(b => b.Units).HasForeignKey(u => u.BuildingId);
             e.HasIndex(u => u.BuildingId);
+        });
+
+        modelBuilder.Entity<MediaHouseUnit>(e =>
+        {
+            e.HasKey(unit => unit.Id);
+            e.Property(unit => unit.MediaType).HasMaxLength(20);
+            e.Property(unit => unit.CampaignBudgetPerTick).HasPrecision(18, 2);
+            e.Property(unit => unit.BrandQualityBoostPerTick).HasPrecision(18, 6);
+            e.Property(unit => unit.LaborCostPerTick).HasPrecision(18, 2);
+            e.Property(unit => unit.EnergyCostPerTick).HasPrecision(18, 2);
+            e.HasIndex(unit => unit.BuildingId);
+            e.HasIndex(unit => unit.TargetCompanyId);
+            e.HasOne(unit => unit.Building)
+                .WithMany(building => building.MediaHouseUnits)
+                .HasForeignKey(unit => unit.BuildingId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(unit => unit.TargetCompany)
+                .WithMany(company => company.TargetedMediaHouseUnits)
+                .HasForeignKey(unit => unit.TargetCompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<BrandQualityRecord>(e =>
+        {
+            e.HasKey(record => record.Id);
+            e.Property(record => record.BoostApplied).HasPrecision(18, 6);
+            e.Property(record => record.CampaignBudgetSpent).HasPrecision(18, 2);
+            e.Property(record => record.LaborCostSpent).HasPrecision(18, 2);
+            e.Property(record => record.EnergyCostSpent).HasPrecision(18, 2);
+            e.HasIndex(record => record.BuildingId);
+            e.HasIndex(record => new { record.BuildingId, record.RecordedAtTick });
+            e.HasIndex(record => record.MediaHouseUnitId);
+            e.HasIndex(record => record.TargetCompanyId);
+            e.HasOne(record => record.Building)
+                .WithMany()
+                .HasForeignKey(record => record.BuildingId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(record => record.MediaHouseUnit)
+                .WithMany()
+                .HasForeignKey(record => record.MediaHouseUnitId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(record => record.TargetCompany)
+                .WithMany()
+                .HasForeignKey(record => record.TargetCompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<BuildingConfigurationPlan>(e =>

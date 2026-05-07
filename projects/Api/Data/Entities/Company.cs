@@ -84,6 +84,9 @@ public sealed class Company
     /// <summary>Buildings owned by this company.</summary>
     public ICollection<Building> Buildings { get; set; } = new List<Building>();
 
+    /// <summary>Media house campaign units targeting this company.</summary>
+    public ICollection<MediaHouseUnit> TargetedMediaHouseUnits { get; set; } = new List<MediaHouseUnit>();
+
     /// <summary>Per-city salary multipliers chosen by the player.</summary>
     public ICollection<CompanyCitySalarySetting> CitySalarySettings { get; set; } = new List<CompanyCitySalarySetting>();
 

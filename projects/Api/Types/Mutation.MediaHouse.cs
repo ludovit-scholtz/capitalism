@@ -183,4 +183,103 @@ public sealed partial class Mutation
         await db.SaveChangesAsync();
         return building;
     }
+
+    /// <summary>
+    /// Creates or updates a media-house campaign unit configuration.
+    /// The targeted company must be owned by the authenticated player.
+    /// </summary>
+    [Authorize]
+    public async Task<MediaHouseUnit> ConfigureMediaHouseUnit(
+        ConfigureMediaHouseUnitInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var building = await db.Buildings
+            .Include(b => b.Company)
+            .FirstOrDefaultAsync(b => b.Id == input.BuildingId);
+
+        if (building is null || building.Company.PlayerId != userId)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Building not found or you don't own it.")
+                    .SetCode("BUILDING_NOT_FOUND")
+                    .Build());
+        }
+
+        if (building.Type != BuildingType.MediaHouse)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Only media house buildings support campaign configuration.")
+                    .SetCode("INVALID_BUILDING_TYPE")
+                    .Build());
+        }
+
+        if (input.CampaignBudgetPerTick < 0m)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Campaign budget per tick must be non-negative.")
+                    .SetCode("INVALID_BUDGET")
+                    .Build());
+        }
+
+        var normalizedMediaType = (input.MediaType ?? string.Empty).Trim().ToUpperInvariant();
+        if (!MediaType.All.Contains(normalizedMediaType))
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Media type must be NEWSPAPER, RADIO, or TV.")
+                    .SetCode("INVALID_MEDIA_TYPE")
+                    .Build());
+        }
+
+        var targetCompany = await db.Companies
+            .FirstOrDefaultAsync(c => c.Id == input.TargetCompanyId && c.PlayerId == userId);
+
+        if (targetCompany is null)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Target company not found or not owned by the current player.")
+                    .SetCode("TARGET_COMPANY_NOT_FOUND")
+                    .Build());
+        }
+
+        MediaHouseUnit? unit = null;
+        if (input.UnitId.HasValue)
+        {
+            unit = await db.MediaHouseUnits
+                .FirstOrDefaultAsync(u => u.Id == input.UnitId.Value && u.BuildingId == input.BuildingId);
+        }
+
+        if (unit is null)
+        {
+            unit = new MediaHouseUnit
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = input.BuildingId,
+            };
+            db.MediaHouseUnits.Add(unit);
+        }
+
+        unit.TargetCompanyId = input.TargetCompanyId;
+        unit.MediaType = normalizedMediaType;
+        unit.CampaignBudgetPerTick = decimal.Round(input.CampaignBudgetPerTick, 2, MidpointRounding.AwayFromZero);
+        unit.IsActive = input.IsActive;
+        unit.BrandQualityBoostPerTick = decimal.Round(
+            unit.CampaignBudgetPerTick
+            * Engine.GameConstants.MediaHouseCampaignMultiplier(normalizedMediaType)
+            * Math.Max(1, building.Level),
+            6,
+            MidpointRounding.AwayFromZero);
+        unit.LaborCostPerTick = Engine.GameConstants.MediaHouseLaborCostPerTick(unit.CampaignBudgetPerTick);
+        unit.EnergyCostPerTick = Engine.GameConstants.MediaHouseEnergyCostPerTick(unit.CampaignBudgetPerTick);
+
+        await db.SaveChangesAsync();
+        return unit;
+    }
 }
