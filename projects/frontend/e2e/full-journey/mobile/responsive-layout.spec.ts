@@ -37,6 +37,8 @@ async function seedAuthenticatedStorage(page: Page, token: string) {
 }
 
 async function expectNoHorizontalOverflow(page: Page) {
+  // Allow a 1px tolerance to avoid false positives from sub-pixel rounding across
+  // different viewport/device scale combinations in Chromium.
   const overflowInfo = await page.evaluate(() => {
     const hasOverflow = document.documentElement.scrollWidth > window.innerWidth + 1
     const offenders = Array.from(document.querySelectorAll<HTMLElement>('body *'))

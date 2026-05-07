@@ -100,7 +100,7 @@ async function markAllNotificationsRead() {
       </RouterLink>
 
       <!-- Mobile menu toggle -->
-      <button class="menu-toggle ml-auto lg:hidden text-muted hover:text-body rounded-md transition-colors min-h-11 min-w-11" @click="toggleMenu" :aria-expanded="isMenuOpen" aria-label="Toggle navigation menu">
+      <button class="menu-toggle ml-auto lg:hidden text-muted hover:text-body rounded-md transition-colors tap-target-44" @click="toggleMenu" :aria-expanded="isMenuOpen" aria-label="Toggle navigation menu">
         <font-awesome-icon :icon="['fas', 'bars']" />
       </button>
 
@@ -206,7 +206,7 @@ async function markAllNotificationsRead() {
 
         <template v-if="auth.isAuthenticated">
           <button
-            class="btn btn-secondary h-11 w-11 p-0 justify-center relative notification-bell-btn"
+            class="btn btn-secondary h-11 w-11 p-0 justify-center relative notification-bell-btn tap-target-44"
             :title="t('notifications.title')"
             :aria-label="t('notifications.title')"
             :aria-expanded="isNotificationsOpen"
@@ -217,7 +217,7 @@ async function markAllNotificationsRead() {
           </button>
           <ContextSwitcher @switched="closeMenu" />
           <button
-            class="btn btn-secondary h-11 w-11 p-0 justify-center"
+            class="btn btn-secondary h-11 w-11 p-0 justify-center tap-target-44"
             @click="
               () => {
                 auth.logout({ federated: true })
@@ -493,6 +493,11 @@ async function markAllNotificationsRead() {
   background: none;
   border: none;
   font-size: 1.25rem;
+}
+
+.tap-target-44 {
+  min-width: 44px;
+  min-height: 44px;
 }
 
 @media (max-width: 1024px) {

@@ -446,7 +446,7 @@ onUnmounted(() => {
   }
 
   .city-content.has-selection {
-    padding-bottom: min(68vh, 38rem);
+    padding-bottom: min(68vh, 42rem);
   }
 
   .map-area,
