@@ -11,6 +11,8 @@ const {
   building,
   isBuildingUsedAsCollateral,
   collateralLoanCount,
+  isLoanDefaulted,
+  ticksUntilDestruction,
   formatBuildingType,
 } = bd
 </script>
@@ -30,6 +32,15 @@ const {
       >
         <font-awesome-icon icon="skull" class="text-[10px]" />
         {{ t('buildingDetail.destroyedBadge') }}
+      </span>
+      <!-- Loan default badge -->
+      <span
+        v-if="isLoanDefaulted && !building?.destroyedAtUtc"
+        class="loan-default-badge inline-flex items-center gap-1 rounded-full border border-red-400/70 bg-red-500/20 px-3 py-1 text-xs font-semibold text-red-700 dark:text-red-300"
+        :title="t('buildingDetail.loanDefaultHint')"
+      >
+        <font-awesome-icon icon="triangle-exclamation" class="text-[10px]" />
+        {{ t('buildingDetail.loanDefaultBadge') }}
       </span>
     </div>
     <div class="building-meta flex flex-wrap items-center gap-2">
@@ -71,6 +82,24 @@ const {
       >
         {{ building?.isForSale ? t('buildingDetail.editSale') : t('buildingDetail.sellBuilding') }}
       </button>
+    </div>
+
+    <!-- Loan default alert banner -->
+    <div
+      v-if="isLoanDefaulted && !building?.destroyedAtUtc"
+      class="loan-default-alert mt-3 rounded-lg border border-red-400/60 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300"
+      role="alert"
+    >
+      <p class="font-semibold">
+        <font-awesome-icon icon="triangle-exclamation" class="mr-1.5" />
+        {{ t('buildingDetail.loanDefaultTitle') }}
+      </p>
+      <p class="mt-1 text-xs">
+        {{ t('buildingDetail.loanDefaultBody') }}
+      </p>
+      <p v-if="ticksUntilDestruction !== null" class="mt-1 text-xs font-medium">
+        {{ t('buildingDetail.loanDefaultDestruction', { ticks: ticksUntilDestruction }) }}
+      </p>
     </div>
 
     <!-- Collateral warning with loan count -->

@@ -106,17 +106,16 @@ public sealed class BuildingTypeExtensions
     }
 
     /// <summary>
-    /// The lot's PopulationIndex for this building (location quality score).
-    /// 1.0 is the baseline; higher values mean better foot traffic or proximity to city centre.
+    /// Returns true when there is at least one DEFAULTED loan with this building as collateral.
+    /// Used by the dashboard building card to show the "⚠️ Loan Default" badge.
     /// </summary>
-    public async Task<decimal?> GetPopulationIndex(
+    public async Task<bool> GetHasDefaultedCollateralLoan(
         [Parent] Building building,
         [Service] AppDbContext db,
         CancellationToken cancellationToken)
     {
-        var lot = await db.BuildingLots
+        return await db.Loans
             .AsNoTracking()
-            .FirstOrDefaultAsync(l => l.BuildingId == building.Id, cancellationToken);
-        return lot?.PopulationIndex;
+            .AnyAsync(l => l.CollateralBuildingId == building.Id && l.Status == LoanStatus.Defaulted, cancellationToken);
     }
 }

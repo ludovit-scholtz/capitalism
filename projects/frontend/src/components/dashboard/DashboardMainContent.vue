@@ -470,6 +470,14 @@ onMounted(() => {
                 >
                   ☠️ {{ t('buildingDetail.destroyedBadge') }}
                 </span>
+                <!-- Loan default badge -->
+                <span
+                  v-if="building.hasDefaultedCollateralLoan && !building.destroyedAtUtc"
+                  class="loan-default-badge inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6rem] font-bold bg-red-500/20 text-red-700 dark:text-red-400 border border-red-400/30"
+                  :title="t('buildingDetail.loanDefaultHint')"
+                >
+                  ⚠️ {{ t('buildingDetail.loanDefaultBadge') }}
+                </span>
                 <span v-if="building.powerStatus && building.powerStatus !== 'POWERED'" :class="powerStatusClass(building.powerStatus)" :aria-label="getBuildingPowerLabel(building.powerStatus)">
                   {{ building.powerStatus === 'OFFLINE' ? '❌' : '⚡' }} {{ getBuildingPowerLabel(building.powerStatus) }}
                 </span>

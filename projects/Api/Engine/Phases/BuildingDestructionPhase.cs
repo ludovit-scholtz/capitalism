@@ -103,6 +103,23 @@ public sealed class BuildingDestructionPhase : ITickPhase
             // Clear the collateral reference on the loan so we don't reprocess.
             loan.CollateralBuildingId = null;
 
+            // Persist an audit record.
+            context.Db.BuildingDestructionRecords.Add(new BuildingDestructionRecord
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = building.Id,
+                BuildingName = building.Name,
+                LoanId = loan.Id,
+                CityId = building.CityId,
+                OwnerCompanyId = building.CompanyId,
+                OriginalPropertyValue = loan.CollateralAppraisedValue ?? 0m,
+                CompensationPaid = refundAmount,
+                DestructionTickCount = context.CurrentTick,
+                DestructionReason = BuildingDestructionReason.GracePeriodExpired,
+                CreatedAtUtc = DateTime.UtcNow,
+            });
+            loan.CollateralBuildingId = null;
+
             // Emit player notification.
             if (borrowerCompany is not null)
             {
