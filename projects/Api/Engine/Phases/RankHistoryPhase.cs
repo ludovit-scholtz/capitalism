@@ -6,8 +6,8 @@ using Microsoft.EntityFrameworkCore;
 namespace Api.Engine.Phases;
 
 /// <summary>
-/// Captures weekly leaderboard rank snapshots for all non-admin players.
-/// Runs every 1,008 ticks (≈ 7 game days) — enough to produce 52 snapshots per year.
+/// Captures leaderboard rank snapshots for all non-admin players.
+/// Runs on each tax-cycle boundary.
 /// At most 365 snapshots per player are retained (FIFO pruning of older entries).
 ///
 /// Wealth metric: personal bank account balances in USD (simplified; share-price
@@ -22,16 +22,16 @@ public sealed class RankHistoryPhase : ITickPhase
     public string Name => "RankHistory";
     public int Order => 1150;
 
-    /// <summary>Capture one snapshot every 1,008 ticks (≈ 1 game week).</summary>
-    private const long SnapshotIntervalTicks = 1_008;
-
     /// <summary>Maximum snapshots retained per player.</summary>
     private const int MaxSnapshotsPerPlayer = 365;
 
     public async Task ProcessAsync(TickContext context)
     {
-        // Only run on the weekly snapshot boundary.
-        if (context.CurrentTick % SnapshotIntervalTicks != 0)
+        // Only run on tax-cycle boundaries; zero/negative tax cycle is invalid.
+        var taxCycleTicks = context.GameState.TaxCycleTicks;
+        if (taxCycleTicks <= 0)
+            return;
+        if (context.CurrentTick % taxCycleTicks != 0)
             return;
 
         var db = context.Db;
@@ -124,6 +124,57 @@ public sealed class RankHistoryPhase : ITickPhase
         }
 
         db.PlayerRankSnapshots.AddRange(newSnapshots);
+
+        // Award profile badges derived from ranking trajectory (idempotent).
+        var rankingBadgeCandidates = new List<PlayerAchievementBadge>();
+        foreach (var entry in ranked)
+        {
+            if (entry.Rank == 1)
+            {
+                rankingBadgeCandidates.Add(new PlayerAchievementBadge
+                {
+                    Id = Guid.NewGuid(),
+                    PlayerId = entry.PlayerId,
+                    BadgeType = BadgeType.TopRank,
+                    UnlockedAtUtc = utcNow,
+                    UnlockedAtTick = context.CurrentTick,
+                });
+            }
+
+            if (entry.WealthUsd >= 1_000_000m)
+            {
+                rankingBadgeCandidates.Add(new PlayerAchievementBadge
+                {
+                    Id = Guid.NewGuid(),
+                    PlayerId = entry.PlayerId,
+                    BadgeType = BadgeType.WealthMilestone,
+                    UnlockedAtUtc = utcNow,
+                    UnlockedAtTick = context.CurrentTick,
+                });
+            }
+        }
+
+        if (rankingBadgeCandidates.Count > 0)
+        {
+            var badgePlayerIds = rankingBadgeCandidates.Select(candidate => candidate.PlayerId).Distinct().ToList();
+            var existingBadgeKeys = await db.PlayerAchievementBadges
+                .AsNoTracking()
+                .Where(b => badgePlayerIds.Contains(b.PlayerId)
+                    && (b.BadgeType == BadgeType.TopRank || b.BadgeType == BadgeType.WealthMilestone))
+                .Select(b => new { b.PlayerId, b.BadgeType })
+                .ToListAsync(ct);
+
+            var existingSet = existingBadgeKeys.ToHashSet();
+            foreach (var candidate in rankingBadgeCandidates)
+            {
+                if (existingSet.Contains(new { candidate.PlayerId, candidate.BadgeType }))
+                {
+                    continue;
+                }
+
+                db.PlayerAchievementBadges.Add(candidate);
+            }
+        }
 
         // Prune old snapshots (keep latest MaxSnapshotsPerPlayer per player).
         // Load counts first; only do the expensive query if anyone is over the limit.

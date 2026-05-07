@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Capitalism.Shared.Ranking;
 
 namespace Api.Data.Entities;
 
@@ -25,6 +26,7 @@ public sealed class PlayerAchievementBadge
 /// <summary>Known badge type string constants.</summary>
 public static class BadgeType
 {
+    // Legacy badge identifiers.
     public const string FirstMillion = "FIRST_MILLION";
     public const string Monopolist = "MONOPOLIST";
     public const string MasterTrader = "MASTER_TRADER";
@@ -36,15 +38,29 @@ public static class BadgeType
     public const string RankClimber = "RANK_CLIMBER";
     public const string LegendaryTycoon = "LEGENDARY_TYCOON";
 
+    // Player-profile completion badges.
+    public const string FirstB2BTrade = "FIRST_B2B_TRADE";
+    public const string LoanMaster = "LOAN_MASTER";
+    public const string MediaMogul = "MEDIA_MOGUL";
+    public const string BankBaron = "BANK_BARON";
+    public const string MarketDominatorV2 = "MARKET_DOMINATOR_V2";
+    public const string TopRank = "TOP_RANK";
+    public const string WealthMilestone = "WEALTH_MILESTONE";
+
     public static readonly IReadOnlySet<string> All = new HashSet<string>
     {
         FirstMillion, Monopolist, MasterTrader, PowerMagnate, CityPioneer,
         ExportChampion, IndustryLeader, MarketDominator, RankClimber, LegendaryTycoon,
+        FirstB2BTrade, LoanMaster, MediaMogul, BankBaron, MarketDominatorV2, TopRank, WealthMilestone,
     };
 
     public static string GetRarity(string badgeType) => badgeType switch
     {
         LegendaryTycoon or MarketDominator => "LEGENDARY",
+        MarketDominatorV2 => "EPIC",
+        TopRank => "LEGENDARY",
+        WealthMilestone => "RARE",
+        MediaMogul or BankBaron or LoanMaster => "RARE",
         PowerMagnate or IndustryLeader => "EPIC",
         MasterTrader or ExportChampion => "RARE",
         _ => "COMMON",
@@ -62,6 +78,24 @@ public static class BadgeType
         MarketDominator => "Hold >50% market share in any product in any city for 10 consecutive ticks",
         RankClimber => "Improve leaderboard rank by 10+ positions in a single tax year",
         LegendaryTycoon => "Accumulate $100,000,000 USD in total wealth",
+        FirstB2BTrade => "Complete your first B2B wholesale trade",
+        LoanMaster => "Complete a lender bounty by maintaining active loan business",
+        MediaMogul => "Complete a media-owner bounty with an active Media House",
+        BankBaron => "Complete a banker bounty with external deposits",
+        MarketDominatorV2 => "Complete a company-master bounty by dominating company rankings",
+        TopRank => "Reach global leaderboard rank #1",
+        WealthMilestone => "Reach $1,000,000 USD total personal wealth",
         _ => "Complete a special milestone",
+    };
+
+    public static string? FromBountyCode(string bountyCode) => bountyCode switch
+    {
+        MasterRankingBountyCodes.Wholesaler => FirstB2BTrade,
+        MasterRankingBountyCodes.Lender => LoanMaster,
+        MasterRankingBountyCodes.MediaOwner => MediaMogul,
+        MasterRankingBountyCodes.Banker => BankBaron,
+        MasterRankingBountyCodes.CompanyMaster => MarketDominatorV2,
+        MasterRankingBountyCodes.TopPlayer => TopRank,
+        _ => null,
     };
 }

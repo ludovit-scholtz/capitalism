@@ -12,6 +12,7 @@ import { formatInGameTime } from '@/lib/gameTime'
 import { formatCompactMoney } from '@/lib/currencyFormat'
 import { calculateRankPage, isActivePlayer } from '@/lib/ranking'
 import type { PlayerRanking, CompanyRanking } from '@/types'
+import { getProfileBadgeIcon } from '@/lib/profileBadges'
 
 const { t, locale } = useI18n()
 const auth = useAuthStore()
@@ -50,6 +51,7 @@ const PLAYER_RANKINGS_QUERY = `
       personalCash
       sharesValue
       companyCount
+      badgeTypes
     }
   }
 `
@@ -167,6 +169,10 @@ function rankBadge(rankNumber: number): string {
   if (rankNumber === 2) return '🥈'
   if (rankNumber === 3) return '🥉'
   return `${rankNumber}`
+}
+
+function rankBadgeIcons(rank: PlayerRanking): string[] {
+  return (rank.badgeTypes ?? []).slice(0, 3)
 }
 
 const currentPlayerId = computed(() => auth.player?.id ?? null)
@@ -364,6 +370,17 @@ async function changePage(nextPage: number) {
             <div class="flex-1 min-w-0">
               <div class="text-base font-bold flex items-center gap-2 whitespace-nowrap overflow-hidden text-ellipsis">
                 {{ rank.displayName }}
+                <span v-if="rankBadgeIcons(rank).length > 0" class="player-badge-icons inline-flex items-center gap-1">
+                  <span
+                    v-for="badgeType in rankBadgeIcons(rank)"
+                    :key="`${rank.playerId}-${badgeType}`"
+                    class="player-badge-icon text-[16px] leading-none opacity-80"
+                    :title="t(`playerProfile.badges.${badgeType}`, badgeType)"
+                    aria-hidden="true"
+                  >
+                    {{ getProfileBadgeIcon(badgeType) }}
+                  </span>
+                </span>
                 <span
                   v-if="isActivePlayer(rank.playerId, currentPlayerId)"
                   class="you-badge text-[0.6875rem] font-bold bg-[color:var(--color-secondary)] text-black px-[0.4rem] py-[0.1rem] rounded-full tracking-[0.04em] uppercase shrink-0"

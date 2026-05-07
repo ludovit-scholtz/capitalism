@@ -32,6 +32,9 @@ public sealed class PlayerRanking
 
     /// <summary>Number of companies owned.</summary>
     public int CompanyCount { get; set; }
+
+    /// <summary>Unlocked profile badge types shown as compact icons in the leaderboard.</summary>
+    public List<string> BadgeTypes { get; set; } = [];
 }
 
 /// <summary>Individual company ranking for the leaderboard.</summary>

@@ -53,6 +53,7 @@ export interface PlayerRanking {
   personalCash: number
   sharesValue: number
   companyCount: number
+  badgeTypes?: string[]
 }
 
 /** Matches backend CompanyRanking response */

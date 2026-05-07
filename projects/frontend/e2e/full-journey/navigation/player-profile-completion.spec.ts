@@ -46,7 +46,8 @@ test.describe('Player Profile – Achievement Badges', () => {
     await page.goto(`/player/${player.id}`)
     await clickProfileTab(page, /Achievements/i)
     await expect(page.locator('[aria-label="Achievement badges"]')).toBeVisible()
-    await expect(page.locator('.badge-card')).toHaveCount(3)
+    await expect(page.locator('.badge-card')).toHaveCount(17)
+    await expect(page.locator('.badge-locked')).not.toHaveCount(0)
   })
 
   test('shows badge tooltip with unlock date on hover', async ({ page }) => {
@@ -64,7 +65,7 @@ test.describe('Player Profile – Achievement Badges', () => {
     await expect(page.locator('.badge-tooltip').first()).toBeVisible()
   })
 
-  test('shows empty state when player has no badges', async ({ page }) => {
+  test('shows locked badge states when player has no earned badges', async ({ page }) => {
     const player = makePlayer()
     player.onboardingCompletedAtUtc = '2024-01-01T00:00:00Z'
     const state = setupMockApi(page, { players: [player] })
@@ -73,7 +74,8 @@ test.describe('Player Profile – Achievement Badges', () => {
     await authenticate(page, `token-${player.id}`)
     await page.goto(`/player/${player.id}`)
     await clickProfileTab(page, /Achievements/i)
-    await expect(page.locator('.badge-empty-state')).toBeVisible()
+    await expect(page.locator('.badge-card')).toHaveCount(17)
+    await expect(page.locator('.badge-locked')).toHaveCount(17)
   })
 
   test('displays correct rarity classes for different rarity tiers', async ({ page }) => {
@@ -135,7 +137,7 @@ test.describe('Player Profile – Rank History', () => {
     await page.goto(`/player/${player.id}`)
     await clickProfileTab(page, /Rank History/i)
     await expect(page.locator('[aria-label="Time range"]')).toBeVisible()
-    await expect(page.locator('.rank-filter-btn').filter({ hasText: '365d' })).toHaveClass(/active/)
+    await expect(page.locator('.rank-filter-btn').filter({ hasText: 'All' })).toHaveClass(/active/)
     await page.locator('.rank-filter-btn').filter({ hasText: '30d' }).click()
     await expect(page.locator('.rank-filter-btn').filter({ hasText: '30d' })).toHaveClass(/active/)
   })
@@ -165,7 +167,7 @@ test.describe('Player Profile – Statistics Export', () => {
     await expect(page.locator('.export-btn')).toBeVisible()
   })
 
-  test('clicking Export Stats opens dropdown with CSV and HTML options', async ({ page }) => {
+  test('clicking Export CSV triggers file download', async ({ page }) => {
     const player = makePlayer()
     player.onboardingCompletedAtUtc = '2024-01-01T00:00:00Z'
     const state = setupMockApi(page, { players: [player] })
@@ -173,10 +175,32 @@ test.describe('Player Profile – Statistics Export', () => {
     state.currentToken = `token-${player.id}`
     await authenticate(page, `token-${player.id}`)
     await page.goto(`/player/${player.id}`)
-    await page.locator('.export-btn').click()
-    await expect(page.locator('.export-dropdown')).toBeVisible()
-    await expect(page.locator('.export-option').filter({ hasText: /CSV/i })).toBeVisible()
-    await expect(page.locator('.export-option').filter({ hasText: /HTML/i })).toBeVisible()
+    const downloadPromise = page.waitForEvent('download')
+    await page.getByRole('button', { name: 'Export CSV' }).click()
+    const download = await downloadPromise
+    expect(download.suggestedFilename()).toContain('_stats_')
+    expect(download.suggestedFilename()).toContain('.csv')
+  })
+
+  test('clicking Export PDF calls window.print', async ({ page }) => {
+    const player = makePlayer()
+    player.onboardingCompletedAtUtc = '2024-01-01T00:00:00Z'
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await authenticate(page, `token-${player.id}`)
+    await page.goto(`/player/${player.id}`)
+    await page.evaluate(() => {
+      ;(window as Window & { __printCalled?: boolean }).__printCalled = false
+      window.print = () => {
+        ;(window as Window & { __printCalled?: boolean }).__printCalled = true
+      }
+    })
+    await page.getByRole('button', { name: 'Export PDF' }).click()
+    const printCalled = await page.evaluate(
+      () => (window as Window & { __printCalled?: boolean }).__printCalled === true,
+    )
+    expect(printCalled).toBe(true)
   })
 
   test('Export Stats button is hidden for unauthenticated users', async ({ page }) => {

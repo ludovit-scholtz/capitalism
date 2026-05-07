@@ -8,6 +8,7 @@ import PlayerBadgeGrid from '@/components/profile/PlayerBadgeGrid.vue'
 import type { PlayerBadge } from '@/components/profile/PlayerBadgeGrid.vue'
 import RankHistoryChart from '@/components/profile/RankHistoryChart.vue'
 import type { RankSnapshot } from '@/components/profile/RankHistoryChart.vue'
+import { buildProfileStatsCsv } from '@/lib/profileStatsExport'
 
 export interface PlayerHallOfFame {
   highestSingleTickRevenue: number
@@ -60,7 +61,6 @@ const rankLoading = ref(false)
 const rankLoaded = ref(false)
 
 // ── Stats Export ───────────────────────────────────────────────────────────────
-const exportMenuOpen = ref(false)
 const exportLoading = ref(false)
 const exportSuccess = ref<string | null>(null)
 const exportError = ref<string | null>(null)
@@ -76,17 +76,9 @@ const PLAYER_BADGES_QUERY = `
 `
 
 const PLAYER_RANK_HISTORY_QUERY = `
-  query GetPlayerRankHistory($playerId: UUID!, $limit: Int) {
-    playerRankHistory(playerId: $playerId, limit: $limit) {
+  query GetPlayerRankHistory($playerId: UUID!, $ticksBack: Int!) {
+    rankHistory(playerId: $playerId, ticksBack: $ticksBack) {
       snapshotTick snapshotUtc leaderboardRank wealthUsd percentileRank positionChange
-    }
-  }
-`
-
-const GENERATE_STATS_EXPORT_MUTATION = `
-  mutation GenerateStatsExport($i: GenerateStatsExportInput!) {
-    generateStatsExport(input: $i) {
-      format fileName contentBase64
     }
   }
 `
@@ -135,11 +127,11 @@ async function fetchRankHistory() {
   if (rankLoaded.value) return
   rankLoading.value = true
   try {
-    const data = await gqlRequest<{ playerRankHistory: RankSnapshot[] }>(
+    const data = await gqlRequest<{ rankHistory: RankSnapshot[] }>(
       PLAYER_RANK_HISTORY_QUERY,
-      { playerId: props.playerId, limit: 365 },
+      { playerId: props.playerId, ticksBack: 365 },
     )
-    rankSnapshots.value = data.playerRankHistory ?? []
+    rankSnapshots.value = data.rankHistory ?? []
     rankLoaded.value = true
   } catch {
     rankSnapshots.value = []
@@ -157,33 +149,44 @@ async function switchTab(tab: ProfileTab) {
   }
 }
 
-async function exportStats(format: 'CSV' | 'HTML') {
-  if (!auth.isAuthenticated) return
-  exportMenuOpen.value = false
+function triggerDownload(fileName: string, content: string, mimeType: string): void {
+  const blob = new Blob([content], { type: mimeType })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = fileName
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+function exportCsv() {
+  if (!auth.isAuthenticated || !props.isOwnProfile) return
   exportLoading.value = true
   exportSuccess.value = null
   exportError.value = null
   try {
-    const input: Record<string, unknown> = { format }
-    if (!props.isOwnProfile) {
-      input.playerId = props.playerId
-    }
-    const data = await gqlRequest<{
-      generateStatsExport: { format: string; fileName: string; contentBase64: string }
-    }>(GENERATE_STATS_EXPORT_MUTATION, { i: input })
-
-    const { fileName, contentBase64 } = data.generateStatsExport
-    const mimeType = format === 'HTML' ? 'text/html' : 'text/csv'
-    const blob = new Blob(
-      [Uint8Array.from(atob(contentBase64), (c) => c.charCodeAt(0))],
-      { type: mimeType },
+    const csv = buildProfileStatsCsv({
+      displayName: props.profile.displayName,
+      leaderboardRank: props.profile.leaderboardRank,
+      totalWealthUsd: props.profile.totalWealthUsd,
+      totalCompanyEquityUsd: props.profile.totalCompanyEquityUsd,
+      companyCount: props.profile.companyCount,
+      totalProductsSold: props.profile.totalProductsSold,
+      citiesWithBuildings: props.profile.citiesWithBuildings,
+      activeBuildingTypes: props.profile.activeBuildingTypes,
+      badgeTypes: badges.value.map((badge) => badge.badgeType),
+      bestRank: (() => {
+        const ranks = rankSnapshots.value.map((snapshot) => snapshot.leaderboardRank)
+        return ranks.length > 0 ? Math.min(...ranks) : null
+      })(),
+    })
+    const dateStr = new Date().toISOString().slice(0, 10)
+    const safeDisplayName = props.profile.displayName.replace(/\s+/g, '_')
+    triggerDownload(
+      `${safeDisplayName}_stats_${dateStr}.csv`,
+      csv,
+      'text/csv;charset=utf-8',
     )
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = fileName
-    anchor.click()
-    URL.revokeObjectURL(url)
     exportSuccess.value = t('playerProfile.exportSuccess')
     setTimeout(() => {
       exportSuccess.value = null
@@ -193,6 +196,11 @@ async function exportStats(format: 'CSV' | 'HTML') {
   } finally {
     exportLoading.value = false
   }
+}
+
+function exportPdf() {
+  if (!auth.isAuthenticated || !props.isOwnProfile) return
+  window.print()
 }
 </script>
 
@@ -403,36 +411,25 @@ async function exportStats(format: 'CSV' | 'HTML') {
   </div>
 
   <!-- Export Stats & Back link -->
-  <div class="max-w-[900px] mx-auto mt-8 flex items-center justify-between flex-wrap gap-3">
+  <div class="max-w-[900px] mx-auto mt-8 flex items-center justify-between flex-wrap gap-3 export-section">
     <RouterLink
       to="/leaderboard"
-      class="text-sm text-muted hover:text-body hover:underline inline-flex items-center gap-1"
+      class="back-link text-sm text-muted hover:text-body hover:underline inline-flex items-center gap-1"
     >
       ← {{ t('playerProfile.backToLeaderboard') }}
     </RouterLink>
 
-    <div v-if="auth.isAuthenticated && (isOwnProfile || auth.player?.role === 'ADMIN')" class="export-container relative">
-      <button
-        class="export-btn export-stats-btn btn btn-secondary inline-flex items-center gap-1.5 text-sm"
-        :disabled="exportLoading"
-        @click="exportMenuOpen = !exportMenuOpen"
-      >
-        <span>📥</span>
-        {{ exportLoading ? t('playerProfile.exporting') : t('playerProfile.exportStats') }}
-        <span v-if="!exportLoading">▾</span>
+    <div v-if="auth.isAuthenticated && isOwnProfile" class="export-container flex items-center gap-2">
+      <button class="export-btn btn btn-secondary text-sm" :disabled="exportLoading" @click="exportCsv">
+        {{ exportLoading ? t('playerProfile.exporting') : t('playerProfile.exportCsv') }}
       </button>
-      <div v-if="exportMenuOpen" class="export-dropdown">
-        <button class="export-option" @click="exportStats('CSV')">
-          📊 {{ t('playerProfile.downloadCsv') }}
-        </button>
-        <button class="export-option" @click="exportStats('HTML')">
-          📄 {{ t('playerProfile.downloadHtml') }}
-        </button>
-      </div>
+      <button class="export-pdf-btn btn btn-secondary text-sm" @click="exportPdf">
+        {{ t('playerProfile.exportPdf') }}
+      </button>
     </div>
   </div>
 
-  <div class="max-w-[900px] mx-auto mt-2">
+  <div class="max-w-[900px] mx-auto mt-2 export-feedback">
     <p v-if="exportSuccess" class="text-good text-sm text-right">✓ {{ exportSuccess }}</p>
     <p v-if="exportError" class="text-bad text-sm text-right">{{ exportError }}</p>
   </div>
@@ -469,41 +466,18 @@ async function exportStats(format: 'CSV' | 'HTML') {
   border-bottom-color: #3b82f6;
 }
 
-/* Export dropdown */
+/* Export */
 .export-container {
-  position: relative;
+  flex-wrap: wrap;
 }
 
-.export-dropdown {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
-  background: var(--color-surface-elevated, #1e293b);
-  border: 1px solid var(--color-border, #334155);
-  border-radius: 8px;
-  padding: 4px;
-  min-width: 180px;
-  z-index: 50;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-}
-
-.export-option {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 8px 12px;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  color: var(--color-text-primary, #f1f5f9);
-  font-size: 13px;
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.1s ease;
-}
-
-.export-option:hover {
-  background: rgba(59, 130, 246, 0.12);
+@media print {
+  .export-section,
+  .export-feedback,
+  .profile-tabs,
+  .rank-filter-row,
+  .rank-tooltip {
+    display: none !important;
+  }
 }
 </style>
