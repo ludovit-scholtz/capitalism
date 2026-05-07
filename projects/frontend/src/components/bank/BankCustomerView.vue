@@ -77,6 +77,7 @@ const myestDeposit = computed<BankDepositSummary | null>(() => {
 
 const FORECLOSURE_WINDOW_TICKS = 72
 const TICKS_PER_DAY = 24
+const REAL_MINUTES_PER_TICK = 10
 
 const overdueDebtLoans = computed(() =>
   props.myLoansHere.filter((loan) => loan.status === 'OVERDUE' || loan.status === 'DEFAULTED'),
@@ -97,7 +98,7 @@ function formatForeclosureCountdown(loan: LoanSummary): string {
 
   const days = Math.floor(ticksRemaining / TICKS_PER_DAY)
   const hours = ticksRemaining % TICKS_PER_DAY
-  const realMinutes = ticksRemaining * 10
+  const realMinutes = ticksRemaining * REAL_MINUTES_PER_TICK
   return t('bank.overdueCountdownValue', { days, hours, realMinutes })
 }
 

@@ -30,6 +30,8 @@ public sealed class BuildingDestructionPhase : ITickPhase
     {
         // Find overdue/defaulted loans with collateral buildings that have passed the foreclosure window.
         var foreclosureDeadline = context.CurrentTick - GameConstants.ForeclosureWindowTicks;
+        // DefaultedAtTick is recorded on the first missed payment (OVERDUE) and
+        // remains set through DEFAULTED, so both statuses are valid here.
         var overdueDefaultedLoans = await context.Db.Loans
             .Where(l => (l.Status == LoanStatus.Overdue || l.Status == LoanStatus.Defaulted)
                 && l.CollateralBuildingId != null

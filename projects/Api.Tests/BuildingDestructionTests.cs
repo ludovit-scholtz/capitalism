@@ -193,6 +193,8 @@ public sealed class BuildingDestructionTests
         var notification = await db.PlayerNotifications
             .FirstOrDefaultAsync(n => n.PlayerId == company.PlayerId && n.Type == PlayerNotificationType.LoanPaymentMissed);
         Assert.NotNull(notification);
+        Assert.Contains("missed payment at", notification!.Message);
+        Assert.Contains("seized in", notification.Message);
     }
 
     [Fact]
@@ -413,6 +415,15 @@ public sealed class BuildingDestructionTests
             .FirstOrDefaultAsync();
         Assert.NotNull(ledger);
         Assert.Equal(700_000m, ledger.Amount);
+        Assert.Equal(account.Id, ledger.BankAccountId);
+
+        var lenderLedger = await db.LedgerEntries
+            .Where(e => e.CompanyId == loanOffer.LenderCompanyId
+                && e.Category == LedgerCategory.LoanRepaymentPrincipal
+                && e.Amount > 0)
+            .FirstOrDefaultAsync();
+        Assert.NotNull(lenderLedger);
+        Assert.Equal(lenderAccount.Id, lenderLedger!.BankAccountId);
     }
 
     [Fact]
