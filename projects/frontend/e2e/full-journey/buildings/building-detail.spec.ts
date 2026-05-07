@@ -301,6 +301,82 @@ test.describe('Building detail upgrades', () => {
     await expect(page.getByText('Down-Left')).toBeVisible()
   })
 
+  test('shows why a queued upgrade is blocked by funding', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-upgrade-blocked',
+      playerId: player.id,
+      name: 'Blocked Upgrade GmbH',
+      cash: 4000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-upgrade-blocked',
+          companyId: 'company-upgrade-blocked',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Blocked Upgrade Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          units: [],
+          pendingConfiguration: {
+            id: 'plan-upgrade-blocked',
+            buildingId: 'building-upgrade-blocked',
+            submittedAtUtc: '2026-01-01T00:00:00Z',
+            submittedAtTick: 10,
+            appliesAtTick: 13,
+            totalTicksRequired: 3,
+            blockReason: 'INSUFFICIENT_FUNDS:4500.00:EUR',
+            units: [
+              {
+                id: 'plan-unit-upgrade-blocked',
+                buildingId: 'building-upgrade-blocked',
+                unitType: 'PURCHASE',
+                gridX: 0,
+                gridY: 0,
+                level: 1,
+                linkUp: false,
+                linkDown: false,
+                linkLeft: false,
+                linkRight: false,
+                linkUpLeft: false,
+                linkUpRight: false,
+                linkDownLeft: false,
+                linkDownRight: false,
+                startedAtTick: 10,
+                appliesAtTick: 13,
+                ticksRequired: 3,
+                isChanged: true,
+                isReverting: false,
+              },
+            ],
+            removals: [],
+          },
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player], cities: makeDefaultCities(), products: makeDefaultProducts() })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.gameState.currentTick = 12
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-upgrade-blocked')
+
+    const upgradeBanner = page.getByRole('status')
+    await expect(upgradeBanner).toContainText('Building upgrade in progress')
+    await expect(upgradeBanner).toContainText('Upgrade is waiting for €4,500 in the building account before the queued layout can activate.')
+  })
+
   test('shows unit configuration panel with type-specific settings', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({

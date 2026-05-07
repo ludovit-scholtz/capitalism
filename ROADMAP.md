@@ -6,25 +6,26 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
-### Operations Dashboard (100% complete)
+### Operations Dashboard in Game frontend (0% complete)
 
-- [x] Organize Operations Dashboard to level 2 menu, add proper routing, and create components
-- [x] Fix News & changelog publisher style. The form is stretched along the whole list of news items. Create multiple pages for this like it is in the ticket support system.
-- [x] Players & intervention tools - Make sure to show the table of the users and on user detail page show the actions
-- [x] Create page for the game statistics where in one columns will be items that distributes the money such as the public sales buildings, the rent, IPOs, or other money distribution sections. In the other column will be where people are paying money - taxes, fx fees, labour costs, energy, research, stock exchange fees or others..
-- [x] Create admin page with detailed statistic for every product. Do it in table. Make sure the table is exportable sortable and filterable. In the table will be the product insights such as the aggregated costs of materials, energy, labor to build the product, number of products produced, sold, market size, saturation, marketing, and research details.
-- [x] Backend: Wire `operationsStatistics` query to real LedgerEntry aggregations for live money flow data
-- [x] Backend: Wire `adminProductAnalytics` query to real ProductionRecord/PublicSalesRecord aggregations
-
-### Stock exchange (100% complete)
-
-- [x] Do not show the government in the stock market. Do not allow players to trade government company stocks.
+- [ ] Organize Operations Dashboard (/admin) to level 2 menu, add proper routing, and create components. Make sure it is not shown as big single page, but split into multiple pages.
+- [ ] Fix News & changelog publisher style. The form is stretched along the whole list of news items. Create multiple pages for this like it is in the ticket support system.
+- [ ] Players & intervention tools - Make sure to show the table of the users and on user detail page show the actions
+- [ ] Create page for the game statistics where in one columns will be items that distributes the money such as the public sales buildings, the rent, IPOs, or other money distribution sections. In the other column will be where people are paying money - taxes, fx fees, labour costs, energy, research, stock exchange fees or others..
+- [ ] Create admin page with detailed statistic for every product. Do it in table. Make sure the table is exportable sortable and filterable. In the table will be the product insights such as the aggregated costs of materials, energy, labor to build the product, number of products produced, sold, market size, saturation, marketing, and research details.
+- [ ] Backend: Wire `operationsStatistics` query to real LedgerEntry aggregations for live money flow data
+- [ ] Backend: Wire `adminProductAnalytics` query to real ProductionRecord/PublicSalesRecord aggregations
 
 ### Onboarding (100% complete)
 
+- [ ] Do not show invitation message with referal code right up to the point when user logs in to the system.
 - [x] Before user first sign in to the game make sure to fill in the referal code. Show link (and allow copy on one click) in the master frontend in the referal section where users can refer user for the game server. When user comes to this link, make sure the referal code is stored in the pinia state, and stored to the user account when he first logs in. Before user logs in, show him that he is using specific referal code and he will get 10% discount for in game purchases.
 - [x] Create better Company name generator. Find npm package with the word list, and do a proper name generation with the combination of two words. Make sure the company names sounds great.
 - [x] Create name generator for personal account name. Find npm package with the names wordlist and do a combination of the Firstname, Middlename and Last name. Allow players to change the personal account name later. In ranking show the personal account name, not the oidc name please. In the form to change name, tell people not to use the real name.
+
+### Authorization
+
+- [ ] Do login/password authorizaiton only if configuration allows it. Make it disabled by default, but make sure to enable it in the tests. Do this on game frontend, master frontend and both backends as well. When biatec oidc is the only authorization method, when user goes to /login page, make sure to automatically follow the authorization process as user would click the authorize with google button.
 
 ### Buildings (75% complete)
 
@@ -62,13 +63,6 @@ It will use real world map. The game will start in single city and later other c
 **Delivered (increment 1):** The FX Rate List now shows buy/mid/sell columns with tooltip explanations, uses compact standard pair codes (for example `CZKUSD`, `CZKEUR`, `EURUSD`) following the configured strength hierarchy, and adds a responsive mobile stacked layout so all three prices stay visible on narrow screens.
 
 **Delivered (increment 2):** FX Rate History Chart is now live. The backend `FxRateHistoryPhase` captures buy/mid/sell snapshots every game tick for all EUR-based pairs, persists them in `FxRateHistories` with a rolling 24-month window, and exposes them via the public `fxRateHistory(quoteCurrencyCode, ticksBack)` GraphQL query. The frontend Rates tab shows an interactive SVG line chart with separate buy (green), mid (blue), and sell (red) series, a currency pair selector, time range buttons (24h / 7d / 30d), hover tooltip with exact rates per tick, and a responsive mobile layout. Unit tests cover all chart math helpers; integration tests cover snapshot creation, spread validation, and empty-state handling; E2E tests cover chart rendering, legend, pair selector, time range controls, empty state, and mobile viewport.
-
-### Country flags (100% complete)
-
-- [x] Add npm library country-flag-icons and use it everywhere where the country flag should be
-- [x] in /cities the flags are visible
-- [x] in footer in the language picker the flags are visible. Sync the footer language picker between master and game frontend.
-- [x] In context switcher make sure flags are visible.
 
 ### Fix city selection (100% complete)
 

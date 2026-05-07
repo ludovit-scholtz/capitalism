@@ -549,6 +549,31 @@ export function useBuildingDetail() {
   })
   const lockedConfiguredProductNames = computed(() => lockedConfiguredProducts.value.map((product) => getLocalizedProductName(product, locale.value)).join(', '))
   const isUpgradeInProgress = computed(() => pendingConfiguration.value !== null)
+  const upgradeBlockMessage = computed(() => {
+    const reason = pendingConfiguration.value?.blockReason
+    if (!reason) return null
+
+    if (reason.startsWith('INSUFFICIENT_FUNDS:')) {
+      const [, requiredAmountRaw, currencyCodeRaw] = reason.split(':')
+      const requiredAmount = Number.parseFloat(requiredAmountRaw ?? '0')
+      const currencyCode = currencyCodeRaw || cityCurrencyCode.value
+      const formattedAmount = formatCurrency(requiredAmount, currencyCode)
+      return t('buildingDetail.upgradeBlockedInsufficientFunds', {
+        amount: formattedAmount,
+        currency: currencyCode,
+      })
+    }
+
+    if (reason.startsWith('BANK_ACCOUNT_CURRENCY_MISMATCH:')) {
+      const [, accountCurrency, requiredCurrency] = reason.split(':')
+      return t('buildingDetail.upgradeBlockedCurrencyMismatch', {
+        accountCurrency: accountCurrency || t('common.notAvailable'),
+        requiredCurrency: requiredCurrency || cityCurrencyCode.value,
+      })
+    }
+
+    return reason
+  })
   const showPlanningSection = computed(() => isEditing.value)
 
   // True when at least one R&D unit (active or pending) is configured but no research brands exist yet
@@ -3031,11 +3056,11 @@ export function useBuildingDetail() {
       })
   })
 
-  function formatCurrency(value: number | null | undefined): string {
+  function formatCurrency(value: number | null | undefined, currencyCode = cityCurrencyCode.value): string {
     const amount = value ?? 0
     return new Intl.NumberFormat(locale.value, {
       style: 'currency',
-      currency: cityCurrencyCode.value,
+      currency: currencyCode,
       minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
       maximumFractionDigits: 2,
     }).format(amount)
@@ -4530,6 +4555,7 @@ export function useBuildingDetail() {
                 submittedAtTick
                 appliesAtTick
                 totalTicksRequired
+                blockReason
                 removals {
                   id
                   gridX
@@ -5103,6 +5129,7 @@ export function useBuildingDetail() {
     lockedConfiguredProducts,
     lockedConfiguredProductNames,
     isUpgradeInProgress,
+    upgradeBlockMessage,
     showPlanningSection,
     hasConfiguredRdUnits,
     remainingUpgradeTicks,

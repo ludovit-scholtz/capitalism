@@ -8,6 +8,7 @@ export interface BuildingConfigurationPlan {
   submittedAtTick: number
   appliesAtTick: number
   totalTicksRequired: number
+  blockReason?: string | null
   units: BuildingConfigurationPlanUnit[]
   removals: BuildingConfigurationPlanRemoval[]
 }

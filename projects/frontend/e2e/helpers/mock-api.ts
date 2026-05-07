@@ -319,6 +319,7 @@ export type MockBuildingConfigurationPlan = {
   submittedAtTick: number
   appliesAtTick: number
   totalTicksRequired: number
+  blockReason?: string | null
   units: MockBuildingConfigurationPlanUnit[]
   removals: MockBuildingConfigurationPlanRemoval[]
 }

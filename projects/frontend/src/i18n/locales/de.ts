@@ -1142,6 +1142,8 @@ export default {
     storeConfiguration: 'Ausbau speichern',
     upgradeQueuedTitle: 'Geb\u00e4ude wird ausgebaut',
     upgradeQueuedBody: 'Die aktuelle Konfiguration bleibt aktiv, bis das neue Layout in {time} freigeschaltet wird.',
+    upgradeBlockedInsufficientFunds: 'Der Ausbau wartet auf {amount} auf dem Gebäudekonto, bevor das geplante Layout aktiviert werden kann.',
+    upgradeBlockedCurrencyMismatch: 'Der Ausbau wartet auf ein Gebäudekonto in {requiredCurrency}, aber das zugewiesene Konto lautet auf {accountCurrency}.',
     upgradeAppliesAt: 'Aktiv ab {time}',
     currentTickLabel: 'Aktuelle Zeit: {time}',
     totalUpgradeTicks: 'Ausbauzeit: {time}',

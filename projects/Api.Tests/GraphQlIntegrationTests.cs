@@ -4313,6 +4313,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
                                 pendingConfiguration {
                                 id
                                 appliesAtTick
+                                blockReason
                                 }
                             }
                             }
@@ -4328,6 +4329,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
                     Assert.Equal(4_000m, delayedCompany.GetProperty("cash").GetDecimal());
                     Assert.Equal(0, delayedBuilding.GetProperty("units").GetArrayLength());
                     Assert.Equal(currentTick + 1, delayedBuilding.GetProperty("pendingConfiguration").GetProperty("appliesAtTick").GetInt64());
+                    Assert.Equal("INSUFFICIENT_FUNDS:4500.00:EUR", delayedBuilding.GetProperty("pendingConfiguration").GetProperty("blockReason").GetString());
 
                     await using (var scope = _factory.Services.CreateAsyncScope())
                     {

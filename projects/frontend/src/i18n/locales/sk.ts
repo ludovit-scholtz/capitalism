@@ -1141,6 +1141,8 @@ export default {
     cancelEditing: 'Zrušiť úpravy',
     upgradeQueuedTitle: 'Upgrade budovy prebieha',
     upgradeQueuedBody: 'Aktu\u00e1lna budova zost\u00e1va v prev\u00e1dzke, k\u00fdm sa nov\u00e9 rozlo\u017eenie aktivuje o {time}.',
+    upgradeBlockedInsufficientFunds: 'Upgrade čaká na {amount} na bankovom účte budovy, kým sa naplánované rozloženie môže aktivovať.',
+    upgradeBlockedCurrencyMismatch: 'Upgrade čaká na bankový účet budovy v mene {requiredCurrency}, ale priradený účet je v mene {accountCurrency}.',
     upgradeAppliesAt: 'Aktivuje sa {time}',
     currentTickLabel: 'Aktu\u00e1lny \u010das: {time}',
     totalUpgradeTicks: '\u010das upgrade: {time}',

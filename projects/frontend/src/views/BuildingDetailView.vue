@@ -39,6 +39,7 @@ const {
   lockedConfiguredProductNames,
   pendingConfiguration,
   remainingUpgradeTicks,
+  upgradeBlockMessage,
   isEditing,
   formatTickDuration,
   formatGameTickTime,
@@ -161,6 +162,7 @@ onMounted(async () => {
         <div>
           <strong>{{ t('buildingDetail.upgradeQueuedTitle') }}</strong>
           <p>{{ t('buildingDetail.upgradeQueuedBody', { time: formatTickDuration(remainingUpgradeTicks, locale) }) }}</p>
+          <p v-if="upgradeBlockMessage" class="upgrade-block-message">{{ upgradeBlockMessage }}</p>
         </div>
         <div class="upgrade-banner-actions">
           <div class="upgrade-pill" :title="t('buildingDetail.upgradeAppliesAt', { time: pendingConfiguration?.appliesAtTick })">
@@ -308,6 +310,11 @@ onMounted(async () => {
 .upgrade-banner p {
   margin: 0.35rem 0 0;
   font-size: 0.875rem;
+}
+
+.upgrade-block-message {
+  color: #b45309;
+  font-weight: 600;
 }
 
 /* ── Error / warning banners ── */

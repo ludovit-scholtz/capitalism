@@ -1142,6 +1142,8 @@ export default {
     storeConfiguration: 'Store Upgrade',
     upgradeQueuedTitle: 'Building upgrade in progress',
     upgradeQueuedBody: 'The current building keeps running until the queued layout activates in {time}.',
+    upgradeBlockedInsufficientFunds: 'Upgrade is waiting for {amount} in the building account before the queued layout can activate.',
+    upgradeBlockedCurrencyMismatch: 'Upgrade is waiting for a {requiredCurrency} building account, but the assigned account is {accountCurrency}.',
     upgradeAppliesAt: 'Applies at {time}',
     currentTickLabel: 'Current time: {time}',
     totalUpgradeTicks: 'Upgrade time: {time}',
