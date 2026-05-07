@@ -21,46 +21,62 @@ public sealed partial class Query
     /// </summary>
     [Authorize]
     public async Task<OperationsStatisticsResult> GetOperationsStatistics(
+        OperationsStatisticsInput? input,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor,
         [Service] GameAdminAuthorizationService gameAdminAuthorizationService)
     {
-        var principal = httpContextAccessor.HttpContext!.User;
-        await gameAdminAuthorizationService.RequireAdminDashboardAccessAsync(db, principal, httpContextAccessor.HttpContext!.RequestAborted);
+        var httpContext = httpContextAccessor.HttpContext
+            ?? throw new InvalidOperationException("HTTP context is required for operations statistics.");
+        var ct = httpContext.RequestAborted;
+        var principal = httpContext.User;
+        await gameAdminAuthorizationService.RequireAdminDashboardAccessAsync(db, principal, ct);
+
+        var normalizedRange = NormalizeOperationsStatisticsRange(input?.Range);
+        var rangeStartUtc = ResolveOperationsStatisticsRangeStartUtc(normalizedRange);
 
         var currentTick = await db.GameStates
             .AsNoTracking()
             .Select(s => s.CurrentTick)
-            .FirstOrDefaultAsync(httpContextAccessor.HttpContext.RequestAborted);
+            .FirstOrDefaultAsync(ct);
 
-        var windowStart = Math.Max(0L, currentTick - OperationsWindowTicks);
+        var ledgerEntriesQuery = db.LedgerEntries.AsNoTracking().AsQueryable();
+        if (rangeStartUtc.HasValue)
+        {
+            ledgerEntriesQuery = ledgerEntriesQuery.Where(e => e.RecordedAtUtc >= rangeStartUtc.Value);
+        }
 
-        var entries = await db.LedgerEntries
-            .AsNoTracking()
-            .Where(e => e.RecordedAtTick >= windowStart)
-            .ToListAsync(httpContextAccessor.HttpContext.RequestAborted);
+        var entries = await ledgerEntriesQuery.ToListAsync(ct);
 
-        var forexFeeAggregate = await db.ForexTradeRecords
-            .AsNoTracking()
-            .Where(t => t.ExecutedAtTick >= windowStart)
+        var forexTradesQuery = db.ForexTradeRecords.AsNoTracking().AsQueryable();
+        if (rangeStartUtc.HasValue)
+        {
+            forexTradesQuery = forexTradesQuery.Where(t => t.ExecutedAtUtc >= rangeStartUtc.Value);
+        }
+
+        var forexFeeAggregate = await forexTradesQuery
             .GroupBy(_ => 1)
             .Select(g => new
             {
                 Total = g.Sum(t => t.FeeAmount),
                 Count = g.Count(),
             })
-            .FirstOrDefaultAsync(httpContextAccessor.HttpContext.RequestAborted);
+            .FirstOrDefaultAsync(ct);
 
-        var goldAmmFeeAggregate = await db.GoldAmmTradeRecords
-            .AsNoTracking()
-            .Where(t => t.ExecutedAtTick >= windowStart)
+        var goldTradesQuery = db.GoldAmmTradeRecords.AsNoTracking().AsQueryable();
+        if (rangeStartUtc.HasValue)
+        {
+            goldTradesQuery = goldTradesQuery.Where(t => t.ExecutedAtUtc >= rangeStartUtc.Value);
+        }
+
+        var goldAmmFeeAggregate = await goldTradesQuery
             .GroupBy(_ => 1)
             .Select(g => new
             {
                 Total = g.Sum(t => t.FeeAmount),
                 Count = g.Count(),
             })
-            .FirstOrDefaultAsync(httpContextAccessor.HttpContext.RequestAborted);
+            .FirstOrDefaultAsync(ct);
 
         var fxFeeAmount = (forexFeeAggregate?.Total ?? 0m) + (goldAmmFeeAggregate?.Total ?? 0m);
         var fxFeeEntryCount = (forexFeeAggregate?.Count ?? 0) + (goldAmmFeeAggregate?.Count ?? 0);
@@ -79,7 +95,7 @@ public sealed partial class Query
                 TotalPlayers = db.Players.AsNoTracking().Count(),
                 TotalCompanies = db.Companies.AsNoTracking().Count(),
                 TotalBuildings = db.Buildings.AsNoTracking().Count(),
-            }).FirstOrDefaultAsync(httpContextAccessor.HttpContext.RequestAborted)
+            }).FirstOrDefaultAsync(ct)
             ?? new { TotalPlayers = 0, TotalCompanies = 0, TotalBuildings = 0 };
 
         // Compute percentages.
@@ -92,6 +108,7 @@ public sealed partial class Query
         {
             CurrentTick = currentTick,
             WindowTicks = OperationsWindowTicks,
+            Range = normalizedRange,
             InflowItems = inflowItems,
             OutflowItems = outflowItems,
             TotalInflow = totalInflow,
@@ -200,6 +217,40 @@ public sealed partial class Query
             })
             .ToListAsync(ct);
 
+        IQueryable<Brand> brandsQuery = db.Brands
+            .AsNoTracking()
+            .Where(b => b.ProductTypeId.HasValue);
+
+        if (productTypeId.HasValue)
+        {
+            brandsQuery = brandsQuery.Where(b => b.ProductTypeId == productTypeId.Value);
+        }
+
+        if (companyId.HasValue)
+        {
+            brandsQuery = brandsQuery.Where(b => b.CompanyId == companyId.Value);
+        }
+        else if (cityId.HasValue)
+        {
+            var cityCompanyIds = await db.Buildings
+                .AsNoTracking()
+                .Where(b => b.CityId == cityId.Value)
+                .Select(b => b.CompanyId)
+                .Distinct()
+                .ToListAsync(ct);
+            brandsQuery = brandsQuery.Where(b => cityCompanyIds.Contains(b.CompanyId));
+        }
+
+        var brandScoresByProduct = await brandsQuery
+            .GroupBy(b => b.ProductTypeId!.Value)
+            .Select(g => new
+            {
+                ProductTypeId = g.Key,
+                MarketingScore = g.Average(b => (b.Awareness * 0.7m) + (b.MarketingQuality * 0.3m)),
+                ResearchScore = g.Average(b => b.Quality),
+            })
+            .ToListAsync(ct);
+
         var filteredLedgerEntries = db.LedgerEntries
             .AsNoTracking()
             .Where(e => e.RecordedAtTick >= windowStart && e.ProductTypeId.HasValue
@@ -261,6 +312,13 @@ public sealed partial class Query
         var salesLookup = salesByProduct.ToDictionary(x => x.ProductTypeId);
         var marketingLookup = marketingByProduct.ToDictionary(x => x.ProductTypeId, x => x.Total);
         var researchLookup = researchByProduct.ToDictionary(x => x.ProductTypeId, x => x.Total);
+        var brandScoreLookup = brandScoresByProduct.ToDictionary(
+            x => x.ProductTypeId,
+            x => new
+            {
+                MarketingScore = decimal.Round(Math.Clamp(x.MarketingScore, 0m, 1m) * 100m, 1),
+                ResearchScore = decimal.Round(Math.Clamp(x.ResearchScore, 0m, 1m) * 100m, 1),
+            });
 
         var rows = productTypes.Select(pt =>
         {
@@ -268,6 +326,7 @@ public sealed partial class Query
             salesLookup.TryGetValue(pt.Id, out var sales);
             marketingLookup.TryGetValue(pt.Id, out var marketing);
             researchLookup.TryGetValue(pt.Id, out var research);
+            brandScoreLookup.TryGetValue(pt.Id, out var brandScores);
             activeSellersByProduct.TryGetValue(pt.Id, out var activeSellers);
 
             var laborCost = costsByProduct
@@ -312,6 +371,8 @@ public sealed partial class Query
                 MarketSaturation = saturation,
                 TotalMarketingSpend = marketing,
                 TotalResearchSpend = research,
+                MarketingScore = brandScores?.MarketingScore ?? 0m,
+                ResearchScore = brandScores?.ResearchScore ?? 0m,
             };
         }).ToList();
 
@@ -325,6 +386,25 @@ public sealed partial class Query
         cache.Set(cacheKey, result, ProductAnalyticsCacheDuration);
         return result;
     }
+
+    private static string NormalizeOperationsStatisticsRange(string? range)
+        => range switch
+        {
+            OperationsStatisticsRange.Last24Hours => OperationsStatisticsRange.Last24Hours,
+            OperationsStatisticsRange.Last30Days => OperationsStatisticsRange.Last30Days,
+            OperationsStatisticsRange.AllTime => OperationsStatisticsRange.AllTime,
+            _ => OperationsStatisticsRange.Last7Days,
+        };
+
+    private static DateTime? ResolveOperationsStatisticsRangeStartUtc(string range)
+        => range switch
+        {
+            OperationsStatisticsRange.Last24Hours => DateTime.UtcNow.AddHours(-24),
+            OperationsStatisticsRange.Last7Days => DateTime.UtcNow.AddDays(-7),
+            OperationsStatisticsRange.Last30Days => DateTime.UtcNow.AddDays(-30),
+            OperationsStatisticsRange.AllTime => null,
+            _ => DateTime.UtcNow.AddDays(-7),
+        };
 
     private static List<OperationsMoneyFlowItem> BuildInflowItems(List<LedgerEntry> entries)
     {

@@ -14,14 +14,27 @@ const adminStore = useGameAdminStore()
 const canAccessDashboard = computed(() => adminStore.session?.canAccessAdminDashboard ?? false)
 
 const navLinks = [
-  { name: 'operations-statistics', path: '/operations/statistics', label: computed(() => t('operations.nav.statistics')) },
-  { name: 'operations-news', path: '/operations/news', label: computed(() => t('operations.nav.news')) },
-  { name: 'operations-players', path: '/operations/players', label: computed(() => t('operations.nav.players')) },
-  { name: 'operations-analytics', path: '/operations/analytics', label: computed(() => t('operations.nav.analytics')) },
+  { name: 'operations-overview', path: '/operations/statistics', label: computed(() => t('operations.nav.overview')) },
+  {
+    name: 'operations-money-flow',
+    path: '/operations/statistics/money-flow',
+    label: computed(() => t('operations.nav.moneyFlow')),
+  },
+  {
+    name: 'operations-product-analytics',
+    path: '/operations/statistics/product-analytics',
+    label: computed(() => t('operations.nav.productAnalytics')),
+  },
+  { name: 'operations-news', path: '/operations/statistics/news', label: computed(() => t('operations.nav.news')) },
+  {
+    name: 'operations-players',
+    path: '/operations/statistics/players',
+    label: computed(() => t('operations.nav.players')),
+  },
 ]
 
 function isActiveRoute(path: string) {
-  return route.path.startsWith(path)
+  return route.path === path || route.path.startsWith(`${path}/`)
 }
 
 onMounted(async () => {
@@ -29,10 +42,11 @@ onMounted(async () => {
     await router.replace('/login')
     return
   }
+
   try {
     await adminStore.fetchSession()
   } catch {
-    // errors handled in template
+    // errors surface through child views
   }
 })
 </script>
@@ -50,8 +64,8 @@ onMounted(async () => {
       <p>{{ t('admin.accessDeniedBody') }}</p>
     </div>
 
-    <template v-else>
-      <nav class="ops-subnav" role="navigation" aria-label="Operations sections">
+    <div v-else class="ops-shell">
+      <nav class="ops-subnav card" role="navigation" aria-label="Operations sections">
         <RouterLink
           v-for="link in navLinks"
           :key="link.name"
@@ -66,18 +80,18 @@ onMounted(async () => {
       <div class="ops-content">
         <RouterView />
       </div>
-    </template>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .operations-view {
-  padding-top: 2rem;
+  padding-top: 1.5rem;
   padding-bottom: 4rem;
 }
 
 .ops-header {
-  margin-bottom: 1.75rem;
+  margin-bottom: 1.5rem;
 }
 
 .ops-eyebrow {
@@ -98,24 +112,33 @@ onMounted(async () => {
   padding: 1.5rem;
 }
 
+.ops-shell {
+  display: grid;
+  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
 .ops-subnav {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 0.35rem;
-  border-bottom: 1px solid var(--color-border);
-  margin-bottom: 2rem;
-  padding-bottom: 0;
+  padding: 0.75rem;
+  position: sticky;
+  top: 5rem;
 }
 
 .ops-nav-tab {
-  padding: 0.6rem 1.1rem;
-  font-size: 0.9rem;
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  border: 1px solid transparent;
-  border-bottom: none;
+  padding: 0.75rem 0.95rem;
+  font-size: 0.92rem;
+  border-radius: var(--radius-md);
   color: var(--color-text-secondary);
   text-decoration: none;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s;
+  border: 1px solid transparent;
 }
 
 .ops-nav-tab:hover {
@@ -125,23 +148,28 @@ onMounted(async () => {
 
 .ops-nav-tab.active {
   color: var(--color-text);
-  background: var(--color-card);
-  border-color: var(--color-border);
-  border-bottom-color: var(--color-card);
-  margin-bottom: -1px;
+  background: rgba(255, 192, 122, 0.08);
+  border-color: rgba(255, 192, 122, 0.25);
 }
 
 .ops-content {
-  min-height: 20rem;
+  min-width: 0;
 }
 
-@media (max-width: 640px) {
-  .ops-subnav {
-    gap: 0.2rem;
+@media (max-width: 900px) {
+  .ops-shell {
+    grid-template-columns: 1fr;
   }
+
+  .ops-subnav {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: 0.35rem;
+  }
+
   .ops-nav-tab {
-    padding: 0.5rem 0.75rem;
-    font-size: 0.82rem;
+    white-space: nowrap;
   }
 }
 </style>

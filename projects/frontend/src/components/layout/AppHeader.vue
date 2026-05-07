@@ -152,8 +152,7 @@ const mobileNavSections = computed(() => {
       key: 'admin' as const,
       label: t('nav.sectionAdmin'),
       links: [
-        { key: 'admin', label: t('nav.admin'), to: '/admin', icon: ['fas', 'shield-halved'], visible: !!session.value?.canAccessAdminDashboard, badge: 0 },
-        { key: 'operations', label: t('nav.operations'), to: '/operations', icon: ['fas', 'chart-line'], visible: !!session.value?.canAccessAdminDashboard, badge: 0 },
+        { key: 'operations', label: t('nav.operations'), to: '/operations/statistics', icon: ['fas', 'chart-line'], visible: !!session.value?.canAccessAdminDashboard, badge: 0 },
       ],
     },
   ]
@@ -241,10 +240,7 @@ const mobileNavSections = computed(() => {
             <font-awesome-icon :icon="['fas', 'comments']" class="mr-2" />
             <span v-if="chatUnreadCount > 0" class="nav-badge nav-badge-chat chat-badge">{{ chatUnreadCount }}</span>
           </button>
-          <RouterLink v-if="session?.canAccessAdminDashboard" to="/admin" :title="t('nav.admin')" :aria-label="t('nav.admin')" class="nav-link" @click="closeMenu">
-            <font-awesome-icon :icon="['fas', 'shield-halved']" class="mr-2" />
-          </RouterLink>
-          <RouterLink v-if="session?.canAccessAdminDashboard" to="/operations" :title="t('nav.operations')" :aria-label="t('nav.operations')" class="nav-link" @click="closeMenu">
+          <RouterLink v-if="session?.canAccessAdminDashboard" to="/operations/statistics" :title="t('nav.operations')" :aria-label="t('nav.operations')" class="nav-link" @click="closeMenu">
             <font-awesome-icon :icon="['fas', 'chart-line']" class="mr-2" />
           </RouterLink>
         </div>

@@ -4,7 +4,27 @@ import { ref } from 'vue'
 import { gqlRequest } from '@/lib/graphql'
 import type { AccountContextType, AuthPayload, GameAdminDashboard, GameAdminPlayer, GameAdminSession, GamesEntry, GamesLocalization, GlobalGameAdminGrant } from '@/types'
 
-const PLAYER_FIELDS = `
+const BASE_PLAYER_FIELDS = `
+  id
+  email
+  displayName
+  role
+  isInvisibleInChat
+  createdAtUtc
+  lastLoginAtUtc
+  personalCash
+  totalCompanyCash
+  totalCompanyEquity
+  companyCount
+  cityNames
+  companies {
+    id
+    name
+    cash
+  }
+`
+
+const SESSION_PLAYER_FIELDS = `
   id
   email
   displayName
@@ -31,10 +51,10 @@ const SESSION_FIELDS = `
   effectiveCompanyId
   effectiveCompanyName
   adminActor {
-    ${PLAYER_FIELDS}
+    ${SESSION_PLAYER_FIELDS}
   }
   effectivePlayer {
-    ${PLAYER_FIELDS}
+    ${SESSION_PLAYER_FIELDS}
   }
 `
 
@@ -63,20 +83,20 @@ const DASHBOARD_FIELDS = `
     supportingEntityType
     supportingEntityName
     primaryPlayer {
-      ${PLAYER_FIELDS}
+      ${BASE_PLAYER_FIELDS}
     }
     relatedPlayer {
-      ${PLAYER_FIELDS}
+      ${BASE_PLAYER_FIELDS}
     }
   }
   players {
-    ${PLAYER_FIELDS}
+    ${BASE_PLAYER_FIELDS}
   }
   invisiblePlayers {
-    ${PLAYER_FIELDS}
+    ${BASE_PLAYER_FIELDS}
   }
   governmentPlayer {
-    ${PLAYER_FIELDS}
+    ${BASE_PLAYER_FIELDS}
   }
   globalGameAdminGrants {
     id
@@ -239,9 +259,9 @@ export const useGameAdminStore = defineStore('gameAdmin', () => {
 
   async function setPlayerInvisibleInChat(playerId: string, isInvisibleInChat: boolean) {
     const data = await gqlRequest<{ setPlayerInvisibleInChat: GameAdminPlayer }>(
-      `mutation SetPlayerInvisibleInChat($input: SetPlayerInvisibleInChatInput!) {
+        `mutation SetPlayerInvisibleInChat($input: SetPlayerInvisibleInChatInput!) {
         setPlayerInvisibleInChat(input: $input) {
-          ${PLAYER_FIELDS}
+          ${SESSION_PLAYER_FIELDS}
         }
       }`,
       { input: { playerId, isInvisibleInChat } },
@@ -253,9 +273,9 @@ export const useGameAdminStore = defineStore('gameAdmin', () => {
 
   async function setLocalGameAdminRole(playerId: string, isAdmin: boolean) {
     const data = await gqlRequest<{ setLocalGameAdminRole: GameAdminPlayer }>(
-      `mutation SetLocalGameAdminRole($input: SetLocalGameAdminRoleInput!) {
+        `mutation SetLocalGameAdminRole($input: SetLocalGameAdminRoleInput!) {
         setLocalGameAdminRole(input: $input) {
-          ${PLAYER_FIELDS}
+          ${SESSION_PLAYER_FIELDS}
         }
       }`,
       { input: { playerId, isAdmin } },
@@ -348,11 +368,14 @@ export const useGameAdminStore = defineStore('gameAdmin', () => {
       return
     }
 
+    const existingPlayer = dashboard.value.players.find((player) => player.id === updatedPlayer.id)
+    const mergedPlayer = existingPlayer ? { ...existingPlayer, ...updatedPlayer } : updatedPlayer
+
     dashboard.value = {
       ...dashboard.value,
-      players: dashboard.value.players.map((player) => (player.id === updatedPlayer.id ? updatedPlayer : player)),
+      players: dashboard.value.players.map((player) => (player.id === updatedPlayer.id ? mergedPlayer : player)),
       invisiblePlayers: updatedPlayer.isInvisibleInChat
-        ? [...dashboard.value.invisiblePlayers.filter((player) => player.id !== updatedPlayer.id), updatedPlayer].sort((left, right) => left.displayName.localeCompare(right.displayName))
+        ? [...dashboard.value.invisiblePlayers.filter((player) => player.id !== updatedPlayer.id), mergedPlayer].sort((left, right) => left.displayName.localeCompare(right.displayName))
         : dashboard.value.invisiblePlayers.filter((player) => player.id !== updatedPlayer.id),
     }
   }

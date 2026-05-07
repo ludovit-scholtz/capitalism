@@ -52,12 +52,14 @@ public sealed class OperationsDashboardProductAnalyticsTests
                   totalRevenue
                   marketSize
                   marketSaturation
-                  avgMarketPrice
-                  totalMaterialCost
-                  totalLaborCost
-                  totalEnergyCost
-                  totalResearchSpend
-                  activeCityCount
+                    avgMarketPrice
+                    totalMaterialCost
+                    totalLaborCost
+                    totalEnergyCost
+                    totalResearchSpend
+                    marketingScore
+                    researchScore
+                    activeCityCount
                 }
               }
             }
@@ -361,5 +363,45 @@ public sealed class OperationsDashboardProductAnalyticsTests
         Assert.Equal(25m, row.GetProperty("marketSaturation").GetDecimal());
         Assert.Equal(50m, row.GetProperty("avgMarketPrice").GetDecimal());
         Assert.Equal(70m, row.GetProperty("totalResearchSpend").GetDecimal());
+    }
+
+    [Fact]
+    public async Task AdminProductAnalytics_ReturnsMarketingAndResearchScores()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var adminEmail = $"analytics-scores-{Guid.NewGuid():N}@test.com";
+        var token = await RegisterAndGetTokenAsync(client, adminEmail, "Analytics Scores Admin");
+        await PromoteToAdminAsync(factory, adminEmail);
+
+        Guid productId;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var admin = await db.Players.FirstAsync(p => p.Email == adminEmail);
+            productId = (await db.ProductTypes.FirstAsync(p => p.Name == "Wooden Chair")).Id;
+
+            var company = new Company { Id = Guid.NewGuid(), PlayerId = admin.Id, Name = "Scores Corp" };
+            db.Companies.Add(company);
+            db.Brands.Add(new Brand
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                Name = "Chair Prime",
+                Scope = BrandScope.Product,
+                ProductTypeId = productId,
+                Awareness = 0.6m,
+                Quality = 0.4m,
+                MarketingQuality = 0.2m,
+            });
+
+            await db.SaveChangesAsync();
+        }
+
+        var analytics = await QueryAnalyticsAsync(client, token, new { productTypeId = productId });
+        var row = analytics.GetProperty("rows").EnumerateArray().Single();
+        Assert.Equal(48.0m, row.GetProperty("marketingScore").GetDecimal());
+        Assert.Equal(40.0m, row.GetProperty("researchScore").GetDecimal());
     }
 }

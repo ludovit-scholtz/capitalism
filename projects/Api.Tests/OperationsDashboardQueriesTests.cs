@@ -105,7 +105,7 @@ public sealed class OperationsDashboardQueriesTests
                     Category = LedgerCategory.Revenue,
                     Amount = 999m,
                     RecordedAtTick = 50,
-                    RecordedAtUtc = DateTime.UtcNow,
+                    RecordedAtUtc = DateTime.UtcNow.AddDays(-10),
                 });
 
             db.ForexTradeRecords.Add(new ForexTradeRecord
@@ -175,6 +175,74 @@ public sealed class OperationsDashboardQueriesTests
         Assert.Equal(30m, outflows["RESEARCH"].GetProperty("amount").GetDecimal());
         Assert.Equal(10m, outflows["FX_FEES"].GetProperty("amount").GetDecimal());
         Assert.Equal(2, outflows["FX_FEES"].GetProperty("entryCount").GetInt32());
+    }
+
+    [Fact]
+    public async Task OperationsStatistics_Last24Hours_ExcludesOlderLedgerEntries()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var adminEmail = $"ops-range-{Guid.NewGuid():N}@test.com";
+        var token = await RegisterAndGetTokenAsync(client, adminEmail, "Ops Range Admin");
+        await PromoteToAdminAsync(factory, adminEmail);
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var admin = await db.Players.FirstAsync(p => p.Email == adminEmail);
+            var company = new Company
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = admin.Id,
+                Name = "Ops Range Corp",
+            };
+            db.Companies.Add(company);
+
+            db.LedgerEntries.AddRange(
+                new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = company.Id,
+                    Category = LedgerCategory.Revenue,
+                    Amount = 300m,
+                    RecordedAtTick = 240,
+                    RecordedAtUtc = DateTime.UtcNow.AddHours(-6),
+                },
+                new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = company.Id,
+                    Category = LedgerCategory.Revenue,
+                    Amount = 999m,
+                    RecordedAtTick = 120,
+                    RecordedAtUtc = DateTime.UtcNow.AddDays(-10),
+                });
+
+            await db.SaveChangesAsync();
+        }
+
+        var result = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            """
+            query OperationsStats($input: OperationsStatisticsInput) {
+              operationsStatistics(input: $input) {
+                range
+                totalInflow
+                inflowItems { category amount }
+              }
+            }
+            """,
+            variables: new { input = new { range = "LAST_24_HOURS" } },
+            token: token);
+
+        Assert.False(result.TryGetProperty("errors", out _));
+        var stats = result.GetProperty("data").GetProperty("operationsStatistics");
+        Assert.Equal("LAST_24_HOURS", stats.GetProperty("range").GetString());
+        Assert.Equal(300m, stats.GetProperty("totalInflow").GetDecimal());
+        var inflow = stats.GetProperty("inflowItems").EnumerateArray().Single();
+        Assert.Equal("PUBLIC_SALES", inflow.GetProperty("category").GetString());
+        Assert.Equal(300m, inflow.GetProperty("amount").GetDecimal());
     }
 
     [Fact]
@@ -320,6 +388,8 @@ public sealed class OperationsDashboardQueriesTests
                   totalEnergyCost
                   totalCost
                   totalMarketingSpend
+                  marketingScore
+                  researchScore
                 }
               }
             }
@@ -347,6 +417,8 @@ public sealed class OperationsDashboardQueriesTests
         Assert.Equal(20m, row.GetProperty("totalEnergyCost").GetDecimal());
         Assert.Equal(150m, row.GetProperty("totalCost").GetDecimal());
         Assert.Equal(10m, row.GetProperty("totalMarketingSpend").GetDecimal());
+        Assert.Equal(0m, row.GetProperty("marketingScore").GetDecimal());
+        Assert.Equal(0m, row.GetProperty("researchScore").GetDecimal());
     }
 
     [Fact]

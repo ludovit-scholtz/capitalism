@@ -46,10 +46,13 @@ public sealed partial class Mutation
             DisplayName = player.DisplayName,
             Role = player.Role,
             IsInvisibleInChat = player.IsInvisibleInChat,
+            CreatedAtUtc = player.CreatedAtUtc,
             LastLoginAtUtc = player.LastLoginAtUtc,
             PersonalCash = personalCash,
             TotalCompanyCash = player.Companies.Sum(CompanyBankingService.GetTotalBalance),
+            TotalCompanyEquity = player.Companies.Sum(CompanyBankingService.GetTotalBalance),
             CompanyCount = player.Companies.Count,
+            CityNames = [],
             Companies = player.Companies.Select(company => new GameAdminCompanySummary
             {
                 Id = company.Id,
@@ -88,10 +91,13 @@ public sealed partial class Mutation
             DisplayName = player.DisplayName,
             Role = player.Role,
             IsInvisibleInChat = player.IsInvisibleInChat,
+            CreatedAtUtc = player.CreatedAtUtc,
             LastLoginAtUtc = player.LastLoginAtUtc,
             PersonalCash = personalCash,
             TotalCompanyCash = player.Companies.Sum(CompanyBankingService.GetTotalBalance),
+            TotalCompanyEquity = player.Companies.Sum(CompanyBankingService.GetTotalBalance),
             CompanyCount = player.Companies.Count,
+            CityNames = [],
             Companies = player.Companies.Select(company => new GameAdminCompanySummary
             {
                 Id = company.Id,

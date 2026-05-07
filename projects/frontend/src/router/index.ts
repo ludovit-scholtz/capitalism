@@ -10,7 +10,7 @@ const router = createRouter({
     { path: '/onboarding', name: 'onboarding', component: () => import('@/views/OnboardingView.vue') },
     { path: '/dashboard', name: 'dashboard', component: () => import('@/views/DashboardView.vue') },
     { path: '/news', name: 'news', component: () => import('@/views/NewsView.vue') },
-    { path: '/admin', name: 'admin-dashboard', component: () => import('@/views/GameAdminDashboardView.vue') },
+    { path: '/admin', redirect: '/operations/statistics' },
     {
       path: '/leaderboard',
       name: 'leaderboard',
@@ -66,15 +66,25 @@ const router = createRouter({
       component: () => import('@/views/TradeRoutesView.vue'),
     },
     { path: '/tutorial', name: 'tutorial', component: () => import('@/views/TutorialView.vue') },
+    { path: '/operations', redirect: '/operations/statistics' },
     {
-      path: '/operations',
+      path: '/operations/statistics',
       component: () => import('@/views/OperationsDashboardView.vue'),
       children: [
-        { path: '', redirect: '/operations/statistics' },
         {
-          path: 'statistics',
-          name: 'operations-statistics',
+          path: '',
+          name: 'operations-overview',
+          component: () => import('@/views/OperationsOverviewView.vue'),
+        },
+        {
+          path: 'money-flow',
+          name: 'operations-money-flow',
           component: () => import('@/views/OperationsStatisticsView.vue'),
+        },
+        {
+          path: 'product-analytics',
+          name: 'operations-product-analytics',
+          component: () => import('@/views/OperationsAnalyticsView.vue'),
         },
         {
           path: 'news',
@@ -90,11 +100,6 @@ const router = createRouter({
           path: 'players/:id',
           name: 'operations-player-detail',
           component: () => import('@/views/OperationsPlayerDetailView.vue'),
-        },
-        {
-          path: 'analytics',
-          name: 'operations-analytics',
-          component: () => import('@/views/OperationsAnalyticsView.vue'),
         },
       ],
     },

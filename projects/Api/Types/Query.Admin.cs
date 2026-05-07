@@ -74,6 +74,7 @@ public sealed partial class Query
             .OrderBy(player => player.DisplayName)
             .ToListAsync(httpContextAccessor.HttpContext.RequestAborted);
         var companies = players.SelectMany(player => player.Companies).ToList();
+        var companyIds = companies.Select(company => company.Id).ToList();
         var currentTick = await db.GameStates
             .AsNoTracking()
             .Select(state => state.CurrentTick)
@@ -89,6 +90,22 @@ public sealed partial class Query
             .AsNoTracking()
             .Where(holding => holding.OwnerPlayerId.HasValue || holding.OwnerCompanyId.HasValue)
             .ToListAsync(httpContextAccessor.HttpContext.RequestAborted);
+        var buildings = await db.Buildings
+            .AsNoTracking()
+            .Where(building => companyIds.Contains(building.CompanyId))
+            .ToListAsync(httpContextAccessor.HttpContext.RequestAborted);
+        var buildingIds = buildings.Select(building => building.Id).ToList();
+        var ownedLots = await db.BuildingLots
+            .AsNoTracking()
+            .Where(lot => lot.OwnerCompanyId.HasValue && companyIds.Contains(lot.OwnerCompanyId.Value))
+            .ToListAsync(httpContextAccessor.HttpContext.RequestAborted);
+        var inventories = await db.Inventories
+            .AsNoTracking()
+            .Where(inventory => buildingIds.Contains(inventory.BuildingId))
+            .ToListAsync(httpContextAccessor.HttpContext.RequestAborted);
+        var cityNamesById = await db.Cities
+            .AsNoTracking()
+            .ToDictionaryAsync(city => city.Id, city => city.Name, httpContextAccessor.HttpContext.RequestAborted);
         var auditLogs = await db.AdminActionAuditLogs
             .AsNoTracking()
             .OrderByDescending(log => log.RecordedAtUtc)
@@ -104,6 +121,22 @@ public sealed partial class Query
             db,
             players.Select(player => player.Id),
             httpContextAccessor.HttpContext.RequestAborted);
+        var baseEquityByCompany = SharePriceCalculator.ComputeBaseEquityByCompany(companies, buildings, ownedLots, inventories);
+        var totalCompanyEquityByPlayerId = players.ToDictionary(
+            player => player.Id,
+            player => player.Companies.Sum(company => baseEquityByCompany.GetValueOrDefault(company.Id)));
+        var companyIdsByPlayerId = players.ToDictionary(
+            player => player.Id,
+            player => player.Companies.Select(company => company.Id).ToHashSet());
+        var cityNamesByPlayerId = players.ToDictionary(
+            player => player.Id,
+            player => buildings
+                .Where(building => companyIdsByPlayerId[player.Id].Contains(building.CompanyId))
+                .Select(building => cityNamesById.GetValueOrDefault(building.CityId, string.Empty))
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToList());
 
         return new GameAdminDashboardResult
         {
@@ -123,13 +156,13 @@ public sealed partial class Query
             MultiAccountAlerts = BuildMultiAccountAlerts(players, companies, loans, shareholdings, personalCashByPlayerId),
             Players = players
                 .Where(player => player.Email != GovernmentActorConstants.GovernmentEmail)
-                .Select(player => ToGameAdminPlayerSummary(player, personalCashByPlayerId)).ToList(),
+                .Select(player => ToGameAdminPlayerSummary(player, personalCashByPlayerId, totalCompanyEquityByPlayerId, cityNamesByPlayerId)).ToList(),
             InvisiblePlayers = players
                 .Where(player => player.Email != GovernmentActorConstants.GovernmentEmail && player.IsInvisibleInChat)
-                .Select(player => ToGameAdminPlayerSummary(player, personalCashByPlayerId)).ToList(),
+                .Select(player => ToGameAdminPlayerSummary(player, personalCashByPlayerId, totalCompanyEquityByPlayerId, cityNamesByPlayerId)).ToList(),
             GovernmentPlayer = players
                 .Where(player => player.Email == GovernmentActorConstants.GovernmentEmail)
-                .Select(player => ToGameAdminPlayerSummary(player, personalCashByPlayerId))
+                .Select(player => ToGameAdminPlayerSummary(player, personalCashByPlayerId, totalCompanyEquityByPlayerId, cityNamesByPlayerId))
                 .FirstOrDefault(),
             GlobalGameAdminGrants = globalAdminGrants,
             RecentAuditLogs = auditLogs.Select(log => new GameAdminAuditLogRecord
@@ -154,7 +187,9 @@ public sealed partial class Query
 
     private static GameAdminPlayerSummary ToGameAdminPlayerSummary(
         Player player,
-        IReadOnlyDictionary<Guid, decimal> personalCashByPlayerId)
+        IReadOnlyDictionary<Guid, decimal> personalCashByPlayerId,
+        IReadOnlyDictionary<Guid, decimal>? totalCompanyEquityByPlayerId = null,
+        IReadOnlyDictionary<Guid, List<string>>? cityNamesByPlayerId = null)
     {
         return new GameAdminPlayerSummary
         {
@@ -163,10 +198,13 @@ public sealed partial class Query
             DisplayName = player.DisplayName,
             Role = player.Role,
             IsInvisibleInChat = player.IsInvisibleInChat,
+            CreatedAtUtc = player.CreatedAtUtc,
             LastLoginAtUtc = player.LastLoginAtUtc,
             PersonalCash = PersonalBankAccountService.GetGrossCash(player, personalCashByPlayerId),
             TotalCompanyCash = player.Companies.Sum(CompanyBankingService.GetTotalBalance),
+            TotalCompanyEquity = totalCompanyEquityByPlayerId?.GetValueOrDefault(player.Id) ?? player.Companies.Sum(CompanyBankingService.GetTotalBalance),
             CompanyCount = player.Companies.Count,
+            CityNames = cityNamesByPlayerId?.GetValueOrDefault(player.Id)?.ToList() ?? [],
             Companies = player.Companies
                 .OrderBy(company => company.Name)
                 .Select(company => new GameAdminCompanySummary
