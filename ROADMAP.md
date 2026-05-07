@@ -26,7 +26,7 @@ It will use real world map. The game will start in single city and later other c
 - [x] Create better Company name generator. Find npm package with the word list, and do a proper name generation with the combination of two words. Make sure the company names sounds great.
 - [x] Create name generator for personal account name. Find npm package with the names wordlist and do a combination of the Firstname, Middlename and Last name. Allow players to change the personal account name later. In ranking show the personal account name, not the oidc name please. In the form to change name, tell people not to use the real name.
 
-### Buildings (70% complete)
+### Buildings (75% complete)
 
 - [x] Add tab view to building overview. Make the default tab to be shown one with the building P&L and statistics. Add second tab the bank account. Make sure the tabs are properly routed through tab view. Make sure to use the components for each tab please.
 - [x] When in the building edit mode, create tab view. For each tab make sure to use the component. 
@@ -36,9 +36,9 @@ It will use real world map. The game will start in single city and later other c
 - [x] Do not allow to put on sale building which is used as a collateral for a loan.
 - [x] Create a workflow to destroy a building. When building is destroyed, return the user 80% of the building property value. Make the property available for purchase again. When bank loan is not paid set it for sale for the property market price minus 10%. When the debt from missed payments is not paid in 3 game days (72 ticks), destroy the building and pay any remaining debt from the sale of property to the bank owner.
 - [ ] In game dashboard, the number of units count for specific building touches the word Buildings in the navigation. Add some space between the tag and text please.
-- [ ] When building is in editation mode, allow copy the configuration of the unit at the building. When user hits ctrl+c or cmd+c on mac, he copies to the clipboard the json config of the unit.
-- [ ] When building is in editation mode, allow paste of the configuration of the unit at the building. When user hits ctrl+v or cmd+v on mac and he has selected the unit, and if the json schema is valid for the unit configuration, apply the configuration to the unit. This copy and paste mechanism will improve the UX of the unit management. For example when user want to expand the factory or if he wants to expand the R&D building.
-- [ ] Allow to paste unit configuration to empty unit space
+- [x] When building is in editation mode, allow copy the configuration of the unit at the building. When user hits ctrl+c or cmd+c on mac, he copies to the clipboard the json config of the unit.
+- [x] When building is in editation mode, allow paste of the configuration of the unit at the building. When user hits ctrl+v or cmd+v on mac and he has selected the unit, and if the json schema is valid for the unit configuration, apply the configuration to the unit. This copy and paste mechanism will improve the UX of the unit management. For example when user want to expand the factory or if he wants to expand the R&D building.
+- [x] Allow to paste unit configuration to empty unit space
 
 **Shipped (sell building increment):** A professional sell-building workflow is live at `/building/:id/sell`. Players can list any building for sale with a custom asking price, cancel an active listing, and see an estimated market value (EMV) based on building level, installed units, and lot population index. The collateral guard blocks listing buildings that are active or overdue loan collateral while allowing listing for defaulted loans (so players can sell to repay defaulted debt). The EMV calculation is extracted into `src/lib/sellBuilding.ts` with 23 dedicated unit tests. Edge-case E2E tests cover: validation (zero price blocked), 150% EMV warning, collateral blocking with loan count, defaulted loan not blocking, already-listed state showing cancel and update buttons, and destroyed buildings hiding the sell action. Backend: 25 integration tests in `BuildingSecondaryMarketTests.cs` cover the full secondary-market lifecycle (list, unlist, make offer, accept offer with ownership transfer and ledger entries, reject offer, concurrent offers, unauthenticated guard, collateral validation for Active/Overdue/Defaulted/Repaid loan states).
 
