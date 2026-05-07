@@ -75,3 +75,10 @@ public sealed class AcceptLoanInput
     /// </summary>
     public Guid? BankAccountId { get; set; }
 }
+
+/// <summary>Input for manually repaying an overdue/defaulted loan debt.</summary>
+public sealed class RepayLoanDebtInput
+{
+    /// <summary>The loan to repay. Must belong to the authenticated borrower's company.</summary>
+    public Guid LoanId { get; set; }
+}

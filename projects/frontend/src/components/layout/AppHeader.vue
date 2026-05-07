@@ -83,6 +83,8 @@ async function handleNotificationClick(notificationId: string, isRead: boolean, 
     await router.push(`/building/${buildingId}`)
   } else if (type === 'LOAN_REPAYMENT_DUE_SOON') {
     await router.push('/banking')
+  } else if (type === 'LOAN_PAYMENT_MISSED') {
+    await router.push('/banking')
   } else if (type === 'BANK_ACCOUNT_LOW_BALANCE') {
     await router.push('/bank-statement')
   } else {

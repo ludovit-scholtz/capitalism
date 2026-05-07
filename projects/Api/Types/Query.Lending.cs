@@ -209,6 +209,7 @@ public sealed partial class Query
         Status = l.Status,
         MissedPayments = l.MissedPayments,
         AccumulatedPenalty = l.AccumulatedPenalty,
+        DefaultedAtTick = l.DefaultedAtTick,
         AcceptedAtUtc = l.AcceptedAtUtc,
         ClosedAtUtc = l.ClosedAtUtc,
         CollateralBuildingId = l.CollateralBuildingId,

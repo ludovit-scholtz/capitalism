@@ -3006,6 +3006,13 @@ export default {
     withdrawAmount: 'Suma výberu ($)',
     maxWithdraw: 'Maximálny výber',
     withdrawSuccess: 'Výber bol úspešne spracovaný.',
+    pendingDebtTitle: '⚠ Nesplatený dlh z pôžičky',
+    pendingDebtSummary: 'Nesplatený dlh v tejto banke: {amount}',
+    pendingDebtAmountLine: 'Výška dlhu: {amount}',
+    overdueCountdownUnknown: 'Odpočet zabavenia nie je dostupný.',
+    overdueCountdownValue: 'Zhabanie o {days}d {hours}h (~{realMinutes} reálnych minút).',
+    repayDebtNow: 'Splatiť dlh',
+    repayDebtSuccess: 'Dlh bol úspešne splatený.',
   },
   forex: {
     title: 'Forex zmenáreň',

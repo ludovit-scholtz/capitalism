@@ -3017,6 +3017,13 @@ export default {
     withdrawAmount: 'Withdrawal Amount ($)',
     maxWithdraw: 'Maximum withdrawal',
     withdrawSuccess: 'Withdrawal processed successfully.',
+    pendingDebtTitle: '⚠ Pending Loan Debt',
+    pendingDebtSummary: 'Overdue debt at this bank: {amount}',
+    pendingDebtAmountLine: 'Debt amount: {amount}',
+    overdueCountdownUnknown: 'Foreclosure countdown unavailable.',
+    overdueCountdownValue: 'Seizure in {days}d {hours}h (~{realMinutes} real minutes).',
+    repayDebtNow: 'Repay Debt',
+    repayDebtSuccess: 'Debt repaid successfully.',
   },
   forex: {
     title: 'Forex Exchange',

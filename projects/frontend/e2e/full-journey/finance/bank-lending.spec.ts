@@ -81,6 +81,7 @@ function makeActiveLoan(overrides: Partial<MockLoan> = {}): MockLoan {
     status: 'ACTIVE',
     missedPayments: 0,
     accumulatedPenalty: 0,
+    defaultedAtTick: null,
     acceptedAtUtc: '2026-01-15T00:00:00Z',
     closedAtUtc: null,
     ...overrides,
@@ -738,6 +739,46 @@ test.describe('Bank Management (/bank/:buildingId)', () => {
     await expect(page.getByText('⚠ Overdue')).toBeVisible()
     // Should show missed count
     await expect(page.getByText('2 missed')).toBeVisible()
+  })
+
+  test('shows pending debt warning with countdown and allows one-click repayment', async ({ page }) => {
+    const borrower = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    borrower.companies.push({
+      id: 'borrower-company-1',
+      playerId: borrower.id,
+      name: 'Borrower Corp',
+      cash: 50_000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [],
+    })
+
+    const overdueLoan = makeActiveLoan({
+      status: 'OVERDUE',
+      missedPayments: 1,
+      remainingPrincipal: 12_500,
+      defaultedAtTick: 150,
+      collateralBuildingId: 'factory-1',
+      collateralBuildingName: 'Factory A',
+    })
+
+    const state = setupMockApi(page, { players: [borrower], myLoans: [overdueLoan] })
+    state.currentUserId = borrower.id
+    state.currentToken = `token-${borrower.id}`
+    state.gameState.currentTick = 200
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${borrower.id}`)
+
+    await page.goto('/bank/bank-building-1')
+
+    await expect(page.getByRole('heading', { name: '⚠ Pending Loan Debt' })).toBeVisible()
+    await expect(page.getByText('Overdue debt at this bank')).toBeVisible()
+    await expect(page.getByText(/Seizure in/)).toBeVisible()
+
+    await page.getByRole('button', { name: 'Repay Debt' }).click()
+    await expect(page.getByRole('heading', { name: '⚠ Pending Loan Debt' })).toHaveCount(0)
   })
 })
 

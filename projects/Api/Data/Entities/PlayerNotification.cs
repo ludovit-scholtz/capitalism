@@ -37,6 +37,7 @@ public sealed class PlayerNotification
 public static class PlayerNotificationType
 {
     public const string Generic = "GENERIC";
+    public const string LoanPaymentMissed = "LOAN_PAYMENT_MISSED";
     public const string BuildingConstructionCompleted = "BUILDING_CONSTRUCTION_COMPLETED";
     public const string BuildingUpgradeApplied = "BUILDING_UPGRADE_APPLIED";
     public const string LoanRepaymentDueSoon = "LOAN_REPAYMENT_DUE_SOON";

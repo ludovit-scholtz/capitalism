@@ -44,6 +44,7 @@ export interface LoanSummary {
   status: LoanStatus
   missedPayments: number
   accumulatedPenalty: number
+  defaultedAtTick: number | null
   acceptedAtUtc: string
   closedAtUtc: string | null
   /** ID of the building pledged as collateral, or null for unsecured loans. */
