@@ -8,6 +8,7 @@ It will use real world map. The game will start in single city and later other c
 
 ### Operations Dashboard in Game frontend (0% complete)
 
+- [ ] Merge /operations/statistics and /admin pages. Keep  /operations/statistics. Remove /admin from the menu. Add to the operations all other features from the admin such as newspaper management.
 - [ ] Organize Operations Dashboard (/admin) to level 2 menu, add proper routing, and create components. Make sure it is not shown as big single page, but split into multiple pages.
 - [ ] Fix News & changelog publisher style. The form is stretched along the whole list of news items. Create multiple pages for this like it is in the ticket support system.
 - [ ] Players & intervention tools - Make sure to show the table of the users and on user detail page show the actions
