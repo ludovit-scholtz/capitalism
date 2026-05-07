@@ -665,6 +665,7 @@ export type MockLoan = {
   status: 'ACTIVE' | 'OVERDUE' | 'DEFAULTED' | 'REPAID'
   missedPayments: number
   accumulatedPenalty: number
+  defaultedAtTick?: number | null
   acceptedAtUtc: string
   closedAtUtc: string | null
   collateralBuildingId?: string | null
@@ -7753,6 +7754,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       !q.includes('initiateBaseDeposit') &&
       // acceptLoan mutation response includes paymentAmount which contains 'me'
       !q.includes('acceptLoan') &&
+      !q.includes('repayLoanDebt') &&
       // procurementPreview contains 'me' as substring
       !q.includes('procurementPreview') &&
       // personAccount query has companyName field which contains 'me' as substring
@@ -8448,6 +8450,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 'ACTIVE',
         missedPayments: 0,
         accumulatedPenalty: 0,
+        defaultedAtTick: null,
         acceptedAtUtc: new Date().toISOString(),
         closedAtUtc: null,
         collateralBuildingId: input.collateralBuildingId ?? null,
@@ -8459,6 +8462,31 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { acceptLoan: newLoan } }),
+      })
+    }
+
+    if (query.includes('repayLoanDebt')) {
+      const input = body.variables?.input ?? {}
+      const loan = state.myLoans.find((candidate) => candidate.id === input.loanId)
+      if (!loan) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Loan not found.', extensions: { code: 'LOAN_NOT_FOUND' } }] }),
+        })
+      }
+
+      loan.status = 'REPAID'
+      loan.remainingPrincipal = 0
+      loan.missedPayments = 0
+      loan.accumulatedPenalty = 0
+      loan.defaultedAtTick = null
+      loan.closedAtUtc = new Date().toISOString()
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { repayLoanDebt: loan } }),
       })
     }
 

@@ -136,6 +136,7 @@ public sealed class LoanSummary
     public string Status { get; set; } = string.Empty;
     public int MissedPayments { get; set; }
     public decimal AccumulatedPenalty { get; set; }
+    public long? DefaultedAtTick { get; set; }
     public DateTime AcceptedAtUtc { get; set; }
     public DateTime? ClosedAtUtc { get; set; }
 

@@ -14,7 +14,7 @@ namespace Api.Tests;
 /// Tests for the building destruction (loan default foreclosure) workflow.
 /// Each test uses an isolated factory to avoid mutating shared game state.
 /// Covers: auto-listing on default at 90%, 72-tick foreclosure window,
-/// 80% refund, player notification, lot release, and edge cases.
+/// debt/surplus distribution, player notification, lot release, and edge cases.
 /// </summary>
 public sealed class BuildingDestructionTests
 {
@@ -142,7 +142,7 @@ public sealed class BuildingDestructionTests
     // ── auto-listing tests (LoanRepaymentPhase) ──────────────────────────────
 
     [Fact]
-    public async Task LoanDefault_WithCollateral_AutoListsBuildingForSale()
+    public async Task LoanMissedPayment_WithCollateral_AutoListsBuildingForSale_AndNotifiesBorrower()
     {
         await using var factory = new ApiWebApplicationFactory();
         factory.CreateClient();
@@ -165,8 +165,8 @@ public sealed class BuildingDestructionTests
             NextPaymentTick = 1L,     // due on tick 1
             PaymentAmount = 10_000m,
             TotalPayments = 10,
-            MissedPayments = 2,       // one more miss → DEFAULTED
-            Status = LoanStatus.Overdue,
+            MissedPayments = 0,
+            Status = LoanStatus.Active,
             CollateralBuildingId = building.Id,
             CollateralAppraisedValue = 1_000_000m,
             AcceptedAtUtc = DateTime.UtcNow,
@@ -183,12 +183,18 @@ public sealed class BuildingDestructionTests
         await db.Entry(building).ReloadAsync();
         await db.Entry(loan).ReloadAsync();
 
-        Assert.True(building.IsForSale, "Building should be auto-listed after loan defaults");
+        Assert.True(building.IsForSale, "Building should be auto-listed immediately after the first missed payment");
         Assert.NotNull(building.AskingPrice);
         // 90% of 1,000,000 = 900,000
         Assert.Equal(900_000m, building.AskingPrice.Value);
-        Assert.Equal(LoanStatus.Defaulted, loan.Status);
+        Assert.Equal(LoanStatus.Overdue, loan.Status);
         Assert.NotNull(loan.DefaultedAtTick);
+
+        var notification = await db.PlayerNotifications
+            .FirstOrDefaultAsync(n => n.PlayerId == company.PlayerId && n.Type == PlayerNotificationType.LoanPaymentMissed);
+        Assert.NotNull(notification);
+        Assert.Contains("missed payment at", notification!.Message);
+        Assert.Contains("seized in", notification.Message);
     }
 
     [Fact]
@@ -279,6 +285,69 @@ public sealed class BuildingDestructionTests
         Assert.False(building.IsForSale, "Unsecured loan default should NOT list any building for sale");
     }
 
+    [Fact]
+    public async Task LoanRepayment_CreatesAccountScopedLedgerEntries_ForBorrowerAndLender()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        factory.CreateClient();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var (db, _, company, building, account, loanOffer) = await SeedBaseAsync(scope);
+
+        account.Balance = 100_000m;
+
+        var loan = new Loan
+        {
+            Id = Guid.NewGuid(),
+            LoanOfferId = loanOffer.Id,
+            BorrowerCompanyId = company.Id,
+            BankBuildingId = building.Id,
+            LenderCompanyId = loanOffer.LenderCompanyId,
+            OriginalPrincipal = 50_000m,
+            RemainingPrincipal = 50_000m,
+            AnnualInterestRatePercent = 12m,
+            DurationTicks = 24L,
+            StartTick = 0L,
+            DueTick = 24L,
+            NextPaymentTick = 1L,
+            PaymentAmount = 2_100m,
+            TotalPayments = 24,
+            BorrowerBankAccountId = account.Id,
+            Status = LoanStatus.Active,
+            AcceptedAtUtc = DateTime.UtcNow,
+            CollateralBuildingId = building.Id,
+            CollateralAppraisedValue = 1_000_000m,
+        };
+        db.Loans.Add(loan);
+
+        var gs = await db.GameStates.FindAsync(1);
+        gs!.CurrentTick = 0;
+        await db.SaveChangesAsync();
+
+        var processor = CreateProcessor(scope);
+        await processor.ProcessTickAsync();
+
+        var borrowerPrincipalEntry = await db.LedgerEntries.FirstOrDefaultAsync(e =>
+            e.CompanyId == company.Id
+            && e.Category == LedgerCategory.LoanRepaymentPrincipal
+            && e.Amount < 0);
+        Assert.NotNull(borrowerPrincipalEntry);
+        Assert.Equal(account.Id, borrowerPrincipalEntry!.BankAccountId);
+
+        var borrowerInterestEntry = await db.LedgerEntries.FirstOrDefaultAsync(e =>
+            e.CompanyId == company.Id
+            && e.Category == LedgerCategory.LoanInterestExpense
+            && e.Amount < 0);
+        Assert.NotNull(borrowerInterestEntry);
+        Assert.Equal(account.Id, borrowerInterestEntry!.BankAccountId);
+
+        var lenderPrincipalEntry = await db.LedgerEntries.FirstOrDefaultAsync(e =>
+            e.CompanyId == loanOffer.LenderCompanyId
+            && e.Category == LedgerCategory.LoanRepaymentPrincipal
+            && e.Amount > 0);
+        Assert.NotNull(lenderPrincipalEntry);
+        Assert.NotNull(lenderPrincipalEntry!.BankAccountId);
+    }
+
     // ── destruction tests (BuildingDestructionPhase) ─────────────────────────
 
     [Fact]
@@ -312,7 +381,7 @@ public sealed class BuildingDestructionTests
     }
 
     [Fact]
-    public async Task BuildingDestruction_RefundIsEightyPercentOfAppraisedValue()
+    public async Task BuildingDestruction_PaysDebtToLender_AndReturnsSurplusToBorrower()
     {
         await using var factory = new ApiWebApplicationFactory();
         factory.CreateClient();
@@ -335,14 +404,26 @@ public sealed class BuildingDestructionTests
         await processor.ProcessTickAsync();
 
         await db.Entry(account).ReloadAsync();
-        // 80% of 1,200,000 = 960,000
-        Assert.Equal(960_000m, account.Balance);
+        var lenderAccount = await db.BankAccounts.FirstAsync(a => a.CompanyId == loanOffer.LenderCompanyId);
+
+        // Appraised 1,200,000 - debt 500,000 = surplus 700,000
+        Assert.Equal(700_000m, account.Balance);
+        Assert.Equal(1_500_000m, lenderAccount.Balance);
 
         var ledger = await db.LedgerEntries
-            .Where(e => e.CompanyId == company.Id && e.Category == LedgerCategory.BuildingAcquisition && e.Amount > 0)
+            .Where(e => e.CompanyId == company.Id && e.Category == LedgerCategory.BuildingSale && e.Amount > 0)
             .FirstOrDefaultAsync();
         Assert.NotNull(ledger);
-        Assert.Equal(960_000m, ledger.Amount);
+        Assert.Equal(700_000m, ledger.Amount);
+        Assert.Equal(account.Id, ledger.BankAccountId);
+
+        var lenderLedger = await db.LedgerEntries
+            .Where(e => e.CompanyId == loanOffer.LenderCompanyId
+                && e.Category == LedgerCategory.LoanRepaymentPrincipal
+                && e.Amount > 0)
+            .FirstOrDefaultAsync();
+        Assert.NotNull(lenderLedger);
+        Assert.Equal(lenderAccount.Id, lenderLedger!.BankAccountId);
     }
 
     [Fact]
@@ -478,12 +559,6 @@ public sealed class BuildingDestructionTests
     }
 
     [Fact]
-    public async Task BuildingDestructionPhase_RefundFraction_IsEightyPercent()
-    {
-        Assert.Equal(0.80m, BuildingDestructionPhase.RefundFraction);
-    }
-
-    [Fact]
     public async Task BuildingDestruction_CreatesDestructionRecord_WithCorrectFields()
     {
         await using var factory = new ApiWebApplicationFactory();
@@ -511,31 +586,11 @@ public sealed class BuildingDestructionTests
         Assert.NotNull(record);
         Assert.Equal(building.Id, record.BuildingId);
         Assert.Equal(appraisedValue, record.OriginalPropertyValue);
-        // Compensation = 80% of appraised value
-        Assert.Equal(appraisedValue * 0.80m, record.CompensationPaid);
+        // Compensation equals borrower surplus after debt payout.
+        Assert.Equal(0m, record.CompensationPaid);
         Assert.Equal(BuildingDestructionReason.GracePeriodExpired, record.DestructionReason);
         // Tick count is stored as the tick AFTER the processor increments.
         Assert.True(record.DestructionTickCount > defaultedAtTick);
-    }
-
-    [Fact]
-    public async Task BuildingDestructionPhase_ComputeRefund_ReturnsEightyPercentOfAppraisedValue()
-    {
-        // 80% of 1,200,000 = 960,000
-        var result = BuildingDestructionPhase.ComputeRefund(1_200_000m);
-        Assert.Equal(960_000m, result);
-    }
-
-    [Fact]
-    public async Task BuildingDestructionPhase_ComputeRefund_ReturnsZeroForNullValue()
-    {
-        Assert.Equal(0m, BuildingDestructionPhase.ComputeRefund(null));
-    }
-
-    [Fact]
-    public async Task BuildingDestructionPhase_ComputeRefund_ReturnsZeroForZeroValue()
-    {
-        Assert.Equal(0m, BuildingDestructionPhase.ComputeRefund(0m));
     }
 
     [Fact]
@@ -543,7 +598,6 @@ public sealed class BuildingDestructionTests
     {
         // Ensures GameConstants and BuildingDestructionPhase stay in sync.
         Assert.Equal(GameConstants.ForeclosureWindowTicks, BuildingDestructionPhase.ForeclosureWindowTicks);
-        Assert.Equal(GameConstants.ForeclosureRefundFraction, BuildingDestructionPhase.RefundFraction);
     }
 
     [Fact]

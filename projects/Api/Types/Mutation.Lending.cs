@@ -224,6 +224,7 @@ public sealed partial class Mutation
         // If a concurrent request already debited the same account and persisted first, SaveChangesAsync
         // below will detect the ConcurrencyToken mismatch and throw DbUpdateConcurrencyException,
         // which we catch and surface as CONCURRENT_MODIFICATION.
+        var lenderDebitedAccount = CompanyBankingService.FindAnyPreferredAccount(lenderAccounts);
         var debitSucceeded = CompanyBankingService.TryDebit(lenderAccounts, input.PrincipalAmount);
         if (!debitSucceeded)
         {
@@ -299,6 +300,7 @@ public sealed partial class Mutation
         {
             Id = Guid.NewGuid(),
             CompanyId = borrower.Id,
+            BankAccountId = borrowerAccount.Id,
             Category = LedgerCategory.LoanOrigination,
             Description = $"Loan received from {bank.Company!.Name} via {bank.Name} – {annualRate}% p.a. over {durationTicks} in-game hours (secured against {collateralBuilding.Name})",
             Amount = input.PrincipalAmount,
@@ -311,6 +313,7 @@ public sealed partial class Mutation
         {
             Id = Guid.NewGuid(),
             CompanyId = bank.CompanyId,
+            BankAccountId = lenderDebitedAccount?.Id,
             Category = LedgerCategory.LoanOrigination,
             Description = $"Loan disbursed to {borrower.Name} via {bank.Name} – {annualRate}% p.a. over {durationTicks} in-game hours",
             Amount = -input.PrincipalAmount,
@@ -334,6 +337,121 @@ public sealed partial class Mutation
                     .Build());
         }
 
+        return loan;
+    }
+
+    /// <summary>
+    /// Repays the full remaining debt of an overdue/defaulted loan immediately.
+    /// The authenticated borrower must own the loan's borrower company.
+    /// </summary>
+    [Authorize]
+    public async Task<Loan> RepayLoanDebt(
+        RepayLoanDebtInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var loan = await db.Loans
+            .Include(l => l.BorrowerCompany).ThenInclude(c => c.BankAccounts)
+            .Include(l => l.LenderCompany).ThenInclude(c => c.BankAccounts)
+            .Include(l => l.LoanOffer)
+            .Include(l => l.CollateralBuilding)
+            .FirstOrDefaultAsync(l => l.Id == input.LoanId)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Loan not found.")
+                    .SetCode("LOAN_NOT_FOUND")
+                    .Build());
+
+        if (loan.BorrowerCompany.PlayerId != userId)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("You do not own this loan.")
+                    .SetCode("LOAN_NOT_FOUND")
+                    .Build());
+        }
+
+        if (loan.Status == LoanStatus.Repaid || loan.RemainingPrincipal <= 0m)
+        {
+            return loan;
+        }
+
+        var borrowerSettlementAccount = loan.BorrowerBankAccountId.HasValue
+            ? loan.BorrowerCompany.BankAccounts.FirstOrDefault(a => a.Id == loan.BorrowerBankAccountId.Value && a.ClosedAtUtc == null)
+            : null;
+        var availableBalance = borrowerSettlementAccount?.Balance ?? CompanyBankingService.GetTotalBalance(loan.BorrowerCompany.BankAccounts);
+        var payoffAmount = decimal.Round(Math.Max(0m, loan.RemainingPrincipal), 2, MidpointRounding.AwayFromZero);
+
+        if (availableBalance < payoffAmount)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Insufficient funds to repay this debt in full.")
+                    .SetCode("INSUFFICIENT_FUNDS")
+                    .Build());
+        }
+
+        if (borrowerSettlementAccount is not null)
+        {
+            borrowerSettlementAccount.Balance -= payoffAmount;
+            borrowerSettlementAccount.ConcurrencyToken = Guid.NewGuid();
+        }
+        else
+        {
+            CompanyBankingService.TryDebit(loan.BorrowerCompany.BankAccounts, payoffAmount);
+        }
+
+        CompanyBankingService.TryCredit(loan.LenderCompany.BankAccounts, payoffAmount, null, out var lenderCreditedAccount);
+
+        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync();
+        var currentTick = gameState?.CurrentTick ?? 0L;
+        var nowUtc = DateTime.UtcNow;
+
+        db.LedgerEntries.Add(new LedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = loan.BorrowerCompanyId,
+            BankAccountId = borrowerSettlementAccount?.Id,
+            BuildingId = loan.CollateralBuildingId,
+            Category = LedgerCategory.LoanRepaymentPrincipal,
+            Description = $"Manual debt repayment for loan {loan.Id}",
+            Amount = -payoffAmount,
+            RecordedAtTick = currentTick,
+            RecordedAtUtc = nowUtc,
+        });
+
+        db.LedgerEntries.Add(new LedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = loan.LenderCompanyId,
+            BankAccountId = lenderCreditedAccount?.Id,
+            BuildingId = loan.CollateralBuildingId,
+            Category = LedgerCategory.LoanRepaymentPrincipal,
+            Description = $"Borrower {loan.BorrowerCompany.Name} repaid overdue/defaulted debt for loan {loan.Id}",
+            Amount = payoffAmount,
+            RecordedAtTick = currentTick,
+            RecordedAtUtc = nowUtc,
+        });
+
+        loan.RemainingPrincipal = 0m;
+        loan.PaymentsMade = loan.TotalPayments;
+        loan.MissedPayments = 0;
+        loan.AccumulatedPenalty = 0m;
+        loan.Status = LoanStatus.Repaid;
+        loan.ClosedAtUtc = nowUtc;
+        loan.DefaultedAtTick = null;
+        loan.LoanOffer.UsedCapacity = Math.Max(0m, loan.LoanOffer.UsedCapacity - loan.OriginalPrincipal);
+
+        if (loan.CollateralBuilding is not null && loan.CollateralBuilding.DestroyedAtUtc == null)
+        {
+            loan.CollateralBuilding.IsForSale = false;
+            loan.CollateralBuilding.AskingPrice = null;
+            loan.CollateralBuilding.ListedAtUtc = null;
+        }
+
+        await db.SaveChangesAsync();
         return loan;
     }
 

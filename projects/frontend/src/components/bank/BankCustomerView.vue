@@ -17,6 +17,7 @@ const props = defineProps<{
   myOperatingAccountsHere: PlayerBankAccountSummary[]
   myLoansHere: LoanSummary[]
   myDepositsHere: BankDepositSummary[]
+  currentTick: number
 }>()
 
 const emit = defineEmits<{
@@ -35,6 +36,9 @@ const withdrawSuccess = ref(false)
 const customerDepositLoading = ref(false)
 const customerDepositError = ref<string | null>(null)
 const customerDepositSuccess = ref(false)
+const repayDebtLoadingByLoanId = ref<Record<string, boolean>>({})
+const repayDebtErrorByLoanId = ref<Record<string, string | null>>({})
+const repayDebtSuccessByLoanId = ref<Record<string, boolean>>({})
 
 const fmt = computed(() => (amount: number) => formatCurrency(amount, props.bankInfo?.cityCurrencyCode ?? 'EUR'))
 
@@ -70,6 +74,46 @@ const myestDeposit = computed<BankDepositSummary | null>(() => {
   const sorted = [...myActiveDepositsHere.value].sort((a, b) => a.depositedAtTick - b.depositedAtTick)
   return sorted[0] ?? null
 })
+
+const FORECLOSURE_WINDOW_TICKS = 72
+const TICKS_PER_DAY = 24
+const REAL_MINUTES_PER_TICK = 10
+
+const overdueDebtLoans = computed(() =>
+  props.myLoansHere.filter((loan) => loan.status === 'OVERDUE' || loan.status === 'DEFAULTED'),
+)
+
+const totalOverdueDebtAmount = computed(() =>
+  overdueDebtLoans.value.reduce((sum, loan) => sum + loan.remainingPrincipal, 0),
+)
+
+function getForeclosureTicksRemaining(loan: LoanSummary): number | null {
+  if (loan.defaultedAtTick === null || loan.defaultedAtTick === undefined) return null
+  return Math.max(0, loan.defaultedAtTick + FORECLOSURE_WINDOW_TICKS - props.currentTick)
+}
+
+function formatForeclosureCountdown(loan: LoanSummary): string {
+  const ticksRemaining = getForeclosureTicksRemaining(loan)
+  if (ticksRemaining === null) return t('bank.overdueCountdownUnknown')
+
+  const days = Math.floor(ticksRemaining / TICKS_PER_DAY)
+  const hours = ticksRemaining % TICKS_PER_DAY
+  const realMinutes = ticksRemaining * REAL_MINUTES_PER_TICK
+  return t('bank.overdueCountdownValue', { days, hours, realMinutes })
+}
+
+const REPAY_LOAN_DEBT_MUTATION = `
+  mutation RepayLoanDebt($input: RepayLoanDebtInput!) {
+    repayLoanDebt(input: $input) {
+      id
+      status
+      remainingPrincipal
+      missedPayments
+      defaultedAtTick
+      closedAtUtc
+    }
+  }
+`
 
 const CREATE_DEPOSIT_MUTATION = `
   mutation OpenBankAccount($input: OpenBankAccountInput!) {
@@ -152,6 +196,30 @@ async function submitWithdraw() {
   }
 }
 
+async function repayLoanDebt(loanId: string) {
+  repayDebtLoadingByLoanId.value = { ...repayDebtLoadingByLoanId.value, [loanId]: true }
+  repayDebtErrorByLoanId.value = { ...repayDebtErrorByLoanId.value, [loanId]: null }
+  repayDebtSuccessByLoanId.value = { ...repayDebtSuccessByLoanId.value, [loanId]: false }
+
+  try {
+    await gqlRequest(REPAY_LOAN_DEBT_MUTATION, { input: { loanId } })
+    repayDebtSuccessByLoanId.value = { ...repayDebtSuccessByLoanId.value, [loanId]: true }
+    emit('data-changed')
+    setTimeout(() => {
+      const currentSuccess = { ...repayDebtSuccessByLoanId.value }
+      currentSuccess[loanId] = false
+      repayDebtSuccessByLoanId.value = currentSuccess
+    }, 3000)
+  } catch (err) {
+    repayDebtErrorByLoanId.value = {
+      ...repayDebtErrorByLoanId.value,
+      [loanId]: err instanceof Error ? err.message : String(err),
+    }
+  } finally {
+    repayDebtLoadingByLoanId.value = { ...repayDebtLoadingByLoanId.value, [loanId]: false }
+  }
+}
+
 function navigateToForexTransfer() {
   router.push('/forex?tab=transfer')
 }
@@ -181,6 +249,47 @@ function navigateToForexTransfer() {
     </div>
   </div>
 
+  <section
+    v-if="isAuthenticated && overdueDebtLoans.length > 0"
+    class="pending-debt-warning mt-6 rounded-2xl border border-red-300/60 bg-red-500/10 p-5 shadow-sm"
+    role="alert"
+    aria-live="polite"
+  >
+    <h2 class="text-lg font-bold text-red-700 dark:text-red-300">{{ t('bank.pendingDebtTitle') }}</h2>
+    <p class="mt-1 text-sm text-red-700 dark:text-red-300">
+      {{ t('bank.pendingDebtSummary', { amount: fmt(totalOverdueDebtAmount) }) }}
+    </p>
+    <div class="mt-4 grid gap-3">
+      <div
+        v-for="loan in overdueDebtLoans"
+        :key="loan.id"
+        class="rounded-xl border border-red-300/50 bg-red-500/5 p-4"
+      >
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="text-sm font-semibold text-body">
+            {{ loan.collateralBuildingName ?? bankInfo?.bankBuildingName }}
+          </div>
+          <span class="rounded-full border border-red-300/60 bg-red-500/15 px-2 py-0.5 text-xs font-semibold text-red-700 dark:text-red-300">
+            {{ loan.status }}
+          </span>
+        </div>
+        <p class="mt-1 text-sm text-body">{{ t('bank.pendingDebtAmountLine', { amount: fmt(loan.remainingPrincipal) }) }}</p>
+        <p class="mt-1 text-xs text-muted">{{ formatForeclosureCountdown(loan) }}</p>
+        <div class="mt-3 flex flex-wrap items-center gap-3">
+          <button
+            class="btn btn-primary btn-sm"
+            :disabled="!!repayDebtLoadingByLoanId[loan.id]"
+            @click="repayLoanDebt(loan.id)"
+          >
+            {{ repayDebtLoadingByLoanId[loan.id] ? t('common.loading') : t('bank.repayDebtNow') }}
+          </button>
+          <span v-if="repayDebtSuccessByLoanId[loan.id]" class="text-xs text-green-500">{{ t('bank.repayDebtSuccess') }}</span>
+          <span v-if="repayDebtErrorByLoanId[loan.id]" class="text-xs text-red-500">{{ repayDebtErrorByLoanId[loan.id] }}</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <div class="flex flex-col gap-6 lg:flex-row">
     <!-- Account-style deposit relationship -->
     <section v-if="isAuthenticated && isEligibleDepositContext" class="customer-account-section grow rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
@@ -207,17 +316,17 @@ function navigateToForexTransfer() {
         <div
           v-for="account in myOperatingAccountsHere"
           :key="account.id"
-          class="operating-account-row flex items-center justify-between gap-4 rounded-2xl border border-divider bg-card-raised px-5 py-4 shadow-sm"
+          class="operating-account-row flex flex-col gap-3 rounded-2xl border border-divider bg-card-raised px-5 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
         >
-          <div class="flex flex-col gap-0.5">
+          <div class="flex flex-col gap-0.5 sm:flex-1">
             <span class="text-xs text-muted">{{ t('bank.accountNumber') }}</span>
             <span class="font-mono text-sm font-semibold text-body">{{ account.accountNumber }}</span>
           </div>
-          <div class="flex flex-col items-end gap-0.5">
+          <div class="flex flex-col gap-0.5 sm:items-end">
             <span class="text-xs text-muted">{{ t('bank.accountBalance') }}</span>
             <span class="text-base font-bold text-body">{{ formatCurrency(account.balance, account.currencyCode) }}</span>
           </div>
-          <router-link :to="`/bank-statement/${account.companyId}`" class="btn btn-outline btn-sm shrink-0">
+          <router-link :to="`/bank-statement/${account.companyId}`" class="btn btn-outline btn-sm shrink-0 self-start sm:self-auto">
             {{ t('bankStatement.title') }}
           </router-link>
         </div>

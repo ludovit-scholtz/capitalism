@@ -3018,6 +3018,13 @@ export default {
     withdrawAmount: 'Abhebungsbetrag ($)',
     maxWithdraw: 'Maximale Abhebung',
     withdrawSuccess: 'Abhebung erfolgreich verarbeitet.',
+    pendingDebtTitle: '⚠ Überfällige Kreditschuld',
+    pendingDebtSummary: 'Überfällige Schulden bei dieser Bank: {amount}',
+    pendingDebtAmountLine: 'Schuldbetrag: {amount}',
+    overdueCountdownUnknown: 'Beschlagnahmungs-Countdown nicht verfügbar.',
+    overdueCountdownValue: 'Beschlagnahmung in {days}d {hours}h (~{realMinutes} Echtzeit-Minuten).',
+    repayDebtNow: 'Schuld zurückzahlen',
+    repayDebtSuccess: 'Schuld erfolgreich beglichen.',
   },
   forex: {
     title: 'Forex-Börse',

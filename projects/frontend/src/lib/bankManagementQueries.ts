@@ -24,6 +24,7 @@ export const BANK_LOANS_QUERY = `
       status
       missedPayments
       accumulatedPenalty
+      defaultedAtTick
       acceptedAtUtc
       closedAtUtc
       collateralBuildingId
@@ -167,7 +168,14 @@ export const MY_LOANS_QUERY = `
       originalPrincipal
       remainingPrincipal
       annualInterestRatePercent
+      nextPaymentTick
+      paymentAmount
+      paymentsMade
+      totalPayments
       status
+      missedPayments
+      accumulatedPenalty
+      defaultedAtTick
       collateralBuildingId
       collateralBuildingName
       collateralAppraisedValue

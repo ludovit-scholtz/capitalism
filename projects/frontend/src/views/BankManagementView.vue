@@ -344,6 +344,7 @@ async function saveDepositRate(newRate: number) {
           :my-operating-accounts-here="myOperatingAccountsHere"
           :my-loans-here="myLoansHere"
           :my-deposits-here="myDepositsHere"
+          :current-tick="gameStateStore.gameState?.currentTick ?? 0"
           @data-changed="loadData(true)"
         />
       </template>

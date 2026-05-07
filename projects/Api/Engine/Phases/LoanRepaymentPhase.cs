@@ -26,6 +26,7 @@ public sealed class LoanRepaymentPhase : ITickPhase
 
     /// <summary>Number of missed payments before the loan is considered DEFAULTED.</summary>
     private const int DefaultedMissedPaymentThreshold = 3;
+    private const long ForeclosureWindowTicks = GameConstants.ForeclosureWindowTicks;
 
     public Task ProcessAsync(TickContext context)
     {
@@ -136,7 +137,7 @@ public sealed class LoanRepaymentPhase : ITickPhase
                 CompanyBankingService.TryDebit(context.GetCompanyBankAccounts(borrower.Id), totalPayment);
             }
 
-            CompanyBankingService.TryCredit(context.GetCompanyBankAccounts(lender.Id), totalPayment, null, out _);
+            CompanyBankingService.TryCredit(context.GetCompanyBankAccounts(lender.Id), totalPayment, null, out var lenderCreditedAccount);
             loan.RemainingPrincipal = Math.Max(0m, loan.RemainingPrincipal - principalPayment);
             loan.PaymentsMade++;
             loan.PaymentAmount = totalPayment;
@@ -147,6 +148,7 @@ public sealed class LoanRepaymentPhase : ITickPhase
             {
                 loan.Status = LoanStatus.Active;
                 loan.MissedPayments = 0;
+                loan.DefaultedAtTick = null;
             }
 
             // Borrower ledger: principal repayment.
@@ -154,12 +156,29 @@ public sealed class LoanRepaymentPhase : ITickPhase
             {
                 Id = Guid.NewGuid(),
                 CompanyId = borrower.Id,
+                BankAccountId = borrowerSettlementAccount?.Id,
                 Category = LedgerCategory.LoanRepaymentPrincipal,
                 Description = $"Loan repayment (principal) – payment {loan.PaymentsMade}/{loan.TotalPayments}",
                 Amount = -principalPayment,
                 RecordedAtTick = context.CurrentTick,
                 RecordedAtUtc = DateTime.UtcNow
             });
+
+            // Lender ledger: principal income.
+            if (principalPayment > 0m)
+            {
+                context.Db.LedgerEntries.Add(new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = lender.Id,
+                    BankAccountId = lenderCreditedAccount?.Id,
+                    Category = LedgerCategory.LoanRepaymentPrincipal,
+                    Description = $"Loan repayment (principal) from {borrower.Name} – payment {loan.PaymentsMade}/{loan.TotalPayments}",
+                    Amount = principalPayment,
+                    RecordedAtTick = context.CurrentTick,
+                    RecordedAtUtc = DateTime.UtcNow
+                });
+            }
 
             // Borrower ledger: interest expense.
             if (interestPayment > 0m)
@@ -168,6 +187,7 @@ public sealed class LoanRepaymentPhase : ITickPhase
                 {
                     Id = Guid.NewGuid(),
                     CompanyId = borrower.Id,
+                    BankAccountId = borrowerSettlementAccount?.Id,
                     Category = LedgerCategory.LoanInterestExpense,
                     Description = $"Loan interest expense – payment {loan.PaymentsMade}/{loan.TotalPayments}",
                     Amount = -interestPayment,
@@ -183,6 +203,7 @@ public sealed class LoanRepaymentPhase : ITickPhase
                 {
                     Id = Guid.NewGuid(),
                     CompanyId = lender.Id,
+                    BankAccountId = lenderCreditedAccount?.Id,
                     Category = LedgerCategory.LoanInterestIncome,
                     Description = $"Loan interest income from {borrower.Name} – payment {loan.PaymentsMade}/{loan.TotalPayments}",
                     Amount = interestPayment,
@@ -223,6 +244,7 @@ public sealed class LoanRepaymentPhase : ITickPhase
                 {
                     Id = Guid.NewGuid(),
                     CompanyId = borrower.Id,
+                    BankAccountId = borrowerSettlementAccount?.Id,
                     Category = LedgerCategory.LoanPenalty,
                     Description = $"Missed loan payment penalty (missed payment #{loan.MissedPayments})",
                     Amount = -penalty,
@@ -236,25 +258,51 @@ public sealed class LoanRepaymentPhase : ITickPhase
                 ? LoanStatus.Defaulted
                 : LoanStatus.Overdue;
 
-            if (loan.Status == LoanStatus.Defaulted)
+            if (!loan.DefaultedAtTick.HasValue)
             {
-                loan.ClosedAtUtc = DateTime.UtcNow;
                 loan.DefaultedAtTick = context.CurrentTick;
-                // Capacity remains locked (lender is owed money but capacity was consumed).
+            }
 
-                // Auto-list collateral building for sale at (1 − ForeclosureAutoListDiscount) of appraised value.
-                if (loan.CollateralBuildingId.HasValue && loan.CollateralAppraisedValue.HasValue)
+            // Auto-list collateral building for sale at (1 − ForeclosureAutoListDiscount) of appraised value.
+            if (loan.CollateralBuildingId.HasValue && loan.CollateralAppraisedValue.HasValue)
+            {
+                var collateralBuilding = context.Db.Buildings
+                    .FirstOrDefault(b => b.Id == loan.CollateralBuildingId.Value && !b.IsForSale && b.DestroyedAtUtc == null);
+                if (collateralBuilding is not null)
                 {
-                    var collateralBuilding = context.Db.Buildings
-                        .FirstOrDefault(b => b.Id == loan.CollateralBuildingId.Value && !b.IsForSale && b.DestroyedAtUtc == null);
-                    if (collateralBuilding is not null)
-                    {
-                        collateralBuilding.IsForSale = true;
-                        collateralBuilding.AskingPrice = decimal.Round(loan.CollateralAppraisedValue.Value * (1m - GameConstants.ForeclosureAutoListDiscount), 2, MidpointRounding.AwayFromZero);
-                        collateralBuilding.ListedAtUtc = DateTime.UtcNow;
-                    }
+                    collateralBuilding.IsForSale = true;
+                    collateralBuilding.AskingPrice = decimal.Round(loan.CollateralAppraisedValue.Value * (1m - GameConstants.ForeclosureAutoListDiscount), 2, MidpointRounding.AwayFromZero);
+                    collateralBuilding.ListedAtUtc = DateTime.UtcNow;
                 }
             }
+
+            if (loan.Status == LoanStatus.Defaulted)
+            {
+                // Capacity remains locked (lender is owed money but capacity was consumed).
+                loan.ClosedAtUtc = DateTime.UtcNow;
+            }
+
+            var overdueAmount = decimal.Round(principalPayment + interestPayment + penalty, 2, MidpointRounding.AwayFromZero);
+            var bankBuildingName = context.BuildingsById.TryGetValue(loan.BankBuildingId, out var bankBuilding)
+                ? bankBuilding.Name
+                : "Bank";
+            var collateralBuildingName = loan.CollateralBuildingId.HasValue
+                && context.BuildingsById.TryGetValue(loan.CollateralBuildingId.Value, out var collateral)
+                ? collateral.Name
+                : "Collateral building";
+            var ticksRemaining = Math.Max(0L, (loan.DefaultedAtTick ?? context.CurrentTick) + ForeclosureWindowTicks - context.CurrentTick);
+
+            PlayerNotificationService.Add(
+                context.Db,
+                borrower.PlayerId,
+                PlayerNotificationType.LoanPaymentMissed,
+                "Loan payment missed",
+                $"You have a missed payment at {bankBuildingName}. {overdueAmount:0.##} overdue. Building {collateralBuildingName} will be seized in {ticksRemaining} ticks if unresolved.",
+                context.CurrentTick,
+                borrower.Id,
+                loan.CollateralBuildingId,
+                loanId: loan.Id,
+                bankAccountId: loan.BorrowerBankAccountId);
         }
     }
 }
