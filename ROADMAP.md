@@ -6,7 +6,7 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
-### Operations Dashboard (90% complete)
+### Operations Dashboard (100% complete)
 
 - [x] Organize Operations Dashboard to level 2 menu, add proper routing, and create components
 - [x] Fix News & changelog publisher style. The form is stretched along the whole list of news items. Create multiple pages for this like it is in the ticket support system.
