@@ -260,6 +260,10 @@ export default {
   onboarding: {
     title: 'Starten Sie Ihr Imperium',
     subtitle: 'Wählen Sie Ihre Branche, sichern Sie sich Ihre ersten Stadtgrundstücke und starten Sie Ihr erstes Produkt.',
+    referralBannerTitle: 'Empfehlungscode aktiv: {code}',
+    referralBannerBody: 'Sie erhalten 10% Rabatt auf berechtigte In-Game-Käufe.',
+    referralBannerTooltip:
+      'Der Empfehlungsrabatt wird serverseitig auf berechtigte Käufe während des Onboardings und nach der Kontoerstellung angewendet.',
     step1Title: 'Stadt wählen',
     step1Desc: 'Wählen Sie die Stadt, in der Ihr erstes Unternehmen arbeiten wird. Diese Stadt wird zugleich im oberen Kontextumschalter aktiv gesetzt.',
     step2Title: 'Branche wählen',

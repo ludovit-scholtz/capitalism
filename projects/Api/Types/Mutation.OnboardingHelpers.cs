@@ -7,6 +7,7 @@ using Api.Data.Entities;
 using Api.Engine;
 using Api.Security;
 using Api.Utilities;
+using Capitalism.Shared.Referrals;
 using HotChocolate.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -101,7 +102,8 @@ public sealed partial class Mutation
         Guid? expectedCityId = null,
         string? powerPlantType = null,
         bool applyConstructionDelay = false,
-        bool validateDestinationCurrency = false)
+        bool validateDestinationCurrency = false,
+        decimal purchaseDiscountRate = 0m)
     {
         var lot = await db.BuildingLots
             .Include(candidate => candidate.City)
@@ -166,7 +168,10 @@ public sealed partial class Mutation
 
         var currentTick = (await db.GameStates.AsNoTracking().FirstOrDefaultDeterministicAsync())?.CurrentTick ?? 0;
         var constructionCost = applyConstructionDelay ? Engine.GameConstants.ConstructionCost(buildingType) : 0m;
-        var totalCost = lot.Price + constructionCost;
+        var effectiveDiscountRate = decimal.Clamp(purchaseDiscountRate, 0m, ReferralProgramConstants.PurchaseDiscountRate);
+        var discountedLotPrice = decimal.Round(lot.Price * (1m - effectiveDiscountRate), 2, MidpointRounding.AwayFromZero);
+        var discountedConstructionCost = decimal.Round(constructionCost * (1m - effectiveDiscountRate), 2, MidpointRounding.AwayFromZero);
+        var totalCost = discountedLotPrice + discountedConstructionCost;
 
         var cityCurrencyCode = lot.City?.CurrencyCode ?? "EUR";
         var fundingAccount = await CompanyBankingService.EnsurePreferredAccountAsync(db, company.Id, cityCurrencyCode);
@@ -238,12 +243,12 @@ public sealed partial class Mutation
             BuildingId = building.Id,
             Category = LedgerCategory.PropertyPurchase,
             Description = $"Purchased lot: {lot.Name}",
-            Amount = -lot.Price,
+            Amount = -discountedLotPrice,
             RecordedAtTick = currentTick,
             RecordedAtUtc = builtAtUtc,
         });
 
-        if (applyConstructionDelay && constructionCost > 0m)
+        if (applyConstructionDelay && discountedConstructionCost > 0m)
         {
             db.LedgerEntries.Add(new LedgerEntry
             {
@@ -252,13 +257,74 @@ public sealed partial class Mutation
                 BuildingId = building.Id,
                 Category = LedgerCategory.ConstructionCost,
                 Description = $"Construction order: {buildingName} ({buildingType})",
-                Amount = -constructionCost,
+                Amount = -discountedConstructionCost,
                 RecordedAtTick = currentTick,
                 RecordedAtUtc = builtAtUtc,
             });
         }
 
         return (lot, building);
+    }
+
+    private static async Task<decimal> GetReferralDiscountRateIfRegisteredAsync(
+        AppDbContext db,
+        Guid playerId,
+        CancellationToken cancellationToken)
+    {
+        var hasActiveRegistration = await db.ReferralRegistrations
+            .AsNoTracking()
+            .AnyAsync(registration => registration.ReferredPlayerId == playerId, cancellationToken);
+        return hasActiveRegistration ? ReferralProgramConstants.PurchaseDiscountRate : 0m;
+    }
+
+    private static async Task<decimal> EnsureReferralRegistrationAndGetDiscountRateAsync(
+        AppDbContext db,
+        Player player,
+        CancellationToken cancellationToken)
+    {
+        var normalizedCode = player.AppliedReferralCode?.Trim().ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(normalizedCode))
+        {
+            return 0m;
+        }
+
+        var existingRegistration = await db.ReferralRegistrations
+            .AsNoTracking()
+            .AnyAsync(registration => registration.ReferredPlayerId == player.Id, cancellationToken);
+        if (existingRegistration)
+        {
+            return ReferralProgramConstants.PurchaseDiscountRate;
+        }
+
+        var referralCode = await db.ReferralCodes
+            .FirstOrDefaultAsync(code => code.Code == normalizedCode, cancellationToken);
+        if (referralCode is null)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("The referral code on your account is not valid.")
+                    .SetCode("REFERRAL_CODE_INVALID")
+                    .Build());
+        }
+
+        if (referralCode.CreatorPlayerId == player.Id)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("You cannot use your own referral code.")
+                    .SetCode("REFERRAL_SELF_REFERRAL_NOT_ALLOWED")
+                    .Build());
+        }
+
+        db.ReferralRegistrations.Add(new ReferralRegistration
+        {
+            Id = Guid.NewGuid(),
+            ReferralCodeId = referralCode.Id,
+            ReferredPlayerId = player.Id,
+            RegisteredAtUtc = DateTime.UtcNow,
+        });
+        referralCode.UsageCount += 1;
+        return ReferralProgramConstants.PurchaseDiscountRate;
     }
 
     private static async Task<Guid> FindCompatibleAvailableLotIdAsync(

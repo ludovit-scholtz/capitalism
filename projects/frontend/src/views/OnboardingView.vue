@@ -22,6 +22,7 @@ import OnboardingLotSelector from '@/components/onboarding/OnboardingLotSelector
 import OnboardingProgressTracker from '@/components/onboarding/OnboardingProgressTracker.vue'
 import OnboardingUnitChain from '@/components/onboarding/OnboardingUnitChain.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useReferralStore } from '@/stores/referral'
 import { useTickCountdown } from '@/composables/useTickCountdown'
 import { formatMoney } from '@/lib/currencyFormat'
 import { generateOnboardingCompanyName, resetNameSession } from '@/lib/onboardingCompanyName'
@@ -31,6 +32,8 @@ const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const referralStore = useReferralStore()
+referralStore.initFromStorage()
 auth.initFromStorage()
 const masterPortalUrl = import.meta.env.VITE_MASTER_WEB_URL || 'http://localhost:5174'
 
@@ -59,6 +62,7 @@ function hasStoredSessionToken() {
 }
 
 const hasAuthenticatedSession = computed(() => auth.isAuthenticated || !!auth.player || hasStoredSessionToken())
+const activeReferralCode = computed(() => auth.player?.appliedReferralCode ?? referralStore.pendingCode)
 
 const PERSONAL_STARTING_CASH = 200_000
 const FOUNDER_CONTRIBUTION = 200_000
@@ -1256,6 +1260,28 @@ watch(visibleIndustries, () => {
       </div>
       <OnboardingProgressTracker v-if="step < 7" :step="step" />
       <div v-if="error" class="bg-[rgba(248,113,113,0.1)] border border-[rgba(248,113,113,0.3)] text-bad px-4 py-3 rounded-lg text-sm mb-4" role="alert">{{ error }}</div>
+      <div
+        v-if="activeReferralCode"
+        class="referral-onboarding-banner mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200"
+        role="status"
+      >
+        <div class="flex items-start gap-3">
+          <span aria-hidden="true" class="text-base">🎁</span>
+          <div>
+            <p class="font-semibold text-amber-300">
+              {{ t('onboarding.referralBannerTitle', { code: activeReferralCode }) }}
+            </p>
+            <p class="text-amber-200/80">
+              {{ t('onboarding.referralBannerBody') }}
+              <span
+                class="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full border border-amber-300/60 text-[0.65rem] font-bold"
+                :title="t('onboarding.referralBannerTooltip')"
+                >i</span
+              >
+            </p>
+          </div>
+        </div>
+      </div>
       <div v-if="step === 1" class="step-content bg-card border border-divider rounded-xl p-8">
         <div class="mb-4">
           <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step1Title') }}</h2>

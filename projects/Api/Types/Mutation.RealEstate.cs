@@ -139,6 +139,7 @@ public sealed partial class Mutation
 
         var company = await db.Companies.FirstOrDefaultAsync(
             c => c.Id == input.CompanyId && c.PlayerId == userId);
+        var referralDiscountRate = await GetReferralDiscountRateIfRegisteredAsync(db, userId, httpContextAccessor.HttpContext!.RequestAborted);
 
         if (company is null)
         {
@@ -167,7 +168,8 @@ public sealed partial class Mutation
             DateTime.UtcNow,
             powerPlantType: input.PowerPlantType,
             applyConstructionDelay: true,
-            validateDestinationCurrency: true);
+            validateDestinationCurrency: true,
+            purchaseDiscountRate: referralDiscountRate);
 
         // Validate and apply media house channel type.
         if (input.BuildingType == BuildingType.MediaHouse)

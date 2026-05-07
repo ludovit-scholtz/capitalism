@@ -179,3 +179,19 @@ public sealed class CityMediaHouseInfo
     /// <summary>True when the building is a government-seeded baseline media house.</summary>
     public bool IsGovernmentOwned { get; set; }
 }
+
+/// <summary>Authenticated player's referral-program summary.</summary>
+public sealed class ReferralProgramSummary
+{
+    /// <summary>The player's primary shareable referral code. Null when none exists yet.</summary>
+    public string? Code { get; set; }
+
+    /// <summary>Total number of players who completed onboarding with this code.</summary>
+    public int UsageCount { get; set; }
+
+    /// <summary>UTC timestamp when the code was generated.</summary>
+    public DateTime? CreatedAtUtc { get; set; }
+
+    /// <summary>Flat referral discount percentage available to referred players.</summary>
+    public decimal DiscountRate { get; set; }
+}

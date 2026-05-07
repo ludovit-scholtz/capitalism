@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { setupMockApi } from '../../helpers/mock-api'
+import { makePlayer, setupMockApi } from '../../helpers/mock-api'
 
 test.describe('Referral code detection', () => {
   test('shows referral banner when ?ref= query param is present', async ({ page }) => {
@@ -73,5 +73,26 @@ test.describe('Referral code detection', () => {
 
     await page.goto('/login?ref=ABCDEFGHIJ12345678901')
     await expect(page.locator('.referral-banner')).toBeHidden()
+  })
+
+  test('shows referral discount banner during onboarding for referred players', async ({ page }) => {
+    const player = makePlayer({
+      id: 'player-ref-onboarding',
+      email: 'referred@example.com',
+      onboardingCompletedAtUtc: null,
+      appliedReferralCode: 'FRIEND10',
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/onboarding')
+    await expect(page.locator('.referral-onboarding-banner')).toBeVisible()
+    await expect(page.locator('.referral-onboarding-banner')).toContainText('FRIEND10')
+    await expect(page.locator('.referral-onboarding-banner')).toContainText('10%')
   })
 })

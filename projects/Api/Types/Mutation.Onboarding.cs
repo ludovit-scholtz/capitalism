@@ -113,6 +113,7 @@ public sealed partial class Mutation
         }
 
         var personalUsdBalance = await EnsureStarterFounderFundingAsync(db, player, httpContextAccessor.HttpContext!.RequestAborted);
+        var referralDiscountRate = await EnsureReferralRegistrationAndGetDiscountRateAsync(db, player, httpContextAccessor.HttpContext!.RequestAborted);
 
         // Create company
         if (personalUsdBalance < StarterFounderContribution)
@@ -198,7 +199,8 @@ public sealed partial class Mutation
             $"{trimmedCompanyName} Factory",
             Engine.GameConstants.PowerDemandMw(BuildingType.Factory, 1),
             nowUtc,
-            city.Id);
+            city.Id,
+            purchaseDiscountRate: referralDiscountRate);
         ConfigureStarterFactory(db, factory, product, starterResourceId.Value, fxRate);
 
         var shopLotId = await FindCompatibleAvailableLotIdAsync(db, city.Id, BuildingType.SalesShop);
@@ -210,7 +212,8 @@ public sealed partial class Mutation
             $"{trimmedCompanyName} Shop",
             Engine.GameConstants.PowerDemandMw(BuildingType.SalesShop, 1),
             nowUtc,
-            city.Id);
+            city.Id,
+            purchaseDiscountRate: referralDiscountRate);
         AddStarterShop(db, company.Id, shop.Id, product, fxRate);
 
         // Mark onboarding as completed for this player
@@ -318,6 +321,7 @@ public sealed partial class Mutation
         }
 
         var personalUsdBalance = await EnsureStarterFounderFundingAsync(db, player, httpContextAccessor.HttpContext!.RequestAborted);
+        var referralDiscountRate = await EnsureReferralRegistrationAndGetDiscountRateAsync(db, player, httpContextAccessor.HttpContext!.RequestAborted);
 
         if (personalUsdBalance < StarterFounderContribution)
         {
@@ -401,7 +405,8 @@ public sealed partial class Mutation
             $"{trimmedCompanyName} Factory",
             Engine.GameConstants.PowerDemandMw(BuildingType.Factory, 1),
             nowUtc,
-            input.CityId);
+            input.CityId,
+            purchaseDiscountRate: referralDiscountRate);
 
         AddStarterFactoryShell(db, factory.Id);
 

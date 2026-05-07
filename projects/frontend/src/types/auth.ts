@@ -24,6 +24,7 @@ export interface Player {
   onboardingFactoryLotId: string | null
   onboardingShopBuildingId: string | null
   onboardingFirstSaleCompletedAtUtc: string | null
+  appliedReferralCode: string | null
   proSubscriptionEndsAtUtc: string | null
   companies: Company[]
 }

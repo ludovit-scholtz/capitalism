@@ -260,6 +260,10 @@ export default {
   onboarding: {
     title: 'Začnite svoje impérium',
     subtitle: 'Vyberte si odvetvie, získajte prvé mestské pozemky a spustite svoj prvý produkt.',
+    referralBannerTitle: 'Aktívny odporúčací kód: {code}',
+    referralBannerBody: 'Na oprávnené nákupy v hre získate 10% zľavu.',
+    referralBannerTooltip:
+      'Odporúčacia zľava sa serverovo aplikuje na oprávnené nákupy počas onboardingu aj po založení účtu.',
     step1Title: 'Vyberte mesto',
     step1Desc: 'Vyberte mesto, v ktorom bude pôsobiť vaša prvá firma. Toto mesto sa zároveň nastaví ako aktívne v hornom prepínači kontextu.',
     step2Title: 'Vyberte odvetvie',

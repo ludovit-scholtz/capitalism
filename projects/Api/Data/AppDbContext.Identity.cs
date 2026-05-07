@@ -20,6 +20,33 @@ public sealed partial class AppDbContext
             e.Property(p => p.ConcurrencyToken).IsConcurrencyToken();
         });
 
+        modelBuilder.Entity<ReferralCode>(e =>
+        {
+            e.HasKey(code => code.Id);
+            e.Property(code => code.Code).HasMaxLength(20);
+            e.HasIndex(code => code.Code).IsUnique();
+            e.HasIndex(code => code.CreatorPlayerId).IsUnique();
+            e.HasOne(code => code.CreatorPlayer)
+                .WithMany(player => player.CreatedReferralCodes)
+                .HasForeignKey(code => code.CreatorPlayerId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ReferralRegistration>(e =>
+        {
+            e.HasKey(registration => registration.Id);
+            e.HasIndex(registration => registration.ReferredPlayerId).IsUnique();
+            e.HasIndex(registration => new { registration.ReferralCodeId, registration.ReferredPlayerId }).IsUnique();
+            e.HasOne(registration => registration.ReferralCode)
+                .WithMany(code => code.Registrations)
+                .HasForeignKey(registration => registration.ReferralCodeId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(registration => registration.ReferredPlayer)
+                .WithMany(player => player.ReferralRegistrations)
+                .HasForeignKey(registration => registration.ReferredPlayerId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<ChatMessage>(e =>
         {
             e.HasKey(message => message.Id);

@@ -260,6 +260,10 @@ export default {
   onboarding: {
     title: 'Start Your Empire',
     subtitle: 'Choose your industry, claim your first city lots, and launch your first product.',
+    referralBannerTitle: 'Referral code active: {code}',
+    referralBannerBody: 'You will receive a 10% discount on eligible in-game purchases.',
+    referralBannerTooltip:
+      'Referral discount is applied by the server to your eligible purchases during onboarding and after account setup.',
     step1Title: 'Choose Your City',
     step1Desc: 'Pick the city where your first company will operate. This city is also set as your active city in the top context switcher.',
     step2Title: 'Choose Your Industry',
