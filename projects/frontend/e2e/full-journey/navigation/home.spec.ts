@@ -8,6 +8,66 @@ async function authenticate(page: Parameters<typeof test>[0]['page'], token: str
   }, token)
 }
 
+async function seedSelectedCity(page: Parameters<typeof test>[0]['page'], cityId: string) {
+  await page.addInitScript((storedCityId) => {
+    localStorage.setItem('selected_city_id', storedCityId)
+  }, cityId)
+}
+
+function makeBuilding(id: string, companyId: string, cityId: string, type: string, name: string) {
+  return {
+    id,
+    companyId,
+    cityId,
+    type,
+    name,
+    latitude: 48.1486,
+    longitude: 17.1077,
+    level: 1,
+    powerConsumption: 10,
+    isForSale: false,
+    units: [],
+    pendingConfiguration: null,
+  }
+}
+
+function makeMainCityPlayer() {
+  return makePlayer({
+    email: 'existing@test.com',
+    password: 'TestPass1!',
+    onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
+    onboardingCityId: 'city-ba',
+    companies: [
+      {
+        id: 'comp-main',
+        playerId: 'player-1',
+        name: 'Main City Industries',
+        cash: 500000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [
+          makeBuilding('factory-ba-1', 'comp-main', 'city-ba', 'FACTORY', 'Bratislava Factory 1'),
+          makeBuilding('factory-ba-2', 'comp-main', 'city-ba', 'FACTORY', 'Bratislava Factory 2'),
+          makeBuilding('shop-pr-1', 'comp-main', 'city-pr', 'SALES_SHOP', 'Prague Shop'),
+        ],
+      },
+    ],
+  })
+}
+
+function makeOidcToken(nonce: string) {
+  const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url')
+  const payload = Buffer.from(
+    JSON.stringify({
+      nonce,
+      iss: 'https://google.biatec.io',
+      aud: 'capitalism',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    }),
+  ).toString('base64url')
+
+  return `${header}.${payload}.signature`
+}
+
 function addPlayerShareholding(state: ReturnType<typeof setupMockApi>, playerId: string, companyId: string, shareCount = 10000) {
   state.shareholdings.push({
     companyId,
@@ -156,6 +216,74 @@ test.describe('Header navigation', () => {
     await page.goto('/')
     await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible()
     await expect(page.getByRole('banner').getByText(player.displayName)).toBeVisible()
+  })
+
+  test('native login auto-switches city context back to the main factory city', async ({ page }) => {
+    const player = makeMainCityPlayer()
+    setupMockApi(page, { players: [player] })
+    await seedSelectedCity(page, 'city-pr')
+
+    await page.goto('/login')
+    await page.getByLabel('Email').fill(player.email)
+    await page.getByLabel('Password').fill(player.password)
+    await page.getByRole('button', { name: 'Sign In', exact: true }).click()
+
+    await expect(page).toHaveURL('/')
+    await expect(page.locator('.ctx-trigger .ctx-city-name')).toContainText('Bratislava')
+    await expect(page.locator('.city-auto-switch-toast')).toContainText(
+      'Switched to Bratislava — your main city.',
+    )
+  })
+
+  test('oidc callback auto-switches city context back to the main factory city', async ({ page }) => {
+    const player = makeMainCityPlayer()
+    setupMockApi(page, { players: [player] })
+
+    const state = 'oidc-state'
+    const nonce = 'oidc-nonce'
+    const token = makeOidcToken(nonce)
+    await page.addInitScript(
+      ({ storedState, storedNonce }) => {
+        localStorage.setItem('selected_city_id', 'city-pr')
+        sessionStorage.setItem(
+          'biatec_oidc_state',
+          JSON.stringify({
+            state: storedState,
+            nonce: storedNonce,
+            redirectPath: '/',
+          }),
+        )
+      },
+      { storedState: state, storedNonce: nonce },
+    )
+
+    await page.goto(`/auth/callback?state=${state}&id_token=${encodeURIComponent(token)}`)
+
+    await expect(page).toHaveURL('/')
+    await expect(page.locator('.ctx-trigger .ctx-city-name')).toContainText('Bratislava')
+    await expect(page.locator('.city-auto-switch-toast')).toContainText(
+      'Switched to Bratislava — your main city.',
+    )
+  })
+
+  test('player without factories falls back to onboarding city after login', async ({ page }) => {
+    const player = makePlayer({
+      email: 'newbie@test.com',
+      password: 'TestPass1!',
+      onboardingCityId: 'city-vi',
+      companies: [],
+    })
+    setupMockApi(page, { players: [player] })
+    await seedSelectedCity(page, 'city-pr')
+
+    await page.goto('/login')
+    await page.getByLabel('Email').fill(player.email)
+    await page.getByLabel('Password').fill(player.password)
+    await page.getByRole('button', { name: 'Sign In', exact: true }).click()
+
+    await expect(page).toHaveURL('/')
+    await expect(page.locator('.ctx-trigger .ctx-city-name')).toContainText('Vienna')
+    await expect(page.locator('.city-auto-switch-toast')).toHaveCount(0)
   })
 
   test('shows current in-game time in the header', async ({ page }) => {

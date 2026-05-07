@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, watch } from 'vue'
+import { onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppFooter from '@/components/layout/AppFooter.vue'
@@ -23,6 +23,14 @@ const gameAdminStore = useGameAdminStore()
 const chatStore = useChatStore()
 const referralStore = useReferralStore()
 gameStateStore.start()
+let citySwitchToastTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearCitySwitchToastTimer() {
+  if (citySwitchToastTimer) {
+    clearTimeout(citySwitchToastTimer)
+    citySwitchToastTimer = null
+  }
+}
 
 onMounted(() => {
   auth.initFromStorage()
@@ -30,11 +38,15 @@ onMounted(() => {
   referralStore.initFromUrl()
   referralStore.initFromStorage()
   if (auth.token) {
-    void auth.fetchMe()
+    void auth.fetchMe({ reconcileCityContext: true })
     void newsStore.fetchUnreadCount()
     void notificationsStore.fetchUnreadCount()
     void gameAdminStore.fetchSession()
   }
+})
+
+onUnmounted(() => {
+  clearCitySwitchToastTimer()
 })
 
 watch(
@@ -64,11 +76,40 @@ watch(
     }
   },
 )
+
+watch(
+  () => auth.autoSwitchedMainCityName,
+  (cityName) => {
+    clearCitySwitchToastTimer()
+    if (!cityName) {
+      return
+    }
+
+    citySwitchToastTimer = setTimeout(() => {
+      auth.clearAutoSwitchedMainCityName()
+    }, 4_000)
+  },
+)
 </script>
 
 <template>
   <div class="flex flex-col min-h-screen">
     <AppHeader />
+
+    <div
+      v-if="auth.autoSwitchedMainCityName"
+      class="city-auto-switch-toast fixed right-4 top-20 z-[220] flex max-w-sm items-start gap-3 rounded-xl border border-brand/35 bg-card-raised px-4 py-3 shadow-2xl"
+      role="status"
+      aria-live="polite"
+    >
+      <span aria-hidden="true" class="pt-0.5 text-brand">📍</span>
+      <div class="min-w-0 flex-1 text-sm text-body">
+        {{ t('auth.autoSwitchedToMainCity', { city: auth.autoSwitchedMainCityName }) }}
+      </div>
+      <button class="btn btn-ghost btn-sm shrink-0" :aria-label="t('common.close')" @click="auth.clearAutoSwitchedMainCityName()">
+        {{ t('common.close') }}
+      </button>
+    </div>
 
     <!-- Offline banner: shown when the browser loses connectivity -->
     <div v-if="isOffline" role="status" aria-live="polite" class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium sticky top-0 z-90 bg-card-raised text-caution border-b border-divider">

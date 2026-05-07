@@ -2,8 +2,9 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { gqlRequest, GraphQLError } from '@/lib/graphql'
 import { gqlRequest as gqlMasterRequest } from '@/lib/graphqlMasterServer'
+import { selectMainCity, shouldAutoSwitchCity } from '@/lib/cityContext'
 import { deepEqual } from '@/lib/utils'
-import type { AccountContextResult, AccountContextType, Player, AuthPayload } from '@/types'
+import type { AccountContextResult, AccountContextType, Player, AuthPayload, Building, City } from '@/types'
 
 const BIATEC_OIDC_AUTHORIZE_URL = import.meta.env.VITE_BIATEC_OIDC_AUTHORIZE_URL || 'https://google.biatec.io/authorize'
 const BIATEC_OIDC_END_SESSION_URL = import.meta.env.VITE_BIATEC_OIDC_END_SESSION_URL || ''
@@ -35,6 +36,10 @@ interface BiatecSignInOptions {
 
 interface LogoutOptions {
   federated?: boolean
+}
+
+interface FetchMeOptions {
+  reconcileCityContext?: boolean
 }
 
 function normalizeRedirectPath(redirectPath: string | null | undefined) {
@@ -107,6 +112,7 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
   const selectedCityId = ref<string | null>(null)
+  const autoSwitchedMainCityName = ref<string | null>(null)
   let renewalTimer: ReturnType<typeof setTimeout> | null = null
 
   function clearRenewalTimer() {
@@ -319,7 +325,6 @@ export const useAuthStore = defineStore('auth', () => {
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('auth_token')
       localStorage.removeItem('auth_expires')
-      localStorage.removeItem('selected_city_id')
       localStorage.removeItem(AUTH_PROVIDER_KEY)
     }
 
@@ -425,29 +430,57 @@ export const useAuthStore = defineStore('auth', () => {
     return true
   }
 
-  function deriveMostUsedCityId(playerValue: Player | null): string | null {
-    if (!playerValue) return null
-    const cityUsage = new Map<string, number>()
+  function getPlayerBuildings(playerValue: Player | null): Building[] {
+    return playerValue?.companies.flatMap((company) => company.buildings ?? []) ?? []
+  }
 
-    for (const company of playerValue.companies ?? []) {
-      for (const building of company.buildings ?? []) {
-        cityUsage.set(building.cityId, (cityUsage.get(building.cityId) ?? 0) + 1)
+  async function loadContextCities() {
+    const data = await gqlRequest<{ cities: Pick<City, 'id' | 'name'>[] }>(`{ cities { id name } }`)
+    return data?.cities ?? []
+  }
+
+  async function reconcileCityContext(playerValue: Player | null) {
+    autoSwitchedMainCityName.value = null
+
+    if (!playerValue) {
+      return
+    }
+
+    try {
+      const cities = await loadContextCities()
+      if (cities.length === 0) {
+        return
       }
-    }
 
-    if (cityUsage.size === 0) {
-      return playerValue.onboardingCityId ?? null
-    }
+      const buildings = getPlayerBuildings(playerValue)
+      const mainCity = selectMainCity(cities, buildings)
 
-    let bestCityId: string | null = null
-    let bestCount = -1
-    for (const [cityId, count] of cityUsage.entries()) {
-      if (count > bestCount) {
-        bestCount = count
-        bestCityId = cityId
+      if (mainCity) {
+        if (shouldAutoSwitchCity(selectedCityId.value, mainCity.id, buildings)) {
+          switchCity(mainCity.id)
+          autoSwitchedMainCityName.value = mainCity.name
+          return
+        }
+
+        const hasValidCurrentCity =
+          !!selectedCityId.value && cities.some((city) => city.id === selectedCityId.value)
+        if (!hasValidCurrentCity) {
+          switchCity(mainCity.id)
+        }
+        return
       }
+
+      const fallbackCity =
+        (playerValue.onboardingCityId
+          ? cities.find((city) => city.id === playerValue.onboardingCityId)
+          : null) ?? cities[0] ?? null
+
+      if (fallbackCity && selectedCityId.value !== fallbackCity.id) {
+        switchCity(fallbackCity.id)
+      }
+    } catch {
+      /* ignore city reconciliation failures to avoid blocking auth */
     }
-    return bestCityId
   }
 
   const isAuthenticated = computed(() => !!token.value || !!getStoredToken())
@@ -483,13 +516,10 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function fetchCurrentPlayer() {
+  async function fetchCurrentPlayer(options: FetchMeOptions = {}) {
     const data = await gqlRequest<{ me: Player }>(`{ me {${PLAYER_SELECTION}} }`)
-    if (!selectedCityId.value) {
-      const preferredCityId = deriveMostUsedCityId(data.me)
-      if (preferredCityId) {
-        switchCity(preferredCityId)
-      }
+    if (options.reconcileCityContext) {
+      await reconcileCityContext(data.me)
     }
     if (!deepEqual(player.value, data.me)) {
       player.value = data.me
@@ -507,7 +537,7 @@ export const useAuthStore = defineStore('auth', () => {
       const data = await gqlMasterRequest<{ register: MasterSessionPayload }>(MASTER_REGISTER_MUTATION, { input })
       player.value = null
       applyStoredSession(data.register.token, data.register.expiresAtUtc)
-      await fetchCurrentPlayer()
+      await fetchCurrentPlayer({ reconcileCityContext: true })
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : 'Registration failed'
       throw e
@@ -523,7 +553,7 @@ export const useAuthStore = defineStore('auth', () => {
       const data = await gqlMasterRequest<{ login: MasterSessionPayload }>(MASTER_LOGIN_MUTATION, { input: { email, password } })
       player.value = null
       applyStoredSession(data.login.token, data.login.expiresAtUtc)
-      await fetchCurrentPlayer()
+      await fetchCurrentPlayer({ reconcileCityContext: true })
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : 'Login failed'
       throw e
@@ -572,7 +602,7 @@ export const useAuthStore = defineStore('auth', () => {
     applyStoredSession(callbackSession.token, callbackSession.expiresAtUtc, AUTH_PROVIDER_BIATEC)
 
     try {
-      await fetchCurrentPlayer()
+      await fetchCurrentPlayer({ reconcileCityContext: true })
       clearPendingOidcState()
       return callbackSession.redirectPath
     } catch (e: unknown) {
@@ -584,14 +614,14 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function fetchMe() {
+  async function fetchMe(options: FetchMeOptions = {}) {
     if (!token.value) {
       initFromStorage()
     }
     if (!token.value) return
     loading.value = true
     try {
-      await fetchCurrentPlayer()
+      await fetchCurrentPlayer(options)
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : 'Failed to load account'
 
@@ -638,6 +668,10 @@ export const useAuthStore = defineStore('auth', () => {
     setStoredCityId(cityId)
   }
 
+  function clearAutoSwitchedMainCityName() {
+    autoSwitchedMainCityName.value = null
+  }
+
   function logout(options: LogoutOptions = {}) {
     const shouldFederatedLogout = options.federated === true && getStoredAuthProvider() === AUTH_PROVIDER_BIATEC
     const idTokenHint = token.value
@@ -646,6 +680,7 @@ export const useAuthStore = defineStore('auth', () => {
     clearRenewalTimer()
     token.value = null
     player.value = null
+    autoSwitchedMainCityName.value = null
     clearStoredSession()
 
     if (federatedLogoutUrl) {
@@ -659,6 +694,7 @@ export const useAuthStore = defineStore('auth', () => {
     loading,
     error,
     selectedCityId,
+    autoSwitchedMainCityName,
     isAuthenticated,
     isAdmin,
     isProSubscriber,
@@ -673,6 +709,7 @@ export const useAuthStore = defineStore('auth', () => {
     fetchMe,
     switchAccountContext,
     switchCity,
+    clearAutoSwitchedMainCityName,
     logout,
   }
 })
