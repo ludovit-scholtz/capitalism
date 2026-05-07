@@ -462,6 +462,12 @@ onMounted(() => {
               <div class="flex flex-col items-end gap-0.5">
                 <span class="bg-brand text-white px-2 py-0.5 rounded text-[0.6875rem] font-bold">Lv.{{ building.level }}</span>
                 <span class="text-[0.6875rem] text-muted">{{ building.units.length }} units</span>
+                <span
+                  v-if="building.type === 'MEDIA_HOUSE' && building.isAdvertisingActive"
+                  class="advertising-active-badge inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6rem] font-bold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-400/30"
+                >
+                  📺 {{ t('dashboard.advertisingActive') }}
+                </span>
                 <!-- Destroyed badge -->
                 <span
                   v-if="building.destroyedAtUtc"

@@ -349,10 +349,10 @@ Per-phase timing was added to `TickProcessor` (each phase is now individually st
 
 - [ ] In root directory create audits folder, and every week do the audit of the security. List all potential risks and create the action plan to resolve them. The main focus should be on question: Can one player gain unfair advantege of another player by executing an api call or exploting some unfair game mechanics?
 
-### Media house (20% complete)
+### Media house (100% complete)
 
-- [ ] When media house is in the construction, allow the marketing units to configure it.
-- [ ] When media house is in the construction, do not make any caluclations for the marketing units, only charge the unit labor and energy costs.
+- [x] When media house is in the construction, allow the marketing units to configure it.
+- [x] When media house is in the construction, do not make any caluclations for the marketing units, only charge the unit labor and energy costs.
 
 ### Mining (100% complete)
 

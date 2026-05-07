@@ -65,6 +65,29 @@ public sealed class UpgradeMediaHouseInput
     public Guid BuildingId { get; set; }
 }
 
+/// <summary>Input for creating/updating a media house campaign unit configuration.</summary>
+public sealed class ConfigureMediaHouseUnitInput
+{
+    /// <summary>Owning MEDIA_HOUSE building.</summary>
+    public Guid BuildingId { get; set; }
+
+    /// <summary>Optional unit ID. When omitted, a new unit is created.</summary>
+    public Guid? UnitId { get; set; }
+
+    /// <summary>Target company to boost. Must be owned by the authenticated player.</summary>
+    public Guid TargetCompanyId { get; set; }
+
+    /// <summary>Campaign media channel: NEWSPAPER, RADIO, TV.</summary>
+    [Required, MaxLength(20)]
+    public string MediaType { get; set; } = string.Empty;
+
+    /// <summary>Campaign spending budget per tick. Must be non-negative.</summary>
+    public decimal CampaignBudgetPerTick { get; set; }
+
+    /// <summary>Whether this campaign unit is active.</summary>
+    public bool IsActive { get; set; } = true;
+}
+
 /// <summary>Input for purchasing a building lot and placing a building on it.</summary>
 public sealed class PurchaseLotInput
 {

@@ -252,6 +252,26 @@ public static partial class GameConstants
     /// </summary>
     public const decimal ContentRankingBaseMultiplier = 0.5m;
 
+    /// <summary>
+    /// Campaign-reach multipliers for Media House units.
+    /// Newspaper is baseline, Radio has 1.8× reach, TV has 3.0× reach.
+    /// </summary>
+    public static decimal MediaHouseCampaignMultiplier(string? mediaType) => mediaType switch
+    {
+        Data.Entities.MediaType.Newspaper => 1.0m,
+        Data.Entities.MediaType.Radio => 1.8m,
+        Data.Entities.MediaType.Tv => 3.0m,
+        _ => 1.0m
+    };
+
+    /// <summary>Estimated labor cost for a media-house campaign unit per tick.</summary>
+    public static decimal MediaHouseLaborCostPerTick(decimal campaignBudgetPerTick) =>
+        decimal.Round(Math.Max(25m, campaignBudgetPerTick * 0.08m), 2, MidpointRounding.AwayFromZero);
+
+    /// <summary>Estimated energy cost for a media-house campaign unit per tick.</summary>
+    public static decimal MediaHouseEnergyCostPerTick(decimal campaignBudgetPerTick) =>
+        decimal.Round(Math.Max(10m, campaignBudgetPerTick * 0.03m), 2, MidpointRounding.AwayFromZero);
+
     /// <summary>R&amp;D efficiency multiplier increment per tick per unit level (for BRAND_QUALITY research).</summary>
     public static decimal ResearchEfficiencyRate(int level) => level switch
     {

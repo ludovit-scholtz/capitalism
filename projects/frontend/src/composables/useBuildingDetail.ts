@@ -73,11 +73,12 @@ import type {
   RankedProductResult,
   ResearchBrandState,
   ResourceType,
-  CityMediaHouseInfo,
-  MediaHouseAnalyticsResult,
-  SourcingCandidate,
-  UnitProductAnalytics,
-} from '@/types'
+   CityMediaHouseInfo,
+   MediaHouseAnalyticsResult,
+    MediaHouseStatsResult,
+    SourcingCandidate,
+    UnitProductAnalytics,
+  } from '@/types'
 import type { HorizontalLinkState, VerticalLinkState } from '@/lib/linkHelpers'
 
 export type GridUnit = BuildingUnit | BuildingConfigurationPlanUnit | EditableGridUnit
@@ -184,6 +185,7 @@ export function useBuildingDetail() {
   /** Inline save error (e.g. RECIPE_INPUT_MISMATCH). Shown within the planning section. */
   const saveError = ref<string | null>(null)
   const companyCash = ref<number | null>(null)
+  const ownedCompanies = ref<Company[]>([])
   const isEditing = ref(false)
   type GridCellSelection = { x: number; y: number }
 
@@ -441,6 +443,16 @@ export function useBuildingDetail() {
   // Media house analytics (MEDIA_HOUSE)
   const mediaHouseAnalytics = ref<MediaHouseAnalyticsResult | null>(null)
   const mediaHouseAnalyticsLoading = ref(false)
+  const mediaHouseStats = ref<MediaHouseStatsResult | null>(null)
+  const mediaHouseStatsLoading = ref(false)
+  const mediaHouseUnitId = ref<string | null>(null)
+  const mediaHouseTargetCompanyId = ref<string | null>(null)
+  const mediaHouseUnitMediaType = ref<'NEWSPAPER' | 'RADIO' | 'TV'>('NEWSPAPER')
+  const mediaHouseCampaignBudgetPerTick = ref<number>(0)
+  const mediaHouseUnitActive = ref(true)
+  const savingMediaHouseUnit = ref(false)
+  const mediaHouseUnitError = ref<string | null>(null)
+  const mediaHouseUnitSuccess = ref(false)
 
   // Flush storage
   const showFlushConfirmDialog = ref(false)
@@ -2357,6 +2369,105 @@ export function useBuildingDetail() {
       mediaHouseAnalytics.value = null
     } finally {
       mediaHouseAnalyticsLoading.value = false
+    }
+  }
+
+  function initMediaHouseUnitFromStats() {
+    const firstUnit = mediaHouseStats.value?.units?.[0]
+    if (firstUnit) {
+      mediaHouseUnitId.value = firstUnit.id
+      mediaHouseTargetCompanyId.value = firstUnit.targetCompanyId
+      mediaHouseUnitMediaType.value = (firstUnit.mediaType as 'NEWSPAPER' | 'RADIO' | 'TV') ?? 'NEWSPAPER'
+      mediaHouseCampaignBudgetPerTick.value = firstUnit.campaignBudgetPerTick ?? 0
+      mediaHouseUnitActive.value = firstUnit.isActive
+      return
+    }
+
+    mediaHouseUnitId.value = null
+    mediaHouseTargetCompanyId.value = building.value?.companyId ?? null
+    mediaHouseUnitMediaType.value = ((building.value?.mediaType as 'NEWSPAPER' | 'RADIO' | 'TV') ?? 'NEWSPAPER')
+    mediaHouseCampaignBudgetPerTick.value = 0
+    mediaHouseUnitActive.value = true
+  }
+
+  async function loadMediaHouseStats() {
+    if (!building.value || building.value.type !== 'MEDIA_HOUSE') return
+    mediaHouseStatsLoading.value = true
+    try {
+      const data = await gqlRequest<{ mediaHouseStats: MediaHouseStatsResult | null }>(
+        `query MediaHouseStats($buildingId: UUID!) {
+          mediaHouseStats(buildingId: $buildingId) {
+            buildingId
+            currentBoostDelivered
+            campaignCostThisTaxCycle
+            estimatedSalesImpact
+            boostHistory { tick boost }
+            units {
+              id
+              targetCompanyId
+              targetCompanyName
+              mediaType
+              campaignBudgetPerTick
+              brandQualityBoostPerTick
+              isActive
+              laborCostPerTick
+              energyCostPerTick
+            }
+          }
+        }`,
+        { buildingId: building.value.id },
+      )
+      mediaHouseStats.value = data.mediaHouseStats ?? null
+      initMediaHouseUnitFromStats()
+    } catch {
+      mediaHouseStats.value = null
+    } finally {
+      mediaHouseStatsLoading.value = false
+    }
+  }
+
+  async function saveMediaHouseUnitConfig() {
+    if (!building.value || building.value.type !== 'MEDIA_HOUSE' || savingMediaHouseUnit.value) return
+    if (!mediaHouseTargetCompanyId.value) {
+      mediaHouseUnitError.value = t('mediaHouse.targetCompanyRequired')
+      return
+    }
+    if (mediaHouseCampaignBudgetPerTick.value < 0) {
+      mediaHouseUnitError.value = t('mediaHouse.budgetMustBeNonNegative')
+      return
+    }
+
+    savingMediaHouseUnit.value = true
+    mediaHouseUnitError.value = null
+    mediaHouseUnitSuccess.value = false
+
+    try {
+      await gqlRequest<{
+        configureMediaHouseUnit: { id: string }
+      }>(
+        `mutation ConfigureMediaHouseUnit($input: ConfigureMediaHouseUnitInput!) {
+          configureMediaHouseUnit(input: $input) { id }
+        }`,
+        {
+          input: {
+            buildingId: building.value.id,
+            unitId: mediaHouseUnitId.value,
+            targetCompanyId: mediaHouseTargetCompanyId.value,
+            mediaType: mediaHouseUnitMediaType.value,
+            campaignBudgetPerTick: mediaHouseCampaignBudgetPerTick.value,
+            isActive: mediaHouseUnitActive.value,
+          },
+        },
+      )
+      mediaHouseUnitSuccess.value = true
+      await loadMediaHouseStats()
+      setTimeout(() => {
+        mediaHouseUnitSuccess.value = false
+      }, 3000)
+    } catch (reason: unknown) {
+      mediaHouseUnitError.value = reason instanceof Error ? reason.message : t('mediaHouse.saveFailed')
+    } finally {
+      savingMediaHouseUnit.value = false
     }
   }
 
@@ -4364,6 +4475,7 @@ export function useBuildingDetail() {
               powerPlantType
               powerOutput
               mediaType
+              isAdvertisingActive
               interestRate
               builtAtUtc
               contentValue
@@ -4569,6 +4681,7 @@ export function useBuildingDetail() {
       }
 
       const allBuildings = companiesData.myCompanies.flatMap((company) => company.buildings)
+      ownedCompanies.value = companiesData.myCompanies
       const newBuilding = allBuildings.find((candidate) => candidate.id === buildingId.value) || null
       if (!deepEqual(building.value, newBuilding)) {
         building.value = newBuilding
@@ -4614,6 +4727,7 @@ export function useBuildingDetail() {
       }
       if (building.value?.type === 'MEDIA_HOUSE') {
         void loadMediaHouseAnalytics()
+        void loadMediaHouseStats()
       }
       if (building.value?.type === 'FACTORY') {
         void loadSupplyChain(buildingId.value)
@@ -4875,6 +4989,7 @@ export function useBuildingDetail() {
     error,
     saveError,
     companyCash,
+    ownedCompanies,
     isEditing,
     selectedCell,
     showUnitPicker,
@@ -4954,6 +5069,16 @@ export function useBuildingDetail() {
     mediaHouseUpgradeSuccess,
     mediaHouseAnalytics,
     mediaHouseAnalyticsLoading,
+    mediaHouseStats,
+    mediaHouseStatsLoading,
+    mediaHouseUnitId,
+    mediaHouseTargetCompanyId,
+    mediaHouseUnitMediaType,
+    mediaHouseCampaignBudgetPerTick,
+    mediaHouseUnitActive,
+    savingMediaHouseUnit,
+    mediaHouseUnitError,
+    mediaHouseUnitSuccess,
     showFlushConfirmDialog,
     flushingStorage,
     flushStorageError,
@@ -5189,6 +5314,8 @@ export function useBuildingDetail() {
     loadCityMediaHouses,
     loadPublicSalesAnalytics,
     loadMediaHouseAnalytics,
+    loadMediaHouseStats,
+    saveMediaHouseUnitConfig,
     upgradeMediaHouse,
     loadUnitProductAnalytics,
     submitQuickPriceUpdate,

@@ -13,6 +13,7 @@ public static class LedgerCalculator
         LedgerCategory.LaborCost,
         LedgerCategory.EnergyCost,
         LedgerCategory.Marketing,
+        LedgerCategory.MediaHouseExpense,
         LedgerCategory.ShippingCost,
         LedgerCategory.Other,
         LedgerCategory.UnitUpgrade,
@@ -39,6 +40,7 @@ public static class LedgerCalculator
     {
         return Math.Abs(entries
             .Where(entry => entry.Category == LedgerCategory.Marketing)
+            .Concat(entries.Where(entry => entry.Category == LedgerCategory.MediaHouseExpense))
             .Sum(entry => entry.Amount));
     }
 

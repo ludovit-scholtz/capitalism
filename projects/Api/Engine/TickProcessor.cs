@@ -154,6 +154,7 @@ public sealed class TickProcessor(
         var productTypes = await db.ProductTypes.Include(p => p.Recipes).ToListAsync(ct);
         var brands = await db.Brands.ToListAsync(ct);
         var inventories = await db.Inventories.ToListAsync(ct);
+        var mediaHouseUnits = await db.MediaHouseUnits.ToListAsync(ct);
         var exchangeOrders = await db.ExchangeOrders.Where(o => o.IsActive).ToListAsync(ct);
         var researchBudgets = await db.ProductResearchBudgets.ToListAsync(ct);
 
@@ -235,6 +236,9 @@ public sealed class TickProcessor(
                 .GroupBy(b => b.Type)
                 .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase),
             UnitsByBuilding = buildings.ToDictionary(b => b.Id, b => b.Units.ToList()),
+            MediaHouseUnitsByBuilding = mediaHouseUnits
+                .GroupBy(unit => unit.BuildingId)
+                .ToDictionary(group => group.Key, group => group.ToList()),
             UnitsByBuildingPosition = unitsByBuildingPosition,
             InventoryByUnit = inventories
                 .Where(i => i.BuildingUnitId.HasValue)

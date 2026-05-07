@@ -130,6 +130,8 @@ export interface Building {
   contentBudgetPerTick: number | null
   /** True when the MEDIA_HOUSE building is a government-seeded baseline outlet (cannot be upgraded). */
   isGovernmentOwned: boolean
+  /** True when at least one media-house campaign unit is actively running. */
+  isAdvertisingActive?: boolean
   /** True when the building was suspended on the last tick due to insufficient bank account funds. */
   isSuspendedForFunds: boolean
   /** Dispatch target percentage for POWER_PLANT buildings (0–100). 100 = full output (default). */

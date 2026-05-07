@@ -24,6 +24,7 @@ public sealed partial class TickContext
     public Dictionary<Guid, Building> BuildingsById { get; init; } = [];
     public Dictionary<string, List<Building>> BuildingsByType { get; init; } = [];
     public Dictionary<Guid, List<BuildingUnit>> UnitsByBuilding { get; init; } = [];
+    public Dictionary<Guid, List<MediaHouseUnit>> MediaHouseUnitsByBuilding { get; init; } = [];
     public Dictionary<Guid, Dictionary<(int GridX, int GridY), BuildingUnit>> UnitsByBuildingPosition { get; init; } = [];
     public Dictionary<Guid, List<Inventory>> InventoryByUnit { get; init; } = [];
     public Dictionary<Guid, List<Inventory>> InventoryByBuilding { get; init; } = [];

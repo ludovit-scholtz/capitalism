@@ -230,6 +230,15 @@ public sealed class Building
     /// <summary>Units installed in this building's 4x4 grid.</summary>
     public ICollection<BuildingUnit> Units { get; set; } = [];
 
+    /// <summary>Configurable advertising units for MEDIA_HOUSE buildings.</summary>
+    public ICollection<MediaHouseUnit> MediaHouseUnits { get; set; } = [];
+
+    /// <summary>
+    /// Cached flag updated by the tick engine. True when at least one active media-house
+    /// unit in this building is currently running a campaign.
+    /// </summary>
+    public bool IsAdvertisingActive { get; set; }
+
     /// <summary>Queued building configuration that will replace the active units on a future tick.</summary>
     public BuildingConfigurationPlan? PendingConfiguration { get; set; }
 }

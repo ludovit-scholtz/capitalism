@@ -209,6 +209,8 @@ export type MockBuilding = {
   contentBudgetPerTick?: number | null
   /** True when the building is a government-seeded media outlet (not player-owned) */
   isGovernmentOwned?: boolean
+  /** True when at least one campaign unit is actively running in this media house. */
+  isAdvertisingActive?: boolean
   /** True when the building is suspended due to insufficient bank account funds */
   isSuspendedForFunds?: boolean
   /** Machine-readable suspension reason: null | 'MISSING_BANK_ACCOUNT' | 'INSUFFICIENT_FUNDS:<amount>' */
@@ -4701,6 +4703,41 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    if (query.includes('configureMediaHouseUnit')) {
+      if (!state.currentUserId) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHORIZED' } }] }),
+        })
+      }
+
+      const input = body.variables?.input
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      const building = player?.companies.flatMap((company) => company.buildings).find((candidate) => candidate.id === input?.buildingId)
+      if (!building || building.type !== 'MEDIA_HOUSE') {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Building not found or not media house.', extensions: { code: 'BUILDING_NOT_FOUND' } }] }),
+        })
+      }
+
+      building.isAdvertisingActive = Boolean(input?.isActive) && Number(input?.campaignBudgetPerTick ?? 0) > 0
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            configureMediaHouseUnit: {
+              id: input?.unitId ?? `mh-unit-${Date.now()}`,
+            },
+          },
+        }),
+      })
+    }
+
     if (query.includes('SetPlantDispatch') || query.includes('setPlantDispatch')) {
       const input = body.variables?.input
       const player = state.players.find((p) => p.id === state.currentUserId)
@@ -6381,6 +6418,47 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { cityMediaHouses: sorted } }),
+      })
+    }
+
+    if (query.includes('mediaHouseStats')) {
+      const buildingId = body.variables?.buildingId as string | undefined
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      const building = player?.companies.flatMap((company) => company.buildings).find((candidate) => candidate.id === buildingId)
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            mediaHouseStats: building
+              ? {
+                  buildingId: building.id,
+                  currentBoostDelivered: building.isAdvertisingActive ? 0.25 : 0,
+                  campaignCostThisTaxCycle: building.isAdvertisingActive ? 450 : 0,
+                  estimatedSalesImpact: building.isAdvertisingActive ? 1250 : 0,
+                  boostHistory: [
+                    { tick: Math.max(0, state.gameState.currentTick - 2), boost: building.isAdvertisingActive ? 0.2 : 0 },
+                    { tick: Math.max(0, state.gameState.currentTick - 1), boost: building.isAdvertisingActive ? 0.22 : 0 },
+                    { tick: state.gameState.currentTick, boost: building.isAdvertisingActive ? 0.25 : 0 },
+                  ],
+                  units: [
+                    {
+                      id: 'mh-unit-1',
+                      targetCompanyId: building.companyId,
+                      targetCompanyName: player?.companies.find((c) => c.id === building.companyId)?.name ?? 'Target',
+                      mediaType: building.mediaType ?? 'NEWSPAPER',
+                      campaignBudgetPerTick: building.contentBudgetPerTick ?? 0,
+                      brandQualityBoostPerTick: building.isAdvertisingActive ? 0.25 : 0,
+                      isActive: Boolean(building.isAdvertisingActive),
+                      laborCostPerTick: 25,
+                      energyCostPerTick: 10,
+                    },
+                  ],
+                }
+              : null,
+          },
+        }),
       })
     }
 
