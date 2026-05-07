@@ -29,6 +29,7 @@ const { session } = storeToRefs(gameAdminStore)
 const { isChatOpen, unreadCount: chatUnreadCount } = storeToRefs(chatStore)
 const isMenuOpen = ref(false)
 const isNotificationsOpen = ref(false)
+const openMobileSection = ref<'main' | 'economy' | 'build' | 'social' | 'admin'>('main')
 
 const showUnreadBadge = computed(() => auth.isAuthenticated && unreadCount.value > 0)
 const showNotificationBadge = computed(() => auth.isAuthenticated && notificationUnreadCount.value > 0)
@@ -50,6 +51,11 @@ const toggleMenu = () => {
 
 const closeMenu = () => {
   isMenuOpen.value = false
+  openMobileSection.value = 'main'
+}
+
+function toggleMobileSection(section: 'main' | 'economy' | 'build' | 'social' | 'admin') {
+  openMobileSection.value = openMobileSection.value === section ? 'main' : section
 }
 
 function handleChatToggle() {
@@ -89,6 +95,74 @@ async function handleNotificationClick(notificationId: string, isRead: boolean, 
 async function markAllNotificationsRead() {
   await notificationsStore.markAllRead()
 }
+
+const mobileNavSections = computed(() => {
+  const sections = [
+    {
+      key: 'main' as const,
+      label: t('nav.sectionMain'),
+      links: [
+        { key: 'home', label: t('nav.home'), to: '/', icon: ['fas', 'home'], visible: true, badge: 0 },
+        { key: 'dashboard', label: t('nav.dashboard'), to: '/dashboard', icon: ['fas', 'tachometer-alt'], visible: auth.isAuthenticated, badge: 0 },
+        { key: 'leaderboard', label: t('nav.leaderboard'), to: '/leaderboard', icon: ['fas', 'trophy'], visible: true, badge: 0 },
+        { key: 'cities', label: t('nav.cities'), to: '/cities', icon: ['fas', 'globe'], visible: true, badge: 0 },
+        { key: 'news', label: t('nav.news'), to: '/news', icon: ['fas', 'newspaper'], visible: true, badge: showUnreadBadge.value ? unreadCount.value : 0 },
+        { key: 'tutorial', label: t('nav.tutorial'), to: '/tutorial', icon: ['fas', 'graduation-cap'], visible: true, badge: 0 },
+      ],
+    },
+    {
+      key: 'economy' as const,
+      label: t('nav.sectionEconomy'),
+      links: [
+        { key: 'exchange', label: t('nav.exchange'), to: '/exchange', icon: ['fas', 'chart-bar'], visible: true, badge: 0 },
+        { key: 'stocks', label: t('nav.stocks'), to: '/stocks', icon: ['fas', 'wallet'], visible: true, badge: 0 },
+        { key: 'forex', label: t('nav.forex'), to: '/forex', icon: ['fas', 'coins'], visible: auth.isAuthenticated, badge: 0 },
+        { key: 'banking', label: t('nav.banking'), to: '/banking', icon: ['fas', 'landmark'], visible: true, badge: 0 },
+        { key: 'bank-statement', label: t('nav.bankStatement'), to: '/bank-statement', icon: ['fas', 'file-invoice-dollar'], visible: auth.isAuthenticated, badge: 0 },
+        { key: 'campaigns', label: t('nav.campaignAnalytics'), to: '/market-intelligence', icon: ['fas', 'bullhorn'], visible: auth.isAuthenticated, badge: 0 },
+        { key: 'trade-routes', label: t('tradeRoutes.nav'), to: '/trade-routes', icon: ['fas', 'route'], visible: auth.isAuthenticated, badge: 0 },
+      ],
+    },
+    {
+      key: 'build' as const,
+      label: t('nav.sectionBuild'),
+      links: [
+        { key: 'building-market', label: t('nav.buildingMarket'), to: '/buildings/market', icon: ['fas', 'store'], visible: true, badge: 0 },
+        { key: 'encyclopedia', label: t('nav.encyclopedia'), to: '/encyclopedia', icon: ['fas', 'book'], visible: true, badge: 0 },
+      ],
+    },
+    {
+      key: 'social' as const,
+      label: t('nav.sectionSocial'),
+      links: [
+        {
+          key: 'chat',
+          label: t('nav.chat'),
+          icon: ['fas', 'comments'],
+          visible: auth.isAuthenticated,
+          action: handleChatToggle,
+          active: isChatOpen.value,
+          badge: chatUnreadCount.value,
+        },
+      ],
+    },
+    {
+      key: 'admin' as const,
+      label: t('nav.sectionAdmin'),
+      links: [
+        { key: 'admin', label: t('nav.admin'), to: '/admin', icon: ['fas', 'shield-halved'], visible: !!session.value?.canAccessAdminDashboard, badge: 0 },
+        { key: 'operations', label: t('nav.operations'), to: '/operations', icon: ['fas', 'chart-line'], visible: !!session.value?.canAccessAdminDashboard, badge: 0 },
+      ],
+    },
+  ]
+
+  return sections
+    .map((section) => ({
+      ...section,
+      links: section.links.filter((link) => link.visible),
+    }))
+    .filter((section) => section.links.length > 0)
+})
 </script>
 
 <template>
@@ -106,88 +180,104 @@ async function markAllNotificationsRead() {
 
       <!-- Navigation links -->
       <nav class="nav-links" :class="{ 'nav-open': isMenuOpen }">
-        <RouterLink to="/" :title="t('nav.home')" class="nav-link" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'home']" class="mr-2" />
-          <span class="inline-block lg:hidden">{{ t('nav.home') }}</span>
-        </RouterLink>
-        <RouterLink v-if="auth.isAuthenticated" to="/dashboard" :title="t('nav.dashboard')" class="nav-link" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'tachometer-alt']" class="mr-2" />
-          <span class="inline-block lg:hidden">{{ t('nav.dashboard') }}</span>
-        </RouterLink>
-        <RouterLink to="/leaderboard" :title="t('nav.leaderboard')" class="nav-link" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'trophy']" class="mr-2" />
-          <span class="inline-block lg:hidden">{{ t('nav.leaderboard') }}</span>
-        </RouterLink>
-        <RouterLink to="/cities" :title="t('nav.cities')" class="nav-link" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'globe']" class="mr-2" />
-          <span class="inline-block lg:hidden">{{ t('nav.cities') }}</span>
-        </RouterLink>
-        <RouterLink to="/buildings/market" :title="t('nav.buildingMarket')" class="nav-link" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'store']" class="mr-2" />
-          <span class="inline-block lg:hidden">{{ t('nav.buildingMarket') }}</span>
-        </RouterLink>
-        <RouterLink to="/encyclopedia" :title="t('nav.encyclopedia')" class="nav-link" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'book']" class="mr-2" />
-          <span class="inline-block lg:hidden">{{ t('nav.encyclopedia') }}</span>
-        </RouterLink>
-        <RouterLink to="/exchange" :title="t('nav.exchange')" class="nav-link" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'chart-bar']" class="mr-2" />
-          <span class="inline-block lg:hidden">{{ t('nav.exchange') }}</span>
-        </RouterLink>
-        <RouterLink to="/stocks" :title="t('nav.stocks')" class="nav-link" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'wallet']" class="mr-2" />
-          <span class="inline-block lg:hidden">{{ t('nav.stocks') }}</span>
-        </RouterLink>
-        <RouterLink v-if="auth.isAuthenticated" to="/forex" :title="t('nav.forex')" class="nav-link" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'coins']" class="mr-2" />
-          <span class="inline-block lg:hidden">{{ t('nav.forex') }}</span>
-        </RouterLink>
-        <RouterLink v-if="auth.isAuthenticated" to="/bank-statement" :title="t('nav.bankStatement')" class="nav-link" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'file-invoice-dollar']" class="mr-2" />
-          <span class="inline-block lg:hidden">{{ t('nav.bankStatement') }}</span>
-        </RouterLink>
-        <RouterLink v-if="auth.isAuthenticated" to="/market-intelligence" :title="t('nav.campaignAnalytics')" class="nav-link" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'bullhorn']" class="mr-2" />
-          <span class="inline-block lg:hidden">{{ t('nav.campaignAnalytics') }}</span>
-        </RouterLink>
-        <RouterLink to="/banking" :title="t('nav.banking')" class="nav-link" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'landmark']" class="mr-2" />
-          <span class="inline-block lg:hidden">{{ t('nav.banking') }}</span>
-        </RouterLink>
-        <RouterLink v-if="auth.isAuthenticated" to="/trade-routes" :title="t('tradeRoutes.nav')" class="nav-link" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'route']" class="mr-2" />
-          <span class="inline-block lg:hidden">{{ t('tradeRoutes.nav') }}</span>
-        </RouterLink>
-        <RouterLink to="/tutorial" :title="t('nav.tutorial')" class="nav-link" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'graduation-cap']" class="mr-2" />
-          <span class="inline-block lg:hidden">{{ t('nav.tutorial') }}</span>
-        </RouterLink>
-        <RouterLink to="/news" :title="t('nav.news')" :aria-label="t('nav.news')" class="nav-link nav-link-badge-host" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'newspaper']" class="mr-2" />
-          <span class="inline-block lg:hidden">{{ t('nav.news') }}</span>
-          <span v-if="showUnreadBadge" class="nav-badge nav-badge-news news-badge">{{ unreadCount }}</span>
-        </RouterLink>
-        <button
-          v-if="auth.isAuthenticated"
-          class="nav-link nav-chat-btn nav-link-badge-host"
-          :class="{ 'nav-link-active': isChatOpen }"
-          :title="t('nav.chat')"
-          :aria-label="t('nav.chat')"
-          :aria-pressed="isChatOpen"
-          @click="handleChatToggle"
-        >
-          <font-awesome-icon :icon="['fas', 'comments']" class="mr-2" />
-          <span class="inline-block lg:hidden">{{ t('nav.chat') }}</span>
-          <span v-if="chatUnreadCount > 0" class="nav-badge nav-badge-chat chat-badge">{{ chatUnreadCount }}</span>
-        </button>
-        <RouterLink v-if="session?.canAccessAdminDashboard" to="/admin" :title="t('nav.admin')" :aria-label="t('nav.admin')" class="nav-link" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'shield-halved']" class="mr-2" />
-          <span class="inline-block lg:hidden">{{ t('nav.admin') }}</span>
-        </RouterLink>
-        <RouterLink v-if="session?.canAccessAdminDashboard" to="/operations" :title="t('nav.operations')" :aria-label="t('nav.operations')" class="nav-link" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'chart-line']" class="mr-2" />
-          <span class="inline-block lg:hidden">{{ t('nav.operations') }}</span>
-        </RouterLink>
+        <div class="desktop-nav-links">
+          <RouterLink to="/" :title="t('nav.home')" class="nav-link" @click="closeMenu">
+            <font-awesome-icon :icon="['fas', 'home']" class="mr-2" />
+          </RouterLink>
+          <RouterLink v-if="auth.isAuthenticated" to="/dashboard" :title="t('nav.dashboard')" class="nav-link" @click="closeMenu">
+            <font-awesome-icon :icon="['fas', 'tachometer-alt']" class="mr-2" />
+          </RouterLink>
+          <RouterLink to="/leaderboard" :title="t('nav.leaderboard')" class="nav-link" @click="closeMenu">
+            <font-awesome-icon :icon="['fas', 'trophy']" class="mr-2" />
+          </RouterLink>
+          <RouterLink to="/cities" :title="t('nav.cities')" class="nav-link" @click="closeMenu">
+            <font-awesome-icon :icon="['fas', 'globe']" class="mr-2" />
+          </RouterLink>
+          <RouterLink to="/buildings/market" :title="t('nav.buildingMarket')" class="nav-link" @click="closeMenu">
+            <font-awesome-icon :icon="['fas', 'store']" class="mr-2" />
+          </RouterLink>
+          <RouterLink to="/encyclopedia" :title="t('nav.encyclopedia')" class="nav-link" @click="closeMenu">
+            <font-awesome-icon :icon="['fas', 'book']" class="mr-2" />
+          </RouterLink>
+          <RouterLink to="/exchange" :title="t('nav.exchange')" class="nav-link" @click="closeMenu">
+            <font-awesome-icon :icon="['fas', 'chart-bar']" class="mr-2" />
+          </RouterLink>
+          <RouterLink to="/stocks" :title="t('nav.stocks')" class="nav-link" @click="closeMenu">
+            <font-awesome-icon :icon="['fas', 'wallet']" class="mr-2" />
+          </RouterLink>
+          <RouterLink v-if="auth.isAuthenticated" to="/forex" :title="t('nav.forex')" class="nav-link" @click="closeMenu">
+            <font-awesome-icon :icon="['fas', 'coins']" class="mr-2" />
+          </RouterLink>
+          <RouterLink v-if="auth.isAuthenticated" to="/bank-statement" :title="t('nav.bankStatement')" class="nav-link" @click="closeMenu">
+            <font-awesome-icon :icon="['fas', 'file-invoice-dollar']" class="mr-2" />
+          </RouterLink>
+          <RouterLink v-if="auth.isAuthenticated" to="/market-intelligence" :title="t('nav.campaignAnalytics')" class="nav-link" @click="closeMenu">
+            <font-awesome-icon :icon="['fas', 'bullhorn']" class="mr-2" />
+          </RouterLink>
+          <RouterLink to="/banking" :title="t('nav.banking')" class="nav-link" @click="closeMenu">
+            <font-awesome-icon :icon="['fas', 'landmark']" class="mr-2" />
+          </RouterLink>
+          <RouterLink v-if="auth.isAuthenticated" to="/trade-routes" :title="t('tradeRoutes.nav')" class="nav-link" @click="closeMenu">
+            <font-awesome-icon :icon="['fas', 'route']" class="mr-2" />
+          </RouterLink>
+          <RouterLink to="/tutorial" :title="t('nav.tutorial')" class="nav-link" @click="closeMenu">
+            <font-awesome-icon :icon="['fas', 'graduation-cap']" class="mr-2" />
+          </RouterLink>
+          <RouterLink to="/news" :title="t('nav.news')" :aria-label="t('nav.news')" class="nav-link nav-link-badge-host" @click="closeMenu">
+            <font-awesome-icon :icon="['fas', 'newspaper']" class="mr-2" />
+            <span v-if="showUnreadBadge" class="nav-badge nav-badge-news news-badge">{{ unreadCount }}</span>
+          </RouterLink>
+          <button
+            v-if="auth.isAuthenticated"
+            class="nav-link nav-chat-btn nav-link-badge-host"
+            :class="{ 'nav-link-active': isChatOpen }"
+            :title="t('nav.chat')"
+            :aria-label="t('nav.chat')"
+            :aria-pressed="isChatOpen"
+            @click="handleChatToggle"
+          >
+            <font-awesome-icon :icon="['fas', 'comments']" class="mr-2" />
+            <span v-if="chatUnreadCount > 0" class="nav-badge nav-badge-chat chat-badge">{{ chatUnreadCount }}</span>
+          </button>
+          <RouterLink v-if="session?.canAccessAdminDashboard" to="/admin" :title="t('nav.admin')" :aria-label="t('nav.admin')" class="nav-link" @click="closeMenu">
+            <font-awesome-icon :icon="['fas', 'shield-halved']" class="mr-2" />
+          </RouterLink>
+          <RouterLink v-if="session?.canAccessAdminDashboard" to="/operations" :title="t('nav.operations')" :aria-label="t('nav.operations')" class="nav-link" @click="closeMenu">
+            <font-awesome-icon :icon="['fas', 'chart-line']" class="mr-2" />
+          </RouterLink>
+        </div>
+
+        <div v-if="isMenuOpen" class="mobile-nav-sections" :aria-label="t('nav.mobileMenuLabel')" role="navigation">
+          <section v-for="section in mobileNavSections" :key="section.key" class="mobile-nav-section">
+            <button
+              class="mobile-section-toggle tap-target-44"
+              :aria-expanded="openMobileSection === section.key"
+              @click="toggleMobileSection(section.key)"
+            >
+              <span>{{ section.label }}</span>
+              <font-awesome-icon :icon="['fas', openMobileSection === section.key ? 'chevron-up' : 'chevron-down']" />
+            </button>
+            <div v-show="openMobileSection === section.key" class="mobile-section-links">
+              <template v-for="link in section.links" :key="link.key">
+                <RouterLink v-if="'to' in link" :to="link.to" class="mobile-sub-link tap-target-44" @click="closeMenu">
+                  <font-awesome-icon :icon="link.icon" />
+                  <span>{{ link.label }}</span>
+                  <span v-if="link.badge && link.badge > 0" class="mobile-sub-badge">{{ link.badge }}</span>
+                </RouterLink>
+                <button
+                  v-else
+                  class="mobile-sub-link mobile-sub-button tap-target-44"
+                  :class="{ 'mobile-sub-link-active': link.active }"
+                  @click="link.action"
+                >
+                  <font-awesome-icon :icon="link.icon" />
+                  <span>{{ link.label }}</span>
+                  <span v-if="link.badge && link.badge > 0" class="mobile-sub-badge">{{ link.badge }}</span>
+                </button>
+              </template>
+            </div>
+          </section>
+        </div>
       </nav>
 
       <!-- Right-side actions -->
@@ -294,8 +384,12 @@ async function markAllNotificationsRead() {
 /* ── Navigation links ─────────────────────────────────────────────────────── */
 .nav-links {
   display: flex;
-  gap: 1.5rem;
   flex: 1;
+}
+
+.desktop-nav-links {
+  display: flex;
+  gap: 1.5rem;
 }
 
 .nav-link {
@@ -338,6 +432,10 @@ async function markAllNotificationsRead() {
 .nav-link.nav-link-active {
   color: var(--color-text);
   text-decoration: none;
+}
+
+.mobile-nav-sections {
+  display: none;
 }
 
 /* ── Notification badges ──────────────────────────────────────────────────── */
@@ -525,26 +623,95 @@ async function markAllNotificationsRead() {
     overflow-y: auto;
   }
 
+  .desktop-nav-links {
+    display: none;
+  }
+
+  .mobile-nav-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0 0.75rem;
+  }
+
+  .mobile-nav-section {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--color-surface) 92%, var(--color-bg));
+    overflow: hidden;
+  }
+
+  .mobile-section-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    border: 0;
+    background: transparent;
+    color: var(--color-text);
+    font-size: 0.92rem;
+    font-weight: 700;
+  }
+
+  .mobile-section-links {
+    display: flex;
+    flex-direction: column;
+    padding: 0.25rem 0.5rem 0.5rem;
+    gap: 0.25rem;
+  }
+
+  .mobile-sub-link {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    background: transparent;
+    font-size: 0.95rem;
+    font-weight: 500;
+  }
+
+  .mobile-sub-link:hover,
+  .mobile-sub-link:focus-visible,
+  .mobile-sub-link.router-link-active,
+  .mobile-sub-link-active {
+    border-color: var(--color-primary);
+    color: var(--color-text);
+    background: color-mix(in srgb, var(--color-primary) 14%, transparent);
+    outline: none;
+  }
+
+  .mobile-sub-button {
+    border: 1px solid transparent;
+    cursor: pointer;
+    background: transparent;
+    text-align: left;
+  }
+
+  .mobile-sub-badge {
+    margin-left: auto;
+    min-width: 1.2rem;
+    height: 1.2rem;
+    border-radius: 999px;
+    padding-inline: 0.28rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.67rem;
+    font-weight: 700;
+    color: white;
+    background: linear-gradient(135deg, #ff8a00, #ff3d00);
+  }
+
   .nav-links.nav-open {
     transform: translateY(0);
     opacity: 1;
     visibility: visible;
-  }
-
-  .nav-link {
-    padding: 1rem 2rem;
-    justify-content: flex-start;
-    gap: 0.75rem;
-    font-size: 1rem;
-    width: 100%;
-  }
-
-  .nav-link svg {
-    font-size: 1.5rem;
-  }
-
-  .nav-link::after {
-    display: none;
   }
 
   .header-actions {

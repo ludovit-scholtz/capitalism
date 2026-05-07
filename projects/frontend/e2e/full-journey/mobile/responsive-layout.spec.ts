@@ -116,17 +116,21 @@ test.describe('Responsive layout baseline checks', () => {
     expect(maxContainerWidth).toBeLessThanOrEqual(1600)
   })
 
-  test('mobile navigation menu opens and links remain reachable', async ({ page }) => {
+  test('mobile navigation menu opens grouped second-level links and closes correctly', async ({ page }) => {
     setupMockApi(page)
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/')
 
     await page.getByRole('button', { name: 'Toggle navigation menu' }).click()
-    await expect(page.getByRole('link', { name: 'Leaderboard' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Cities' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Main' })).toBeVisible()
+    await expect(page.locator('.mobile-nav-sections').getByRole('link', { name: 'Leaderboard', exact: true })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Economy' }).click()
+    await expect(page.locator('.mobile-nav-sections').getByRole('link', { name: 'Banking', exact: true })).toBeVisible()
+    await expect(page.locator('.mobile-nav-sections').getByRole('link', { name: 'Stocks', exact: true })).toBeVisible()
 
     await page.getByRole('button', { name: 'Toggle navigation menu' }).click()
-    await expect(page.locator('.nav-links').getByRole('link', { name: 'Leaderboard', exact: true })).toBeHidden()
+    await expect(page.locator('.mobile-nav-sections').getByRole('link', { name: 'Leaderboard', exact: true })).toBeHidden()
   })
 
   test('city map lot detail behaves as a bottom drawer on mobile', async ({ page }) => {

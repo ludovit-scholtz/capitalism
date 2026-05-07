@@ -65,6 +65,12 @@ export default {
     cities: 'Cities',
     buildingMarket: 'Building Market',
     tutorial: 'Tutorial',
+    mobileMenuLabel: 'Mobile menu sections',
+    sectionMain: 'Main',
+    sectionEconomy: 'Economy',
+    sectionBuild: 'Build',
+    sectionSocial: 'Social',
+    sectionAdmin: 'Administration',
   },
   news: {
     eyebrow: 'Official feed',
