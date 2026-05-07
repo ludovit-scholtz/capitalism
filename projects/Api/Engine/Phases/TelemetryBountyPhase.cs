@@ -51,7 +51,7 @@ public sealed class TelemetryBountyPhase(
                 uniqueScopeKey: $"{bountyCode}:{email}:{today}:{serverKey}"));
 
             var badgeType = BadgeType.FromBountyCode(bountyCode);
-            if (string.IsNullOrWhiteSpace(badgeType))
+            if (badgeType is null)
             {
                 return;
             }

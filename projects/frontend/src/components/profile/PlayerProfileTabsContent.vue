@@ -175,10 +175,10 @@ function exportCsv() {
       citiesWithBuildings: props.profile.citiesWithBuildings,
       activeBuildingTypes: props.profile.activeBuildingTypes,
       badgeTypes: badges.value.map((badge) => badge.badgeType),
-      bestRank:
-        rankSnapshots.value.length > 0
-          ? Math.min(...rankSnapshots.value.map((snapshot) => snapshot.leaderboardRank))
-          : null,
+      bestRank: (() => {
+        const ranks = rankSnapshots.value.map((snapshot) => snapshot.leaderboardRank)
+        return ranks.length > 0 ? Math.min(...ranks) : null
+      })(),
     })
     const dateStr = new Date().toISOString().slice(0, 10)
     const safeDisplayName = props.profile.displayName.replace(/\s+/g, '_')

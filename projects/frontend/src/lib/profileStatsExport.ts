@@ -13,7 +13,7 @@ export interface ProfileExportData {
 
 function escapeCsvCell(value: string | number): string {
   const raw = String(value)
-  if (raw.includes(',') || raw.includes('"') || raw.includes('\n')) {
+  if (raw.includes(',') || raw.includes('"') || raw.includes('\n') || raw.includes('\r')) {
     return `"${raw.replace(/"/g, '""')}"`
   }
   return raw

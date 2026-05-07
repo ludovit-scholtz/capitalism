@@ -436,6 +436,9 @@ public sealed class PlayerAchievementsTests
         Assert.Equal(BadgeType.FirstB2BTrade, BadgeType.FromBountyCode(Capitalism.Shared.Ranking.MasterRankingBountyCodes.Wholesaler));
         Assert.Equal(BadgeType.BankBaron, BadgeType.FromBountyCode(Capitalism.Shared.Ranking.MasterRankingBountyCodes.Banker));
         Assert.Equal(BadgeType.LoanMaster, BadgeType.FromBountyCode(Capitalism.Shared.Ranking.MasterRankingBountyCodes.Lender));
+        Assert.Equal(BadgeType.MediaMogul, BadgeType.FromBountyCode(Capitalism.Shared.Ranking.MasterRankingBountyCodes.MediaOwner));
+        Assert.Equal(BadgeType.MarketDominatorV2, BadgeType.FromBountyCode(Capitalism.Shared.Ranking.MasterRankingBountyCodes.CompanyMaster));
+        Assert.Equal(BadgeType.TopRank, BadgeType.FromBountyCode(Capitalism.Shared.Ranking.MasterRankingBountyCodes.TopPlayer));
         Assert.Null(BadgeType.FromBountyCode("UNKNOWN"));
     }
 

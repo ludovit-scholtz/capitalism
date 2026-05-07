@@ -27,9 +27,11 @@ public sealed class RankHistoryPhase : ITickPhase
 
     public async Task ProcessAsync(TickContext context)
     {
-        // Only run on tax-cycle boundaries.
-        if (context.GameState.TaxCycleTicks <= 0
-            || context.CurrentTick % context.GameState.TaxCycleTicks != 0)
+        // Only run on tax-cycle boundaries; zero/negative tax cycle is invalid.
+        var taxCycleTicks = context.GameState.TaxCycleTicks;
+        if (taxCycleTicks <= 0)
+            return;
+        if (context.CurrentTick % taxCycleTicks != 0)
             return;
 
         var db = context.Db;
@@ -157,7 +159,8 @@ public sealed class RankHistoryPhase : ITickPhase
             var badgePlayerIds = rankingBadgeCandidates.Select(candidate => candidate.PlayerId).Distinct().ToList();
             var existingBadgeKeys = await db.PlayerAchievementBadges
                 .AsNoTracking()
-                .Where(b => badgePlayerIds.Contains(b.PlayerId))
+                .Where(b => badgePlayerIds.Contains(b.PlayerId)
+                    && (b.BadgeType == BadgeType.TopRank || b.BadgeType == BadgeType.WealthMilestone))
                 .Select(b => new { b.PlayerId, b.BadgeType })
                 .ToListAsync(ct);
 
