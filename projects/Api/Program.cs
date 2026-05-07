@@ -230,6 +230,7 @@ public class Program
             .AddQueryType<Query>()
             .AddMutationType<Mutation>()
             .AddTypeExtension<CompanyTypeExtensions>()
+            .AddTypeExtension<BuildingConfigurationPlanTypeExtensions>()
             .AddTypeExtension<BuildingTypeExtensions>()
             .AddTypeExtension<PlayerTypeExtensions>();
 
