@@ -651,7 +651,33 @@ test.describe('Forex Exchange page', () => {
   // ── City-based FX rate board ──────────────────────────────────────────────
 
   test('Rate List shows CZK as base currency when Prague is selected city', async ({ page }) => {
-    const player = makePlayer()
+    const player = makePlayer({
+      companies: [
+        {
+          id: 'company-prague-rates',
+          playerId: 'player-1',
+          name: 'Prague Rates Corp',
+          cash: 500000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [
+            {
+              id: 'building-prague-rates',
+              companyId: 'company-prague-rates',
+              cityId: 'city-pr',
+              type: 'FACTORY',
+              name: 'Prague Rates Factory',
+              latitude: 50.08,
+              longitude: 14.44,
+              level: 1,
+              powerConsumption: 10,
+              isForSale: false,
+              units: [],
+              pendingConfiguration: null,
+            },
+          ],
+        },
+      ],
+    })
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
@@ -716,7 +742,33 @@ test.describe('Forex Exchange page', () => {
   })
 
   test('cross rate is correctly computed for non-EUR base (CZK base)', async ({ page }) => {
-    const player = makePlayer()
+    const player = makePlayer({
+      companies: [
+        {
+          id: 'company-prague-cross',
+          playerId: 'player-1',
+          name: 'Prague Cross Corp',
+          cash: 500000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [
+            {
+              id: 'building-prague-cross',
+              companyId: 'company-prague-cross',
+              cityId: 'city-pr',
+              type: 'FACTORY',
+              name: 'Prague Cross Factory',
+              latitude: 50.08,
+              longitude: 14.44,
+              level: 1,
+              powerConsumption: 10,
+              isForSale: false,
+              units: [],
+              pendingConfiguration: null,
+            },
+          ],
+        },
+      ],
+    })
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
