@@ -100,7 +100,7 @@ async function markAllNotificationsRead() {
       </RouterLink>
 
       <!-- Mobile menu toggle -->
-      <button class="menu-toggle ml-auto lg:hidden text-muted hover:text-body rounded-md transition-colors tap-target-44" @click="toggleMenu" :aria-expanded="isMenuOpen" aria-label="Toggle navigation menu">
+      <button class="menu-toggle ml-auto lg:hidden text-muted hover:text-body p-2 rounded-md transition-colors tap-target-44" @click="toggleMenu" :aria-expanded="isMenuOpen" aria-label="Toggle navigation menu">
         <font-awesome-icon :icon="['fas', 'bars']" />
       </button>
 
@@ -567,8 +567,5 @@ async function markAllNotificationsRead() {
     margin-left: auto;
   }
 
-  .notification-bell-btn {
-    display: none;
-  }
 }
 </style>

@@ -578,6 +578,9 @@ async function confirmPurchase() {
   border-radius: 12px;
   padding: 1.25rem;
   flex-shrink: 0;
+  align-self: start;
+  position: sticky;
+  top: 80px;
 }
 
 .detail-header {
@@ -1361,7 +1364,7 @@ async function confirmPurchase() {
 
 @media (max-width: 768px) {
   .detail-panel {
-    position: fixed !important;
+    position: fixed;
     left: 0.5rem;
     right: 0.5rem;
     bottom: 0.5rem;

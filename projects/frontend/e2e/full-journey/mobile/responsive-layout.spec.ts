@@ -6,6 +6,7 @@ const overflowViewports = [
   { label: 'tablet', width: 768, height: 1024 },
   { label: 'fullhd', width: 1920, height: 1080 },
 ] as const
+const OVERFLOW_TOLERANCE_PX = 1
 
 function seedAuthenticatedState(page: Page) {
   const player = makePlayer({
@@ -39,8 +40,8 @@ async function seedAuthenticatedStorage(page: Page, token: string) {
 async function expectNoHorizontalOverflow(page: Page) {
   // Allow a 1px tolerance to avoid false positives from sub-pixel rounding across
   // different viewport/device scale combinations in Chromium.
-  const overflowInfo = await page.evaluate(() => {
-    const hasOverflow = document.documentElement.scrollWidth > window.innerWidth + 1
+  const overflowInfo = await page.evaluate((tolerance) => {
+    const hasOverflow = document.documentElement.scrollWidth > window.innerWidth + tolerance
     const offenders = Array.from(document.querySelectorAll<HTMLElement>('body *'))
       .map((element) => {
         const rect = element.getBoundingClientRect()
@@ -51,7 +52,7 @@ async function expectNoHorizontalOverflow(page: Page) {
           right: Math.round(rect.right),
         }
       })
-      .filter((item) => item.right > window.innerWidth + 1)
+      .filter((item) => item.right > window.innerWidth + tolerance)
       .sort((a, b) => b.right - a.right)
       .slice(0, 8)
 
@@ -61,7 +62,7 @@ async function expectNoHorizontalOverflow(page: Page) {
       scrollWidth: document.documentElement.scrollWidth,
       offenders,
     }
-  })
+  }, OVERFLOW_TOLERANCE_PX)
   expect(overflowInfo.hasOverflow, JSON.stringify(overflowInfo)).toBe(false)
 }
 
@@ -142,9 +143,10 @@ test.describe('Responsive layout baseline checks', () => {
 
     await page.locator('.view-toggle .toggle-btn').nth(1).click()
     await page.locator('.lot-list-item').first().click()
+    await expect(page.locator('.detail-header')).toBeVisible()
 
-    const panelPosition = await page.locator('.detail-panel').evaluate((element) => getComputedStyle(element).position)
-    const panelBottom = await page.locator('.detail-panel').evaluate((element) => getComputedStyle(element).bottom)
+    const panelPosition = await page.locator('.detail-header').evaluate((element) => getComputedStyle(element.closest('.detail-panel') as Element).position)
+    const panelBottom = await page.locator('.detail-header').evaluate((element) => getComputedStyle(element.closest('.detail-panel') as Element).bottom)
     expect(panelPosition).toBe('fixed')
     expect(panelBottom).toBe('8px')
   })

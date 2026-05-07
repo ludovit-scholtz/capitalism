@@ -405,14 +405,12 @@ onUnmounted(() => {
   color: var(--color-primary);
 }
 
-.detail-panel {
+.empty-panel {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: 1.5rem;
   align-self: start;
-  position: sticky;
-  top: 80px;
 }
 
 .empty-panel {
