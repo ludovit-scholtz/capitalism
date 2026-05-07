@@ -153,7 +153,7 @@ public sealed class ChangelogCsvImporter(MasterDbContext db)
                 await db.SaveChangesAsync(ct);
                 imported++;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!IsCriticalException(ex))
             {
                 failures.Add((row.Id, ex.Message));
                 db.ChangeTracker.Clear();
@@ -167,6 +167,17 @@ public sealed class ChangelogCsvImporter(MasterDbContext db)
             FailedCount = failures.Count,
             Failures = failures,
         };
+    }
+
+    private static bool IsCriticalException(Exception ex)
+    {
+        return ex is OutOfMemoryException
+            or StackOverflowException
+            or AccessViolationException
+            or AppDomainUnloadedException
+            or BadImageFormatException
+            or CannotUnloadAppDomainException
+            or InvalidProgramException;
     }
 
     private static GameNewsEntry CreateEntry(ChangelogCsvRow row)

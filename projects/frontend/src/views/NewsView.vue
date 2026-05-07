@@ -129,8 +129,12 @@ async function loadFeed() {
 
   try {
     const feed = await newsStore.fetchFeed(false)
-    const unreadEntryIds = feed.items.filter((entry) => entry.status === 'PUBLISHED' && !entry.isRead).map((entry) => entry.id)
-    initiallyUnreadIds.value = new Set(unreadEntryIds)
+    if (auth.isAuthenticated) {
+      const unreadEntryIds = feed.items.filter((entry) => entry.status === 'PUBLISHED' && !entry.isRead).map((entry) => entry.id)
+      initiallyUnreadIds.value = new Set(unreadEntryIds)
+    } else {
+      initiallyUnreadIds.value = new Set()
+    }
   } catch (caughtError) {
     viewError.value = caughtError instanceof Error ? caughtError.message : t('news.loadFailed')
   }
