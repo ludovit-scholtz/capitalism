@@ -39,10 +39,12 @@ const rangeOptions: Array<{ value: OperationsRange; labelKey: string }> = [
   { value: 'LAST_30_DAYS', labelKey: 'operations.moneyFlow.ranges.last30Days' },
   { value: 'ALL_TIME', labelKey: 'operations.moneyFlow.ranges.allTime' },
 ]
+const defaultRange = rangeOptions[1]!.value
 
 const selectedRangeLabel = computed(() => {
   const selected = rangeOptions.find((option) => option.value === range.value)
-  return selected ? t(selected.labelKey) : t('operations.moneyFlow.ranges.last7Days')
+  const fallback = rangeOptions.find((option) => option.value === defaultRange) ?? rangeOptions[0]!
+  return t((selected ?? fallback).labelKey)
 })
 
 function formatCurrency(value: number) {
@@ -51,6 +53,10 @@ function formatCurrency(value: number) {
     currency: 'USD',
     maximumFractionDigits: 0,
   }).format(value)
+}
+
+function flowBarStyle(percentage: number) {
+  return { width: `${percentage}%` }
 }
 
 async function loadStatistics() {
@@ -167,7 +173,7 @@ onMounted(loadStatistics)
                 <span class="ops-positive">{{ formatCurrency(item.amount) }}</span>
               </div>
               <div class="ops-flow-bar-row">
-                <div class="ops-flow-bar ops-flow-bar-in" :style="{ width: `${item.percentage}%` }"></div>
+                <div class="ops-flow-bar ops-flow-bar-in" :style="flowBarStyle(item.percentage)"></div>
                 <span>{{ item.percentage.toFixed(1) }}%</span>
               </div>
             </li>
@@ -199,7 +205,7 @@ onMounted(loadStatistics)
                 <span class="ops-negative">{{ formatCurrency(item.amount) }}</span>
               </div>
               <div class="ops-flow-bar-row">
-                <div class="ops-flow-bar ops-flow-bar-out" :style="{ width: `${item.percentage}%` }"></div>
+                <div class="ops-flow-bar ops-flow-bar-out" :style="flowBarStyle(item.percentage)"></div>
                 <span>{{ item.percentage.toFixed(1) }}%</span>
               </div>
             </li>

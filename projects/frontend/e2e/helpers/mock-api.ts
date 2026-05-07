@@ -12,6 +12,7 @@
 import type { Page } from '@playwright/test'
 
 export const GOVERNMENT_PLAYER_EMAIL = 'government@capitalism.game'
+const MOCK_BUILDING_BASE_VALUE = 75_000
 
 export type MockPlayer = {
   id: string
@@ -2916,7 +2917,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     totalCompanyEquity: Number(
       (
         player.companies.reduce((total, company) => total + company.cash, 0)
-        + player.companies.reduce((total, company) => total + company.buildings.length * 75000, 0)
+        + player.companies.reduce((total, company) => total + company.buildings.length * MOCK_BUILDING_BASE_VALUE, 0)
       ).toFixed(2),
     ),
     companyCount: player.companies.length,

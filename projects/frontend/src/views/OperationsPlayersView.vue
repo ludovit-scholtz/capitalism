@@ -164,7 +164,7 @@ onMounted(loadPlayers)
               <td class="ops-table-secondary">{{ (player.cityNames ?? []).join(', ') || t('common.notAvailable') }}</td>
               <td class="ops-table-secondary">{{ player.companies.map((company) => company.name).join(', ') }}</td>
               <td class="ops-table-secondary">{{ formatDate(player.createdAtUtc) }}</td>
-              <td>{{ formatCurrency(player.personalCash + player.totalCompanyCash) }}</td>
+              <td>{{ formatCurrency(player.personalCash) }}</td>
               <td>{{ formatCurrency(player.totalCompanyEquity ?? player.totalCompanyCash) }}</td>
               <td class="ops-table-secondary">{{ formatDate(player.lastLoginAtUtc) }}</td>
               <td>

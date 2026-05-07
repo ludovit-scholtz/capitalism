@@ -140,7 +140,7 @@ onMounted(async () => {
         </div>
         <div class="ops-stat-card card">
           <span class="ops-stat-label">{{ t('operations.players.personalBalance') }}</span>
-          <span class="ops-stat-value">{{ formatCurrency(player.personalCash + player.totalCompanyCash) }}</span>
+          <span class="ops-stat-value">{{ formatCurrency(player.personalCash) }}</span>
         </div>
         <div class="ops-stat-card card">
           <span class="ops-stat-label">{{ t('operations.players.companyEquity') }}</span>

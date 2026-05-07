@@ -158,7 +158,7 @@ export function filterAndSortOperationsAnalyticsRows(
 
 function escapeCsvValue(value: string | number | null | undefined) {
   const raw = value == null ? '' : String(value)
-  if (raw.includes(',') || raw.includes('"') || raw.includes('\n')) {
+  if (raw.includes(',') || raw.includes('"') || raw.includes('\n') || raw.includes('\r')) {
     return `"${raw.replace(/"/g, '""')}"`
   }
 

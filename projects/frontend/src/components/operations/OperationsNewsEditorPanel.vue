@@ -39,6 +39,24 @@ function patchDraft(patch: Partial<EntryDraft>) {
   emit('update:draft', { ...props.draft, ...patch })
 }
 
+function updateEntryType(event: Event) {
+  const target = event.target
+  if (!(target instanceof HTMLSelectElement)) {
+    return
+  }
+
+  patchDraft({ entryType: target.value as GamesEntry['entryType'] })
+}
+
+function updateEntryStatus(event: Event) {
+  const target = event.target
+  if (!(target instanceof HTMLSelectElement)) {
+    return
+  }
+
+  patchDraft({ status: target.value as GamesEntry['status'] })
+}
+
 function patchLocalization(patch: Partial<GamesLocalization>) {
   const localizations = props.draft.localizations.map((localization) =>
     localization.locale === props.activeLocale ? { ...localization, ...patch } : localization,
@@ -65,7 +83,7 @@ function patchLocalization(patch: Partial<GamesLocalization>) {
         <select
           class="form-select"
           :value="draft.entryType"
-          @change="patchDraft({ entryType: ($event.target as HTMLSelectElement).value as GamesEntry['entryType'] })"
+          @change="updateEntryType"
         >
           <option value="NEWS">{{ t('operations.news.filterNews') }}</option>
           <option value="CHANGELOG">{{ t('operations.news.filterChangelog') }}</option>
@@ -76,7 +94,7 @@ function patchLocalization(patch: Partial<GamesLocalization>) {
         <select
           class="form-select"
           :value="draft.status"
-          @change="patchDraft({ status: ($event.target as HTMLSelectElement).value as GamesEntry['status'] })"
+          @change="updateEntryStatus"
         >
           <option value="DRAFT">{{ t('admin.statusDraft') }}</option>
           <option value="PUBLISHED">{{ t('admin.statusPublished') }}</option>
