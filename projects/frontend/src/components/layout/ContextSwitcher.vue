@@ -309,12 +309,15 @@ defineExpose({ closePanel })
 /* ── Responsive overrides ────────────────────────────────────────────────── */
 @media (max-width: 480px) {
   .ctx-city-name,
-  .ctx-sep {
+  .ctx-sep,
+  .ctx-account-name,
+  .ctx-account-badge {
     display: none;
   }
 
-  .ctx-account-name {
-    max-width: 6rem;
+  .ctx-trigger {
+    max-width: none;
+    padding: 0 0.55rem;
   }
 }
 </style>

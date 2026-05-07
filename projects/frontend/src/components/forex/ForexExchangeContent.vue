@@ -88,9 +88,9 @@ watch(activeTab, async (tab) => {
 
       <template v-else>
         <div class="flex flex-col gap-8">
-          <div class="flex flex-wrap gap-4" role="tablist" :aria-label="t('forex.tabsLabel')">
+          <div class="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:thin] sm:flex-wrap sm:overflow-visible" role="tablist" :aria-label="t('forex.tabsLabel')">
             <button v-for="tab in (['swap', 'transfer', 'rates', 'history', 'gold'] as const)" :key="tab" role="tab" :aria-selected="activeTab === tab"
-              class="border rounded-full px-4 py-2 text-sm font-semibold cursor-pointer transition-colors"
+              class="shrink-0 border rounded-full px-4 py-2 text-sm font-semibold cursor-pointer transition-colors"
               :class="activeTab === tab ? 'bg-brand border-brand text-white' : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
               @click="activeTab = tab">
               {{ t(tab === 'swap' ? 'forex.tabSwap' : tab === 'transfer' ? 'bankTransfer.tabLabel' : tab === 'rates' ? 'forex.tabRateList' : tab === 'history' ? 'forex.tabHistory' : 'forex.tabGold') }}

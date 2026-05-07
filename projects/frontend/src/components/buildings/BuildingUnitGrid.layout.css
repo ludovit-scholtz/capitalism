@@ -250,6 +250,19 @@
   }
 }
 
+@media (max-width: 640px) {
+  .unit-grid {
+    display: block;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .unit-grid .grid-row {
+    min-width: 330px;
+  }
+}
+
 /* ── Unit copy/paste clipboard feedback ───────────────────────────────────── */
 
 .clipboard-message {

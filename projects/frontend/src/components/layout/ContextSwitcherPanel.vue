@@ -96,6 +96,10 @@ const { t } = useI18n()
   top: calc(100% + 0.4rem);
   right: 0;
   width: min(22rem, calc(100vw - 1rem));
+  max-height: min(80vh, 34rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 0.5rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md, 8px);

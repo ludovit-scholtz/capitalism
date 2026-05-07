@@ -438,9 +438,20 @@ onUnmounted(() => {
   .city-content {
     grid-template-columns: 1fr;
   }
+}
 
-  .detail-panel {
-    position: static;
+@media (max-width: 768px) {
+  .city-content {
+    min-height: calc(100vh - 9.5rem);
+  }
+
+  .city-content.has-selection {
+    padding-bottom: min(68vh, 38rem);
+  }
+
+  .map-area,
+  .map-container {
+    min-height: calc(100vh - 14rem);
   }
 }
 </style>

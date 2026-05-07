@@ -100,7 +100,7 @@ async function markAllNotificationsRead() {
       </RouterLink>
 
       <!-- Mobile menu toggle -->
-      <button class="menu-toggle ml-auto md:hidden text-muted hover:text-body p-2 rounded-md transition-colors" @click="toggleMenu" :aria-expanded="isMenuOpen" aria-label="Toggle navigation menu">
+      <button class="menu-toggle ml-auto lg:hidden text-muted hover:text-body rounded-md transition-colors min-h-11 min-w-11" @click="toggleMenu" :aria-expanded="isMenuOpen" aria-label="Toggle navigation menu">
         <font-awesome-icon :icon="['fas', 'bars']" />
       </button>
 
@@ -108,63 +108,63 @@ async function markAllNotificationsRead() {
       <nav class="nav-links" :class="{ 'nav-open': isMenuOpen }">
         <RouterLink to="/" :title="t('nav.home')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'home']" class="mr-2" />
-          <span class="inline-block md:hidden">{{ t('nav.home') }}</span>
+          <span class="inline-block lg:hidden">{{ t('nav.home') }}</span>
         </RouterLink>
         <RouterLink v-if="auth.isAuthenticated" to="/dashboard" :title="t('nav.dashboard')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'tachometer-alt']" class="mr-2" />
-          <span class="inline-block md:hidden">{{ t('nav.dashboard') }}</span>
+          <span class="inline-block lg:hidden">{{ t('nav.dashboard') }}</span>
         </RouterLink>
         <RouterLink to="/leaderboard" :title="t('nav.leaderboard')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'trophy']" class="mr-2" />
-          <span class="inline-block md:hidden">{{ t('nav.leaderboard') }}</span>
+          <span class="inline-block lg:hidden">{{ t('nav.leaderboard') }}</span>
         </RouterLink>
         <RouterLink to="/cities" :title="t('nav.cities')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'globe']" class="mr-2" />
-          <span class="inline-block md:hidden">{{ t('nav.cities') }}</span>
+          <span class="inline-block lg:hidden">{{ t('nav.cities') }}</span>
         </RouterLink>
         <RouterLink to="/buildings/market" :title="t('nav.buildingMarket')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'store']" class="mr-2" />
-          <span class="inline-block md:hidden">{{ t('nav.buildingMarket') }}</span>
+          <span class="inline-block lg:hidden">{{ t('nav.buildingMarket') }}</span>
         </RouterLink>
         <RouterLink to="/encyclopedia" :title="t('nav.encyclopedia')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'book']" class="mr-2" />
-          <span class="inline-block md:hidden">{{ t('nav.encyclopedia') }}</span>
+          <span class="inline-block lg:hidden">{{ t('nav.encyclopedia') }}</span>
         </RouterLink>
         <RouterLink to="/exchange" :title="t('nav.exchange')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'chart-bar']" class="mr-2" />
-          <span class="inline-block md:hidden">{{ t('nav.exchange') }}</span>
+          <span class="inline-block lg:hidden">{{ t('nav.exchange') }}</span>
         </RouterLink>
         <RouterLink to="/stocks" :title="t('nav.stocks')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'wallet']" class="mr-2" />
-          <span class="inline-block md:hidden">{{ t('nav.stocks') }}</span>
+          <span class="inline-block lg:hidden">{{ t('nav.stocks') }}</span>
         </RouterLink>
         <RouterLink v-if="auth.isAuthenticated" to="/forex" :title="t('nav.forex')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'coins']" class="mr-2" />
-          <span class="inline-block md:hidden">{{ t('nav.forex') }}</span>
+          <span class="inline-block lg:hidden">{{ t('nav.forex') }}</span>
         </RouterLink>
         <RouterLink v-if="auth.isAuthenticated" to="/bank-statement" :title="t('nav.bankStatement')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'file-invoice-dollar']" class="mr-2" />
-          <span class="inline-block md:hidden">{{ t('nav.bankStatement') }}</span>
+          <span class="inline-block lg:hidden">{{ t('nav.bankStatement') }}</span>
         </RouterLink>
         <RouterLink v-if="auth.isAuthenticated" to="/market-intelligence" :title="t('nav.campaignAnalytics')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'bullhorn']" class="mr-2" />
-          <span class="inline-block md:hidden">{{ t('nav.campaignAnalytics') }}</span>
+          <span class="inline-block lg:hidden">{{ t('nav.campaignAnalytics') }}</span>
         </RouterLink>
         <RouterLink to="/banking" :title="t('nav.banking')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'landmark']" class="mr-2" />
-          <span class="inline-block md:hidden">{{ t('nav.banking') }}</span>
+          <span class="inline-block lg:hidden">{{ t('nav.banking') }}</span>
         </RouterLink>
         <RouterLink v-if="auth.isAuthenticated" to="/trade-routes" :title="t('tradeRoutes.nav')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'route']" class="mr-2" />
-          <span class="inline-block md:hidden">{{ t('tradeRoutes.nav') }}</span>
+          <span class="inline-block lg:hidden">{{ t('tradeRoutes.nav') }}</span>
         </RouterLink>
         <RouterLink to="/tutorial" :title="t('nav.tutorial')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'graduation-cap']" class="mr-2" />
-          <span class="inline-block md:hidden">{{ t('nav.tutorial') }}</span>
+          <span class="inline-block lg:hidden">{{ t('nav.tutorial') }}</span>
         </RouterLink>
         <RouterLink to="/news" :title="t('nav.news')" :aria-label="t('nav.news')" class="nav-link nav-link-badge-host" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'newspaper']" class="mr-2" />
-          <span class="inline-block md:hidden">{{ t('nav.news') }}</span>
+          <span class="inline-block lg:hidden">{{ t('nav.news') }}</span>
           <span v-if="showUnreadBadge" class="nav-badge nav-badge-news news-badge">{{ unreadCount }}</span>
         </RouterLink>
         <button
@@ -177,22 +177,24 @@ async function markAllNotificationsRead() {
           @click="handleChatToggle"
         >
           <font-awesome-icon :icon="['fas', 'comments']" class="mr-2" />
-          <span class="inline-block md:hidden">{{ t('nav.chat') }}</span>
+          <span class="inline-block lg:hidden">{{ t('nav.chat') }}</span>
           <span v-if="chatUnreadCount > 0" class="nav-badge nav-badge-chat chat-badge">{{ chatUnreadCount }}</span>
         </button>
         <RouterLink v-if="session?.canAccessAdminDashboard" to="/admin" :title="t('nav.admin')" :aria-label="t('nav.admin')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'shield-halved']" class="mr-2" />
-          <span class="inline-block md:hidden">{{ t('nav.admin') }}</span>
+          <span class="inline-block lg:hidden">{{ t('nav.admin') }}</span>
         </RouterLink>
         <RouterLink v-if="session?.canAccessAdminDashboard" to="/operations" :title="t('nav.operations')" :aria-label="t('nav.operations')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'chart-line']" class="mr-2" />
-          <span class="inline-block md:hidden">{{ t('nav.operations') }}</span>
+          <span class="inline-block lg:hidden">{{ t('nav.operations') }}</span>
         </RouterLink>
       </nav>
 
       <!-- Right-side actions -->
       <div class="header-actions flex items-center gap-3 shrink-0">
-        <GameTimeChip />
+        <div class="hidden xl:block">
+          <GameTimeChip />
+        </div>
 
         <!-- Impersonation chip -->
         <div
@@ -204,7 +206,7 @@ async function markAllNotificationsRead() {
 
         <template v-if="auth.isAuthenticated">
           <button
-            class="btn btn-secondary h-9 w-9 p-0 justify-center relative notification-bell-btn"
+            class="btn btn-secondary h-11 w-11 p-0 justify-center relative notification-bell-btn"
             :title="t('notifications.title')"
             :aria-label="t('notifications.title')"
             :aria-expanded="isNotificationsOpen"
@@ -215,7 +217,7 @@ async function markAllNotificationsRead() {
           </button>
           <ContextSwitcher @switched="closeMenu" />
           <button
-            class="btn btn-secondary h-9 w-9 p-0 justify-center"
+            class="btn btn-secondary h-11 w-11 p-0 justify-center"
             @click="
               () => {
                 auth.logout({ federated: true })
@@ -493,7 +495,7 @@ async function markAllNotificationsRead() {
   font-size: 1.25rem;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .menu-toggle {
     display: block;
     order: 2;
@@ -546,8 +548,22 @@ async function markAllNotificationsRead() {
 }
 
 @media (max-width: 640px) {
+  .container {
+    gap: 0.5rem;
+    padding-inline: 0.5rem;
+  }
+
+  .logo-text {
+    font-size: 1.05rem;
+  }
+
   .header-actions {
     gap: 0.5rem;
+    margin-left: auto;
+  }
+
+  .notification-bell-btn {
+    display: none;
   }
 }
 </style>
