@@ -18,7 +18,7 @@ namespace Api.Types;
 /// </summary>
 public sealed partial class Mutation
 {
-    private static async Task<(List<Company> Companies, List<Shareholding> Shareholdings, Dictionary<Guid, decimal> SharePrices)> LoadSharePricingSnapshotAsync(AppDbContext db)
+    private static async Task<(List<Company> Companies, List<Shareholding> Shareholdings, Dictionary<Guid, decimal> SharePrices, HashSet<Guid> GovernmentCompanyIds)> LoadSharePricingSnapshotAsync(AppDbContext db)
     {
         var companies = await db.Companies
             .Include(company => company.BankAccounts)
@@ -56,8 +56,20 @@ public sealed partial class Mutation
                 4,
                 MidpointRounding.AwayFromZero));
 
-        return (companies, shareholdings, sharePricesUsd);
+        var governmentCompanyIds = await GovernmentCompanyQueries.GetGovernmentCompanyIdsAsync(db);
+
+        return (companies, shareholdings, sharePricesUsd, governmentCompanyIds);
     }
+
+    private static bool IsGovernmentCompany(HashSet<Guid> governmentCompanyIds, Company? company)
+        => company is not null && governmentCompanyIds.Contains(company.Id);
+
+    private static GraphQLException CreateGovernmentSharesNotTradeableException()
+        => new(
+            ErrorBuilder.New()
+                .SetMessage("Government company shares cannot be traded on the stock exchange.")
+                .SetCode("GOVERNMENT_SHARES_NOT_TRADEABLE")
+                .Build());
 
     private static async Task<BankAccount> ResolveTradeSettlementBankAccountAsync(
         AppDbContext db,

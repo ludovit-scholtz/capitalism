@@ -17,9 +17,11 @@ public sealed partial class Query
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
+        var governmentCompanyIds = await GovernmentCompanyQueries.GetGovernmentCompanyIdsAsync(db);
         var companies = await db.Companies
             .AsNoTracking()
             .Include(company => company.BankAccounts)
+            .Where(company => !governmentCompanyIds.Contains(company.Id))
             .OrderBy(company => company.Name)
             .ToListAsync();
         var buildings = await db.Buildings
@@ -112,9 +114,11 @@ public sealed partial class Query
         Guid companyId,
         [Service] AppDbContext db)
     {
+        var governmentCompanyIds = await GovernmentCompanyQueries.GetGovernmentCompanyIdsAsync(db);
         var companies = await db.Companies
             .AsNoTracking()
             .Include(company => company.BankAccounts)
+            .Where(company => !governmentCompanyIds.Contains(company.Id))
             .OrderBy(company => company.Name)
             .ToListAsync();
         var targetCompany = companies.FirstOrDefault(company => company.Id == companyId);
@@ -203,6 +207,12 @@ public sealed partial class Query
         Guid companyId,
         [Service] AppDbContext db)
     {
+        var governmentCompanyIds = await GovernmentCompanyQueries.GetGovernmentCompanyIdsAsync(db);
+        if (governmentCompanyIds.Contains(companyId))
+        {
+            return null;
+        }
+
         var company = await db.Companies
             .AsNoTracking()
             .FirstOrDefaultAsync(candidate => candidate.Id == companyId);
