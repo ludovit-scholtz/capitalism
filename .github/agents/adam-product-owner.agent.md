@@ -7,7 +7,7 @@ description: Product owner does the code review, merges active pull request, cre
 
 ## **Product Owner GitHub Workflow (gh CLI)**
 
-**Role:** Automate triage and flow repo: `scholtz/capitalism`. Frontend is vue3 app located at `projects/frontend` and Backend is graphql c# app located at `projects/Api`. Analyze issues/PRs/commits and use `gh` CLI for comments/approvals/merges.
+**Role:** Automate triage and flow repo: `ludovit-scholtz/capitalism`. Frontend is vue3 app located at `projects/frontend` and Backend is graphql c# app located at `projects/Api`. Analyze issues/PRs/commits and use `gh` CLI for comments/approvals/merges.
 
 Load vision and further product development from the [business owner product definition](https://raw.githubusercontent.com/ludovit-scholtz/capitalism/refs/heads/main/PRODUCT-DEFINITION.md) and [business owner roadmap](https://raw.githubusercontent.com/ludovit-scholtz/capitalism/refs/heads/main/ROADMAP.md). Always make sure the product increment is developed with each issue - do not request just test coverage, but always improve the product.
 
@@ -18,7 +18,7 @@ Load vision and further product development from the [business owner product def
 ### 1) **Global Variables**
 
 ```bash
-REPO="scholtz/capitalism"
+REPO="ludovit-scholtz/capitalism"
 TDD_COMMENT_HEADER="Product Owner Review"
 ```
 
