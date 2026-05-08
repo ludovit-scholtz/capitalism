@@ -26,6 +26,13 @@ public static class MasterRankingBountyCodes
     public const string TopPlayer = "TOP_PLAYER";
     public const string GreatPlayer = "GREAT_PLAYER";
     public const string CompanyMaster = "COMPANY_MASTER";
+    public const string TutorialFirstResourceSold = "TUTORIAL_FIRST_RESOURCE_SOLD";
+    public const string TutorialFirstB2BTrade = "TUTORIAL_FIRST_B2B_TRADE";
+    public const string TutorialFirstLoanTaken = "TUTORIAL_FIRST_LOAN_TAKEN";
+    public const string TutorialFirstCompetitorObserved = "TUTORIAL_FIRST_COMPETITOR_OBSERVED";
+    public const string TutorialFirstBrandEstablished = "TUTORIAL_FIRST_BRAND_ESTABLISHED";
+    public const string TutorialFirstBuildingDetailVisit = "TUTORIAL_FIRST_BUILDING_DETAIL_VISIT";
+    public const string TutorialFirstGridEditorOpen = "TUTORIAL_FIRST_GRID_EDITOR_OPEN";
 
     public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal)
     {
@@ -50,5 +57,12 @@ public static class MasterRankingBountyCodes
         TopPlayer,
         GreatPlayer,
         CompanyMaster,
+        TutorialFirstResourceSold,
+        TutorialFirstB2BTrade,
+        TutorialFirstLoanTaken,
+        TutorialFirstCompetitorObserved,
+        TutorialFirstBrandEstablished,
+        TutorialFirstBuildingDetailVisit,
+        TutorialFirstGridEditorOpen,
     };
 }

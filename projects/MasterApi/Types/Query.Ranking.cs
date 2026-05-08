@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Capitalism.Shared.Ranking;
 using MasterApi.Configuration;
 using MasterApi.Data;
 using MasterApi.Data.Entities;
@@ -59,6 +60,51 @@ public sealed partial class Query
                 RankMovement = snapshot.PreviousGlobalRank - snapshot.GlobalRank,
             })
             .ToListAsync();
+    }
+
+    public async Task<List<TutorialBountyStatusInfo>> GetTutorialBountyStatuses(
+        GetTutorialBountyStatusesInput input,
+        [Service] MasterDbContext db,
+        [Service] IOptions<MasterServerOptions> masterServerOptions)
+    {
+        Query.EnsureServiceAccess(input, masterServerOptions, requireRegistrationKey: true, requireServerKey: false);
+
+        var playerEmail = Query.NormalizeEmail(input.PlayerEmail, "INVALID_PLAYER_EMAIL");
+        var playerId = await db.PlayerAccounts
+            .AsNoTracking()
+            .Where(player => player.Email == playerEmail)
+            .Select(player => (Guid?)player.Id)
+            .FirstOrDefaultAsync();
+
+        Dictionary<string, MasterRankingRewardRecord>? rewardsByCode = null;
+        if (playerId.HasValue)
+        {
+            var tutorialBountyCodes = TutorialRankingBountyCatalog.ByBountyCode.Keys.ToList();
+            rewardsByCode = await db.MasterRankingRewardRecords
+                .AsNoTracking()
+                .Include(record => record.BountyDefinition)
+                .Where(record => record.PlayerAccountId == playerId.Value && record.Status == RankingRewardStatus.Awarded)
+                .Where(record => tutorialBountyCodes.Contains(record.BountyDefinition.Code))
+                .GroupBy(record => record.BountyDefinition.Code)
+                .Select(group => group.OrderByDescending(item => item.AwardedAtUtc).First())
+                .ToDictionaryAsync(record => record.BountyDefinition.Code, StringComparer.Ordinal);
+        }
+
+        return TutorialRankingBountyCatalog.All
+            .Select(entry =>
+            {
+                MasterRankingRewardRecord? reward = null;
+                var hasReward = rewardsByCode is not null && rewardsByCode.TryGetValue(entry.BountyCode, out reward);
+                return new TutorialBountyStatusInfo
+                {
+                    Milestone = entry.Milestone,
+                    BountyCode = entry.BountyCode,
+                    IsAwarded = hasReward,
+                    AwardedAtUtc = reward?.AwardedAtUtc,
+                    RewardPoints = entry.RewardPoints,
+                };
+            })
+            .ToList();
     }
 
     [HotChocolate.Authorization.Authorize]

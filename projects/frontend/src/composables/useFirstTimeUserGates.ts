@@ -1,13 +1,16 @@
 import { ref, computed } from 'vue'
-import { useAuthStore } from '@/stores/auth'
-import { gqlRequest } from '@/lib/graphql'
-import type { TutorialMilestoneStatus } from '@/types'
+import {
+  useTutorialContext,
+  MILESTONE_TOOLTIP_DASHBOARD_SHOWN,
+  MILESTONE_FIRST_BUILDING_DETAIL_VISIT,
+  MILESTONE_FIRST_GRID_EDITOR_OPEN,
+} from '@/composables/useTutorialContext'
 
 // ─── Tooltip milestone identifiers ────────────────────────────────────────────
 
-export const TOOLTIP_DASHBOARD_SHOWN = 'TOOLTIP_DASHBOARD_SHOWN'
-export const TOOLTIP_BUILDING_DETAIL_SHOWN = 'TOOLTIP_BUILDING_DETAIL_SHOWN'
-export const TOOLTIP_GRID_EDITOR_SHOWN = 'TOOLTIP_GRID_EDITOR_SHOWN'
+export const TOOLTIP_DASHBOARD_SHOWN = MILESTONE_TOOLTIP_DASHBOARD_SHOWN
+export const TOOLTIP_BUILDING_DETAIL_SHOWN = MILESTONE_FIRST_BUILDING_DETAIL_VISIT
+export const TOOLTIP_GRID_EDITOR_SHOWN = MILESTONE_FIRST_GRID_EDITOR_OPEN
 
 // ─── Session storage keys (fallback for unauthenticated users) ────────────────
 
@@ -31,18 +34,6 @@ function ssSet(key: string): void {
   }
 }
 
-// ─── GraphQL ──────────────────────────────────────────────────────────────────
-
-const MARK_TOOLTIP_MUTATION = `
-  mutation MarkTutorialMilestoneComplete($input: MarkTutorialMilestoneCompleteInput!) {
-    markTutorialMilestoneComplete(input: $input) {
-      milestone
-      isCompleted
-      completedAtUtc
-    }
-  }
-`
-
 // ─── Composable ───────────────────────────────────────────────────────────────
 
 /**
@@ -52,7 +43,7 @@ const MARK_TOOLTIP_MUTATION = `
  * sessions for authenticated players).
  */
 export function useFirstTimeUserGates() {
-  const auth = useAuthStore()
+  const { completeMilestone } = useTutorialContext()
 
   // ── reactive dismissed flags ────────────────────────────────────────────────
   const dashboardDismissed = ref(ssGet(SS_DASHBOARD))
@@ -66,12 +57,8 @@ export function useFirstTimeUserGates() {
 
   // ── backend sync helper ─────────────────────────────────────────────────────
   async function persistToBackend(milestone: string): Promise<void> {
-    if (!auth.isAuthenticated) return
     try {
-      await gqlRequest<{ markTutorialMilestoneComplete: TutorialMilestoneStatus }>(
-        MARK_TOOLTIP_MUTATION,
-        { input: { milestone } },
-      )
+      await completeMilestone(milestone)
     } catch {
       // Non-critical: silently ignore persistence failures
     }

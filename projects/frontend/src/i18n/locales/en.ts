@@ -3533,6 +3533,7 @@ export default {
     pointsEarned: '{earned}/{total} pts earned',
     resume: 'Resume',
     done: 'Done',
+    bountyEarned: 'Bounty Earned ✓',
     completedAria: 'Completed',
     pendingAria: 'Pending',
     authNotice: 'Sign in to track your progress and earn bounty points for each milestone.',
@@ -3569,6 +3570,16 @@ export default {
         desc: 'Invest in branding for your product and achieve measurable brand awareness.',
         value: 'Discover how brand quality boosts demand and lets you charge premium prices.',
       },
+      firstBuildingDetailVisit: {
+        title: 'First Building Detail Visit',
+        desc: 'Open a building detail page and review the 4×4 unit grid, unit roles, and available actions.',
+        value: 'Learn where Mining, Storage, Purchase, Manufacturing, and Sales units are configured.',
+      },
+      firstGridEditorOpen: {
+        title: 'First Grid Editor Open',
+        desc: 'Enter edit mode in a building and open the grid editor for the first time.',
+        value: 'Learn active/inactive links plus diagonal connections to design efficient production chains.',
+      },
     },
     tooltips: {
       gridEditorIntro: {
@@ -3589,11 +3600,11 @@ export default {
       },
       buildingDetailOverlay: {
         title: 'Building Detail View',
-        body: 'Here you can inspect every unit in your building, configure production chains, and queue upgrades. Click any grid cell to select a unit and see its current settings.',
+        body: 'Here you can inspect the 4×4 unit grid, review unit types (Mining, Storage, Purchase, Manufacturing, and Sales), configure production chains, and queue upgrades. Click any grid cell to inspect and plan the unit.',
       },
       gridEditorOverlay: {
         title: 'Unit Grid Editor',
-        body: 'Drag unit tiles into the grid to set up your production layout. Link units together to form efficient production chains. Visit the Tutorial page for a step-by-step guide.',
+        body: 'Drag unit tiles to shape your layout. Toggle links to connect units and route materials between neighbors, including diagonal links for advanced chains. Active links send flow, inactive links stop flow.',
       },
     },
   },

@@ -3536,6 +3536,7 @@ export default {
     pointsEarned: '{earned}/{total} Punkte verdient',
     resume: 'Fortsetzen',
     done: 'Fertig',
+    bountyEarned: 'Bounty verdient ✓',
     completedAria: 'Abgeschlossen',
     pendingAria: 'Ausstehend',
     authNotice: 'Melden Sie sich an, um Ihren Fortschritt zu verfolgen und Bonuspunkte für jeden Meilenstein zu verdienen.',
@@ -3572,6 +3573,16 @@ export default {
         desc: 'Investieren Sie in das Branding Ihres Produkts und erreichen Sie messbares Markenbewusstsein.',
         value: 'Entdecken Sie, wie Markenqualität die Nachfrage steigert und Premiumpreise ermöglicht.',
       },
+      firstBuildingDetailVisit: {
+        title: 'Erster Besuch der Gebäudedetails',
+        desc: 'Öffnen Sie die Gebäudedetailseite und prüfen Sie das 4×4-Einheitenraster, Einheitentypen und Aktionen.',
+        value: 'Lernen Sie, wo Mining-, Lager-, Einkaufs-, Produktions- und Verkaufseinheiten konfiguriert werden.',
+      },
+      firstGridEditorOpen: {
+        title: 'Erstes Öffnen des Raster-Editors',
+        desc: 'Wechseln Sie in den Bearbeitungsmodus und öffnen Sie erstmals den Raster-Editor.',
+        value: 'Lernen Sie aktive/inaktive Verbindungen und diagonale Verknüpfungen für effiziente Produktionsketten.',
+      },
     },
     tooltips: {
       gridEditorIntro: {
@@ -3592,11 +3603,11 @@ export default {
       },
       buildingDetailOverlay: {
         title: 'Gebäudedetailansicht',
-        body: 'Hier können Sie jede Einheit Ihres Gebäudes einsehen, Produktionsketten konfigurieren und Upgrades einreihen. Klicken Sie auf eine Rasterzelle, um eine Einheit auszuwählen und ihre Einstellungen zu sehen.',
+        body: 'Hier sehen Sie das 4×4-Einheitenraster, die Einheitentypen (Mining, Lager, Einkauf, Produktion, Verkauf), konfigurieren Produktionsketten und planen Upgrades. Klicken Sie auf eine Zelle, um die Einheit zu prüfen.',
       },
       gridEditorOverlay: {
         title: 'Einheiten-Raster-Editor',
-        body: 'Ziehen Sie Einheitenkacheln in das Raster, um Ihr Produktionslayout einzurichten. Verbinden Sie Einheiten für effiziente Produktionsketten. Besuchen Sie die Tutorial-Seite für eine Schritt-für-Schritt-Anleitung.',
+        body: 'Ziehen Sie Einheitenkacheln, um Ihr Layout aufzubauen. Schalten Sie Verbindungen zwischen Nachbareinheiten um – auch diagonal. Aktive Verbindungen leiten Materialfluss, inaktive stoppen den Fluss.',
       },
     },
   },

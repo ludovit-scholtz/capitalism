@@ -4,6 +4,10 @@ using System.Text.Json;
 using Api.Data;
 using Api.Data.Entities;
 using Api.Tests.Infrastructure;
+using Api.Types;
+using Api.Utilities;
+using Capitalism.Shared.Ranking;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Api.Tests;
@@ -14,6 +18,68 @@ namespace Api.Tests;
 /// </summary>
 public sealed class TutorialProgressTests
 {
+    private sealed class CapturingTutorialTelemetryService : IMasterRankingTelemetryService
+    {
+        public List<(string EventType, string Email, string? UniqueScopeKey)> Calls { get; } = [];
+
+        public Task ReportEventAsync(string eventType, string playerEmail, string? uniqueScopeKey = null, string? externalEventId = null, CancellationToken cancellationToken = default)
+        {
+            Calls.Add((eventType, playerEmail, uniqueScopeKey));
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class StubMasterGameAdministrationService : IMasterGameAdministrationService
+    {
+        public List<TutorialBountyStatusResult> TutorialBounties { get; } = [];
+
+        public Task<MasterGameAdministrationAccessSnapshot> GetGameAdministrationAccessAsync(string email, CancellationToken cancellationToken = default) => Task.FromResult(new MasterGameAdministrationAccessSnapshot(false, false, false));
+
+        public Task<IReadOnlyList<GlobalGameAdminGrantSummary>> GetGlobalGameAdminGrantsAsync(string requesterEmail, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<GlobalGameAdminGrantSummary>>([]);
+
+        public Task<GlobalGameAdminGrantSummary> AssignGlobalGameAdminAsync(string requesterEmail, string targetEmail, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task RemoveGlobalGameAdminAsync(string requesterEmail, string targetEmail, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<GameNewsFeedResult> GetGameNewsFeedAsync(string? playerEmail, bool includeDrafts, string? requesterEmail, CancellationToken cancellationToken = default) => Task.FromResult(new GameNewsFeedResult());
+
+        public Task MarkGameNewsReadAsync(string playerEmail, IReadOnlyCollection<Guid> entryIds, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task<int> MarkAllGameNewsReadAsync(string playerEmail, CancellationToken cancellationToken = default) => Task.FromResult(0);
+
+        public Task<GameNewsEntryResult> UpsertGameNewsEntryAsync(string requesterEmail, Guid? entryId, string entryType, string status, IReadOnlyList<GameNewsLocalizationInput> localizations, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<TutorialBountyStatusResult>> GetTutorialBountyStatusesAsync(string playerEmail, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<TutorialBountyStatusResult>>(TutorialBounties);
+    }
+
+    private sealed class TutorialBountyAwareFactory(
+        CapturingTutorialTelemetryService telemetry,
+        StubMasterGameAdministrationService masterStub) : ApiWebApplicationFactory
+    {
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            ApplyBaseConfiguration(builder);
+            builder.ConfigureServices(services =>
+            {
+                var telemetryDescriptor = services.FirstOrDefault(item => item.ServiceType == typeof(IMasterRankingTelemetryService));
+                if (telemetryDescriptor is not null)
+                {
+                    services.Remove(telemetryDescriptor);
+                }
+
+                var adminDescriptor = services.FirstOrDefault(item => item.ServiceType == typeof(IMasterGameAdministrationService));
+                if (adminDescriptor is not null)
+                {
+                    services.Remove(adminDescriptor);
+                }
+
+                services.AddScoped<IMasterRankingTelemetryService>(_ => telemetry);
+                services.AddScoped<IMasterGameAdministrationService>(_ => masterStub);
+            });
+        }
+    }
+
     // ──────────────────────────────────────────────────────────────────────────
     // GraphQL helpers
     // ──────────────────────────────────────────────────────────────────────────
@@ -72,7 +138,7 @@ public sealed class TutorialProgressTests
         var result = await ExecAsync(client, "{ tutorialProgress { milestone isCompleted completedAtUtc } }", token: token);
 
         var milestones = result.GetProperty("data").GetProperty("tutorialProgress");
-        // 5 original milestones + 3 tooltip overlay milestones = 8 total
+        // 5 tutorial milestones + 2 contextual milestones + 1 dashboard tooltip milestone = 8 total
         Assert.Equal(TutorialMilestone.All.Count, milestones.GetArrayLength());
 
         foreach (var m in milestones.EnumerateArray())
@@ -104,8 +170,8 @@ public sealed class TutorialProgressTests
         Assert.Contains("FIRST_BRAND_ESTABLISHED", returned);
         // Tooltip overlay milestones
         Assert.Contains("TOOLTIP_DASHBOARD_SHOWN", returned);
-        Assert.Contains("TOOLTIP_BUILDING_DETAIL_SHOWN", returned);
-        Assert.Contains("TOOLTIP_GRID_EDITOR_SHOWN", returned);
+        Assert.Contains("FIRST_BUILDING_DETAIL_VISIT", returned);
+        Assert.Contains("FIRST_GRID_EDITOR_OPEN", returned);
     }
 
     [Fact]
@@ -239,15 +305,14 @@ public sealed class TutorialProgressTests
         foreach (var m in milestones)
             Assert.Contains(m, completedSet);
 
-        // The 3 tooltip milestones were NOT explicitly marked, so they remain false
+        // Context milestones were NOT explicitly marked, so they remain false
         Assert.DoesNotContain("TOOLTIP_DASHBOARD_SHOWN", completedSet);
-        Assert.DoesNotContain("TOOLTIP_BUILDING_DETAIL_SHOWN", completedSet);
-        Assert.DoesNotContain("TOOLTIP_GRID_EDITOR_SHOWN", completedSet);
+        Assert.DoesNotContain("FIRST_BUILDING_DETAIL_VISIT", completedSet);
+        Assert.DoesNotContain("FIRST_GRID_EDITOR_OPEN", completedSet);
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // Tooltip-overlay milestone tests (new contextual tooltips for dashboard
-    // and building-detail views — TOOLTIP_DASHBOARD_SHOWN, etc.)
+    // Tooltip/context milestone tests
     // ──────────────────────────────────────────────────────────────────────────
 
     [Fact]
@@ -274,12 +339,12 @@ public sealed class TutorialProgressTests
         Assert.True(dashMilestone.GetProperty("isCompleted").GetBoolean());
 
         // Other tooltip milestones must remain incomplete
-        var detailMilestone = milestones.First(m => m.GetProperty("milestone").GetString() == "TOOLTIP_BUILDING_DETAIL_SHOWN");
+        var detailMilestone = milestones.First(m => m.GetProperty("milestone").GetString() == "FIRST_BUILDING_DETAIL_VISIT");
         Assert.False(detailMilestone.GetProperty("isCompleted").GetBoolean());
     }
 
     [Fact]
-    public async Task MarkTutorialMilestoneComplete_TooltipBuildingDetailShown_PersistsCorrectly()
+    public async Task MarkTutorialMilestoneComplete_FirstBuildingDetailVisit_PersistsCorrectly()
     {
         await using var factory = new ApiWebApplicationFactory();
         var client = factory.CreateClient();
@@ -287,17 +352,17 @@ public sealed class TutorialProgressTests
 
         var result = await ExecAsync(client,
             "mutation M($i: MarkTutorialMilestoneCompleteInput!) { markTutorialMilestoneComplete(input: $i) { milestone isCompleted completedAtUtc } }",
-            new { i = new { milestone = "TOOLTIP_BUILDING_DETAIL_SHOWN" } },
+            new { i = new { milestone = "FIRST_BUILDING_DETAIL_VISIT" } },
             token: token);
 
         var payload = result.GetProperty("data").GetProperty("markTutorialMilestoneComplete");
-        Assert.Equal("TOOLTIP_BUILDING_DETAIL_SHOWN", payload.GetProperty("milestone").GetString());
+        Assert.Equal("FIRST_BUILDING_DETAIL_VISIT", payload.GetProperty("milestone").GetString());
         Assert.True(payload.GetProperty("isCompleted").GetBoolean());
         Assert.NotEqual(JsonValueKind.Null, payload.GetProperty("completedAtUtc").ValueKind);
     }
 
     [Fact]
-    public async Task MarkTutorialMilestoneComplete_TooltipGridEditorShown_PersistsCorrectly()
+    public async Task MarkTutorialMilestoneComplete_FirstGridEditorOpen_PersistsCorrectly()
     {
         await using var factory = new ApiWebApplicationFactory();
         var client = factory.CreateClient();
@@ -305,11 +370,11 @@ public sealed class TutorialProgressTests
 
         var result = await ExecAsync(client,
             "mutation M($i: MarkTutorialMilestoneCompleteInput!) { markTutorialMilestoneComplete(input: $i) { milestone isCompleted completedAtUtc } }",
-            new { i = new { milestone = "TOOLTIP_GRID_EDITOR_SHOWN" } },
+            new { i = new { milestone = "FIRST_GRID_EDITOR_OPEN" } },
             token: token);
 
         var payload = result.GetProperty("data").GetProperty("markTutorialMilestoneComplete");
-        Assert.Equal("TOOLTIP_GRID_EDITOR_SHOWN", payload.GetProperty("milestone").GetString());
+        Assert.Equal("FIRST_GRID_EDITOR_OPEN", payload.GetProperty("milestone").GetString());
         Assert.True(payload.GetProperty("isCompleted").GetBoolean());
         Assert.NotEqual(JsonValueKind.Null, payload.GetProperty("completedAtUtc").ValueKind);
     }
@@ -327,8 +392,8 @@ public sealed class TutorialProgressTests
         var tooltipMilestones = new[]
         {
             "TOOLTIP_DASHBOARD_SHOWN",
-            "TOOLTIP_BUILDING_DETAIL_SHOWN",
-            "TOOLTIP_GRID_EDITOR_SHOWN",
+            "FIRST_BUILDING_DETAIL_VISIT",
+            "FIRST_GRID_EDITOR_OPEN",
         };
 
         // Mark each twice — must succeed both times without duplicate DB rows
@@ -408,5 +473,53 @@ public sealed class TutorialProgressTests
         var p1Progress = p1Result.GetProperty("data").GetProperty("tutorialProgress").EnumerateArray().ToList();
         var brandMilestone = p1Progress.First(m => m.GetProperty("milestone").GetString() == "FIRST_BRAND_ESTABLISHED");
         Assert.True(brandMilestone.GetProperty("isCompleted").GetBoolean());
+    }
+
+    [Fact]
+    public async Task MarkTutorialMilestoneComplete_FirstGridEditorOpen_EmitsTutorialBountyTelemetry()
+    {
+        var telemetry = new CapturingTutorialTelemetryService();
+        var masterStub = new StubMasterGameAdministrationService();
+        await using var factory = new TutorialBountyAwareFactory(telemetry, masterStub);
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "tutorial-bounty-emit@test.com");
+
+        await ExecAsync(client,
+            "mutation M($i: MarkTutorialMilestoneCompleteInput!) { markTutorialMilestoneComplete(input: $i) { milestone isCompleted } }",
+            new { i = new { milestone = "FIRST_GRID_EDITOR_OPEN" } },
+            token: token);
+
+        Assert.Contains(telemetry.Calls, call => call.EventType == MasterRankingBountyCodes.TutorialFirstGridEditorOpen);
+    }
+
+    [Fact]
+    public async Task GetTutorialProgress_BountyAwardedMarksMilestoneCompleted()
+    {
+        var telemetry = new CapturingTutorialTelemetryService();
+        var masterStub = new StubMasterGameAdministrationService();
+        masterStub.TutorialBounties.Add(new TutorialBountyStatusResult
+        {
+            Milestone = "FIRST_LOAN_TAKEN",
+            BountyCode = MasterRankingBountyCodes.TutorialFirstLoanTaken,
+            IsAwarded = true,
+            AwardedAtUtc = DateTime.UtcNow,
+            RewardPoints = 60m,
+        });
+
+        await using var factory = new TutorialBountyAwareFactory(telemetry, masterStub);
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "tutorial-bounty-truth@test.com");
+
+        var progressResult = await ExecAsync(client,
+            "{ tutorialProgress { milestone isCompleted completedAtUtc bountyAwarded bountyAwardedAtUtc bountyPoints } }",
+            token: token);
+
+        var milestones = progressResult.GetProperty("data").GetProperty("tutorialProgress").EnumerateArray().ToList();
+        var loanMilestone = milestones.First(item => item.GetProperty("milestone").GetString() == "FIRST_LOAN_TAKEN");
+
+        Assert.True(loanMilestone.GetProperty("isCompleted").GetBoolean());
+        Assert.True(loanMilestone.GetProperty("bountyAwarded").GetBoolean());
+        Assert.NotEqual(JsonValueKind.Null, loanMilestone.GetProperty("bountyAwardedAtUtc").ValueKind);
+        Assert.Equal(60m, loanMilestone.GetProperty("bountyPoints").GetDecimal());
     }
 }

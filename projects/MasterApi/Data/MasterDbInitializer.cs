@@ -1,4 +1,5 @@
 using MasterApi.Data.Entities;
+using Capitalism.Shared.Ranking;
 using Microsoft.EntityFrameworkCore;
 
 namespace MasterApi.Data;
@@ -275,6 +276,16 @@ public sealed class MasterDbInitializer(MasterDbContext db, ILogger<MasterDbInit
             BuildDefaultDefinition(MasterRankingBountyCodes.GreatPlayer, "Great player", "Player rank is in the top hundred.", 2m, RankingCooldownMode.UtcDay, RankingProofRequirement.None, RankingVisibilityScope.PlayerHistory),
             BuildDefaultDefinition(MasterRankingBountyCodes.CompanyMaster, "Company master", "Any owned company rank is in top ten.", 5m, RankingCooldownMode.UtcDay, RankingProofRequirement.None, RankingVisibilityScope.PlayerHistory),
         };
+
+        defaults.AddRange(TutorialRankingBountyCatalog.All.Select(item =>
+            BuildDefaultDefinition(
+                item.BountyCode,
+                item.DisplayName,
+                item.Description,
+                item.RewardPoints,
+                RankingCooldownMode.Once,
+                RankingProofRequirement.None,
+                RankingVisibilityScope.PlayerHistory)));
 
         foreach (var definition in defaults)
         {

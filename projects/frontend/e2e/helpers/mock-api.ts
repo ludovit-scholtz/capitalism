@@ -1140,7 +1140,14 @@ export type MockState = {
     balanceRequirementMet: boolean
   } | null
   /** Tutorial milestone completion state for the current player. */
-  tutorialProgress: Array<{ milestone: string; isCompleted: boolean; completedAtUtc: string | null }>
+  tutorialProgress: Array<{
+    milestone: string
+    isCompleted: boolean
+    completedAtUtc: string | null
+    bountyAwarded: boolean
+    bountyAwardedAtUtc: string | null
+    bountyPoints?: number | null
+  }>
   /** Achievement badges for a player (keyed by playerId). */
   playerBadges: Record<
     string,
@@ -2866,15 +2873,15 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     tradeRoutes: [],
     additionalCompanyPrerequisites: null,
     tutorialProgress: [
-      { milestone: 'FIRST_RESOURCE_SOLD', isCompleted: false, completedAtUtc: null },
-      { milestone: 'FIRST_B2B_TRADE', isCompleted: false, completedAtUtc: null },
-      { milestone: 'FIRST_LOAN_TAKEN', isCompleted: false, completedAtUtc: null },
-      { milestone: 'FIRST_COMPETITOR_OBSERVED', isCompleted: false, completedAtUtc: null },
-      { milestone: 'FIRST_BRAND_ESTABLISHED', isCompleted: false, completedAtUtc: null },
+      { milestone: 'FIRST_RESOURCE_SOLD', isCompleted: false, completedAtUtc: null, bountyAwarded: false, bountyAwardedAtUtc: null, bountyPoints: 50 },
+      { milestone: 'FIRST_B2B_TRADE', isCompleted: false, completedAtUtc: null, bountyAwarded: false, bountyAwardedAtUtc: null, bountyPoints: 75 },
+      { milestone: 'FIRST_LOAN_TAKEN', isCompleted: false, completedAtUtc: null, bountyAwarded: false, bountyAwardedAtUtc: null, bountyPoints: 60 },
+      { milestone: 'FIRST_COMPETITOR_OBSERVED', isCompleted: false, completedAtUtc: null, bountyAwarded: false, bountyAwardedAtUtc: null, bountyPoints: 40 },
+      { milestone: 'FIRST_BRAND_ESTABLISHED', isCompleted: false, completedAtUtc: null, bountyAwarded: false, bountyAwardedAtUtc: null, bountyPoints: 80 },
+      { milestone: 'FIRST_BUILDING_DETAIL_VISIT', isCompleted: false, completedAtUtc: null, bountyAwarded: false, bountyAwardedAtUtc: null, bountyPoints: 30 },
+      { milestone: 'FIRST_GRID_EDITOR_OPEN', isCompleted: false, completedAtUtc: null, bountyAwarded: false, bountyAwardedAtUtc: null, bountyPoints: 30 },
       // Tooltip milestones default to completed so existing tests are not interrupted by overlays
-      { milestone: 'TOOLTIP_DASHBOARD_SHOWN', isCompleted: true, completedAtUtc: '2026-01-01T00:00:00Z' },
-      { milestone: 'TOOLTIP_BUILDING_DETAIL_SHOWN', isCompleted: true, completedAtUtc: '2026-01-01T00:00:00Z' },
-      { milestone: 'TOOLTIP_GRID_EDITOR_SHOWN', isCompleted: true, completedAtUtc: '2026-01-01T00:00:00Z' },
+      { milestone: 'TOOLTIP_DASHBOARD_SHOWN', isCompleted: true, completedAtUtc: '2026-01-01T00:00:00Z', bountyAwarded: false, bountyAwardedAtUtc: null, bountyPoints: null },
     ],
     playerBadges: {},
     playerRankSnapshots: {},
@@ -7480,12 +7487,32 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const milestone: string = body.variables?.input?.milestone ?? ''
       const existing = state.tutorialProgress.find((m) => m.milestone === milestone)
       const now = new Date().toISOString()
+      const pointsByMilestone: Record<string, number> = {
+        FIRST_RESOURCE_SOLD: 50,
+        FIRST_B2B_TRADE: 75,
+        FIRST_LOAN_TAKEN: 60,
+        FIRST_COMPETITOR_OBSERVED: 40,
+        FIRST_BRAND_ESTABLISHED: 80,
+        FIRST_BUILDING_DETAIL_VISIT: 30,
+        FIRST_GRID_EDITOR_OPEN: 30,
+      }
       if (existing) {
         existing.isCompleted = true
         existing.completedAtUtc = existing.completedAtUtc ?? now
+        existing.bountyAwarded = pointsByMilestone[milestone] != null
+        existing.bountyAwardedAtUtc = existing.bountyAwardedAtUtc ?? (existing.bountyAwarded ? now : null)
+        existing.bountyPoints = existing.bountyPoints ?? pointsByMilestone[milestone] ?? null
         return routeJson({ markTutorialMilestoneComplete: { ...existing } })
       }
-      const newEntry = { milestone, isCompleted: true, completedAtUtc: now }
+      const bountyPoints = pointsByMilestone[milestone] ?? null
+      const newEntry = {
+        milestone,
+        isCompleted: true,
+        completedAtUtc: now,
+        bountyAwarded: bountyPoints != null,
+        bountyAwardedAtUtc: bountyPoints != null ? now : null,
+        bountyPoints,
+      }
       state.tutorialProgress.push(newEntry)
       return routeJson({ markTutorialMilestoneComplete: { ...newEntry } })
     }

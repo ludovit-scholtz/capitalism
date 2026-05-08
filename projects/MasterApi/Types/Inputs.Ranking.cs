@@ -200,6 +200,24 @@ public sealed class IngestRankingEventInput : MasterServerServiceInput
     public string? ProofReference { get; set; }
 }
 
+public sealed class GetTutorialBountyStatusesInput : MasterServerServiceInput
+{
+    public string PlayerEmail { get; set; } = string.Empty;
+}
+
+public sealed class TutorialBountyStatusInfo
+{
+    public string Milestone { get; set; } = string.Empty;
+
+    public string BountyCode { get; set; } = string.Empty;
+
+    public bool IsAwarded { get; set; }
+
+    public DateTime? AwardedAtUtc { get; set; }
+
+    public decimal RewardPoints { get; set; }
+}
+
 public sealed class ModerateRankingEventInput
 {
     public Guid EventId { get; set; }

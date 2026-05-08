@@ -114,6 +114,148 @@ public sealed class RankingIntegrationTests
     }
 
     [Fact]
+    public async Task TutorialBounty_OnceCooldown_AwardsOnlyOneRecordPerPlayer()
+    {
+        await using var factory = new MasterApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var userEmail = $"rank-tutorial-once-{Guid.NewGuid():N}@example.com";
+        var (userToken, _) = await RegisterAsync(client, userEmail, "Tutorial Once");
+        var rootToken = CreateRootAdminToken();
+
+        var ingestMutation = """
+            mutation Ingest($input: IngestRankingEventInput!) {
+              ingestRankingEvent(input: $input) { id status }
+            }
+            """;
+
+        await GraphQlAsync(client, ingestMutation, new
+        {
+            input = new
+            {
+                registrationKey = "test-registration-key",
+                serverKey = "capitalism-eu-1",
+                eventType = MasterRankingBountyCodes.TutorialFirstGridEditorOpen,
+                playerEmail = userEmail,
+                occurredAtUtc = DateTime.UtcNow,
+                uniqueScopeKey = "tutorial-visit-1",
+                payloadJson = "{}",
+            }
+        });
+
+        await GraphQlAsync(client, ingestMutation, new
+        {
+            input = new
+            {
+                registrationKey = "test-registration-key",
+                serverKey = "capitalism-eu-1",
+                eventType = MasterRankingBountyCodes.TutorialFirstGridEditorOpen,
+                playerEmail = userEmail,
+                occurredAtUtc = DateTime.UtcNow.AddMinutes(1),
+                uniqueScopeKey = "tutorial-visit-2",
+                payloadJson = "{}",
+            }
+        });
+
+        await GraphQlAsync(client, "mutation { runRankingEvaluationNow { id status } }", token: rootToken);
+
+        var history = await GraphQlAsync(client,
+            """
+            query {
+              myRankingBountyHistory {
+                bountyCode
+              }
+            }
+            """,
+            token: userToken);
+
+        Assert.False(history.TryGetProperty("errors", out _));
+        var items = history.GetProperty("data").GetProperty("myRankingBountyHistory").EnumerateArray().ToList();
+        Assert.Single(items, item => item.GetProperty("bountyCode").GetString() == MasterRankingBountyCodes.TutorialFirstGridEditorOpen);
+    }
+
+    [Fact]
+    public async Task TutorialBountyStatuses_ServiceQuery_OnlyReturnsAwardedForTargetPlayer()
+    {
+        await using var factory = new MasterApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var userEmail = $"rank-tutorial-status-{Guid.NewGuid():N}@example.com";
+        var otherEmail = $"rank-tutorial-status-other-{Guid.NewGuid():N}@example.com";
+        await RegisterAsync(client, userEmail, "Tutorial Status");
+        await RegisterAsync(client, otherEmail, "Tutorial Status Other");
+        var rootToken = CreateRootAdminToken();
+
+        await GraphQlAsync(client,
+            """
+            mutation Ingest($input: IngestRankingEventInput!) {
+              ingestRankingEvent(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey = "capitalism-eu-1",
+                    eventType = MasterRankingBountyCodes.TutorialFirstBuildingDetailVisit,
+                    playerEmail = userEmail,
+                    occurredAtUtc = DateTime.UtcNow,
+                    uniqueScopeKey = "tutorial-status-1",
+                    payloadJson = "{}",
+                }
+            });
+
+        await GraphQlAsync(client, "mutation { runRankingEvaluationNow { id status } }", token: rootToken);
+
+        var statusForTarget = await GraphQlAsync(client,
+            """
+            query Status($input: GetTutorialBountyStatusesInput!) {
+              tutorialBountyStatuses(input: $input) {
+                milestone
+                isAwarded
+              }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey = string.Empty,
+                    playerEmail = userEmail,
+                }
+            });
+
+        var targetItems = statusForTarget.GetProperty("data").GetProperty("tutorialBountyStatuses").EnumerateArray().ToList();
+        var targetMilestone = targetItems.First(item => item.GetProperty("milestone").GetString() == "FIRST_BUILDING_DETAIL_VISIT");
+        Assert.True(targetMilestone.GetProperty("isAwarded").GetBoolean());
+
+        var statusForOther = await GraphQlAsync(client,
+            """
+            query Status($input: GetTutorialBountyStatusesInput!) {
+              tutorialBountyStatuses(input: $input) {
+                milestone
+                isAwarded
+              }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey = string.Empty,
+                    playerEmail = otherEmail,
+                }
+            });
+
+        var otherItems = statusForOther.GetProperty("data").GetProperty("tutorialBountyStatuses").EnumerateArray().ToList();
+        var otherMilestone = otherItems.First(item => item.GetProperty("milestone").GetString() == "FIRST_BUILDING_DETAIL_VISIT");
+        Assert.False(otherMilestone.GetProperty("isAwarded").GetBoolean());
+    }
+
+    [Fact]
     public async Task DailyDecay_Run_ReducesRankingPointsDeterministically()
     {
       await using var factory = new MasterApiWebApplicationFactory();
@@ -1156,4 +1298,3 @@ public sealed class RankingIntegrationTests
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 }
-
