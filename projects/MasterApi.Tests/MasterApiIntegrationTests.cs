@@ -371,6 +371,51 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
     }
 
     [Fact]
+    public async Task UpdatePersonalAccountName_TooLong_ReturnsValidationError()
+    {
+        var (token, _) = await RegisterAndGetTokenAsync(
+            email: $"alias-toolong-{Guid.NewGuid():N}@example.com",
+            displayName: "Initial Alias");
+
+        var result = await GraphQlAsync("""
+            mutation UpdatePersonalAccountName($input: UpdatePersonalAccountNameInput!) {
+              updatePersonalAccountName(input: $input) {
+                personalAccountName
+              }
+            }
+            """,
+            new { input = new { personalAccountName = new string('X', 41) } },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Equal("PERSONAL_ACCOUNT_NAME_TOO_LONG", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task SharedAuthSync_DoesNotOverwriteExistingPersonalAlias()
+    {
+        var email = $"alias-preserve-{Guid.NewGuid():N}@example.com";
+        await RegisterAndGetTokenAsync(email: email, displayName: "Persisted Alias");
+
+        var sharedToken = CreateSharedToken(Guid.NewGuid().ToString(), email, "External OIDC Name");
+        var meResult = await GraphQlAsync("""
+            query {
+              me {
+                email
+                displayName
+                personalAccountName
+              }
+            }
+            """, token: sharedToken);
+
+        Assert.False(meResult.TryGetProperty("errors", out _));
+        var me = meResult.GetProperty("data").GetProperty("me");
+        Assert.Equal(email, me.GetProperty("email").GetString());
+        Assert.Equal("Persisted Alias", me.GetProperty("displayName").GetString());
+        Assert.Equal("Persisted Alias", me.GetProperty("personalAccountName").GetString());
+    }
+
+    [Fact]
     public async Task UpdatePersonalAccountName_Unauthenticated_ReturnsAuthError()
     {
         var result = await GraphQlAsync("""
