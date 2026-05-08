@@ -31,6 +31,8 @@ public sealed class MasterApiWebApplicationFactory : WebApplicationFactory<Progr
                 ["MasterServer:RegistrationKey"] = "test-registration-key",
                 ["MasterServer:ActiveThresholdSeconds"] = "90",
                 ["GameAdministration:RootAdministratorEmails:0"] = "root@example.com",
+                // Enable password auth in tests so all existing auth tests continue to pass.
+                ["Auth:PasswordAuthEnabled"] = "true",
             });
         });
     }

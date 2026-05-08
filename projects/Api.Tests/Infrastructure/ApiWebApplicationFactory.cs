@@ -27,7 +27,9 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>
                 ["SeedData:AdminDisplayName"] = "Platform Admin",
                 ["SeedData:AdminPassword"] = "ChangeMe123!",
                 ["GameEngine:Enabled"] = "false",
-                ["MasterServer:RegistrationEnabled"] = "false"
+                ["MasterServer:RegistrationEnabled"] = "false",
+                // Enable password auth in tests so all existing auth tests continue to pass.
+                ["Auth:PasswordAuthEnabled"] = "true"
             });
         });
     }

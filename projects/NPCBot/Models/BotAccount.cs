@@ -45,13 +45,22 @@ public sealed class BotAccount
     public long TrackingStartTick { get; set; }
 
     /// <summary>
-    /// Returns true when the JWT token is present and not yet expired.
-    /// Uses a 5-minute proactive-refresh buffer (configurable via <c>TokenRefreshBufferMinutes</c>).
+    /// Returns true when the auth token is valid.
+    /// For API key tokens (prefixed <c>APIKEY:</c>) this is always true — they never expire.
+    /// For JWT bearer tokens, uses a 5-minute proactive-refresh buffer (configurable via <c>TokenRefreshBufferMinutes</c>).
     /// </summary>
-    public bool IsTokenValid(int bufferMinutes = 5) =>
-        !string.IsNullOrWhiteSpace(Token) &&
-        TokenExpiresAtUtc.HasValue &&
-        DateTime.UtcNow < TokenExpiresAtUtc.Value.AddMinutes(-bufferMinutes);
+    public bool IsTokenValid(int bufferMinutes = 5)
+    {
+        if (string.IsNullOrWhiteSpace(Token))
+            return false;
+
+        // API key sentinel: never expires.
+        if (Token.StartsWith("APIKEY:", StringComparison.Ordinal))
+            return true;
+
+        return TokenExpiresAtUtc.HasValue &&
+               DateTime.UtcNow < TokenExpiresAtUtc.Value.AddMinutes(-bufferMinutes);
+    }
 
     /// <summary>
     /// Convenience property using the default 5-minute refresh buffer.

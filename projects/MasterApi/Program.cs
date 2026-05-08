@@ -29,6 +29,8 @@ public class Program
             builder.Configuration.GetSection(JwtOptions.SectionName));
         builder.Services.Configure<BiatecOidcOptions>(
             builder.Configuration.GetSection(BiatecOidcOptions.SectionName));
+        builder.Services.Configure<AuthOptions>(
+            builder.Configuration.GetSection(AuthOptions.SectionName));
 
         var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
             ?? new JwtOptions();

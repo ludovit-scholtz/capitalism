@@ -29,6 +29,7 @@ public class Program
         builder.Services.Configure<VapidOptions>(builder.Configuration.GetSection("Vapid"));
         builder.Services.Configure<GameEngineOptions>(builder.Configuration.GetSection(GameEngineOptions.SectionName));
         builder.Services.Configure<MasterServerRegistrationOptions>(builder.Configuration.GetSection(MasterServerRegistrationOptions.SectionName));
+        builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.SectionName));
 
         var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
             ?? throw new InvalidOperationException("JWT configuration is missing.");
@@ -280,6 +281,7 @@ public class Program
         var app = builder.Build();
 
         app.UseCors("frontend");
+        app.UseMiddleware<ApiKeyAuthMiddleware>();
         app.UseAuthentication();
         app.UseAuthorization();
         app.UseMiddleware<GameEndedMutationGuardMiddleware>();

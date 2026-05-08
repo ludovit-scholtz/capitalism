@@ -16,6 +16,7 @@ export async function gqlRequest<T>(
   query: string,
   variables?: Record<string, unknown>,
   token?: string | null,
+  overrideUrl?: string,
 ): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -25,7 +26,7 @@ export async function gqlRequest<T>(
     headers['Authorization'] = `Bearer ${token}`
   }
 
-  const res = await fetch(GRAPHQL_URL, {
+  const res = await fetch(overrideUrl ?? GRAPHQL_URL, {
     method: 'POST',
     headers,
     body: JSON.stringify({ query, variables }),

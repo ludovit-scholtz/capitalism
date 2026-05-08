@@ -57,7 +57,17 @@ public sealed class GameApiClient
         };
 
         if (bearerToken is not null)
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
+        {
+            if (bearerToken.StartsWith("APIKEY:", StringComparison.Ordinal))
+            {
+                var rawApiKey = bearerToken["APIKEY:".Length..];
+                request.Headers.Authorization = new AuthenticationHeaderValue("ApiKey", rawApiKey);
+            }
+            else
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
+            }
+        }
 
         using var response = await _http.SendAsync(request, ct);
         var body = await response.Content.ReadAsStringAsync(ct);

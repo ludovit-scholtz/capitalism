@@ -20,6 +20,19 @@ public sealed partial class AppDbContext
             e.Property(p => p.ConcurrencyToken).IsConcurrencyToken();
         });
 
+        modelBuilder.Entity<PlayerApiKey>(e =>
+        {
+            e.HasKey(k => k.Id);
+            e.HasIndex(k => k.KeyHash).IsUnique();
+            e.HasIndex(k => k.PlayerId);
+            e.Property(k => k.Name).HasMaxLength(80);
+            e.Property(k => k.KeyHash).HasMaxLength(64);
+            e.HasOne(k => k.Player)
+                .WithMany()
+                .HasForeignKey(k => k.PlayerId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<ReferralCode>(e =>
         {
             e.HasKey(code => code.Id);

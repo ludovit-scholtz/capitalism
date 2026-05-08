@@ -98,6 +98,11 @@ const router = createRouter({
       name: 'ranking-admin',
       component: () => import('@/views/RankingAdminView.vue'),
     },
+    {
+      path: '/api-keys',
+      name: 'api-keys',
+      component: () => import('@/views/ApiKeyManagementView.vue'),
+    },
   ],
   scrollBehavior(to) {
     if (to.hash) {

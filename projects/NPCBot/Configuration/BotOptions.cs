@@ -55,6 +55,15 @@ public sealed class BotOptions
     /// </summary>
     public int MinTicksBeforeAdjustment { get; set; } = 5;
 
+    /// <summary>
+    /// Optional API key for authenticating with the Capitalism Game API.
+    /// When set, the bot skips password-based registration/login and sends
+    /// <c>Authorization: ApiKey &lt;key&gt;</c> on every request.
+    /// Generate a key via the master-portal's "API Keys" page.
+    /// In production, supply via <c>NPCBOT_NpcBot__ApiKey</c> environment variable.
+    /// </summary>
+    public string? ApiKey { get; set; }
+
     /// <summary>Free-to-use starter industries that NPC bots may join.</summary>
     public string[] AllowedIndustries { get; set; } =
     [
