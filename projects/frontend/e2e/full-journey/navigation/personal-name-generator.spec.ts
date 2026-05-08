@@ -197,8 +197,8 @@ test.describe('Onboarding IPO – personal account name generator', () => {
     const regenerateButton = page.locator('.regenerate-personal-name-btn')
     await expect(regenerateButton).toBeVisible()
     await regenerateButton.click()
-    const regenerated = await personalNameInput.inputValue()
+    const regenerated = personalNameInput
     expect(regenerated.trim().split(' ')).toHaveLength(3)
-    expect(regenerated).not.toBe(generated)
+    await expect(regenerated).not.toHaveValue(generated)
   })
 })
