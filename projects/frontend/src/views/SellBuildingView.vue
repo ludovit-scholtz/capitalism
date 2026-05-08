@@ -23,6 +23,14 @@ interface CompanyBuilding {
   cityId: string
   populationIndex?: number | null
   units: Array<{ id: string }>
+  marketValuation?: {
+    landValue: number
+    structureValue: number
+    unitsValue: number
+    totalValue: number
+    minimumSalePrice: number
+    currencyCode: string
+  } | null
 }
 interface Company {
   id: string
@@ -66,7 +74,7 @@ const lastAction = ref<'list' | 'cancel' | 'destroy'>('list')
 
 const DATA_QUERY = `
   {
-    myCompanies { id name buildings { id name type level isForSale askingPrice listedAtUtc cityId populationIndex units { id } } }
+    myCompanies { id name buildings { id name type level isForSale askingPrice listedAtUtc cityId populationIndex marketValuation { landValue structureValue unitsValue totalValue minimumSalePrice currencyCode } units { id } } }
     cities { id name currencyCode }
     myLoans { id status missedPayments remainingPrincipal collateralBuildingId }
   }
@@ -117,6 +125,7 @@ async function loadData() {
 async function submitListing() {
   if (!building.value) return
   if (!salePrice.value || salePrice.value <= 0) return
+  if (salePriceBelowMinimum.value) return
   saving.value = true
   saveError.value = null
   try {
@@ -130,6 +139,11 @@ async function submitListing() {
     const msg = err instanceof Error ? err.message : String(err)
     if (msg.includes('BUILDING_IS_COLLATERAL')) {
       saveError.value = t('buildingDetail.collateralBlockedByLoans', { count: 1 })
+    } else if (msg.includes('ASKING_PRICE_BELOW_MINIMUM')) {
+      saveError.value = t('buildingDetail.minimumSalePriceError', {
+        minimum: formatCurrency(minimumSalePrice.value ?? 0, currencyCode.value),
+        marketValue: formatCurrency(estimatedMarketValue.value ?? 0, currencyCode.value),
+      })
     } else if (msg.includes('INVALID_ASKING_PRICE')) {
       saveError.value = t('buildingDetail.askingPriceMustBePositive')
     } else {
@@ -201,11 +215,21 @@ function onPriceInput(event: Event) {
 const estimatedMarketValue = computed(() => {
   const b = building.value
   if (!b) return null
+  if (b.marketValuation?.totalValue != null) return b.marketValuation.totalValue
   return computeEstimatedMarketValue({
     level: b.level,
     unitCount: b.units?.length ?? 0,
     populationIndex: b.populationIndex,
   })
+})
+const minimumSalePrice = computed(() => {
+  if (!estimatedMarketValue.value) return null
+  if (building.value?.marketValuation?.minimumSalePrice != null) return building.value.marketValuation.minimumSalePrice
+  return Math.round(estimatedMarketValue.value * 0.7 * 100) / 100
+})
+const salePriceBelowMinimum = computed(() => {
+  if (salePrice.value == null || minimumSalePrice.value == null) return false
+  return salePrice.value < minimumSalePrice.value
 })
 
 const isPriceHigh = computed(() => {
@@ -234,6 +258,7 @@ const cityName = computed(() => {
 
 const currencyCode = computed(() => {
   if (!building.value) return 'EUR'
+  if (building.value.marketValuation?.currencyCode) return building.value.marketValuation.currencyCode
   return cities.value.find((c) => c.id === building.value!.cityId)?.currencyCode ?? 'EUR'
 })
 
@@ -335,6 +360,11 @@ onMounted(loadData)
         <p class="estimated-value mt-0.5 text-xl font-bold text-foreground">
           {{ formatCurrency(estimatedMarketValue, currencyCode) }}
         </p>
+        <div v-if="building.marketValuation" class="mt-2 grid gap-1 text-xs text-muted">
+          <p>{{ t('buildingDetail.marketValueLand', { amount: formatCurrency(building.marketValuation.landValue, currencyCode) }) }}</p>
+          <p>{{ t('buildingDetail.marketValueStructure', { amount: formatCurrency(building.marketValuation.structureValue, currencyCode) }) }}</p>
+          <p>{{ t('buildingDetail.marketValueUnits', { amount: formatCurrency(building.marketValuation.unitsValue, currencyCode) }) }}</p>
+        </div>
         <p class="mt-0.5 text-xs text-muted">{{ t('buildingDetail.estimatedValueHint') }}</p>
       </div>
 
@@ -385,9 +415,20 @@ onMounted(loadData)
             :disabled="saving"
             @input="onPriceInput"
           />
+          <p v-if="minimumSalePrice !== null" class="mt-1 text-xs text-muted">
+            {{ t('buildingDetail.minimumSalePriceHint', { minimum: formatCurrency(minimumSalePrice, currencyCode) }) }}
+          </p>
           <!-- Validation messages -->
           <p v-if="salePrice !== null && salePrice <= 0" class="mt-1 text-xs text-red-500">
             {{ t('buildingDetail.askingPriceMustBePositive') }}
+          </p>
+          <p v-else-if="salePriceBelowMinimum" class="mt-1 text-xs text-red-500">
+            {{
+              t('buildingDetail.minimumSalePriceError', {
+                minimum: formatCurrency(minimumSalePrice ?? 0, currencyCode),
+                marketValue: formatCurrency(estimatedMarketValue ?? 0, currencyCode),
+              })
+            }}
           </p>
           <p
             v-else-if="isPriceHigh"
@@ -411,7 +452,7 @@ onMounted(loadData)
         <div class="sell-actions flex gap-3">
           <button
             class="list-for-sale-btn btn btn-primary flex-1"
-            :disabled="saving || !salePrice || salePrice <= 0"
+            :disabled="saving || !salePrice || salePrice <= 0 || salePriceBelowMinimum"
             @click="submitListing"
           >
             <font-awesome-icon v-if="saving" icon="spinner" spin class="mr-2" />

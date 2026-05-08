@@ -229,7 +229,7 @@ function navigateToForexTransfer() {
 
 <template>
   <!-- Bank profile card (rates + capacity) -->
-  <div v-if="bankInfo" class="customer-bank-profile rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
+  <div v-if="bankInfo" class="customer-bank-profile mb-4 rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
     <div class="customer-rates-grid grid gap-4 md:grid-cols-3">
       <div class="customer-rate-card deposit rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
         <span class="customer-rate-label">{{ t('bank.depositInterestRate') }}</span>
@@ -318,19 +318,23 @@ function navigateToForexTransfer() {
         <div
           v-for="account in myOperatingAccountsHere"
           :key="account.id"
-          class="operating-account-row flex flex-col gap-3 rounded-2xl border border-divider bg-card-raised px-5 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+          class="operating-account-row flex flex-col gap-3 rounded-2xl border border-divider bg-card-raised px-5 py-4 shadow-sm"
         >
-          <div class="flex flex-col gap-0.5 sm:flex-1">
-            <span class="text-xs text-muted">{{ t('bank.accountNumber') }}</span>
-            <span class="font-mono text-sm font-semibold text-body">{{ account.accountNumber }}</span>
+          <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div class="flex flex-col gap-0.5">
+              <span class="text-xs text-muted">{{ t('bank.accountNumber') }}</span>
+              <span class="font-mono text-sm font-semibold text-body">{{ account.accountNumber }}</span>
+            </div>
+            <div class="flex flex-col gap-0.5 lg:items-end">
+              <span class="text-xs text-muted">{{ t('bank.accountBalance') }}</span>
+              <span class="text-base font-bold text-body">{{ formatCurrency(account.balance, account.currencyCode) }}</span>
+            </div>
           </div>
-          <div class="flex flex-col gap-0.5 sm:items-end">
-            <span class="text-xs text-muted">{{ t('bank.accountBalance') }}</span>
-            <span class="text-base font-bold text-body">{{ formatCurrency(account.balance, account.currencyCode) }}</span>
+          <div class="pt-1">
+            <router-link :to="`/bank-statement/${account.companyId}`" class="btn btn-outline btn-sm">
+              {{ t('bankStatement.title') }}
+            </router-link>
           </div>
-          <router-link :to="`/bank-statement/${account.companyId}`" class="btn btn-outline btn-sm shrink-0 self-start sm:self-auto">
-            {{ t('bankStatement.title') }}
-          </router-link>
         </div>
       </div>
 

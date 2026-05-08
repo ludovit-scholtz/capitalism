@@ -35,6 +35,7 @@
   padding: 0 1rem;
   overflow-x: auto;
   scrollbar-width: none;
+  align-items: flex-end;
 }
 
 .unit-detail-tabs::-webkit-scrollbar {
@@ -45,7 +46,7 @@
   flex-shrink: 0;
   background: none;
   border: none;
-  border-bottom: 2px solid transparent;
+  border-bottom: 1px solid transparent;
   padding: 0.6rem 0.85rem;
   font: inherit;
   font-size: 0.8rem;
@@ -56,6 +57,7 @@
   transition:
     color 0.15s,
     border-color 0.15s;
+  margin-bottom: -1px;
 }
 
 .unit-tab-btn:hover {
@@ -64,8 +66,9 @@
 
 .unit-tab-btn--active {
   color: var(--color-primary);
-  border-bottom-color: var(--color-primary);
+  border-bottom-color: var(--color-surface);
   font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--color-primary);
 }
 
 .unit-detail {

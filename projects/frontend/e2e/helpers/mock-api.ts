@@ -212,6 +212,14 @@ export type MockBuilding = {
   isGovernmentOwned?: boolean
   /** True when at least one campaign unit is actively running in this media house. */
   isAdvertisingActive?: boolean
+  marketValuation?: {
+    landValue: number
+    structureValue: number
+    unitsValue: number
+    totalValue: number
+    minimumSalePrice: number
+    currencyCode: string
+  } | null
   /** True when the building is suspended due to insufficient bank account funds */
   isSuspendedForFunds?: boolean
   /** Machine-readable suspension reason: null | 'MISSING_BANK_ACCOUNT' | 'INSUFFICIENT_FUNDS:<amount>' */
@@ -4653,6 +4661,40 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
                 {
                   message: 'Sale cannot be cancelled because this building is collateral for an unpaid loan.',
                   extensions: { code: 'BUILDING_SALE_LOCKED_BY_UNPAID_COLLATERAL' },
+                },
+              ],
+            }),
+          })
+        }
+      }
+
+      if (input?.isForSale === true) {
+        const structureBaseByType: Record<string, number> = {
+          MINE: 250000,
+          FACTORY: 200000,
+          SALES_SHOP: 150000,
+          RESEARCH_DEVELOPMENT: 300000,
+          APARTMENT: 400000,
+          COMMERCIAL: 350000,
+          MEDIA_HOUSE: 500000,
+          BANK: 600000,
+          EXCHANGE: 450000,
+          POWER_PLANT: 350000,
+        }
+        const structureValue = (structureBaseByType[building.type] ?? 0) * Math.max(1, building.level ?? 1)
+        const unitsValue = (building.units ?? []).reduce((sum, unit) => sum + Math.max(1, unit.level ?? 1) * 20000, 0)
+        const fallbackMarketValue = structureValue + unitsValue
+        const marketValue = building.marketValuation?.totalValue ?? fallbackMarketValue
+        const minimumSalePrice = building.marketValuation?.minimumSalePrice ?? Math.round(marketValue * 0.7 * 100) / 100
+        if ((input.askingPrice ?? 0) < minimumSalePrice) {
+          return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              errors: [
+                {
+                  message: `Asking price must be at least ${minimumSalePrice.toFixed(2)} EUR (70% of market value ${marketValue.toFixed(2)} EUR).`,
+                  extensions: { code: 'ASKING_PRICE_BELOW_MINIMUM' },
                 },
               ],
             }),

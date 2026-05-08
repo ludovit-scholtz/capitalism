@@ -911,6 +911,212 @@ public sealed class BuildingSecondaryMarketTests
     }
 
     [Fact]
+    public async Task SetBuildingForSale_RejectsListing_WhenAskingPriceIsBelowSeventyPercentOfMarketValue()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "price-minimum-below@market.test");
+        var (buildingId, companyId, _) = await SeedOwnerWithBuildingAsync(factory, token);
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var building = await db.Buildings.FirstAsync(b => b.Id == buildingId);
+
+            db.BuildingLots.Add(new BuildingLot
+            {
+                Id = Guid.NewGuid(),
+                CityId = building.CityId,
+                Name = "Sale valuation lot",
+                Description = "Valuation test lot",
+                District = "Test",
+                Latitude = 48.15,
+                Longitude = 17.11,
+                BasePrice = 50_000m,
+                Price = 50_000m,
+                SuitableTypes = "FACTORY",
+                OwnerCompanyId = companyId,
+                BuildingId = buildingId,
+            });
+            db.BuildingUnits.AddRange(
+                new BuildingUnit
+                {
+                    Id = Guid.NewGuid(),
+                    BuildingId = buildingId,
+                    UnitType = UnitType.Purchase,
+                    GridX = 0,
+                    GridY = 0,
+                    Level = 1,
+                },
+                new BuildingUnit
+                {
+                    Id = Guid.NewGuid(),
+                    BuildingId = buildingId,
+                    UnitType = UnitType.Storage,
+                    GridX = 1,
+                    GridY = 0,
+                    Level = 2,
+                });
+            await db.SaveChangesAsync();
+        }
+
+        // Market value = land 50k + structure 200k + units (1+2)*20k = 310k
+        // Minimum allowed sale price = 217k
+        var result = await ExecAsync(client,
+            "mutation S($i: SetBuildingForSaleInput!) { setBuildingForSale(input: $i) { id } }",
+            new { i = new { buildingId, isForSale = true, askingPrice = 216_999m } },
+            token);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0);
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("ASKING_PRICE_BELOW_MINIMUM", code);
+    }
+
+    [Fact]
+    public async Task SetBuildingForSale_AllowsListing_WhenAskingPriceIsExactlySeventyPercentOfMarketValue()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "price-minimum-at@market.test");
+        var (buildingId, companyId, _) = await SeedOwnerWithBuildingAsync(factory, token);
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var building = await db.Buildings.FirstAsync(b => b.Id == buildingId);
+
+            db.BuildingLots.Add(new BuildingLot
+            {
+                Id = Guid.NewGuid(),
+                CityId = building.CityId,
+                Name = "Sale valuation lot 2",
+                Description = "Valuation test lot 2",
+                District = "Test",
+                Latitude = 48.15,
+                Longitude = 17.11,
+                BasePrice = 50_000m,
+                Price = 50_000m,
+                SuitableTypes = "FACTORY",
+                OwnerCompanyId = companyId,
+                BuildingId = buildingId,
+            });
+            db.BuildingUnits.AddRange(
+                new BuildingUnit
+                {
+                    Id = Guid.NewGuid(),
+                    BuildingId = buildingId,
+                    UnitType = UnitType.Purchase,
+                    GridX = 0,
+                    GridY = 0,
+                    Level = 1,
+                },
+                new BuildingUnit
+                {
+                    Id = Guid.NewGuid(),
+                    BuildingId = buildingId,
+                    UnitType = UnitType.Storage,
+                    GridX = 1,
+                    GridY = 0,
+                    Level = 2,
+                });
+            await db.SaveChangesAsync();
+        }
+
+        var result = await ExecAsync(client,
+            "mutation S($i: SetBuildingForSaleInput!) { setBuildingForSale(input: $i) { id isForSale askingPrice } }",
+            new { i = new { buildingId, isForSale = true, askingPrice = 217_000m } },
+            token);
+
+        var listed = result.GetProperty("data").GetProperty("setBuildingForSale");
+        Assert.True(listed.GetProperty("isForSale").GetBoolean());
+        Assert.Equal(217_000m, listed.GetProperty("askingPrice").GetDecimal());
+    }
+
+    [Fact]
+    public async Task BuildingMarketValuation_ReturnsLandStructureAndUnitBreakdown()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "market-valuation-breakdown@market.test");
+        var (buildingId, companyId, _) = await SeedOwnerWithBuildingAsync(factory, token);
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var building = await db.Buildings.FirstAsync(b => b.Id == buildingId);
+
+            db.BuildingLots.Add(new BuildingLot
+            {
+                Id = Guid.NewGuid(),
+                CityId = building.CityId,
+                Name = "Breakdown lot",
+                Description = "Breakdown",
+                District = "Test",
+                Latitude = 48.15,
+                Longitude = 17.11,
+                BasePrice = 50_000m,
+                Price = 50_000m,
+                SuitableTypes = "FACTORY",
+                OwnerCompanyId = companyId,
+                BuildingId = buildingId,
+            });
+            db.BuildingUnits.AddRange(
+                new BuildingUnit
+                {
+                    Id = Guid.NewGuid(),
+                    BuildingId = buildingId,
+                    UnitType = UnitType.Purchase,
+                    GridX = 0,
+                    GridY = 0,
+                    Level = 1,
+                },
+                new BuildingUnit
+                {
+                    Id = Guid.NewGuid(),
+                    BuildingId = buildingId,
+                    UnitType = UnitType.Storage,
+                    GridX = 1,
+                    GridY = 0,
+                    Level = 2,
+                });
+            await db.SaveChangesAsync();
+        }
+
+        var result = await ExecAsync(client,
+            """
+            query {
+              myCompanies {
+                buildings {
+                  id
+                  marketValuation {
+                    landValue
+                    structureValue
+                    unitsValue
+                    totalValue
+                    minimumSalePrice
+                    currencyCode
+                  }
+                }
+              }
+            }
+            """,
+            token: token);
+
+        var buildings = result.GetProperty("data").GetProperty("myCompanies")[0].GetProperty("buildings");
+        var valuation = buildings.EnumerateArray()
+            .First(candidate => candidate.GetProperty("id").GetString() == buildingId.ToString())
+            .GetProperty("marketValuation");
+
+        Assert.Equal(50_000m, valuation.GetProperty("landValue").GetDecimal());
+        Assert.Equal(200_000m, valuation.GetProperty("structureValue").GetDecimal());
+        Assert.Equal(60_000m, valuation.GetProperty("unitsValue").GetDecimal());
+        Assert.Equal(310_000m, valuation.GetProperty("totalValue").GetDecimal());
+        Assert.Equal(217_000m, valuation.GetProperty("minimumSalePrice").GetDecimal());
+        Assert.Equal("EUR", valuation.GetProperty("currencyCode").GetString());
+    }
+
+    [Fact]
     public async Task SetBuildingForSale_AllowsListing_WhenLoanIsDefaulted()
     {
         // Defaulted loans must NOT block listing — the player may need to sell the
@@ -1106,7 +1312,7 @@ public sealed class BuildingSecondaryMarketTests
         var payload = result.GetProperty("data").GetProperty("destroyBuilding");
         Assert.Equal(buildingId.ToString(), payload.GetProperty("buildingId").GetString());
         Assert.Equal("EUR", payload.GetProperty("currencyCode").GetString());
-        Assert.Equal(176_000m, payload.GetProperty("refundAmount").GetDecimal());
+        Assert.Equal(240_000m, payload.GetProperty("refundAmount").GetDecimal());
 
         await using var verifyScope = factory.Services.CreateAsyncScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -1120,7 +1326,7 @@ public sealed class BuildingSecondaryMarketTests
         Assert.NotNull(lotAfter);
 
         var accountAfter = await verifyDb.BankAccounts.FirstAsync(a => a.Id == accountId);
-        Assert.Equal(176_000m, accountAfter.Balance);
+        Assert.Equal(240_000m, accountAfter.Balance);
     }
 
     [Fact]

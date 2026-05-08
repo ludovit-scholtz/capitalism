@@ -2236,6 +2236,7 @@ export function useBuildingDetail() {
   const estimatedMarketValue = computed(() => {
     const b = building.value
     if (!b) return null
+    if (b.marketValuation?.totalValue != null) return b.marketValuation.totalValue
     const levelMultiplier = Math.pow(EMV_LEVEL_MULTIPLIER_BASE, b.level - 1)
     const unitValue = (b.units?.length ?? 0) * EMV_UNIT_BASE_VALUE
     const locationMultiplier = 1 + (b.populationIndex ?? EMV_DEFAULT_POPULATION_INDEX) * 0.5
@@ -4518,6 +4519,14 @@ export function useBuildingDetail() {
               lotMaterialQuality
               lotMaterialQuantity
               lotOriginalMaterialQuantity
+              marketValuation {
+                landValue
+                structureValue
+                unitsValue
+                totalValue
+                minimumSalePrice
+                currencyCode
+              }
               units {
                 id
                 buildingId

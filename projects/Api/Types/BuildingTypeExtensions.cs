@@ -1,5 +1,6 @@
 using Api.Data;
 using Api.Data.Entities;
+using Api.Utilities;
 using HotChocolate;
 using HotChocolate.Types;
 using Microsoft.EntityFrameworkCore;
@@ -133,5 +134,13 @@ public sealed class BuildingTypeExtensions
         return await db.Loans
             .AsNoTracking()
             .AnyAsync(l => l.CollateralBuildingId == building.Id && l.Status == LoanStatus.Defaulted, cancellationToken);
+    }
+
+    public async Task<BuildingMarketValuation> GetMarketValuation(
+        [Parent] Building building,
+        [Service] AppDbContext db,
+        CancellationToken cancellationToken)
+    {
+        return await BuildingMarketValuationCalculator.CalculateAsync(db, building, cancellationToken);
     }
 }
