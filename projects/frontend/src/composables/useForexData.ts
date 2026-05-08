@@ -70,6 +70,8 @@ export function useForexData() {
         const strong = pairStronger(base, code)
         const weakEurRate = eurRatesMap.value[weak] ?? 1
         const strongEurRate = eurRatesMap.value[strong] ?? 1
+        // Pair labels are STRONGER+WEAKER (e.g. USDCZK), so we display
+        // "how many weak currency units for 1 strong currency unit".
         const pairMidRate = weakEurRate / strongEurRate
         const symbol = code === 'EUR' ? '€' : (rates.value.find((r) => r.quoteCurrencyCode === code)?.quoteCurrencySymbol ?? code)
         const rateEntry = rates.value.find((r) => r.quoteCurrencyCode === code)

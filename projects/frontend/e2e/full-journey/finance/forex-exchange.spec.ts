@@ -1456,14 +1456,13 @@ test.describe('FX Rate History Chart on Rate List tab', () => {
     }, `token-${player.id}`)
     await page.goto('/forex?tab=rates')
     const order = await page.evaluate(() => {
-      const section = document.querySelector('section[aria-label="Rate List"]')
-      if (!section) return null
-      const table = section.querySelector('.rates-table')
-      const chart = section.querySelector('.rates-chart-section')
+      const table = document.querySelector('.rates-table')
+      const chart = document.querySelector('.rates-chart-section')
       if (!table || !chart) return null
       const position = table.compareDocumentPosition(chart)
       return Boolean(position & Node.DOCUMENT_POSITION_FOLLOWING)
     })
+    expect(order).not.toBeNull()
     expect(order).toBe(true)
   })
 

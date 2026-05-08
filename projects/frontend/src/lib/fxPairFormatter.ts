@@ -15,7 +15,6 @@ const CURRENCY_STRENGTH: Record<string, number> = {
   GBP: 3,
   INR: 4,
   CZK: 5,
-  PLN: 6,
 }
 
 /**
