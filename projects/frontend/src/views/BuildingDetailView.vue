@@ -99,7 +99,7 @@ onMounted(async () => {
     <!-- Building detail first-visit contextual tooltip overlay -->
     <TutorialTooltip
       v-if="buildingDetailTooltipReady && showBuildingDetailTooltip"
-      milestone="TOOLTIP_BUILDING_DETAIL_SHOWN"
+      milestone="FIRST_BUILDING_DETAIL_VISIT"
       :title="t('tutorial.tooltips.buildingDetailOverlay.title')"
       :description="t('tutorial.tooltips.buildingDetailOverlay.body')"
       position="bottom"
@@ -209,7 +209,7 @@ onMounted(async () => {
           <div class="relative">
             <TutorialTooltip
               v-if="buildingDetailTooltipReady && showGridEditorTooltip && !showBuildingDetailTooltip"
-              milestone="TOOLTIP_GRID_EDITOR_SHOWN"
+              milestone="FIRST_GRID_EDITOR_OPEN"
               :title="t('tutorial.tooltips.gridEditorOverlay.title')"
               :description="t('tutorial.tooltips.gridEditorOverlay.body')"
               position="bottom"

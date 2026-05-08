@@ -80,7 +80,7 @@ It will use real world map. The game will start in single city and later other c
 - [ ] Make sure the design is smooth on Full HD devices
 - [ ] Make sure the design is smooth on 4K screens
 
-### In-game tutorials and interactive help (85% complete)
+### In-game tutorials and interactive help (100% complete)
 
 - [x] Add a `TutorialProgress` entity tracking per-player completion of guided tutorial milestones: first resource sold, first B2B trade, first loan taken, first competitor observed in market intelligence, first brand established.
 - [x] `getTutorialProgress` GraphQL query returns all 5 milestones with `isCompleted` and `completedAtUtc` for the authenticated player. `markTutorialMilestoneComplete` mutation persists a milestone completion idempotently with full validation.
@@ -88,8 +88,8 @@ It will use real world map. The game will start in single city and later other c
 - [x] `TutorialTooltip.vue` reusable component with fade-in animation, "Got it" dismiss button, Escape-key support, and 30-second auto-dismiss.
 - [x] `useTutorialContext` composable for milestone state management, completion fetching, and completing milestones from any view.
 - [x] All tooltip and tutorial UI strings available in English, Slovak, and German via vue-i18n.
-- [ ] Contextual tooltip overlays on the dashboard and building detail views (first grid-editor open, first building detail visit) using `TutorialTooltip.vue` and `useTutorialContext` — integration deferred to next increment.
-- [ ] The tutorials does not grant the points to the master ranking at the moment. Create bounty in the master ranking for every tutorial. Make sure that the tutorial bounties are counted only once per lifetime per user. Make sure the tutorial is marked as completed if the bounty is awarded.
+- [x] Contextual tooltip overlays on building-detail first visit and first grid-editor open now use `TutorialTooltip.vue` + `useTutorialContext`, including dismiss persistence via `markTutorialMilestoneComplete`.
+- [x] Tutorial milestones now grant dedicated master-ranking tutorial bounties (once per lifetime), and `/tutorial` completion display uses bounty-award status as the source of truth with a “Bounty Earned ✓” badge.
 
 ### Player profile and statistics page (100% complete)
 

@@ -11,6 +11,8 @@ import {
   MILESTONE_FIRST_LOAN_TAKEN,
   MILESTONE_FIRST_COMPETITOR_OBSERVED,
   MILESTONE_FIRST_BRAND_ESTABLISHED,
+  MILESTONE_FIRST_BUILDING_DETAIL_VISIT,
+  MILESTONE_FIRST_GRID_EDITOR_OPEN,
 } from '@/composables/useTutorialContext'
 
 const { t } = useI18n()
@@ -76,11 +78,32 @@ const MILESTONE_DEFS: MilestoneDef[] = [
     bountyPoints: 80,
     resumeRoute: '/dashboard',
   },
+  {
+    id: MILESTONE_FIRST_BUILDING_DETAIL_VISIT,
+    icon: '🏗️',
+    titleKey: 'tutorial.milestones.firstBuildingDetailVisit.title',
+    descKey: 'tutorial.milestones.firstBuildingDetailVisit.desc',
+    valueKey: 'tutorial.milestones.firstBuildingDetailVisit.value',
+    bountyPoints: 30,
+    resumeRoute: '/dashboard',
+  },
+  {
+    id: MILESTONE_FIRST_GRID_EDITOR_OPEN,
+    icon: '🧩',
+    titleKey: 'tutorial.milestones.firstGridEditorOpen.title',
+    descKey: 'tutorial.milestones.firstGridEditorOpen.desc',
+    valueKey: 'tutorial.milestones.firstGridEditorOpen.value',
+    bountyPoints: 30,
+    resumeRoute: '/dashboard',
+  },
 ]
 
 const totalPoints = computed(() => MILESTONE_DEFS.reduce((sum, m) => sum + m.bountyPoints, 0))
 const earnedPoints = computed(() => {
-  return MILESTONE_DEFS.filter((def) => isCompleted(def.id)).reduce((sum, m) => sum + m.bountyPoints, 0)
+  return MILESTONE_DEFS.filter((def) => isCompleted(def.id)).reduce((sum, def) => {
+    const status = milestones.value.find((item) => item.milestone === def.id)
+    return sum + (status?.bountyPoints ?? def.bountyPoints)
+  }, 0)
 })
 const progressPercent = computed(() => {
   const total = (ALL_MILESTONES as readonly string[]).length
@@ -89,7 +112,16 @@ const progressPercent = computed(() => {
 })
 
 function isCompleted(milestoneId: string): boolean {
-  return milestones.value.find((m) => m.milestone === milestoneId)?.isCompleted ?? false
+  const status = milestones.value.find((m) => m.milestone === milestoneId)
+  return (status?.bountyAwarded ?? false) || (status?.isCompleted ?? false)
+}
+
+function isBountyAwarded(milestoneId: string): boolean {
+  return milestones.value.find((m) => m.milestone === milestoneId)?.bountyAwarded ?? false
+}
+
+function getBountyPoints(milestoneId: string, fallbackPoints: number): number {
+  return milestones.value.find((m) => m.milestone === milestoneId)?.bountyPoints ?? fallbackPoints
 }
 
 async function handleResume(route: string) {
@@ -184,7 +216,7 @@ onMounted(async () => {
         </div>
 
         <div class="milestone-card__aside">
-          <span class="milestone-card__bounty">+{{ def.bountyPoints }} pts</span>
+          <span class="milestone-card__bounty">+{{ getBountyPoints(def.id, def.bountyPoints) }} pts</span>
           <button
             v-if="auth.isAuthenticated && !isCompleted(def.id)"
             class="milestone-card__resume-btn"
@@ -193,8 +225,14 @@ onMounted(async () => {
           >
             {{ t('tutorial.resume') }}
           </button>
-          <span v-else class="milestone-card__done-badge">
-            {{ t('tutorial.done') }}
+          <span
+            v-else
+            :class="[
+              'milestone-card__done-badge',
+              { 'milestone-card__done-badge--bounty': isBountyAwarded(def.id) },
+            ]"
+          >
+            {{ isBountyAwarded(def.id) ? t('tutorial.bountyEarned') : t('tutorial.done') }}
           </span>
         </div>
       </article>
@@ -408,6 +446,11 @@ onMounted(async () => {
   color: var(--color-success, #22c55e);
   font-weight: 600;
   white-space: nowrap;
+}
+
+.milestone-card__done-badge--bounty {
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
 }
 
 /* ─── Auth notice ────────────────────────────────────────────────────────── */

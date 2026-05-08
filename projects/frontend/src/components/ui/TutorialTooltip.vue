@@ -74,9 +74,6 @@ onUnmounted(() => {
       :aria-label="title"
       aria-live="polite"
     >
-      <!-- Overlay backdrop (optional; only on first-visit) -->
-      <div class="tutorial-tooltip__overlay" aria-hidden="true" @click="handleDismiss" />
-
       <div class="tutorial-tooltip__card">
         <div class="tutorial-tooltip__header">
           <span class="tutorial-tooltip__icon" aria-hidden="true">💡</span>
@@ -98,30 +95,16 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* ── Fullscreen fixed overlay wrapper ────────────────────────────────────── */
 .tutorial-tooltip {
   position: fixed;
-  inset: 0;
-  z-index: 900;
+  z-index: 120;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
+  pointer-events: none;
 }
 
-/* Semi-transparent glassmorphic backdrop */
-.tutorial-tooltip__overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(2px);
-  cursor: pointer;
-}
-
-/* Centered content card */
 .tutorial-tooltip__card {
   position: relative;
-  z-index: 1;
+  pointer-events: auto;
   background: var(--color-card, #1e293b);
   border: 1px solid var(--color-accent, #6366f1);
   border-radius: 14px;
@@ -132,6 +115,29 @@ onUnmounted(() => {
     0 4px 6px -1px rgba(0, 0, 0, 0.3),
     0 20px 48px rgba(0, 0, 0, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.tutorial-tooltip--top {
+  top: 84px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.tutorial-tooltip--bottom {
+  bottom: 22px;
+  right: 22px;
+}
+
+.tutorial-tooltip--left {
+  top: 50%;
+  left: 22px;
+  transform: translateY(-50%);
+}
+
+.tutorial-tooltip--right {
+  top: 50%;
+  right: 22px;
+  transform: translateY(-50%);
 }
 
 .tutorial-tooltip__header {
@@ -208,5 +214,23 @@ onUnmounted(() => {
 .tt-fade-leave-to .tutorial-tooltip__card {
   opacity: 0;
   transform: scale(0.95) translateY(8px);
+}
+
+@media (max-width: 768px) {
+  .tutorial-tooltip--top,
+  .tutorial-tooltip--left,
+  .tutorial-tooltip--right,
+  .tutorial-tooltip--bottom {
+    left: 12px;
+    right: 12px;
+    bottom: 76px;
+    top: auto;
+    transform: none;
+  }
+
+  .tutorial-tooltip__card {
+    max-width: none;
+    padding: 16px 18px;
+  }
 }
 </style>

@@ -150,9 +150,12 @@ test.describe('Building detail and grid editor contextual tooltip overlay', () =
     // Building detail tooltip is already dismissed, grid editor is not
     state.tutorialProgress = [
       {
-        milestone: 'TOOLTIP_BUILDING_DETAIL_SHOWN',
+        milestone: 'FIRST_BUILDING_DETAIL_VISIT',
         isCompleted: true,
         completedAtUtc: '2026-01-01T00:00:00Z',
+        bountyAwarded: true,
+        bountyAwardedAtUtc: '2026-01-01T00:00:00Z',
+        bountyPoints: 30,
       },
     ]
     state.cities = makeDefaultCities()
@@ -189,14 +192,20 @@ test.describe('Building detail and grid editor contextual tooltip overlay', () =
     // Both tooltips already dismissed
     state.tutorialProgress = [
       {
-        milestone: 'TOOLTIP_BUILDING_DETAIL_SHOWN',
+        milestone: 'FIRST_BUILDING_DETAIL_VISIT',
         isCompleted: true,
         completedAtUtc: '2026-01-01T00:00:00Z',
+        bountyAwarded: true,
+        bountyAwardedAtUtc: '2026-01-01T00:00:00Z',
+        bountyPoints: 30,
       },
       {
-        milestone: 'TOOLTIP_GRID_EDITOR_SHOWN',
+        milestone: 'FIRST_GRID_EDITOR_OPEN',
         isCompleted: true,
         completedAtUtc: '2026-01-01T00:00:00Z',
+        bountyAwarded: true,
+        bountyAwardedAtUtc: '2026-01-01T00:00:00Z',
+        bountyPoints: 30,
       },
     ]
     state.cities = makeDefaultCities()
@@ -231,9 +240,12 @@ test.describe('Building detail and grid editor contextual tooltip overlay', () =
     state.currentToken = `token-${player.id}`
     state.tutorialProgress = [
       {
-        milestone: 'TOOLTIP_BUILDING_DETAIL_SHOWN',
+        milestone: 'FIRST_BUILDING_DETAIL_VISIT',
         isCompleted: true,
         completedAtUtc: '2026-01-01T00:00:00Z',
+        bountyAwarded: true,
+        bountyAwardedAtUtc: '2026-01-01T00:00:00Z',
+        bountyPoints: 30,
       },
     ]
     state.cities = makeDefaultCities()
@@ -268,9 +280,12 @@ test.describe('Building detail and grid editor contextual tooltip overlay', () =
     state.currentToken = `token-${player.id}`
     state.tutorialProgress = [
       {
-        milestone: 'TOOLTIP_BUILDING_DETAIL_SHOWN',
+        milestone: 'FIRST_BUILDING_DETAIL_VISIT',
         isCompleted: true,
         completedAtUtc: '2026-01-01T00:00:00Z',
+        bountyAwarded: true,
+        bountyAwardedAtUtc: '2026-01-01T00:00:00Z',
+        bountyPoints: 30,
       },
     ]
     state.cities = makeDefaultCities()
@@ -288,7 +303,7 @@ test.describe('Building detail and grid editor contextual tooltip overlay', () =
 
     // Verify milestone was persisted
     await expect
-      .poll(() => state.tutorialProgress.find((m) => m.milestone === 'TOOLTIP_GRID_EDITOR_SHOWN')?.isCompleted, { timeout: 3000 })
+      .poll(() => state.tutorialProgress.find((m) => m.milestone === 'FIRST_GRID_EDITOR_OPEN')?.isCompleted, { timeout: 3000 })
       .toBe(true)
   })
 })

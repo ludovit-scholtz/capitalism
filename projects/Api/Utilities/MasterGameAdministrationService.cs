@@ -29,6 +29,10 @@ public interface IMasterGameAdministrationService
         string status,
         IReadOnlyList<GameNewsLocalizationInput> localizations,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<TutorialBountyStatusResult>> GetTutorialBountyStatusesAsync(
+        string playerEmail,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record MasterGameAdministrationAccessSnapshot(
@@ -323,6 +327,39 @@ public sealed class MasterGameAdministrationService(
         return payload.UpsertGameNewsEntry;
     }
 
+    public async Task<IReadOnlyList<TutorialBountyStatusResult>> GetTutorialBountyStatusesAsync(
+        string playerEmail,
+        CancellationToken cancellationToken = default)
+    {
+        if (!options.Value.IsConfigured())
+        {
+            return [];
+        }
+
+        var payload = await SendGraphQlAsync<GetTutorialBountyStatusesResponse>(
+            """
+            query TutorialBounties($input: GetTutorialBountyStatusesInput!) {
+              tutorialBountyStatuses(input: $input) {
+                milestone
+                bountyCode
+                isAwarded
+                awardedAtUtc
+                rewardPoints
+              }
+            }
+            """,
+            new
+            {
+                input = BuildServiceInput(new
+                {
+                    playerEmail,
+                })
+            },
+            cancellationToken);
+
+        return payload.TutorialBountyStatuses;
+    }
+
     private object BuildServiceInput(object payload)
     {
         var source = payload
@@ -455,4 +492,22 @@ public sealed class MasterGameAdministrationService(
     {
         public GameNewsEntryResult UpsertGameNewsEntry { get; init; } = new();
     }
+
+    private sealed class GetTutorialBountyStatusesResponse
+    {
+        public List<TutorialBountyStatusResult> TutorialBountyStatuses { get; init; } = [];
+    }
+}
+
+public sealed class TutorialBountyStatusResult
+{
+    public string Milestone { get; init; } = string.Empty;
+
+    public string BountyCode { get; init; } = string.Empty;
+
+    public bool IsAwarded { get; init; }
+
+    public DateTime? AwardedAtUtc { get; init; }
+
+    public decimal RewardPoints { get; init; }
 }

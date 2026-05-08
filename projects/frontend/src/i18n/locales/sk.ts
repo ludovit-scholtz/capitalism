@@ -3521,6 +3521,7 @@ export default {
     pointsEarned: '{earned}/{total} bodov získaných',
     resume: 'Pokračovať',
     done: 'Hotovo',
+    bountyEarned: 'Bounty získaná ✓',
     completedAria: 'Dokončené',
     pendingAria: 'Čaká',
     authNotice: 'Prihláste sa, aby ste mohli sledovať postup a získavať body za každý míľnik.',
@@ -3557,6 +3558,16 @@ export default {
         desc: 'Investujte do brandingu produktu a dosiahnite merateľnú povedomosť o značke.',
         value: 'Objavte, ako kvalita značky zvyšuje dopyt a umožňuje účtovať prémiové ceny.',
       },
+      firstBuildingDetailVisit: {
+        title: 'Prvá návšteva detailu budovy',
+        desc: 'Otvorte detail budovy a prezrite si mriežku 4×4, role jednotiek a dostupné akcie.',
+        value: 'Naučte sa, kde sa nastavujú jednotky ťažby, skladu, nákupu, výroby a predaja.',
+      },
+      firstGridEditorOpen: {
+        title: 'Prvé otvorenie editora mriežky',
+        desc: 'Vstúpte do režimu úprav v budove a prvýkrát otvorte editor mriežky.',
+        value: 'Naučte sa aktívne/neaktívne prepojenia aj diagonálne spojenia pre efektívne výrobné reťazce.',
+      },
     },
     tooltips: {
       gridEditorIntro: {
@@ -3577,11 +3588,11 @@ export default {
       },
       buildingDetailOverlay: {
         title: 'Detail budovy',
-        body: 'Tu môžete kontrolovať každú jednotku budovy, konfigurovať výrobné reťazce a zaradiť do frontu vylepšenia. Kliknite na ľubovoľnú bunku mriežky a zobrazte nastavenia jednotky.',
+        body: 'Tu môžete skontrolovať mriežku jednotiek 4×4, typy jednotiek (ťažba, sklad, nákup, výroba, predaj), konfigurovať výrobné reťazce a zaradiť vylepšenia do frontu. Kliknite na bunku mriežky pre detail jednotky.',
       },
       gridEditorOverlay: {
         title: 'Editor mriežky jednotiek',
-        body: 'Presuňte dlaždice jednotiek do mriežky a nastavte rozloženie výroby. Prepojte jednotky na vytvorenie efektívnych výrobných reťazcov. Navštívte stránku Tutoriál pre sprievodcu krok za krokom.',
+        body: 'Presúvajte dlaždice jednotiek a nastavte rozloženie. Prepínajte prepojenia medzi susednými jednotkami vrátane diagonálnych spojení. Aktívne prepojenie prenáša tok, neaktívne ho zastaví.',
       },
     },
   },

@@ -10,6 +10,9 @@ export const MILESTONE_FIRST_B2B_TRADE = 'FIRST_B2B_TRADE'
 export const MILESTONE_FIRST_LOAN_TAKEN = 'FIRST_LOAN_TAKEN'
 export const MILESTONE_FIRST_COMPETITOR_OBSERVED = 'FIRST_COMPETITOR_OBSERVED'
 export const MILESTONE_FIRST_BRAND_ESTABLISHED = 'FIRST_BRAND_ESTABLISHED'
+export const MILESTONE_FIRST_BUILDING_DETAIL_VISIT = 'FIRST_BUILDING_DETAIL_VISIT'
+export const MILESTONE_FIRST_GRID_EDITOR_OPEN = 'FIRST_GRID_EDITOR_OPEN'
+export const MILESTONE_TOOLTIP_DASHBOARD_SHOWN = 'TOOLTIP_DASHBOARD_SHOWN'
 
 export const ALL_MILESTONES = [
   MILESTONE_FIRST_RESOURCE_SOLD,
@@ -17,6 +20,8 @@ export const ALL_MILESTONES = [
   MILESTONE_FIRST_LOAN_TAKEN,
   MILESTONE_FIRST_COMPETITOR_OBSERVED,
   MILESTONE_FIRST_BRAND_ESTABLISHED,
+  MILESTONE_FIRST_BUILDING_DETAIL_VISIT,
+  MILESTONE_FIRST_GRID_EDITOR_OPEN,
 ] as const
 
 const TUTORIAL_MILESTONE_SET = new Set<string>(ALL_MILESTONES)
@@ -27,6 +32,9 @@ const TUTORIAL_PROGRESS_QUERY = `
       milestone
       isCompleted
       completedAtUtc
+      bountyAwarded
+      bountyAwardedAtUtc
+      bountyPoints
     }
   }
 `
@@ -37,6 +45,9 @@ const MARK_MILESTONE_MUTATION = `
       milestone
       isCompleted
       completedAtUtc
+      bountyAwarded
+      bountyAwardedAtUtc
+      bountyPoints
     }
   }
 `
@@ -55,12 +66,12 @@ export function useTutorialContext() {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  /** Whether all 5 milestones are completed. */
+  /** Whether all tracked tutorial milestones are completed. */
   const allCompleted = computed(
     () => milestones.value.length > 0 && milestones.value.every((m) => m.isCompleted),
   )
 
-  /** Count of completed milestones (only counts the 5 real tutorial milestones,
+  /** Count of completed milestones (only counts the real tutorial milestones,
    *  not internal tracking milestones like tooltip-dismissal flags). */
   const completedCount = computed(
     () =>

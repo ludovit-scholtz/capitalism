@@ -27,7 +27,14 @@ test.describe('Dashboard contextual tooltip overlay', () => {
     state.currentToken = `token-${player.id}`
     // Tutorial milestones have no tooltip dismissed yet
     state.tutorialProgress = [
-      { milestone: 'FIRST_RESOURCE_SOLD', isCompleted: false, completedAtUtc: null },
+      {
+        milestone: 'FIRST_RESOURCE_SOLD',
+        isCompleted: false,
+        completedAtUtc: null,
+        bountyAwarded: false,
+        bountyAwardedAtUtc: null,
+        bountyPoints: 50,
+      },
     ]
 
     await clearSessionStorage(page)
@@ -40,9 +47,6 @@ test.describe('Dashboard contextual tooltip overlay', () => {
     // Verify tooltip content
     await expect(page.locator('.tutorial-tooltip__title')).toContainText('Welcome to Your Dashboard')
     await expect(page.locator('.tutorial-tooltip__body')).toContainText('command centre')
-
-    // Verify backdrop overlay is shown
-    await expect(page.locator('.tutorial-tooltip__overlay')).toBeVisible()
 
     // Dismiss button is visible
     await expect(page.locator('.tutorial-tooltip__dismiss-btn')).toBeVisible()
@@ -100,7 +104,14 @@ test.describe('Dashboard contextual tooltip overlay', () => {
     state.currentToken = `token-${player.id}`
     // Dashboard tooltip already dismissed
     state.tutorialProgress = [
-      { milestone: 'TOOLTIP_DASHBOARD_SHOWN', isCompleted: true, completedAtUtc: '2026-01-01T00:00:00Z' },
+      {
+        milestone: 'TOOLTIP_DASHBOARD_SHOWN',
+        isCompleted: true,
+        completedAtUtc: '2026-01-01T00:00:00Z',
+        bountyAwarded: false,
+        bountyAwardedAtUtc: null,
+        bountyPoints: null,
+      },
     ]
 
     await clearSessionStorage(page)

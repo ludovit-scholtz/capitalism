@@ -226,4 +226,7 @@ export interface TutorialMilestoneStatus {
   milestone: string
   isCompleted: boolean
   completedAtUtc: string | null
+  bountyAwarded: boolean
+  bountyAwardedAtUtc: string | null
+  bountyPoints?: number | null
 }
