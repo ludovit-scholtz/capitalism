@@ -2,19 +2,20 @@
  * FX currency pair formatting utilities.
  *
  * Conventions:
- * - A "pair" is rendered as WEAKER+STRONGER (e.g. CZKUSD, CZKEUR).
- * - Stronger currencies follow roadmap hierarchy: USD > EUR > CNY > GBP > INR > CZK.
+ * - A "pair" is rendered as STRONGER+WEAKER (e.g. EURUSD, USDCZK).
+ * - Stronger currencies follow roadmap hierarchy: EUR > USD > CNY > GBP > INR > CZK.
  * - No slash separator is used in the pair code.
  */
 
 /** Canonical ranking of strong/global currencies: lower index = stronger. */
 const CURRENCY_STRENGTH: Record<string, number> = {
-  USD: 0,
-  EUR: 1,
+  EUR: 0,
+  USD: 1,
   CNY: 2,
   GBP: 3,
   INR: 4,
   CZK: 5,
+  PLN: 6,
 }
 
 /**
@@ -33,13 +34,13 @@ export function isStrongerThan(base: string, quote: string): boolean {
 }
 
 /**
- * Returns canonical pair code as WEAKER then STRONGER (no separator).
- * E.g. formatPairLabel('CZK', 'EUR') → 'CZKEUR'
+ * Returns canonical pair code as STRONGER then WEAKER (no separator).
+ * E.g. formatPairLabel('CZK', 'EUR') → 'EURCZK'
  */
 export function formatPairLabel(codeA: string, codeB: string): string {
   const a = codeA.toUpperCase()
   const b = codeB.toUpperCase()
-  return isStrongerThan(a, b) ? `${b}${a}` : `${a}${b}`
+  return isStrongerThan(a, b) ? `${a}${b}` : `${b}${a}`
 }
 
 /**
@@ -78,7 +79,7 @@ export function buildEurPairList(currencyCodes: string[]): string[] {
  * (e.g. 25.19 for EUR/CZK meaning "1 EUR = 25.19 CZK").
  *
  * - If the pair code starts with EUR (e.g. "EURUSD"), the rate is returned unchanged.
- * - If the pair code starts with a non-EUR currency (e.g. "CZKEUR"), the rate is inverted.
+ * - If the pair code ends with EUR (e.g. "USDEUR"), the rate is inverted.
  */
 export function rateForPair(pairLabel: string, eurToQuoteRate: number): number {
   const base = pairLabel.slice(0, 3).toUpperCase()
@@ -88,7 +89,7 @@ export function rateForPair(pairLabel: string, eurToQuoteRate: number): number {
 
 /**
  * Extracts the non-EUR quote currency from a compact EUR pair code.
- * Supports "EURUSD" -> "USD" and "CZKEUR" -> "CZK".
+ * Supports "EURUSD" -> "USD" and "USDEUR" -> "USD".
  */
 export function extractQuoteCurrencyFromEurPair(pairLabel: string): string | null {
   const normalized = pairLabel.toUpperCase()

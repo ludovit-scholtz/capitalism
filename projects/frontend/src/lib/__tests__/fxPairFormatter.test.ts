@@ -12,12 +12,12 @@ import {
 
 describe('fxPairFormatter', () => {
   describe('currencyStrength', () => {
-    it('returns 0 for USD (strongest)', () => {
-      expect(currencyStrength('USD')).toBe(0)
+    it('returns 0 for EUR (strongest)', () => {
+      expect(currencyStrength('EUR')).toBe(0)
     })
 
-    it('returns 1 for EUR (second strongest)', () => {
-      expect(currencyStrength('EUR')).toBe(1)
+    it('returns 1 for USD (second strongest)', () => {
+      expect(currencyStrength('USD')).toBe(1)
     })
 
     it('CZK is weaker than INR', () => {
@@ -35,8 +35,8 @@ describe('fxPairFormatter', () => {
   })
 
   describe('isStrongerThan', () => {
-    it('USD is stronger than EUR', () => {
-      expect(isStrongerThan('USD', 'EUR')).toBe(true)
+    it('EUR is stronger than USD', () => {
+      expect(isStrongerThan('EUR', 'USD')).toBe(true)
     })
 
     it('CZK is not stronger than EUR', () => {
@@ -53,25 +53,25 @@ describe('fxPairFormatter', () => {
   })
 
   describe('formatPairLabel', () => {
-    it('places weaker currency first as roadmap format: CZKEUR', () => {
-      expect(formatPairLabel('CZK', 'EUR')).toBe('CZKEUR')
+    it('places stronger currency first as roadmap format: EURCZK', () => {
+      expect(formatPairLabel('CZK', 'EUR')).toBe('EURCZK')
     })
 
-    it('uses EURUSD in EUR/USD pair because EUR is weaker than USD', () => {
+    it('uses EURUSD in EUR/USD pair because EUR is stronger than USD', () => {
       expect(formatPairLabel('USD', 'EUR')).toBe('EURUSD')
     })
 
-    it('preserves already-correct ordering CZKEUR', () => {
-      expect(formatPairLabel('CZK', 'EUR')).toBe('CZKEUR')
+    it('preserves already-correct ordering EURCZK', () => {
+      expect(formatPairLabel('CZK', 'EUR')).toBe('EURCZK')
     })
 
     it('uppercases currency codes', () => {
-      expect(formatPairLabel('eur', 'czk')).toBe('CZKEUR')
+      expect(formatPairLabel('eur', 'czk')).toBe('EURCZK')
     })
 
-    it('handles unknown currencies by treating them as weaker than known majors', () => {
+    it('handles unknown currencies by treating them as weaker than known majors (known first)', () => {
       const label = formatPairLabel('EUR', 'XYZ')
-      expect(label).toBe('XYZEUR')
+      expect(label).toBe('EURXYZ')
     })
 
     it('returns a 6-character pair code for two unknown currencies', () => {
@@ -85,8 +85,8 @@ describe('fxPairFormatter', () => {
       expect(pairWeaker('CZK', 'EUR')).toBe('CZK')
     })
 
-    it('returns EUR when paired with USD (EUR is weaker)', () => {
-      expect(pairWeaker('USD', 'EUR')).toBe('EUR')
+    it('returns USD when paired with EUR (USD is weaker)', () => {
+      expect(pairWeaker('USD', 'EUR')).toBe('USD')
     })
   })
 
@@ -95,8 +95,8 @@ describe('fxPairFormatter', () => {
       expect(pairStronger('EUR', 'CZK')).toBe('EUR')
     })
 
-    it('returns USD for EUR/USD pair (USD stronger)', () => {
-      expect(pairStronger('EUR', 'USD')).toBe('USD')
+    it('returns EUR for EUR/USD pair (EUR stronger)', () => {
+      expect(pairStronger('EUR', 'USD')).toBe('EUR')
     })
   })
 
@@ -122,7 +122,7 @@ describe('fxPairFormatter', () => {
 
     it('creates correct EUR/X labels for all provided currencies', () => {
       const pairs = buildEurPairList(['CZK', 'USD'])
-      expect(pairs).toContain('CZKEUR')
+      expect(pairs).toContain('EURCZK')
       expect(pairs).toContain('EURUSD')
     })
   })
@@ -136,14 +136,19 @@ describe('fxPairFormatter', () => {
       expect(rateForPair('EURUSD', 0)).toBe(0)
     })
 
-    it('inverts rate when pair starts with weaker non-EUR currency', () => {
-      const result = rateForPair('CZKEUR', 25.2)
-      expect(result).toBeCloseTo(1 / 25.2, 5)
-    })
-
-    it('inverts rate when pair starts with stronger non-EUR currency too', () => {
+    it('inverts rate when pair ends with EUR', () => {
       const result = rateForPair('USDEUR', 1.08)
       expect(result).toBeCloseTo(1 / 1.08, 5)
+    })
+
+    it('returns raw rate unchanged for EURCZK pair (EUR base)', () => {
+      const result = rateForPair('EURCZK', 25.2)
+      expect(result).toBe(25.2)
+    })
+
+    it('inverts rate when pair starts with non-EUR base and ends with EUR', () => {
+      const result = rateForPair('CZKEUR', 25.2)
+      expect(result).toBeCloseTo(1 / 25.2, 5)
     })
   })
 
@@ -152,8 +157,8 @@ describe('fxPairFormatter', () => {
       expect(extractQuoteCurrencyFromEurPair('EURUSD')).toBe('USD')
     })
 
-    it('returns CZK for CZKEUR', () => {
-      expect(extractQuoteCurrencyFromEurPair('CZKEUR')).toBe('CZK')
+    it('returns CZK for EURCZK', () => {
+      expect(extractQuoteCurrencyFromEurPair('EURCZK')).toBe('CZK')
     })
 
     it('returns null for invalid pair code', () => {
