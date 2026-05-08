@@ -104,6 +104,6 @@ It will use real world map. The game will start in single city and later other c
 
 - [ ] In root directory create audits folder, and every week do the audit of the security. List all potential risks and create the action plan to resolve them. The main focus should be on question: Can one player gain unfair advantege of another player by executing an api call or exploting some unfair game mechanics?
 
-### Media house (0% complete)
+### Media house (100% complete)
 
-- [ ] When media house is in the upgrade, allow the marketing units to configure it
+- [x] When media house is in the upgrade, allow the marketing units to configure it

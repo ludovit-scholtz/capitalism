@@ -2212,6 +2212,7 @@ export default {
     configTargetCompany: 'Cieľová firma',
     configCampaignBudget: 'Rozpočet kampane na tik',
     configIsActive: 'Kampaň aktívna',
+    upgradeConfigNotice: 'Budova sa vylepšuje – zmeny konfigurácie sa použijú po dokončení.',
     saveUnitConfigBtn: 'Uložiť kampaňovú jednotku',
     unitConfigSaved: 'Konfigurácia kampane uložená.',
     targetCompanyRequired: 'Cieľová firma je povinná.',
