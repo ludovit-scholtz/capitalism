@@ -1,8 +1,13 @@
 import { expect, test, type Page } from '@playwright/test'
 import { makeAdminPlayer, makePlayer, setupMockApi } from '../../helpers/mock-api'
 
+const MAX_TABLET_WIDTH = 768
+
+// 375×667 is the acceptance-criteria baseline (iPhone SE class).
+// Keep 390×844 too so we continue covering modern larger mobile devices.
 const overflowViewports = [
   { label: 'mobile', width: 375, height: 667 },
+  { label: 'mobile-lg', width: 390, height: 844 },
   { label: 'tablet', width: 768, height: 1024 },
   { label: 'fullhd', width: 1920, height: 1080 },
 ] as const
@@ -233,7 +238,7 @@ test.describe('Responsive layout baseline checks', () => {
     const { player } = seedAuthenticatedState(page)
     await seedAuthenticatedStorage(page, `token-${player.id}`)
 
-    for (const viewport of overflowViewports.filter((item) => item.width <= 768)) {
+    for (const viewport of overflowViewports.filter((item) => item.width <= MAX_TABLET_WIDTH)) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height })
       await page.goto('/building/building-responsive')
       await expect(page.getByRole('heading', { name: 'Responsive Factory' })).toBeVisible()
@@ -245,7 +250,7 @@ test.describe('Responsive layout baseline checks', () => {
     const { admin } = seedAdminState(page)
     await seedAuthenticatedStorage(page, `token-${admin.id}`)
 
-    for (const viewport of overflowViewports.filter((item) => item.width <= 768)) {
+    for (const viewport of overflowViewports.filter((item) => item.width <= MAX_TABLET_WIDTH)) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height })
       await page.goto('/operations/statistics')
       await expect(page.getByRole('heading', { name: /operations overview/i })).toBeVisible()
