@@ -165,6 +165,14 @@ export interface Building {
   destroyedAtUtc: string | null
   /** True when at least one DEFAULTED loan uses this building as collateral. */
   hasDefaultedCollateralLoan?: boolean
+  marketValuation?: {
+    landValue: number
+    structureValue: number
+    unitsValue: number
+    totalValue: number
+    minimumSalePrice: number
+    currencyCode: string
+  } | null
   units: BuildingUnit[]
   pendingConfiguration: BuildingConfigurationPlan | null
 }

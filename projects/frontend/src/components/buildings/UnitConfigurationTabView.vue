@@ -30,6 +30,8 @@ const {
   logisticsTrapWarning,
   selectedPurchaseResourceSlug,
   selectedPurchaseUnit,
+  sourcingCandidates,
+  sourcingCandidatesLoading,
   getUnitAtFrom,
   getDraftUnitConstructionCostLabel,
   getUnitInventorySummary,
@@ -63,13 +65,24 @@ const currentUnit = computed(() => {
   if (!selectedCell.value) return null
   return getUnitAtFrom(plannedUnits.value, selectedCell.value.x, selectedCell.value.y)
 })
+
+const purchaseSourcingHistory = computed(() => {
+  return [...sourcingCandidates.value]
+    .filter((candidate) => candidate.deliveredPricePerUnit != null || candidate.estimatedQuality != null)
+    .sort((left, right) => {
+      const leftPrice = left.deliveredPricePerUnit ?? Number.MAX_SAFE_INTEGER
+      const rightPrice = right.deliveredPricePerUnit ?? Number.MAX_SAFE_INTEGER
+      return leftPrice - rightPrice
+    })
+    .slice(0, 8)
+})
 </script>
 
 <template>
   <div v-if="selectedCell && currentUnit" class="unit-configuration-tab-view">
     <!-- Tab navigation -->
     <nav
-      class="unit-detail-tabs flex flex-nowrap items-center gap-1 overflow-x-auto border-b border-divider bg-bg px-4 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      class="unit-detail-tabs flex flex-nowrap items-center gap-1 overflow-x-auto bg-bg px-4 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       :aria-label="t('buildingDetail.unitConfiguration')"
     >
       <button
@@ -87,6 +100,7 @@ const currentUnit = computed(() => {
 
       <!-- ── Tab: General Settings ── -->
       <template v-if="selectedConfigTab === 'config'">
+        <div class="unit-basic-info mt-3">
         <h4>{{ t(`buildingDetail.unitTypes.${currentUnit.unitType}`) }}</h4>
         <p class="unit-desc">{{ t(`buildingDetail.unitDescriptions.${currentUnit.unitType}`) }}</p>
         <div class="unit-stats">
@@ -117,6 +131,41 @@ const currentUnit = computed(() => {
 
         <!-- Unit-specific configuration (shown on default tab so settings are immediately visible) -->
         <BuildingUnitConfigFields />
+
+        <div v-if="currentUnit.unitType === 'PURCHASE'" class="unit-insight-card purchase-history-panel">
+          <h5>{{ t('buildingDetail.purchasePriceQualityHistory.title') }}</h5>
+          <p class="config-help">{{ t('buildingDetail.purchasePriceQualityHistory.subtitle') }}</p>
+          <p v-if="sourcingCandidatesLoading" class="config-help">{{ t('common.loading') }}</p>
+          <div v-else-if="purchaseSourcingHistory.length > 0" class="inventory-table mt-2">
+            <div class="inventory-table-header">
+              <span class="inventory-col-item">{{ t('common.city') }}</span>
+              <span class="inventory-col-cost">{{ t('buildingDetail.purchasePriceQualityHistory.purchasePrice') }}</span>
+              <span class="inventory-col-quality">{{ t('buildingDetail.purchasePriceQualityHistory.quality') }}</span>
+            </div>
+            <div v-for="entry in purchaseSourcingHistory" :key="`${entry.sourceType}-${entry.sourceCityId ?? 'none'}-${entry.rank}`" class="inventory-table-row">
+              <div class="inventory-col-item">
+                <span class="inventory-item-name">{{ entry.sourceCityName }}</span>
+              </div>
+              <div class="inventory-col-cost">
+                <span class="inventory-item-cost">{{ entry.deliveredPricePerUnit != null ? formatCurrency(entry.deliveredPricePerUnit) : '—' }}</span>
+              </div>
+              <div class="inventory-col-quality">
+                <span class="inventory-item-quality">{{ entry.estimatedQuality != null ? formatPercent(entry.estimatedQuality) : '—' }}</span>
+              </div>
+            </div>
+          </div>
+          <p v-else class="config-help">{{ t('buildingDetail.purchasePriceQualityHistory.empty') }}</p>
+        </div>
+
+        <UnitResourceHistoryPanel
+          v-if="currentUnit.unitType === 'PURCHASE' && selectedHistoryItemOptions.length > 0"
+          :items="selectedHistoryItemOptions"
+          :selected-item-key="selectedHistoryItemKey"
+          :history="selectedUnitResourceHistory"
+          borderless
+          @update:selected-item-key="selectedHistoryItemKey = $event"
+        />
+        </div>
 
         <!-- Exchange offers panel — shown on General tab when PURCHASE unit has EXCHANGE/OPTIMAL source -->
         <div
@@ -199,7 +248,7 @@ const currentUnit = computed(() => {
       <!-- ── Tab: Production (future use) ── -->
       <!-- ── Tab: Inventory ── -->
       <template v-else-if="selectedConfigTab === 'performance'">
-        <div v-if="getUnitInventorySummary(currentUnit)" class="unit-insight-card">
+        <div v-if="getUnitInventorySummary(currentUnit)" class="unit-insight-card mt-0 border-0 pt-0">
           <h5>{{ t('buildingDetail.inventory.title') }}</h5>
           <div class="inventory-summary-grid">
             <div class="inventory-summary-stat">
@@ -276,13 +325,14 @@ const currentUnit = computed(() => {
           :items="selectedHistoryItemOptions"
           :selected-item-key="selectedHistoryItemKey"
           :history="selectedUnitResourceHistory"
+          borderless
           @update:selected-item-key="selectedHistoryItemKey = $event"
         />
       </template>
 
       <!-- ── Tab: Sales / Upgrade ── -->
       <template v-else-if="selectedConfigTab === 'maintenance'">
-        <div v-if="isEditing && selectedCellUpgradeInfo !== null" class="unit-insight-card unit-upgrade-panel" :aria-label="t('buildingDetail.accessibility.unitUpgrade')">
+        <div v-if="isEditing && selectedCellUpgradeInfo !== null" class="unit-insight-card unit-upgrade-panel mt-0 border-0 pt-0" :aria-label="t('buildingDetail.accessibility.unitUpgrade')">
           <h5>{{ t('buildingDetail.unitUpgrade.sectionTitle') }}</h5>
 
           <!-- Upgrade in progress -->

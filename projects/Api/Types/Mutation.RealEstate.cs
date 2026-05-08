@@ -46,6 +46,20 @@ public sealed partial class Mutation
                         .Build());
             }
 
+            var marketValuation = await BuildingMarketValuationCalculator.CalculateAsync(
+                db,
+                building,
+                httpContextAccessor.HttpContext!.RequestAborted);
+            if (input.AskingPrice.Value < marketValuation.MinimumSalePrice)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage(
+                            $"Asking price must be at least {marketValuation.MinimumSalePrice:F2} {marketValuation.CurrencyCode} (70% of market value {marketValuation.TotalValue:F2} {marketValuation.CurrencyCode}).")
+                        .SetCode("ASKING_PRICE_BELOW_MINIMUM")
+                        .Build());
+            }
+
             // Prevent listing a building that is pledged as collateral on an active or overdue loan.
             // Defaulted loans are excluded: a building with a defaulted loan must be sold to repay the debt.
             var isCollateral = await db.Loans.AnyAsync(l =>
@@ -138,19 +152,17 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        var currencyCode = building.City?.CurrencyCode ?? "EUR";
-        var fxRates = await FxRateHelper.BuildEurRatesLookupAsync(db, [currencyCode]);
-        var cityFxRate = FxRateHelper.GetEurRate(fxRates, currencyCode);
-
-        var propertyValueLocal = WealthCalculator.GetBuildingValue(building) * cityFxRate;
-        var unitValueLocal = building.Units.Count * 20_000m * cityFxRate;
-        var estimatedMarketValue = decimal.Round(propertyValueLocal + unitValueLocal, 2, MidpointRounding.AwayFromZero);
+        var marketValuation = await BuildingMarketValuationCalculator.CalculateAsync(
+            db,
+            building,
+            httpContextAccessor.HttpContext!.RequestAborted);
+        var estimatedMarketValue = marketValuation.TotalValue;
         var refundAmount = decimal.Round(
             estimatedMarketValue * GameConstants.ForeclosureRefundFraction,
             2,
             MidpointRounding.AwayFromZero);
 
-        var ownerAccount = await CompanyBankingService.EnsurePreferredAccountAsync(db, building.CompanyId, currencyCode);
+        var ownerAccount = await CompanyBankingService.EnsurePreferredAccountAsync(db, building.CompanyId, marketValuation.CurrencyCode);
         ownerAccount.Balance += refundAmount;
         ownerAccount.ConcurrencyToken = Guid.NewGuid();
 
@@ -205,7 +217,7 @@ public sealed partial class Mutation
             userId,
             PlayerNotificationType.Generic,
             "Building destroyed",
-            $"'{building.Name}' was destroyed. {refundAmount.ToString("N2", CultureInfo.InvariantCulture)} {currencyCode} was credited to your account.",
+            $"'{building.Name}' was destroyed. {refundAmount.ToString("N2", CultureInfo.InvariantCulture)} {marketValuation.CurrencyCode} was credited to your account.",
             currentTick,
             building.CompanyId,
             building.Id,
@@ -218,7 +230,7 @@ public sealed partial class Mutation
             BuildingId = building.Id,
             BuildingName = building.Name,
             RefundAmount = refundAmount,
-            CurrencyCode = currencyCode,
+            CurrencyCode = marketValuation.CurrencyCode,
         };
     }
 

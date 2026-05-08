@@ -5,7 +5,10 @@ import {
   EMV_HIGH_PRICE_WARNING_FACTOR,
   EMV_LEVEL_MULTIPLIER_BASE,
   EMV_UNIT_BASE_VALUE,
+  MINIMUM_SALE_PRICE_FACTOR,
+  computeMinimumSalePrice,
   computeEstimatedMarketValue,
+  isAskingPriceBelowMinimum,
   isAskingPriceTooHigh,
 } from '../sellBuilding'
 
@@ -32,6 +35,10 @@ describe('EMV constants', () => {
 
   it('EMV_HIGH_PRICE_WARNING_FACTOR is 1.5', () => {
     expect(EMV_HIGH_PRICE_WARNING_FACTOR).toBe(1.5)
+  })
+
+  it('MINIMUM_SALE_PRICE_FACTOR is 0.7', () => {
+    expect(MINIMUM_SALE_PRICE_FACTOR).toBe(0.7)
   })
 })
 
@@ -153,5 +160,21 @@ describe('isAskingPriceTooHigh', () => {
 
   it('returns false when asking price is zero', () => {
     expect(isAskingPriceTooHigh(0, emv)).toBe(false)
+  })
+})
+
+describe('minimum sale price rules', () => {
+  const marketValue = 100_000
+
+  it('computes minimum sale price as 70% of market value', () => {
+    expect(computeMinimumSalePrice(marketValue)).toBe(70_000)
+  })
+
+  it('rejects asking price below 70% of market value', () => {
+    expect(isAskingPriceBelowMinimum(69_999, marketValue)).toBe(true)
+  })
+
+  it('allows asking price exactly at 70% of market value', () => {
+    expect(isAskingPriceBelowMinimum(70_000, marketValue)).toBe(false)
   })
 })

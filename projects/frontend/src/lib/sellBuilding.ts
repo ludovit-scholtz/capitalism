@@ -12,6 +12,7 @@ export const EMV_DEFAULT_POPULATION_INDEX = 0.5
 
 /** Maximum price factor before showing a "price is very high" warning (1.5 = 150%). */
 export const EMV_HIGH_PRICE_WARNING_FACTOR = 1.5
+export const MINIMUM_SALE_PRICE_FACTOR = 0.7
 
 export interface BuildingEmvInput {
   level: number
@@ -43,4 +44,12 @@ export function computeEstimatedMarketValue(input: BuildingEmvInput): number {
  */
 export function isAskingPriceTooHigh(askingPrice: number, estimatedMarketValue: number): boolean {
   return askingPrice > estimatedMarketValue * EMV_HIGH_PRICE_WARNING_FACTOR
+}
+
+export function computeMinimumSalePrice(estimatedMarketValue: number): number {
+  return Math.round(estimatedMarketValue * MINIMUM_SALE_PRICE_FACTOR * 100) / 100
+}
+
+export function isAskingPriceBelowMinimum(askingPrice: number, estimatedMarketValue: number): boolean {
+  return askingPrice < computeMinimumSalePrice(estimatedMarketValue)
 }

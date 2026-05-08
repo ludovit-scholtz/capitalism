@@ -232,7 +232,7 @@ function buildCompetitionPieGradient(entries: CompetitionLegendEntry[]): string 
       <!-- Unit detail tab navigation -->
       <nav
         v-if="unitDetailTabs.length > 0"
-        class="unit-detail-tabs flex flex-nowrap items-center gap-1 overflow-x-auto border-b border-divider bg-bg px-4 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        class="unit-detail-tabs flex flex-nowrap items-center gap-1 overflow-x-auto bg-bg px-4 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         :aria-label="t('buildingDetail.accessibility.unitDetailSections')"
       >
         <button
@@ -1100,7 +1100,7 @@ function buildCompetitionPieGradient(entries: CompetitionLegendEntry[]): string 
         ><!-- ── Supply Chain tab ─────────────────────────────── --><template v-else-if="selectedUnitTab === 'supplyChain'"
           ><SupplyChainTab :supply-chain="supplyChain" :loading="supplyChainLoading" /></template
         ><!-- ── Recent Activity tab ─────────────────────────────── --><template v-else-if="selectedUnitTab === 'recentActivity'"
-          ><div class="unit-insight-card recent-activity-panel" :aria-label="t('buildingDetail.accessibility.recentActivity')">
+          ><div class="unit-insight-card recent-activity-panel mt-0 border-0 pt-0" :aria-label="t('buildingDetail.accessibility.recentActivity')">
             <h5 class="mb-2">{{ t('buildingDetail.recentActivity.title') }}</h5>
             <p class="text-xs text-muted mb-3">{{ t('buildingDetail.recentActivity.subtitle') }}</p>
             <p v-if="recentActivityLoading" class="text-xs text-muted">...</p>

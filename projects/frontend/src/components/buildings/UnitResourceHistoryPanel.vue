@@ -15,6 +15,7 @@ const props = defineProps<{
   items: UnitResourceHistoryItemOption[]
   selectedItemKey: string | null
   history: BuildingUnitResourceHistoryPoint[]
+  borderless?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -63,7 +64,7 @@ function getMetricLabel(metricKey: UnitResourceHistoryMetricKey): string {
 </script>
 
 <template>
-  <div class="unit-insight-card history-card">
+  <div class="unit-insight-card history-card" :class="{ 'mt-0 border-0 pt-0': borderless }">
     <div class="history-header">
       <div>
         <h5>{{ t('buildingDetail.inventory.history.title') }}</h5>

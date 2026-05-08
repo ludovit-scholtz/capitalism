@@ -609,7 +609,7 @@ test.describe('Building detail upgrades', () => {
     await expect(page.locator('#asking-price')).toBeVisible()
 
     // Fill in price and list for sale
-    await page.locator('#asking-price').fill('100000')
+    await page.locator('#asking-price').fill('200000')
     await page.locator('.list-for-sale-btn').click()
 
     // Sell flow redirects back to building detail after successful listing.
@@ -747,8 +747,14 @@ test.describe('Building detail upgrades', () => {
     await expect(page.locator('.sell-form-section')).toContainText('greater than zero')
     await expect(listBtn).toBeDisabled()
 
-    // Enter valid price
-    await page.locator('#asking-price').fill('50000')
+    // Enter below-minimum price (minimum is 70% of market value)
+    await page.locator('#asking-price').fill('60000')
+    await expect(page.locator('.sell-form-section')).toContainText('Minimum listing price')
+    await expect(page.locator('.sell-form-section')).toContainText('70% of market value')
+    await expect(listBtn).toBeDisabled()
+
+    // Enter valid price at the minimum threshold
+    await page.locator('#asking-price').fill('65800')
     await expect(listBtn).toBeEnabled()
   })
 
@@ -23048,9 +23054,9 @@ test.describe('Supply chain tab', () => {
     // The estimated market value card should be displayed
     await expect(page.locator('.estimated-value-card')).toBeVisible()
 
-    // Enter a price higher than 150% of estimated market value (default mock market value is 75000)
-    // 75000 * 1.5 = 112500; entering 200000 should trigger the warning
-    await page.locator('#asking-price').fill('200000')
+    // Enter a price higher than 150% of estimated market value (default mock market value is 200000)
+    // 200000 * 1.5 = 300000; entering 350000 should trigger the warning
+    await page.locator('#asking-price').fill('350000')
     await expect(page.locator('.price-high-warning')).toBeVisible()
 
     // The List for Sale button should still be enabled (it's a warning, not an error)
