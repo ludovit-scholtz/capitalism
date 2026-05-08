@@ -270,8 +270,28 @@ public sealed class LoanRepaymentPhase : ITickPhase
                     .FirstOrDefault(b => b.Id == loan.CollateralBuildingId.Value && !b.IsForSale && b.DestroyedAtUtc == null);
                 if (collateralBuilding is not null)
                 {
+                    var buildingCurrencyCode = context.CitiesById.TryGetValue(collateralBuilding.CityId, out var buildingCity)
+                        ? buildingCity.CurrencyCode
+                        : "EUR";
+                    var loanCurrencyCode = context.BuildingsById.TryGetValue(loan.BankBuildingId, out var loanBankBuilding)
+                        && context.CitiesById.TryGetValue(loanBankBuilding.CityId, out var bankCity)
+                        ? bankCity.CurrencyCode
+                        : buildingCurrencyCode;
+
+                    var collateralAppraisedInBuildingCurrency = decimal.Round(
+                        FxRateHelper.ConvertAmount(
+                            loan.CollateralAppraisedValue.Value,
+                            loanCurrencyCode,
+                            buildingCurrencyCode,
+                            context.EurFxRates),
+                        2,
+                        MidpointRounding.AwayFromZero);
+
                     collateralBuilding.IsForSale = true;
-                    collateralBuilding.AskingPrice = decimal.Round(loan.CollateralAppraisedValue.Value * (1m - GameConstants.ForeclosureAutoListDiscount), 2, MidpointRounding.AwayFromZero);
+                    collateralBuilding.AskingPrice = decimal.Round(
+                        collateralAppraisedInBuildingCurrency * (1m - GameConstants.ForeclosureAutoListDiscount),
+                        2,
+                        MidpointRounding.AwayFromZero);
                     collateralBuilding.ListedAtUtc = DateTime.UtcNow;
                 }
             }

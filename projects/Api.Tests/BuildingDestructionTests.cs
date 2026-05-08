@@ -286,6 +286,134 @@ public sealed class BuildingDestructionTests
     }
 
     [Fact]
+    public async Task LoanMissedPayment_WithCrossCurrencyCollateral_AutoListUsesBuildingCurrencyPrice()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        factory.CreateClient();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var bratislava = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+        var prague = await db.Cities.FirstAsync(c => c.Name == "Prague");
+
+        var borrowerPlayer = new Player
+        {
+            Id = Guid.NewGuid(),
+            Email = $"cross-borrower-{Guid.NewGuid():N}@test.com",
+            DisplayName = "Cross Borrower",
+            PasswordHash = "hash",
+            Role = PlayerRole.Player,
+        };
+        var lenderPlayer = new Player
+        {
+            Id = Guid.NewGuid(),
+            Email = $"cross-lender-{Guid.NewGuid():N}@test.com",
+            DisplayName = "Cross Lender",
+            PasswordHash = "hash",
+            Role = PlayerRole.Player,
+        };
+        db.Players.AddRange(borrowerPlayer, lenderPlayer);
+
+        var borrowerCompany = new Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "Borrower CZ" };
+        var lenderCompany = new Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "Lender EUR" };
+        db.Companies.AddRange(borrowerCompany, lenderCompany);
+
+        var collateralBuilding = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = borrowerCompany.Id,
+            CityId = prague.Id,
+            Type = BuildingType.Factory,
+            Name = "Prague Collateral Factory",
+            Latitude = 50.08,
+            Longitude = 14.43,
+            Level = 1,
+        };
+        var bankBuilding = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = lenderCompany.Id,
+            CityId = bratislava.Id,
+            Type = BuildingType.Bank,
+            Name = "Bratislava Bank",
+            Latitude = 48.15,
+            Longitude = 17.11,
+            Level = 1,
+        };
+        db.Buildings.AddRange(collateralBuilding, bankBuilding);
+
+        db.BankAccounts.Add(new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = $"{Random.Shared.NextInt64(1_000_000_000_000_000L, 9_999_999_999_999_999L)}",
+            CurrencyCode = bratislava.CurrencyCode,
+            Balance = 1_000_000m,
+            CompanyId = lenderCompany.Id,
+        });
+
+        var loanOffer = new LoanOffer
+        {
+            Id = Guid.NewGuid(),
+            BankBuildingId = bankBuilding.Id,
+            LenderCompanyId = lenderCompany.Id,
+            AnnualInterestRatePercent = 8m,
+            MaxPrincipalPerLoan = 500_000m,
+            TotalCapacity = 1_000_000m,
+            UsedCapacity = 0m,
+            DurationTicks = 1440L,
+            IsActive = true,
+            CreatedAtTick = 1L,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.LoanOffers.Add(loanOffer);
+
+        var collateralAppraisedInBankCurrency = 300_000m;
+        db.Loans.Add(new Loan
+        {
+            Id = Guid.NewGuid(),
+            LoanOfferId = loanOffer.Id,
+            BorrowerCompanyId = borrowerCompany.Id,
+            BankBuildingId = bankBuilding.Id,
+            LenderCompanyId = lenderCompany.Id,
+            OriginalPrincipal = 200_000m,
+            RemainingPrincipal = 200_000m,
+            AnnualInterestRatePercent = 8m,
+            DurationTicks = 1440L,
+            StartTick = 0L,
+            DueTick = 1440L,
+            NextPaymentTick = 1L,
+            PaymentAmount = 5_000m,
+            TotalPayments = 10,
+            MissedPayments = 0,
+            Status = LoanStatus.Active,
+            CollateralBuildingId = collateralBuilding.Id,
+            CollateralAppraisedValue = collateralAppraisedInBankCurrency,
+            AcceptedAtUtc = DateTime.UtcNow,
+        });
+
+        var gameState = await db.GameStates.FindAsync(1);
+        gameState!.CurrentTick = 0;
+        await db.SaveChangesAsync();
+
+        var fxRates = await FxRateHelper.BuildEurRatesLookupAsync(db, [bratislava.CurrencyCode, prague.CurrencyCode]);
+        var expectedCollateralValueInBuildingCurrency = decimal.Round(
+            FxRateHelper.ConvertAmount(collateralAppraisedInBankCurrency, bratislava.CurrencyCode, prague.CurrencyCode, fxRates),
+            2,
+            MidpointRounding.AwayFromZero);
+        var expectedAskingPrice = decimal.Round(
+            expectedCollateralValueInBuildingCurrency * (1m - GameConstants.ForeclosureAutoListDiscount),
+            2,
+            MidpointRounding.AwayFromZero);
+
+        var processor = CreateProcessor(scope);
+        await processor.ProcessTickAsync();
+
+        await db.Entry(collateralBuilding).ReloadAsync();
+        Assert.True(collateralBuilding.IsForSale);
+        Assert.Equal(expectedAskingPrice, collateralBuilding.AskingPrice);
+    }
+
+    [Fact]
     public async Task LoanRepayment_CreatesAccountScopedLedgerEntries_ForBorrowerAndLender()
     {
         await using var factory = new ApiWebApplicationFactory();
@@ -406,15 +534,16 @@ public sealed class BuildingDestructionTests
         await db.Entry(account).ReloadAsync();
         var lenderAccount = await db.BankAccounts.FirstAsync(a => a.CompanyId == loanOffer.LenderCompanyId);
 
-        // Appraised 1,200,000 - debt 500,000 = surplus 700,000
-        Assert.Equal(700_000m, account.Balance);
+        // Liquidation proceeds are 80% of appraised value: 960,000.
+        // Debt payout = 500,000, surplus to borrower = 460,000.
+        Assert.Equal(460_000m, account.Balance);
         Assert.Equal(1_500_000m, lenderAccount.Balance);
 
         var ledger = await db.LedgerEntries
             .Where(e => e.CompanyId == company.Id && e.Category == LedgerCategory.BuildingSale && e.Amount > 0)
             .FirstOrDefaultAsync();
         Assert.NotNull(ledger);
-        Assert.Equal(700_000m, ledger.Amount);
+        Assert.Equal(460_000m, ledger.Amount);
         Assert.Equal(account.Id, ledger.BankAccountId);
 
         var lenderLedger = await db.LedgerEntries

@@ -66,3 +66,19 @@ public sealed class PurchaseLotResult
     /// <summary>The company with updated cash balance.</summary>
     public Company Company { get; set; } = null!;
 }
+
+/// <summary>Result payload for <c>destroyBuilding</c>.</summary>
+public sealed class DestroyBuildingResult
+{
+    /// <summary>ID of the destroyed building.</summary>
+    public Guid BuildingId { get; set; }
+
+    /// <summary>Building name at the moment of destruction.</summary>
+    public string BuildingName { get; set; } = string.Empty;
+
+    /// <summary>Refund paid to the owner (80% of estimated market value).</summary>
+    public decimal RefundAmount { get; set; }
+
+    /// <summary>ISO 4217 currency code of <see cref="RefundAmount"/>.</summary>
+    public string CurrencyCode { get; set; } = "EUR";
+}

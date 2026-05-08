@@ -37,7 +37,7 @@ It will use real world map. The game will start in single city and later other c
 - [ ] Do login/password authorizaiton only if configuration allows it. Make it disabled by default, but make sure to enable it in the tests. Do this on game frontend, master frontend and both backends as well. When biatec oidc is the only authorization method, when user goes to /login page, make sure to automatically follow the authorization process as user would click the authorize with google button.
 - [ ] Allow special token based authorizations for bots. Create a form for users to create an API key. Each API key is bound to the personal account and user can impersonalize this key to control his controlled companies. Track the usage of the API keys in the administrators section. Create tests to test also negative scenarios such as user is not allow to control foreign company or he cannot do forex swaps. Make sure the bots console app is using this form of authorization.
 
-### Buildings (75% complete)
+### Buildings (80% complete)
 
 - [ ] Improve design of the tabs in building editation mode for public sale unit. The `unit-insight-card recent-activity-panel` div has the top border while `unit-detail-tabs` div has bottom border which creates effect of two horizontal lines. Also `unit-detail-tabs` is touching the tab button bottom border `unit-tab-btn--active`. 
 - [ ] Improve design of the tabs in building editation mode for purchase unit. In the first tab add some space between the tabs and content. Add to the basic info also the history of the purchase price and quality of purchased products. In other tabs there is one extra line below the tab headers.
@@ -45,7 +45,7 @@ It will use real world map. The game will start in single city and later other c
 - [ ] Do not allow to sell building below 70% of its market value.
 - [ ] Add some space below `customer-bank-profile` div.
 - [ ] In bank building in `operating-account-row` is too much content that does not fit into the row. Add `Bank Statement Review` in second line or somewhere else.
-- [ ] Create a workflow to destroy a building. Make sure the button to destroy the building is in the sell building form and show also the refund how much user will receive. When building is destroyed, return the user 80% of the building property value. Make the property available for purchase again. When bank loan is not paid set it for sale for the property market price minus 10%. When the debt from missed payments is not paid in 3 game days (72 ticks), destroy the building and pay any remaining debt from the sale of property to the bank owner.
+- [x] Create a workflow to destroy a building. Make sure the button to destroy the building is in the sell building form and show also the refund how much user will receive. When building is destroyed, return the user 80% of the building property value. Make the property available for purchase again. When bank loan is not paid set it for sale for the property market price minus 10%. When the debt from missed payments is not paid in 3 game days (72 ticks), destroy the building and pay any remaining debt from the sale of property to the bank owner.
 
 ### News (100% complete)
 
@@ -57,8 +57,8 @@ It will use real world map. The game will start in single city and later other c
 - [x] Investigate why bank statement latest row does not equal to current balance on the bank account. Perhaps it is related to the loan payments as I do not see the loan received nor any of the loans currently on the bank account statement.
 - [x] When bank loan is not paid set it for sale for the property market price minus 10%. When the debt from missed payments is not paid in 3 game days (72 ticks), destroy the building and pay any remaining debt from the sale of property to the bank owner.
 - [x] When bank loan is not paid, make sure to notify user using the notifications that he has pending debt to the bank. When user goes to the bank, make sure the pending debt amount is clearly visible and also pending time until the building in the collateral will be destroyed.
-- [ ] When bank loan is unpaid and building goes for sale, make sure to put it on sale in proper currency. When builing in Prague which costs 10M CZK is collateralized in USD bank, the collateral amount is correctly calculated and allows to lend 300k USD. However when unpaid loan is hit, make sure to sell it not for 300k USD but for 10M CZK. After the building is sold on market make sure to settle the loan payments in correct currency - make sure to do the swap if required.
-- [ ] When there is unpaid loan and building is put on sale, user can cancel the sale of the building. Do not allow user to cancel sale of the building which is collateralized for loan and loan has missed payments.
+- [x] When bank loan is unpaid and building goes for sale, make sure to put it on sale in proper currency. When builing in Prague which costs 10M CZK is collateralized in USD bank, the collateral amount is correctly calculated and allows to lend 300k USD. However when unpaid loan is hit, make sure to sell it not for 300k USD but for 10M CZK. After the building is sold on market make sure to settle the loan payments in correct currency - make sure to do the swap if required.
+- [x] When there is unpaid loan and building is put on sale, user can cancel the sale of the building. Do not allow user to cancel sale of the building which is collateralized for loan and loan has missed payments.
 
 ### FX Exchange (100% complete)
 
