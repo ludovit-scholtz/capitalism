@@ -28,6 +28,24 @@ public sealed class GameState
     /// <summary>Global tax rate percentage (0-100).</summary>
     public decimal TaxRate { get; set; } = 15m;
 
+    /// <summary>UTC timestamp when this game shard started.</summary>
+    public DateTime GameStartedAtUtc { get; set; } = DateTime.UtcNow;
+
+    /// <summary>Indicates whether this game shard has ended and is read-only.</summary>
+    public bool GameEnded { get; set; }
+
+    /// <summary>Winner player id once <see cref="GameEnded"/> is true.</summary>
+    public Guid? WinnerPlayerId { get; set; }
+
+    /// <summary>Winner display name shown in endgame banner and errors.</summary>
+    public string? WinnerDisplayName { get; set; }
+
+    /// <summary>Primary winner company name for endgame celebration text.</summary>
+    public string? WinnerCompanyName { get; set; }
+
+    /// <summary>UTC timestamp when the winner was declared.</summary>
+    public DateTime? GameEndedAtUtc { get; set; }
+
     [NotMapped]
     public int CurrentGameYear => GameTime.GetGameYear(CurrentTick);
 

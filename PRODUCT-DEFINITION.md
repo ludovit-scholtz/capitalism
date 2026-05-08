@@ -4,6 +4,12 @@ Create a fun game in the style of Capitalism II. This game is an economic simula
 
 It will use a real-world map. The game starts in a single city and later expands to more cities.
 
+## Endgame win condition
+
+The game shard ends immediately when any player surpasses the estimated net worth of the 5th richest real-world billionaire (USD benchmark).
+After the winner is declared, the server becomes read-only, ticks stop, and a final newsletter with winner details and top rankings is published.
+The personal ledger must show a "Race to the Top" benchmark panel so players can track progress toward this objective from the start.
+
 ## FX Exchange
 
 Each city is located in a physical country and has a local currency, for example CZK for Prague, EUR for Vienna, or USD for New York.

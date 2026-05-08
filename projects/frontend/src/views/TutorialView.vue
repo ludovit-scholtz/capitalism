@@ -150,6 +150,17 @@ onMounted(async () => {
 
     <!-- Milestone list -->
     <div v-else class="tutorial-milestones">
+      <article class="milestone-card" aria-label="Endgame goal">
+        <div class="milestone-card__icon-col">
+          <span class="milestone-card__emoji" aria-hidden="true">🏆</span>
+        </div>
+        <div class="milestone-card__content">
+          <h2 class="milestone-card__title">{{ t('tutorial.endgame.title') }}</h2>
+          <p class="milestone-card__desc">{{ t('tutorial.endgame.desc') }}</p>
+          <p class="milestone-card__value">{{ t('tutorial.endgame.value') }}</p>
+        </div>
+      </article>
+
       <article
         v-for="def in MILESTONE_DEFS"
         :key="def.id"

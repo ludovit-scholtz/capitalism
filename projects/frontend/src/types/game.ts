@@ -91,6 +91,26 @@ export interface GameState {
   currentQuarter: number
   /** Human-readable quarter label e.g. "Q1" or "Q4" */
   currentQuarterLabel: string
+  gameEnded?: boolean
+  winnerPlayerId?: string | null
+  winnerDisplayName?: string | null
+  winnerCompanyName?: string | null
+  gameEndedAtUtc?: string | null
+}
+
+export interface RealWorldWealth {
+  name: string
+  wealthUsd: number
+}
+
+export interface EndgameStatus {
+  gameEnded: boolean
+  winnerPlayerId: string | null
+  winnerDisplayName: string | null
+  winnerCompanyName: string | null
+  gameEndedAtUtc: string | null
+  winningThresholdUsd: number
+  topRealWorldRichest: RealWorldWealth[]
 }
 
 /** Matches backend ScheduledActionSummary — a pending player action waiting for tick resolution. */

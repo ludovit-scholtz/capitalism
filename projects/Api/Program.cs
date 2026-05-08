@@ -271,6 +271,7 @@ public class Program
         builder.Services.AddScoped<ITickPhase, EconomicReportPhase>();
         builder.Services.AddScoped<ITickPhase, MarketReportPhase>();
         builder.Services.AddScoped<ITickPhase, RankHistoryPhase>();
+        builder.Services.AddScoped<ITickPhase, EndgamePhase>();
         builder.Services.AddScoped<ITickPhase, FxRateHistoryPhase>();
         builder.Services.AddHostedService<GameTickHostedService>();
         builder.Services.AddHostedService<MasterServerRegistrationHostedService>();
@@ -281,7 +282,8 @@ public class Program
         app.UseCors("frontend");
         app.UseAuthentication();
         app.UseAuthorization();
-    app.UseMiddleware<AdminAuditLoggingMiddleware>();
+        app.UseMiddleware<GameEndedMutationGuardMiddleware>();
+        app.UseMiddleware<AdminAuditLoggingMiddleware>();
 
         app.MapGet("/", () => Results.Ok(new
         {

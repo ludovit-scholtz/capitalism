@@ -14,7 +14,7 @@ function authenticatePlayer(page: Parameters<typeof test>[0]['page'], playerId: 
 // ── Tests ─────────────────────────────────────────────────────────────────
 
 test.describe('Tutorial view (/tutorial)', () => {
-  test('unauthenticated visitor sees all 5 milestone titles and public descriptions', async ({
+  test('unauthenticated visitor sees milestone list plus endgame goal card', async ({
     page,
   }) => {
     setupMockApi(page)
@@ -23,8 +23,9 @@ test.describe('Tutorial view (/tutorial)', () => {
     // Page heading
     await expect(page.getByRole('heading', { name: 'Tutorial' })).toBeVisible()
 
-    // All 5 milestone cards should be listed (they show even without auth)
-    await expect(page.locator('.milestone-card')).toHaveCount(5)
+    // Endgame goal card + 5 milestone cards
+    await expect(page.locator('.milestone-card')).toHaveCount(6)
+    await expect(page.getByRole('heading', { name: 'Endgame Goal' })).toBeVisible()
 
     // A known milestone title should be visible
     await expect(page.getByRole('heading', { name: 'First Resource Sold' })).toBeVisible()
@@ -116,7 +117,7 @@ test.describe('Tutorial view (/tutorial)', () => {
 
     // The first milestone card is "First Resource Sold" with resumeRoute=/dashboard
     // Click its Resume button
-    const firstCard = page.locator('.milestone-card').first()
+    const firstCard = page.locator('.milestone-card').nth(1)
     await firstCard.getByRole('button', { name: 'Resume' }).click()
 
     // Should navigate to /dashboard
@@ -164,7 +165,7 @@ test.describe('Tutorial view (/tutorial)', () => {
     setupMockApi(page)
     await page.goto('/tutorial')
 
-    await expect(page.locator('.milestone-card')).toHaveCount(5)
+    await expect(page.locator('.milestone-card')).toHaveCount(6)
     await expect(page.getByRole('heading', { name: 'Tutorial' })).toBeVisible()
   })
 

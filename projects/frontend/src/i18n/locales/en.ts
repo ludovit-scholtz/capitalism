@@ -2505,6 +2505,22 @@ export default {
     amount: 'Amount',
     wealthBreakdownTitle: 'Wealth breakdown',
   },
+  endgame: {
+    raceTitle: 'Race to the Top',
+    raceSubtitle: 'Beat the 5th richest real-world billionaire to end the game and claim victory.',
+    yourProgress: 'Your progress',
+    rank: 'Rank',
+    person: 'Person',
+    wealthUsd: 'Wealth (USD)',
+    thresholdHint: 'Winning threshold: {target} USD',
+    readOnlyBanner: 'Game Over — {winner} has won! This server is now read-only.',
+    unknownWinner: 'A player',
+    overlayEyebrow: 'Final Result',
+    overlayTitle: 'Game Over',
+    overlayWinner: '{winner} has won this server.',
+    overlayCompany: 'Winning company: {company}',
+    viewFinalRankings: 'View Final Rankings',
+  },
   powerGrid: {
     title: 'City Power Grid',
     supply: 'Supply',
@@ -3487,6 +3503,11 @@ export default {
     authNotice: 'Sign in to track your progress and earn bounty points for each milestone.',
     signIn: 'Sign In',
     gotIt: 'Got it',
+    endgame: {
+      title: 'Endgame Goal',
+      desc: 'The server ends when a player exceeds the wealth of the 5th richest real-world billionaire.',
+      value: 'Track the Race to the Top panel in Personal Ledger and push your net worth above the benchmark.',
+    },
     milestones: {
       firstResourceSold: {
         title: 'First Resource Sold',

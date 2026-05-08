@@ -32,6 +32,12 @@ public sealed class TickProcessor(
             return 10;
         }
 
+        if (gameState.GameEnded)
+        {
+            logger.LogInformation("Game has ended. Tick processing is frozen.");
+            return Math.Max(1, gameState.TickIntervalSeconds);
+        }
+
         gameState.CurrentTick++;
         gameState.LastTickAtUtc = DateTime.UtcNow;
 

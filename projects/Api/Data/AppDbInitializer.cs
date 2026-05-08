@@ -45,7 +45,13 @@ public sealed partial class AppDbInitializer(
 
         if (!await dbContext.GameStates.AnyAsync())
         {
-            dbContext.GameStates.Add(new GameState { Id = 1, CurrentTick = 0, TickIntervalSeconds = seedOptions.Value.TickIntervalSeconds });
+            dbContext.GameStates.Add(new GameState
+            {
+                Id = 1,
+                CurrentTick = 0,
+                TickIntervalSeconds = seedOptions.Value.TickIntervalSeconds,
+                GameStartedAtUtc = DateTime.UtcNow,
+            });
         }
         else
         {
@@ -58,6 +64,11 @@ public sealed partial class AppDbInitializer(
             if (gameState.TaxCycleTicks != GameConstants.TicksPerYear)
             {
                 gameState.TaxCycleTicks = GameConstants.TicksPerYear;
+            }
+
+            if (gameState.GameStartedAtUtc == default)
+            {
+                gameState.GameStartedAtUtc = DateTime.UtcNow;
             }
         }
 

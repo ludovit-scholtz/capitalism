@@ -17,12 +17,12 @@ It will use real world map. The game will start in single city and later other c
 - [x] Backend: Wire `operationsStatistics` query to real LedgerEntry aggregations for live money flow data
 - [x] Backend: Wire `adminProductAnalytics` query to real ProductionRecord/PublicSalesRecord aggregations
 
-### Endgame
+### Endgame (100% complete)
 
-- [ ] Add to the top personal account the 5 most richest persons in the real world with their current estimated wealth
-- [ ] The game server will stop when any of the players will be the most rich
-- [ ] When game server is stopped, players cannot do any in game operations - no forex trades, no stock trades, no amm trading, ticks engine does not process new tick. The newslatter is published with the game details and top personal account ranking.
-- [ ] Update the documentation and set a game goal for the players to become the richest persons in the world.
+- [x] Add to the top personal account the 5 most richest persons in the real world with their current estimated wealth
+- [x] The game server will stop when any of the players will be the most rich
+- [x] When game server is stopped, players cannot do any in game operations - no forex trades, no stock trades, no amm trading, ticks engine does not process new tick. The newslatter is published with the game details and top personal account ranking.
+- [x] Update the documentation and set a game goal for the players to become the richest persons in the world.
 
 ### Onboarding (50% complete)
 
