@@ -1506,3 +1506,16 @@ Root-cause of a multi-second dashboard load regression (May 2026, PR #optimize-d
 7. **For test helpers generating account numbers with `DateTime.UtcNow.Ticks % N`**: use `N = 1_000_000_000_000_000L` (10^15) so the result is ≤ 15 digits, then `.ToString("D16")` pads to exactly 16 characters without risk of overflow. Extract into a `GenerateTestAccountNumber()` helper to avoid duplication.
 8. **Minimum test coverage for any read-resolver optimization PR**: (1) unauthenticated access returns auth error; (2) multiple entities for the same user are all returned; (3) one player's query does NOT affect another player's data; (4) multiple due plans in the same entity are ALL preserved; (5) resolver returns correct data fields; (6) non-existent ID returns null; (7) IMemoryCache is populated after the first call; (8) second call returns cached value; (9) per-user cache is populated; (10) list query caches after first call; (11) all three seeded cities are returned by list query; (12) alphabetical ordering is preserved; (13) combined unauthenticated query is rejected. `DashboardPerformanceTests.cs` now has 22 tests covering all these cases.
 9. **For combined GraphQL queries that mix `[Authorize]` and public fields:** HotChocolate may set `data: null` for the entire document when a non-nullable authorized field fails. Never call `.GetProperty(...)` on `data` without first checking `data.ValueKind == JsonValueKind.Object`. Always guard unauthenticated combined-query tests with `if (dataEl.ValueKind == JsonValueKind.Object)` before accessing nested properties.
+
+## PR hygiene after feature delivery — avoid unrelated regressions and temporary test leaks
+
+Root-cause of a quality failure (May 2026, PR #315 follow-up):
+- A temporary screenshot spec (`tmp-destroy-screenshot.spec.ts`) created for UI proof was accidentally committed.
+- An unrelated Playwright file (`personal-name-generator.spec.ts`) was unintentionally modified while addressing the building-destroy issue.
+- CI then failed on that unrelated test with `TypeError: regenerated.trim is not a function`, causing avoidable rework and review delay.
+
+**Rules to prevent recurrence:**
+1. **Before every `report_progress`, inspect the exact staged file list with `git --no-pager show --name-only --stat` (or `git status --short`) and confirm every file is in-scope for the issue.** Revert unrelated changes immediately.
+2. **Temporary screenshot specs must never stay in the repository.** If you create a `tmp-*.spec.ts` to capture proof, delete it in the same session before committing.
+3. **After touching any Playwright spec file, run that specific spec in CI mode before pushing.** If a changed file is unrelated to the issue scope, restore it instead of carrying it into the PR.
+4. **When CI fails on a PR, first classify whether the failure is in-scope or unrelated drift.** Fix the failing test if in-scope; if unrelated and introduced accidentally, revert that file to keep the PR surgical.
