@@ -29,4 +29,16 @@ describe('realWorldBenchmark helpers', () => {
     expect(findSurpassedBenchmark(benchmarks, 220_000_000_000)?.rank).toBe(3)
     expect(findSurpassedBenchmark(benchmarks, 500_000_000_000)?.rank).toBe(1)
   })
+
+  it('handles zero/negative threshold and wealth edge cases', () => {
+    expect(computeTargetProgressPercent(100, 0)).toBe(0)
+    expect(computeTargetProgressPercent(-100, 430_000_000_000)).toBe(0)
+    expect(computeDistanceToWinUsd(-100, 430_000_000_000)).toBe(430_000_000_000)
+    expect(computeDistanceToWinUsd(100, 0)).toBe(0)
+  })
+
+  it('resolves surpassed benchmark from unsorted input by rank order', () => {
+    const unsorted: RealWorldWealth[] = [benchmarks[2]!, benchmarks[0]!, benchmarks[1]!]
+    expect(findSurpassedBenchmark(unsorted, 220_000_000_000)?.rank).toBe(3)
+  })
 })

@@ -1455,6 +1455,8 @@ test.describe('FX Rate History Chart on Rate List tab', () => {
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
     }, `token-${player.id}`)
     await page.goto('/forex?tab=rates')
+    await expect(page.locator('.rates-table')).toBeVisible()
+    await expect(page.locator('.rates-chart-section')).toBeVisible()
     const order = await page.evaluate(() => {
       const table = document.querySelector('.rates-table')
       const chart = document.querySelector('.rates-chart-section')

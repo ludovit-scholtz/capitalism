@@ -47,7 +47,7 @@ test.describe('Ranking page', () => {
     await expect(masterLink).toHaveAttribute('href', /\/ranking$/)
   })
 
-  test('shows real-world benchmark section with top five billionaires', async ({ page }) => {
+  test('shows real-world benchmark section with top ten billionaires', async ({ page }) => {
     const state = setupMockApi(page, {
       players: [makePlayer({ id: 'benchmark-player', email: 'benchmark@test.com', displayName: 'Benchmark Player' })],
     })
@@ -60,6 +60,7 @@ test.describe('Ranking page', () => {
     const benchmarkTable = page.getByRole('table', { name: 'Race to the Top — Real World Benchmark' })
     await expect(benchmarkTable.getByText('Elon Musk')).toBeVisible()
     await expect(benchmarkTable.getByText('Jensen Huang')).toBeVisible()
+    await expect(benchmarkTable.locator('tbody tr')).toHaveCount(10)
 
     const benchmarkY = await page.getByRole('heading', { name: 'Race to the Top — Real World Benchmark' }).evaluate(
       (node) => node.getBoundingClientRect().top,
@@ -114,6 +115,7 @@ test.describe('Ranking page', () => {
 
     await expect(page.locator('.leader-percent-of-target').first()).toBeVisible()
     await expect(page.locator('.leader-distance-to-win')).toHaveCount(3)
+    await expect(page.locator('.rank-card').nth(3).locator('.leader-distance-to-win')).toHaveCount(0)
     await expect(page.getByText('Leader One has surpassed #3 — Mark Zuckerberg.')).toBeVisible()
     await expect(page.locator('.rank-card').first()).toContainText('of #1 target')
   })
