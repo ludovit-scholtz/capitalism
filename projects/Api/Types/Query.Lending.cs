@@ -96,6 +96,7 @@ public sealed partial class Query
         var offers = await db.LoanOffers
             .Include(o => o.LenderCompany)
             .Include(o => o.BankBuilding)
+            // Loan offers always point at bank buildings; EF skips the nested include if the optional navigation is absent.
             .ThenInclude(b => b!.City)
             .Where(o => companyIds.Contains(o.LenderCompanyId))
             .AsNoTracking()
@@ -142,6 +143,7 @@ public sealed partial class Query
             .Include(l => l.BankBuilding)
             .ThenInclude(b => b!.City)
             .Include(l => l.BorrowerCompany)
+            // Collateral is optional for unsecured loans; EF skips the nested include when the parent nav is null.
             .Include(l => l.CollateralBuilding!)
             .ThenInclude(b => b!.City)
             .Where(l => companyIds.Contains(l.BorrowerCompanyId))
@@ -180,7 +182,8 @@ public sealed partial class Query
             .Include(l => l.BorrowerCompany)
             .Include(l => l.LenderCompany)
             .Include(l => l.BankBuilding)
-            .ThenInclude(b => b.City)
+            .ThenInclude(b => b!.City)
+            // Collateral is optional for unsecured loans; EF skips the nested include when the parent nav is null.
             .Include(l => l.CollateralBuilding!)
             .ThenInclude(b => b!.City)
             .Where(l => l.BankBuildingId == bankBuildingId)

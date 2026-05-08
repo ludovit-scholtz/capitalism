@@ -17,6 +17,8 @@ namespace Api.Tests;
 /// </summary>
 public sealed class BuildingSecondaryMarketTests
 {
+    private static string NewAccountNumber() => Guid.NewGuid().ToString("N")[..16];
+
     // ──────────────────────────────────────────────────────────────────────────
     // GraphQL helpers
     // ──────────────────────────────────────────────────────────────────────────
@@ -89,7 +91,7 @@ public sealed class BuildingSecondaryMarketTests
         var bankAccount = new BankAccount
         {
             Id = Guid.NewGuid(),
-            AccountNumber = $"{Random.Shared.NextInt64(1_000_000_000_000_000L, 9_999_999_999_999_999L)}",
+            AccountNumber = NewAccountNumber(),
             CurrencyCode = city.CurrencyCode,
             Balance = initialBalance,
             CompanyId = company.Id,
@@ -623,7 +625,7 @@ public sealed class BuildingSecondaryMarketTests
         var sellerAccount = new BankAccount
         {
             Id = Guid.NewGuid(),
-            AccountNumber = $"{Random.Shared.NextInt64(1_000_000_000_000_000L, 9_999_999_999_999_999L)}",
+            AccountNumber = NewAccountNumber(),
             CurrencyCode = city.CurrencyCode,
             Balance = 1_000m,
             CompanyId = sellerCompany.Id,
@@ -688,7 +690,7 @@ public sealed class BuildingSecondaryMarketTests
         db.BankAccounts.Add(new BankAccount
         {
             Id = Guid.NewGuid(),
-            AccountNumber = $"{Random.Shared.NextInt64(1_000_000_000_000_000L, 9_999_999_999_999_999L)}",
+            AccountNumber = NewAccountNumber(),
             CurrencyCode = bratislava.CurrencyCode, Balance = 500m, CompanyId = co1.Id,
         });
 
@@ -706,7 +708,7 @@ public sealed class BuildingSecondaryMarketTests
         db.BankAccounts.Add(new BankAccount
         {
             Id = Guid.NewGuid(),
-            AccountNumber = $"{Random.Shared.NextInt64(1_000_000_000_000_000L, 9_999_999_999_999_999L)}",
+            AccountNumber = NewAccountNumber(),
             CurrencyCode = prague.CurrencyCode, Balance = 500m, CompanyId = co2.Id,
         });
         await db.SaveChangesAsync();
@@ -1222,7 +1224,7 @@ public sealed class BuildingSecondaryMarketTests
             var lenderAccount = new BankAccount
             {
                 Id = Guid.NewGuid(),
-                AccountNumber = $"{Random.Shared.NextInt64(1_000_000_000_000_000L, 9_999_999_999_999_999L)}",
+                AccountNumber = NewAccountNumber(),
                 CurrencyCode = bratislava.CurrencyCode,
                 Balance = 0m,
                 CompanyId = lenderCompany.Id,
@@ -1383,7 +1385,7 @@ public sealed class BuildingSecondaryMarketTests
             var lenderAccount = new BankAccount
             {
                 Id = Guid.NewGuid(),
-                AccountNumber = $"{Random.Shared.NextInt64(1_000_000_000_000_000L, 9_999_999_999_999_999L)}",
+                AccountNumber = NewAccountNumber(),
                 CurrencyCode = bratislava.CurrencyCode,
                 Balance = 0m,
                 CompanyId = lenderCompany.Id,

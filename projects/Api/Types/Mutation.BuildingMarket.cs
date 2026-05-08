@@ -211,6 +211,7 @@ public sealed partial class Mutation
         var sellerNetProceeds = salePrice;
         BankAccount? lenderDebtCreditedAccount = null;
         decimal debtPaidInLoanCurrency = 0m;
+        // These are populated inside the collateral-loan block and reused when we write the settlement ledger rows.
         decimal debtPaidFromSale = 0m;
         string? debtCurrencyCode = null;
         var usesForcedSaleFx = false;
@@ -389,6 +390,7 @@ public sealed partial class Mutation
             BankAccountId = sellerAccount.Id,
             BuildingId = building.Id,
             Category = LedgerCategory.BuildingSale,
+            // Record the gross sale so the bank statement can show the full sale proceeds, with debt settlement split into its own row.
             Description = $"Building sale: {building.Name} ({building.Type}) in {city.Name} to {offer.BuyerCompany.Name}",
             Amount = salePrice,
             RecordedAtTick = currentTick,
