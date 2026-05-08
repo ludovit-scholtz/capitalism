@@ -6,33 +6,19 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
-### Operations Dashboard in Game frontend (100% complete)
+### Endgame (0% complete)
 
-- [x] Merge /operations/statistics and /admin pages. Keep  /operations/statistics. Remove /admin from the menu. Add to the operations all other features from the admin such as newspaper management.
-- [x] Organize Operations Dashboard (/admin) to level 2 menu, add proper routing, and create components. Make sure it is not shown as big single page, but split into multiple pages.
-- [x] Fix News & changelog publisher style. The form is stretched along the whole list of news items. Create multiple pages for this like it is in the ticket support system.
-- [x] Players & intervention tools - Make sure to show the table of the users and on user detail page show the actions
-- [x] Create page for the game statistics where in one columns will be items that distributes the money such as the public sales buildings, the rent, IPOs, or other money distribution sections. In the other column will be where people are paying money - taxes, fx fees, labour costs, energy, research, stock exchange fees or others..
-- [x] Create admin page with detailed statistic for every product. Do it in table. Make sure the table is exportable sortable and filterable. In the table will be the product insights such as the aggregated costs of materials, energy, labor to build the product, number of products produced, sold, market size, saturation, marketing, and research details.
-- [x] Backend: Wire `operationsStatistics` query to real LedgerEntry aggregations for live money flow data
-- [x] Backend: Wire `adminProductAnalytics` query to real ProductionRecord/PublicSalesRecord aggregations
-
-### Endgame (100% complete)
-
-- [x] Add to the top personal account the 5 most richest persons in the real world with their current estimated wealth
-- [x] The game server will stop when any of the players will be the most rich
-- [x] When game server is stopped, players cannot do any in game operations - no forex trades, no stock trades, no amm trading, ticks engine does not process new tick. The newslatter is published with the game details and top personal account ranking.
-- [x] Update the documentation and set a game goal for the players to become the richest persons in the world.
+- [ ] Fix endgame. This is not true: 'The server ends when a player exceeds the wealth of the 5th richest real-world billionaire.' The game ends when player exeecds the wealth of the most richest real world billionare, not the 5th.
+- [ ] Show the real world billionares in game personal account rankings.
 
 ### Onboarding (100% complete)
 
-- [x] Do not show invitation message with referal code right up to the point when user logs in to the system.
-- [x] After the code has been applied and stored to the database, remove it from the game pinia store.
-- [x] Before user first sign in to the game make sure to fill in the referal code. Show link (and allow copy on one click) in the master frontend in the referal section where users can refer user for the game server. When user comes to this link, make sure the referal code is stored in the pinia state, and stored to the user account when he first logs in. Before user logs in, show him that he is using specific referal code and he will get 10% discount for in game purchases.
-- [x] Create better Company name generator. Find npm package with the word list, and do a proper name generation with the combination of two words. Make sure the company names sounds great.
-- [x] Create name generator for personal account name. Find npm package with the names wordlist and do a combination of the Firstname, Middlename and Last name. Allow players to change the personal account name later. In ranking show the personal account name, not the oidc name please. In the form to change name, tell people not to use the real name. Make sure the personal name is generated in the onboarding in the IPO step when player picks the company name. Make sure the personal account name is showned in the ranking. Make sure player can change the personal account name in the player settings. Store the personal account name in the master database so that the personal account player name is the same in all game servers. If the personal account name already exists in the master database after new game onboarding, do not change it, and make sure the personal account name is preserved.
+- [ ] Allow players to change the personal account name. Make sure in the dashboard for the personal account is tab to change the player name. Store the personal account name in the master database so that the personal account player name is the same in all game servers. If the personal account name already exists in the master database after new game onboarding, do not change it, and make sure the personal account name is preserved.
 
 ### Authorization (100% complete)
+
+- [ ] When I log out from game server, the login is executed. Make sure to show the main page after the logout.
+- [ ] Do login/password authorizaiton only if configuration allows it. Make it disabled by default, but make sure to enable it in the tests. This works now on game server, but user password authentication is still enabled on master server.
 
 - [x] Do login/password authorizaiton only if configuration allows it. Make it disabled by default, but make sure to enable it in the tests. Do this on game frontend, master frontend and both backends as well. When biatec oidc is the only authorization method, when user goes to /login page, make sure to automatically follow the authorization process as user would click the authorize with google button.
 - [x] Allow special token based authorizations for bots. Create a form for users to create an API key. Each API key is bound to the personal account and user can impersonalize this key to control his controlled companies. Track the usage of the API keys in the administrators section. Create tests to test also negative scenarios such as user is not allow to control foreign company or he cannot do forex swaps. Make sure the bots console app is using this form of authorization.
@@ -47,10 +33,6 @@ It will use real world map. The game will start in single city and later other c
 - [x] In bank building in `operating-account-row` is too much content that does not fit into the row. Add `Bank Statement Review` in second line or somewhere else.
 - [x] Create a workflow to destroy a building. Make sure the button to destroy the building is in the sell building form and show also the refund how much user will receive. When building is destroyed, return the user 80% of the building property value. Make the property available for purchase again. When bank loan is not paid set it for sale for the property market price minus 10%. When the debt from missed payments is not paid in 3 game days (72 ticks), destroy the building and pay any remaining debt from the sale of property to the bank owner.
 
-### News (100% complete)
-
-- [x] Add button to news and changelog to mark all news as read.
-- [x] Changelog.csv news are not imported to the database. Make sure that after every restart every changelog news item is imported. If any error occurs during the import log it and skip the import of that one item. Do it more resilient to errors.
 
 ### Banks (100% complete)
 
