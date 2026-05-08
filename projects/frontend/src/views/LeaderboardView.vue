@@ -11,6 +11,11 @@ import { deepEqual } from '@/lib/utils'
 import { formatInGameTime } from '@/lib/gameTime'
 import { formatCompactMoney } from '@/lib/currencyFormat'
 import { calculateRankPage, isActivePlayer } from '@/lib/ranking'
+import {
+  computeDistanceToWinUsd,
+  computeTargetProgressPercent,
+  findSurpassedBenchmark,
+} from '@/lib/realWorldBenchmark'
 import type { EndgameStatus, PlayerRanking, CompanyRanking } from '@/types'
 import { getProfileBadgeIcon } from '@/lib/profileBadges'
 
@@ -219,11 +224,12 @@ const currentGameTime = computed(() => {
   return utc ? formatInGameTime(utc, locale.value) : null
 })
 
-function getRankClasses(index: number, ownerId: string | null) {
+function getRankClasses(index: number, ownerId: string | null, isShardLeader = false) {
   return {
     'border-l-4 border-l-[#ffd700]': index === 1,
     'border-l-4 border-l-[#c0c0c0]': index === 2,
     'border-l-4 border-l-[#cd7f32]': index === 3,
+    'border border-amber-300/70 ring-1 ring-amber-300/60': isShardLeader,
     'bg-blue-50/90 dark:bg-blue-900/30 font-semibold ring-1 ring-blue-400 border-l-4 border-l-blue-500':
       isActivePlayer(ownerId, currentPlayerId.value),
   }
@@ -251,6 +257,20 @@ const pagedCompanyRankings = computed(() =>
   companyRankings.value.slice(pageStartIndex.value, pageStartIndex.value + itemsPerPage),
 )
 const hasNextPage = computed(() => currentPage.value < totalPages.value)
+const winningThresholdUsd = computed(() => endgameStatus.value?.winningThresholdUsd ?? 0)
+const topShardPlayer = computed(() => rankings.value[0] ?? null)
+const topShardLeaderProgress = computed(() =>
+  computeTargetProgressPercent(topShardPlayer.value?.totalWealthUsd ?? 0, winningThresholdUsd.value),
+)
+const topShardLeaderDistance = computed(() =>
+  computeDistanceToWinUsd(topShardPlayer.value?.totalWealthUsd ?? 0, winningThresholdUsd.value),
+)
+const topShardMilestone = computed(() =>
+  findSurpassedBenchmark(
+    endgameStatus.value?.topRealWorldRichest ?? [],
+    topShardPlayer.value?.totalWealthUsd ?? 0,
+  ),
+)
 
 function parsePageQuery(value: unknown): number {
   const raw = Array.isArray(value) ? value[0] : value
@@ -296,6 +316,15 @@ async function changePage(nextPage: number) {
   }
   currentPage.value = nextPage
   await persistRankingQuery()
+}
+
+function formatTargetPercent(wealthUsd: number): string {
+  const percent = computeTargetProgressPercent(wealthUsd, winningThresholdUsd.value)
+  const fractionDigits = percent >= 10 ? 1 : 2
+  return `${new Intl.NumberFormat(locale.value, {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(percent)}%`
 }
 </script>
 
@@ -370,15 +399,36 @@ async function changePage(nextPage: number) {
       </div>
 
       <section v-if="endgameStatus" class="max-w-[800px] mx-auto mb-8 rounded-xl border border-divider bg-card p-5">
-        <h2 class="text-lg font-semibold">{{ t('leaderboard.realWorldBenchmarkTitle') }}</h2>
+        <h2 class="text-lg font-semibold">
+          🏆 {{ t('leaderboard.raceBenchmarkTitle') }}
+        </h2>
         <p class="mt-1 text-sm text-muted">
           {{ t('leaderboard.realWorldBenchmarkBody') }}
         </p>
         <p class="mt-3 text-sm">
           {{ t('leaderboard.realWorldTarget', { amount: formatWealth(endgameStatus.winningThresholdUsd) }) }}
         </p>
-        <div class="mt-3 overflow-x-auto">
-          <table class="w-full text-sm" :aria-label="t('leaderboard.realWorldBenchmarkTitle')">
+        <div v-if="topShardPlayer" class="mt-3 rounded-lg border border-divider bg-surface p-3">
+          <div class="flex flex-wrap items-center justify-between gap-2 text-sm">
+            <p class="font-semibold">
+              {{ t('leaderboard.shardLeaderProgress', { name: getPlayerAlias(topShardPlayer) }) }}
+            </p>
+            <p class="text-muted">
+              {{ t('leaderboard.shardLeaderProgressValue', { percent: formatTargetPercent(topShardPlayer.totalWealthUsd) }) }}
+            </p>
+          </div>
+          <div class="mt-2 h-2 overflow-hidden rounded-full bg-divider/50" role="progressbar" :aria-valuemin="0" :aria-valuemax="100" :aria-valuenow="topShardLeaderProgress">
+            <div class="h-full bg-brand transition-all" :style="{ width: `${topShardLeaderProgress}%` }" />
+          </div>
+          <p class="mt-2 text-xs text-muted">
+            {{ t('leaderboard.distanceToWin', { amount: formatWealth(topShardLeaderDistance) }) }}
+          </p>
+        </div>
+        <p v-if="topShardPlayer && topShardMilestone" class="mt-3 text-sm font-medium">
+          {{ t('leaderboard.surpassedMilestone', { player: getPlayerAlias(topShardPlayer), rank: topShardMilestone.rank, name: topShardMilestone.name }) }}
+        </p>
+        <div class="mt-3 overflow-x-auto hidden sm:block">
+          <table class="w-full text-sm" :aria-label="t('leaderboard.raceBenchmarkTitle')">
             <thead>
               <tr>
                 <th class="border-b border-divider px-3 py-2 text-left">{{ t('endgame.rank') }}</th>
@@ -388,7 +438,7 @@ async function changePage(nextPage: number) {
             </thead>
             <tbody>
               <tr
-                v-for="entry in endgameStatus.topRealWorldRichest.slice(0, 5)"
+                v-for="entry in endgameStatus.topRealWorldRichest.slice(0, 10)"
                 :key="entry.id"
               >
                 <td class="border-b border-divider px-3 py-2">#{{ entry.rank }}</td>
@@ -397,6 +447,13 @@ async function changePage(nextPage: number) {
               </tr>
             </tbody>
           </table>
+        </div>
+        <div class="mt-3 sm:hidden rounded-lg border border-divider bg-surface p-3 text-sm">
+          <p class="font-semibold">{{ t('leaderboard.mobileBenchmarkTarget') }}</p>
+          <p class="text-muted">
+            #{{ endgameStatus.topRealWorldRichest[0]?.rank }} — {{ endgameStatus.topRealWorldRichest[0]?.name }}
+          </p>
+          <p class="mt-1 font-semibold">{{ formatWealth(endgameStatus.winningThresholdUsd) }}</p>
         </div>
       </section>
 
@@ -427,7 +484,7 @@ async function changePage(nextPage: number) {
             v-for="(rank, index) in pagedRankings"
             :key="rank.playerId"
             class="rank-card flex items-center flex-wrap sm:flex-nowrap gap-4 bg-card border border-divider rounded-xl p-4 md:p-5 hover:border-brand transition-colors"
-            :class="getRankClasses(pageStartIndex + index + 1, rank.playerId)"
+            :class="getRankClasses(pageStartIndex + index + 1, rank.playerId, pageStartIndex + index + 1 === 1)"
             :style="getRankGradient(pageStartIndex + index + 1)"
             :aria-current="isActivePlayer(rank.playerId, currentPlayerId) ? 'true' : undefined"
             :aria-label="isActivePlayer(rank.playerId, currentPlayerId) ? t('leaderboard.activePlayerRowAria') : undefined"
@@ -466,6 +523,17 @@ async function changePage(nextPage: number) {
                 <span :title="t('leaderboard.cashTooltip')"> 💵 {{ formatWealth(rank.personalCash) }} </span>
                 <span class="opacity-40">·</span>
                 <span :title="t('leaderboard.stocksTooltip')"> 📈 {{ formatWealth(rank.sharesValue) }} </span>
+              </div>
+              <div class="mt-1 text-xs text-muted flex flex-wrap gap-2 justify-start sm:justify-end">
+                <span class="leader-percent-of-target">
+                  🎯 {{ t('leaderboard.percentOfTarget', { percent: formatTargetPercent(rank.totalWealthUsd) }) }}
+                </span>
+                <span
+                  v-if="pageStartIndex + index + 1 <= 3"
+                  class="leader-distance-to-win"
+                >
+                  🧭 {{ t('leaderboard.distanceToWin', { amount: formatWealth(computeDistanceToWinUsd(rank.totalWealthUsd, winningThresholdUsd)) }) }}
+                </span>
               </div>
               <RouterLink
                 :to="`/player/${rank.playerId}`"

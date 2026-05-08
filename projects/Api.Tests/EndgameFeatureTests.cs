@@ -64,7 +64,7 @@ public sealed class EndgameFeatureTests
               endgameStatus {
                 gameEnded
                 winningThresholdUsd
-                topRealWorldRichest { name wealthUsd }
+                topRealWorldRichest { rank name wealthUsd }
               }
             }
             """);
@@ -73,6 +73,9 @@ public sealed class EndgameFeatureTests
         Assert.False(status.GetProperty("gameEnded").GetBoolean());
         var list = status.GetProperty("topRealWorldRichest");
         Assert.Equal(10, list.GetArrayLength());
+        Assert.Equal(1, list[0].GetProperty("rank").GetInt32());
+        Assert.Equal(10, list[9].GetProperty("rank").GetInt32());
+        Assert.True(list[0].GetProperty("wealthUsd").GetDecimal() >= list[1].GetProperty("wealthUsd").GetDecimal());
         Assert.Equal("Elon Musk", list[0].GetProperty("name").GetString());
         Assert.Equal(430_000_000_000m, status.GetProperty("winningThresholdUsd").GetDecimal());
     }
