@@ -23,5 +23,5 @@ public static class EndgameCatalog
         new("Jensen Huang", 116_000_000_000m),
     ];
 
-    public static decimal DefaultWinningThresholdUsd => DefaultTopTenRichestPeople.Max(item => item.WealthUsd);
+    public const decimal DefaultWinningThresholdUsd = 430_000_000_000m;
 }

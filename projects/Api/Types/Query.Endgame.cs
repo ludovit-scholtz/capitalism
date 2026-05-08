@@ -29,6 +29,12 @@ public sealed partial class Query
                     WealthUsd = item.WealthUsd,
                 })
                 .ToList();
+        var orderedBenchmarks = benchmarks
+            .OrderBy(item => item.Rank)
+            .ThenByDescending(item => item.WealthUsd)
+            .ToList();
+        var winningThresholdUsd = orderedBenchmarks.FirstOrDefault()?.WealthUsd
+            ?? EndgameCatalog.DefaultWinningThresholdUsd;
 
         return new EndgameStatusResult
         {
@@ -37,14 +43,8 @@ public sealed partial class Query
             WinnerDisplayName = gameState?.WinnerDisplayName,
             WinnerCompanyName = gameState?.WinnerCompanyName,
             GameEndedAtUtc = gameState?.GameEndedAtUtc,
-            WinningThresholdUsd = benchmarks
-                .OrderBy(item => item.Rank)
-                .ThenByDescending(item => item.WealthUsd)
-                .FirstOrDefault()?.WealthUsd
-                ?? EndgameCatalog.DefaultWinningThresholdUsd,
-            TopRealWorldRichest = benchmarks
-                .OrderBy(item => item.Rank)
-                .ThenByDescending(item => item.WealthUsd)
+            WinningThresholdUsd = winningThresholdUsd,
+            TopRealWorldRichest = orderedBenchmarks
                 .Select(item => new RealWorldWealthResult
                 {
                     Id = item.Id,
