@@ -1,4 +1,4 @@
-# Copilot instructions for `scholtz/capitalism`
+# Copilot instructions for `ludovit-scholtz/capitalism`
 
 ## Repository structure
 - Root repository contains both frontend and backend.

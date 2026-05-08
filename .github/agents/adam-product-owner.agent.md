@@ -93,7 +93,7 @@ gh issue create --title $title --body-file /tmp/issue.md --assignee copilot-swe-
 To check if there is more than one active issue, use commands and output it to the console:
 
 ```
-gh issue list -R scholtz/capitalism --json id,title,state
+gh issue list -R ludovit-scholtz/capitalism --json id,title,state
 ```
 
 ### 5) **Instructions Summary**
@@ -113,8 +113,8 @@ Single-line JSON per repo for final action (e.g., success with URL) or failure r
 **Examples:**
 
 ```json
-{"result":"success","repo":"scholtz/capitalism","action":"merge","pr":123,"merged":true,"pr_url":"..."}
-{"result":"failure","reason":"actions_running:scholtz/capitalism"}
+{"result":"success","repo":"ludovit-scholtz/capitalism","action":"merge","pr":123,"merged":true,"pr_url":"..."}
+{"result":"failure","reason":"actions_running:ludovit-scholtz/capitalism"}
 ```
 
 ### 7) **Approval/Merge Guidelines**
