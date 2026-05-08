@@ -68,6 +68,21 @@ public sealed class MarkGameNewsReadInput
     public List<Guid> EntryIds { get; set; } = [];
 }
 
+public sealed class UpdateRealWorldBillionaireInput
+{
+    [Required]
+    public Guid Id { get; set; }
+
+    [Range(1, 10)]
+    public int Rank { get; set; }
+
+    [Required, MaxLength(120)]
+    public string Name { get; set; } = string.Empty;
+
+    [Range(1, double.MaxValue)]
+    public decimal WealthUsd { get; set; }
+}
+
 /// <summary>Input for admin setting a player's gold balance.</summary>
 public sealed class AdminSetPlayerGoldBalanceInput
 {

@@ -28,6 +28,17 @@ public sealed class EndgamePhase(
         }
 
         var db = context.Db;
+        var benchmarkRows = await db.RealWorldBillionaires
+            .AsNoTracking()
+            .OrderBy(item => item.Rank)
+            .ThenByDescending(item => item.WealthUsd)
+            .ToListAsync();
+        var winningThresholdUsd = benchmarkRows
+            .OrderBy(item => item.Rank)
+            .ThenByDescending(item => item.WealthUsd)
+            .FirstOrDefault()?.WealthUsd
+            ?? EndgameCatalog.DefaultWinningThresholdUsd;
+
         var players = await db.Players
             .AsNoTracking()
             .Where(player => player.Role != PlayerRole.Admin
@@ -146,7 +157,7 @@ public sealed class EndgamePhase(
             .ToList();
 
         var winner = top10.FirstOrDefault();
-        if (winner is null || winner.TotalWealthUsd < EndgameCatalog.WinningThresholdUsd)
+        if (winner is null || winner.TotalWealthUsd < winningThresholdUsd)
         {
             return;
         }

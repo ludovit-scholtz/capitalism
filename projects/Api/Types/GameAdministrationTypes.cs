@@ -101,6 +101,8 @@ public sealed class GameAdminDashboardResult
     public List<GlobalGameAdminGrantSummary> GlobalGameAdminGrants { get; set; } = [];
 
     public List<GameAdminAuditLogRecord> RecentAuditLogs { get; set; } = [];
+
+    public List<RealWorldBillionaireAdminRecord> RealWorldBillionaires { get; set; } = [];
 }
 
 public sealed class GameAdminShippingCostSummary
@@ -220,4 +222,13 @@ public sealed class GameAdminAuditLogRecord
     public int ResponseStatusCode { get; set; }
 
     public DateTime RecordedAtUtc { get; set; }
+}
+
+public sealed class RealWorldBillionaireAdminRecord
+{
+    public Guid Id { get; set; }
+    public int Rank { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public decimal WealthUsd { get; set; }
+    public DateTime UpdatedAtUtc { get; set; }
 }

@@ -889,7 +889,7 @@ export type MockState = {
     winnerCompanyName: string | null
     gameEndedAtUtc: string | null
     winningThresholdUsd: number
-    topRealWorldRichest: Array<{ name: string; wealthUsd: number }>
+    topRealWorldRichest: Array<{ id: string; rank: number; name: string; wealthUsd: number }>
   }
   cityWeatherForecasts: Record<string, MockCityWeatherForecast>
   stockPriceHistory: Record<string, MockStockPriceHistoryPoint[]>
@@ -2809,13 +2809,18 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       winnerDisplayName: null,
       winnerCompanyName: null,
       gameEndedAtUtc: null,
-      winningThresholdUsd: 178000000000,
+      winningThresholdUsd: 430000000000,
       topRealWorldRichest: [
-        { name: 'Elon Musk', wealthUsd: 430000000000 },
-        { name: 'Jeff Bezos', wealthUsd: 245000000000 },
-        { name: 'Mark Zuckerberg', wealthUsd: 216000000000 },
-        { name: 'Larry Ellison', wealthUsd: 192000000000 },
-        { name: 'Bernard Arnault', wealthUsd: 178000000000 },
+        { id: 'rw-1', rank: 1, name: 'Elon Musk', wealthUsd: 430000000000 },
+        { id: 'rw-2', rank: 2, name: 'Jeff Bezos', wealthUsd: 245000000000 },
+        { id: 'rw-3', rank: 3, name: 'Mark Zuckerberg', wealthUsd: 216000000000 },
+        { id: 'rw-4', rank: 4, name: 'Larry Ellison', wealthUsd: 192000000000 },
+        { id: 'rw-5', rank: 5, name: 'Bernard Arnault', wealthUsd: 178000000000 },
+        { id: 'rw-6', rank: 6, name: 'Larry Page', wealthUsd: 144000000000 },
+        { id: 'rw-7', rank: 7, name: 'Sergey Brin', wealthUsd: 138000000000 },
+        { id: 'rw-8', rank: 8, name: 'Warren Buffett', wealthUsd: 133000000000 },
+        { id: 'rw-9', rank: 9, name: 'Steve Ballmer', wealthUsd: 130000000000 },
+        { id: 'rw-10', rank: 10, name: 'Jensen Huang', wealthUsd: 116000000000 },
       ],
     },
     cityWeatherForecasts: {},
@@ -7700,6 +7705,15 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           })(),
           globalGameAdminGrants: state.globalGameAdminGrants.map((grant) => ({ ...grant })).sort((left, right) => left.email.localeCompare(right.email)),
           recentAuditLogs: [...state.adminAuditLogs].sort((left, right) => right.recordedAtUtc.localeCompare(left.recordedAtUtc)).slice(0, 12),
+          realWorldBillionaires: [...state.endgameStatus.topRealWorldRichest]
+            .map((item) => ({
+              id: item.id,
+              rank: item.rank,
+              name: item.name,
+              wealthUsd: item.wealthUsd,
+              updatedAtUtc: new Date().toISOString(),
+            }))
+            .sort((left, right) => left.rank - right.rank),
         },
       })
     }
@@ -7911,6 +7925,35 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
       targetPlayer.role = input?.isAdmin ? 'ADMIN' : 'PLAYER'
       return routeJson({ setLocalGameAdminRole: buildGameAdminPlayer(targetPlayer) })
+    }
+
+    if (query.includes('updateRealWorldBillionaire')) {
+      const accessFailure = getAdminAccessFailure(false)
+      if (accessFailure) {
+        return routeJsonError(accessFailure.message, accessFailure.code)
+      }
+
+      const input = body.variables?.input
+      const billionaire = state.endgameStatus.topRealWorldRichest.find((item) => item.id === input?.id)
+      if (!billionaire) {
+        return routeJsonError('Real-world billionaire benchmark not found.', 'REAL_WORLD_BENCHMARK_NOT_FOUND')
+      }
+
+      billionaire.rank = Number(input.rank)
+      billionaire.name = String(input.name ?? billionaire.name)
+      billionaire.wealthUsd = Number(input.wealthUsd ?? billionaire.wealthUsd)
+      state.endgameStatus.topRealWorldRichest = [...state.endgameStatus.topRealWorldRichest].sort((a, b) => a.rank - b.rank)
+      state.endgameStatus.winningThresholdUsd = state.endgameStatus.topRealWorldRichest[0]?.wealthUsd ?? 0
+
+      return routeJson({
+        updateRealWorldBillionaire: {
+          id: billionaire.id,
+          rank: billionaire.rank,
+          name: billionaire.name,
+          wealthUsd: billionaire.wealthUsd,
+          updatedAtUtc: new Date().toISOString(),
+        },
+      })
     }
 
     if (query.includes('assignGlobalGameAdminRole')) {

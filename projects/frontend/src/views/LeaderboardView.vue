@@ -11,7 +11,7 @@ import { deepEqual } from '@/lib/utils'
 import { formatInGameTime } from '@/lib/gameTime'
 import { formatCompactMoney } from '@/lib/currencyFormat'
 import { calculateRankPage, isActivePlayer } from '@/lib/ranking'
-import type { PlayerRanking, CompanyRanking } from '@/types'
+import type { EndgameStatus, PlayerRanking, CompanyRanking } from '@/types'
 import { getProfileBadgeIcon } from '@/lib/profileBadges'
 
 const { t, locale } = useI18n()
@@ -23,6 +23,7 @@ const { saveScrollPosition, restoreScrollPosition } = useScrollPreservation()
 
 const rankings = ref<PlayerRanking[]>([])
 const companyRankings = ref<CompanyRanking[]>([])
+const endgameStatus = ref<EndgameStatus | null>(null)
 const playerLoading = ref(true)
 const companyLoading = ref(false)
 const playerError = ref<string | null>(null)
@@ -76,6 +77,20 @@ const COMPANY_RANKINGS_QUERY = `
   }
 `
 
+const ENDGAME_STATUS_QUERY = `
+  {
+    endgameStatus {
+      winningThresholdUsd
+      topRealWorldRichest {
+        id
+        rank
+        name
+        wealthUsd
+      }
+    }
+  }
+`
+
 async function fetchPlayerRankings(isRefresh = false) {
   if (!isRefresh) {
     playerLoading.value = true
@@ -115,12 +130,24 @@ async function fetchCompanyRankings(isRefresh = false) {
   }
 }
 
+async function fetchEndgameStatus() {
+  try {
+    const data = await gqlRequest<{
+      endgameStatus: EndgameStatus
+    }>(ENDGAME_STATUS_QUERY)
+    endgameStatus.value = data.endgameStatus
+  } catch {
+    endgameStatus.value = null
+  }
+}
+
 onMounted(async () => {
   auth.initFromStorage()
   if (auth.isAuthenticated) {
     void auth.fetchMe()
   }
   await Promise.allSettled([fetchPlayerRankings(), fetchCompanyRankings()])
+  await fetchEndgameStatus()
   currentPage.value = parsePageQuery(route.query.page)
   if (route.query.page === undefined) {
     setPageToActivePlayer()
@@ -341,6 +368,37 @@ async function changePage(nextPage: number) {
           🏆 {{ t('leaderboard.viewMasterRanking') }}
         </a>
       </div>
+
+      <section v-if="endgameStatus" class="max-w-[800px] mx-auto mb-8 rounded-xl border border-divider bg-card p-5">
+        <h2 class="text-lg font-semibold">{{ t('leaderboard.realWorldBenchmarkTitle') }}</h2>
+        <p class="mt-1 text-sm text-muted">
+          {{ t('leaderboard.realWorldBenchmarkBody') }}
+        </p>
+        <p class="mt-3 text-sm">
+          {{ t('leaderboard.realWorldTarget', { amount: formatWealth(endgameStatus.winningThresholdUsd) }) }}
+        </p>
+        <div class="mt-3 overflow-x-auto">
+          <table class="w-full text-sm" :aria-label="t('leaderboard.realWorldBenchmarkTitle')">
+            <thead>
+              <tr>
+                <th class="border-b border-divider px-3 py-2 text-left">{{ t('endgame.rank') }}</th>
+                <th class="border-b border-divider px-3 py-2 text-left">{{ t('endgame.person') }}</th>
+                <th class="border-b border-divider px-3 py-2 text-right">{{ t('endgame.wealthUsd') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="entry in endgameStatus.topRealWorldRichest.slice(0, 5)"
+                :key="entry.id"
+              >
+                <td class="border-b border-divider px-3 py-2">#{{ entry.rank }}</td>
+                <td class="border-b border-divider px-3 py-2">{{ entry.name }}</td>
+                <td class="border-b border-divider px-3 py-2 text-right">{{ formatWealth(entry.wealthUsd) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <!-- Player rankings tab -->
       <template v-if="activeTab === 'players'">

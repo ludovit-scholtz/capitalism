@@ -20,6 +20,7 @@ test.describe('Endgame UI', () => {
     await expect(page.getByRole('heading', { name: 'Race to the Top' })).toBeVisible()
     await expect(page.locator('table').getByText('Elon Musk')).toBeVisible()
     await expect(page.locator('table').getByText('Bernard Arnault')).toBeVisible()
+    await expect(page.getByText(/Winning threshold: 430000000000 USD/i)).toBeVisible()
   })
 
   test('when game ended app shows winner overlay and read-only banner', async ({ page }) => {
@@ -35,7 +36,7 @@ test.describe('Endgame UI', () => {
       winnerDisplayName: 'Alice Winner',
       winnerCompanyName: 'Winner Corp',
       gameEndedAtUtc: '2026-05-08T06:30:00Z',
-      winningThresholdUsd: 178000000000,
+      winningThresholdUsd: 430000000000,
       topRealWorldRichest: state.endgameStatus.topRealWorldRichest,
     }
 

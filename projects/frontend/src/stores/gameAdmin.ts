@@ -2,7 +2,17 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 import { gqlRequest } from '@/lib/graphql'
-import type { AccountContextType, AuthPayload, GameAdminDashboard, GameAdminPlayer, GameAdminSession, GamesEntry, GamesLocalization, GlobalGameAdminGrant } from '@/types'
+import type {
+  AccountContextType,
+  AuthPayload,
+  GameAdminDashboard,
+  GameAdminPlayer,
+  GameAdminSession,
+  GamesEntry,
+  GamesLocalization,
+  GlobalGameAdminGrant,
+  RealWorldBillionaireAdminRecord,
+} from '@/types'
 
 const BASE_PLAYER_FIELDS = `
   id
@@ -120,6 +130,13 @@ const DASHBOARD_FIELDS = `
     mutationSummary
     responseStatusCode
     recordedAtUtc
+  }
+  realWorldBillionaires {
+    id
+    rank
+    name
+    wealthUsd
+    updatedAtUtc
   }
 `
 
@@ -363,6 +380,36 @@ export const useGameAdminStore = defineStore('gameAdmin', () => {
     return data.upsertGameNewsEntry
   }
 
+  async function updateRealWorldBillionaire(input: {
+    id: string
+    rank: number
+    name: string
+    wealthUsd: number
+  }) {
+    const data = await gqlRequest<{ updateRealWorldBillionaire: RealWorldBillionaireAdminRecord }>(
+      `mutation UpdateRealWorldBillionaire($input: UpdateRealWorldBillionaireInput!) {
+        updateRealWorldBillionaire(input: $input) {
+          id
+          rank
+          name
+          wealthUsd
+          updatedAtUtc
+        }
+      }`,
+      { input },
+    )
+
+    if (dashboard.value) {
+      const remaining = dashboard.value.realWorldBillionaires.filter((item) => item.id !== data.updateRealWorldBillionaire.id)
+      dashboard.value = {
+        ...dashboard.value,
+        realWorldBillionaires: [...remaining, data.updateRealWorldBillionaire].sort((left, right) => left.rank - right.rank),
+      }
+    }
+
+    return data.updateRealWorldBillionaire
+  }
+
   function replaceDashboardPlayer(updatedPlayer: GameAdminPlayer) {
     if (!dashboard.value) {
       return
@@ -403,6 +450,7 @@ export const useGameAdminStore = defineStore('gameAdmin', () => {
     assignGlobalGameAdminRole,
     removeGlobalGameAdminRole,
     upsertGamesEntry,
+    updateRealWorldBillionaire,
     clear,
   }
 })

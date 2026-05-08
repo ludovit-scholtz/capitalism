@@ -74,6 +74,8 @@ const ENDGAME_STATUS_QUERY = `
       gameEndedAtUtc
       winningThresholdUsd
       topRealWorldRichest {
+        id
+        rank
         name
         wealthUsd
       }
@@ -93,6 +95,12 @@ const raceProgressPercent = computed(() => {
   const threshold = endgameStatus.value?.winningThresholdUsd ?? 0
   if (threshold <= 0 || !personAccount.value) return 0
   return Math.min(100, Math.round((personAccount.value.totalNetWealth / threshold) * 100))
+})
+
+const raceGapUsd = computed(() => {
+  const threshold = endgameStatus.value?.winningThresholdUsd ?? 0
+  const current = personAccount.value?.totalNetWealth ?? 0
+  return Math.max(0, threshold - current)
 })
 
 async function loadData(isRefresh = false) {
@@ -290,6 +298,20 @@ useTickRefresh(() => loadData(true))
           <div class="mt-4 h-2.5 overflow-hidden rounded-full bg-card-raised">
             <div class="h-full bg-brand transition-all" :style="{ width: `${raceProgressPercent}%` }" />
           </div>
+          <div class="mt-3 grid gap-2 text-sm sm:grid-cols-3">
+            <p>
+              <strong>{{ t('endgame.targetWealth') }}:</strong>
+              <CurrencyAmount :amount="endgameStatus?.winningThresholdUsd ?? 0" currency="USD" />
+            </p>
+            <p>
+              <strong>{{ t('endgame.playerWealth') }}:</strong>
+              <CurrencyAmount :amount="personAccount.totalNetWealth" currency="USD" />
+            </p>
+            <p>
+              <strong>{{ t('endgame.gapToWin') }}:</strong>
+              <CurrencyAmount :amount="raceGapUsd" currency="USD" />
+            </p>
+          </div>
           <div class="mt-4 overflow-x-auto">
             <table class="w-full border-collapse text-sm" :aria-label="t('endgame.raceTitle')">
               <thead>
@@ -300,8 +322,8 @@ useTickRefresh(() => loadData(true))
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(entry, index) in endgameStatus?.topRealWorldRichest ?? []" :key="entry.name">
-                  <td class="border-b border-divider px-3 py-[0.55rem] font-semibold">#{{ index + 1 }}</td>
+                <tr v-for="entry in (endgameStatus?.topRealWorldRichest ?? []).slice(0, 5)" :key="entry.id">
+                  <td class="border-b border-divider px-3 py-[0.55rem] font-semibold">#{{ entry.rank }}</td>
                   <td class="border-b border-divider px-3 py-[0.55rem]">{{ entry.name }}</td>
                   <td class="border-b border-divider px-3 py-[0.55rem] text-right tabular-nums">
                     <CurrencyAmount :amount="entry.wealthUsd" currency="USD" />
@@ -313,6 +335,7 @@ useTickRefresh(() => loadData(true))
           <p class="mt-3 text-xs text-muted">
             {{ t('endgame.thresholdHint', { target: endgameStatus?.winningThresholdUsd ?? 0 }) }}
           </p>
+          <p class="mt-1 text-xs text-muted">{{ t('endgame.approximateDisclaimer') }}</p>
         </section>
 
         <!-- Tax reserve history (sell trades) -->

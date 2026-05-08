@@ -47,6 +47,15 @@ test.describe('Ranking page', () => {
     await expect(masterLink).toHaveAttribute('href', /\/ranking$/)
   })
 
+  test('shows real-world benchmark section with top five billionaires', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/ranking')
+
+    await expect(page.getByRole('heading', { name: 'Real-World Benchmark' })).toBeVisible()
+    await expect(page.getByRole('table', { name: 'Real-World Benchmark' }).getByText('Elon Musk')).toBeVisible()
+    await expect(page.getByRole('table', { name: 'Real-World Benchmark' }).getByText('Bernard Arnault')).toBeVisible()
+  })
+
   test('unauthenticated user stays on page 1 with no active-row highlight', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/ranking')
