@@ -1276,6 +1276,19 @@ Root-cause of a design regression (April 2026, Home/Login/Forex spacing after Ta
 4. **If a Tailwind migration removes a scoped CSS spacing rule, replace that spacing in the template in the same commit.** Do not rely on browser default margins because the global reset removes them.
 5. **After migrating any landing, auth, or finance page, run the narrow page-level validation that can catch visual collapse** (`npm run lint`, `npm run build`, and the targeted Playwright spec for that page when one exists).
 
+## Alias/name validation contract changes — always update boundary tests and roadmap status in the same PR
+
+Root-cause of a quality gap (May 2026, PR #313 alias onboarding):
+- The display-name validation limit was tightened in API code from 100 to 40 characters to match the product requirement, but an existing backend boundary test (`UpdateDisplayName_Exactly100Chars_Succeeds`) was not updated.
+- `api-ci-cd` failed in CI with one failing test while other workflows were green, creating a "work not finished in proper quality" review outcome.
+- The onboarding roadmap section and checklist were also left stale after implementation, which made product-completion status look inconsistent.
+
+**Rules to prevent recurrence:**
+1. **When changing any validation bound (max length, min length, numeric range), update all matching boundary tests in the same commit.** For display-name length changes, this means both the "too long" test and the "exact boundary succeeds" test must be aligned immediately.
+2. **Always inspect failing workflow logs before further coding and classify the exact failing test by name.** For this PR pattern: run `list_workflow_runs` → `list_workflow_jobs` → `get_job_logs`, then fix the named test first.
+3. **For product-definition checklist items, update `ROADMAP.md` status in the same PR once functionality and tests are complete.** Do not leave completed onboarding items unchecked.
+4. **After adding onboarding/profile alias behavior, minimum regression coverage must include:** valid update, duplicate rejection, unauthenticated rejection, too-long rejection, and "existing alias is preserved on shared-auth sign-in".
+
 ## Frontend spacing system — follow the shared design pattern document
 
 Root-cause of repeated visual regressions (April 2026, landing/auth/forex spacing review):

@@ -53,6 +53,7 @@ public sealed partial class Query
             {
                 PlayerId = snapshot.PlayerAccountId,
                 DisplayName = snapshot.PlayerAccount.DisplayName,
+                PersonalAccountName = snapshot.PlayerAccount.DisplayName,
                 TotalPoints = snapshot.TotalPoints,
                 GlobalRank = snapshot.GlobalRank,
                 RankMovement = snapshot.PreviousGlobalRank - snapshot.GlobalRank,

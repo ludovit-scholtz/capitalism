@@ -45,10 +45,6 @@ public sealed class AuthenticatedMasterPlayerClaimsSyncService(
         else
         {
             player.LastLoginAtUtc = now;
-            if (!string.Equals(player.DisplayName, displayName, StringComparison.Ordinal))
-            {
-                player.DisplayName = displayName;
-            }
         }
 
         await db.SaveChangesAsync(cancellationToken);

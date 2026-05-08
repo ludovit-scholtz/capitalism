@@ -179,6 +179,62 @@ public sealed partial class Mutation
         };
     }
 
+    [HotChocolate.Authorization.Authorize]
+    public async Task<UpdatePersonalAccountNamePayload> UpdatePersonalAccountName(
+        UpdatePersonalAccountNameInput input,
+        ClaimsPrincipal claimsPrincipal,
+        [Service] MasterDbContext db)
+    {
+        var player = await Query.GetCurrentUserAsync(claimsPrincipal, db)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Player not found.")
+                    .SetCode("PLAYER_NOT_FOUND")
+                    .Build());
+
+        var personalAccountName = input.PersonalAccountName?.Trim();
+        if (string.IsNullOrWhiteSpace(personalAccountName))
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Personal account name is required.")
+                    .SetCode("PERSONAL_ACCOUNT_NAME_REQUIRED")
+                    .Build());
+        }
+
+        if (personalAccountName.Length > 40)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Personal account name must be 40 characters or fewer.")
+                    .SetCode("PERSONAL_ACCOUNT_NAME_TOO_LONG")
+                    .Build());
+        }
+
+        var duplicateExists = await db.PlayerAccounts
+            .AsNoTracking()
+            .AnyAsync(candidate =>
+                candidate.Id != player.Id
+                && candidate.DisplayName.ToLower() == personalAccountName.ToLower());
+        if (duplicateExists)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("This personal account name is already taken.")
+                    .SetCode("PERSONAL_ACCOUNT_NAME_NOT_UNIQUE")
+                    .Build());
+        }
+
+        player.DisplayName = personalAccountName;
+        await db.SaveChangesAsync();
+
+        return new UpdatePersonalAccountNamePayload
+        {
+            PlayerId = player.Id,
+            PersonalAccountName = player.DisplayName,
+        };
+    }
+
     /// <summary>Prolongs (or creates) a Pro subscription for the authenticated player.</summary>
     [HotChocolate.Authorization.Authorize]
     public async Task<SubscriptionInfo> ProlongSubscription(

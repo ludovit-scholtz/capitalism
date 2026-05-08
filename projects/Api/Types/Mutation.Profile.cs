@@ -54,7 +54,7 @@ public sealed partial class Mutation
 
     /// <summary>
     /// Updates the authenticated player's public display name.
-    /// Maximum 100 characters. The display name is shown in rankings,
+    /// Maximum 40 characters. The display name is shown in rankings,
     /// chat, and on building pages. Players are encouraged not to use
     /// their real name.
     /// </summary>
@@ -77,11 +77,11 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        if (displayName.Length > 100)
+        if (displayName.Length > 40)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("Display name must be 100 characters or fewer.")
+                    .SetMessage("Display name must be 40 characters or fewer.")
                     .SetCode("DISPLAY_NAME_TOO_LONG")
                     .Build());
         }
@@ -131,11 +131,11 @@ public sealed class UpdatePlayerBioPayload
 public sealed class UpdateDisplayNameInput
 {
     /// <summary>
-    /// The new display name (1–100 characters). Players are encouraged not to use
+    /// The new display name (1–40 characters). Players are encouraged not to use
     /// their real name — use a fictional alias instead.
     /// </summary>
     [Required]
-    [MaxLength(100)]
+    [MaxLength(40)]
     public string DisplayName { get; set; } = string.Empty;
 }
 

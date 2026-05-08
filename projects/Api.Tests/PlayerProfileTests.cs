@@ -337,7 +337,7 @@ public sealed class PlayerProfileTests
         var client = factory.CreateClient();
         var token = await RegisterAsync(client, "dn-toolong@test.com", "Short Name");
 
-        var longName = new string('A', 101);
+        var longName = new string('A', 41);
         var result = await ExecAsync(client,
             "mutation UDN($dn: String!) { updateDisplayName(input: { displayName: $dn }) { displayName } }",
             new { dn = longName },
@@ -349,13 +349,13 @@ public sealed class PlayerProfileTests
     }
 
     [Fact]
-    public async Task UpdateDisplayName_Exactly100Chars_Succeeds()
+    public async Task UpdateDisplayName_Exactly40Chars_Succeeds()
     {
         await using var factory = new ApiWebApplicationFactory();
         var client = factory.CreateClient();
-        var token = await RegisterAsync(client, "dn-exact100@test.com", "Start Name");
+        var token = await RegisterAsync(client, "dn-exact40@test.com", "Start Name");
 
-        var exactName = new string('B', 100);
+        var exactName = new string('B', 40);
         var result = await ExecAsync(client,
             "mutation UDN($dn: String!) { updateDisplayName(input: { displayName: $dn }) { displayName } }",
             new { dn = exactName },

@@ -106,11 +106,25 @@ public sealed class MasterPlayerProfile
 
     public string DisplayName { get; set; } = string.Empty;
 
+    public string PersonalAccountName { get; set; } = string.Empty;
+
     public DateTime CreatedAtUtc { get; set; }
 
     public DateTime? StartupPackClaimedAtUtc { get; set; }
 
     public bool CanClaimStartupPack { get; set; }
+}
+
+public sealed class UpdatePersonalAccountNameInput
+{
+    public string PersonalAccountName { get; set; } = string.Empty;
+}
+
+public sealed class UpdatePersonalAccountNamePayload
+{
+    public Guid PlayerId { get; set; }
+
+    public string PersonalAccountName { get; set; } = string.Empty;
 }
 
 public sealed class SubscriptionInfo

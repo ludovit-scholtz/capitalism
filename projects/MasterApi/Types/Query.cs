@@ -245,6 +245,7 @@ public sealed partial class Query
             Id = player.Id,
             Email = player.Email,
             DisplayName = player.DisplayName,
+            PersonalAccountName = player.DisplayName,
             CreatedAtUtc = player.CreatedAtUtc,
             StartupPackClaimedAtUtc = player.StartupPackClaimedAtUtc,
             CanClaimStartupPack = player.StartupPackClaimedAtUtc is null,

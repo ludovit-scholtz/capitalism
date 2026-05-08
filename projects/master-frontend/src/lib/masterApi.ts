@@ -23,6 +23,7 @@ export interface MasterPlayerProfile {
   id: string
   email: string
   displayName: string
+  personalAccountName?: string
   createdAtUtc: string
   startupPackClaimedAtUtc: string | null
   canClaimStartupPack: boolean
@@ -80,6 +81,7 @@ const REGISTER_MUTATION = `
         id
         email
         displayName
+        personalAccountName
         createdAtUtc
         startupPackClaimedAtUtc
         canClaimStartupPack
@@ -97,6 +99,7 @@ const LOGIN_MUTATION = `
         id
         email
         displayName
+        personalAccountName
         createdAtUtc
         startupPackClaimedAtUtc
         canClaimStartupPack
@@ -111,6 +114,7 @@ const ME_QUERY = `
       id
       email
       displayName
+      personalAccountName
       createdAtUtc
       startupPackClaimedAtUtc
       canClaimStartupPack
@@ -562,6 +566,7 @@ export interface RankingSummaryInfo {
 export interface RankingLeaderboardEntryInfo {
   playerId: string
   displayName: string
+  personalAccountName?: string
   totalPoints: number
   globalRank: number
   rankMovement: number
@@ -671,6 +676,7 @@ const RANKING_LEADERBOARD_QUERY = `
     rankingLeaderboard(limit: $limit, offset: $offset) {
       playerId
       displayName
+      personalAccountName
       totalPoints
       globalRank
       rankMovement

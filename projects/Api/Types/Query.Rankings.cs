@@ -108,6 +108,7 @@ public sealed partial class Query
                 {
                     PlayerId = p.Id,
                     DisplayName = p.DisplayName,
+                    PersonalAccountName = p.DisplayName,
                     PersonalCash = personalCashUsd,
                     SharesValue = sharesValue,
                     TotalWealth = decimal.Round(personalCashUsd + sharesValue, 4, MidpointRounding.AwayFromZero),
@@ -183,6 +184,7 @@ public sealed partial class Query
                     CompanyName = c.Name,
                     PlayerId = c.PlayerId,
                     OwnerDisplayName = c.Player?.DisplayName ?? "Unknown",
+                    OwnerPersonalAccountName = c.Player?.DisplayName ?? "Unknown",
                     Cash = companyCashUsd,
                     CurrencyCode = "USD",
                     BuildingValue = buildingValueUsd,

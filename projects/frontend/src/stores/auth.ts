@@ -518,6 +518,9 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function fetchCurrentPlayer(options: FetchMeOptions = {}) {
     const data = await gqlRequest<{ me: Player }>(`{ me {${PLAYER_SELECTION}} }`)
+    if (!data.me.personalAccountName) {
+      data.me.personalAccountName = data.me.displayName
+    }
     if (options.reconcileCityContext) {
       await reconcileCityContext(data.me)
     }

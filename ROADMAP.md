@@ -24,13 +24,13 @@ It will use real world map. The game will start in single city and later other c
 - [x] When game server is stopped, players cannot do any in game operations - no forex trades, no stock trades, no amm trading, ticks engine does not process new tick. The newslatter is published with the game details and top personal account ranking.
 - [x] Update the documentation and set a game goal for the players to become the richest persons in the world.
 
-### Onboarding (50% complete)
+### Onboarding (100% complete)
 
-- [ ] Do not show invitation message with referal code right up to the point when user logs in to the system.
-- [ ] After the code has been applied and stored to the database, remove it from the game pinia store.
+- [x] Do not show invitation message with referal code right up to the point when user logs in to the system.
+- [x] After the code has been applied and stored to the database, remove it from the game pinia store.
 - [x] Before user first sign in to the game make sure to fill in the referal code. Show link (and allow copy on one click) in the master frontend in the referal section where users can refer user for the game server. When user comes to this link, make sure the referal code is stored in the pinia state, and stored to the user account when he first logs in. Before user logs in, show him that he is using specific referal code and he will get 10% discount for in game purchases.
 - [x] Create better Company name generator. Find npm package with the word list, and do a proper name generation with the combination of two words. Make sure the company names sounds great.
-- [ ] Create name generator for personal account name. Find npm package with the names wordlist and do a combination of the Firstname, Middlename and Last name. Allow players to change the personal account name later. In ranking show the personal account name, not the oidc name please. In the form to change name, tell people not to use the real name. Make sure the personal name is generated in the onboarding in the IPO step when player picks the company name. Make sure the personal account name is showned in the ranking. Make sure player can change the personal account name in the player settings. Store the personal account name in the master database so that the personal account player name is the same in all game servers. If the personal account name already exists in the master database after new game onboarding, do not change it, and make sure the personal account name is preserved.
+- [x] Create name generator for personal account name. Find npm package with the names wordlist and do a combination of the Firstname, Middlename and Last name. Allow players to change the personal account name later. In ranking show the personal account name, not the oidc name please. In the form to change name, tell people not to use the real name. Make sure the personal name is generated in the onboarding in the IPO step when player picks the company name. Make sure the personal account name is showned in the ranking. Make sure player can change the personal account name in the player settings. Store the personal account name in the master database so that the personal account player name is the same in all game servers. If the personal account name already exists in the master database after new game onboarding, do not change it, and make sure the personal account name is preserved.
 
 ### Authorization
 
