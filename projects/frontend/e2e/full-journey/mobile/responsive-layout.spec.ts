@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 import { makeAdminPlayer, makePlayer, setupMockApi } from '../../helpers/mock-api'
 
 const MAX_TABLET_WIDTH = 768
+const MIN_4K_ROOT_FONT_SIZE_PX = 17
 
 // 375×667 is the acceptance-criteria baseline (iPhone SE class).
 // Keep 390×844 too so we continue covering modern larger mobile devices.
@@ -192,7 +193,7 @@ test.describe('Responsive layout baseline checks', () => {
     expect(maxContainerWidth).toBeLessThanOrEqual(1600)
 
     const rootFontSizePx = await page.evaluate(() => Number.parseFloat(getComputedStyle(document.documentElement).fontSize))
-    expect(rootFontSizePx).toBeGreaterThanOrEqual(17)
+    expect(rootFontSizePx).toBeGreaterThanOrEqual(MIN_4K_ROOT_FONT_SIZE_PX)
   })
 
   test('mobile navigation menu opens grouped second-level links and closes correctly', async ({ page }) => {
