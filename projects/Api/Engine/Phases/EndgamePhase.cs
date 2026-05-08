@@ -97,7 +97,10 @@ public sealed class EndgamePhase(
                 var localPrice = pool.FiatReserve / pool.GoldReserve;
                 return FxRateHelper.ConvertToUsd(localPrice, pool.CurrencyCode, eurRates);
             });
-        var fallbackGoldPriceUsd = poolGoldPriceUsdByPoolId.Values.Where(value => value > 0m).DefaultIfEmpty(3_000m).Average();
+        var fallbackGoldPriceUsd = poolGoldPriceUsdByPoolId.Values
+            .Where(value => value > 0m)
+            .DefaultIfEmpty(EndgameCatalog.DefaultGoldPriceUsd)
+            .Average();
 
         var top10 = players
             .Select(player =>

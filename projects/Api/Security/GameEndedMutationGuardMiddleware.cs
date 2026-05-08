@@ -2,6 +2,7 @@ using System.Text.Json;
 using Api.Data;
 using Api.Utilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Api.Security;
 
@@ -11,6 +12,13 @@ namespace Api.Security;
 /// </summary>
 public sealed class GameEndedMutationGuardMiddleware(RequestDelegate next)
 {
+    private readonly ILogger<GameEndedMutationGuardMiddleware> _logger = NullLogger<GameEndedMutationGuardMiddleware>.Instance;
+
+    public GameEndedMutationGuardMiddleware(RequestDelegate next, ILogger<GameEndedMutationGuardMiddleware> logger) : this(next)
+    {
+        _logger = logger;
+    }
+
     public async Task InvokeAsync(HttpContext context, AppDbContext db)
     {
         if (!IsGraphQlPost(context))
@@ -69,7 +77,7 @@ public sealed class GameEndedMutationGuardMiddleware(RequestDelegate next)
         => HttpMethods.IsPost(context.Request.Method)
             && context.Request.Path.StartsWithSegments("/graphql", StringComparison.OrdinalIgnoreCase);
 
-    private static bool ContainsMutationOperation(string requestBody)
+    private bool ContainsMutationOperation(string requestBody)
     {
         if (string.IsNullOrWhiteSpace(requestBody))
         {
@@ -96,6 +104,7 @@ public sealed class GameEndedMutationGuardMiddleware(RequestDelegate next)
         }
         catch
         {
+            _logger.LogDebug("Unable to parse GraphQL request payload while checking mutation gate.");
             // If parsing fails, do not block at middleware level.
             return false;
         }

@@ -19,7 +19,7 @@ const ENDGAME_STATUS_QUERY = `
   }
 `
 
-export function useEndgameStatus(pollIntervalMs = 15000) {
+export function useEndgameStatus(pollIntervalMs = 30000) {
   const status = ref<EndgameStatus | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
