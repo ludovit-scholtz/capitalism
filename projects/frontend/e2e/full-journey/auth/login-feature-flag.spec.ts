@@ -60,13 +60,18 @@ test.describe('Login page — password auth feature flag', () => {
 
   test('login page does not crash when no referral code is present', async ({ page }) => {
     setupMockApi(page)
-    await page.goto('/login')
-    // Verify no JS errors on the page.
+    // Collect console errors before navigating.
     const consoleErrors: string[] = []
     page.on('console', (msg) => {
       if (msg.type() === 'error') consoleErrors.push(msg.text())
     })
-    await page.waitForTimeout(600)
+    // Intercept OIDC redirect so the page never leaves the origin.
+    await page.route(
+      (url) => url.pathname.includes('/authorize') || url.hostname.includes('biatec'),
+      (route) => route.fulfill({ status: 200, body: 'oidc-intercepted' }),
+    )
+    await page.goto('/login')
+    await expect(page).not.toHaveURL(/error/)
     // Allow network-related errors (OIDC redirect) but no Vue/app errors.
     const appErrors = consoleErrors.filter(
       (e) => !e.includes('net::ERR') && !e.includes('fetch') && !e.includes('Failed to load'),
