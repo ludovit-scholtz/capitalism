@@ -871,6 +871,15 @@ export type MockState = {
   currentUserId: string | null
   currentToken: string | null
   gameState: { currentTick: number; lastTickAtUtc: string; tickIntervalSeconds: number; taxCycleTicks: number; taxRate: number }
+  endgameStatus: {
+    gameEnded: boolean
+    winnerPlayerId: string | null
+    winnerDisplayName: string | null
+    winnerCompanyName: string | null
+    gameEndedAtUtc: string | null
+    winningThresholdUsd: number
+    topRealWorldRichest: Array<{ name: string; wealthUsd: number }>
+  }
   cityWeatherForecasts: Record<string, MockCityWeatherForecast>
   stockPriceHistory: Record<string, MockStockPriceHistoryPoint[]>
   ledgerData: Record<string, MockLedgerSummary>
@@ -2776,6 +2785,21 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     currentUserId: null,
     currentToken: null,
     gameState: { currentTick: 42, lastTickAtUtc: new Date(Date.now() - 30000).toISOString(), tickIntervalSeconds: 60, taxCycleTicks: 8760, taxRate: 15 },
+    endgameStatus: {
+      gameEnded: false,
+      winnerPlayerId: null,
+      winnerDisplayName: null,
+      winnerCompanyName: null,
+      gameEndedAtUtc: null,
+      winningThresholdUsd: 178000000000,
+      topRealWorldRichest: [
+        { name: 'Elon Musk', wealthUsd: 430000000000 },
+        { name: 'Jeff Bezos', wealthUsd: 245000000000 },
+        { name: 'Mark Zuckerberg', wealthUsd: 216000000000 },
+        { name: 'Larry Ellison', wealthUsd: 192000000000 },
+        { name: 'Bernard Arnault', wealthUsd: 178000000000 },
+      ],
+    },
     cityWeatherForecasts: {},
     stockPriceHistory: {},
     ledgerData: {},
@@ -6208,6 +6232,14 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { gameState: buildMockGameStatePayload(state.gameState) } }),
+      })
+    }
+
+    if (query.includes('endgameStatus')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { endgameStatus: state.endgameStatus } }),
       })
     }
 

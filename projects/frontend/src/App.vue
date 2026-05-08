@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppFooter from '@/components/layout/AppFooter.vue'
@@ -12,6 +12,7 @@ import { useNotificationsStore } from '@/stores/notifications'
 import { useGameAdminStore } from '@/stores/gameAdmin'
 import { useChatStore } from '@/stores/chat'
 import { useReferralStore } from '@/stores/referral'
+import { useEndgameStatus } from '@/composables/useEndgameStatus'
 
 const { t } = useI18n()
 const { isOffline, updateAvailable, acceptUpdate } = usePwa()
@@ -22,6 +23,8 @@ const notificationsStore = useNotificationsStore()
 const gameAdminStore = useGameAdminStore()
 const chatStore = useChatStore()
 const referralStore = useReferralStore()
+const { status: endgameStatus } = useEndgameStatus()
+const endgameOverlayDismissed = ref(false)
 gameStateStore.start()
 let citySwitchToastTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -67,6 +70,15 @@ watch(
   },
 )
 
+watch(
+  () => endgameStatus.value?.gameEnded,
+  (gameEnded) => {
+    if (!gameEnded) {
+      endgameOverlayDismissed.value = false
+    }
+  },
+)
+
 // Close chat when user logs out
 watch(
   () => auth.isAuthenticated,
@@ -95,6 +107,16 @@ watch(
 <template>
   <div class="flex flex-col min-h-screen">
     <AppHeader />
+
+    <div
+      v-if="endgameStatus?.gameEnded"
+      class="sticky top-0 z-[210] flex items-center justify-center gap-2 border-b border-brand bg-brand-subtle px-4 py-2 text-sm font-semibold text-brand"
+      role="status"
+      aria-live="polite"
+    >
+      <span aria-hidden="true">🏆</span>
+      <span>{{ t('endgame.readOnlyBanner', { winner: endgameStatus?.winnerDisplayName ?? t('endgame.unknownWinner') }) }}</span>
+    </div>
 
     <div
       v-if="auth.autoSwitchedMainCityName"
@@ -133,6 +155,25 @@ watch(
     <main class="flex-1">
       <RouterView />
     </main>
+    <div
+      v-if="endgameStatus?.gameEnded && !endgameOverlayDismissed"
+      class="fixed inset-0 z-[230] flex items-center justify-center bg-[rgba(5,10,22,0.86)] p-6"
+    >
+      <div class="max-w-xl rounded-2xl border border-brand bg-card px-6 py-7 text-center shadow-2xl">
+        <p class="text-sm font-bold uppercase tracking-[0.08em] text-brand">{{ t('endgame.overlayEyebrow') }}</p>
+        <h2 class="mt-2 text-3xl font-extrabold">{{ t('endgame.overlayTitle') }}</h2>
+        <p class="mt-3 text-base text-muted">
+          {{ t('endgame.overlayWinner', { winner: endgameStatus?.winnerDisplayName ?? t('endgame.unknownWinner') }) }}
+        </p>
+        <p v-if="endgameStatus?.winnerCompanyName" class="mt-1 text-sm text-muted">
+          {{ t('endgame.overlayCompany', { company: endgameStatus.winnerCompanyName }) }}
+        </p>
+        <div class="mt-5 flex justify-center gap-3">
+          <RouterLink to="/leaderboard" class="btn btn-primary">{{ t('endgame.viewFinalRankings') }}</RouterLink>
+          <button class="btn btn-secondary" @click="endgameOverlayDismissed = true">{{ t('common.close') }}</button>
+        </div>
+      </div>
+    </div>
     <AppFooter />
     <!-- Global chat side panel — rendered via Teleport to body inside the component -->
     <ChatSidePanel v-if="auth.isAuthenticated" />

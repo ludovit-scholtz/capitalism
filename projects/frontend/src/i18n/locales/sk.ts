@@ -2498,6 +2498,22 @@ export default {
     amount: 'Suma',
     wealthBreakdownTitle: 'Prehľad bohatstva',
   },
+  endgame: {
+    raceTitle: 'Preteky na vrchol',
+    raceSubtitle: 'Prekonajte 5. najbohatšieho reálneho miliardára a ukončite hru víťazstvom.',
+    yourProgress: 'Váš progres',
+    rank: 'Poradie',
+    person: 'Osoba',
+    wealthUsd: 'Bohatstvo (USD)',
+    thresholdHint: 'Víťazný prah: {target} USD',
+    readOnlyBanner: 'Koniec hry — vyhral {winner}! Tento server je teraz len na čítanie.',
+    unknownWinner: 'jeden hráč',
+    overlayEyebrow: 'Finálny výsledok',
+    overlayTitle: 'Koniec hry',
+    overlayWinner: '{winner} vyhral tento server.',
+    overlayCompany: 'Víťazná spoločnosť: {company}',
+    viewFinalRankings: 'Zobraziť finálne poradie',
+  },
   powerGrid: {
     title: 'Mestská elektrosieť',
     supply: 'Výroba',
@@ -3476,6 +3492,11 @@ export default {
     authNotice: 'Prihláste sa, aby ste mohli sledovať postup a získavať body za každý míľnik.',
     signIn: 'Prihlásiť sa',
     gotIt: 'Rozumiem',
+    endgame: {
+      title: 'Cieľ Endgame',
+      desc: 'Server sa skončí, keď hráč prekoná majetok 5. najbohatšieho reálneho miliardára.',
+      value: 'Sledujte panel Preteky na vrchol v Osobných knihách a zvýšte čisté bohatstvo nad benchmark.',
+    },
     milestones: {
       firstResourceSold: {
         title: 'Prvý predaj',

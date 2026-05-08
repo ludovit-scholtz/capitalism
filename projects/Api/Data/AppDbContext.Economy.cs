@@ -104,6 +104,8 @@ public sealed partial class AppDbContext
         {
             e.HasKey(g => g.Id);
             e.Property(g => g.TaxRate).HasPrecision(5, 2);
+            e.Property(g => g.WinnerDisplayName).HasMaxLength(100);
+            e.Property(g => g.WinnerCompanyName).HasMaxLength(200);
         });
 
         modelBuilder.Entity<ExchangeOrder>(e =>

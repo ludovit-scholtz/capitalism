@@ -2507,6 +2507,22 @@ export default {
     amount: 'Betrag',
     wealthBreakdownTitle: 'Vermögensaufschlüsselung',
   },
+  endgame: {
+    raceTitle: 'Rennen an die Spitze',
+    raceSubtitle: 'Übertreffen Sie den 5.-reichsten realen Milliardär, um das Spiel zu beenden und zu gewinnen.',
+    yourProgress: 'Ihr Fortschritt',
+    rank: 'Rang',
+    person: 'Person',
+    wealthUsd: 'Vermögen (USD)',
+    thresholdHint: 'Siegesschwelle: {target} USD',
+    readOnlyBanner: 'Spiel vorbei — {winner} hat gewonnen! Dieser Server ist jetzt schreibgeschützt.',
+    unknownWinner: 'Ein Spieler',
+    overlayEyebrow: 'Endergebnis',
+    overlayTitle: 'Spiel vorbei',
+    overlayWinner: '{winner} hat diesen Server gewonnen.',
+    overlayCompany: 'Siegerunternehmen: {company}',
+    viewFinalRankings: 'Finales Ranking ansehen',
+  },
   powerGrid: {
     title: 'Städtisches Stromnetz',
     supply: 'Erzeugung',
@@ -3490,6 +3506,11 @@ export default {
     authNotice: 'Melden Sie sich an, um Ihren Fortschritt zu verfolgen und Bonuspunkte für jeden Meilenstein zu verdienen.',
     signIn: 'Anmelden',
     gotIt: 'Verstanden',
+    endgame: {
+      title: 'Endgame-Ziel',
+      desc: 'Der Server endet, wenn ein Spieler das Vermögen des 5.-reichsten realen Milliardärs übertrifft.',
+      value: 'Verfolgen Sie das Rennen-an-die-Spitze-Panel im persönlichen Hauptbuch und steigern Sie Ihr Nettovermögen über den Benchmark.',
+    },
     milestones: {
       firstResourceSold: {
         title: 'Erster Verkauf',

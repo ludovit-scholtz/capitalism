@@ -6,7 +6,7 @@ import { gqlRequest } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
 import { useTickRefresh } from '@/composables/useTickRefresh'
 import CurrencyAmount from '@/components/numbers/CurrencyAmount.vue'
-import type { PersonAccount } from '@/types/index'
+import type { EndgameStatus, PersonAccount } from '@/types/index'
 
 const PERSONAL_STOCK_SALE_TAX_RATE = 0.15
 
@@ -14,6 +14,7 @@ const { t, locale } = useI18n()
 const auth = useAuthStore()
 
 const personAccount = ref<PersonAccount | null>(null)
+const endgameStatus = ref<EndgameStatus | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
 
@@ -63,6 +64,23 @@ const PERSON_ACCOUNT_QUERY = `
   }
 `
 
+const ENDGAME_STATUS_QUERY = `
+  {
+    endgameStatus {
+      gameEnded
+      winnerPlayerId
+      winnerDisplayName
+      winnerCompanyName
+      gameEndedAtUtc
+      winningThresholdUsd
+      topRealWorldRichest {
+        name
+        wealthUsd
+      }
+    }
+  }
+`
+
 const portfolioValue = computed(() =>
   (personAccount.value?.shareholdings ?? []).reduce((sum, h) => sum + h.marketValue, 0),
 )
@@ -70,6 +88,12 @@ const portfolioValue = computed(() =>
 const sellTrades = computed(() =>
   (personAccount.value?.stockTrades ?? []).filter((t) => t.direction === 'SELL'),
 )
+
+const raceProgressPercent = computed(() => {
+  const threshold = endgameStatus.value?.winningThresholdUsd ?? 0
+  if (threshold <= 0 || !personAccount.value) return 0
+  return Math.min(100, Math.round((personAccount.value.totalNetWealth / threshold) * 100))
+})
 
 async function loadData(isRefresh = false) {
   if (!isRefresh) loading.value = true
@@ -81,6 +105,8 @@ async function loadData(isRefresh = false) {
     }
     const data = await gqlRequest<{ personAccount: PersonAccount | null }>(PERSON_ACCOUNT_QUERY)
     personAccount.value = data.personAccount
+    const endgameData = await gqlRequest<{ endgameStatus: EndgameStatus }>(ENDGAME_STATUS_QUERY)
+    endgameStatus.value = endgameData.endgameStatus
   } catch (reason: unknown) {
     if (!isRefresh) {
       error.value = reason instanceof Error ? reason.message : t('personalLedger.loadFailed')
@@ -247,6 +273,45 @@ useTickRefresh(() => loadData(true))
             role="note"
           >
             {{ t('personalLedger.taxNote') }}
+          </p>
+        </section>
+
+        <section class="rounded-2xl border border-divider bg-card p-6 shadow-sm">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <h2 class="text-lg font-semibold">{{ t('endgame.raceTitle') }}</h2>
+              <p class="mt-1 text-sm text-muted">{{ t('endgame.raceSubtitle') }}</p>
+            </div>
+            <div class="text-right">
+              <p class="text-xs font-bold uppercase tracking-[0.06em] text-muted">{{ t('endgame.yourProgress') }}</p>
+              <p class="text-lg font-bold text-brand">{{ raceProgressPercent }}%</p>
+            </div>
+          </div>
+          <div class="mt-4 h-2.5 overflow-hidden rounded-full bg-card-raised">
+            <div class="h-full bg-brand transition-all" :style="{ width: `${raceProgressPercent}%` }" />
+          </div>
+          <div class="mt-4 overflow-x-auto">
+            <table class="w-full border-collapse text-sm" :aria-label="t('endgame.raceTitle')">
+              <thead>
+                <tr>
+                  <th class="border-b border-divider px-3 py-2 text-left text-[0.78rem] font-bold uppercase tracking-[0.06em] text-muted">{{ t('endgame.rank') }}</th>
+                  <th class="border-b border-divider px-3 py-2 text-left text-[0.78rem] font-bold uppercase tracking-[0.06em] text-muted">{{ t('endgame.person') }}</th>
+                  <th class="border-b border-divider px-3 py-2 text-right text-[0.78rem] font-bold uppercase tracking-[0.06em] text-muted">{{ t('endgame.wealthUsd') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(entry, index) in endgameStatus?.topRealWorldRichest ?? []" :key="entry.name">
+                  <td class="border-b border-divider px-3 py-[0.55rem] font-semibold">#{{ index + 1 }}</td>
+                  <td class="border-b border-divider px-3 py-[0.55rem]">{{ entry.name }}</td>
+                  <td class="border-b border-divider px-3 py-[0.55rem] text-right tabular-nums">
+                    <CurrencyAmount :amount="entry.wealthUsd" currency="USD" />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="mt-3 text-xs text-muted">
+            {{ t('endgame.thresholdHint', { target: endgameStatus?.winningThresholdUsd ?? 0 }) }}
           </p>
         </section>
 
