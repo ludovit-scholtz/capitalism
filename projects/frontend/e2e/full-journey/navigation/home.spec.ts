@@ -54,6 +54,28 @@ function makeMainCityPlayer() {
   })
 }
 
+function makeMixedCityPlayer() {
+  return makePlayer({
+    email: 'mixed@test.com',
+    password: 'TestPass1!',
+    onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
+    onboardingCityId: 'city-ba',
+    companies: [
+      {
+        id: 'comp-mixed',
+        playerId: 'player-1',
+        name: 'Mixed City Holdings',
+        cash: 500000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [
+          makeBuilding('factory-ba-1', 'comp-mixed', 'city-ba', 'FACTORY', 'Bratislava Factory'),
+          makeBuilding('shop-pr-1', 'comp-mixed', 'city-pr', 'SALES_SHOP', 'Prague Shop'),
+        ],
+      },
+    ],
+  })
+}
+
 function makeOidcToken(nonce: string) {
   const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url')
   const payload = Buffer.from(
@@ -221,7 +243,7 @@ test.describe('Header navigation', () => {
   test('native login auto-switches city context back to the main factory city', async ({ page }) => {
     const player = makeMainCityPlayer()
     setupMockApi(page, { players: [player] })
-    await seedSelectedCity(page, 'city-pr')
+    await seedSelectedCity(page, 'city-vi')
 
     await page.goto('/login')
     await page.getByLabel('Email').fill(player.email)
@@ -244,7 +266,7 @@ test.describe('Header navigation', () => {
     const token = makeOidcToken(nonce)
     await page.addInitScript(
       ({ storedState, storedNonce }) => {
-        localStorage.setItem('selected_city_id', 'city-pr')
+        localStorage.setItem('selected_city_id', 'city-vi')
         sessionStorage.setItem(
           'biatec_oidc_state',
           JSON.stringify({
@@ -283,6 +305,37 @@ test.describe('Header navigation', () => {
 
     await expect(page).toHaveURL('/')
     await expect(page.locator('.ctx-trigger .ctx-city-name')).toContainText('Vienna')
+    await expect(page.locator('.city-auto-switch-toast')).toHaveCount(0)
+  })
+
+  test('oidc callback keeps the stored city when the player already has a building there', async ({
+    page,
+  }) => {
+    const player = makeMixedCityPlayer()
+    setupMockApi(page, { players: [player] })
+
+    const state = 'oidc-state-keep-city'
+    const nonce = 'oidc-nonce-keep-city'
+    const token = makeOidcToken(nonce)
+    await page.addInitScript(
+      ({ storedState, storedNonce }) => {
+        localStorage.setItem('selected_city_id', 'city-pr')
+        sessionStorage.setItem(
+          'biatec_oidc_state',
+          JSON.stringify({
+            state: storedState,
+            nonce: storedNonce,
+            redirectPath: '/',
+          }),
+        )
+      },
+      { storedState: state, storedNonce: nonce },
+    )
+
+    await page.goto(`/auth/callback?state=${state}&id_token=${encodeURIComponent(token)}`)
+
+    await expect(page).toHaveURL('/')
+    await expect(page.locator('.ctx-trigger .ctx-city-name')).toContainText('Prague')
     await expect(page.locator('.city-auto-switch-toast')).toHaveCount(0)
   })
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  getFactoryBuildingCountByCity,
+  getBuildingCountByCity,
   selectMainCity,
   shouldAutoSwitchCity,
 } from '@/lib/cityContext'
@@ -13,21 +13,21 @@ describe('cityContext', () => {
     { id: 'city-vi', name: 'Vienna' },
   ]
 
-  it('counts only factory buildings by city', () => {
+  it('counts all player buildings by city', () => {
     expect(
-      getFactoryBuildingCountByCity([
+      getBuildingCountByCity([
         { cityId: 'city-ba', type: 'FACTORY' },
         { cityId: 'city-ba', type: 'SALES_SHOP' },
         { cityId: 'city-pr', type: 'FACTORY' },
         { cityId: 'city-pr', type: 'FACTORY' },
       ]),
     ).toEqual({
-      'city-ba': 1,
+      'city-ba': 2,
       'city-pr': 2,
     })
   })
 
-  it('selectMainCity returns the city with the most factory buildings', () => {
+  it('selectMainCity returns the city with the most player buildings', () => {
     const result = selectMainCity(cities, [
       { cityId: 'city-ba', type: 'FACTORY' },
       { cityId: 'city-pr', type: 'FACTORY' },
@@ -48,29 +48,29 @@ describe('cityContext', () => {
     expect(result).toEqual({ id: 'city-ba', name: 'Bratislava' })
   })
 
-  it('selectMainCity returns null when the player has no factories', () => {
+  it('selectMainCity can choose a city that only has non-factory buildings', () => {
     expect(
       selectMainCity(cities, [
         { cityId: 'city-ba', type: 'SALES_SHOP' },
+        { cityId: 'city-ba', type: 'BANK' },
         { cityId: 'city-pr', type: 'BANK' },
       ]),
-    ).toBeNull()
+    ).toEqual({ id: 'city-ba', name: 'Bratislava' })
   })
 
-  it('shouldAutoSwitchCity returns true when current city has zero factories and main city differs', () => {
+  it('shouldAutoSwitchCity returns true when current city has zero buildings and main city differs', () => {
     expect(
       shouldAutoSwitchCity('city-pr', 'city-ba', [
         { cityId: 'city-ba', type: 'FACTORY' },
-        { cityId: 'city-pr', type: 'SALES_SHOP' },
       ]),
     ).toBe(true)
   })
 
-  it('shouldAutoSwitchCity returns false when the current city already has a factory', () => {
+  it('shouldAutoSwitchCity returns false when the current city already has any building', () => {
     expect(
       shouldAutoSwitchCity('city-pr', 'city-ba', [
         { cityId: 'city-ba', type: 'FACTORY' },
-        { cityId: 'city-pr', type: 'FACTORY' },
+        { cityId: 'city-pr', type: 'SALES_SHOP' },
       ]),
     ).toBe(false)
   })

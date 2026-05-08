@@ -52,7 +52,7 @@ It will use real world map. The game will start in single city and later other c
 
 ### Fix city selection (100% complete)
 
-- [ ] When I switch city to city where i dont have any factory, log out and log in later with biatec oidc, i want the context switcher automatically switch to my main city where I have the most factories
+- [x] When I switch city to city where i dont have any factory, log out and log in later with biatec oidc, i want the context switcher automatically switch to my main city where I have the most factories
 
 ### Ranking (100% complete)
 
