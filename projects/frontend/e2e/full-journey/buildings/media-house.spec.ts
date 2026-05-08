@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { setupMockApi, makePlayer } from '../../helpers/mock-api'
+import { setupMockApi, makePlayer, type MockBuilding } from '../../helpers/mock-api'
 
 async function authenticate(page: Parameters<typeof test>[0]['page'], token: string) {
   await page.addInitScript((value) => {
@@ -8,7 +8,7 @@ async function authenticate(page: Parameters<typeof test>[0]['page'], token: str
   }, token)
 }
 
-function makeMediaHouseBuilding(overrides?: Partial<{ isAdvertisingActive: boolean }>) {
+function makeMediaHouseBuilding(overrides: Partial<MockBuilding> = {}): MockBuilding {
   return {
     id: 'building-media',
     companyId: 'company-media',
@@ -24,9 +24,10 @@ function makeMediaHouseBuilding(overrides?: Partial<{ isAdvertisingActive: boole
     contentValue: 2500,
     contentBudgetPerTick: 400,
     isGovernmentOwned: false,
-    isAdvertisingActive: overrides?.isAdvertisingActive ?? true,
-    units: [],
-    pendingConfiguration: null,
+    isAdvertisingActive: overrides.isAdvertisingActive ?? true,
+    units: overrides.units ?? [],
+    pendingConfiguration: overrides.pendingConfiguration ?? null,
+    ...overrides,
   }
 }
 
@@ -99,6 +100,75 @@ test.describe('Media house campaigns', () => {
     await authenticate(page, `token-${player.id}`)
     await page.goto('/building/building-media')
     await expect(page.getByRole('heading', { name: /Media House Management/i })).toBeVisible()
+    await page.getByRole('button', { name: /Save Campaign Unit/i }).click()
+    await expect(page.getByText(/configuration saved/i)).toBeVisible()
+  })
+
+  test('keeps campaign unit configuration interactive while upgrade is pending', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-media',
+          playerId: 'player-1',
+          name: 'Media Corp',
+          cash: 100000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [
+            makeMediaHouseBuilding({
+              pendingConfiguration: {
+                id: 'plan-media-upgrade',
+                buildingId: 'building-media',
+                submittedAtUtc: '2026-01-01T00:00:00Z',
+                submittedAtTick: 10,
+                appliesAtTick: 25,
+                totalTicksRequired: 15,
+                units: [],
+                removals: [
+                  {
+                    id: 'plan-removal-1',
+                    gridX: 0,
+                    gridY: 0,
+                    startedAtTick: 10,
+                    appliesAtTick: 25,
+                    ticksRequired: 15,
+                    isReverting: false,
+                  },
+                ],
+              },
+            }),
+          ],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.gameState.currentTick = 12
+    state.cityMediaHouses['city-ba'] = [
+      {
+        id: 'building-media',
+        name: 'Central Media House',
+        cityId: 'city-ba',
+        cityName: 'Bratislava',
+        mediaType: 'TV',
+        ownerCompanyId: 'company-media',
+        ownerCompanyName: 'Media Corp',
+        effectivenessMultiplier: 2,
+        powerStatus: 'POWERED',
+        isUnderConstruction: false,
+        contentRanking: 100,
+        contentValue: 2500,
+        contentBudgetPerTick: 400,
+        isGovernmentOwned: false,
+      },
+    ]
+
+    await authenticate(page, `token-${player.id}`)
+    await page.goto('/building/building-media')
+
+    await expect(page.getByText(/configuration changes will apply on completion/i)).toBeVisible()
+    await expect(page.locator('.media-house-upgrade-config-notice')).toBeVisible()
     await page.getByRole('button', { name: /Save Campaign Unit/i }).click()
     await expect(page.getByText(/configuration saved/i)).toBeVisible()
   })

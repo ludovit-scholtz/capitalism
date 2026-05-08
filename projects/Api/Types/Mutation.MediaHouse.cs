@@ -218,6 +218,15 @@ public sealed partial class Mutation
                     .Build());
         }
 
+        if (building.DestroyedAtUtc is not null)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Destroyed buildings cannot be configured.")
+                    .SetCode("BUILDING_ALREADY_DESTROYED")
+                    .Build());
+        }
+
         if (input.CampaignBudgetPerTick < 0m)
         {
             throw new GraphQLException(

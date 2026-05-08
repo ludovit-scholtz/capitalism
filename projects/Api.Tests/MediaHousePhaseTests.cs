@@ -358,6 +358,149 @@ public sealed class MediaHousePhaseTests
     }
 
     [Fact]
+    public async Task ConfigureMediaHouseUnit_Mutation_AllowsConfigurationWhileUpgradePlanIsPending()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var email = $"media-upgrading-{Guid.NewGuid():N}@test.com";
+        var register = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            RegisterMutation,
+            new { input = new { email, displayName = "Upgrading Configurator", password = "TestPass123!" } });
+        var token = register.GetProperty("data").GetProperty("register").GetProperty("token").GetString()!;
+        var userId = Guid.Parse(register.GetProperty("data").GetProperty("register").GetProperty("player").GetProperty("id").GetString()!);
+
+        var city = await db.Cities.FirstDeterministicAsync();
+        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync() ?? throw new InvalidOperationException("Game state missing.");
+        var mediaCompany = new Company { Id = Guid.NewGuid(), PlayerId = userId, Name = "Media Upgrading Co", FoundedAtUtc = DateTime.UtcNow, FoundedAtTick = gameState.CurrentTick };
+        var targetCompany = new Company { Id = Guid.NewGuid(), PlayerId = userId, Name = "Target Co", FoundedAtUtc = DateTime.UtcNow, FoundedAtTick = gameState.CurrentTick };
+        db.Companies.AddRange(mediaCompany, targetCompany);
+        var building = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = mediaCompany.Id,
+            CityId = city.Id,
+            Type = BuildingType.MediaHouse,
+            Name = "Upgrading Media House",
+            Latitude = city.Latitude,
+            Longitude = city.Longitude,
+            Level = 2,
+            BuiltAtUtc = DateTime.UtcNow,
+        };
+        db.Buildings.Add(building);
+
+        db.BuildingConfigurationPlans.Add(new BuildingConfigurationPlan
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = building.Id,
+            SubmittedAtUtc = DateTime.UtcNow,
+            SubmittedAtTick = gameState.CurrentTick,
+            AppliesAtTick = gameState.CurrentTick + 5,
+            TotalTicksRequired = 5,
+        });
+        await db.SaveChangesAsync();
+
+        const string mutation = """
+            mutation ConfigureMediaHouseUnit($input: ConfigureMediaHouseUnitInput!) {
+              configureMediaHouseUnit(input: $input) {
+                id
+                targetCompanyId
+                campaignBudgetPerTick
+              }
+            }
+            """;
+
+        var result = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            mutation,
+            new
+            {
+                input = new
+                {
+                    buildingId = building.Id,
+                    targetCompanyId = targetCompany.Id,
+                    mediaType = "TV",
+                    campaignBudgetPerTick = 250m,
+                    isActive = true,
+                }
+            },
+            token);
+
+        var unit = result.GetProperty("data").GetProperty("configureMediaHouseUnit");
+        Assert.Equal(targetCompany.Id.ToString(), unit.GetProperty("targetCompanyId").GetString());
+        Assert.Equal(250m, unit.GetProperty("campaignBudgetPerTick").GetDecimal());
+    }
+
+    [Fact]
+    public async Task ConfigureMediaHouseUnit_Mutation_DestroyedBuilding_ReturnsBuildingAlreadyDestroyed()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var email = $"media-destroyed-{Guid.NewGuid():N}@test.com";
+        var register = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            RegisterMutation,
+            new { input = new { email, displayName = "Destroyed Configurator", password = "TestPass123!" } });
+        var token = register.GetProperty("data").GetProperty("register").GetProperty("token").GetString()!;
+        var userId = Guid.Parse(register.GetProperty("data").GetProperty("register").GetProperty("player").GetProperty("id").GetString()!);
+
+        var city = await db.Cities.FirstDeterministicAsync();
+        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync() ?? throw new InvalidOperationException("Game state missing.");
+        var mediaCompany = new Company { Id = Guid.NewGuid(), PlayerId = userId, Name = "Destroyed Media Co", FoundedAtUtc = DateTime.UtcNow, FoundedAtTick = gameState.CurrentTick };
+        var targetCompany = new Company { Id = Guid.NewGuid(), PlayerId = userId, Name = "Target Co", FoundedAtUtc = DateTime.UtcNow, FoundedAtTick = gameState.CurrentTick };
+        db.Companies.AddRange(mediaCompany, targetCompany);
+        var building = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = mediaCompany.Id,
+            CityId = city.Id,
+            Type = BuildingType.MediaHouse,
+            Name = "Destroyed Media House",
+            Latitude = city.Latitude,
+            Longitude = city.Longitude,
+            Level = 2,
+            DestroyedAtUtc = DateTime.UtcNow,
+            BuiltAtUtc = DateTime.UtcNow,
+        };
+        db.Buildings.Add(building);
+        await db.SaveChangesAsync();
+
+        const string mutation = """
+            mutation ConfigureMediaHouseUnit($input: ConfigureMediaHouseUnitInput!) {
+              configureMediaHouseUnit(input: $input) { id }
+            }
+            """;
+
+        var result = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            mutation,
+            new
+            {
+                input = new
+                {
+                    buildingId = building.Id,
+                    targetCompanyId = targetCompany.Id,
+                    mediaType = "RADIO",
+                    campaignBudgetPerTick = 100m,
+                    isActive = true,
+                }
+            },
+            token);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0);
+        Assert.Equal(
+            "BUILDING_ALREADY_DESTROYED",
+            errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
     public async Task MediaHouseStats_Query_ReturnsBoostAndSpend()
     {
         await using var factory = new ApiWebApplicationFactory();

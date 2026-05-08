@@ -2218,6 +2218,7 @@ export default {
     configTargetCompany: 'Target Company',
     configCampaignBudget: 'Campaign Budget per Tick',
     configIsActive: 'Campaign Active',
+    upgradeConfigNotice: 'Building is upgrading – configuration changes will apply on completion.',
     saveUnitConfigBtn: 'Save Campaign Unit',
     unitConfigSaved: 'Campaign unit configuration saved.',
     targetCompanyRequired: 'Target company is required.',

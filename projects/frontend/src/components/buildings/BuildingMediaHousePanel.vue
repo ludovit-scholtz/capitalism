@@ -23,6 +23,7 @@ const {
   mediaHouseStats,
   mediaHouseStatsLoading,
   ownedCompanies,
+  isUpgradeInProgress,
   mediaHouseTargetCompanyId,
   mediaHouseUnitMediaType,
   mediaHouseCampaignBudgetPerTick,
@@ -146,6 +147,12 @@ const mediaHouseBoostChartMax = computed(() => {
       <h3 class="media-house-section-title mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
         {{ t('mediaHouse.unitConfigTitle') }}
       </h3>
+      <p
+        v-if="isUpgradeInProgress"
+        class="media-house-upgrade-config-notice mb-3 rounded-md border border-amber-300/50 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-800 dark:text-amber-300"
+      >
+        {{ t('mediaHouse.upgradeConfigNotice') }}
+      </p>
       <div class="grid gap-3 md:grid-cols-2">
         <label class="flex flex-col gap-1 text-sm">
           <span class="text-muted">{{ t('mediaHouse.configMediaType') }}</span>
