@@ -1,8 +1,8 @@
 import { expect, test, type Page } from '@playwright/test'
-import { makePlayer, setupMockApi } from '../../helpers/mock-api'
+import { makeAdminPlayer, makePlayer, setupMockApi } from '../../helpers/mock-api'
 
 const overflowViewports = [
-  { label: 'mobile', width: 390, height: 844 },
+  { label: 'mobile', width: 375, height: 667 },
   { label: 'tablet', width: 768, height: 1024 },
   { label: 'fullhd', width: 1920, height: 1080 },
 ] as const
@@ -12,22 +12,82 @@ function seedAuthenticatedState(page: Page) {
   const player = makePlayer({
     onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
     companies: [
-      {
-        id: 'company-responsive',
-        playerId: 'player-1',
-        name: 'Responsive Corp',
-        cash: 650000,
-        foundedAtUtc: '2026-01-01T00:00:00Z',
-        buildings: [],
-      },
-    ],
-  })
+        {
+          id: 'company-responsive',
+          playerId: 'player-1',
+          name: 'Responsive Corp',
+          cash: 650000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [
+            {
+              id: 'building-responsive',
+              companyId: 'company-responsive',
+              cityId: 'city-ba',
+              type: 'FACTORY',
+              name: 'Responsive Factory',
+              latitude: 48.15,
+              longitude: 17.1,
+              level: 1,
+              powerConsumption: 0,
+              isForSale: false,
+              units: [
+                {
+                  id: 'unit-purchase',
+                  buildingId: 'building-responsive',
+                  unitType: 'PURCHASE',
+                  gridX: 0,
+                  gridY: 0,
+                  level: 1,
+                  linkRight: true,
+                },
+                {
+                  id: 'unit-manufacturing',
+                  buildingId: 'building-responsive',
+                  unitType: 'MANUFACTURING',
+                  gridX: 1,
+                  gridY: 0,
+                  level: 1,
+                  linkRight: true,
+                },
+                {
+                  id: 'unit-storage',
+                  buildingId: 'building-responsive',
+                  unitType: 'STORAGE',
+                  gridX: 2,
+                  gridY: 0,
+                  level: 1,
+                  linkRight: true,
+                },
+                {
+                  id: 'unit-sales',
+                  buildingId: 'building-responsive',
+                  unitType: 'B2B_SALES',
+                  gridX: 3,
+                  gridY: 0,
+                  level: 1,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    })
 
   const state = setupMockApi(page, { players: [player] })
   state.currentUserId = player.id
   state.currentToken = `token-${player.id}`
 
   return { player, state }
+}
+
+function seedAdminState(page: Page) {
+  const admin = makeAdminPlayer({
+    onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+  })
+  const state = setupMockApi(page, { players: [admin] })
+  state.currentUserId = admin.id
+  state.currentToken = `token-${admin.id}`
+  return { admin, state }
 }
 
 async function seedAuthenticatedStorage(page: Page, token: string) {
@@ -100,10 +160,21 @@ test.describe('Responsive layout baseline checks', () => {
   })
 
   test('4K viewport keeps content width constrained', async ({ page }) => {
-    setupMockApi(page)
+    const { player } = seedAuthenticatedState(page)
+    await seedAuthenticatedStorage(page, `token-${player.id}`)
     await page.setViewportSize({ width: 3840, height: 2160 })
+
     await page.goto('/leaderboard')
     await expect(page.getByRole('heading', { name: /Leaderboard/i })).toBeVisible()
+    await expectNoHorizontalOverflow(page)
+
+    await page.goto('/dashboard')
+    await expect(page.getByRole('heading', { name: /Dashboard/i })).toBeVisible()
+    await expectNoHorizontalOverflow(page)
+
+    await page.goto('/forex')
+    await expect(page.getByRole('heading', { name: /Forex Exchange/i })).toBeVisible()
+    await expectNoHorizontalOverflow(page)
 
     const maxContainerWidth = await page.evaluate(() =>
       Math.max(
@@ -114,6 +185,9 @@ test.describe('Responsive layout baseline checks', () => {
       ),
     )
     expect(maxContainerWidth).toBeLessThanOrEqual(1600)
+
+    const rootFontSizePx = await page.evaluate(() => Number.parseFloat(getComputedStyle(document.documentElement).fontSize))
+    expect(rootFontSizePx).toBeGreaterThanOrEqual(17)
   })
 
   test('mobile navigation menu opens grouped second-level links and closes correctly', async ({ page }) => {
@@ -153,5 +227,29 @@ test.describe('Responsive layout baseline checks', () => {
     const panelBottom = await page.locator('.detail-header').evaluate((element) => getComputedStyle(element.closest('.detail-panel') as Element).bottom)
     expect(panelPosition).toBe('fixed')
     expect(panelBottom).toBe('8px')
+  })
+
+  test('building detail grid editor and operations dashboard stay responsive on mobile and tablet', async ({ page }) => {
+    const { player } = seedAuthenticatedState(page)
+    await seedAuthenticatedStorage(page, `token-${player.id}`)
+
+    for (const viewport of overflowViewports.filter((item) => item.width <= 768)) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height })
+      await page.goto('/building/building-responsive')
+      await expect(page.getByRole('heading', { name: 'Responsive Factory' })).toBeVisible()
+      await page.getByRole('button', { name: 'Edit Building' }).click()
+      await expect(page.locator('.unit-grid')).toBeVisible()
+      await expectNoHorizontalOverflow(page)
+    }
+
+    const { admin } = seedAdminState(page)
+    await seedAuthenticatedStorage(page, `token-${admin.id}`)
+
+    for (const viewport of overflowViewports.filter((item) => item.width <= 768)) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height })
+      await page.goto('/operations/statistics')
+      await expect(page.getByRole('heading', { name: /operations overview/i })).toBeVisible()
+      await expectNoHorizontalOverflow(page)
+    }
   })
 })
