@@ -3,14 +3,10 @@ import type { Building, City } from '@/types'
 type CityContextBuilding = Pick<Building, 'cityId' | 'type'>
 type CityContextCity = Pick<City, 'id' | 'name'>
 
-export function getFactoryBuildingCountByCity(buildings: readonly CityContextBuilding[]): Record<string, number> {
+export function getBuildingCountByCity(buildings: readonly CityContextBuilding[]): Record<string, number> {
   const counts: Record<string, number> = {}
 
   for (const building of buildings) {
-    if (building.type !== 'FACTORY') {
-      continue
-    }
-
     counts[building.cityId] = (counts[building.cityId] ?? 0) + 1
   }
 
@@ -21,16 +17,16 @@ export function selectMainCity(
   cities: readonly CityContextCity[],
   buildings: readonly CityContextBuilding[],
 ): CityContextCity | null {
-  const counts = getFactoryBuildingCountByCity(buildings)
+  const counts = getBuildingCountByCity(buildings)
   const rankedCities = cities
     .map((city) => ({
       city,
-      factoryCount: counts[city.id] ?? 0,
+      buildingCount: counts[city.id] ?? 0,
     }))
-    .filter((entry) => entry.factoryCount > 0)
+    .filter((entry) => entry.buildingCount > 0)
     .sort((left, right) => {
-      if (right.factoryCount !== left.factoryCount) {
-        return right.factoryCount - left.factoryCount
+      if (right.buildingCount !== left.buildingCount) {
+        return right.buildingCount - left.buildingCount
       }
 
       return left.city.name.localeCompare(right.city.name)
@@ -48,6 +44,6 @@ export function shouldAutoSwitchCity(
     return false
   }
 
-  const counts = getFactoryBuildingCountByCity(buildings)
+  const counts = getBuildingCountByCity(buildings)
   return (counts[currentCityId] ?? 0) === 0
 }
