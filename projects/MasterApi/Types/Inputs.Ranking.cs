@@ -21,6 +21,8 @@ public sealed class RankingLeaderboardEntryInfo
 
     public string DisplayName { get; set; } = string.Empty;
 
+    public string PersonalAccountName { get; set; } = string.Empty;
+
     public decimal TotalPoints { get; set; }
 
     public int GlobalRank { get; set; }

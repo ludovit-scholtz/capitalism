@@ -170,3 +170,35 @@ test.describe('Rankings – display name shown', () => {
     await expect(page.locator('.rank-card').getByText(player.email)).toBeHidden()
   })
 })
+
+test.describe('Onboarding IPO – personal account name generator', () => {
+  test('ipo step shows generated personal account name and regenerate button', async ({ page }) => {
+    const player = makePlayer({
+      id: 'player-onboarding-personal-alias',
+      email: 'alias-onboarding@example.com',
+      displayName: 'alias-onboarding@example.com',
+      onboardingCompletedAtUtc: null,
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await authenticate(page, `token-${player.id}`)
+
+    await page.goto('/onboarding')
+    await page.locator('.city-card').first().click()
+    await page.locator('.industry-card').first().click()
+    await page.locator('.product-card').first().click()
+
+    const personalNameInput = page.locator('#onboarding-personal-account-name')
+    await expect(personalNameInput).toBeVisible()
+    const generated = await personalNameInput.inputValue()
+    expect(generated.trim().split(' ')).toHaveLength(3)
+
+    const regenerateButton = page.locator('.regenerate-personal-name-btn')
+    await expect(regenerateButton).toBeVisible()
+    await regenerateButton.click()
+    const regenerated = await personalNameInput.inputValue()
+    expect(regenerated.trim().split(' ')).toHaveLength(3)
+    expect(regenerated).not.toBe(generated)
+  })
+})

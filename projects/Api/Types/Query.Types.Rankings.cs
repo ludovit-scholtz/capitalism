@@ -11,6 +11,9 @@ public sealed class PlayerRanking
     /// <summary>Player display name.</summary>
     public string DisplayName { get; set; } = string.Empty;
 
+    /// <summary>Player personal account alias used in rankings.</summary>
+    public string PersonalAccountName { get; set; } = string.Empty;
+
     /// <summary>
     /// Total wealth = PersonalCash + SharesValue.
     /// See <see cref="Query.GetRankings"/> for the full valuation formula.
@@ -51,6 +54,9 @@ public sealed class CompanyRanking
 
     /// <summary>Owner player display name.</summary>
     public string OwnerDisplayName { get; set; } = string.Empty;
+
+    /// <summary>Owner personal account alias used in rankings.</summary>
+    public string OwnerPersonalAccountName { get; set; } = string.Empty;
 
     /// <summary>Total company wealth = Cash + BuildingValue + InventoryValue in the company's local currency.</summary>
     public decimal TotalWealth { get; set; }

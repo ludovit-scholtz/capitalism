@@ -6011,6 +6011,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           return {
             playerId: p.id,
             displayName: p.displayName,
+            personalAccountName: p.displayName,
             personalCash,
             sharesValue,
             totalWealth,
@@ -6057,6 +6058,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               companyName: company.name,
               playerId: player.id,
               ownerDisplayName: player.displayName,
+              ownerPersonalAccountName: player.displayName,
               currencyCode: 'EUR',
               cash: company.cash,
               buildingValue,
@@ -6148,6 +6150,61 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             updatePlayerBio: {
               playerId: state.currentUserId,
               bio,
+            },
+          },
+        }),
+      })
+    }
+
+    // updateDisplayName mutation
+    if (query.includes('updatePersonalAccountName')) {
+      if (!state.currentUserId) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Not authenticated.' }] }),
+        })
+      }
+
+      const personalAccountName = (body.variables?.input?.personalAccountName as string | undefined)?.trim() ?? ''
+      if (!personalAccountName) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [{ message: 'Personal account name is required.', extensions: { code: 'PERSONAL_ACCOUNT_NAME_REQUIRED' } }],
+          }),
+        })
+      }
+
+      const duplicate = state.players.some(
+        (player) =>
+          player.id !== state.currentUserId
+          && player.displayName.toLowerCase() === personalAccountName.toLowerCase(),
+      )
+      if (duplicate) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [{ message: 'This personal account name is already taken.', extensions: { code: 'PERSONAL_ACCOUNT_NAME_NOT_UNIQUE' } }],
+          }),
+        })
+      }
+
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      if (player) {
+        player.displayName = personalAccountName
+      }
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            updatePersonalAccountName: {
+              playerId: state.currentUserId,
+              personalAccountName,
             },
           },
         }),

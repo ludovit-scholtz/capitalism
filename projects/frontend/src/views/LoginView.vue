@@ -25,7 +25,7 @@ const showsDriveAccessHint = computed(
   () => requiresConsentRetry.value && route.query.oidc_reason === 'drive_access',
 )
 
-const hasReferralCode = computed(() => !!referralStore.pendingCode)
+const hasReferralCode = computed(() => !auth.isAuthenticated && !auth.player && !!referralStore.pendingCode)
 
 // Auto-fill display name when switching to registration mode.
 watch(isRegister, (nowRegister) => {
@@ -169,4 +169,3 @@ function handleBiatecSignIn() {
     </section>
   </main>
 </template>
-

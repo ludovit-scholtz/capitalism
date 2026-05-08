@@ -42,13 +42,17 @@ const hasNextPage = computed(() => leaderboard.value.length === pageSize.value)
 const currentOffset = computed(() => (currentPage.value - 1) * pageSize.value)
 const currentPlayerId = computed(() => auth.player?.id ?? null)
 
+function getPlayerAlias(entry: RankingLeaderboardEntryInfo): string {
+  return entry.personalAccountName || entry.displayName
+}
+
 const filteredLeaderboard = computed(() => {
   const filter = nameFilter.value.trim().toLowerCase()
   if (!filter) {
     return leaderboard.value
   }
 
-  return leaderboard.value.filter((entry) => entry.displayName.toLowerCase().includes(filter))
+  return leaderboard.value.filter((entry) => getPlayerAlias(entry).toLowerCase().includes(filter))
 })
 
 const topThree = computed(() => filteredLeaderboard.value.slice(0, 3))
@@ -191,7 +195,7 @@ onMounted(async () => {
             class="rounded-xl border border-divider bg-card-raised p-4"
           >
             <p class="text-sm font-semibold text-brand">#{{ entry.globalRank }}</p>
-            <h3 class="mt-1 text-lg font-semibold">{{ entry.displayName }}</h3>
+            <h3 class="mt-1 text-lg font-semibold">{{ getPlayerAlias(entry) }}</h3>
             <p class="mt-2 text-sm text-muted">{{ formatPoints(entry.totalPoints) }} pts</p>
             <p :class="movementClass(entry.rankMovement)">
               {{ t('rankingDashboard.delta') }} {{ movementLabel(entry.rankMovement) }}
@@ -265,7 +269,7 @@ onMounted(async () => {
               >
                 <td class="px-5 py-3 font-semibold">#{{ entry.globalRank }}</td>
                 <td class="px-5 py-3">
-                  {{ entry.displayName }}
+                  {{ getPlayerAlias(entry) }}
                   <span
                     v-if="isActivePlayer(entry.playerId, currentPlayerId)"
                     class="ml-2 rounded bg-blue-100 px-1.5 py-0.5 text-xs font-semibold text-blue-700"

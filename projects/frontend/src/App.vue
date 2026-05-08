@@ -71,6 +71,15 @@ watch(
 )
 
 watch(
+  () => auth.player?.appliedReferralCode,
+  (appliedReferralCode) => {
+    if (appliedReferralCode && referralStore.pendingCode) {
+      referralStore.clearPendingCode()
+    }
+  },
+)
+
+watch(
   () => endgameStatus.value?.gameEnded,
   (gameEnded) => {
     if (!gameEnded) {

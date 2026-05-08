@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest, GraphQLError } from '@/lib/graphql'
+import { gqlRequest as gqlMasterRequest } from '@/lib/graphqlMasterServer'
 import { computeSimulatedProfit, trackOnboardingEvent } from '@/lib/onboardingAnalytics'
 import { getLocalizedProductDescription, getLocalizedProductName, getLocalizedRecipeIngredientName, getLocalizedResourceName, getProductImageUrl } from '@/lib/catalogPresentation'
 import { formatGameTickTime } from '@/lib/gameTime'
@@ -26,6 +27,7 @@ import { useReferralStore } from '@/stores/referral'
 import { useTickCountdown } from '@/composables/useTickCountdown'
 import { formatMoney } from '@/lib/currencyFormat'
 import { generateOnboardingCompanyName, resetNameSession } from '@/lib/onboardingCompanyName'
+import { generatePersonalAccountName } from '@/lib/personalAccountName'
 import type { BuildingLot, City, EurFxRate, FirstSaleMission, GameState, OnboardingResult, OnboardingStartResult, ProductType } from '@/types'
 
 const { t, locale } = useI18n()
@@ -257,6 +259,7 @@ const selectedShopLot = computed(() => cityLots.value.find((lot) => lot.id === s
 
 /** The current company name — starts as a generated suggestion, can be edited by the player. */
 const companyName = ref('')
+const personalAccountName = ref('')
 
 /** Derives a fresh suggested name from the current industry. */
 function refreshSuggestedName() {
@@ -268,11 +271,26 @@ function regenerateCompanyName() {
   companyName.value = generateOnboardingCompanyName(selectedIndustry.value)
 }
 
+function refreshSuggestedPersonalAccountName() {
+  const existingAlias = (auth.player?.personalAccountName ?? auth.player?.displayName ?? '').trim()
+  if (existingAlias && !existingAlias.includes('@')) {
+    personalAccountName.value = existingAlias
+    return
+  }
+
+  personalAccountName.value = generatePersonalAccountName()
+}
+
+function regeneratePersonalAccountName() {
+  personalAccountName.value = generatePersonalAccountName()
+}
+
 // Auto-refresh the suggested name whenever industry or city changes so the
 // first suggestion always reflects the player's current choices.
 watch([selectedIndustry, selectedCity], ([newIndustry, newCity]) => {
   resetNameSession(`${newIndustry}:${newCity?.name ?? ''}`)
   refreshSuggestedName()
+  refreshSuggestedPersonalAccountName()
 })
 const starterCompany = computed(() => {
   const companyId = auth.player?.onboardingCompanyId
@@ -632,6 +650,7 @@ async function migrateGuestProgressToAuthenticated() {
   try {
     loading.value = true
     error.value = null
+    await persistPersonalAccountNameIfNeeded()
 
     const startResult = await gqlRequest<{ startOnboardingCompany: OnboardingStartResult }>(
       `mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
@@ -784,6 +803,8 @@ onMounted(async () => {
       }
     }
 
+    refreshSuggestedPersonalAccountName()
+
     if (hasAuthenticatedSession.value) {
       await syncOngoingOnboardingState()
 
@@ -863,6 +884,14 @@ function prevStep() {
 }
 
 function resolveFactoryStartValidationError(): string | null {
+  if (!personalAccountName.value.trim()) {
+    return t('onboarding.personalAccountNameRequired')
+  }
+
+  if (personalAccountName.value.trim().length > 40) {
+    return t('onboarding.personalAccountNameTooLong')
+  }
+
   if (!selectedFactoryLotId.value) {
     return t('onboarding.selectFactoryLotToContinue')
   }
@@ -893,6 +922,41 @@ function reportFactoryStartError(message: string, details?: unknown) {
     selectedLotPrice: selectedFactoryLot.value?.price ?? null,
     details,
   })
+}
+
+async function persistPersonalAccountNameIfNeeded() {
+  if (isGuestMode.value) {
+    return
+  }
+
+  const trimmedAlias = personalAccountName.value.trim()
+  const currentAlias = (auth.player?.personalAccountName ?? auth.player?.displayName ?? '').trim()
+  if (!trimmedAlias || trimmedAlias === currentAlias) {
+    return
+  }
+
+  await gqlMasterRequest<{ updatePersonalAccountName: { personalAccountName: string } }>(
+    `mutation UpdatePersonalAccountName($input: UpdatePersonalAccountNameInput!) {
+      updatePersonalAccountName(input: $input) {
+        personalAccountName
+      }
+    }`,
+    { input: { personalAccountName: trimmedAlias } },
+  )
+
+  await gqlRequest<{ updateDisplayName: { displayName: string } }>(
+    `mutation UpdateDisplayName($displayName: String!) {
+      updateDisplayName(input: { displayName: $displayName }) {
+        displayName
+      }
+    }`,
+    { displayName: trimmedAlias },
+  )
+
+  if (auth.player) {
+    auth.player.displayName = trimmedAlias
+    auth.player.personalAccountName = trimmedAlias
+  }
 }
 
 async function startOnboardingCompany() {
@@ -929,6 +993,8 @@ async function startOnboardingCompany() {
   error.value = null
 
   try {
+    await persistPersonalAccountNameIfNeeded()
+
     const result = await gqlRequest<{ startOnboardingCompany: OnboardingStartResult }>(
       `mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
         startOnboardingCompany(input: $input) {
@@ -1398,6 +1464,28 @@ watch(visibleIndustries, () => {
           </div>
           <p class="text-xs text-muted m-0">{{ t('onboarding.companyNameHint') }}</p>
         </div>
+        <div class="personal-account-name-editor flex flex-col gap-2 p-4 rounded-lg bg-page border border-divider">
+          <label class="text-xs font-semibold text-muted" for="onboarding-personal-account-name">{{
+            t('onboarding.personalAccountNameLabel')
+          }}</label>
+          <div class="flex gap-2 flex-wrap">
+            <input
+              id="onboarding-personal-account-name"
+              v-model="personalAccountName"
+              type="text"
+              maxlength="40"
+              :placeholder="t('onboarding.personalAccountNamePlaceholder')"
+              class="flex-1 min-w-0 px-3 py-2 border border-divider rounded-lg bg-card text-primary focus:outline-none focus:border-brand transition-colors text-sm font-semibold"
+            />
+            <button
+              type="button"
+              class="regenerate-personal-name-btn btn btn-secondary text-sm whitespace-nowrap"
+              :title="t('onboarding.regeneratePersonalAccountName')"
+              @click="regeneratePersonalAccountName"
+            >🎲</button>
+          </div>
+          <p class="text-xs text-amber-400 m-0">{{ t('onboarding.personalAccountNameWarning') }}</p>
+        </div>
         <div class="budget-grid grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4">
           <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
             <span class="text-muted text-xs">{{ t('onboarding.founderContribution') }}</span
@@ -1439,6 +1527,10 @@ watch(visibleIndustries, () => {
           <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
             <span class="text-muted text-xs">{{ t('onboarding.generatedCompanyName') }}</span
             ><strong>{{ companyName }}</strong>
+          </article>
+          <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
+            <span class="text-muted text-xs">{{ t('onboarding.personalAccountNameLabel') }}</span
+            ><strong>{{ personalAccountName }}</strong>
           </article>
           <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
             <span class="text-muted text-xs">{{ t('onboarding.startingCash') }}</span

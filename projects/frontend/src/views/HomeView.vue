@@ -18,13 +18,17 @@ const { gameState } = storeToRefs(gameStateStore)
 const rankings = ref<PlayerRanking[]>([])
 const loading = ref(true)
 
+function getPlayerAlias(rank: PlayerRanking): string {
+  return rank.personalAccountName || rank.displayName
+}
+
 async function loadHomeData(isRefresh = false) {
   if (!isRefresh) {
     loading.value = true
   }
   try {
     const [rankData, stateData] = await Promise.all([
-      gqlRequest<{ rankings: PlayerRanking[] }>('{ rankings { playerId displayName totalWealth totalWealthUsd personalCash sharesValue companyCount } }'),
+      gqlRequest<{ rankings: PlayerRanking[] }>('{ rankings { playerId displayName personalAccountName totalWealth totalWealthUsd personalCash sharesValue companyCount } }'),
       gqlRequest<{ gameState: GameState }>(
         '{ gameState { currentTick lastTickAtUtc tickIntervalSeconds taxCycleTicks taxRate currentGameYear currentGameTimeUtc ticksPerDay ticksPerYear nextTaxTick nextTaxGameTimeUtc nextTaxGameYear } }',
       ),
@@ -126,7 +130,7 @@ useTickRefresh(() => loadHomeData(true))
               <td class="border-b border-divider px-8 py-5 align-middle font-bold text-brand">
                 {{ index + 1 }}
               </td>
-              <td class="border-b border-divider px-8 py-5 align-middle text-body">{{ rank.displayName }}</td>
+              <td class="border-b border-divider px-8 py-5 align-middle text-body">{{ getPlayerAlias(rank) }}</td>
               <!-- wealth class kept for E2E test selector backward compatibility -->
               <td class="wealth border-b border-divider px-8 py-5 align-middle font-semibold text-good">
                 {{ formatCompactMoney(rank.totalWealthUsd, 'USD', locale) }}

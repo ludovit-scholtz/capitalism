@@ -61,13 +61,8 @@ public sealed class AuthenticatedPlayerClaimsSyncService(AppDbContext db)
                 changed = true;
             }
 
-            var displayName = claimedDisplayName.Trim();
-            if (!string.IsNullOrWhiteSpace(displayName)
-                && !string.Equals(player.DisplayName, displayName, StringComparison.Ordinal))
-            {
-                player.DisplayName = displayName;
-                changed = true;
-            }
+            // Keep an already chosen in-game alias stable across future sign-ins.
+            // The player can explicitly change this value via profile settings/onboarding.
         }
 
         var settlementAccount = createdPlayer

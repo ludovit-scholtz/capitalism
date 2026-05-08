@@ -10,6 +10,7 @@ export interface Player {
   id: string
   email: string
   displayName: string
+  personalAccountName?: string
   role: PlayerRole
   createdAtUtc: string
   lastLoginAtUtc: string | null

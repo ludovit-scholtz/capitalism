@@ -46,6 +46,7 @@ const PLAYER_RANKINGS_QUERY = `
     rankings {
       playerId
       displayName
+      personalAccountName
       totalWealth
       totalWealthUsd
       personalCash
@@ -63,6 +64,7 @@ const COMPANY_RANKINGS_QUERY = `
       companyName
       playerId
       ownerDisplayName
+      ownerPersonalAccountName
       totalWealth
       totalWealthUsd
       currencyCode
@@ -173,6 +175,14 @@ function rankBadge(rankNumber: number): string {
 
 function rankBadgeIcons(rank: PlayerRanking): string[] {
   return (rank.badgeTypes ?? []).slice(0, 3)
+}
+
+function getPlayerAlias(rank: PlayerRanking): string {
+  return rank.personalAccountName || rank.displayName
+}
+
+function getCompanyOwnerAlias(rank: CompanyRanking): string {
+  return rank.ownerPersonalAccountName || rank.ownerDisplayName
 }
 
 const currentPlayerId = computed(() => auth.player?.id ?? null)
@@ -369,7 +379,7 @@ async function changePage(nextPage: number) {
             </div>
             <div class="flex-1 min-w-0">
               <div class="text-base font-bold flex items-center gap-2 whitespace-nowrap overflow-hidden text-ellipsis">
-                {{ rank.displayName }}
+                <span :title="t('leaderboard.personalAliasTooltip')">{{ getPlayerAlias(rank) }}</span>
                 <span v-if="rankBadgeIcons(rank).length > 0" class="player-badge-icons inline-flex items-center gap-1">
                   <span
                     v-for="badgeType in rankBadgeIcons(rank)"
@@ -454,7 +464,7 @@ async function changePage(nextPage: number) {
                 >{{ t('leaderboard.you') }}</span>
               </div>
               <div class="text-[0.8125rem] text-muted mt-0.5">
-                {{ t('leaderboard.ownedBy', { name: rank.ownerDisplayName }) }} ·
+                {{ t('leaderboard.ownedBy', { name: getCompanyOwnerAlias(rank) }) }} ·
                 {{ t('leaderboard.buildingsCount', { n: rank.buildingCount }) }}
               </div>
             </div>

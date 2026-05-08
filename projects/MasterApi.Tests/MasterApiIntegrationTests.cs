@@ -311,6 +311,82 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
 
     #endregion
 
+    #region Profile alias
+
+    [Fact]
+    public async Task UpdatePersonalAccountName_ValidAlias_UpdatesProfile()
+    {
+        var (token, _) = await RegisterAndGetTokenAsync(
+            email: $"alias-{Guid.NewGuid():N}@example.com",
+            displayName: "Initial Alias");
+
+        var updateResult = await GraphQlAsync("""
+            mutation UpdatePersonalAccountName($input: UpdatePersonalAccountNameInput!) {
+              updatePersonalAccountName(input: $input) {
+                playerId
+                personalAccountName
+              }
+            }
+            """,
+            new { input = new { personalAccountName = "Orion Cassian Vale" } },
+            token);
+
+        Assert.False(updateResult.TryGetProperty("errors", out _));
+        Assert.Equal("Orion Cassian Vale", updateResult.GetProperty("data").GetProperty("updatePersonalAccountName").GetProperty("personalAccountName").GetString());
+
+        var meResult = await GraphQlAsync("""
+            query {
+              me {
+                displayName
+                personalAccountName
+              }
+            }
+            """, token: token);
+
+        Assert.False(meResult.TryGetProperty("errors", out _));
+        var me = meResult.GetProperty("data").GetProperty("me");
+        Assert.Equal("Orion Cassian Vale", me.GetProperty("displayName").GetString());
+        Assert.Equal("Orion Cassian Vale", me.GetProperty("personalAccountName").GetString());
+    }
+
+    [Fact]
+    public async Task UpdatePersonalAccountName_DuplicateAlias_ReturnsValidationError()
+    {
+        var alias = $"Shared Alias {Guid.NewGuid():N}"[..40];
+        await RegisterAndGetTokenAsync(email: $"alias-first-{Guid.NewGuid():N}@example.com", displayName: alias);
+        var (token, _) = await RegisterAndGetTokenAsync(email: $"alias-second-{Guid.NewGuid():N}@example.com", displayName: "Second Alias");
+
+        var result = await GraphQlAsync("""
+            mutation UpdatePersonalAccountName($input: UpdatePersonalAccountNameInput!) {
+              updatePersonalAccountName(input: $input) {
+                personalAccountName
+              }
+            }
+            """,
+            new { input = new { personalAccountName = alias } },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Equal("PERSONAL_ACCOUNT_NAME_NOT_UNIQUE", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task UpdatePersonalAccountName_Unauthenticated_ReturnsAuthError()
+    {
+        var result = await GraphQlAsync("""
+            mutation UpdatePersonalAccountName($input: UpdatePersonalAccountNameInput!) {
+              updatePersonalAccountName(input: $input) {
+                personalAccountName
+              }
+            }
+            """,
+            new { input = new { personalAccountName = "Unauthenticated Alias" } });
+
+        Assert.True(result.TryGetProperty("errors", out _));
+    }
+
+    #endregion
+
     #region Authenticated queries
 
     [Fact]

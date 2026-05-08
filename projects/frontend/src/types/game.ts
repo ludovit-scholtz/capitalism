@@ -47,6 +47,7 @@ export interface ShareTradeResult {
 export interface PlayerRanking {
   playerId: string
   displayName: string
+  personalAccountName?: string
   totalWealth: number
   /** Total wealth normalized to USD for cross-currency leaderboard comparison */
   totalWealthUsd: number
@@ -62,6 +63,7 @@ export interface CompanyRanking {
   companyName: string
   playerId: string
   ownerDisplayName: string
+  ownerPersonalAccountName?: string
   totalWealth: number
   /** Total wealth normalized to USD for cross-currency leaderboard comparison */
   totalWealthUsd: number

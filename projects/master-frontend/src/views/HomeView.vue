@@ -33,6 +33,10 @@ function formatPoints(value: number) {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value)
 }
 
+function getPlayerAlias(entry: RankingLeaderboardEntryInfo): string {
+  return entry.personalAccountName || entry.displayName
+}
+
 async function loadRanking() {
   rankingLoading.value = true
   rankingError.value = ''
@@ -133,7 +137,7 @@ onMounted(() => {
                 class="border-t border-divider/70"
               >
                 <td class="px-5 py-3 font-semibold">#{{ entry.globalRank }}</td>
-                <td class="px-5 py-3">{{ entry.displayName }}</td>
+                <td class="px-5 py-3">{{ getPlayerAlias(entry) }}</td>
                 <td class="px-5 py-3">{{ formatPoints(entry.totalPoints) }}</td>
                 <td
                   class="px-5 py-3"

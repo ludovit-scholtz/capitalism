@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
+import { gqlRequest as gqlMasterRequest } from '@/lib/graphqlMasterServer'
 import PlayerProfileTabsContent from '@/components/profile/PlayerProfileTabsContent.vue'
 import type { PlayerProfile } from '@/components/profile/PlayerProfileTabsContent.vue'
 
@@ -86,6 +87,15 @@ const UPDATE_DISPLAY_NAME_MUTATION = `
   }
 `
 
+const UPDATE_PERSONAL_ACCOUNT_NAME_MASTER_MUTATION = `
+  mutation UpdatePersonalAccountName($input: UpdatePersonalAccountNameInput!) {
+    updatePersonalAccountName(input: $input) {
+      playerId
+      personalAccountName
+    }
+  }
+`
+
 // ── Functions ──────────────────────────────────────────────────────────────────
 
 async function fetchProfile() {
@@ -141,6 +151,12 @@ async function saveDisplayName() {
   displayNameError.value = null
   displayNameSuccess.value = false
   try {
+    await gqlMasterRequest<{
+      updatePersonalAccountName: { playerId: string; personalAccountName: string }
+    }>(UPDATE_PERSONAL_ACCOUNT_NAME_MASTER_MUTATION, {
+      input: { personalAccountName: trimmed },
+    })
+
     const data = await gqlRequest<{
       updateDisplayName: { playerId: string; displayName: string }
     }>(UPDATE_DISPLAY_NAME_MUTATION, { displayName: trimmed })
@@ -149,6 +165,7 @@ async function saveDisplayName() {
     }
     if (auth.player) {
       auth.player.displayName = data.updateDisplayName.displayName
+      auth.player.personalAccountName = data.updateDisplayName.displayName
     }
     editingDisplayName.value = false
     displayNameSuccess.value = true
@@ -248,7 +265,7 @@ onUnmounted(() => {
                 <input
                   v-model="displayNameInput"
                   type="text"
-                  maxlength="100"
+                  maxlength="40"
                   class="display-name-input flex-1 bg-surface border border-divider rounded-lg px-3 py-2 text-sm text-body focus:outline-none focus:border-brand"
                   :placeholder="t('auth.displayNamePlaceholder')"
                 />

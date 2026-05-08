@@ -2824,7 +2824,10 @@ test.describe('Onboarding budget coaching — guest cash visibility (AC 6)', () 
 
     await expect(page.locator('.budget-grid').getByText('Cash after purchase')).toBeVisible()
     // The cash-after value must be a currency amount (Bratislava = EUR)
-    const cashAfterEl = page.locator('.budget-card').nth(1).locator('strong')
+    const cashAfterEl = page
+      .locator('.budget-card')
+      .filter({ has: page.getByText('Cash after purchase') })
+      .locator('strong')
     await expect(cashAfterEl).toBeVisible()
     const cashAfterText = await cashAfterEl.textContent()
     expect(cashAfterText).toMatch(/^€[\d,]+$/)

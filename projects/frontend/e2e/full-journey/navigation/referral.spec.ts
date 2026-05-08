@@ -95,4 +95,44 @@ test.describe('Referral code detection', () => {
     await expect(page.locator('.referral-onboarding-banner')).toContainText('FRIEND10')
     await expect(page.locator('.referral-onboarding-banner')).toContainText('10%')
   })
+
+  test('does not show referral login banner when player is already authenticated', async ({ page }) => {
+    const player = makePlayer({
+      id: 'player-auth-referral-hidden',
+      email: 'auth-referral@example.com',
+      onboardingCompletedAtUtc: '2024-01-01T00:00:00Z',
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/login?ref=ABC123')
+    await expect(page.locator('.referral-banner')).toBeHidden()
+  })
+
+  test('clears pending referral code from store after it is applied to authenticated profile', async ({
+    page,
+  }) => {
+    const player = makePlayer({
+      id: 'player-referral-cleared',
+      email: 'referral-cleared@example.com',
+      onboardingCompletedAtUtc: '2024-01-01T00:00:00Z',
+      appliedReferralCode: 'CLEAR123',
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('pending_referral_code', 'CLEAR123')
+    }, `token-${player.id}`)
+
+    await page.goto('/dashboard')
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('pending_referral_code'))).toBeNull()
+  })
 })
