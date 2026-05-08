@@ -38,6 +38,7 @@ It will use real world map. The game will start in single city and later other c
 
 
 - [ ] After fx transfer the transfer amount resets and it shows error 'Enter a positive amount.'. Do not show the error after the successful transfer.
+- [ ] Make sure the intest paid from the bank to the users who deposited money to the bank account at the bank is clearly visible in the ledger and the bank statement for every tick.
 - [x] Investigate why bank statement latest row does not equal to current balance on the bank account. Perhaps it is related to the loan payments as I do not see the loan received nor any of the loans currently on the bank account statement.
 - [x] When bank loan is not paid set it for sale for the property market price minus 10%. When the debt from missed payments is not paid in 3 game days (72 ticks), destroy the building and pay any remaining debt from the sale of property to the bank owner.
 - [x] When bank loan is not paid, make sure to notify user using the notifications that he has pending debt to the bank. When user goes to the bank, make sure the pending debt amount is clearly visible and also pending time until the building in the collateral will be destroyed.
