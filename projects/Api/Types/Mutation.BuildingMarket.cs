@@ -216,6 +216,22 @@ public sealed partial class Mutation
         string? debtCurrencyCode = null;
         var usesForcedSaleFx = false;
 
+        static string BuildDebtSettlementDescription(
+            bool usesFx,
+            decimal debtPaidFromSale,
+            string saleCurrencyCode,
+            decimal debtPaidInLoanCurrency,
+            string? loanCurrencyCode,
+            string buildingName) =>
+            usesFx
+                ? $"Forced-sale FX swap: {debtPaidFromSale.ToString("N2", CultureInfo.InvariantCulture)} {saleCurrencyCode} → {debtPaidInLoanCurrency.ToString("N2", CultureInfo.InvariantCulture)} {loanCurrencyCode} for loan settlement of {buildingName}"
+                : $"Collateral debt settled from sale proceeds for {buildingName}";
+
+        static decimal GetSellerDebtSettlementLedgerAmount(
+            bool usesFx,
+            decimal debtPaidFromSale,
+            decimal debtPaidInLoanCurrency) => usesFx ? -debtPaidFromSale : -debtPaidInLoanCurrency;
+
         // If this building is collateral for an unpaid overdue/defaulted loan, settle that debt from sale proceeds first.
         var collateralLoan = await db.Loans
             .Include(l => l.BankBuilding)
@@ -299,9 +315,13 @@ public sealed partial class Mutation
         sellerAccount.Balance += sellerNetProceeds;
         sellerAccount.ConcurrencyToken = Guid.NewGuid();
         var debtSettlementDescription = debtPaidInLoanCurrency > 0m
-            ? usesForcedSaleFx
-                ? $"Forced-sale FX swap: {debtPaidFromSale.ToString("N2", CultureInfo.InvariantCulture)} {currencyCode} → {debtPaidInLoanCurrency.ToString("N2", CultureInfo.InvariantCulture)} {debtCurrencyCode} for loan settlement of {building.Name}"
-                : $"Collateral debt settled from sale proceeds for {building.Name}"
+            ? BuildDebtSettlementDescription(
+                usesForcedSaleFx,
+                debtPaidFromSale,
+                currencyCode,
+                debtPaidInLoanCurrency,
+                debtCurrencyCode,
+                building.Name)
             : null;
 
         // Transfer building ownership
@@ -363,7 +383,7 @@ public sealed partial class Mutation
                 BuildingId = building.Id,
                 Category = LedgerCategory.LoanRepaymentPrincipal,
                 Description = debtSettlementDescription!,
-                Amount = -(usesForcedSaleFx ? debtPaidFromSale : debtPaidInLoanCurrency),
+                Amount = GetSellerDebtSettlementLedgerAmount(usesForcedSaleFx, debtPaidFromSale, debtPaidInLoanCurrency),
                 RecordedAtTick = currentTick,
                 RecordedAtUtc = nowUtc,
             });
