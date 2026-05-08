@@ -11,6 +11,7 @@ export const BANK_LOANS_QUERY = `
       lenderCompanyName
       bankBuildingId
       bankBuildingName
+      loanCurrencyCode
       originalPrincipal
       remainingPrincipal
       annualInterestRatePercent
@@ -30,6 +31,8 @@ export const BANK_LOANS_QUERY = `
       collateralBuildingId
       collateralBuildingName
       collateralAppraisedValue
+      collateralListingPrice
+      collateralListingCurrencyCode
     }
   }
 `
@@ -165,6 +168,7 @@ export const MY_LOANS_QUERY = `
       id
       bankBuildingId
       bankBuildingName
+      loanCurrencyCode
       originalPrincipal
       remainingPrincipal
       annualInterestRatePercent
@@ -179,6 +183,8 @@ export const MY_LOANS_QUERY = `
       collateralBuildingId
       collateralBuildingName
       collateralAppraisedValue
+      collateralListingPrice
+      collateralListingCurrencyCode
     }
   }
 `

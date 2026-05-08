@@ -3017,6 +3017,7 @@ export default {
     collateralHint: "Pledge one of your buildings to secure this loan. You may borrow up to 70% of the building's appraised value.",
     collateralBuilding: 'Collateral Building',
     collateralAppraisedValue: 'Appraised Value',
+    forcedSaleListingPrice: 'Forced-sale listing',
     collateralMaxBorrowable: 'Max Borrowable (70%)',
     collateralRemainingCapacity: 'Remaining Borrowing Capacity',
     collateralExistingExposure: 'Existing Secured Debt',

@@ -1586,6 +1586,118 @@ test.describe('Loan collateral selection', () => {
     await expect(page.locator('.collateral-badge')).toContainText('Main Factory')
   })
 
+  test('defaulted secured loan shows loan currency, forced-sale listing price, locked cancel sale, and FX settlement statement row', async ({ page }) => {
+    const player = makeCompanyPlayer()
+    player.activeAccountType = 'COMPANY'
+    player.activeCompanyId = 'borrower-co-1'
+    player.companies[0]!.buildings.push({
+      id: 'factory-prague',
+      companyId: 'borrower-co-1',
+      cityId: 'city-pr',
+      type: 'FACTORY',
+      name: 'Prague Collateral Factory',
+      latitude: 50.08,
+      longitude: 14.43,
+      level: 2,
+      powerConsumption: 2,
+      isForSale: true,
+      askingPrice: 10000000,
+      listedAtUtc: '2026-01-02T00:00:00Z',
+      builtAtUtc: '2026-01-01T00:00:00Z',
+      pendingConfiguration: null,
+      units: [],
+    })
+
+    const defaultedLoan = makeActiveLoan({
+      id: 'loan-defaulted-fx',
+      borrowerCompanyId: 'borrower-co-1',
+      borrowerCompanyName: 'My Company',
+      lenderCompanyId: 'lender-company-1',
+      lenderCompanyName: 'City Bank',
+      bankBuildingId: 'bank-building-1',
+      bankBuildingName: 'City Bank',
+      loanCurrencyCode: 'USD',
+      remainingPrincipal: 370000,
+      paymentAmount: 18000,
+      status: 'DEFAULTED',
+      missedPayments: 3,
+      accumulatedPenalty: 12000,
+      defaultedAtTick: 96,
+      collateralBuildingId: 'factory-prague',
+      collateralBuildingName: 'Prague Collateral Factory',
+      collateralAppraisedValue: 300000,
+      collateralListingPrice: 10000000,
+      collateralListingCurrencyCode: 'CZK',
+    })
+
+    const state = setupMockApi(page, {
+      players: [player],
+      loanOffers: [makeLoanOffer()],
+      myLoans: [defaultedLoan],
+      allBanks: [makeBankInfoEntry()],
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.myBankAccounts = [
+      {
+        id: 'borrower-settlement-prague',
+        accountNumber: '5555000011113333',
+        currencyCode: 'CZK',
+        currencySymbol: 'CZK',
+        balance: 9630000,
+        companyId: 'borrower-co-1',
+        companyName: 'My Company',
+        ownerType: 'COMPANY',
+        ownerDisplayName: 'My Company',
+        cityId: 'city-pr',
+      },
+    ]
+    state.bankStatementRows['borrower-co-1'] = [
+      {
+        id: 'statement-sale',
+        recordedAtTick: 120,
+        recordedAtUtc: '2026-01-05T00:00:00Z',
+        description: 'Building sale: Prague Collateral Factory',
+        category: 'BUILDING_SALE',
+        amount: 10000000,
+        runningBalance: 10000000,
+        buildingId: 'factory-prague',
+        buildingName: 'Prague Collateral Factory',
+      },
+      {
+        id: 'statement-fx',
+        recordedAtTick: 120,
+        recordedAtUtc: '2026-01-05T00:01:00Z',
+        description: 'Forced-sale FX swap: 10,000,000 CZK → 370,000 USD for loan settlement of Prague Collateral Factory',
+        category: 'LOAN_REPAYMENT_PRINCIPAL',
+        amount: -370000,
+        runningBalance: 9630000,
+        buildingId: 'factory-prague',
+        buildingName: 'Prague Collateral Factory',
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/bank/bank-building-1')
+    const loanRow = page.locator('.my-loans-here-section .loan-row').first()
+    await expect(loanRow).toContainText('$370,000')
+    await expect(loanRow.locator('.collateral-badge')).toContainText(/Forced-sale listing:\s*CZK\s*10,000,000/i)
+
+    await page.goto('/building/factory-prague/sell')
+    const cancelBtn = page.locator('.cancel-listing-btn')
+    await expect(cancelBtn).toBeDisabled()
+    await expect(page.getByText(/Sale cannot be cancelled/i)).toBeVisible()
+
+    await page.goto('/bank-statement/borrower-settlement-prague')
+    await expect(
+      page.getByText(/Forced-sale FX swap: 10,000,000 CZK → 370,000 USD for loan settlement of Prague Collateral Factory/i),
+    ).toBeVisible()
+  })
+
   test('fresh onboarding company can borrow from the government bank and repay over 10 ticks', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, { players: [player] })

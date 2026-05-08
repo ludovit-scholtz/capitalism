@@ -211,7 +211,9 @@ public sealed partial class Mutation
         var sellerNetProceeds = salePrice;
         BankAccount? lenderDebtCreditedAccount = null;
         decimal debtPaidInLoanCurrency = 0m;
+        decimal debtPaidFromSale = 0m;
         string? debtCurrencyCode = null;
+        var usesForcedSaleFx = false;
 
         // If this building is collateral for an unpaid overdue/defaulted loan, settle that debt from sale proceeds first.
         var collateralLoan = await db.Loans
@@ -236,7 +238,8 @@ public sealed partial class Mutation
                 2,
                 MidpointRounding.AwayFromZero);
 
-            var debtPaidFromSale = Math.Min(salePrice, remainingDebtInSaleCurrency);
+            debtPaidFromSale = Math.Min(salePrice, remainingDebtInSaleCurrency);
+            usesForcedSaleFx = !string.Equals(debtCurrencyCode, currencyCode, StringComparison.OrdinalIgnoreCase);
             debtPaidInLoanCurrency = debtPaidFromSale >= remainingDebtInSaleCurrency
                 ? collateralLoan.RemainingPrincipal
                 : decimal.Round(
@@ -294,6 +297,11 @@ public sealed partial class Mutation
         var sellerAccount = await CompanyBankingService.EnsurePreferredAccountAsync(db, sellerCompany.Id, currencyCode);
         sellerAccount.Balance += sellerNetProceeds;
         sellerAccount.ConcurrencyToken = Guid.NewGuid();
+        var debtSettlementDescription = debtPaidInLoanCurrency > 0m
+            ? usesForcedSaleFx
+                ? $"Forced-sale FX swap: {debtPaidFromSale.ToString("N2", CultureInfo.InvariantCulture)} {currencyCode} → {debtPaidInLoanCurrency.ToString("N2", CultureInfo.InvariantCulture)} {debtCurrencyCode} for loan settlement of {building.Name}"
+                : $"Collateral debt settled from sale proceeds for {building.Name}"
+            : null;
 
         // Transfer building ownership
         building.CompanyId = offer.BuyerCompanyId;
@@ -350,10 +358,11 @@ public sealed partial class Mutation
             {
                 Id = Guid.NewGuid(),
                 CompanyId = sellerCompany.Id,
+                BankAccountId = sellerAccount.Id,
                 BuildingId = building.Id,
                 Category = LedgerCategory.LoanRepaymentPrincipal,
-                Description = $"Collateral debt settled from sale proceeds for {building.Name}",
-                Amount = -debtPaidInLoanCurrency,
+                Description = debtSettlementDescription!,
+                Amount = -(usesForcedSaleFx ? debtPaidFromSale : debtPaidInLoanCurrency),
                 RecordedAtTick = currentTick,
                 RecordedAtUtc = nowUtc,
             });
@@ -365,7 +374,7 @@ public sealed partial class Mutation
                 BankAccountId = lenderDebtCreditedAccount?.Id,
                 BuildingId = building.Id,
                 Category = LedgerCategory.LoanRepaymentPrincipal,
-                Description = $"Collateral debt settlement from sale of {building.Name}",
+                Description = debtSettlementDescription!,
                 Amount = debtPaidInLoanCurrency,
                 RecordedAtTick = currentTick,
                 RecordedAtUtc = nowUtc,
@@ -377,10 +386,11 @@ public sealed partial class Mutation
         {
             Id = Guid.NewGuid(),
             CompanyId = sellerCompany.Id,
+            BankAccountId = sellerAccount.Id,
             BuildingId = building.Id,
             Category = LedgerCategory.BuildingSale,
             Description = $"Building sale: {building.Name} ({building.Type}) in {city.Name} to {offer.BuyerCompany.Name}",
-            Amount = sellerNetProceeds,
+            Amount = salePrice,
             RecordedAtTick = currentTick,
             RecordedAtUtc = nowUtc,
         });

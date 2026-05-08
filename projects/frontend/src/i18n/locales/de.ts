@@ -3018,6 +3018,7 @@ export default {
     collateralHint: 'Verpfänden Sie eines Ihrer Gebäude zur Besicherung dieses Darlehens. Sie können bis zu 70 % des Schätzwerts des Gebäudes leihen.',
     collateralBuilding: 'Sicherheitengebäude',
     collateralAppraisedValue: 'Schätzwert',
+    forcedSaleListingPrice: 'Zwangsverkaufs-Listing',
     collateralMaxBorrowable: 'Max. Darlehen (70 %)',
     collateralRemainingCapacity: 'Verbleibende Kreditkapazität',
     collateralExistingExposure: 'Bestehende gesicherte Schulden',

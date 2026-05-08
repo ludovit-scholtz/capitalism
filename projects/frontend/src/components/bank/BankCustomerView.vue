@@ -41,6 +41,8 @@ const repayDebtErrorByLoanId = ref<Record<string, string | null>>({})
 const repayDebtSuccessByLoanId = ref<Record<string, boolean>>({})
 
 const fmt = computed(() => (amount: number) => formatCurrency(amount, props.bankInfo?.cityCurrencyCode ?? 'EUR'))
+const formatLoanAmount = (amount: number, loan: LoanSummary) =>
+  formatCurrency(amount, loan.loanCurrencyCode ?? props.bankInfo?.cityCurrencyCode ?? 'EUR')
 
 const directBorrowingOption = computed<LoanOfferSummary | null>(() => {
   const info = props.bankInfo
@@ -451,14 +453,23 @@ function navigateToForexTransfer() {
   <section v-if="isAuthenticated && myLoansHere.length > 0" class="my-loans-here-section mt-8 rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
     <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.myLoans') }}</h2>
     <div class="loans-list mt-6 grid gap-4">
-      <div v-for="loan in myLoansHere" :key="loan.id" class="loan-row rounded-2xl border border-divider bg-card-raised p-4 shadow-sm">
+        <div v-for="loan in myLoansHere" :key="loan.id" class="loan-row rounded-2xl border border-divider bg-card-raised p-4 shadow-sm">
         <div class="loan-row-main">
-          <span class="loan-amount">{{ fmt(loan.remainingPrincipal) }}</span>
+          <span class="loan-amount">{{ formatLoanAmount(loan.remainingPrincipal, loan) }}</span>
           <span :class="['loan-status', loanStatusClass(loan.status)]">{{ loan.status }}</span>
         </div>
         <div v-if="loan.collateralBuildingId" class="collateral-badge">
           <span aria-hidden="true">🔒</span> {{ t('bank.securedLoan') }}: {{ loan.collateralBuildingName }}
-          <span v-if="loan.collateralAppraisedValue" class="collateral-badge-value"> ({{ fmt(loan.collateralAppraisedValue) }}) </span>
+          <span v-if="loan.collateralAppraisedValue" class="collateral-badge-value">
+            ({{ formatLoanAmount(loan.collateralAppraisedValue, loan) }})
+          </span>
+          <div
+            v-if="loan.collateralListingPrice && loan.collateralListingCurrencyCode"
+            class="collateral-badge-listing"
+          >
+            {{ t('bank.forcedSaleListingPrice') }}:
+            {{ formatCurrency(loan.collateralListingPrice, loan.collateralListingCurrencyCode) }}
+          </div>
         </div>
       </div>
     </div>

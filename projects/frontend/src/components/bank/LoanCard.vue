@@ -9,11 +9,11 @@
     <div class="loan-card-body mb-3 grid grid-cols-2 gap-2">
       <div class="loan-stat flex flex-col gap-0.5">
         <span class="stat-label text-[0.7rem] uppercase tracking-wider text-muted">{{ t('bank.remainingPrincipal') }}</span>
-        <span class="stat-value text-sm font-semibold text-body">{{ formatCurrency(loan.remainingPrincipal) }}</span>
+        <span class="stat-value text-sm font-semibold text-body">{{ formatCurrency(loan.remainingPrincipal, loan.loanCurrencyCode) }}</span>
       </div>
       <div class="loan-stat flex flex-col gap-0.5">
         <span class="stat-label text-[0.7rem] uppercase tracking-wider text-muted">{{ t('bank.nextPayment') }}</span>
-        <span class="stat-value text-sm font-semibold text-body">{{ formatCurrency(loan.paymentAmount) }}</span>
+        <span class="stat-value text-sm font-semibold text-body">{{ formatCurrency(loan.paymentAmount, loan.loanCurrencyCode) }}</span>
       </div>
       <div class="loan-stat flex flex-col gap-0.5">
         <span class="stat-label text-[0.7rem] uppercase tracking-wider text-muted">{{ t('bank.paymentsMade') }}</span>
@@ -29,7 +29,16 @@
     </div>
     <div v-if="loan.collateralBuildingId" class="collateral-badge mt-2 rounded border p-2 text-xs">
       🔒 {{ t('bank.securedLoan') }}: {{ loan.collateralBuildingName }}
-      <span v-if="loan.collateralAppraisedValue" class="collateral-badge-value text-muted"> ({{ t('bank.collateralAppraisedValue') }}: {{ formatCurrency(loan.collateralAppraisedValue) }}) </span>
+      <span v-if="loan.collateralAppraisedValue" class="collateral-badge-value text-muted">
+        ({{ t('bank.collateralAppraisedValue') }}: {{ formatCurrency(loan.collateralAppraisedValue, loan.loanCurrencyCode) }})
+      </span>
+      <div
+        v-if="loan.collateralListingPrice && loan.collateralListingCurrencyCode"
+        class="collateral-badge-listing mt-1 text-muted"
+      >
+        {{ t('bank.forcedSaleListingPrice') }}:
+        {{ formatCurrency(loan.collateralListingPrice, loan.collateralListingCurrencyCode) }}
+      </div>
     </div>
   </div>
 </template>
