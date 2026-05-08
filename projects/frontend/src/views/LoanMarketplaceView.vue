@@ -193,10 +193,10 @@ const closeAccountErrors = ref<Record<string, string>>({})
 const MY_LOANS_QUERY = `{
   myLoans {
     id loanOfferId borrowerCompanyId borrowerCompanyName lenderCompanyId lenderCompanyName
-    bankBuildingId bankBuildingName originalPrincipal remainingPrincipal annualInterestRatePercent
+    bankBuildingId bankBuildingName loanCurrencyCode originalPrincipal remainingPrincipal annualInterestRatePercent
     durationTicks startTick dueTick nextPaymentTick paymentAmount paymentsMade totalPayments
     status missedPayments accumulatedPenalty acceptedAtUtc closedAtUtc
-    collateralBuildingId collateralBuildingName collateralAppraisedValue
+    collateralBuildingId collateralBuildingName collateralAppraisedValue collateralListingPrice collateralListingCurrencyCode
   }
 }`
 

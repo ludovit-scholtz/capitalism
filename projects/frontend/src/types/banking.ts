@@ -31,6 +31,7 @@ export interface LoanSummary {
   lenderCompanyName: string
   bankBuildingId: string
   bankBuildingName: string
+  loanCurrencyCode: string
   originalPrincipal: number
   remainingPrincipal: number
   annualInterestRatePercent: number
@@ -53,6 +54,10 @@ export interface LoanSummary {
   collateralBuildingName: string | null
   /** Appraised value of the collateral building at origination, or null for unsecured loans. */
   collateralAppraisedValue: number | null
+  /** Current asking price of the collateral building when it is listed for sale. */
+  collateralListingPrice: number | null
+  /** Currency code used by the current collateral listing price. */
+  collateralListingCurrencyCode: string | null
 }
 
 /** Collateral eligibility summary for one of the player's buildings. */

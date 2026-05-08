@@ -3006,6 +3006,7 @@ export default {
     collateralHint: 'Zálohovajte jednu zo svojich budov na zabezpečenie úveru. Môžete si požičať až 70 % odhadovanej hodnoty budovy.',
     collateralBuilding: 'Záložná budova',
     collateralAppraisedValue: 'Odhadovaná hodnota',
+    forcedSaleListingPrice: 'Predajná cena núteného predaja',
     collateralMaxBorrowable: 'Max. pôžička (70 %)',
     collateralRemainingCapacity: 'Zostávajúca kapacita pôžičky',
     collateralExistingExposure: 'Existujúci zabezpečený dlh',

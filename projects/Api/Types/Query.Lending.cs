@@ -96,7 +96,8 @@ public sealed partial class Query
         var offers = await db.LoanOffers
             .Include(o => o.LenderCompany)
             .Include(o => o.BankBuilding)
-            .ThenInclude(b => b.City)
+            // Loan offers always point at bank buildings; EF skips the nested include if the optional navigation is absent.
+            .ThenInclude(b => b!.City)
             .Where(o => companyIds.Contains(o.LenderCompanyId))
             .AsNoTracking()
             .ToListAsync();
@@ -140,8 +141,11 @@ public sealed partial class Query
         var loans = await db.Loans
             .Include(l => l.LenderCompany)
             .Include(l => l.BankBuilding)
+            .ThenInclude(b => b!.City)
             .Include(l => l.BorrowerCompany)
-            .Include(l => l.CollateralBuilding)
+            // Collateral is optional for unsecured loans; EF skips the nested include when the parent nav is null.
+            .Include(l => l.CollateralBuilding!)
+            .ThenInclude(b => b!.City)
             .Where(l => companyIds.Contains(l.BorrowerCompanyId))
             .AsNoTracking()
             .ToListAsync();
@@ -178,7 +182,10 @@ public sealed partial class Query
             .Include(l => l.BorrowerCompany)
             .Include(l => l.LenderCompany)
             .Include(l => l.BankBuilding)
-            .Include(l => l.CollateralBuilding)
+            .ThenInclude(b => b!.City)
+            // Collateral is optional for unsecured loans; EF skips the nested include when the parent nav is null.
+            .Include(l => l.CollateralBuilding!)
+            .ThenInclude(b => b!.City)
             .Where(l => l.BankBuildingId == bankBuildingId)
             .AsNoTracking()
             .ToListAsync();
@@ -196,6 +203,7 @@ public sealed partial class Query
         LenderCompanyName = l.LenderCompany.Name,
         BankBuildingId = l.BankBuildingId,
         BankBuildingName = l.BankBuilding.Name,
+        LoanCurrencyCode = l.BankBuilding.City?.CurrencyCode ?? "EUR",
         OriginalPrincipal = l.OriginalPrincipal,
         RemainingPrincipal = l.RemainingPrincipal,
         AnnualInterestRatePercent = l.AnnualInterestRatePercent,
@@ -215,6 +223,8 @@ public sealed partial class Query
         CollateralBuildingId = l.CollateralBuildingId,
         CollateralBuildingName = l.CollateralBuilding?.Name,
         CollateralAppraisedValue = l.CollateralAppraisedValue,
+        CollateralListingPrice = l.CollateralBuilding?.IsForSale == true ? l.CollateralBuilding.AskingPrice : null,
+        CollateralListingCurrencyCode = l.CollateralBuilding?.City?.CurrencyCode,
     };
 
     /// <summary>

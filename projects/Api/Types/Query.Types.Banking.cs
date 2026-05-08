@@ -123,6 +123,8 @@ public sealed class LoanSummary
     public string LenderCompanyName { get; set; } = string.Empty;
     public Guid BankBuildingId { get; set; }
     public string BankBuildingName { get; set; } = string.Empty;
+    /// <summary>ISO 4217 currency code of the lending bank city; all loan principal/payment amounts use this currency.</summary>
+    public string LoanCurrencyCode { get; set; } = "EUR";
     public decimal OriginalPrincipal { get; set; }
     public decimal RemainingPrincipal { get; set; }
     public decimal AnnualInterestRatePercent { get; set; }
@@ -147,6 +149,10 @@ public sealed class LoanSummary
     public string? CollateralBuildingName { get; set; }
     /// <summary>Appraised value of the collateral building at origination, or null for unsecured loans.</summary>
     public decimal? CollateralAppraisedValue { get; set; }
+    /// <summary>Current asking price when the collateral building is listed for sale, expressed in the building city currency.</summary>
+    public decimal? CollateralListingPrice { get; set; }
+    /// <summary>ISO 4217 currency code used by the current collateral listing price.</summary>
+    public string? CollateralListingCurrencyCode { get; set; }
 }
 
 /// <summary>

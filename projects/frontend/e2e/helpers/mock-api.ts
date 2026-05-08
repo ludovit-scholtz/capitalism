@@ -653,6 +653,7 @@ export type MockLoan = {
   lenderCompanyName: string
   bankBuildingId: string
   bankBuildingName: string
+  loanCurrencyCode?: string
   originalPrincipal: number
   remainingPrincipal: number
   annualInterestRatePercent: number
@@ -672,6 +673,8 @@ export type MockLoan = {
   collateralBuildingId?: string | null
   collateralBuildingName?: string | null
   collateralAppraisedValue?: number | null
+  collateralListingPrice?: number | null
+  collateralListingCurrencyCode?: string | null
 }
 
 export type MockCollateralBuilding = {

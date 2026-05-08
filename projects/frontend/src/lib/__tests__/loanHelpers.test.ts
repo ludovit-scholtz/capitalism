@@ -28,6 +28,7 @@ function makeLoan(overrides: Partial<LoanSummary> = {}): LoanSummary {
     lenderCompanyName: 'LenderCo',
     bankBuildingId: 'bank-1',
     bankBuildingName: 'My Bank',
+    loanCurrencyCode: 'USD',
     originalPrincipal: 10000,
     remainingPrincipal: 10000,
     annualInterestRatePercent: 12,
@@ -41,8 +42,14 @@ function makeLoan(overrides: Partial<LoanSummary> = {}): LoanSummary {
     status: 'ACTIVE',
     missedPayments: 0,
     accumulatedPenalty: 0,
+    defaultedAtTick: null,
     acceptedAtUtc: '2026-01-01T00:00:00Z',
     closedAtUtc: null,
+    collateralBuildingId: null,
+    collateralBuildingName: null,
+    collateralAppraisedValue: null,
+    collateralListingPrice: null,
+    collateralListingCurrencyCode: null,
     ...overrides,
   }
 }
