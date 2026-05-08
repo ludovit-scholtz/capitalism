@@ -72,6 +72,8 @@ public sealed partial class AppDbInitializer(
             }
         }
 
+        await EnsureRealWorldBillionaireBenchmarksAsync();
+
         if (!await dbContext.ResourceTypes.AnyAsync())
         {
             SeedResources();

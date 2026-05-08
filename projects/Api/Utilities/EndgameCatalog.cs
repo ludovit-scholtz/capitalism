@@ -9,14 +9,19 @@ public static class EndgameCatalog
     /// </summary>
     public const decimal DefaultGoldPriceUsd = 3_000m;
 
-    public static readonly IReadOnlyList<RealWorldBillionaireBenchmark> TopFiveRichestPeople =
+    public static readonly IReadOnlyList<RealWorldBillionaireBenchmark> DefaultTopTenRichestPeople =
     [
         new("Elon Musk", 430_000_000_000m),
         new("Jeff Bezos", 245_000_000_000m),
         new("Mark Zuckerberg", 216_000_000_000m),
         new("Larry Ellison", 192_000_000_000m),
         new("Bernard Arnault", 178_000_000_000m),
+        new("Larry Page", 144_000_000_000m),
+        new("Sergey Brin", 138_000_000_000m),
+        new("Warren Buffett", 133_000_000_000m),
+        new("Steve Ballmer", 130_000_000_000m),
+        new("Jensen Huang", 116_000_000_000m),
     ];
 
-    public static decimal WinningThresholdUsd => TopFiveRichestPeople.Min(item => item.WealthUsd);
+    public const decimal DefaultWinningThresholdUsd = 430_000_000_000m;
 }

@@ -16,6 +16,7 @@ const globalAdminEmail = ref('')
 const actionError = ref<string | null>(null)
 const actionMessage = ref<string | null>(null)
 const showShippingCosts = ref(false)
+const pendingBenchmarkSaveId = ref<string | null>(null)
 
 const canManageRootFeatures = computed(() => adminStore.session?.isRootAdministrator ?? false)
 
@@ -69,6 +70,26 @@ async function removeGlobalAdmin(email: string) {
     actionMessage.value = t('admin.globalAdminRemoved')
   } catch (caughtError) {
     actionError.value = caughtError instanceof Error ? caughtError.message : t('admin.globalAdminFailed')
+  }
+}
+
+async function saveBillionaire(row: { id: string; rank: number; name: string; wealthUsd: number }) {
+  actionError.value = null
+  pendingBenchmarkSaveId.value = row.id
+
+  try {
+    await adminStore.updateRealWorldBillionaire({
+      id: row.id,
+      rank: Number(row.rank),
+      name: row.name,
+      wealthUsd: Number(row.wealthUsd),
+    })
+    actionMessage.value = t('admin.billionaireSaved')
+  } catch (caughtError) {
+    actionError.value =
+      caughtError instanceof Error ? caughtError.message : t('admin.billionaireSaveFailed')
+  } finally {
+    pendingBenchmarkSaveId.value = null
   }
 }
 </script>
@@ -172,6 +193,39 @@ async function removeGlobalAdmin(email: string) {
 
   <section class="admin-grid admin-grid-wide">
     <AdminNewsComposer />
+  </section>
+
+  <section class="admin-grid admin-grid-wide">
+    <article class="card admin-panel admin-panel-wide">
+      <div class="admin-panel-header">
+        <div>
+          <h2>{{ t('admin.billionaireTitle') }}</h2>
+          <p>{{ t('admin.billionaireBody') }}</p>
+        </div>
+      </div>
+
+      <div class="admin-list">
+        <div
+          v-for="row in adminStore.dashboard?.realWorldBillionaires ?? []"
+          :key="row.id"
+          class="admin-list-item admin-list-item-form"
+        >
+          <div class="admin-inline-fields admin-inline-fields-benchmark">
+            <input v-model.number="row.rank" class="form-input" type="number" min="1" max="10" />
+            <input v-model="row.name" class="form-input" type="text" maxlength="120" />
+            <input v-model.number="row.wealthUsd" class="form-input" type="number" min="1" step="1000000" />
+          </div>
+          <button
+            type="button"
+            class="btn btn-secondary"
+            :disabled="pendingBenchmarkSaveId === row.id"
+            @click="() => void saveBillionaire(row)"
+          >
+            {{ pendingBenchmarkSaveId === row.id ? t('common.loading') : t('common.save') }}
+          </button>
+        </div>
+      </div>
+    </article>
   </section>
 
   <section v-if="canManageRootFeatures" class="admin-grid admin-grid-wide">
@@ -328,6 +382,10 @@ async function removeGlobalAdmin(email: string) {
   background: rgba(255, 255, 255, 0.02);
 }
 
+.admin-list-item-form {
+  align-items: flex-end;
+}
+
 .admin-list-item p {
   color: var(--color-text-secondary);
   margin-top: 0.2rem;
@@ -382,6 +440,10 @@ async function removeGlobalAdmin(email: string) {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
+}
+
+.admin-inline-fields-benchmark {
+  grid-template-columns: minmax(0, 110px) minmax(0, 1.1fr) minmax(0, 0.9fr);
 }
 
 @media (max-width: 1080px) {

@@ -108,6 +108,16 @@ public sealed partial class AppDbContext
             e.Property(g => g.WinnerCompanyName).HasMaxLength(200);
         });
 
+        modelBuilder.Entity<RealWorldBillionaire>(e =>
+        {
+            e.HasKey(item => item.Id);
+            e.Property(item => item.Name).HasMaxLength(120);
+            e.Property(item => item.WealthUsd).HasPrecision(18, 2);
+            e.HasIndex(item => item.Rank).IsUnique();
+            e.ToTable("RealWorldBillionaires", table =>
+                table.HasCheckConstraint("CK_RealWorldBillionaires_Rank_Range", "\"Rank\" BETWEEN 1 AND 10"));
+        });
+
         modelBuilder.Entity<ExchangeOrder>(e =>
         {
             e.HasKey(o => o.Id);

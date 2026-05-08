@@ -6,7 +6,7 @@ It will use a real-world map. The game starts in a single city and later expands
 
 ## Endgame win condition
 
-The game shard ends immediately when any player surpasses the estimated net worth of the 5th richest real-world billionaire (USD benchmark).
+The game shard ends immediately when any player surpasses the estimated net worth of the #1 richest real-world billionaire (USD benchmark).
 After the winner is declared, the server becomes read-only, ticks stop, and a final newsletter with winner details and top rankings is published.
 The personal ledger must show a "Race to the Top" benchmark panel so players can track progress toward this objective from the start.
 

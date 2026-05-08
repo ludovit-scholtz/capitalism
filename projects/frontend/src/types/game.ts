@@ -101,6 +101,8 @@ export interface GameState {
 }
 
 export interface RealWorldWealth {
+  id: string
+  rank: number
   name: string
   wealthUsd: number
 }

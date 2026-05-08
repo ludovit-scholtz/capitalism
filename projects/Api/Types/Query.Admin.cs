@@ -111,6 +111,11 @@ public sealed partial class Query
             .OrderByDescending(log => log.RecordedAtUtc)
             .Take(25)
             .ToListAsync(httpContextAccessor.HttpContext.RequestAborted);
+        var billionaireBenchmarks = await db.RealWorldBillionaires
+            .AsNoTracking()
+            .OrderBy(item => item.Rank)
+            .ThenByDescending(item => item.WealthUsd)
+            .ToListAsync(httpContextAccessor.HttpContext.RequestAborted);
 
         var inflowSummaries = BuildInflowSummaries(recentLedgerEntries);
         var shippingCostSummaries = BuildShippingCostSummaries(recentLedgerEntries, companies);
@@ -182,6 +187,16 @@ public sealed partial class Query
                 ResponseStatusCode = log.ResponseStatusCode,
                 RecordedAtUtc = log.RecordedAtUtc,
             }).ToList(),
+            RealWorldBillionaires = billionaireBenchmarks
+                .Select(item => new RealWorldBillionaireAdminRecord
+                {
+                    Id = item.Id,
+                    Rank = item.Rank,
+                    Name = item.Name,
+                    WealthUsd = item.WealthUsd,
+                    UpdatedAtUtc = item.UpdatedAtUtc,
+                })
+                .ToList(),
         };
     }
 

@@ -12,6 +12,8 @@ const ENDGAME_STATUS_QUERY = `
       gameEndedAtUtc
       winningThresholdUsd
       topRealWorldRichest {
+        id
+        rank
         name
         wealthUsd
       }

@@ -109,6 +109,14 @@ export interface GameAdminAuditLog {
   recordedAtUtc: string
 }
 
+export interface RealWorldBillionaireAdminRecord {
+  id: string
+  rank: number
+  name: string
+  wealthUsd: number
+  updatedAtUtc: string
+}
+
 export interface GameAdminDashboard {
   serverKey: string
   totalPersonalCash: number
@@ -123,6 +131,7 @@ export interface GameAdminDashboard {
   invisiblePlayers: GameAdminPlayer[]
   globalGameAdminGrants: GlobalGameAdminGrant[]
   recentAuditLogs: GameAdminAuditLog[]
+  realWorldBillionaires: RealWorldBillionaireAdminRecord[]
   /** The government system account, separated from regular players for admin impersonation. */
   governmentPlayer: GameAdminPlayer | null
 }

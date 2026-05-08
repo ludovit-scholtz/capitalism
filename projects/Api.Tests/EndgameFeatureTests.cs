@@ -52,7 +52,7 @@ public sealed class EndgameFeatureTests
     }
 
     [Fact]
-    public async Task EndgameStatus_ReturnsTopFiveBenchmarks()
+    public async Task EndgameStatus_ReturnsTopTenBenchmarks()
     {
         await using var factory = new ApiWebApplicationFactory();
         var client = factory.CreateClient();
@@ -72,12 +72,13 @@ public sealed class EndgameFeatureTests
         var status = result.GetProperty("data").GetProperty("endgameStatus");
         Assert.False(status.GetProperty("gameEnded").GetBoolean());
         var list = status.GetProperty("topRealWorldRichest");
-        Assert.Equal(5, list.GetArrayLength());
-        Assert.True(status.GetProperty("winningThresholdUsd").GetDecimal() > 0m);
+        Assert.Equal(10, list.GetArrayLength());
+        Assert.Equal("Elon Musk", list[0].GetProperty("name").GetString());
+        Assert.Equal(430_000_000_000m, status.GetProperty("winningThresholdUsd").GetDecimal());
     }
 
     [Fact]
-    public async Task TickProcessor_WhenWinnerSurpassesThreshold_MarksGameEnded()
+    public async Task TickProcessor_WhenWinnerBelowRichestThreshold_DoesNotEndGame()
     {
         await using var factory = new ApiWebApplicationFactory();
         var client = factory.CreateClient();
@@ -87,7 +88,39 @@ public sealed class EndgameFeatureTests
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var account = await db.BankAccounts.FirstAsync(a => a.PlayerId == playerId && a.CurrencyCode == "USD");
-            account.Balance = 180_000_000_000m;
+            account.Balance = 179_000_000_000m;
+            await db.SaveChangesAsync();
+        }
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var phases = scope.ServiceProvider.GetServices<ITickPhase>();
+            var processor = new TickProcessor(db, phases, new NullLogger<TickProcessor>());
+            await processor.ProcessTickAsync();
+        }
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var gameState = await db.GameStates.FirstDeterministicAsync();
+            Assert.False(gameState.GameEnded);
+            Assert.Null(gameState.WinnerPlayerId);
+        }
+    }
+
+    [Fact]
+    public async Task TickProcessor_WhenWinnerAtOrAboveRichestThreshold_MarksGameEnded()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var (_, playerId) = await RegisterAndGetTokenAsync(client, "winner-threshold@endgame.test");
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var account = await db.BankAccounts.FirstAsync(a => a.PlayerId == playerId && a.CurrencyCode == "USD");
+            account.Balance = 430_000_000_000m;
             await db.SaveChangesAsync();
         }
 
@@ -107,6 +140,37 @@ public sealed class EndgameFeatureTests
             Assert.Equal(playerId, gameState.WinnerPlayerId);
             Assert.False(string.IsNullOrWhiteSpace(gameState.WinnerDisplayName));
             Assert.NotNull(gameState.GameEndedAtUtc);
+        }
+    }
+
+    [Fact]
+    public async Task TickProcessor_WhenWinnerBeatsOldFifthRichestButNotRichest_DoesNotEndGame()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var (_, playerId) = await RegisterAndGetTokenAsync(client, "winner-fifth@endgame.test");
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var account = await db.BankAccounts.FirstAsync(a => a.PlayerId == playerId && a.CurrencyCode == "USD");
+            account.Balance = 190_000_000_000m;
+            await db.SaveChangesAsync();
+        }
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var phases = scope.ServiceProvider.GetServices<ITickPhase>();
+            var processor = new TickProcessor(db, phases, new NullLogger<TickProcessor>());
+            await processor.ProcessTickAsync();
+        }
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var gameState = await db.GameStates.FirstDeterministicAsync();
+            Assert.False(gameState.GameEnded);
         }
     }
 
@@ -172,5 +236,55 @@ public sealed class EndgameFeatureTests
         var firstError = errors[0];
         Assert.Equal("GAME_ENDED", firstError.GetProperty("extensions").GetProperty("code").GetString());
         Assert.Contains("Alice has won", firstError.GetProperty("message").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AdminCanUpdateRealWorldBillionaireBenchmarks()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var (token, playerId) = await RegisterAndGetTokenAsync(client, "admin-benchmark@endgame.test");
+
+        Guid benchmarkId;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.FirstAsync(p => p.Id == playerId);
+            player.Role = PlayerRole.Admin;
+            benchmarkId = await db.RealWorldBillionaires
+                .AsNoTracking()
+                .Where(item => item.Rank == 1)
+                .Select(item => item.Id)
+                .FirstAsync();
+            await db.SaveChangesAsync();
+        }
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            mutation UpdateBenchmark($input: UpdateRealWorldBillionaireInput!) {
+              updateRealWorldBillionaire(input: $input) {
+                id
+                rank
+                name
+                wealthUsd
+              }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    id = benchmarkId,
+                    rank = 1,
+                    name = "Elon Musk Updated",
+                    wealthUsd = 431000000000m
+                }
+            },
+            token);
+
+        var updated = result.GetProperty("data").GetProperty("updateRealWorldBillionaire");
+        Assert.Equal("Elon Musk Updated", updated.GetProperty("name").GetString());
+        Assert.Equal(431_000_000_000m, updated.GetProperty("wealthUsd").GetDecimal());
     }
 }

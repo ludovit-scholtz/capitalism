@@ -6,10 +6,10 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
-### Endgame (0% complete)
+### Endgame (100% complete)
 
-- [ ] Fix endgame. This is not true: 'The server ends when a player exceeds the wealth of the 5th richest real-world billionaire.' The game ends when player exeecds the wealth of the most richest real world billionare, not the 5th.
-- [ ] Show the real world billionares in game personal account rankings.
+- [x] Fix endgame. This is not true: 'The server ends when a player exceeds the wealth of the 5th richest real-world billionaire.' The game ends when player exeecds the wealth of the most richest real world billionare, not the 5th.
+- [x] Show the real world billionares in game personal account rankings.
 
 ### Onboarding (100% complete)
 

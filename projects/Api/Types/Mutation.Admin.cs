@@ -133,6 +133,50 @@ public sealed partial class Mutation
     }
 
     [Authorize]
+    public async Task<RealWorldBillionaireAdminRecord> UpdateRealWorldBillionaire(
+        UpdateRealWorldBillionaireInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] GameAdminAuthorizationService gameAdminAuthorizationService)
+    {
+        await gameAdminAuthorizationService.RequireAdminDashboardAccessAsync(db, httpContextAccessor.HttpContext!.User, httpContextAccessor.HttpContext.RequestAborted);
+        var target = await db.RealWorldBillionaires
+            .FirstOrDefaultAsync(item => item.Id == input.Id, httpContextAccessor.HttpContext.RequestAborted)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Real-world billionaire benchmark not found.")
+                    .SetCode("REAL_WORLD_BENCHMARK_NOT_FOUND")
+                    .Build());
+
+        var duplicateRank = await db.RealWorldBillionaires
+            .AnyAsync(item => item.Rank == input.Rank && item.Id != input.Id, httpContextAccessor.HttpContext.RequestAborted);
+        if (duplicateRank)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage($"Rank {input.Rank} is already used by another benchmark.")
+                    .SetCode("REAL_WORLD_BENCHMARK_RANK_CONFLICT")
+                    .Build());
+        }
+
+        target.Rank = input.Rank;
+        target.Name = input.Name.Trim();
+        target.WealthUsd = decimal.Round(input.WealthUsd, 2, MidpointRounding.AwayFromZero);
+        target.UpdatedAtUtc = DateTime.UtcNow;
+
+        await db.SaveChangesAsync(httpContextAccessor.HttpContext.RequestAborted);
+
+        return new RealWorldBillionaireAdminRecord
+        {
+            Id = target.Id,
+            Rank = target.Rank,
+            Name = target.Name,
+            WealthUsd = target.WealthUsd,
+            UpdatedAtUtc = target.UpdatedAtUtc,
+        };
+    }
+
+    [Authorize]
     public async Task<GameNewsEntryResult> UpsertGameNewsEntry(
         UpsertGameNewsEntryInput input,
         [Service] AppDbContext db,
