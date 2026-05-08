@@ -997,3 +997,94 @@ export async function probeGameAdminAccess(token: string): Promise<boolean> {
     return false
   }
 }
+
+// ─── API Key Management ──────────────────────────────────────────────────────
+
+export interface ApiKeyInfo {
+  id: string
+  name: string
+  createdAtUtc: string
+  lastUsedAtUtc: string | null
+  totalCallCount: number
+  revokedAtUtc: string | null
+}
+
+export interface GenerateApiKeyPayload {
+  apiKey: ApiKeyInfo
+  plaintextKey: string
+}
+
+const MY_API_KEYS_QUERY = `
+  query GetMyApiKeys {
+    myApiKeys {
+      id
+      name
+      createdAtUtc
+      lastUsedAtUtc
+      totalCallCount
+      revokedAtUtc
+    }
+  }
+`
+
+const GENERATE_API_KEY_MUTATION = `
+  mutation GenerateApiKey($input: GenerateApiKeyInput!) {
+    generateApiKey(input: $input) {
+      apiKey {
+        id
+        name
+        createdAtUtc
+        lastUsedAtUtc
+        totalCallCount
+        revokedAtUtc
+      }
+      plaintextKey
+    }
+  }
+`
+
+const REVOKE_API_KEY_MUTATION = `
+  mutation RevokeApiKey($input: RevokeApiKeyInput!) {
+    revokeApiKey(input: $input)
+  }
+`
+
+/** Returns the caller's active and revoked API keys from the Game API. */
+export async function fetchMyApiKeys(gameGqlUrl: string, token: string): Promise<ApiKeyInfo[]> {
+  const data = await gqlRequest<{ myApiKeys: ApiKeyInfo[] }>(
+    MY_API_KEYS_QUERY,
+    undefined,
+    token,
+    gameGqlUrl,
+  )
+  return data.myApiKeys
+}
+
+/** Generates a new API key for the authenticated player on the Game API. */
+export async function generateApiKey(
+  gameGqlUrl: string,
+  token: string,
+  name: string,
+): Promise<GenerateApiKeyPayload> {
+  const data = await gqlRequest<{ generateApiKey: GenerateApiKeyPayload }>(
+    GENERATE_API_KEY_MUTATION,
+    { input: { name } },
+    token,
+    gameGqlUrl,
+  )
+  return data.generateApiKey
+}
+
+/** Revokes an API key by ID. */
+export async function revokeApiKey(
+  gameGqlUrl: string,
+  token: string,
+  keyId: string,
+): Promise<void> {
+  await gqlRequest<{ revokeApiKey: boolean }>(
+    REVOKE_API_KEY_MUTATION,
+    { input: { keyId } },
+    token,
+    gameGqlUrl,
+  )
+}

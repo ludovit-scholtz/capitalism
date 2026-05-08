@@ -73,11 +73,20 @@ public sealed class AccountService : IAccountService
     /// <summary>
     /// Registers a new NPC account. If the e-mail is already taken (DUPLICATE_EMAIL),
     /// attempts to log in with the stored password instead (idempotent behaviour).
+    /// When <see cref="BotOptions.ApiKey"/> is configured, skips registration/login and
+    /// returns a token sentinel that uses API key authentication on all subsequent requests.
     /// </summary>
     public async Task<(string token, DateTime expiresAt)> RegisterOrLoginAsync(
         BotAccount bot,
         CancellationToken ct)
     {
+        // API key mode: skip password-based registration/login entirely.
+        if (!string.IsNullOrWhiteSpace(_options.ApiKey))
+        {
+            _logger.LogInformation("{Bot} Using API key authentication — skipping registration/login.", bot);
+            return ($"APIKEY:{_options.ApiKey}", DateTime.MaxValue);
+        }
+
         try
         {
             _logger.LogInformation("{Bot} Registering new account…", bot);

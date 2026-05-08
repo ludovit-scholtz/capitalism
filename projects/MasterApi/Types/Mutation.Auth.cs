@@ -17,8 +17,18 @@ public sealed partial class Mutation
         RegisterInput input,
         [Service] MasterDbContext db,
         [Service] IOptions<JwtOptions> jwtOptions,
+        [Service] IOptions<AuthOptions> authOptions,
         [Service] MasterRankingService rankingService)
     {
+        if (!authOptions.Value.PasswordAuthEnabled)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Password-based registration is disabled. Please use the OIDC sign-in flow.")
+                    .SetCode("AUTH_PASSWORD_DISABLED")
+                    .Build());
+        }
+
         var email = input.Email.Trim().ToLowerInvariant();
         if (string.IsNullOrWhiteSpace(email) || !IsValidEmail(email))
         {
@@ -142,8 +152,18 @@ public sealed partial class Mutation
     public async Task<MasterAuthPayload> Login(
         LoginInput input,
         [Service] MasterDbContext db,
-        [Service] IOptions<JwtOptions> jwtOptions)
+        [Service] IOptions<JwtOptions> jwtOptions,
+        [Service] IOptions<AuthOptions> authOptions)
     {
+        if (!authOptions.Value.PasswordAuthEnabled)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Password-based login is disabled. Please use the OIDC sign-in flow.")
+                    .SetCode("AUTH_PASSWORD_DISABLED")
+                    .Build());
+        }
+
         var email = input.Email.Trim().ToLowerInvariant();
         var player = await db.PlayerAccounts.FirstOrDefaultAsync(p => p.Email == email);
         if (player is null)

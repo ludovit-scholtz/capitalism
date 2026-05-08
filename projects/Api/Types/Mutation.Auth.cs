@@ -31,9 +31,19 @@ public sealed partial class Mutation
         RegisterInput input,
         [Service] AppDbContext db,
         [Service] IOptions<JwtOptions> jwtOptions,
+        [Service] IOptions<AuthOptions> authOptions,
         [Service] IMasterRankingTelemetryService rankingTelemetry,
         [Service] IOptions<MasterServerRegistrationOptions> masterOptions)
     {
+        if (!authOptions.Value.PasswordAuthEnabled)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Password-based registration is disabled on this server. Please use the OIDC sign-in flow.")
+                    .SetCode("AUTH_PASSWORD_DISABLED")
+                    .Build());
+        }
+
         var normalizedEmail = input.Email.Trim().ToLowerInvariant();
 
         if (await db.Players.AnyAsync(p => p.Email.ToLower() == normalizedEmail))
@@ -78,9 +88,19 @@ public sealed partial class Mutation
         LoginInput input,
         [Service] AppDbContext db,
         [Service] IOptions<JwtOptions> jwtOptions,
+        [Service] IOptions<AuthOptions> authOptions,
         [Service] IMasterRankingTelemetryService rankingTelemetry,
         [Service] IOptions<MasterServerRegistrationOptions> masterOptions)
     {
+        if (!authOptions.Value.PasswordAuthEnabled)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Password-based login is disabled on this server. Please use the OIDC sign-in flow.")
+                    .SetCode("AUTH_PASSWORD_DISABLED")
+                    .Build());
+        }
+
         var normalizedEmail = input.Email.Trim().ToLowerInvariant();
         var player = await db.Players.FirstOrDefaultAsync(p => p.Email.ToLower() == normalizedEmail);
         if (player is null)

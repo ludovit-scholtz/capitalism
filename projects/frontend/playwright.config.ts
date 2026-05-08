@@ -114,6 +114,9 @@ export default defineConfig({
     // All API calls are intercepted by page.route() in tests.
     env: {
       VITE_GRAPHQL_URL: process.env.VITE_GRAPHQL_URL ?? 'http://localhost:4000/graphql',
+      // Enable password auth in E2E tests so existing login/register form tests continue to pass.
+      // The feature flag defaults to false (OIDC-only) in production deployments.
+      VITE_AUTH_PASSWORD_ENABLED: 'true',
     },
   },
 })
