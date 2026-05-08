@@ -73,12 +73,12 @@ It will use real world map. The game will start in single city and later other c
 
 - [ ] Move link from game ranking to master ranking next to richest players and richest companies
 
-### Optimize for mobile (75% complete)
+### Optimize for mobile (100% complete)
 
-- [ ] Make sure the design is smooth on small mobile devices for all pages. Mainly the content should be visible without the page scroll to the right.
-- [ ] Make sure the design is smooth on tablet sized screens.
-- [ ] Make sure the design is smooth on Full HD devices
-- [ ] Make sure the design is smooth on 4K screens
+- [x] Make sure the design is smooth on small mobile devices for all pages. Mainly the content should be visible without the page scroll to the right.
+- [x] Make sure the design is smooth on tablet sized screens.
+- [x] Make sure the design is smooth on Full HD devices
+- [x] Make sure the design is smooth on 4K screens
 
 ### In-game tutorials and interactive help (100% complete)
 

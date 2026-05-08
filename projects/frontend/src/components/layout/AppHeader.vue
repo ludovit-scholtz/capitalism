@@ -320,7 +320,9 @@ const mobileNavSections = computed(() => {
         <RouterLink v-else to="/login" class="btn btn-primary" :title="t('common.login')" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'sign-in-alt']" />
         </RouterLink>
-        <ThemeToggle />
+        <div class="theme-toggle-wrap">
+          <ThemeToggle />
+        </div>
       </div>
     </div>
 
@@ -732,5 +734,8 @@ const mobileNavSections = computed(() => {
     margin-left: auto;
   }
 
+  .theme-toggle-wrap {
+    display: none;
+  }
 }
 </style>
