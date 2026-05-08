@@ -62,8 +62,8 @@ It will use real world map. The game will start in single city and later other c
 
 ### FX Exchange (100% complete)
 
-- [ ] Make sure to show the rate in the stronger currency. The currency strength is EUR,USD,CNY,GBP,INR,CZK. So when user has selected in the context switcher Prague the CZK currency it will show USDCZK and EURCZK numbers. When Vienna and EUR is selected make sure to show rates for EURUSD and EURCZK. Show the pair also in the rate list as it is common in standard forex. 
-- [ ] Move the rates table above the currency pair chart
+- [x] Make sure to show the rate in the stronger currency. The currency strength is EUR,USD,CNY,GBP,INR,CZK. So when user has selected in the context switcher Prague the CZK currency it will show USDCZK and EURCZK numbers. When Vienna and EUR is selected make sure to show rates for EURUSD and EURCZK. Show the pair also in the rate list as it is common in standard forex. 
+- [x] Move the rates table above the currency pair chart
 
 ### Fix city selection (100% complete)
 

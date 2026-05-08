@@ -741,7 +741,7 @@ test.describe('Forex Exchange page', () => {
     await expect(page.locator('.rates-table')).toContainText('USD')
   })
 
-  test('cross rate is correctly computed for non-EUR base (CZK base)', async ({ page }) => {
+  test('cross rate is correctly computed for stronger-first non-EUR base pair (USDCZK)', async ({ page }) => {
     const player = makePlayer({
       companies: [
         {
@@ -772,7 +772,7 @@ test.describe('Forex Exchange page', () => {
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
-    // EUR/CZK = 25, EUR/USD = 1.0 → CZK/USD = 1/25 = 0.04
+    // EUR/CZK = 25, EUR/USD = 1.0 → USDCZK = 25
     state.fxRates = [
       { baseCurrencyCode: 'EUR', quoteCurrencyCode: 'CZK', rate: 25, rateDate: '2026-04-27', source: 'FALLBACK', quoteCurrencySymbol: 'Kč' },
       { baseCurrencyCode: 'EUR', quoteCurrencyCode: 'USD', rate: 1.0, rateDate: '2026-04-27', source: 'FALLBACK', quoteCurrencySymbol: '$' },
@@ -789,13 +789,14 @@ test.describe('Forex Exchange page', () => {
 
     await page.getByRole('tab', { name: 'Rate List' }).click()
 
-    // Mid rate for USD row should be 1/25 = 0.04
+    // Mid rate for USD row should be 25.00
     const usdRow = page.locator('.rates-table tbody tr').filter({ hasText: 'USD' })
     await expect(usdRow).toBeVisible()
-    // The mid rate column should show 0.04
-    await expect(usdRow).toContainText('0.04')
-    // The after-fee column shows 0.04 * 0.99 = 0.0396
-    await expect(usdRow).toContainText('0.0396')
+    await expect(usdRow.locator('.rate-pair-label').filter({ hasText: 'USDCZK' })).toHaveCount(1)
+    // The mid rate column should show 25.00
+    await expect(usdRow).toContainText('25.00')
+    // The after-fee column shows 25.00 * 0.99 = 24.75
+    await expect(usdRow).toContainText('24.75')
   })
 
   test('city context badge is visible on the Swap tab', async ({ page }) => {
@@ -1293,7 +1294,7 @@ test.describe('FX Rate History Chart on Rate List tab', () => {
     await expect(page.locator('.legend-sell')).toBeVisible()
   })
 
-  test('shows pair selector with roadmap pair format option (CZKEUR)', async ({ page }) => {
+  test('shows pair selector with stronger-first roadmap pair format option (EURCZK)', async ({ page }) => {
     const { player } = setupChartTab(page)
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
@@ -1302,7 +1303,7 @@ test.describe('FX Rate History Chart on Rate List tab', () => {
     await page.goto('/forex?tab=rates')
     const selector = page.locator('.chart-pair-selector')
     await expect(selector).toBeVisible()
-    await expect(selector).toContainText('CZKEUR')
+    await expect(selector).toContainText('EURCZK')
   })
 
   test('shows time range buttons (24h, 7d, 30d)', async ({ page }) => {
@@ -1341,7 +1342,7 @@ test.describe('FX Rate History Chart on Rate List tab', () => {
     await expect(table.locator('thead').getByText('Sell')).toBeVisible()
   })
 
-  test('rate table shows compact weaker-first forex pairs without slash formatting', async ({ page }) => {
+  test('rate table shows compact stronger-first forex pairs without slash formatting', async ({ page }) => {
     const { player } = setupChartTab(page)
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
@@ -1350,9 +1351,119 @@ test.describe('FX Rate History Chart on Rate List tab', () => {
     await page.goto('/forex?tab=rates')
     const table = page.locator('.rates-table')
     await expect(table).toBeVisible()
-    await expect(table.locator('.rate-pair-label').filter({ hasText: 'CZKEUR' })).toHaveCount(1)
+    await expect(table.locator('.rate-pair-label').filter({ hasText: 'EURCZK' })).toHaveCount(1)
     await expect(table.locator('.rate-pair-label').filter({ hasText: 'EURUSD' })).toHaveCount(1)
     await expect(table.locator('.rate-pair-label').filter({ hasText: '/' })).toHaveCount(0)
+  })
+
+  test('Prague context shows stronger-first pair labels USDCZK and EURCZK', async ({ page }) => {
+    const player = makePlayer({
+      companies: [
+        {
+          id: 'company-prague-pairs',
+          playerId: 'player-1',
+          name: 'Prague Pair Corp',
+          cash: 500000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [
+            {
+              id: 'building-prague-pairs',
+              companyId: 'company-prague-pairs',
+              cityId: 'city-pr',
+              type: 'FACTORY',
+              name: 'Prague Pair Factory',
+              latitude: 50.08,
+              longitude: 14.44,
+              level: 1,
+              powerConsumption: 10,
+              isForSale: false,
+              units: [],
+              pendingConfiguration: null,
+            },
+          ],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript(
+      ({ token, cityId }) => {
+        localStorage.setItem('auth_token', token)
+        localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+        localStorage.setItem('selected_city_id', cityId)
+      },
+      { token: `token-${player.id}`, cityId: 'city-pr' },
+    )
+    await page.goto('/forex?tab=rates')
+    const table = page.locator('.rates-table')
+    await expect(table).toBeVisible()
+    await expect(table.locator('.rate-pair-label').filter({ hasText: 'USDCZK' })).toHaveCount(1)
+    await expect(table.locator('.rate-pair-label').filter({ hasText: 'EURCZK' })).toHaveCount(1)
+  })
+
+  test('Vienna context shows stronger-first pair labels EURUSD and EURCZK', async ({ page }) => {
+    const player = makePlayer({
+      companies: [
+        {
+          id: 'company-vienna-pairs',
+          playerId: 'player-1',
+          name: 'Vienna Pair Corp',
+          cash: 500000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [
+            {
+              id: 'building-vienna-pairs',
+              companyId: 'company-vienna-pairs',
+              cityId: 'city-vi',
+              type: 'FACTORY',
+              name: 'Vienna Pair Factory',
+              latitude: 48.21,
+              longitude: 16.38,
+              level: 1,
+              powerConsumption: 10,
+              isForSale: false,
+              units: [],
+              pendingConfiguration: null,
+            },
+          ],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript(
+      ({ token, cityId }) => {
+        localStorage.setItem('auth_token', token)
+        localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+        localStorage.setItem('selected_city_id', cityId)
+      },
+      { token: `token-${player.id}`, cityId: 'city-vi' },
+    )
+    await page.goto('/forex?tab=rates')
+    const table = page.locator('.rates-table')
+    await expect(table).toBeVisible()
+    await expect(table.locator('.rate-pair-label').filter({ hasText: 'EURUSD' })).toHaveCount(1)
+    await expect(table.locator('.rate-pair-label').filter({ hasText: 'EURCZK' })).toHaveCount(1)
+  })
+
+  test('rates table is rendered above chart in DOM order', async ({ page }) => {
+    const { player } = setupChartTab(page)
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex?tab=rates')
+    const order = await page.evaluate(() => {
+      const table = document.querySelector('.rates-table')
+      const chart = document.querySelector('.rates-chart-section')
+      if (!table || !chart) return null
+      const position = table.compareDocumentPosition(chart)
+      return Boolean(position & Node.DOCUMENT_POSITION_FOLLOWING)
+    })
+    expect(order).not.toBeNull()
+    expect(order).toBe(true)
   })
 
   test('mobile rates table stacks buy, mid, and sell values inside each pair row', async ({ page }) => {
@@ -1393,5 +1504,20 @@ test.describe('FX Rate History Chart on Rate List tab', () => {
     await page.goto('/forex?tab=rates')
     await expect(page.locator('.rates-chart-section')).toBeVisible()
     await expect(page.locator('.chart-pair-selector')).toBeVisible()
+  })
+
+  test('mobile rates view has no horizontal overflow', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
+    const { player } = setupChartTab(page)
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex?tab=rates')
+    const hasOverflow = await page.evaluate(() => {
+      const root = document.documentElement
+      return root.scrollWidth > root.clientWidth
+    })
+    expect(hasOverflow).toBe(false)
   })
 })

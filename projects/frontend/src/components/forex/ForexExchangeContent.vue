@@ -45,7 +45,7 @@ watch(activeTab, async (tab) => {
 
 // ── Chart state ────────────────────────────────────────────────────────────
 const availablePairs = computed(() => buildEurPairList(availableCurrencies.value))
-const selectedPair = ref('CZKEUR')
+const selectedPair = ref('EURCZK')
 const selectedTicksBack = ref(100)
 
 const tickRangeOptions = [
@@ -132,29 +132,6 @@ watch(activeTab, async (tab) => {
                 </div>
               </div>
 
-              <!-- Rate history chart ─────────────────────────────────── -->
-              <div class="rates-chart-section rounded-xl border border-divider bg-surface p-4">
-                <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
-                  <div class="flex flex-col gap-1">
-                    <span class="text-xs font-semibold uppercase tracking-wide text-muted">{{ t('forex.rateChartPair') }}</span>
-                    <select v-model="selectedPair" class="chart-pair-selector rounded border border-divider bg-card px-2 py-1 text-sm text-body" :aria-label="t('forex.rateChartPairAriaLabel')">
-                      <option v-for="pair in availablePairs" :key="pair" :value="pair">{{ pair }}</option>
-                    </select>
-                  </div>
-                  <div class="flex gap-1">
-                    <button
-                      v-for="opt in tickRangeOptions"
-                      :key="opt.value"
-                      class="tick-range-btn rounded border px-3 py-1 text-xs font-semibold transition-colors"
-                      :class="selectedTicksBack === opt.value ? 'border-brand bg-brand/10 text-brand' : 'border-divider bg-card text-muted hover:border-brand/50'"
-                      @click="selectedTicksBack = opt.value"
-                    >{{ opt.label }}</button>
-                  </div>
-                </div>
-                <div v-if="rateHistoryLoading" class="flex items-center justify-center py-8 text-sm text-muted">{{ t('common.loading') }}</div>
-                <FxRateChart v-else :snapshots="rateHistory" :pair-label="selectedPair" />
-              </div>
-
               <!-- Rate table ─────────────────────────────────────────── -->
               <div>
                 <p class="mb-3 text-sm text-muted">{{ t('forex.rateTableIntro', { base: `1 ${baseCurrencySymbol} ${baseCurrencyCode}` }) }}</p>
@@ -200,6 +177,29 @@ watch(activeTab, async (tab) => {
                   </table>
                 </div>
                 <p class="mt-3 text-xs text-subtle">{{ t('forex.rateAfterFeeNote') }}</p>
+              </div>
+
+              <!-- Rate history chart ─────────────────────────────────── -->
+              <div class="rates-chart-section rounded-xl border border-divider bg-surface p-4">
+                <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+                  <div class="flex flex-col gap-1">
+                    <span class="text-xs font-semibold uppercase tracking-wide text-muted">{{ t('forex.rateChartPair') }}</span>
+                    <select v-model="selectedPair" class="chart-pair-selector rounded border border-divider bg-card px-2 py-1 text-sm text-body" :aria-label="t('forex.rateChartPairAriaLabel')">
+                      <option v-for="pair in availablePairs" :key="pair" :value="pair">{{ pair }}</option>
+                    </select>
+                  </div>
+                  <div class="flex gap-1">
+                    <button
+                      v-for="opt in tickRangeOptions"
+                      :key="opt.value"
+                      class="tick-range-btn rounded border px-3 py-1 text-xs font-semibold transition-colors"
+                      :class="selectedTicksBack === opt.value ? 'border-brand bg-brand/10 text-brand' : 'border-divider bg-card text-muted hover:border-brand/50'"
+                      @click="selectedTicksBack = opt.value"
+                    >{{ opt.label }}</button>
+                  </div>
+                </div>
+                <div v-if="rateHistoryLoading" class="flex items-center justify-center py-8 text-sm text-muted">{{ t('common.loading') }}</div>
+                <FxRateChart v-else :snapshots="rateHistory" :pair-label="selectedPair" />
               </div>
             </template>
           </section>
