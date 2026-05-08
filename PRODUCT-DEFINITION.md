@@ -36,17 +36,27 @@ Master API has its own database and handles the subscription management.
 
 When player creates the account, he creates it at the master server. When user requests the token, he does it against the master server. The token is usable against every game server and master server.
 
-The game supports two authentication modes:
-- Native account authentication via `register` and `login` GraphQL mutations (email + password).
-- Biatec OpenID Connect sign-in via redirect to the Biatec `/authorize` endpoint and callback handling at `/auth/callback` in both game frontend and master frontend.
+The game supports configuration-driven authentication modes:
+- **OIDC-only mode (default)**: Biatec OpenID Connect is the only login method.
+- **Hybrid mode (explicitly enabled by configuration)**: native account authentication (`register` and `login`) is enabled alongside OIDC for local development and automated tests.
+
+When OIDC-only mode is active, navigating to `/login` must immediately start the OIDC authorization flow (equivalent to clicking the Google authorization button).
 
 OIDC integration requirements:
 - Client flow must validate `state` and `nonce` before accepting callback tokens.
 - API and Master API must validate external JWT `iss`, `aud`, signature, and expiry against the Biatec OIDC configuration and JWKS.
-- Existing local JWT validation for native login must remain enabled in parallel.
 - Player provisioning from external claims must use normalized email matching to prevent duplicate-player creation.
 - OIDC sessions should schedule periodic renewal before token expiry to avoid hard logout during active use.
 - Production environments must use HTTPS for OIDC authority and redirect URIs.
+
+### Bot API authorization
+
+Players can generate API keys bound to their personal account to authorize bot automation.
+
+- Each API key can impersonate only the owner's personal account and owner-controlled companies.
+- API keys must not allow controlling foreign companies, bypassing ownership checks, or bypassing gameplay restrictions (including forex and stock authorization rules).
+- API key creation, rotation, revocation, and usage audit trail must be available in player settings and administrator tooling.
+- Bot console applications must use API-key-based authorization instead of interactive user login.
 
 ## Buildings
 
@@ -273,6 +283,18 @@ When a unit is being modified, user can still change it. For example, if user up
 
 The onboarding wizard is available without prior authentication. Guest progress is held in browser local storage (not on the backend) so new players can explore the full flow risk-free before committing to an account.
 
+Referral flow requirements in onboarding:
+- When user arrives through a referral link, store the referral code in onboarding state and show the referral discount message before first login.
+- Do not show the invitation/referral message after user has logged in.
+- After referral code is successfully persisted to backend, clear the referral code from game Pinia onboarding state.
+
+Personal account name requirements in onboarding:
+- Generate personal account name during IPO step using first-name, middle-name, and last-name generator.
+- Personal account name is shown in rankings instead of raw OIDC identity name.
+- Personal account name can be changed later in player settings, with clear warning not to use real legal identity.
+- Personal account name is stored in MasterApi so one person uses same name across all game servers.
+- If personal account name already exists for the player in MasterApi, onboarding must preserve it and not overwrite it.
+
 Onboarding steps (city-first order):
 1. **City selection** — Player picks their starting city (e.g. Bratislava EUR, Prague CZK, Vienna EUR, Berlin EUR, Warsaw PLN). City choice is first because it fixes starting currency, available lot inventory, salary baseline, and bank-account context for every subsequent step. The selected city is also reflected in the navbar context switcher immediately.
 2. **Player name & personal bank account** — Player picks a display name. The system grants $200 000 USD to a personal bank account. This is the startup capital for the IPO.
@@ -319,6 +341,8 @@ In the onboarding the player picks the game player name. This is the person acco
 Person cannot own land or buildings and does not pay tax. He can only own bank account balances or shares in the companies. Person account income is the sale of shares and dividends.
 
 Player can switch to person view so that he can trade the stocks.
+
+The person account display name is a cross-server identity attribute stored in MasterApi and reused by every game shard.
 
 ## City Global Exchanges
 
@@ -373,6 +397,15 @@ Game administration is managed in the master API, but local game-administrator r
 
 List of root game administrators is managed by master API configuration.
 
+### Operations dashboard (game frontend)
+
+The game frontend uses one unified operations surface at `/operations/statistics` (legacy `/admin` route removed from primary navigation).
+
+- Operations pages are split into focused subpages (statistics, players, interventions, publishing) instead of one oversized page.
+- Money-flow statistics use live LedgerEntry aggregations (`operationsStatistics`) with inflow and outflow grouped by economic category.
+- Product analytics table uses live production/sales aggregations (`adminProductAnalytics`) with sorting, filtering, and export support.
+- News and changelog publishing is integrated into operations navigation with dedicated page layout and editor flow.
+
 ## Newspaper and changelog
 
 Master API database holds changelog and newspaper. Admins can publish news to direct users or report progress.
@@ -396,6 +429,8 @@ Each tick every media house loses 0.5% of aggregated content value.
 Content quality is determined by comparison with other media houses. If a media house has highest content, it is ranked at 100%. If a competing media house has half of top aggregated content value, it is ranked at 50%. This applies in same media category and city. Different categories do not affect each other.
 
 The content quality ranking determines the speed with which the branding quality is increasing.
+
+When media house building upgrade is in progress, marketing units must remain configurable and selectable against that media house. Upgrade state must not block marketing-configuration workflows.
 
 ## Monetization
 
@@ -449,6 +484,11 @@ User can borrow money only for buildings which are not mortgaged. User can pick 
 
 Borrower decides amount and duration of loan. When player goes to bank, they can request loan with chosen duration and requested amount. They also deposit a building as collateral. One building can be used in only one loan.
 
+Collateral enforcement requirements:
+- If loan has missed payments and collateral building is moved to forced market sale, asking price must stay in building city/property currency (not in lending bank currency).
+- Loan settlement after collateral sale must apply required FX conversion internally so debt is closed in loan currency while property sale remains in local property currency.
+- User must not be allowed to cancel forced sale while collateralized loan is in missed-payment state.
+
 Creating a loan creates a contract between bank and a player which will hold the interest rate even if the bank player changes the lending interest rate. Each contract has a maturity date. User can see each tick payment amount. The calculation is the same as in the real world mortgage payments with difference that the payment is done on every tick. The borrower pays the interest and principal amount.
 
 Borrower can repay any part of the loan any time.
@@ -491,6 +531,7 @@ Make sure to show power-plant P&L chart in building overview.
 - In the banking page show only banks in selected city.
 - In global exchange remove city selection and use selection from navbar.
 - In marketing analytics page show only data related to selected city.
+- If user logs out while selected city has no owned factory, after next login the context switcher must automatically fall back to the player's primary city (city with highest owned factory count).
 
 ## Referral program
 
@@ -751,13 +792,14 @@ The **/cities** overview page lists all active game cities with their population
 
 ### Building destruction
 
-A building owner can choose to demolish a building that has no active loans against it. The destruction workflow:
+A building owner can choose to destroy a building from the sell-building workflow. The destruction workflow:
 
-1. Player initiates destruction from the building overview panel.
-2. A 72-tick countdown begins. During this time the building is locked (no unit upgrades, no new purchases).
-3. After 72 ticks the building is removed. The owner receives 80% of the original land purchase price credited back to the building's bank account.
-4. If the owner needs an immediate exit (for example in a forced sale scenario), a forced-sale discount option is offered at 90% of the market appraised value; this completes in 10 ticks but returns 10% less.
-5. A building that is currently used as loan collateral cannot be destroyed until the loan is fully repaid.
+1. Player opens sell-building form and selects the destroy action.
+2. UI must show refund preview before confirmation.
+3. On confirmation, building is destroyed and owner receives 80% of building property value.
+4. Destroyed lot becomes available for purchase again.
+5. If collateralized loan has missed payments, system forces building sale at market appraised value minus 10% and user cannot cancel that sale.
+6. If missed-payment debt is still unresolved after 72 ticks (3 game days), building is destroyed and remaining debt is settled from collateral sale proceeds.
 
 ### Building secondary market
 
@@ -794,11 +836,11 @@ Public sales volumes are modified by seasonal demand multipliers. Each product b
 
 A guided tutorial system helps new players navigate key game mechanics after onboarding.
 
-- The **TutorialProgress** entity records which milestones each player has completed.
-- The **/tutorial** view shows a checklist of all tutorial milestones with their completion status and links to the relevant in-game view.
-- Contextual **TutorialTooltip** overlays appear on first visit to key pages (factory layout, exchange, bank loan form) explaining the main controls and what to do next.
-- Players can dismiss tooltips permanently or re-open them from the tutorial page.
-- Tutorial milestones include: purchase first resource, configure factory layout, set public sales price, make first sale, create a bank account, swap currencies, and buy shares.
+- The **TutorialProgress** entity records completion of five canonical milestones: first resource sold, first B2B trade, first loan taken, first competitor observed in market intelligence, first brand established.
+- The **/tutorial** view shows checklist progress, completion timestamps, and deep links for unfinished milestones.
+- **TutorialTooltip** component is the standard contextual overlay and supports dismiss, escape, and auto-dismiss behavior.
+- Contextual overlays for first dashboard visit and first building-detail/grid-editor visit are required integration points for next increment.
+- Tutorial completion must integrate with master ranking bounties; each tutorial bounty is awarded once per lifetime per user, and bounty award must mark the tutorial milestone as completed when needed.
 
 ## Player profile and statistics
 
@@ -850,7 +892,13 @@ The FX rates page shows all available currency pairs with a three-price display:
 - **Mid price**: the theoretical mid-market rate used for valuation.
 - **Sell price** (bid): the rate a player receives when selling the foreign currency.
 
-Currency pairs are sorted by currency strength in this order: USD > EUR > CNY > GBP > INR > CZK > PLN.
+Currency-pair orientation follows stronger-currency-first convention in this strength order: EUR > USD > CNY > GBP > INR > CZK > PLN.
+
+Examples:
+- If selected context currency is CZK (Prague), rate list should show pairs like `USDCZK` and `EURCZK`.
+- If selected context currency is EUR (Vienna), rate list should show pairs like `EURUSD` and `EURCZK`.
+
+The rates table is displayed above the pair-history chart.
 
 A **rate history chart** is available for any selected currency pair, showing the last 100 ticks of mid-price movement.
 
@@ -888,17 +936,13 @@ A security audit is conducted weekly by reviewing the audit log and running a st
 - Whether server-controlled fields (tick counts, prices, balances, ownership) can be overridden by client-supplied input.
 - Findings are documented in `/audits/<YYYY-WW>.md` with risk severity, affected endpoint or component, and a remediation action plan.
 
-## Building destruction and forced exit (planned)
+## Building lifecycle delivery notes
 
-See **Building lifecycle → Building destruction** above.
+See **Building lifecycle → Building destruction** above for canonical behavior. Implementation and rollout must follow those rules and remain consistent with collateral-enforcement behavior under missed loan payments.
 
-- [ ] Implement 72-tick destruction countdown with locked-state enforcement.
-- [ ] Implement forced-sale fast exit (10-tick, 10% price discount).
-- [ ] Block destruction and forced sale when collateral loan is active.
+## News feed behavior
 
-## News feed improvements (planned)
-
-- [ ] Add "Mark all as read" button to the news/changelog feed page.
+News and changelog feed includes a **Mark all as read** action for authenticated players. Read receipts are tracked server-side and unread counter in navbar must clear immediately after successful action.
 
 ## Banking deposit rate management (planned)
 
