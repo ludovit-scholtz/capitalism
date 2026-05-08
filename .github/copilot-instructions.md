@@ -644,6 +644,7 @@ Root-cause of a quality failure (March 2026, PR #76 guest onboarding):
 4. **The PR description must explicitly link to the issue it resolves** using GitHub's `Fixes #N` or `Closes #N` syntax so reviewers can trace the PR back to the product requirement.
 5. **Always demonstrate the full scope of delivery in the PR description**, not just the last incremental change. Reviewers need to see what was already on main vs what this branch contributes — make both clear.
 6. **Respond to product-owner review comments by adding concrete proof** (test names, passing counts, screenshots) — never by just asserting "it works."
+7. **Before replying to a review comment that claims the PR is only an initial-plan/placeholder state, verify the current branch head commit and workflow statuses first.** If implementation commits already exist, reply with the exact short commit hash, concrete test evidence, and the screenshot link so stale review context does not lead to false "not implemented" conclusions.
 
 ## Guest onboarding temporary-state guarantee — clearProgress after migration
 
