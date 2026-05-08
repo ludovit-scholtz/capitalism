@@ -34,6 +34,13 @@ public sealed class SetBuildingForSaleInput
     public decimal? AskingPrice { get; set; }
 }
 
+/// <summary>Input for permanently destroying a building owned by the authenticated player.</summary>
+public sealed class DestroyBuildingInput
+{
+    /// <summary>Building to destroy.</summary>
+    public Guid BuildingId { get; set; }
+}
+
 /// <summary>Input for setting the rent per m² on an apartment or commercial building.</summary>
 public sealed class SetRentPerSqmInput
 {

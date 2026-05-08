@@ -612,8 +612,9 @@ test.describe('Building detail upgrades', () => {
     await page.locator('#asking-price').fill('100000')
     await page.locator('.list-for-sale-btn').click()
 
-    // Should show success confirmation
-    await expect(page.locator('.sell-success')).toBeVisible()
+    // Sell flow redirects back to building detail after successful listing.
+    await expect(page).toHaveURL(/\/building\/building-sell$/)
+    await expect(page.getByRole('heading', { name: 'Selling Factory' })).toBeVisible()
   })
 
   test('sell building button is disabled and shows warning when building is active collateral', async ({ page }) => {
@@ -23228,6 +23229,127 @@ test.describe('Supply chain tab', () => {
 
     // The "Update Listing" button should be shown
     await expect(page.locator('.list-for-sale-btn')).toContainText('Update Listing')
+  })
+
+  test('sell form disables cancel listing when building is unpaid loan collateral', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-locked-sale',
+      playerId: player.id,
+      name: 'Locked Sale Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-locked-sale',
+          companyId: 'company-locked-sale',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Locked Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 2,
+          powerConsumption: 2,
+          isForSale: true,
+          askingPrice: 350000,
+          listedAtUtc: '2026-04-01T00:00:00Z',
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.myLoans = [
+      {
+        id: 'loan-locked-sale',
+        loanOfferId: 'offer-locked-sale',
+        borrowerCompanyId: 'company-locked-sale',
+        lenderCompanyName: 'Locked Bank',
+        bankBuildingId: 'bank-building-locked',
+        bankBuildingName: 'Locked Bank Building',
+        originalPrincipal: 500000,
+        remainingPrincipal: 420000,
+        annualInterestRatePercent: 8,
+        durationTicks: 1440,
+        startTick: 0,
+        dueTick: 1440,
+        nextPaymentTick: 1440,
+        paymentAmount: 12000,
+        paymentsMade: 0,
+        totalPayments: 10,
+        status: 'OVERDUE',
+        missedPayments: 2,
+        accumulatedPenalty: 10000,
+        acceptedAtUtc: '2026-01-01T00:00:00Z',
+        closedAtUtc: null,
+        collateralBuildingId: 'building-locked-sale',
+        collateralBuildingName: 'Locked Factory',
+        collateralAppraisedValue: 1000000,
+      },
+    ]
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-locked-sale/sell')
+
+    const cancelBtn = page.locator('.cancel-listing-btn')
+    await expect(cancelBtn).toBeDisabled()
+    await expect(cancelBtn).toHaveAttribute(
+      'title',
+      /Sale cannot be cancelled — this building is collateral for an unpaid loan./i,
+    )
+  })
+
+  test('sell form destroy workflow shows confirmation and success credit message', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-destroy-sell',
+      playerId: player.id,
+      name: 'Destroy Sell Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-destroy-sell',
+          companyId: 'company-destroy-sell',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Destroy Sell Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 2,
+          powerConsumption: 2,
+          isForSale: false,
+          askingPrice: null,
+          listedAtUtc: null,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-destroy-sell/sell')
+    await page.locator('.open-destroy-confirm-btn').click()
+    await expect(page.locator('.destroy-confirm-dialog')).toBeVisible()
+    await page.locator('.confirm-destroy-btn').click()
+
+    await expect(page.getByText(/Building destroyed\./i)).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Bank Statement' })).toBeVisible()
   })
 
   test('defaulted loan does not show collateral warning on building header', async ({ page }) => {

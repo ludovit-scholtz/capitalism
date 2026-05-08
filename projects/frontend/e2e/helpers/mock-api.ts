@@ -4632,6 +4632,31 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Building not found' }] }) })
       }
 
+      if (input?.isForSale === false) {
+        const isLockedByUnpaidCollateral = state.myLoans.some(
+          (loan) =>
+            loan.collateralBuildingId === building.id &&
+            (loan.status === 'OVERDUE' || loan.status === 'DEFAULTED') &&
+            (loan.missedPayments ?? 0) > 0 &&
+            (loan.remainingPrincipal ?? 0) > 0,
+        )
+
+        if (isLockedByUnpaidCollateral) {
+          return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              errors: [
+                {
+                  message: 'Sale cannot be cancelled because this building is collateral for an unpaid loan.',
+                  extensions: { code: 'BUILDING_SALE_LOCKED_BY_UNPAID_COLLATERAL' },
+                },
+              ],
+            }),
+          })
+        }
+      }
+
       building.isForSale = input.isForSale
       building.askingPrice = input.isForSale ? input.askingPrice : null
       building.listedAtUtc = input.isForSale ? new Date().toISOString() : null
@@ -4640,6 +4665,74 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { setBuildingForSale: { id: building.id, isForSale: building.isForSale, askingPrice: building.askingPrice, listedAtUtc: building.listedAtUtc } } }),
+      })
+    }
+
+    if (query.includes('DestroyBuilding') || query.includes('destroyBuilding')) {
+      const input = body.variables?.input
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      const company = player?.companies.find((candidate) => candidate.buildings.some((building) => building.id === input?.buildingId))
+      const building = company?.buildings.find((candidate) => candidate.id === input?.buildingId)
+
+      if (!player || !company || !building) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Building not found', extensions: { code: 'BUILDING_NOT_FOUND' } }] }),
+        })
+      }
+
+      const hasUnpaidCollateralLoan = state.myLoans.some(
+        (loan) =>
+          loan.collateralBuildingId === building.id &&
+          (loan.status === 'ACTIVE' || loan.status === 'OVERDUE' || loan.status === 'DEFAULTED') &&
+          (loan.remainingPrincipal ?? 0) > 0,
+      )
+
+      if (hasUnpaidCollateralLoan) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              {
+                message: 'Building cannot be destroyed while it is collateral for an unpaid loan.',
+                extensions: { code: 'BUILDING_HAS_UNPAID_COLLATERAL_LOAN' },
+              },
+            ],
+          }),
+        })
+      }
+
+      const city = state.cities.find((entry) => entry.id === building.cityId)
+      const currencyCode = city?.currencyCode ?? 'EUR'
+      const populationIndex = building.populationIndex ?? 0.5
+      const estimatedMarketValue =
+        Math.round(((75_000 * Math.pow(1.5, (building.level ?? 1) - 1) + (building.units?.length ?? 0) * 20_000) * (1 + populationIndex * 0.5)) / 1_000) * 1_000
+      const refundAmount = Math.round(estimatedMarketValue * 0.8 * 100) / 100
+
+      company.buildings = company.buildings.filter((candidate) => candidate.id !== building.id)
+
+      for (const lot of state.buildingLots) {
+        if (lot.buildingId === building.id) {
+          lot.buildingId = null
+          lot.ownerCompanyId = null
+        }
+      }
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            destroyBuilding: {
+              buildingId: building.id,
+              buildingName: building.name,
+              refundAmount,
+              currencyCode,
+            },
+          },
+        }),
       })
     }
 
@@ -5746,6 +5839,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       }
       if (query.includes('cities')) {
         responseData.cities = state.cities ?? []
+      }
+      if (query.includes('myLoans')) {
+        responseData.myLoans = state.myLoans ?? []
       }
       if (query.includes('tutorialProgress')) {
         responseData.tutorialProgress = state.tutorialProgress

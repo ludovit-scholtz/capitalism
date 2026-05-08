@@ -59,19 +59,60 @@ public sealed class BuildingDestructionPhase : ITickPhase
                 continue;
             }
 
-            var liquidationProceeds = decimal.Round(Math.Max(0m, loan.CollateralAppraisedValue ?? 0m), 2, MidpointRounding.AwayFromZero);
-            var debtOutstanding = decimal.Round(Math.Max(0m, loan.RemainingPrincipal), 2, MidpointRounding.AwayFromZero);
-            var debtPayout = Math.Min(liquidationProceeds, debtOutstanding);
-            var borrowerSurplus = Math.Max(0m, liquidationProceeds - debtPayout);
+            var buildingCurrencyCode = context.CitiesById.TryGetValue(building.CityId, out var buildingCity)
+                ? buildingCity.CurrencyCode
+                : "EUR";
+            var loanCurrencyCode = context.BuildingsById.TryGetValue(loan.BankBuildingId, out var bankBuilding)
+                && context.CitiesById.TryGetValue(bankBuilding.CityId, out var bankCity)
+                ? bankCity.CurrencyCode
+                : buildingCurrencyCode;
+
+            var collateralAppraisedInBuildingCurrency = decimal.Round(
+                FxRateHelper.ConvertAmount(
+                    Math.Max(0m, loan.CollateralAppraisedValue ?? 0m),
+                    loanCurrencyCode,
+                    buildingCurrencyCode,
+                    context.EurFxRates),
+                2,
+                MidpointRounding.AwayFromZero);
+
+            var liquidationProceeds = decimal.Round(
+                collateralAppraisedInBuildingCurrency * GameConstants.ForeclosureRefundFraction,
+                2,
+                MidpointRounding.AwayFromZero);
+            var debtOutstandingLoanCurrency = decimal.Round(Math.Max(0m, loan.RemainingPrincipal), 2, MidpointRounding.AwayFromZero);
+            var debtOutstandingInBuildingCurrency = decimal.Round(
+                FxRateHelper.ConvertAmount(debtOutstandingLoanCurrency, loanCurrencyCode, buildingCurrencyCode, context.EurFxRates),
+                2,
+                MidpointRounding.AwayFromZero);
+
+            var debtPayoutInBuildingCurrency = Math.Min(liquidationProceeds, debtOutstandingInBuildingCurrency);
+            var debtPayoutInLoanCurrency = debtPayoutInBuildingCurrency >= debtOutstandingInBuildingCurrency
+                ? debtOutstandingLoanCurrency
+                : decimal.Round(
+                    FxRateHelper.ConvertAmount(
+                        debtPayoutInBuildingCurrency,
+                        buildingCurrencyCode,
+                        loanCurrencyCode,
+                        context.EurFxRates),
+                    2,
+                    MidpointRounding.AwayFromZero);
+            debtPayoutInLoanCurrency = Math.Min(debtOutstandingLoanCurrency, debtPayoutInLoanCurrency);
+
+            var borrowerSurplus = Math.Max(0m, liquidationProceeds - debtPayoutInBuildingCurrency);
 
             // Find the borrower company to issue the surplus.
             context.CompaniesById.TryGetValue(loan.BorrowerCompanyId, out var borrowerCompany);
             context.CompaniesById.TryGetValue(loan.LenderCompanyId, out var lenderCompany);
 
-            if (debtPayout > 0m && lenderCompany is not null)
+            if (debtPayoutInLoanCurrency > 0m && lenderCompany is not null)
             {
-                var lenderAccounts = context.GetCompanyBankAccounts(lenderCompany.Id);
-                CompanyBankingService.TryCredit(lenderAccounts, debtPayout, null, out var lenderAccount);
+                var lenderAccount = await CompanyBankingService.EnsurePreferredAccountAsync(
+                    context.Db,
+                    lenderCompany.Id,
+                    loanCurrencyCode);
+                lenderAccount.Balance += debtPayoutInLoanCurrency;
+                lenderAccount.ConcurrencyToken = Guid.NewGuid();
 
                 context.Db.LedgerEntries.Add(new LedgerEntry
                 {
@@ -81,7 +122,7 @@ public sealed class BuildingDestructionPhase : ITickPhase
                     BuildingId = building.Id,
                     Category = LedgerCategory.LoanRepaymentPrincipal,
                     Description = $"Foreclosure liquidation payout for '{building.Name}' (loan #{loan.Id})",
-                    Amount = debtPayout,
+                    Amount = debtPayoutInLoanCurrency,
                     RecordedAtTick = context.CurrentTick,
                     RecordedAtUtc = DateTime.UtcNow,
                 });
@@ -90,8 +131,12 @@ public sealed class BuildingDestructionPhase : ITickPhase
             // Credit any surplus back to the borrower's company bank accounts.
             if (borrowerSurplus > 0m && borrowerCompany is not null)
             {
-                var companyAccounts = context.GetCompanyBankAccounts(borrowerCompany.Id);
-                CompanyBankingService.TryCredit(companyAccounts, borrowerSurplus, null, out var borrowerAccount);
+                var borrowerAccount = await CompanyBankingService.EnsurePreferredAccountAsync(
+                    context.Db,
+                    borrowerCompany.Id,
+                    buildingCurrencyCode);
+                borrowerAccount.Balance += borrowerSurplus;
+                borrowerAccount.ConcurrencyToken = Guid.NewGuid();
 
                 context.Db.LedgerEntries.Add(new LedgerEntry
                 {
@@ -123,9 +168,14 @@ public sealed class BuildingDestructionPhase : ITickPhase
             building.DestroyedAtUtc = DateTime.UtcNow;
 
             // Clear the collateral reference on the loan so we don't reprocess.
-            loan.RemainingPrincipal = Math.Max(0m, debtOutstanding - debtPayout);
+            loan.RemainingPrincipal = Math.Max(0m, debtOutstandingLoanCurrency - debtPayoutInLoanCurrency);
             loan.CollateralBuildingId = null;
-            loan.ClosedAtUtc = DateTime.UtcNow;
+            if (loan.RemainingPrincipal <= 0m)
+            {
+                loan.RemainingPrincipal = 0m;
+                loan.Status = LoanStatus.Repaid;
+                loan.ClosedAtUtc = DateTime.UtcNow;
+            }
 
             // Persist an audit record.
             context.Db.BuildingDestructionRecords.Add(new BuildingDestructionRecord
@@ -136,7 +186,7 @@ public sealed class BuildingDestructionPhase : ITickPhase
                 LoanId = loan.Id,
                 CityId = building.CityId,
                 OwnerCompanyId = building.CompanyId,
-                OriginalPropertyValue = loan.CollateralAppraisedValue ?? 0m,
+                OriginalPropertyValue = collateralAppraisedInBuildingCurrency,
                 CompensationPaid = borrowerSurplus,
                 DestructionTickCount = context.CurrentTick,
                 DestructionReason = BuildingDestructionReason.GracePeriodExpired,
@@ -151,7 +201,7 @@ public sealed class BuildingDestructionPhase : ITickPhase
                     borrowerCompany.PlayerId,
                     PlayerNotificationType.BuildingDestroyedByDefault,
                     "Building foreclosed and destroyed",
-                    $"'{building.Name}' was unsold for 3 game days after loan default. The property has been destroyed. Debt payout: {debtPayout:0.##}. Surplus returned: {borrowerSurplus:0.##}.",
+                    $"'{building.Name}' was unsold for 3 game days after loan default. The property has been destroyed. Debt payout: {debtPayoutInLoanCurrency:0.##} {loanCurrencyCode}. Surplus returned: {borrowerSurplus:0.##} {buildingCurrencyCode}.",
                     context.CurrentTick,
                     borrowerCompany.Id,
                     building.Id,

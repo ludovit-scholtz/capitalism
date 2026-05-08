@@ -4,6 +4,7 @@ using System.Text.Json;
 using Api.Data;
 using Api.Data.Entities;
 using Api.Tests.Infrastructure;
+using Api.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -995,5 +996,319 @@ public sealed class BuildingSecondaryMarketTests
         Assert.True(errors.GetArrayLength() > 0);
         var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
         Assert.Equal("BUILDING_IS_COLLATERAL", code);
+    }
+
+    [Fact]
+    public async Task SetBuildingForSale_RejectsCancel_WhenBuildingIsForeclosureCollateral()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "cancel-foreclosure@market.test");
+        var (buildingId, companyId, _) = await SeedOwnerWithBuildingAsync(factory, token);
+
+        await ExecAsync(client,
+            "mutation S($i: SetBuildingForSaleInput!) { setBuildingForSale(input: $i) { id } }",
+            new { i = new { buildingId, isForSale = true, askingPrice = 1_000_000m } },
+            token);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Loans.Add(new Loan
+        {
+            Id = Guid.NewGuid(),
+            LoanOfferId = Guid.NewGuid(),
+            BorrowerCompanyId = companyId,
+            BankBuildingId = Guid.NewGuid(),
+            LenderCompanyId = Guid.NewGuid(),
+            OriginalPrincipal = 500_000m,
+            RemainingPrincipal = 450_000m,
+            AnnualInterestRatePercent = 8m,
+            DurationTicks = 1440L,
+            StartTick = 0L,
+            DueTick = 1440L,
+            NextPaymentTick = 1440L,
+            PaymentAmount = 10_000m,
+            TotalPayments = 10,
+            Status = LoanStatus.Overdue,
+            MissedPayments = 1,
+            CollateralBuildingId = buildingId,
+            CollateralAppraisedValue = 1_000_000m,
+            AcceptedAtUtc = DateTime.UtcNow.AddDays(-10),
+        });
+        await db.SaveChangesAsync();
+
+        var result = await ExecAsync(client,
+            "mutation S($i: SetBuildingForSaleInput!) { setBuildingForSale(input: $i) { id } }",
+            new { i = new { buildingId, isForSale = false, askingPrice = (decimal?)null } },
+            token);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0);
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("BUILDING_SALE_LOCKED_BY_UNPAID_COLLATERAL", code);
+    }
+
+    [Fact]
+    public async Task DestroyBuilding_DestroysBuilding_ReleasesLot_AndCreditsRefund()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "destroy-flow@market.test");
+        var (buildingId, companyId, accountId) = await SeedOwnerWithBuildingAsync(factory, token, initialBalance: 0m);
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var building = await db.Buildings.FirstAsync(b => b.Id == buildingId);
+            db.BuildingUnits.Add(new BuildingUnit
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = building.Id,
+                GridX = 0,
+                GridY = 0,
+                UnitType = UnitType.Storage,
+                Level = 1,
+            });
+
+            db.BuildingLots.Add(new BuildingLot
+            {
+                Id = Guid.NewGuid(),
+                CityId = building.CityId,
+                Name = "Destroy Test Lot",
+                Description = "Lot used in destruction integration test",
+                District = "Industrial Zone",
+                Latitude = building.Latitude,
+                Longitude = building.Longitude,
+                SuitableTypes = "FACTORY",
+                BasePrice = 80_000m,
+                Price = 80_000m,
+                OwnerCompanyId = companyId,
+                BuildingId = building.Id,
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var result = await ExecAsync(client,
+            """
+            mutation D($input: DestroyBuildingInput!) {
+              destroyBuilding(input: $input) {
+                buildingId
+                refundAmount
+                currencyCode
+              }
+            }
+            """,
+            new { input = new { buildingId } },
+            token);
+
+        var payload = result.GetProperty("data").GetProperty("destroyBuilding");
+        Assert.Equal(buildingId.ToString(), payload.GetProperty("buildingId").GetString());
+        Assert.Equal("EUR", payload.GetProperty("currencyCode").GetString());
+        Assert.Equal(176_000m, payload.GetProperty("refundAmount").GetDecimal());
+
+        await using var verifyScope = factory.Services.CreateAsyncScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var buildingAfter = await verifyDb.Buildings.FirstAsync(b => b.Id == buildingId);
+        Assert.NotNull(buildingAfter.DestroyedAtUtc);
+        Assert.False(buildingAfter.IsForSale);
+
+        var lotAfter = await verifyDb.BuildingLots.SingleAsync(l => l.Name == "Destroy Test Lot");
+        Assert.Null(lotAfter.BuildingId);
+        Assert.Null(lotAfter.OwnerCompanyId);
+        Assert.NotNull(lotAfter);
+
+        var accountAfter = await verifyDb.BankAccounts.FirstAsync(a => a.Id == accountId);
+        Assert.Equal(176_000m, accountAfter.Balance);
+    }
+
+    [Fact]
+    public async Task DestroyBuilding_RejectsWhenBuildingHasUnpaidCollateralLoan()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "destroy-blocked@market.test");
+        var (buildingId, companyId, _) = await SeedOwnerWithBuildingAsync(factory, token);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Loans.Add(new Loan
+        {
+            Id = Guid.NewGuid(),
+            LoanOfferId = Guid.NewGuid(),
+            BorrowerCompanyId = companyId,
+            BankBuildingId = Guid.NewGuid(),
+            LenderCompanyId = Guid.NewGuid(),
+            OriginalPrincipal = 500_000m,
+            RemainingPrincipal = 350_000m,
+            AnnualInterestRatePercent = 8m,
+            DurationTicks = 1440L,
+            StartTick = 0L,
+            DueTick = 1440L,
+            NextPaymentTick = 1440L,
+            PaymentAmount = 10_000m,
+            TotalPayments = 10,
+            Status = LoanStatus.Active,
+            CollateralBuildingId = buildingId,
+            CollateralAppraisedValue = 1_000_000m,
+            AcceptedAtUtc = DateTime.UtcNow.AddDays(-5),
+        });
+        await db.SaveChangesAsync();
+
+        var result = await ExecAsync(client,
+            "mutation D($input: DestroyBuildingInput!) { destroyBuilding(input: $input) { buildingId } }",
+            new { input = new { buildingId } },
+            token);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0);
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("BUILDING_HAS_UNPAID_COLLATERAL_LOAN", code);
+    }
+
+    [Fact]
+    public async Task AcceptBuildingOffer_DefaultedCollateral_SettlesDebtWithFx_AndReturnsSurplusToSeller()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var sellerToken = await RegisterAsync(client, "seller-fx-settlement@market.test");
+        var buyerToken = await RegisterAsync(client, "buyer-fx-settlement@market.test");
+
+        var (sellerBuildingId, sellerCompanyId, sellerAccountId) = await SeedOwnerWithBuildingAsync(factory, sellerToken, initialBalance: 0m);
+        var (_, buyerCompanyId, buyerAccountId) = await SeedOwnerWithBuildingAsync(factory, buyerToken, initialBalance: 20_000_000m);
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var bratislava = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+            var prague = await db.Cities.FirstAsync(c => c.Name == "Prague");
+
+            var sellerBuilding = await db.Buildings.FirstAsync(b => b.Id == sellerBuildingId);
+            sellerBuilding.CityId = prague.Id;
+
+            var sellerAccount = await db.BankAccounts.FirstAsync(a => a.Id == sellerAccountId);
+            sellerAccount.CurrencyCode = prague.CurrencyCode;
+            sellerAccount.Balance = 0m;
+
+            var buyerAccount = await db.BankAccounts.FirstAsync(a => a.Id == buyerAccountId);
+            buyerAccount.CurrencyCode = prague.CurrencyCode;
+            buyerAccount.Balance = 20_000_000m;
+
+            var lenderPlayer = new Player
+            {
+                Id = Guid.NewGuid(),
+                Email = $"lender-fx-{Guid.NewGuid():N}@test.com",
+                DisplayName = "FX Lender",
+                PasswordHash = "hash",
+                Role = PlayerRole.Player,
+            };
+            var lenderCompany = new Company
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = lenderPlayer.Id,
+                Name = "FX Lender Corp",
+            };
+            var bankBuilding = new Building
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = lenderCompany.Id,
+                CityId = bratislava.Id,
+                Type = BuildingType.Bank,
+                Name = "FX Bank",
+                Latitude = 48.15,
+                Longitude = 17.11,
+                Level = 1,
+            };
+            var lenderAccount = new BankAccount
+            {
+                Id = Guid.NewGuid(),
+                AccountNumber = $"{Random.Shared.NextInt64(1_000_000_000_000_000L, 9_999_999_999_999_999L)}",
+                CurrencyCode = bratislava.CurrencyCode,
+                Balance = 0m,
+                CompanyId = lenderCompany.Id,
+            };
+            var loanOffer = new LoanOffer
+            {
+                Id = Guid.NewGuid(),
+                BankBuildingId = bankBuilding.Id,
+                LenderCompanyId = lenderCompany.Id,
+                AnnualInterestRatePercent = 8m,
+                MaxPrincipalPerLoan = 500_000m,
+                TotalCapacity = 1_000_000m,
+                UsedCapacity = 100_000m,
+                DurationTicks = 1440L,
+                IsActive = false,
+                CreatedAtTick = 1,
+                CreatedAtUtc = DateTime.UtcNow,
+            };
+            var collateralLoan = new Loan
+            {
+                Id = Guid.NewGuid(),
+                LoanOfferId = loanOffer.Id,
+                BorrowerCompanyId = sellerCompanyId,
+                BankBuildingId = bankBuilding.Id,
+                LenderCompanyId = lenderCompany.Id,
+                OriginalPrincipal = 100_000m,
+                RemainingPrincipal = 100_000m,
+                AnnualInterestRatePercent = 8m,
+                DurationTicks = 1440L,
+                StartTick = 0,
+                DueTick = 1440,
+                NextPaymentTick = 1440,
+                PaymentAmount = 10_000m,
+                TotalPayments = 10,
+                Status = LoanStatus.Defaulted,
+                MissedPayments = 3,
+                DefaultedAtTick = 10,
+                CollateralBuildingId = sellerBuildingId,
+                CollateralAppraisedValue = 300_000m,
+                AcceptedAtUtc = DateTime.UtcNow.AddDays(-10),
+            };
+
+            db.Players.Add(lenderPlayer);
+            db.Companies.Add(lenderCompany);
+            db.Buildings.Add(bankBuilding);
+            db.BankAccounts.Add(lenderAccount);
+            db.LoanOffers.Add(loanOffer);
+            db.Loans.Add(collateralLoan);
+            await db.SaveChangesAsync();
+        }
+
+        await ExecAsync(client,
+            "mutation S($input: SetBuildingForSaleInput!) { setBuildingForSale(input: $input) { id } }",
+            new { input = new { buildingId = sellerBuildingId, isForSale = true, askingPrice = 10_000_000m } },
+            sellerToken);
+
+        var offerResult = await ExecAsync(client,
+            "mutation O($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id } }",
+            new { input = new { buildingId = sellerBuildingId, buyerCompanyId, offeredPrice = 10_000_000m, negotiationNote = "FX settlement offer" } },
+            buyerToken);
+        var offerId = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("id").GetString()!);
+
+        await ExecAsync(client,
+            "mutation A($input: AcceptBuildingOfferInput!) { acceptBuildingOffer(input: $input) { building { id } } }",
+            new { input = new { offerId } },
+            sellerToken);
+
+        await using var verifyScope = factory.Services.CreateAsyncScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var pragueCurrencyCode = (await verifyDb.Cities.FirstAsync(c => c.Name == "Prague")).CurrencyCode;
+        var bratislavaCurrencyCode = (await verifyDb.Cities.FirstAsync(c => c.Name == "Bratislava")).CurrencyCode;
+        var fxRates = await FxRateHelper.BuildEurRatesLookupAsync(verifyDb, [pragueCurrencyCode, bratislavaCurrencyCode]);
+        var expectedDebtInSaleCurrency = decimal.Round(
+            FxRateHelper.ConvertAmount(100_000m, bratislavaCurrencyCode, pragueCurrencyCode, fxRates),
+            2,
+            MidpointRounding.AwayFromZero);
+        var expectedSellerNet = decimal.Round(10_000_000m - expectedDebtInSaleCurrency, 2, MidpointRounding.AwayFromZero);
+
+        var sellerAccountAfter = await verifyDb.BankAccounts.FirstAsync(a => a.Id == sellerAccountId);
+        Assert.Equal(expectedSellerNet, sellerAccountAfter.Balance);
+
+        var loanAfter = await verifyDb.Loans.FirstAsync(l => l.BorrowerCompanyId == sellerCompanyId);
+        var lenderAccountAfter = await verifyDb.BankAccounts.FirstAsync(a => a.CompanyId == loanAfter.LenderCompanyId && a.CurrencyCode == bratislavaCurrencyCode);
+        Assert.Equal(100_000m, lenderAccountAfter.Balance);
+
+        Assert.Equal(0m, loanAfter.RemainingPrincipal);
+        Assert.Equal(LoanStatus.Repaid, loanAfter.Status);
     }
 }

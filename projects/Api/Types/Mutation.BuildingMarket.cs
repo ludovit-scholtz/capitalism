@@ -208,6 +208,77 @@ public sealed partial class Mutation
         var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync();
         var currentTick = gameState?.CurrentTick ?? 0;
         var nowUtc = DateTime.UtcNow;
+        var sellerNetProceeds = salePrice;
+        BankAccount? lenderDebtCreditedAccount = null;
+        decimal debtPaidInLoanCurrency = 0m;
+        string? debtCurrencyCode = null;
+
+        // If this building is collateral for an unpaid overdue/defaulted loan, settle that debt from sale proceeds first.
+        var collateralLoan = await db.Loans
+            .Include(l => l.BankBuilding)
+            .ThenInclude(b => b.City)
+            .Include(l => l.LoanOffer)
+            .FirstOrDefaultAsync(l =>
+                l.CollateralBuildingId == building.Id
+                && l.RemainingPrincipal > 0m
+                && (l.Status == LoanStatus.Overdue || l.Status == LoanStatus.Defaulted));
+
+        if (collateralLoan is not null)
+        {
+            debtCurrencyCode = collateralLoan.BankBuilding.City?.CurrencyCode ?? currencyCode;
+            var fxRates = await FxRateHelper.BuildEurRatesLookupAsync(db, [currencyCode, debtCurrencyCode]);
+            var remainingDebtInSaleCurrency = decimal.Round(
+                FxRateHelper.ConvertAmount(
+                    collateralLoan.RemainingPrincipal,
+                    debtCurrencyCode,
+                    currencyCode,
+                    fxRates),
+                2,
+                MidpointRounding.AwayFromZero);
+
+            var debtPaidFromSale = Math.Min(salePrice, remainingDebtInSaleCurrency);
+            debtPaidInLoanCurrency = debtPaidFromSale >= remainingDebtInSaleCurrency
+                ? collateralLoan.RemainingPrincipal
+                : decimal.Round(
+                    FxRateHelper.ConvertAmount(
+                        debtPaidFromSale,
+                        currencyCode,
+                        debtCurrencyCode,
+                        fxRates),
+                    2,
+                    MidpointRounding.AwayFromZero);
+            debtPaidInLoanCurrency = Math.Min(collateralLoan.RemainingPrincipal, debtPaidInLoanCurrency);
+
+            if (debtPaidInLoanCurrency > 0m)
+            {
+                lenderDebtCreditedAccount = await CompanyBankingService.EnsurePreferredAccountAsync(
+                    db,
+                    collateralLoan.LenderCompanyId,
+                    debtCurrencyCode);
+                lenderDebtCreditedAccount.Balance += debtPaidInLoanCurrency;
+                lenderDebtCreditedAccount.ConcurrencyToken = Guid.NewGuid();
+            }
+
+            collateralLoan.RemainingPrincipal = Math.Max(0m, collateralLoan.RemainingPrincipal - debtPaidInLoanCurrency);
+            collateralLoan.CollateralBuildingId = null;
+            if (collateralLoan.RemainingPrincipal <= 0m)
+            {
+                collateralLoan.RemainingPrincipal = 0m;
+                collateralLoan.Status = LoanStatus.Repaid;
+                collateralLoan.DefaultedAtTick = null;
+                collateralLoan.ClosedAtUtc = nowUtc;
+                collateralLoan.MissedPayments = 0;
+                collateralLoan.AccumulatedPenalty = 0m;
+                collateralLoan.LoanOffer.UsedCapacity = Math.Max(0m, collateralLoan.LoanOffer.UsedCapacity - collateralLoan.OriginalPrincipal);
+            }
+            else
+            {
+                collateralLoan.Status = LoanStatus.Defaulted;
+                collateralLoan.ClosedAtUtc = nowUtc;
+            }
+
+            sellerNetProceeds = Math.Max(0m, salePrice - debtPaidFromSale);
+        }
 
         // Debit buyer
         if (!CompanyBankingService.TryDebit(offer.BuyerCompany.BankAccounts, salePrice, currencyCode))
@@ -221,7 +292,8 @@ public sealed partial class Mutation
 
         // Credit seller – find or create preferred account in the building currency
         var sellerAccount = await CompanyBankingService.EnsurePreferredAccountAsync(db, sellerCompany.Id, currencyCode);
-        sellerAccount.Balance += salePrice;
+        sellerAccount.Balance += sellerNetProceeds;
+        sellerAccount.ConcurrencyToken = Guid.NewGuid();
 
         // Transfer building ownership
         building.CompanyId = offer.BuyerCompanyId;
@@ -272,6 +344,34 @@ public sealed partial class Mutation
             RecordedAtUtc = nowUtc,
         });
 
+        if (debtPaidInLoanCurrency > 0m)
+        {
+            db.LedgerEntries.Add(new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = sellerCompany.Id,
+                BuildingId = building.Id,
+                Category = LedgerCategory.LoanRepaymentPrincipal,
+                Description = $"Collateral debt settled from sale proceeds for {building.Name}",
+                Amount = -debtPaidInLoanCurrency,
+                RecordedAtTick = currentTick,
+                RecordedAtUtc = nowUtc,
+            });
+
+            db.LedgerEntries.Add(new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = collateralLoan!.LenderCompanyId,
+                BankAccountId = lenderDebtCreditedAccount?.Id,
+                BuildingId = building.Id,
+                Category = LedgerCategory.LoanRepaymentPrincipal,
+                Description = $"Collateral debt settlement from sale of {building.Name}",
+                Amount = debtPaidInLoanCurrency,
+                RecordedAtTick = currentTick,
+                RecordedAtUtc = nowUtc,
+            });
+        }
+
         // Ledger: seller (income)
         db.LedgerEntries.Add(new LedgerEntry
         {
@@ -280,7 +380,7 @@ public sealed partial class Mutation
             BuildingId = building.Id,
             Category = LedgerCategory.BuildingSale,
             Description = $"Building sale: {building.Name} ({building.Type}) in {city.Name} to {offer.BuyerCompany.Name}",
-            Amount = salePrice,
+            Amount = sellerNetProceeds,
             RecordedAtTick = currentTick,
             RecordedAtUtc = nowUtc,
         });
@@ -292,7 +392,9 @@ public sealed partial class Mutation
             PlayerId = userId,
             Type = PlayerNotificationType.BuildingSoldSuccessfully,
             Title = "Building sold",
-            Message = $"Your building {building.Name} was sold to {offer.BuyerCompany.Name} for {salePrice.ToString("N2", CultureInfo.InvariantCulture)} {currencyCode}.",
+            Message = debtPaidInLoanCurrency > 0m
+                ? $"Your building {building.Name} was sold to {offer.BuyerCompany.Name} for {salePrice.ToString("N2", CultureInfo.InvariantCulture)} {currencyCode}. Debt settlement: {debtPaidInLoanCurrency.ToString("N2", CultureInfo.InvariantCulture)} {debtCurrencyCode}. Net proceeds: {sellerNetProceeds.ToString("N2", CultureInfo.InvariantCulture)} {currencyCode}."
+                : $"Your building {building.Name} was sold to {offer.BuyerCompany.Name} for {salePrice.ToString("N2", CultureInfo.InvariantCulture)} {currencyCode}.",
             BuildingId = building.Id,
             CreatedAtTick = currentTick,
         });

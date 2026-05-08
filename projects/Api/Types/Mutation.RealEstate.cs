@@ -1,6 +1,7 @@
 using System.Globalization;
 using Api.Data;
 using Api.Data.Entities;
+using Api.Engine;
 using Api.Security;
 using Api.Utilities;
 using HotChocolate.Authorization;
@@ -60,6 +61,24 @@ public sealed partial class Mutation
                         .Build());
             }
         }
+        else
+        {
+            // During a missed-payment foreclosure flow, the collateral listing cannot be cancelled.
+            var isForeclosureLocked = await db.Loans.AnyAsync(l =>
+                l.CollateralBuildingId == input.BuildingId
+                && l.RemainingPrincipal > 0m
+                && (l.Status == LoanStatus.Overdue || l.Status == LoanStatus.Defaulted)
+                && l.MissedPayments > 0);
+
+            if (isForeclosureLocked)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("Sale cannot be cancelled because this building is collateral for an unpaid loan.")
+                        .SetCode("BUILDING_SALE_LOCKED_BY_UNPAID_COLLATERAL")
+                        .Build());
+            }
+        }
 
         building.IsForSale = input.IsForSale;
         building.AskingPrice = input.IsForSale ? input.AskingPrice : null;
@@ -67,6 +86,140 @@ public sealed partial class Mutation
 
         await db.SaveChangesAsync();
         return building;
+    }
+
+    /// <summary>
+    /// Permanently destroys a building, releases its lot, and pays an 80% refund to the owner.
+    /// Destruction is blocked while the building is collateral for an unpaid loan.
+    /// </summary>
+    [Authorize]
+    public async Task<DestroyBuildingResult> DestroyBuilding(
+        DestroyBuildingInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var building = await db.Buildings
+            .Include(b => b.Company)
+            .Include(b => b.City)
+            .Include(b => b.Units)
+            .FirstOrDefaultAsync(b => b.Id == input.BuildingId);
+
+        if (building is null || building.Company.PlayerId != userId)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Building not found or you don't own it.")
+                    .SetCode("BUILDING_NOT_FOUND")
+                    .Build());
+        }
+
+        if (building.DestroyedAtUtc is not null)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Building is already destroyed.")
+                    .SetCode("BUILDING_ALREADY_DESTROYED")
+                    .Build());
+        }
+
+        var hasUnpaidCollateralLoan = await db.Loans.AnyAsync(loan =>
+            loan.CollateralBuildingId == building.Id
+            && loan.RemainingPrincipal > 0m
+            && (loan.Status == LoanStatus.Active || loan.Status == LoanStatus.Overdue || loan.Status == LoanStatus.Defaulted));
+
+        if (hasUnpaidCollateralLoan)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Building cannot be destroyed while it is collateral for an unpaid loan.")
+                    .SetCode("BUILDING_HAS_UNPAID_COLLATERAL_LOAN")
+                    .Build());
+        }
+
+        var currencyCode = building.City?.CurrencyCode ?? "EUR";
+        var fxRates = await FxRateHelper.BuildEurRatesLookupAsync(db, [currencyCode]);
+        var cityFxRate = FxRateHelper.GetEurRate(fxRates, currencyCode);
+
+        var propertyValueLocal = WealthCalculator.GetBuildingValue(building) * cityFxRate;
+        var unitValueLocal = building.Units.Count * 20_000m * cityFxRate;
+        var estimatedMarketValue = decimal.Round(propertyValueLocal + unitValueLocal, 2, MidpointRounding.AwayFromZero);
+        var refundAmount = decimal.Round(
+            estimatedMarketValue * GameConstants.ForeclosureRefundFraction,
+            2,
+            MidpointRounding.AwayFromZero);
+
+        var ownerAccount = await CompanyBankingService.EnsurePreferredAccountAsync(db, building.CompanyId, currencyCode);
+        ownerAccount.Balance += refundAmount;
+        ownerAccount.ConcurrencyToken = Guid.NewGuid();
+
+        var lot = await db.BuildingLots.FirstOrDefaultAsync(l => l.BuildingId == building.Id);
+        if (lot is not null)
+        {
+            lot.OwnerCompanyId = null;
+            lot.BuildingId = null;
+            lot.ConcurrencyToken = Guid.NewGuid();
+        }
+
+        var currentTick = await db.GameStates
+            .AsNoTracking()
+            .Select(gs => gs.CurrentTick)
+            .FirstOrDefaultDeterministicAsync();
+
+        building.IsForSale = false;
+        building.AskingPrice = null;
+        building.ListedAtUtc = null;
+        building.DestroyedAtUtc = DateTime.UtcNow;
+
+        db.LedgerEntries.Add(new LedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = building.CompanyId,
+            BankAccountId = ownerAccount.Id,
+            BuildingId = building.Id,
+            Category = LedgerCategory.BuildingSale,
+            Description = $"Building destroyed refund for '{building.Name}'",
+            Amount = refundAmount,
+            RecordedAtTick = currentTick,
+            RecordedAtUtc = DateTime.UtcNow,
+        });
+
+        db.BuildingDestructionRecords.Add(new BuildingDestructionRecord
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = building.Id,
+            BuildingName = building.Name,
+            LoanId = null,
+            CityId = building.CityId,
+            OwnerCompanyId = building.CompanyId,
+            OriginalPropertyValue = estimatedMarketValue,
+            CompensationPaid = refundAmount,
+            DestructionTickCount = currentTick,
+            DestructionReason = BuildingDestructionReason.Other,
+            CreatedAtUtc = DateTime.UtcNow,
+        });
+
+        PlayerNotificationService.Add(
+            db,
+            userId,
+            PlayerNotificationType.Generic,
+            "Building destroyed",
+            $"'{building.Name}' was destroyed. {refundAmount.ToString("N2", CultureInfo.InvariantCulture)} {currencyCode} was credited to your account.",
+            currentTick,
+            building.CompanyId,
+            building.Id,
+            bankAccountId: ownerAccount.Id);
+
+        await db.SaveChangesAsync();
+
+        return new DestroyBuildingResult
+        {
+            BuildingId = building.Id,
+            BuildingName = building.Name,
+            RefundAmount = refundAmount,
+            CurrencyCode = currencyCode,
+        };
     }
 
     /// <summary>

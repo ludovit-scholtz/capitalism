@@ -34,9 +34,23 @@ interface City {
   name: string
   currencyCode: string
 }
+interface LoanSummary {
+  id: string
+  status: string
+  missedPayments: number
+  remainingPrincipal: number
+  collateralBuildingId: string | null
+}
+interface DestroyBuildingResult {
+  buildingId: string
+  buildingName: string
+  refundAmount: number
+  currencyCode: string
+}
 
 const building = ref<CompanyBuilding | null>(null)
 const cities = ref<City[]>([])
+const loans = ref<LoanSummary[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 const salePrice = ref<number | null>(null)
@@ -44,11 +58,17 @@ const saving = ref(false)
 const saveError = ref<string | null>(null)
 const saveSuccess = ref(false)
 const isListing = ref(true)
+const showDestroyConfirm = ref(false)
+const destroying = ref(false)
+const destroyError = ref<string | null>(null)
+const destroyedResult = ref<DestroyBuildingResult | null>(null)
+const lastAction = ref<'list' | 'cancel' | 'destroy'>('list')
 
 const DATA_QUERY = `
   {
     myCompanies { id name buildings { id name type level isForSale askingPrice listedAtUtc cityId populationIndex units { id } } }
     cities { id name currencyCode }
+    myLoans { id status missedPayments remainingPrincipal collateralBuildingId }
   }
 `
 
@@ -59,13 +79,24 @@ const SET_FOR_SALE_MUTATION = `
     }
   }
 `
+const DESTROY_BUILDING_MUTATION = `
+  mutation DestroyBuilding($input: DestroyBuildingInput!) {
+    destroyBuilding(input: $input) {
+      buildingId
+      buildingName
+      refundAmount
+      currencyCode
+    }
+  }
+`
 
 async function loadData() {
   loading.value = true
   error.value = null
   try {
-    const data = await gqlRequest<{ myCompanies: Company[]; cities: City[] }>(DATA_QUERY)
+    const data = await gqlRequest<{ myCompanies: Company[]; cities: City[]; myLoans: LoanSummary[] }>(DATA_QUERY)
     cities.value = data.cities ?? []
+    loans.value = data.myLoans ?? []
     const allBuildings = data.myCompanies.flatMap((c) => c.buildings)
     const found = allBuildings.find((b) => b.id === buildingId.value)
     if (!found) {
@@ -89,6 +120,7 @@ async function submitListing() {
   saving.value = true
   saveError.value = null
   try {
+    lastAction.value = 'list'
     await gqlRequest(SET_FOR_SALE_MUTATION, {
       input: { buildingId: building.value.id, isForSale: true, askingPrice: salePrice.value },
     })
@@ -110,19 +142,50 @@ async function submitListing() {
 
 async function cancelListing() {
   if (!building.value) return
+  if (cancelSaleLockedByUnpaidLoan.value) return
   saving.value = true
   saveError.value = null
   try {
+    lastAction.value = 'cancel'
     await gqlRequest(SET_FOR_SALE_MUTATION, {
       input: { buildingId: building.value.id, isForSale: false, askingPrice: null },
     })
     saveSuccess.value = true
     await router.push(`/building/${building.value!.id}`)
   } catch (err) {
-    saveError.value = t('buildingDetail.saleFailed')
+    const msg = err instanceof Error ? err.message : String(err)
+    if (msg.includes('BUILDING_SALE_LOCKED_BY_UNPAID_COLLATERAL')) {
+      saveError.value = t('buildingDetail.cancelSaleLockedTooltip')
+    } else {
+      saveError.value = t('buildingDetail.saleFailed')
+    }
     console.error('[SellBuildingView] Failed to cancel listing:', err)
   } finally {
     saving.value = false
+  }
+}
+
+async function confirmDestroy() {
+  if (!building.value) return
+  destroying.value = true
+  destroyError.value = null
+  try {
+    const data = await gqlRequest<{ destroyBuilding: DestroyBuildingResult }>(DESTROY_BUILDING_MUTATION, {
+      input: { buildingId: building.value.id },
+    })
+    lastAction.value = 'destroy'
+    destroyedResult.value = data.destroyBuilding
+    saveSuccess.value = true
+    showDestroyConfirm.value = false
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (msg.includes('BUILDING_HAS_UNPAID_COLLATERAL_LOAN')) {
+      destroyError.value = t('buildingDetail.destroyBlockedByUnpaidLoan')
+    } else {
+      destroyError.value = t('buildingDetail.destroyFailed')
+    }
+  } finally {
+    destroying.value = false
   }
 }
 
@@ -148,6 +211,20 @@ const estimatedMarketValue = computed(() => {
 const isPriceHigh = computed(() => {
   if (!salePrice.value || !estimatedMarketValue.value) return false
   return isAskingPriceTooHigh(salePrice.value, estimatedMarketValue.value)
+})
+const destroyRefundAmount = computed(() => {
+  if (!estimatedMarketValue.value) return null
+  return Math.round(estimatedMarketValue.value * 0.8 * 100) / 100
+})
+const cancelSaleLockedByUnpaidLoan = computed(() => {
+  if (!building.value?.isForSale) return false
+  return loans.value.some(
+    (loan) =>
+      loan.collateralBuildingId === building.value!.id &&
+      (loan.status === 'OVERDUE' || loan.status === 'DEFAULTED') &&
+      (loan.missedPayments ?? 0) > 0 &&
+      (loan.remainingPrincipal ?? 0) > 0,
+  )
 })
 
 const cityName = computed(() => {
@@ -196,9 +273,28 @@ onMounted(loadData)
     >
       <font-awesome-icon icon="circle-check" class="mb-3 text-4xl text-green-600 dark:text-green-400" />
       <p class="font-semibold text-green-700 dark:text-green-300">
-        {{ isListing ? t('buildingDetail.listingSuccess') : t('buildingDetail.cancelListingSuccess') }}
+        {{
+          lastAction === 'destroy'
+            ? t('buildingDetail.destroySuccessWithAmount', {
+                amount: formatCurrency(
+                  destroyedResult?.refundAmount ?? destroyRefundAmount ?? 0,
+                  destroyedResult?.currencyCode ?? currencyCode,
+                ),
+              })
+            : isListing
+              ? t('buildingDetail.listingSuccess')
+              : t('buildingDetail.cancelListingSuccess')
+        }}
       </p>
-      <p class="mt-1 text-sm text-muted">{{ t('buildingDetail.sellRedirecting') }}</p>
+      <p v-if="lastAction !== 'destroy'" class="mt-1 text-sm text-muted">{{ t('buildingDetail.sellRedirecting') }}</p>
+      <div v-else class="mt-4 flex flex-wrap justify-center gap-2">
+        <button class="btn btn-secondary" @click="router.push('/dashboard')">
+          {{ t('nav.dashboard') }}
+        </button>
+        <button class="btn btn-primary" @click="router.push('/bank-statement')">
+          {{ t('bankStatement.title') }}
+        </button>
+      </div>
     </div>
 
     <!-- Sell form -->
@@ -258,12 +354,16 @@ onMounted(loadData)
         <p class="mt-1 text-xs text-muted">{{ t('buildingDetail.cancelListingHint') }}</p>
         <button
           class="cancel-listing-btn btn btn-danger mt-3 w-full"
-          :disabled="saving"
+          :disabled="saving || cancelSaleLockedByUnpaidLoan"
+          :title="cancelSaleLockedByUnpaidLoan ? t('buildingDetail.cancelSaleLockedTooltip') : ''"
           @click="cancelListing"
         >
           <font-awesome-icon v-if="saving" icon="spinner" spin class="mr-2" />
           {{ t('buildingDetail.cancelSale') }}
         </button>
+        <p v-if="cancelSaleLockedByUnpaidLoan" class="mt-2 text-xs text-amber-700 dark:text-amber-300">
+          {{ t('buildingDetail.cancelSaleLockedTooltip') }}
+        </p>
       </div>
 
       <!-- Price form -->
@@ -326,7 +426,49 @@ onMounted(loadData)
           </button>
         </div>
       </div>
+
+      <div class="mt-5 rounded-xl border border-red-400/40 bg-red-500/5 p-4">
+        <p class="text-sm font-semibold text-red-700 dark:text-red-300">
+          🗑️ {{ t('buildingDetail.destroyBuilding') }}
+        </p>
+        <p class="mt-1 text-xs text-muted">{{ t('buildingDetail.destroyHint') }}</p>
+        <div class="mt-3 rounded-lg border border-red-300/40 bg-red-500/10 p-3 text-sm">
+          <p>{{ t('buildingDetail.destroyPropertyValue', { amount: formatCurrency(estimatedMarketValue ?? 0, currencyCode) }) }}</p>
+          <p class="font-semibold text-red-700 dark:text-red-300">
+            {{ t('buildingDetail.destroyRefundPreview', { amount: formatCurrency(destroyRefundAmount ?? 0, currencyCode) }) }}
+          </p>
+          <p class="text-xs text-muted">{{ t('buildingDetail.destroyCurrency', { currency: currencyCode }) }}</p>
+        </div>
+        <p v-if="destroyError" class="mt-2 text-sm text-red-700 dark:text-red-300">{{ destroyError }}</p>
+        <button class="open-destroy-confirm-btn btn btn-danger mt-3 w-full" :disabled="destroying" @click="showDestroyConfirm = true">
+          {{ t('buildingDetail.destroyBuilding') }}
+        </button>
+      </div>
     </template>
+
+    <div v-if="showDestroyConfirm" class="destroy-confirm-dialog fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4">
+      <div class="w-full max-w-md rounded-xl border border-divider bg-card p-5 shadow-xl">
+        <h2 class="text-lg font-semibold text-foreground">
+          {{ t('buildingDetail.destroyConfirmTitle', { name: building?.name ?? '' }) }}
+        </h2>
+        <p class="mt-2 text-sm text-muted">
+          {{
+            t('buildingDetail.destroyConfirmBody', {
+              amount: formatCurrency(destroyRefundAmount ?? 0, currencyCode),
+            })
+          }}
+        </p>
+        <div class="mt-4 flex justify-end gap-3">
+          <button class="btn btn-secondary" :disabled="destroying" @click="showDestroyConfirm = false">
+            {{ t('common.cancel') }}
+          </button>
+          <button class="confirm-destroy-btn btn btn-danger" :disabled="destroying" @click="confirmDestroy">
+            <font-awesome-icon v-if="destroying" icon="spinner" spin class="mr-2" />
+            {{ t('buildingDetail.destroyConfirmAction') }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
