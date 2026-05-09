@@ -9612,6 +9612,31 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task CompanyShareholders_RequiresAuthentication()
+    {
+        var ownerToken = await RegisterAndGetTokenAsync($"shareholders-auth-{Guid.NewGuid():N}@test.com", "Shareholder Owner");
+        var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+        var companyId = await SeedPublicCompanyAsync(ownerId, name: "Auth Shareholders Corp", cash: 100_000m, totalShares: 5_000m, founderShares: 5_000m);
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query GetShareholders($companyId: UUID!) {
+                companyShareholders(companyId: $companyId) {
+                    companyId
+                }
+            }
+            """,
+            new { companyId });
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        var errorCode = errors.EnumerateArray()
+            .Select(error => error.TryGetProperty("extensions", out var ext) &&
+                        ext.TryGetProperty("code", out var code) ? code.GetString() : null)
+            .FirstOrDefault(code => code is not null);
+        Assert.Equal("AUTH_NOT_AUTHENTICATED", errorCode);
+    }
+
+    [Fact]
     public async Task CompanyShareholders_SingleOwner_ReturnsSingleShareholderRow()
     {
         var ownerToken = await RegisterAndGetTokenAsync($"shareholders-single-{Guid.NewGuid():N}@test.com", "Single Owner");
@@ -9638,7 +9663,8 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
                 }
             }
             """,
-            new { companyId });
+            new { companyId },
+            ownerToken);
 
         var data = result.GetProperty("data").GetProperty("companyShareholders");
         Assert.Equal(5_000m, data.GetProperty("totalSharesIssued").GetDecimal());
@@ -9692,7 +9718,8 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
                 }
             }
             """,
-            new { companyId });
+            new { companyId },
+            ownerToken);
 
         var data = result.GetProperty("data").GetProperty("companyShareholders");
         Assert.Equal(10_000m, data.GetProperty("totalSharesIssued").GetDecimal());
@@ -9776,7 +9803,8 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
                 }
             }
             """,
-            new { companyId = targetCompanyId });
+            new { companyId = targetCompanyId },
+            ownerToken);
 
         var shareholders = result.GetProperty("data").GetProperty("companyShareholders").GetProperty("shareholders").EnumerateArray().ToList();
         var companyHolder = shareholders.Single(s => s.GetProperty("holderType").GetString() == "COMPANY");
@@ -9789,6 +9817,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     [Fact]
     public async Task CompanyShareholders_NonExistentCompany_ReturnsNull()
     {
+        var token = await RegisterAndGetTokenAsync($"shareholders-missing-{Guid.NewGuid():N}@test.com", "Missing Shareholders");
         var result = await ExecuteGraphQlAsync(
             """
             query GetShareholders($companyId: UUID!) {
@@ -9797,7 +9826,8 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
                 }
             }
             """,
-            new { companyId = Guid.NewGuid() });
+            new { companyId = Guid.NewGuid() },
+            token);
 
         var data = result.GetProperty("data").GetProperty("companyShareholders");
         Assert.Equal(JsonValueKind.Null, data.ValueKind);
@@ -9837,7 +9867,8 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
                 }
             }
             """,
-            new { companyId });
+            new { companyId },
+            ownerToken);
 
         var data = result.GetProperty("data").GetProperty("companyShareholders");
         var shareholders = data.GetProperty("shareholders").EnumerateArray().ToList();
@@ -29287,6 +29318,22 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.True(errors.GetArrayLength() > 0);
         var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
         Assert.Equal("EXCEEDS_COLLATERAL_LIMIT", code);
+    }
+
+    [Fact]
+    public async Task GetLoanOffers_RequiresAuthentication()
+    {
+        var result = await ExecuteGraphQlAsync(
+            """
+            query { loanOffers { id } }
+            """);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        var errorCode = errors.EnumerateArray()
+            .Select(error => error.TryGetProperty("extensions", out var ext) &&
+                        ext.TryGetProperty("code", out var code) ? code.GetString() : null)
+            .FirstOrDefault(code => code is not null);
+        Assert.Equal("AUTH_NOT_AUTHENTICATED", errorCode);
     }
 
     [Fact]

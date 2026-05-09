@@ -203,6 +203,7 @@ public sealed partial class Query
     }
 
     /// <summary>Returns the ownership breakdown (shareholders list) for a single company.</summary>
+    [Authorize]
     public async Task<CompanyOwnershipResult?> GetCompanyShareholders(
         Guid companyId,
         [Service] AppDbContext db)

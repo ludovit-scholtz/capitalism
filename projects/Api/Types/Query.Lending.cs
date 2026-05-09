@@ -20,6 +20,7 @@ public sealed partial class Query
     /// Returns borrower-facing lending options for every open bank.
     /// Loan offers are no longer player-published; each bank is exposed directly.
     /// </summary>
+    [Authorize]
     public async Task<List<LoanOfferSummary>> GetLoanOffers(
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor)

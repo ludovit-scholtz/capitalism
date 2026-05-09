@@ -15,6 +15,37 @@ public sealed class RankingIntegrationTests
     private const string SharedJwtSigningKey = "ChangeThisSigningKeyBeforeProduction123!";
 
     [Fact]
+    public async Task IngestRankingEvent_RequiresServerKey()
+    {
+        await using var factory = new MasterApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var result = await GraphQlAsync(
+            client,
+            """
+            mutation Ingest($input: IngestRankingEventInput!) {
+              ingestRankingEvent(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey = string.Empty,
+                    eventType = MasterRankingBountyCodes.FxTrader,
+                    playerEmail = $"rank-noserver-{Guid.NewGuid():N}@example.com",
+                    occurredAtUtc = DateTime.UtcNow,
+                    uniqueScopeKey = $"noserver-{Guid.NewGuid():N}",
+                    payloadJson = "{}",
+                }
+            });
+
+        var errors = result.GetProperty("errors").EnumerateArray().ToList();
+        Assert.Contains(errors, error => error.GetProperty("extensions").GetProperty("code").GetString() == "SERVER_KEY_REQUIRED");
+    }
+
+    [Fact]
     public async Task IngestRankingEvent_HourlyEvaluation_IsIdempotentByUniquenessKey()
     {
       await using var factory = new MasterApiWebApplicationFactory();
