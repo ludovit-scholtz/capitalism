@@ -567,6 +567,19 @@ export default {
     tabActivity: 'Aktivität',
     tabChat: 'Chat',
     tabPro: 'Pro',
+    economyWidget: {
+      title: 'Konjunkturzyklus',
+      noData: 'Daten zum Konjunkturzyklus sind noch nicht verfügbar.',
+      intensity: 'Intensität',
+      history: 'Letzte 365 Ticks',
+      ticksRemaining: '{ticks} Ticks bis zur nächsten Phase',
+      phase: {
+        EXPANSION: 'Expansion',
+        PEAK: 'Hochphase',
+        RECESSION: 'Rezession',
+        TROUGH: 'Talsohle',
+      },
+    },
     advertisingActive: 'Werbung aktiv',
     proBenefitsHeading: 'Was Sie mit Pro freischalten',
     proBenefitProducts: 'Mehr Produkte herstellen',
@@ -3185,6 +3198,7 @@ export default {
   forex: {
     title: 'Forex-Börse',
     subtitle: 'Tauschen Sie Währungen zwischen Stadtökonomien mit Live-Wechselkursen.',
+    commodityShockBanner: 'Warnung vor Rohstoffschock',
     tabsLabel: 'Forex-Bereiche',
     tabSwap: 'Tausch',
     tabRateList: 'Kursliste',

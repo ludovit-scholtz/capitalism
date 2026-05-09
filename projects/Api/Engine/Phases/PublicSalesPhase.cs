@@ -206,6 +206,7 @@ public sealed partial class PublicSalesPhase : ITickPhase
             // This implements the ROADMAP "Seasonal Demand" mechanic.
             // Products without a DemandSeasonality row default to 1.0× (neutral).
             var seasonalMultiplier = 1.0m;
+            var seasonalEventMultiplier = context.GetSeasonalDemandEventMultiplier(city.Id);
             if (firstOffer.Inventory?.ProductTypeId.HasValue == true
                 && context.SeasonalityByProductTypeId.TryGetValue(
                     firstOffer.Inventory.ProductTypeId!.Value, out var seasonality))
@@ -216,7 +217,12 @@ public sealed partial class PublicSalesPhase : ITickPhase
 
             // Apply trend and random multipliers to the base city demand.
             var cityBaseDemand = city.Population * GameConstants.BaseDemandPerCapita
-                * salaryFactor * trendFactor * randomMultiplier * seasonalMultiplier;
+                * salaryFactor
+                * trendFactor
+                * randomMultiplier
+                * seasonalMultiplier
+                * seasonalEventMultiplier
+                * context.EconomicCycleIntensity;
             if (cityBaseDemand <= 0m)
                 continue;
 

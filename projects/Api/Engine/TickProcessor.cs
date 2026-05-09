@@ -233,6 +233,62 @@ public sealed class TickProcessor(
         var seasonalities = await db.DemandSeasonalities.ToListAsync(ct);
         var seasonalityByProductTypeId = seasonalities.ToDictionary(s => s.ProductTypeId);
 
+        var currentCycle = await db.EconomicCycles
+            .OrderByDescending(cycle => cycle.PhaseStartedTick)
+            .FirstOrDefaultAsync(ct);
+        var economicCycleIntensity = Math.Clamp(
+            currentCycle?.IntensityFactor ?? 1.0m,
+            GameConstants.EconomicCycleIntensityMin,
+            GameConstants.EconomicCycleIntensityMax);
+
+        var activeMarketEvents = await db.MarketEvents
+            .Where(me => me.StartsAtTick <= gameState.CurrentTick && me.ExpiresAtTick >= gameState.CurrentTick)
+            .ToListAsync(ct);
+
+        var commodityShockByResource = activeMarketEvents
+            .Where(me => me.EventType == MarketEventType.CommodityShock && me.AffectedResourceTypeId.HasValue)
+            .GroupBy(me => me.AffectedResourceTypeId!.Value)
+            .ToDictionary(
+                group => group.Key,
+                group => Math.Clamp(
+                    group.Aggregate(1m, (acc, next) => acc * next.MagnitudeMultiplier),
+                    GameConstants.MarketEventMultiplierMin,
+                    GameConstants.MarketEventMultiplierMax));
+
+        var interestRateMultiplierByCity = activeMarketEvents
+            .Where(me => me.EventType == MarketEventType.InterestRateChange)
+            .Where(me => me.AffectedCityId.HasValue)
+            .GroupBy(me => me.AffectedCityId!.Value)
+            .ToDictionary(
+                group => group.Key,
+                group => Math.Clamp(
+                    group.Aggregate(1m, (acc, next) => acc * next.MagnitudeMultiplier),
+                    GameConstants.MarketEventMultiplierMin,
+                    GameConstants.MarketEventMultiplierMax));
+        var globalInterestRateMultiplier = Math.Clamp(
+            activeMarketEvents
+                .Where(me => me.EventType == MarketEventType.InterestRateChange && !me.AffectedCityId.HasValue)
+                .Aggregate(1m, (acc, next) => acc * next.MagnitudeMultiplier),
+            GameConstants.MarketEventMultiplierMin,
+            GameConstants.MarketEventMultiplierMax);
+
+        var seasonalDemandMultiplierByCity = activeMarketEvents
+            .Where(me => me.EventType == MarketEventType.SeasonalDemandSurge)
+            .Where(me => me.AffectedCityId.HasValue)
+            .GroupBy(me => me.AffectedCityId!.Value)
+            .ToDictionary(
+                group => group.Key,
+                group => Math.Clamp(
+                    group.Aggregate(1m, (acc, next) => acc * next.MagnitudeMultiplier),
+                    GameConstants.MarketEventMultiplierMin,
+                    GameConstants.MarketEventMultiplierMax));
+        var globalSeasonalDemandMultiplier = Math.Clamp(
+            activeMarketEvents
+                .Where(me => me.EventType == MarketEventType.SeasonalDemandSurge && !me.AffectedCityId.HasValue)
+                .Aggregate(1m, (acc, next) => acc * next.MagnitudeMultiplier),
+            GameConstants.MarketEventMultiplierMin,
+            GameConstants.MarketEventMultiplierMax);
+
         return new TickContext
         {
             Db = db,
@@ -283,6 +339,13 @@ public sealed class TickProcessor(
             WeatherByCity = weatherByCity,
             BankAccountsById = bankAccounts.ToDictionary(a => a.Id),
             SeasonalityByProductTypeId = seasonalityByProductTypeId,
+            EconomicCycleIntensity = economicCycleIntensity,
+            ActiveMarketEvents = activeMarketEvents,
+            CommodityShockMultiplierByResourceId = commodityShockByResource,
+            InterestRateMultiplierByCityId = interestRateMultiplierByCity,
+            GlobalInterestRateMultiplier = globalInterestRateMultiplier,
+            SeasonalDemandMultiplierByCityId = seasonalDemandMultiplierByCity,
+            GlobalSeasonalDemandMultiplier = globalSeasonalDemandMultiplier,
         };
     }
 }

@@ -565,6 +565,19 @@ export default {
     tabActivity: 'Activity',
     tabChat: 'Chat',
     tabPro: 'Pro',
+    economyWidget: {
+      title: 'Economy cycle',
+      noData: 'Economic cycle data is not available yet.',
+      intensity: 'Intensity',
+      history: 'Last 365 ticks',
+      ticksRemaining: '{ticks} ticks until next phase',
+      phase: {
+        EXPANSION: 'Expansion',
+        PEAK: 'Peak',
+        RECESSION: 'Recession',
+        TROUGH: 'Trough',
+      },
+    },
     advertisingActive: 'Advertising Active',
     proBenefitsHeading: 'What you unlock with Pro',
     proBenefitProducts: 'More products to manufacture',
@@ -3184,6 +3197,7 @@ export default {
   forex: {
     title: 'Forex Exchange',
     subtitle: 'Swap currencies between city economies using live exchange rates.',
+    commodityShockBanner: 'Commodity shock alert',
     tabsLabel: 'Forex sections',
     tabSwap: 'Swap',
     tabRateList: 'Rate List',

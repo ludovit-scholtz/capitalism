@@ -202,7 +202,7 @@ public sealed partial class Mutation
 
         var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultDeterministicAsync();
         var durationTicks = input.DurationTicks ?? GameConstants.TicksPerYear;
-        var annualRate = bank.LendingInterestRatePercent ?? 8m;
+        var annualRate = await ResolveActiveAnnualRateAsync(db, currentTick, bank);
 
         var ticksPerPayment = 1L;
         var totalPayments = (int)Math.Max(1L, durationTicks);
@@ -338,6 +338,27 @@ public sealed partial class Mutation
         }
 
         return loan;
+    }
+
+    private static async Task<decimal> ResolveActiveAnnualRateAsync(AppDbContext db, long currentTick, Building bank)
+    {
+        var baseRate = bank.LendingInterestRatePercent ?? 8m;
+        var activeInterestEvents = await db.MarketEvents
+            .AsNoTracking()
+            .Where(me => me.EventType == MarketEventType.InterestRateChange
+                && me.StartsAtTick <= currentTick
+                && me.ExpiresAtTick >= currentTick
+                && (me.AffectedCityId == null || me.AffectedCityId == bank.CityId))
+            .ToListAsync();
+
+        if (activeInterestEvents.Count == 0)
+            return baseRate;
+
+        var multiplier = Math.Clamp(
+            activeInterestEvents.Aggregate(1m, (acc, next) => acc * next.MagnitudeMultiplier),
+            GameConstants.MarketEventMultiplierMin,
+            GameConstants.MarketEventMultiplierMax);
+        return decimal.Round(baseRate * multiplier, 4, MidpointRounding.AwayFromZero);
     }
 
     /// <summary>

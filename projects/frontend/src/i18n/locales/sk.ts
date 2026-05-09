@@ -565,6 +565,19 @@ export default {
     tabActivity: 'Aktivita',
     tabChat: 'Chat',
     tabPro: 'Pro',
+    economyWidget: {
+      title: 'Ekonomický cyklus',
+      noData: 'Dáta ekonomického cyklu zatiaľ nie sú dostupné.',
+      intensity: 'Intenzita',
+      history: 'Posledných 365 tickov',
+      ticksRemaining: '{ticks} tickov do ďalšej fázy',
+      phase: {
+        EXPANSION: 'Expanzia',
+        PEAK: 'Vrchol',
+        RECESSION: 'Recesia',
+        TROUGH: 'Dno',
+      },
+    },
     advertisingActive: 'Reklama aktívna',
     proBenefitsHeading: 'Čo odomknete s Pro',
     proBenefitProducts: 'Viac produktov na výrobu',
@@ -3172,6 +3185,7 @@ export default {
   forex: {
     title: 'Forex zmenáreň',
     subtitle: 'Vymieňajte meny medzi mestskými ekonomikami pomocou živých kurzov.',
+    commodityShockBanner: 'Upozornenie na komoditný šok',
     tabsLabel: 'Sekcie forexu',
     tabSwap: 'Výmena',
     tabRateList: 'Kurzy',

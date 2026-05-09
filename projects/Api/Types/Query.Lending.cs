@@ -38,6 +38,12 @@ public sealed partial class Query
             return [];
 
         var bankIds = banks.Select(b => b.Id).ToList();
+        var currentTick = await db.GameStates
+            .AsNoTracking()
+            .Select(state => state.CurrentTick)
+            .FirstOrDefaultDeterministicAsync();
+
+        var (interestMultiplierByCity, globalInterestMultiplier) = await LoadInterestRateMultiplierByCityAsync(db, currentTick);
 
         var outstandingByBank = await db.Loans
             .Where(l => bankIds.Contains(l.BankBuildingId)
@@ -65,7 +71,11 @@ public sealed partial class Query
                 CityName = bank.City.Name,
                 LenderCompanyId = bank.CompanyId,
                 LenderCompanyName = bank.Company.Name,
-                AnnualInterestRatePercent = bank.LendingInterestRatePercent ?? 8m,
+                AnnualInterestRatePercent = decimal.Round(
+                    (bank.LendingInterestRatePercent ?? 8m)
+                    * ResolveInterestMultiplier(interestMultiplierByCity, globalInterestMultiplier, bank.CityId),
+                    4,
+                    MidpointRounding.AwayFromZero),
                 MaxPrincipalPerLoan = available,
                 TotalCapacity = lendable,
                 UsedCapacity = outstanding,
@@ -76,6 +86,40 @@ public sealed partial class Query
                 CreatedAtUtc = nowUtc,
             };
         }).ToList();
+    }
+
+    private static async Task<(Dictionary<Guid, decimal> byCity, decimal global)> LoadInterestRateMultiplierByCityAsync(AppDbContext db, long currentTick)
+    {
+        var active = await db.MarketEvents
+            .AsNoTracking()
+            .Where(me => me.EventType == MarketEventType.InterestRateChange
+                && me.StartsAtTick <= currentTick
+                && me.ExpiresAtTick >= currentTick)
+            .ToListAsync();
+
+        var byCity = active
+            .Where(me => me.AffectedCityId.HasValue)
+            .GroupBy(me => me.AffectedCityId!.Value)
+            .ToDictionary(
+                group => group.Key,
+                group => Math.Clamp(
+                    group.Aggregate(1m, (acc, next) => acc * next.MagnitudeMultiplier),
+                    GameConstants.MarketEventMultiplierMin,
+                    GameConstants.MarketEventMultiplierMax));
+        var global = Math.Clamp(
+            active
+                .Where(me => !me.AffectedCityId.HasValue)
+                .Aggregate(1m, (acc, next) => acc * next.MagnitudeMultiplier),
+            GameConstants.MarketEventMultiplierMin,
+            GameConstants.MarketEventMultiplierMax);
+        return (byCity, global);
+    }
+
+    private static decimal ResolveInterestMultiplier(IReadOnlyDictionary<Guid, decimal> byCity, decimal globalMultiplier, Guid cityId)
+    {
+        if (byCity.TryGetValue(cityId, out var cityMultiplier))
+            return cityMultiplier;
+        return globalMultiplier;
     }
 
     /// <summary>

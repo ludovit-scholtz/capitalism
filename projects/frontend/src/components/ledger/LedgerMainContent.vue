@@ -405,7 +405,12 @@ function formatGameTime(value: string): string {
           </thead>
           <tbody>
             <tr v-for="entry in drillEntries" :key="entry.id">
-              <td>{{ entry.productName ?? entry.resourceName ?? entry.description }}</td>
+              <td>
+                <div class="flex flex-col gap-1">
+                  <span>{{ entry.productName ?? entry.resourceName ?? entry.description }}</span>
+                  <span v-if="entry.eventTag" class="event-tag" :title="entry.eventDescription ?? entry.eventTag">{{ entry.eventTag }}</span>
+                </div>
+              </td>
               <td :class="amountClass(entry.amount)">
                 {{ formatAmount(entry.amount, entry.currencyCode) }}
                 <span v-if="showInlineCurrencyBadge(entry.currencyCode)" class="currency-badge currency-badge-inline">{{ entry.currencyCode }}</span>
@@ -698,6 +703,18 @@ function formatGameTime(value: string): string {
 .currency-badge-inline {
   margin-left: 0.35rem;
   vertical-align: middle;
+}
+.event-tag {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  color: var(--color-accent);
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.65rem;
+  font-weight: 700;
 }
 .currency-mixed-hint {
   display: block;

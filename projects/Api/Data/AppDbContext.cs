@@ -112,6 +112,12 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Persisted market-trend state keyed by (city, item) pair.</summary>
     public DbSet<MarketTrendState> MarketTrendStates => Set<MarketTrendState>();
 
+    /// <summary>Global macroeconomic cycle phase and intensity.</summary>
+    public DbSet<EconomicCycle> EconomicCycles => Set<EconomicCycle>();
+
+    /// <summary>Active and historical macro market events.</summary>
+    public DbSet<MarketEvent> MarketEvents => Set<MarketEvent>();
+
     /// <summary>Loan offers published by bank buildings.</summary>
     public DbSet<LoanOffer> LoanOffers => Set<LoanOffer>();
 

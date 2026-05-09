@@ -115,6 +115,23 @@ public sealed partial class TickContext
     /// </summary>
     public Dictionary<Guid, DemandSeasonality> SeasonalityByProductTypeId { get; init; } = [];
 
+    /// <summary>Current global cycle demand intensity multiplier.</summary>
+    public decimal EconomicCycleIntensity { get; init; } = 1.0m;
+
+    /// <summary>Active market events for the current tick.</summary>
+    public List<MarketEvent> ActiveMarketEvents { get; init; } = [];
+
+    /// <summary>Resource-level commodity shock multipliers.</summary>
+    public Dictionary<Guid, decimal> CommodityShockMultiplierByResourceId { get; init; } = [];
+
+    /// <summary>City-scoped interest-rate multipliers.</summary>
+    public Dictionary<Guid, decimal> InterestRateMultiplierByCityId { get; init; } = [];
+    public decimal GlobalInterestRateMultiplier { get; init; } = 1.0m;
+
+    /// <summary>City-scoped seasonal-demand event multipliers.</summary>
+    public Dictionary<Guid, decimal> SeasonalDemandMultiplierByCityId { get; init; } = [];
+    public decimal GlobalSeasonalDemandMultiplier { get; init; } = 1.0m;
+
     public List<Inventory> NewInventory { get; } = [];
     public List<BuildingUnitResourceHistory> NewUnitResourceHistories { get; } = [];
 
@@ -167,6 +184,28 @@ public sealed partial class TickContext
         }
 
         return GetCompanyFundingAccount(building.CompanyId, CitiesById.GetValueOrDefault(building.CityId)?.CurrencyCode);
+    }
+
+    public decimal GetCommodityShockMultiplier(Guid? resourceTypeId)
+    {
+        if (!resourceTypeId.HasValue) return 1m;
+        return CommodityShockMultiplierByResourceId.TryGetValue(resourceTypeId.Value, out var multiplier)
+            ? multiplier
+            : 1m;
+    }
+
+    public decimal GetInterestRateMultiplier(Guid? cityId)
+    {
+        if (cityId.HasValue && InterestRateMultiplierByCityId.TryGetValue(cityId.Value, out var cityMultiplier))
+            return cityMultiplier;
+        return GlobalInterestRateMultiplier;
+    }
+
+    public decimal GetSeasonalDemandEventMultiplier(Guid cityId)
+    {
+        if (SeasonalDemandMultiplierByCityId.TryGetValue(cityId, out var cityMultiplier))
+            return cityMultiplier;
+        return GlobalSeasonalDemandMultiplier;
     }
 
 }

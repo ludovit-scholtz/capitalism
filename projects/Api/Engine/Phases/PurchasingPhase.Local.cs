@@ -14,7 +14,8 @@ public sealed partial class PurchasingPhase
         decimal itemWeightPerUnit,
         decimal maxPrice,
         decimal minQuality,
-        decimal fuelPriceIndex = 1.0m)
+        decimal fuelPriceIndex = 1.0m,
+        decimal commodityShockMultiplier = 1.0m)
     {
         var matchingSupplies = new List<(Building Building, BuildingUnit Unit, Inventory Inventory, decimal PricePerUnit, decimal TransitCostPerUnit, decimal DeliveredPricePerUnit)>();
 
@@ -51,7 +52,8 @@ public sealed partial class PurchasingPhase
                     if (inventory.Quality < minQuality)
                         continue;
 
-                    var price = unit.MinPrice ?? GetBasePrice(context, inventory.ResourceTypeId, inventory.ProductTypeId);
+                    var basePrice = unit.MinPrice ?? GetBasePrice(context, inventory.ResourceTypeId, inventory.ProductTypeId);
+                    var price = resourceId.HasValue ? basePrice * commodityShockMultiplier : basePrice;
                     var transitCostPerUnit = ComputeBuildingTransitCostPerUnit(building, destinationBuilding, itemWeightPerUnit, fuelPriceIndex);
                     var deliveredPricePerUnit = price + transitCostPerUnit;
                     if (price <= 0m || deliveredPricePerUnit > maxPrice)

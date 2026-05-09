@@ -12,6 +12,7 @@ import FinancialSummaryCard from '@/components/dashboard/FinancialSummaryCard.vu
 import StarterGuidance from '@/components/dashboard/StarterGuidance.vue'
 import DashboardChatPanel from '@/components/dashboard/DashboardChatPanel.vue'
 import DashboardTabNav from '@/components/dashboard/DashboardTabNav.vue'
+import EconomyCycleWidget from '@/components/dashboard/EconomyCycleWidget.vue'
 import BuildingHeaderFinancials from '@/components/buildings/BuildingHeaderFinancials.vue'
 import NewCompanyModal from '@/components/dashboard/NewCompanyModal.vue'
 import type {
@@ -22,6 +23,9 @@ import type {
   CompanyLedgerSummary,
   City,
   BuildingUnitOperationalStatus,
+  EconomicCycleView,
+  MarketEventView,
+  EconomicCycleHistoryPoint,
 } from '@/types'
 
 const { t, locale } = useI18n()
@@ -42,6 +46,9 @@ const props = defineProps<{
   buildingFinancials: Record<string, { totalSales: number; totalCosts: number; totalProfit: number }>
   buildingFinancialsLoading: boolean
   buildingUnitStatuses: Record<string, BuildingUnitOperationalStatus[]>
+  economicCycle: EconomicCycleView | null
+  activeMarketEvents: MarketEventView[]
+  economicHistory: EconomicCycleHistoryPoint[]
 }>()
 
 const emit = defineEmits<{
@@ -258,6 +265,13 @@ onMounted(() => {
 </script>
 
 <template>
+  <EconomyCycleWidget
+    :economic-cycle="economicCycle"
+    :active-market-events="activeMarketEvents"
+    :economic-history="economicHistory"
+    class="mb-6"
+  />
+
   <!-- Person account mode (no company selected) -->
   <section v-if="isPersonAccount" class="person-account-panel mt-6 p-6 border border-divider rounded-xl bg-card">
     <div class="mb-1">

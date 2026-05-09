@@ -53,4 +53,5 @@ public static class PlayerNotificationType
     public const string BuildingDestroyedByDefault = "BUILDING_DESTROYED_BY_DEFAULT";
     public const string DividendProposalOpened = "DIVIDEND_PROPOSAL_OPENED";
     public const string DividendProposalSettled = "DIVIDEND_PROPOSAL_SETTLED";
+    public const string EconomicAlert = "ECONOMIC_ALERT";
 }

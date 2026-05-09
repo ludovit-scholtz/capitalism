@@ -71,6 +71,12 @@ It will use real world map. The game will start in single city and later other c
 - [x] Add native limit-order entities and a tick-based price-time priority matching engine with cancellable pending orders and explicit order book depth.
 - [x] Add dividend-governance proposals and shareholder voting windows (propose, notify, vote, settle after 10 ticks).
 
+### Dynamic Macroeconomic Cycles & Market Events (100% complete)
+
+- [x] Added a server-driven global economic cycle (Expansion → Peak → Recession → Trough) with monthly evaluation, phase intensity multipliers, and 48-tick recession warning notifications.
+- [x] Added market-event infrastructure for commodity shocks, interest-rate changes, and seasonal demand surges, and wired these multipliers into tick processing (public sales demand, purchase sourcing, loan repricing, and exchange offers).
+- [x] Added GraphQL economy queries (`currentEconomicCycle`, `activeMarketEvents`, `economicHistory`) and surfaced the data in the dashboard economy widget plus contextual event banners in forex and public-sales views.
+
 ### Optimize for mobile (100% complete)
 
 - [x] Make sure the design is smooth on small mobile devices for all pages. Mainly the content should be visible without the page scroll to the right.
