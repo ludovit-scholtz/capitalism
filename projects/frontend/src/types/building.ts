@@ -247,6 +247,8 @@ export interface BuildingLot {
   materialQuality: number | null
   /** Estimated extractable quantity in tonnes; null when no resource */
   materialQuantity: number | null
+  /** Original tracked extractable quantity used to compute depletion ratio */
+  originalMaterialQuantity?: number | null
 }
 
 /** Result of purchasing a building lot */

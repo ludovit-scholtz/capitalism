@@ -493,6 +493,7 @@ export type MockBuildingLot = {
   resourceType: { id: string; name: string; slug: string } | null
   materialQuality: number | null
   materialQuantity: number | null
+  originalMaterialQuantity?: number | null
 }
 
 export type MockResourceType = {
@@ -2353,6 +2354,7 @@ export function makeDefaultBuildingLots(): MockBuildingLot[] {
       resourceType: { id: 'res-iron-ore', name: 'Iron Ore', slug: 'iron-ore' },
       materialQuality: 0.72,
       materialQuantity: 18000,
+      originalMaterialQuantity: 18000,
     },
     {
       id: 'lot-industrial-2',

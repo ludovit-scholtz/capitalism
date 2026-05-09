@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { formatMoney } from '@/lib/currencyFormat'
-import { getLotStatus as lotStatusFromOwnership, getLotMarkerColor as markerColorFromStatus } from '@/lib/cityMapHelpers'
+import { getLotStatus as lotStatusFromOwnership, getLotMarkerColor as markerColorFromStatus, getResourceLayerMarkerColor } from '@/lib/cityMapHelpers'
 import { getActiveCompany } from '@/lib/accountContext'
 import CityLotDetailPanel from '@/components/cityMap/CityLotDetailPanel.vue'
 import CityMediaHousesSection from '@/components/cityMap/CityMediaHousesSection.vue'
@@ -30,6 +30,7 @@ const props = defineProps<{
   mediaHousesLoading: boolean
   highlightedBuildingId: string | null
   cityId: string
+  showResourceLayer: boolean
 }>()
 
 const emit = defineEmits<{
@@ -54,6 +55,10 @@ function getLotStatus(lot: BuildingLot): 'available' | 'owned' | 'yours' {
 }
 
 function getLotMarkerColor(lot: BuildingLot): string {
+  if (props.showResourceLayer && lot.resourceType) {
+    const resourceLayerColor = getResourceLayerMarkerColor(lot.materialQuantity, lot.originalMaterialQuantity)
+    if (resourceLayerColor) return resourceLayerColor
+  }
   return markerColorFromStatus(getLotStatus(lot))
 }
 
@@ -166,6 +171,15 @@ function handleLotRefreshedInternal(lot: BuildingLot) {
 
 watch(
   () => props.filteredLots,
+  () => {
+    if (map) {
+      updateMarkers()
+    }
+  },
+)
+
+watch(
+  () => props.showResourceLayer,
   () => {
     if (map) {
       updateMarkers()

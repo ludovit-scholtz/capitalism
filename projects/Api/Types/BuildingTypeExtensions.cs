@@ -1,9 +1,11 @@
 using Api.Data;
 using Api.Data.Entities;
+using Api.Engine;
 using Api.Utilities;
 using HotChocolate;
 using HotChocolate.Types;
 using Microsoft.EntityFrameworkCore;
+using Shared.Economy;
 
 namespace Api.Types;
 
@@ -76,6 +78,58 @@ public sealed class BuildingTypeExtensions
             .FirstOrDefaultAsync(l => l.BuildingId == building.Id, cancellationToken);
 
         return lot?.OriginalMaterialQuantity;
+    }
+
+    public async Task<decimal?> GetLotEfficiencyFactor(
+        [Parent] Building building,
+        [Service] AppDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var lot = await db.BuildingLots
+            .AsNoTracking()
+            .FirstOrDefaultAsync(l => l.BuildingId == building.Id, cancellationToken);
+
+        if (lot is null)
+        {
+            return null;
+        }
+
+        return MiningScarcityCalculator.ComputeEfficiencyFactor(lot.MaterialQuantity, lot.OriginalMaterialQuantity);
+    }
+
+    public async Task<decimal?> GetLotEstimatedTicksRemaining(
+        [Parent] Building building,
+        [Service] AppDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var lot = await db.BuildingLots
+            .AsNoTracking()
+            .FirstOrDefaultAsync(l => l.BuildingId == building.Id, cancellationToken);
+        if (lot is null || !lot.MaterialQuantity.HasValue || lot.MaterialQuantity <= 0m)
+        {
+            return null;
+        }
+
+        var miningLevels = await db.BuildingUnits
+            .AsNoTracking()
+            .Where(unit => unit.BuildingId == building.Id && unit.UnitType == UnitType.Mining)
+            .Select(unit => unit.Level)
+            .ToListAsync(cancellationToken);
+        var nominalRate = miningLevels.Sum(GameConstants.MiningRate);
+
+        if (nominalRate <= 0m)
+        {
+            return null;
+        }
+
+        var efficiency = MiningScarcityCalculator.ComputeEfficiencyFactor(lot.MaterialQuantity, lot.OriginalMaterialQuantity);
+        var effectiveRate = nominalRate * efficiency;
+        if (effectiveRate <= 0m)
+        {
+            return null;
+        }
+
+        return Math.Ceiling(lot.MaterialQuantity.Value / effectiveRate);
     }
 
     /// <summary>

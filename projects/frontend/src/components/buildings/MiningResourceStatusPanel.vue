@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import type { Building } from '@/types'
+import { computeMiningEfficiencyFactor } from '@/lib/miningScarcity'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -27,6 +28,9 @@ const remainingPercent = computed<number | null>(() => {
   return Math.round((remaining.value / original.value) * 100)
 })
 
+const efficiencyFactor = computed(() => computeMiningEfficiencyFactor(remaining.value, original.value))
+const efficiencyPercent = computed(() => Math.round(efficiencyFactor.value * 100))
+
 const barColor = computed(() => {
   const p = remainingPercent.value
   if (p === null) return 'bg-muted'
@@ -44,7 +48,9 @@ const isDepletionRisk = computed(() => {
 const estimatedTicksToDepletion = computed<number | null>(() => {
   if (!props.miningRatePerTick || props.miningRatePerTick <= 0) return null
   if (remaining.value === null || remaining.value <= 0) return null
-  return Math.ceil(remaining.value / props.miningRatePerTick)
+  const effectiveRate = props.miningRatePerTick * efficiencyFactor.value
+  if (effectiveRate <= 0) return null
+  return Math.ceil(remaining.value / effectiveRate)
 })
 
 const unitSymbol = computed(() => 't')
@@ -99,20 +105,25 @@ function navigateToBuyLot() {
       </div>
 
       <!-- Stats grid -->
-      <div class="grid grid-cols-2 gap-y-1.5 text-sm">
+        <div class="grid grid-cols-2 gap-y-1.5 text-sm">
         <span class="text-muted">{{ t('mining.remainingQuantity', { quantity: '', unit: '' }).trim() }}</span>
         <span class="font-medium text-body">
           {{ remaining.toLocaleString() }} {{ unitSymbol }}
         </span>
 
-        <template v-if="miningRatePerTick">
-          <span class="text-muted">{{ t('mining.extractionRate') }}</span>
-          <span class="font-medium text-body">
-            {{ t('mining.extractionRateValue', { rate: miningRatePerTick.toLocaleString(), unit: unitSymbol }) }}
-          </span>
+          <template v-if="miningRatePerTick">
+            <span class="text-muted">{{ t('mining.extractionRate') }}</span>
+            <span class="font-medium text-body">
+              {{ t('mining.extractionRateValue', { rate: (miningRatePerTick * efficiencyFactor).toLocaleString(undefined, { maximumFractionDigits: 2 }), unit: unitSymbol }) }}
+            </span>
 
-          <template v-if="estimatedTicksToDepletion !== null">
-            <span class="text-muted">{{ t('mining.estimatedDepletion') }}</span>
+            <span class="text-muted">{{ t('mining.efficiency') }}</span>
+            <span class="font-medium text-body">
+              {{ t('mining.efficiencyValue', { percent: efficiencyPercent }) }}
+            </span>
+
+            <template v-if="estimatedTicksToDepletion !== null">
+              <span class="text-muted">{{ t('mining.estimatedDepletion') }}</span>
             <span class="font-medium text-body">
               {{ t('mining.estimatedDepletionValue', { ticks: estimatedTicksToDepletion.toLocaleString() }) }}
             </span>

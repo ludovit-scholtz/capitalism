@@ -15,6 +15,7 @@ import DashboardTabNav from '@/components/dashboard/DashboardTabNav.vue'
 import EconomyCycleWidget from '@/components/dashboard/EconomyCycleWidget.vue'
 import BuildingHeaderFinancials from '@/components/buildings/BuildingHeaderFinancials.vue'
 import NewCompanyModal from '@/components/dashboard/NewCompanyModal.vue'
+import { computeMiningEfficiencyFactor } from '@/lib/miningScarcity'
 import type {
   Company,
   GameState,
@@ -140,6 +141,14 @@ function powerBalanceClass(status: string): string {
   if (status === 'CRITICAL') return `${base} power-balance--critical bg-red-400/10 border-red-400/25 text-[var(--color-danger)]`
   if (status === 'CONSTRAINED') return `${base} power-balance--constrained bg-amber-400/15 border-amber-400/30 text-amber-400`
   return `${base} power-balance--balanced bg-green-500/10 border-green-500/25 text-[var(--color-secondary)]`
+}
+
+function miningEfficiencyPercent(building: Company['buildings'][number]): number | null {
+  if (building.lotOriginalMaterialQuantity == null || building.lotOriginalMaterialQuantity <= 0) return null
+  if (building.lotMaterialQuantity == null) return null
+  return Math.round(
+    computeMiningEfficiencyFactor(building.lotMaterialQuantity, building.lotOriginalMaterialQuantity) * 100,
+  )
 }
 
 function formatCurrency(value: number, currencyCode = 'EUR'): string {
@@ -501,14 +510,27 @@ onMounted(() => {
                 <span v-if="building.powerStatus && building.powerStatus !== 'POWERED'" :class="powerStatusClass(building.powerStatus)" :aria-label="getBuildingPowerLabel(building.powerStatus)">
                   {{ building.powerStatus === 'OFFLINE' ? '❌' : '⚡' }} {{ getBuildingPowerLabel(building.powerStatus) }}
                 </span>
-                <!-- Depletion risk badge for mine buildings with < 20% remaining -->
+                <!-- Depletion warning badge for mine buildings when efficiency falls below 60% -->
                 <span
-                  v-if="building.type === 'MINE' && building.lotOriginalMaterialQuantity != null && building.lotOriginalMaterialQuantity > 0 && building.lotMaterialQuantity != null && (building.lotMaterialQuantity / building.lotOriginalMaterialQuantity) < 0.2"
-                  class="depletion-risk-badge inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6rem] font-bold bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-400/30"
-                  :title="t('mining.dashboardBadgeTooltip', { percent: Math.round((building.lotMaterialQuantity / building.lotOriginalMaterialQuantity) * 100) })"
+                  v-if="building.type === 'MINE' && miningEfficiencyPercent(building) != null && miningEfficiencyPercent(building)! < 60"
+                  class="depletion-risk-badge inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6rem] font-bold border"
+                  :class="
+                    building.lotMaterialQuantity != null && building.lotMaterialQuantity <= 0
+                      ? 'bg-red-500/20 text-red-700 dark:text-red-400 border-red-400/30'
+                      : miningEfficiencyPercent(building)! < 30
+                        ? 'bg-red-500/20 text-red-700 dark:text-red-400 border-red-400/30'
+                        : 'bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-400/30'
+                  "
+                  :title="t('mining.dashboardBadgeTooltip', { percent: Math.round((building.lotMaterialQuantity ?? 0) / (building.lotOriginalMaterialQuantity ?? 1) * 100) })"
                   :aria-label="t('mining.depletionRisk')"
                 >
-                  ⚠️ {{ building.lotMaterialQuantity <= 0 ? t('mining.depleted') : t('mining.depletionRisk') }}
+                  {{
+                    building.lotMaterialQuantity != null && building.lotMaterialQuantity <= 0
+                      ? `🔴 ${t('mining.depleted')}`
+                      : miningEfficiencyPercent(building)! < 30
+                        ? `🔴 ${t('mining.criticalDepletionRisk')}`
+                        : `⚠️ ${t('mining.depletionRisk')}`
+                  }}
                 </span>
               </div>
             </RouterLink>

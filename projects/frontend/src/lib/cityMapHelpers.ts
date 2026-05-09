@@ -20,6 +20,24 @@ export function getLotMarkerColor(status: 'available' | 'owned' | 'yours'): stri
   return '#6B7280'
 }
 
+/**
+ * Maps resource availability to traffic-light marker colors.
+ * Returns null when resource-layer coloring cannot be computed for this lot.
+ */
+export function getResourceLayerMarkerColor(
+  materialQuantity: number | null | undefined,
+  originalMaterialQuantity: number | null | undefined,
+): string | null {
+  if (materialQuantity == null || originalMaterialQuantity == null || originalMaterialQuantity <= 0) {
+    return null
+  }
+  if (materialQuantity <= 0) return '#6B7280'
+  const ratio = materialQuantity / originalMaterialQuantity
+  if (ratio < 0.2) return '#DC2626'
+  if (ratio < 0.7) return '#F59E0B'
+  return '#16A34A'
+}
+
 /** Formats a population-index multiplier for display, e.g. 1.42 → "1.42x". */
 export function formatPopulationIndex(value: number): string {
   return value.toFixed(2) + 'x'
