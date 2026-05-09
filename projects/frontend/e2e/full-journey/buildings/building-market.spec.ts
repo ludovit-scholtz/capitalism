@@ -122,6 +122,98 @@ test('shows make offer button for authenticated users', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Make Offer' })).toBeVisible()
 })
 
+test('player A cannot list player B building for sale via GraphQL mutation', async ({ page }) => {
+  const owner = makePlayer({
+    id: 'owner-player',
+    email: 'owner@example.com',
+    displayName: 'Owner',
+    onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+    activeAccountType: 'COMPANY',
+    activeCompanyId: 'owner-company',
+    companies: [
+      {
+        id: 'owner-company',
+        playerId: 'owner-player',
+        name: 'Owner Corp',
+        cash: 1000000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [
+          {
+            id: 'owner-building',
+            companyId: 'owner-company',
+            cityId: BRATISLAVA.id,
+            name: 'Owner Factory',
+            type: 'FACTORY',
+            latitude: 48.1486,
+            longitude: 17.1077,
+            level: 1,
+            powerConsumption: 0,
+            isForSale: false,
+            units: [],
+          },
+        ],
+      },
+    ],
+  })
+  const viewer = makePlayer({
+    id: 'viewer-player',
+    email: 'viewer@example.com',
+    displayName: 'Viewer',
+    onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+    activeAccountType: 'COMPANY',
+    activeCompanyId: 'viewer-company',
+    companies: [
+      {
+        id: 'viewer-company',
+        playerId: 'viewer-player',
+        name: 'Viewer Corp',
+        cash: 1000000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [],
+      },
+    ],
+  })
+
+  const state = setupMockApi(page, {
+    players: [owner, viewer],
+    buildingMarketListings: [makeMarketListing({ id: 'owner-building', company: { id: 'owner-company', name: 'Owner Corp', player: { displayName: 'Owner' } } })],
+  })
+  state.currentUserId = viewer.id
+  state.currentToken = `token-${viewer.id}`
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${viewer.id}`)
+
+  await page.goto('/buildings/market')
+
+  const result = await page.evaluate(async () => {
+    const response = await fetch('/graphql', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: `
+          mutation SetForSale($input: SetBuildingForSaleInput!) {
+            setBuildingForSale(input: $input) { id }
+          }
+        `,
+        variables: {
+          input: {
+            buildingId: 'owner-building',
+            isForSale: true,
+            askingPrice: 500000,
+          },
+        },
+      }),
+    })
+
+    return response.json()
+  })
+
+  expect(result.errors?.length ?? 0).toBeGreaterThan(0)
+  expect(result.errors[0].message).toContain('Building not found')
+})
+
 test('hides make offer button for guests', async ({ page }) => {
   setupMockApi(page, { buildingMarketListings: [makeMarketListing()] })
   await page.goto('/buildings/market')

@@ -1,0 +1,62 @@
+name: weekly-audit-reminder
+
+on:
+  schedule:
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create weekly security audit reminder issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            function getIsoWeekParts(date) {
+              const utc = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
+              const day = utc.getUTCDay() || 7
+              utc.setUTCDate(utc.getUTCDate() + 4 - day)
+              const yearStart = new Date(Date.UTC(utc.getUTCFullYear(), 0, 1))
+              const week = Math.ceil((((utc - yearStart) / 86400000) + 1) / 7)
+              return { year: utc.getUTCFullYear(), week }
+            }
+
+            const now = new Date()
+            const { year, week } = getIsoWeekParts(now)
+            const paddedWeek = String(week).padStart(2, '0')
+            const title = `Weekly security audit reminder (${year}-W${paddedWeek})`
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            })
+
+            if (issues.some(issue => issue.title === title)) {
+              core.info(`Open reminder already exists: ${title}`)
+              return
+            }
+
+            const body = [
+              `Create \`/audits/${year}-W${paddedWeek}-security-audit.md\` and review the current exploit/fairness surface.`,
+              '',
+              'Checklist:',
+              '- Review new GraphQL queries and mutations for ownership and authorization gaps',
+              '- Re-test FX, loan, building-market, and stock-exchange fairness paths',
+              '- Review bot/API key scope risks and MasterApi service-input protections',
+              '- Convert any High/Critical findings into follow-up issues with concrete fixes',
+              '- Update prior audit statuses if a finding was resolved',
+            ].join('\n')
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+            })

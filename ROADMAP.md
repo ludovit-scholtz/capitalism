@@ -85,9 +85,9 @@ It will use real world map. The game will start in single city and later other c
 - [x] Rank history chart over last 365 ticks.
 - [x] Export statistics as PDF or CSV.
 
-### Audits (0% complete)
+### Audits (100% complete)
 
-- [ ] In root directory create audits folder, and every week do the audit of the security. List all potential risks and create the action plan to resolve them. The main focus should be on question: Can one player gain unfair advantege of another player by executing an api call or exploting some unfair game mechanics?
+- [x] In root directory create audits folder, and every week do the audit of the security. List all potential risks and create the action plan to resolve them. The main focus should be on question: Can one player gain unfair advantege of another player by executing an api call or exploting some unfair game mechanics?
 
 ### Media house (100% complete)
 

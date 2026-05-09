@@ -17,7 +17,7 @@ public sealed partial class Mutation
         [Service] MasterRankingService rankingService,
         [Service] IOptions<MasterServerOptions> masterServerOptions)
     {
-        Query.EnsureServiceAccess(input, masterServerOptions, requireRegistrationKey: true, requireServerKey: false);
+        Query.EnsureServiceAccess(input, masterServerOptions, requireRegistrationKey: true, requireServerKey: true);
 
         var eventType = input.EventType.Trim().ToUpperInvariant();
         if (string.IsNullOrWhiteSpace(eventType))
