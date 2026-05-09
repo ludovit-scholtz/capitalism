@@ -3072,4 +3072,99 @@ test.describe('Personal Ledger view', () => {
     await expect(tradeTable.locator('.direction-badge--buy')).toBeVisible()
     await expect(tradeTable.locator('.direction-badge--sell')).toBeVisible()
   })
+
+  test('places a stock limit order and shows it in open orders panel', async ({ page }) => {
+    const player = makePlayer({
+      personalCash: 100_000,
+      companies: [makeControlledCompany()],
+    })
+    const rival = makePlayer({
+      id: 'player-order-rival',
+      email: 'order-rival@test.com',
+      displayName: 'Order Rival',
+      companies: [
+        {
+          id: 'company-order-rival',
+          playerId: 'player-order-rival',
+          name: 'Order Rival Corp',
+          cash: 500_000,
+          totalSharesIssued: 10_000,
+          dividendPayoutRatio: 0.2,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          foundedAtTick: 1,
+          buildings: [],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player, rival] })
+    seedPersonalUsdSettlementAccount(state, player, 150_000)
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/stocks')
+
+    await expect(page.getByRole('heading', { name: 'Limit-order book' })).toBeVisible()
+    await page.getByLabel('Limit price').fill('12.5')
+    await page.getByLabel('Order quantity').fill('25')
+    await page.getByRole('button', { name: 'Place limit order' }).click()
+
+    await expect(page.getByText('Limit order placed.')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'My open orders' })).toBeVisible()
+    await expect(page.locator('.open-orders-list')).toContainText('BUY')
+  })
+
+  test('cancels an open limit order from the stock exchange panel', async ({ page }) => {
+    const player = makePlayer({
+      personalCash: 100_000,
+      companies: [makeControlledCompany()],
+    })
+    const rivalCompany = {
+      id: 'company-cancel-rival',
+      playerId: 'player-cancel-rival',
+      name: 'Cancel Rival',
+      cash: 400_000,
+      totalSharesIssued: 10_000,
+      dividendPayoutRatio: 0.2,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      foundedAtTick: 1,
+      buildings: [],
+    }
+    const rival = makePlayer({
+      id: 'player-cancel-rival',
+      email: 'cancel-rival@test.com',
+      displayName: 'Cancel Rival',
+      companies: [rivalCompany],
+    })
+
+    const state = setupMockApi(page, { players: [player, rival] })
+    seedPersonalUsdSettlementAccount(state, player, 150_000)
+    state.stockLimitOrders = [
+      {
+        id: 'limit-open-1',
+        companyId: rivalCompany.id,
+        stockSymbol: `CMP-${rivalCompany.id.replaceAll('-', '').toUpperCase()}`,
+        side: 'BUY',
+        limitPrice: 11,
+        quantity: 40,
+        filledQuantity: 0,
+        status: 'OPEN',
+        ownerPlayerId: player.id,
+        ownerCompanyId: null,
+        createdAtTick: 40,
+        updatedAtTick: 40,
+      },
+    ]
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/stocks')
+
+    await expect(page.locator('.open-orders-list')).toContainText('Cancel Rival')
+    await page.getByRole('button', { name: 'Cancel' }).first().click()
+    await expect(page.getByText('Limit order cancelled.')).toBeVisible()
+    await expect(page.getByText('No open limit orders.')).toBeVisible()
+  })
 })

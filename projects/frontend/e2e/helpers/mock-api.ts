@@ -187,6 +187,31 @@ export type MockStockPriceHistoryPoint = {
   recordedAtUtc: string
 }
 
+export type MockLimitOrder = {
+  id: string
+  companyId: string
+  stockSymbol: string
+  side: 'BUY' | 'SELL'
+  limitPrice: number
+  quantity: number
+  filledQuantity: number
+  status: 'OPEN' | 'PARTIALLY_FILLED' | 'FILLED' | 'CANCELLED'
+  ownerPlayerId: string | null
+  ownerCompanyId: string | null
+  createdAtTick: number
+  updatedAtTick: number
+}
+
+export type MockLimitOrderExecution = {
+  id: string
+  companyId: string
+  stockSymbol: string
+  price: number
+  quantity: number
+  executedAtTick: number
+  executedAtUtc: string
+}
+
 export type MockBuilding = {
   id: string
   companyId: string
@@ -907,6 +932,8 @@ export type MockState = {
   }
   cityWeatherForecasts: Record<string, MockCityWeatherForecast>
   stockPriceHistory: Record<string, MockStockPriceHistoryPoint[]>
+  stockLimitOrders: MockLimitOrder[]
+  stockLimitOrderExecutions: MockLimitOrderExecution[]
   ledgerData: Record<string, MockLedgerSummary>
   drillDownData: Record<string, MockLedgerEntry[]>
   /** Research brand states keyed by companyId for the companyBrands query. */
@@ -1340,6 +1367,10 @@ function getCompanyAssetBaseValue(company: MockCompany) {
 
 function computeMockSharePrice(company: MockCompany) {
   return Number(Math.max((company.cash + getCompanyAssetBaseValue(company)) / getCompanyTotalShares(company), 1).toFixed(2))
+}
+
+function stockSymbolForCompany(companyId: string): string {
+  return `CMP-${companyId.replaceAll('-', '').toUpperCase()}`
 }
 
 function deriveMockPrimaryIndustry(state: MockState, company: MockCompany): string {
@@ -2883,6 +2914,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     },
     cityWeatherForecasts: {},
     stockPriceHistory: {},
+    stockLimitOrders: [],
+    stockLimitOrderExecutions: [],
     ledgerData: {},
     drillDownData: {},
     researchBrands: {},
@@ -4291,6 +4324,180 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           },
         }),
       })
+    }
+
+    if (query.includes('placeLimitOrder')) {
+      const input = body.variables?.input
+      const player = state.players.find((candidate) => candidate.id === state.currentUserId)
+      if (!player) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Not authenticated.' }] }) })
+      }
+
+      const symbol = String(input?.stockSymbol ?? '')
+      const company = state.players
+        .flatMap((candidate) => candidate.companies)
+        .find((candidate) => stockSymbolForCompany(candidate.id) === symbol)
+      if (!company) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Company not found.' }] }) })
+      }
+
+      const side = String(input?.side ?? '').toUpperCase() as 'BUY' | 'SELL'
+      const limitPrice = Number(input?.limitPrice ?? 0)
+      const quantity = Math.max(0, Math.floor(Number(input?.quantity ?? 0)))
+      if (quantity <= 0 || limitPrice <= 0) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Invalid order input.' }] }) })
+      }
+
+      const ownerCompanyId = player.activeAccountType === 'COMPANY' ? player.activeCompanyId : null
+      const ownerPlayerId = ownerCompanyId ? null : player.id
+      const ownerCompany = ownerCompanyId ? player.companies.find((candidate) => candidate.id === ownerCompanyId) : null
+      const reserve = Number((limitPrice * quantity).toFixed(4))
+
+      if (side === 'BUY') {
+        if (ownerCompany) {
+          if ((ownerCompany.cash ?? 0) < reserve) {
+            return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Insufficient funds.' }] }) })
+          }
+          ownerCompany.cash = Number(((ownerCompany.cash ?? 0) - reserve).toFixed(4))
+        } else if (computeAvailableCash(player) < reserve) {
+          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Insufficient funds.' }] }) })
+        } else {
+          player.personalCash = Number((player.personalCash - reserve).toFixed(4))
+        }
+      } else {
+        const reservedShares = state.stockLimitOrders
+          .filter((order) => order.companyId === company.id && order.side === 'SELL' && order.status !== 'CANCELLED' && order.status !== 'FILLED' && order.ownerPlayerId === ownerPlayerId && order.ownerCompanyId === ownerCompanyId)
+          .reduce((sum, order) => sum + (order.quantity - order.filledQuantity), 0)
+        const holding = getOrCreateShareholding(state, company.id, ownerPlayerId, ownerCompanyId)
+        if ((holding.shareCount ?? 0) < quantity + reservedShares) {
+          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Insufficient shares.' }] }) })
+        }
+      }
+
+      const order: MockLimitOrder = {
+        id: `limit-${Math.random().toString(36).slice(2)}`,
+        companyId: company.id,
+        stockSymbol: stockSymbolForCompany(company.id),
+        side,
+        limitPrice: Number(limitPrice.toFixed(4)),
+        quantity,
+        filledQuantity: 0,
+        status: 'OPEN',
+        ownerPlayerId,
+        ownerCompanyId,
+        createdAtTick: state.gameState.currentTick,
+        updatedAtTick: state.gameState.currentTick,
+      }
+      state.stockLimitOrders.push(order)
+
+      const buyOrders = state.stockLimitOrders
+        .filter((candidate) => candidate.companyId === company.id && candidate.side === 'BUY' && (candidate.status === 'OPEN' || candidate.status === 'PARTIALLY_FILLED'))
+        .sort((left, right) => right.limitPrice - left.limitPrice || left.createdAtTick - right.createdAtTick)
+      const sellOrders = state.stockLimitOrders
+        .filter((candidate) => candidate.companyId === company.id && candidate.side === 'SELL' && (candidate.status === 'OPEN' || candidate.status === 'PARTIALLY_FILLED'))
+        .sort((left, right) => left.limitPrice - right.limitPrice || left.createdAtTick - right.createdAtTick)
+
+      let buyIdx = 0
+      let sellIdx = 0
+      while (buyIdx < buyOrders.length && sellIdx < sellOrders.length) {
+        const buy = buyOrders[buyIdx]
+        const sell = sellOrders[sellIdx]
+        if (buy.limitPrice < sell.limitPrice) break
+        const qty = Math.min(buy.quantity - buy.filledQuantity, sell.quantity - sell.filledQuantity)
+        if (qty <= 0) break
+        const tradePrice = sell.limitPrice
+        const tradeValue = Number((tradePrice * qty).toFixed(4))
+
+        const sellHolding = getOrCreateShareholding(state, company.id, sell.ownerPlayerId, sell.ownerCompanyId)
+        sellHolding.shareCount = Number(Math.max(0, (sellHolding.shareCount ?? 0) - qty).toFixed(4))
+        const buyHolding = getOrCreateShareholding(state, company.id, buy.ownerPlayerId, buy.ownerCompanyId)
+        buyHolding.shareCount = Number(((buyHolding.shareCount ?? 0) + qty).toFixed(4))
+
+        if (sell.ownerCompanyId) {
+          const sellerCompany = state.players.flatMap((candidate) => candidate.companies).find((candidate) => candidate.id === sell.ownerCompanyId)
+          if (sellerCompany) sellerCompany.cash = Number(((sellerCompany.cash ?? 0) + tradeValue).toFixed(4))
+        } else if (sell.ownerPlayerId) {
+          const seller = state.players.find((candidate) => candidate.id === sell.ownerPlayerId)
+          if (seller) seller.personalCash = Number((seller.personalCash + tradeValue).toFixed(4))
+        }
+
+        if (buy.ownerCompanyId) {
+          const buyerCompany = state.players.flatMap((candidate) => candidate.companies).find((candidate) => candidate.id === buy.ownerCompanyId)
+          if (buyerCompany && buy.limitPrice > tradePrice) {
+            buyerCompany.cash = Number(((buyerCompany.cash ?? 0) + (buy.limitPrice - tradePrice) * qty).toFixed(4))
+          }
+        } else if (buy.ownerPlayerId && buy.limitPrice > tradePrice) {
+          const buyer = state.players.find((candidate) => candidate.id === buy.ownerPlayerId)
+          if (buyer) buyer.personalCash = Number((buyer.personalCash + (buy.limitPrice - tradePrice) * qty).toFixed(4))
+        }
+
+        buy.filledQuantity += qty
+        sell.filledQuantity += qty
+        buy.status = buy.filledQuantity >= buy.quantity ? 'FILLED' : 'PARTIALLY_FILLED'
+        sell.status = sell.filledQuantity >= sell.quantity ? 'FILLED' : 'PARTIALLY_FILLED'
+        buy.updatedAtTick = state.gameState.currentTick
+        sell.updatedAtTick = state.gameState.currentTick
+
+        state.stockLimitOrderExecutions.unshift({
+          id: `limit-trade-${Math.random().toString(36).slice(2)}`,
+          companyId: company.id,
+          stockSymbol: stockSymbolForCompany(company.id),
+          price: tradePrice,
+          quantity: qty,
+          executedAtTick: state.gameState.currentTick,
+          executedAtUtc: new Date().toISOString(),
+        })
+        appendMockStockPriceHistory(state, company.id, tradePrice)
+
+        if (buy.status === 'FILLED') buyIdx += 1
+        if (sell.status === 'FILLED') sellIdx += 1
+      }
+
+      const result = {
+        id: order.id,
+        companyId: order.companyId,
+        companyName: company.name,
+        stockSymbol: order.stockSymbol,
+        side: order.side,
+        limitPrice: order.limitPrice,
+        quantity: order.quantity,
+        filledQuantity: order.filledQuantity,
+        remainingQuantity: Math.max(0, order.quantity - order.filledQuantity),
+        status: order.status,
+        createdAtTick: order.createdAtTick,
+        updatedAtTick: order.updatedAtTick,
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { placeLimitOrder: result } }) })
+    }
+
+    if (query.includes('cancelLimitOrder')) {
+      const orderId = body.variables?.orderId
+      const player = state.players.find((candidate) => candidate.id === state.currentUserId)
+      const order = state.stockLimitOrders.find((candidate) => candidate.id === orderId)
+      if (!player || !order) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Order not found.' }] }) })
+      }
+      const playerCompanyIds = new Set(player.companies.map((company) => company.id))
+      if (!(order.ownerPlayerId === player.id || (order.ownerCompanyId && playerCompanyIds.has(order.ownerCompanyId)))) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Order not owned.' }] }) })
+      }
+      if (order.status === 'FILLED' || order.status === 'CANCELLED') {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Order cannot be cancelled.' }] }) })
+      }
+
+      const remaining = Math.max(0, order.quantity - order.filledQuantity)
+      if (order.side === 'BUY' && remaining > 0) {
+        const refund = Number((remaining * order.limitPrice).toFixed(4))
+        if (order.ownerCompanyId) {
+          const company = state.players.flatMap((candidate) => candidate.companies).find((candidate) => candidate.id === order.ownerCompanyId)
+          if (company) company.cash = Number(((company.cash ?? 0) + refund).toFixed(4))
+        } else {
+          player.personalCash = Number((player.personalCash + refund).toFixed(4))
+        }
+      }
+      order.status = 'CANCELLED'
+      order.updatedAtTick = state.gameState.currentTick
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { cancelLimitOrder: { id: order.id, status: order.status, remainingQuantity: remaining } } }) })
     }
 
     if (query.includes('mergeCompany')) {
@@ -6065,6 +6272,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           const sharePrice = computeMockSharePrice(company)
           return {
             companyId: company.id,
+            stockSymbol: stockSymbolForCompany(company.id),
             companyName: company.name,
             shareCount: holding.shareCount,
             ownershipRatio: Number((holding.shareCount / getCompanyTotalShares(company)).toFixed(4)),
@@ -6144,6 +6352,77 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         contentType: 'application/json',
         body: JSON.stringify({ data: { stockExchangeListings: listings } }),
       })
+    }
+
+    if (query.includes('myOpenOrders')) {
+      const player = state.players.find((candidate) => candidate.id === state.currentUserId)
+      const playerCompanyIds = new Set((player?.companies ?? []).map((company) => company.id))
+      const rows = state.stockLimitOrders
+        .filter((order) => (order.status === 'OPEN' || order.status === 'PARTIALLY_FILLED')
+          && (order.ownerPlayerId === player?.id || (order.ownerCompanyId && playerCompanyIds.has(order.ownerCompanyId))))
+        .map((order) => {
+          const company = state.players.flatMap((candidate) => candidate.companies).find((candidate) => candidate.id === order.companyId)
+          return {
+            id: order.id,
+            companyId: order.companyId,
+            companyName: company?.name ?? 'Unknown',
+            stockSymbol: order.stockSymbol,
+            side: order.side,
+            limitPrice: order.limitPrice,
+            quantity: order.quantity,
+            filledQuantity: order.filledQuantity,
+            remainingQuantity: Math.max(0, order.quantity - order.filledQuantity),
+            status: order.status,
+            createdAtTick: order.createdAtTick,
+            updatedAtTick: order.updatedAtTick,
+          }
+        })
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { myOpenOrders: rows } }) })
+    }
+
+    if (query.includes('getOrderBook')) {
+      const symbol = String(body.variables?.stockSymbol ?? '')
+      const bids = state.stockLimitOrders
+        .filter((order) => order.stockSymbol === symbol && order.side === 'BUY' && (order.status === 'OPEN' || order.status === 'PARTIALLY_FILLED'))
+        .reduce<Record<string, number>>((acc, order) => {
+          const price = order.limitPrice.toFixed(4)
+          acc[price] = (acc[price] ?? 0) + Math.max(0, order.quantity - order.filledQuantity)
+          return acc
+        }, {})
+      const asks = state.stockLimitOrders
+        .filter((order) => order.stockSymbol === symbol && order.side === 'SELL' && (order.status === 'OPEN' || order.status === 'PARTIALLY_FILLED'))
+        .reduce<Record<string, number>>((acc, order) => {
+          const price = order.limitPrice.toFixed(4)
+          acc[price] = (acc[price] ?? 0) + Math.max(0, order.quantity - order.filledQuantity)
+          return acc
+        }, {})
+      const mapToLevels = (levels: Record<string, number>, direction: 'ASC' | 'DESC') =>
+        Object.entries(levels)
+          .map(([price, totalQuantity]) => ({ price: Number(price), totalQuantity }))
+          .filter((row) => row.totalQuantity > 0)
+          .sort((left, right) => (direction === 'ASC' ? left.price - right.price : right.price - left.price))
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            orderBook: {
+              stockSymbol: symbol,
+              bids: mapToLevels(bids, 'DESC'),
+              asks: mapToLevels(asks, 'ASC'),
+            },
+          },
+        }),
+      })
+    }
+
+    if (query.includes('stockTradeHistory')) {
+      const symbol = String(body.variables?.stockSymbol ?? '')
+      const limit = Number(body.variables?.limit ?? 20)
+      const rows = state.stockLimitOrderExecutions
+        .filter((execution) => execution.stockSymbol === symbol)
+        .slice(0, Math.max(1, limit))
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { stockTradeHistory: rows } }) })
     }
 
     if (query.includes('companyShareholders')) {

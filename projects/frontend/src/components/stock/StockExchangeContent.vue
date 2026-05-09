@@ -7,7 +7,7 @@ import { useStockExchange } from '@/composables/useStockExchange'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
-const { currentTick, loading, error, personAccount, portfolioValue, recentDividendTotal, locale, filterText, selectedCityFilter, selectedIndustryFilter, availableCityFilters, availableIndustryFilters, filteredAndSortedListings, paginatedListings, totalPages, currentPage, toggleSort, sortIcon, isControlledCompany, actionLoadingKey, activeTradeAccountName, activeTradeAccountType, activeTradeAccountCash, activeSettlementAccounts, selectedSettlementBankAccountId, quantityByCompany, errorByCompany, successByCompany, expandedCompany, priceHistoryByCompany, priceHistoryLoadingByCompany, priceHistoryErrorByCompany, shareholdersByCompany, shareholdersLoadingByCompany, shareholdersErrorByCompany, mergeDialogOpen, mergeDestinationCompanyId, controlledCompanies, mergeLoading, mergeError, mergeSuccess, updateQuantity, estimatedBuyCost, estimatedSellProceeds, toggleTradePanel, switchToCompanyAccount, executeTrade, openMergeDialog, closeMergeDialog, executeMerge, loadData } = useStockExchange()
+const { currentTick, loading, error, personAccount, portfolioValue, recentDividendTotal, locale, filterText, selectedCityFilter, selectedIndustryFilter, availableCityFilters, availableIndustryFilters, filteredAndSortedListings, paginatedListings, totalPages, currentPage, toggleSort, sortIcon, isControlledCompany, actionLoadingKey, activeTradeAccountName, activeTradeAccountType, activeTradeAccountCash, activeSettlementAccounts, selectedSettlementBankAccountId, quantityByCompany, errorByCompany, successByCompany, expandedCompany, priceHistoryByCompany, priceHistoryLoadingByCompany, priceHistoryErrorByCompany, shareholdersByCompany, shareholdersLoadingByCompany, shareholdersErrorByCompany, mergeDialogOpen, mergeDestinationCompanyId, controlledCompanies, mergeLoading, mergeError, mergeSuccess, updateQuantity, estimatedBuyCost, estimatedSellProceeds, toggleTradePanel, switchToCompanyAccount, executeTrade, openMergeDialog, closeMergeDialog, executeMerge, loadData, openOrders, selectedOrderBookSymbol, orderBook, tradeHistory, orderSide, orderPrice, orderQuantity, orderLoading, orderError, orderSuccess, selectedOrderListing, stockSymbolForListing, placeLimitOrder, cancelLimitOrder } = useStockExchange()
 
 function formatCityFilterLabel(city: string): string {
   return city === 'UNKNOWN' ? t('stockExchange.unknownCity') : city
@@ -153,6 +153,118 @@ function formatIndustryFilterLabel(industry: string): string {
               <button class="btn btn-secondary btn-sm" :disabled="currentPage === 1" @click="currentPage -= 1">{{ t('stockExchange.prevPage') }}</button
               ><span class="pagination-bar__status"> {{ t('stockExchange.pageStatus', { page: currentPage, total: totalPages }) }} </span
               ><button class="btn btn-secondary btn-sm" :disabled="currentPage === totalPages" @click="currentPage += 1">{{ t('stockExchange.nextPage') }}</button>
+            </div>
+          </div>
+        </section>
+        <section v-if="personAccount" class="panel limit-order-panel">
+          <div class="section-header">
+            <div>
+              <h2>{{ t('stockExchange.limitOrdersTitle') }}</h2>
+              <p>{{ t('stockExchange.limitOrdersDesc') }}</p>
+            </div>
+          </div>
+          <div class="order-grid">
+            <div class="order-form">
+              <label class="filter-select-label">
+                <span>{{ t('stockExchange.orderSymbol') }}</span>
+                <select v-model="selectedOrderBookSymbol" class="filter-select" :aria-label="t('stockExchange.orderSymbol')">
+                  <option v-for="listing in filteredAndSortedListings" :key="listing.companyId" :value="stockSymbolForListing(listing)">{{ listing.companyName }} ({{ stockSymbolForListing(listing) }})</option>
+                </select>
+              </label>
+              <label class="filter-select-label">
+                <span>{{ t('stockExchange.orderSide') }}</span>
+                <select v-model="orderSide" class="filter-select" :aria-label="t('stockExchange.orderSide')">
+                  <option value="BUY">{{ t('stockExchange.buy') }}</option>
+                  <option value="SELL">{{ t('stockExchange.sell') }}</option>
+                </select>
+              </label>
+              <label class="filter-select-label">
+                <span>{{ t('stockExchange.orderPrice') }}</span>
+                <input v-model.number="orderPrice" type="number" min="0" step="0.0001" class="filter-input" :aria-label="t('stockExchange.orderPrice')" />
+              </label>
+              <label class="filter-select-label">
+                <span>{{ t('stockExchange.orderQuantity') }}</span>
+                <input v-model.number="orderQuantity" type="number" min="1" step="1" class="filter-input" :aria-label="t('stockExchange.orderQuantity')" />
+              </label>
+              <p class="market-note">
+                {{ t('stockExchange.orderEstimate') }}
+                <strong>{{ new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format((Number(orderPrice) || 0) * (Number(orderQuantity) || 0)) }}</strong>
+              </p>
+              <p v-if="selectedOrderListing" class="market-note">
+                {{ t('stockExchange.orderAvailableBalance', { account: activeTradeAccountName, balance: new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(activeTradeAccountCash ?? 0) }) }}
+              </p>
+              <button class="btn btn-primary" :disabled="orderLoading" @click="placeLimitOrder">
+                {{ t('stockExchange.placeLimitOrder') }}
+              </button>
+              <p v-if="orderSuccess" class="order-success">{{ orderSuccess }}</p>
+              <p v-if="orderError" class="order-error">{{ orderError }}</p>
+            </div>
+            <div class="order-book">
+              <h3>{{ t('stockExchange.orderBookTitle') }}</h3>
+              <div class="order-book-tables">
+                <div>
+                  <h4 class="book-side-title book-side-buy">{{ t('stockExchange.bids') }}</h4>
+                  <table class="data-table order-book-table">
+                    <thead>
+                      <tr>
+                        <th>{{ t('stockExchange.price') }}</th>
+                        <th>{{ t('stockExchange.quantity') }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="bid in orderBook.bids" :key="`bid-${bid.price}`" class="book-row-buy">
+                        <td>{{ new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD', maximumFractionDigits: 4 }).format(bid.price) }}</td>
+                        <td>{{ bid.totalQuantity }}</td>
+                      </tr>
+                      <tr v-if="orderBook.bids.length === 0">
+                        <td colspan="2">{{ t('stockExchange.noBids') }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div>
+                  <h4 class="book-side-title book-side-sell">{{ t('stockExchange.asks') }}</h4>
+                  <table class="data-table order-book-table">
+                    <thead>
+                      <tr>
+                        <th>{{ t('stockExchange.price') }}</th>
+                        <th>{{ t('stockExchange.quantity') }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="ask in orderBook.asks" :key="`ask-${ask.price}`" class="book-row-sell">
+                        <td>{{ new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD', maximumFractionDigits: 4 }).format(ask.price) }}</td>
+                        <td>{{ ask.totalQuantity }}</td>
+                      </tr>
+                      <tr v-if="orderBook.asks.length === 0">
+                        <td colspan="2">{{ t('stockExchange.noAsks') }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="order-lists">
+            <div>
+              <h3>{{ t('stockExchange.openOrdersTitle') }}</h3>
+              <ul v-if="openOrders.length > 0" class="open-orders-list">
+                <li v-for="order in openOrders" :key="order.id" class="open-order-row">
+                  <span>{{ order.companyName }} · {{ order.side }} · {{ order.filledQuantity }} / {{ order.quantity }} @ {{ new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD', maximumFractionDigits: 4 }).format(order.limitPrice) }}</span>
+                  <button class="btn btn-secondary btn-sm" :disabled="orderLoading" @click="cancelLimitOrder(order.id)">{{ t('stockExchange.cancelOrder') }}</button>
+                </li>
+              </ul>
+              <p v-else class="market-note">{{ t('stockExchange.noOpenOrders') }}</p>
+            </div>
+            <div>
+              <h3>{{ t('stockExchange.matchedTradesTitle') }}</h3>
+              <ul v-if="tradeHistory.length > 0" class="open-orders-list">
+                <li v-for="trade in tradeHistory" :key="trade.id" class="open-order-row">
+                  <span>{{ trade.quantity }} @ {{ new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD', maximumFractionDigits: 4 }).format(trade.price) }}</span>
+                  <span>{{ t('stockExchange.tick') }} {{ trade.executedAtTick }}</span>
+                </li>
+              </ul>
+              <p v-else class="market-note">{{ t('stockExchange.noTradeHistory') }}</p>
             </div>
           </div>
         </section>
@@ -324,6 +436,85 @@ function formatIndustryFilterLabel(industry: string): string {
   background: color-mix(in srgb, var(--color-danger, #ef4444) 12%, var(--color-surface));
 }
 
+.order-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) 1fr;
+  gap: 1rem;
+}
+
+.order-form {
+  display: grid;
+  gap: 0.75rem;
+  align-content: start;
+}
+
+.order-book-tables {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.book-side-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+}
+
+.book-side-buy {
+  color: var(--color-success);
+}
+
+.book-side-sell {
+  color: var(--color-danger);
+}
+
+.order-book-table td,
+.order-book-table th {
+  white-space: normal;
+}
+
+.book-row-buy {
+  background: color-mix(in srgb, var(--color-success) 10%, transparent);
+}
+
+.book-row-sell {
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+}
+
+.order-lists {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.open-orders-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.open-order-row {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 0.6rem 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.order-success {
+  color: var(--color-success);
+  margin: 0;
+}
+
+.order-error {
+  color: var(--color-danger);
+  margin: 0;
+}
+
 @media (max-width: 720px) {
   .stocks-hero {
     padding-top: 2.5rem;
@@ -333,6 +524,13 @@ function formatIndustryFilterLabel(industry: string): string {
   }
   .pagination-bar {
     justify-content: flex-start;
+  }
+  .order-grid {
+    grid-template-columns: 1fr;
+  }
+  .order-book-tables,
+  .order-lists {
+    grid-template-columns: 1fr;
   }
 }
 </style>

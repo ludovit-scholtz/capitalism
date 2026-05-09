@@ -44,3 +44,16 @@ public sealed class SellSharesInput
     /// </summary>
     public Guid? BankAccountId { get; set; }
 }
+
+public sealed class PlaceLimitOrderInput
+{
+    [MaxLength(40)]
+    public string StockSymbol { get; set; } = string.Empty;
+
+    [MaxLength(10)]
+    public string Side { get; set; } = string.Empty;
+
+    public decimal LimitPrice { get; set; }
+
+    public int Quantity { get; set; }
+}
