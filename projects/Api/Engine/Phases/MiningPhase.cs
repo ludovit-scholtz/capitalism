@@ -1,5 +1,6 @@
 using Api.Data.Entities;
 using Api.Utilities;
+using Microsoft.EntityFrameworkCore;
 using Shared.Economy;
 
 namespace Api.Engine.Phases;
@@ -12,16 +13,24 @@ namespace Api.Engine.Phases;
 /// Output is stored in the mining unit's own inventory up to its storage capacity.
 /// When a lot transitions from non-zero to zero remaining quantity, a <see cref="MineDepletionRecord"/>
 /// is created and a <see cref="PlayerNotification"/> is emitted to the building owner.
+/// A <see cref="MineExtractionRecord"/> is written each tick for every mine that produced output,
+/// enabling the 30-day sparkline chart and depletion forecasting UI.
+/// Records older than 90 game days are pruned in this phase.
 /// </summary>
 public sealed class MiningPhase : ITickPhase
 {
     public string Name => "Mining";
     public int Order => 500;
 
-    public Task ProcessAsync(TickContext context)
+    /// <summary>Game days after which extraction history records are pruned.</summary>
+    private const int ExtractionHistoryRetentionDays = 90;
+
+    public async Task ProcessAsync(TickContext context)
     {
         if (!context.BuildingsByType.TryGetValue(BuildingType.Mine, out var mines))
-            return Task.CompletedTask;
+            return;
+
+        var extractionByBuilding = new Dictionary<Guid, (decimal extracted, decimal efficiency, decimal reserve)>();
 
         foreach (var building in mines)
         {
@@ -57,6 +66,8 @@ public sealed class MiningPhase : ITickPhase
             // Skip buildings suspended for insufficient funds (evaluated by OperatingCostPhase).
             if (building.IsSuspendedForFunds) continue;
 
+            var totalExtractedThisTick = 0m;
+
             foreach (var unit in units)
             {
                 if (unit.UnitType != UnitType.Mining) continue;
@@ -85,6 +96,8 @@ public sealed class MiningPhase : ITickPhase
                     null,
                     producedQuantity: actual);
 
+                totalExtractedThisTick += actual;
+
                 if (hasFiniteReserve)
                 {
                     remainingReserve = Math.Max(0m, remainingReserve - actual);
@@ -104,9 +117,36 @@ public sealed class MiningPhase : ITickPhase
                     RecordDepletion(context, building, lot);
                 }
             }
+
+            // Write per-tick extraction record when the mine produced anything.
+            if (totalExtractedThisTick > 0m)
+            {
+                extractionByBuilding[building.Id] = (totalExtractedThisTick, efficiencyFactor, lot.MaterialQuantity ?? 0m);
+            }
         }
 
-        return Task.CompletedTask;
+        // Persist extraction records.
+        foreach (var (buildingId, (extracted, efficiency, reserve)) in extractionByBuilding)
+        {
+            context.Db.MineExtractionRecords.Add(new MineExtractionRecord
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = buildingId,
+                Tick = context.CurrentTick,
+                ExtractedAmount = extracted,
+                EfficiencyPercent = efficiency,
+                ReserveRemaining = reserve,
+            });
+        }
+
+        // Prune extraction records older than 90 game days.
+        var pruneBefore = context.CurrentTick - (ExtractionHistoryRetentionDays * GameConstants.TicksPerDay);
+        if (pruneBefore > 0)
+        {
+            await context.Db.MineExtractionRecords
+                .Where(r => r.Tick < pruneBefore)
+                .ExecuteDeleteAsync();
+        }
     }
 
     private static void RecordDepletionThresholdNotifications(

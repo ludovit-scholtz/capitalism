@@ -1279,6 +1279,23 @@ export type MockState = {
       positionChange: number | null
     }>
   >
+  /** Mine extraction records returned by getMineExtractionHistory query. */
+  mineExtractionRecords?: Array<{
+    tick: number
+    extractedAmount: number
+    efficiencyPercent: number
+    reserveRemaining: number
+  }>
+  /** Mine depletion forecast returned by getMineDepletionForecast query. */
+  mineDepletionForecast?: {
+    averageExtractionRatePerTick: number | null
+    depletionTick: number | null
+    critical5PctTick: number | null
+    critical20PctTick: number | null
+    estimatedGameDaysRemaining: number | null
+    currentReserve: number | null
+    originalReserve: number | null
+  } | null
 }
 
 export interface MockBuildingMarketListing {
@@ -8868,7 +8885,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       !q.includes('fundBuildingBankAccount') &&
       !q.includes('assignBuildingBankAccount') &&
       // transferFunds mutation response includes companyName/currencySymbol/accountNumber which contain 'me' as substring
-      !q.includes('transferFunds')
+      !q.includes('transferFunds') &&
+      // getMineDepletionForecast has estimatedGameDaysRemaining field which contains 'me' via 'Game'
+      !q.includes('getMineDepletionForecast')
 
     if (isStandaloneMeQuery(query)) {
       const player = resolveCurrentPlayer()
@@ -10130,6 +10149,24 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           buildingUnitId,
           lowInventoryAlertThreshold: minInventoryThreshold,
         },
+      })
+    }
+
+    if (query.includes('getMineExtractionHistory')) {
+      const mockRecords = state.mineExtractionRecords ?? []
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getMineExtractionHistory: mockRecords } }),
+      })
+    }
+
+    if (query.includes('getMineDepletionForecast')) {
+      const mockForecast = state.mineDepletionForecast ?? null
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getMineDepletionForecast: mockForecast } }),
       })
     }
 

@@ -181,6 +181,9 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Audit records created when a mine lot is fully depleted.</summary>
     public DbSet<MineDepletionRecord> MineDepletionRecords => Set<MineDepletionRecord>();
 
+    /// <summary>Per-tick extraction history records written by the mining phase.</summary>
+    public DbSet<MineExtractionRecord> MineExtractionRecords => Set<MineExtractionRecord>();
+
     /// <summary>Per-city scheduling rows for the annual resource replenishment cycle.</summary>
     public DbSet<ResourceReplenishmentSchedule> ResourceReplenishmentSchedules => Set<ResourceReplenishmentSchedule>();
 
