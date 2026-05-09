@@ -184,6 +184,12 @@ public sealed partial class Query
             .OrderBy(entry => entry.RecordedAtTick)
             .ThenBy(entry => entry.RecordedAtUtc)
             .ToListAsync();
+        var dividendPayments = await db.DividendPayments
+            .AsNoTracking()
+            .Where(payment => payment.RecipientPlayerId == playerId)
+            .OrderBy(payment => payment.RecordedAtTick)
+            .ThenBy(payment => payment.RecordedAtUtc)
+            .ToListAsync();
 
         var movementEntries = new List<BankStatementRow>();
 
@@ -213,6 +219,22 @@ public sealed partial class Query
                     : founderEntry.Description,
                 Category = LedgerCategory.FounderContribution,
                 Amount = -200_000m,
+                RunningBalance = 0m,
+            });
+        }
+
+        foreach (var payment in dividendPayments)
+        {
+            movementEntries.Add(new BankStatementRow
+            {
+                Id = Guid.NewGuid(),
+                RecordedAtTick = payment.RecordedAtTick,
+                RecordedAtUtc = payment.RecordedAtUtc,
+                Description = string.IsNullOrWhiteSpace(payment.Description)
+                    ? "Dividend payout"
+                    : payment.Description,
+                Category = LedgerCategory.Dividend,
+                Amount = payment.TotalAmount,
                 RunningBalance = 0m,
             });
         }

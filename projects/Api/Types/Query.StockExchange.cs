@@ -118,6 +118,7 @@ public sealed partial class Query
                     PlayerOwnedShares = playerOwnedShares,
                     ControlledCompanyOwnedShares = controlledCompanyOwnedShares,
                     CombinedControlledOwnershipRatio = combinedRatio,
+                    CanProposeDividend = userId.HasValue && (company.PlayerId == userId.Value || combinedRatio > 0.5m),
                     CanClaimControl = userId.HasValue && company.PlayerId != userId.Value && combinedRatio >= 0.5m,
                     CanMerge = userId.HasValue && company.PlayerId != userId.Value && combinedRatio >= 0.9m,
                 };

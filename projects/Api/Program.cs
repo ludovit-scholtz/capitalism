@@ -268,6 +268,7 @@ public class Program
         builder.Services.AddScoped<ITickPhase, PlayerAlertPhase>();
         builder.Services.AddScoped<ITickPhase, BankInterestPhase>();
         builder.Services.AddScoped<ITickPhase, TaxPhase>();
+        builder.Services.AddScoped<ITickPhase, DividendGovernanceSettlementPhase>();
         builder.Services.AddScoped<ITickPhase, DividendPhase>();
         builder.Services.AddScoped<ITickPhase, TelemetryBountyPhase>();
         builder.Services.AddScoped<ITickPhase, EconomicReportPhase>();

@@ -212,6 +212,32 @@ export type MockLimitOrderExecution = {
   executedAtUtc: string
 }
 
+export type MockDividendProposal = {
+  id: string
+  companyId: string
+  stockSymbol: string
+  proposedByAccountId: string
+  proposedByAccountType: 'PERSON' | 'COMPANY'
+  dividendPerShare: number
+  totalPayout: number
+  status: string
+  outcome: string
+  proposedAtTick: number
+  votingOpenTick: number
+  votingCloseTick: number
+  settledAtTick: number | null
+}
+
+export type MockDividendVote = {
+  id: string
+  proposalId: string
+  voterAccountId: string
+  voterAccountType: 'PERSON' | 'COMPANY'
+  sharesVoted: number
+  voteChoice: 'FOR' | 'AGAINST'
+  castAtTick: number
+}
+
 export type MockBuilding = {
   id: string
   companyId: string
@@ -934,6 +960,8 @@ export type MockState = {
   stockPriceHistory: Record<string, MockStockPriceHistoryPoint[]>
   stockLimitOrders: MockLimitOrder[]
   stockLimitOrderExecutions: MockLimitOrderExecution[]
+  dividendProposals: MockDividendProposal[]
+  dividendVotes: MockDividendVote[]
   ledgerData: Record<string, MockLedgerSummary>
   drillDownData: Record<string, MockLedgerEntry[]>
   /** Research brand states keyed by companyId for the companyBrands query. */
@@ -2916,6 +2944,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     stockPriceHistory: {},
     stockLimitOrders: [],
     stockLimitOrderExecutions: [],
+    dividendProposals: [],
+    dividendVotes: [],
     ledgerData: {},
     drillDownData: {},
     researchBrands: {},
@@ -4320,6 +4350,129 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               personalCash: player.personalCash,
               personalTaxReserve: player.personalTaxReserve ?? 0,
               companyCash,
+            },
+          },
+        }),
+      })
+    }
+
+    if (query.includes('proposeDividend')) {
+      const input = body.variables?.input
+      const player = state.players.find((candidate) => candidate.id === state.currentUserId)
+      const stockSymbol = String(input?.stockSymbol ?? '')
+      const company = state.players
+        .flatMap((candidate) => candidate.companies)
+        .find((candidate) => stockSymbolForCompany(candidate.id) === stockSymbol)
+
+      if (!player || !company) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Company not found or not authenticated.' }] }) })
+      }
+
+      const dividendPerShare = Number(input?.dividendPerShare ?? 0)
+      if (dividendPerShare <= 0) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Dividend per share must be greater than zero.' }] }) })
+      }
+
+      const currentTick = state.gameState.currentTick
+      const totalPayout = Number((dividendPerShare * getCompanyTotalShares(company)).toFixed(4))
+      const combinedOwnership = getCombinedControlledOwnershipRatio(state, player.id, company)
+      const canPropose = company.playerId === player.id || combinedOwnership > 0.5
+      if (!canPropose) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Only majority shareholders can propose dividends.' }] }) })
+      }
+
+      if ((company.cash ?? 0) < totalPayout) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Company does not have enough cash.' }] }) })
+      }
+
+      company.cash = Number((company.cash - totalPayout).toFixed(4))
+      const proposalId = `proposal-${Math.random().toString(36).slice(2)}`
+      state.dividendProposals.unshift({
+        id: proposalId,
+        companyId: company.id,
+        stockSymbol,
+        proposedByAccountId: player.activeAccountType === 'COMPANY' && player.activeCompanyId ? player.activeCompanyId : player.id,
+        proposedByAccountType: player.activeAccountType,
+        dividendPerShare,
+        totalPayout,
+        status: 'VOTING',
+        outcome: 'PENDING',
+        proposedAtTick: currentTick,
+        votingOpenTick: currentTick,
+        votingCloseTick: currentTick + 10,
+        settledAtTick: null,
+      })
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            proposeDividend: {
+              id: proposalId,
+              companyId: company.id,
+              stockSymbol,
+              status: 'VOTING',
+              votingCloseTick: currentTick + 10,
+            },
+          },
+        }),
+      })
+    }
+
+    if (query.includes('voteDividendProposal')) {
+      const input = body.variables?.input
+      const player = state.players.find((candidate) => candidate.id === state.currentUserId)
+      const proposal = state.dividendProposals.find((candidate) => candidate.id === input?.proposalId)
+      if (!player || !proposal) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Proposal not found or not authenticated.' }] }) })
+      }
+
+      const currentTick = state.gameState.currentTick
+      if (proposal.status !== 'VOTING' || currentTick > proposal.votingCloseTick) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Voting is closed.' }] }) })
+      }
+
+      const voterAccountId = player.activeAccountType === 'COMPANY' && player.activeCompanyId ? player.activeCompanyId : player.id
+      const voterAccountType = player.activeAccountType
+      const existingVote = state.dividendVotes.find((candidate) => candidate.proposalId === proposal.id && candidate.voterAccountId === voterAccountId)
+      if (existingVote) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Already voted.' }] }) })
+      }
+
+      const sharesVoted = state.shareholdings
+        .filter((holding) =>
+          holding.companyId === proposal.companyId
+          && holding.shareCount > 0
+          && (voterAccountType === 'COMPANY' ? holding.ownerCompanyId === voterAccountId : holding.ownerPlayerId === voterAccountId))
+        .reduce((sum, holding) => sum + holding.shareCount, 0)
+      if (sharesVoted <= 0) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Only shareholders can vote.' }] }) })
+      }
+
+      const voteId = `vote-${Math.random().toString(36).slice(2)}`
+      const voteChoice = String(input?.choice ?? '').toUpperCase() === 'AGAINST' ? 'AGAINST' : 'FOR'
+      state.dividendVotes.push({
+        id: voteId,
+        proposalId: proposal.id,
+        voterAccountId,
+        voterAccountType,
+        sharesVoted,
+        voteChoice,
+        castAtTick: currentTick,
+      })
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            voteDividendProposal: {
+              id: voteId,
+              proposalId: proposal.id,
+              voteChoice,
+              sharesVoted,
+              castAtTick: currentTick,
             },
           },
         }),
@@ -6310,6 +6463,68 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    if (query.includes('myOpenDividendProposalCount')) {
+      const player = state.players.find((candidate) => candidate.id === state.currentUserId)
+      if (!player) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { myOpenDividendProposalCount: 0 } }) })
+      }
+
+      const companyIds = new Set(
+        state.shareholdings
+          .filter((holding) =>
+            holding.shareCount > 0
+            && (holding.ownerPlayerId === player.id
+              || (holding.ownerCompanyId && player.companies.some((company) => company.id === holding.ownerCompanyId))))
+          .map((holding) => holding.companyId),
+      )
+      const openCount = state.dividendProposals.filter((proposal) =>
+        companyIds.has(proposal.companyId)
+        && proposal.status === 'VOTING'
+        && proposal.votingCloseTick >= state.gameState.currentTick).length
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { myOpenDividendProposalCount: openCount } }),
+      })
+    }
+
+    if (query.includes('getDividendProposals')) {
+      const player = state.players.find((candidate) => candidate.id === state.currentUserId)
+      const stockSymbol = String(body.variables?.stockSymbol ?? '')
+      const proposals = state.dividendProposals
+        .filter((proposal) => proposal.stockSymbol === stockSymbol)
+        .map((proposal) => {
+          const proposalVotes = state.dividendVotes.filter((vote) => vote.proposalId === proposal.id)
+          const forVotes = proposalVotes
+            .filter((vote) => vote.voteChoice === 'FOR')
+            .reduce((sum, vote) => sum + vote.sharesVoted, 0)
+          const againstVotes = proposalVotes
+            .filter((vote) => vote.voteChoice === 'AGAINST')
+            .reduce((sum, vote) => sum + vote.sharesVoted, 0)
+          const myVote = player
+            ? proposalVotes.find((vote) =>
+                vote.voterAccountId === player.id || player.companies.some((company) => company.id === vote.voterAccountId))
+            : null
+
+          return {
+            ...proposal,
+            forVotes,
+            againstVotes,
+            outcome: proposal.outcome === 'PENDING' ? (forVotes > againstVotes ? 'APPROVED' : 'REJECTED') : proposal.outcome,
+            ticksRemaining: proposal.status === 'VOTING' ? Math.max(0, proposal.votingCloseTick - state.gameState.currentTick) : 0,
+            myVoteChoice: myVote?.voteChoice ?? null,
+            mySharesVoted: myVote?.sharesVoted ?? null,
+          }
+        })
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { dividendProposals: proposals } }),
+      })
+    }
+
     if (query.includes('stockExchangeListings')) {
       const player = state.players.find((candidate) => candidate.id === state.currentUserId)
       const listings = state.players
@@ -6345,6 +6560,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             playerOwnedShares,
             controlledCompanyOwnedShares,
             combinedControlledOwnershipRatio,
+            canProposeDividend: player ? company.playerId === player.id || combinedControlledOwnershipRatio > 0.5 : false,
             canClaimControl: combinedControlledOwnershipRatio >= 0.5,
             canMerge: combinedControlledOwnershipRatio >= 0.9,
           }

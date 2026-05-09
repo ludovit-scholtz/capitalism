@@ -102,7 +102,6 @@ test.describe('Stock exchange', () => {
         },
       ],
     })
-
     const state = setupMockApi(page, {
       players: [player, rival],
       shareholdings: [
@@ -110,6 +109,8 @@ test.describe('Stock exchange', () => {
         { companyId: 'company-rival', ownerPlayerId: 'player-2', ownerCompanyId: null, shareCount: 5000 },
       ],
     })
+    player.activeAccountType = 'PERSON'
+    player.activeCompanyId = null
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
 
@@ -189,6 +190,11 @@ test.describe('Stock exchange', () => {
         { companyId: 'company-gov', ownerPlayerId: 'player-gov', ownerCompanyId: null, shareCount: 10000 },
       ],
     })
+    const currentPlayer = state.players.find((candidate) => candidate.id === player.id)
+    if (currentPlayer) {
+      currentPlayer.activeAccountType = 'PERSON'
+      currentPlayer.activeCompanyId = null
+    }
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
 
@@ -425,6 +431,60 @@ test.describe('Stock exchange', () => {
     const sellBtn = tradePanel.getByRole('button', { name: /Sell @ \$/ })
     await expect(buyBtn).toBeVisible()
     await expect(sellBtn).toBeVisible()
+  })
+
+  test('majority shareholder can propose dividend and vote panel updates tally', async ({ page }) => {
+    const player = makePlayer({
+      personalCash: 150000,
+      companies: [makeControlledCompany()],
+    })
+    const rival = makePlayer({
+      id: 'player-dividend-target',
+      email: 'dividend-target@test.com',
+      displayName: 'Dividend Target Owner',
+      companies: [
+        {
+          id: 'company-dividend-target',
+          playerId: 'player-dividend-target',
+          name: 'Dividend Target Corp',
+          cash: 800000,
+          totalSharesIssued: 10000,
+          dividendPayoutRatio: 0.2,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          foundedAtTick: 5,
+          buildings: [],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, {
+      players: [player, rival],
+      shareholdings: [
+        { companyId: 'company-home', ownerPlayerId: 'player-1', ownerCompanyId: null, shareCount: 10000 },
+        { companyId: 'company-dividend-target', ownerPlayerId: null, ownerCompanyId: 'company-home', shareCount: 6000 },
+        { companyId: 'company-dividend-target', ownerPlayerId: 'player-dividend-target', ownerCompanyId: null, shareCount: 4000 },
+      ],
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/stocks')
+
+    await openTradePanel(page, 'Dividend Target Corp')
+
+    const governancePanel = page.locator('.dividend-governance-panel')
+    await expect(governancePanel).toBeVisible()
+    await governancePanel.getByLabel('Per share').fill('1.5')
+    await governancePanel.getByRole('button', { name: 'Propose dividend' }).click()
+    await expect(page.locator('.trade-feedback--success').first()).toContainText('Dividend proposal opened')
+
+    const proposalCard = governancePanel.locator('.dividend-proposal-card').first()
+    await expect(proposalCard).toContainText('Per share $1.50')
+    await expect(proposalCard).toContainText('Vote For: 0')
+    await proposalCard.getByRole('button', { name: 'Vote For' }).click()
+    await expect(proposalCard).toContainText('Vote For: 6,000')
+    await expect(proposalCard).toContainText('Your vote: FOR')
   })
 
   test('trade controls — quantity input and buy/sell buttons are vertically aligned in the same row', async ({

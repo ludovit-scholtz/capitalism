@@ -17,8 +17,38 @@ export interface StockExchangeListing {
   playerOwnedShares: number
   controlledCompanyOwnedShares: number
   combinedControlledOwnershipRatio: number
+  canProposeDividend: boolean
   canClaimControl: boolean
   canMerge: boolean
+}
+
+export interface DividendProposal {
+  id: string
+  companyId: string
+  stockSymbol: string
+  proposedByAccountId: string
+  proposedByAccountType: 'PERSON' | 'COMPANY'
+  dividendPerShare: number
+  totalPayout: number
+  status: string
+  outcome: string
+  proposedAtTick: number
+  votingOpenTick: number
+  votingCloseTick: number
+  settledAtTick: number | null
+  ticksRemaining: number
+  forVotes: number
+  againstVotes: number
+  myVoteChoice: 'FOR' | 'AGAINST' | null
+  mySharesVoted: number | null
+}
+
+export interface DividendVoteResult {
+  id: string
+  proposalId: string
+  voteChoice: 'FOR' | 'AGAINST'
+  sharesVoted: number
+  castAtTick: number
 }
 
 export interface OrderBookLevel {

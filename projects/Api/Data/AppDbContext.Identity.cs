@@ -158,6 +158,36 @@ public sealed partial class AppDbContext
             e.HasIndex(payment => new { payment.RecipientPlayerId, payment.RecordedAtTick });
         });
 
+        modelBuilder.Entity<DividendProposal>(e =>
+        {
+            e.HasKey(proposal => proposal.Id);
+            e.Property(proposal => proposal.StockSymbol).HasMaxLength(40);
+            e.Property(proposal => proposal.ProposedByAccountType).HasMaxLength(20);
+            e.Property(proposal => proposal.DividendPerShare).HasPrecision(18, 4);
+            e.Property(proposal => proposal.TotalPayout).HasPrecision(18, 4);
+            e.Property(proposal => proposal.Status).HasMaxLength(20);
+            e.HasOne(proposal => proposal.Company)
+                .WithMany()
+                .HasForeignKey(proposal => proposal.CompanyId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(proposal => new { proposal.CompanyId, proposal.Status, proposal.VotingCloseTick });
+            e.HasIndex(proposal => new { proposal.StockSymbol, proposal.ProposedAtTick });
+        });
+
+        modelBuilder.Entity<DividendVote>(e =>
+        {
+            e.HasKey(vote => vote.Id);
+            e.Property(vote => vote.VoterAccountType).HasMaxLength(20);
+            e.Property(vote => vote.SharesVoted).HasPrecision(18, 4);
+            e.Property(vote => vote.VoteChoice).HasMaxLength(10);
+            e.HasOne(vote => vote.Proposal)
+                .WithMany(proposal => proposal.Votes)
+                .HasForeignKey(vote => vote.ProposalId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(vote => new { vote.ProposalId, vote.VoterAccountId }).IsUnique();
+            e.HasIndex(vote => new { vote.ProposalId, vote.VoteChoice });
+        });
+
         modelBuilder.Entity<SharePriceHistoryEntry>(e =>
         {
             e.HasKey(entry => entry.Id);

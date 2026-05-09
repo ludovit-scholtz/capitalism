@@ -136,6 +136,100 @@
         <p v-if="successMessage" class="trade-feedback trade-feedback--success" role="status">{{ successMessage }}</p>
         <p v-if="errorMessage" class="trade-feedback trade-feedback--error" role="alert">{{ errorMessage }}</p>
 
+        <div class="dividend-governance-panel">
+          <div class="history-panel__header">
+            <h3>{{ t('stockExchange.dividendGovernanceTitle') }}</h3>
+            <span class="history-panel__hint">{{ t('stockExchange.dividendGovernanceDesc') }}</span>
+          </div>
+          <p v-if="dividendProposalsLoading" class="history-panel__state">{{ t('common.loading') }}</p>
+          <p v-else-if="dividendProposalsError" class="history-panel__state history-panel__state--error">{{ dividendProposalsError }}</p>
+          <div v-else class="dividend-governance-content">
+            <div v-if="listing.canProposeDividend" class="dividend-propose-form">
+              <h4>{{ t('stockExchange.proposeDividendTitle') }}</h4>
+              <div class="dividend-propose-fields">
+                <label class="trade-field">
+                  <span class="trade-field-label">{{ t('stockExchange.dividendPerShare') }}</span>
+                  <input
+                    :value="dividendPerShareDraft"
+                    type="number"
+                    min="0"
+                    step="0.0001"
+                    class="trade-input"
+                    :aria-label="t('stockExchange.dividendPerShare')"
+                    @input="emit('update-dividend-per-share', Number(($event.target as HTMLInputElement).value))"
+                  />
+                </label>
+                <p class="trade-order-hint">
+                  {{ t('stockExchange.dividendTotalPreview', { total: formatCurrency(dividendPerShareDraft * listing.totalSharesIssued) }) }}
+                </p>
+                <p class="trade-order-hint">
+                  {{ t('stockExchange.dividendPersonalPreview', { total: formatCurrency(dividendPerShareDraft * listing.playerOwnedShares) }) }}
+                </p>
+                <button
+                  class="btn btn-primary btn-sm"
+                  :disabled="actionLoadingKey === `propose-dividend-${listing.companyId}`"
+                  @click="emit('propose-dividend')"
+                >
+                  <font-awesome-icon :icon="['fas', 'coins']" />
+                  <span>{{ t('stockExchange.proposeDividend') }}</span>
+                </button>
+              </div>
+            </div>
+            <p v-else class="history-panel__state">{{ t('stockExchange.dividendProposeNotEligible') }}</p>
+
+            <div class="dividend-open-list">
+              <h4>{{ t('stockExchange.openDividendProposalsTitle') }}</h4>
+              <p v-if="openDividendProposals.length === 0" class="history-panel__state">{{ t('stockExchange.openDividendProposalsEmpty') }}</p>
+              <article v-for="proposal in openDividendProposals" :key="proposal.id" class="dividend-proposal-card">
+                <header class="dividend-proposal-header">
+                  <strong>{{ t('stockExchange.dividendPerShareValue', { value: formatCurrency(proposal.dividendPerShare) }) }}</strong>
+                  <span class="trade-order-hint">{{ t('stockExchange.dividendTicksRemaining', { ticks: proposal.ticksRemaining }) }}</span>
+                </header>
+                <p class="trade-order-hint">{{ t('stockExchange.dividendTotalPreview', { total: formatCurrency(proposal.totalPayout) }) }}</p>
+                <div class="dividend-progress">
+                  <div class="dividend-progress-bar dividend-progress-bar--for" :style="{ width: `${proposalSupportPercent(proposal)}%` }"></div>
+                  <div class="dividend-progress-bar dividend-progress-bar--against" :style="{ width: `${proposalAgainstPercent(proposal)}%` }"></div>
+                </div>
+                <div class="dividend-vote-summary">
+                  <span>{{ t('stockExchange.voteFor') }}: {{ formatShares(proposal.forVotes) }}</span>
+                  <span>{{ t('stockExchange.voteAgainst') }}: {{ formatShares(proposal.againstVotes) }}</span>
+                </div>
+                <div class="dividend-vote-actions">
+                  <button
+                    class="btn btn-primary btn-sm"
+                    :disabled="!!proposal.myVoteChoice || actionLoadingKey === `vote-dividend-${proposal.id}-FOR`"
+                    @click="emit('vote-dividend', { proposalId: proposal.id, choice: 'FOR' })"
+                  >
+                    {{ t('stockExchange.voteFor') }}
+                  </button>
+                  <button
+                    class="btn btn-secondary btn-sm"
+                    :disabled="!!proposal.myVoteChoice || actionLoadingKey === `vote-dividend-${proposal.id}-AGAINST`"
+                    @click="emit('vote-dividend', { proposalId: proposal.id, choice: 'AGAINST' })"
+                  >
+                    {{ t('stockExchange.voteAgainst') }}
+                  </button>
+                  <span v-if="proposal.myVoteChoice" class="trade-order-hint">
+                    {{ t('stockExchange.myVoteLabel', { choice: proposal.myVoteChoice }) }}
+                  </span>
+                </div>
+              </article>
+            </div>
+
+            <details class="dividend-history-collapsible">
+              <summary>{{ t('stockExchange.dividendProposalHistoryTitle') }}</summary>
+              <p v-if="closedDividendProposals.length === 0" class="history-panel__state">{{ t('stockExchange.dividendProposalHistoryEmpty') }}</p>
+              <ul v-else class="dividend-history-list">
+                <li v-for="proposal in closedDividendProposals" :key="proposal.id" class="dividend-history-item">
+                  <span>{{ t('stockExchange.dividendPerShareValue', { value: formatCurrency(proposal.dividendPerShare) }) }}</span>
+                  <span>{{ proposalOutcomeLabel(proposal) }}</span>
+                  <span>{{ t('stockExchange.dividendSettledAtTick', { tick: proposal.settledAtTick ?? proposal.votingCloseTick }) }}</span>
+                </li>
+              </ul>
+            </details>
+          </div>
+        </div>
+
         <div class="history-panel">
           <div class="history-panel__header">
             <h3>{{ t('stockExchange.priceHistoryTitle') }}</h3>
@@ -257,7 +351,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { CompanyOwnership, PlayerBankAccountSummary, StockExchangeListing, StockExchangePriceHistoryPoint } from '@/types'
+import type { CompanyOwnership, DividendProposal, PlayerBankAccountSummary, StockExchangeListing, StockExchangePriceHistoryPoint } from '@/types'
 
 type PieSlice = {
   label: string
@@ -292,6 +386,10 @@ const props = defineProps<{
   priceHistory: StockExchangePriceHistoryPoint[]
   priceHistoryLoading: boolean
   priceHistoryError: string | null
+  dividendProposals: DividendProposal[]
+  dividendProposalsLoading: boolean
+  dividendProposalsError: string | null
+  dividendPerShareDraft: number
   shareholders: CompanyOwnership | null
   shareholdersLoading: boolean
   shareholdersError: string | null
@@ -303,14 +401,21 @@ const emit = defineEmits<{
   (e: 'open-merge'): void
   (e: 'update:settlement-bank-account-id', value: string): void
   (e: 'update-quantity', value: number): void
+  (e: 'update-dividend-per-share', value: number): void
   (e: 'buy'): void
   (e: 'sell'): void
+  (e: 'propose-dividend'): void
+  (e: 'vote-dividend', payload: { proposalId: string; choice: 'FOR' | 'AGAINST' }): void
 }>()
 
 const { t } = useI18n()
 
 const pieSlices = computed(() => (props.shareholders ? buildPieSlices(props.shareholders) : []))
 const donutPaths = computed(() => buildDonuts(pieSlices.value, 80, 80, 72, 44))
+const openDividendProposals = computed(() =>
+  props.dividendProposals.filter((proposal) => proposal.status === 'VOTING' && proposal.ticksRemaining > 0))
+const closedDividendProposals = computed(() =>
+  props.dividendProposals.filter((proposal) => proposal.status !== 'VOTING' || proposal.ticksRemaining <= 0))
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat(props.locale, {
@@ -346,6 +451,32 @@ function formatIndustryLabel(industry: string): string {
     .split('_')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ')
+}
+
+function proposalSupportPercent(proposal: DividendProposal): number {
+  const total = proposal.forVotes + proposal.againstVotes
+  if (total <= 0) {
+    return 0
+  }
+
+  return (proposal.forVotes / total) * 100
+}
+
+function proposalAgainstPercent(proposal: DividendProposal): number {
+  const total = proposal.forVotes + proposal.againstVotes
+  if (total <= 0) {
+    return 0
+  }
+
+  return (proposal.againstVotes / total) * 100
+}
+
+function proposalOutcomeLabel(proposal: DividendProposal): string {
+  if (proposal.outcome === 'APPROVED') {
+    return t('stockExchange.dividendOutcomeApproved')
+  }
+
+  return t('stockExchange.dividendOutcomeRejected')
 }
 
 function buildPieSlices(ownership: CompanyOwnership): PieSlice[] {
@@ -763,6 +894,102 @@ function buildDonuts(slices: PieSlice[], cx: number, cy: number, r: number, inne
   font-size: 0.88rem;
 }
 
+.dividend-governance-panel {
+  display: grid;
+  gap: 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 0.9rem;
+  background: color-mix(in srgb, var(--color-surface) 90%, var(--color-primary) 10%);
+}
+
+.dividend-governance-content {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.dividend-propose-form h4,
+.dividend-open-list h4 {
+  margin: 0 0 0.4rem;
+}
+
+.dividend-propose-fields {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 380px;
+}
+
+.dividend-proposal-card {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 0.65rem 0.75rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.dividend-proposal-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.dividend-progress {
+  display: flex;
+  width: 100%;
+  height: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-border) 65%, transparent);
+}
+
+.dividend-progress-bar {
+  transition: width 0.25s ease;
+}
+
+.dividend-progress-bar--for {
+  background: color-mix(in srgb, var(--color-success, #22c55e) 75%, #ffffff 0%);
+}
+
+.dividend-progress-bar--against {
+  background: color-mix(in srgb, var(--color-danger, #ef4444) 75%, #ffffff 0%);
+}
+
+.dividend-vote-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+}
+
+.dividend-vote-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.dividend-history-collapsible summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.dividend-history-list {
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.dividend-history-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+}
+
 .trade-feedback--success {
   background: color-mix(in srgb, var(--color-success, #22c55e) 14%, var(--color-surface));
   color: var(--color-success, #22c55e);
@@ -1085,6 +1312,13 @@ function buildDonuts(slices: PieSlice[], cx: number, cy: number, r: number, inne
 
   .trade-actions {
     grid-template-columns: 1fr;
+  }
+
+  .dividend-proposal-header,
+  .dividend-vote-actions,
+  .dividend-history-item {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>
