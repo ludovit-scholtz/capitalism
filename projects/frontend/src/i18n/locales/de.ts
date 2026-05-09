@@ -692,6 +692,7 @@ export default {
     displayNameSaveError: 'Spielername konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.',
     displayNameSaved: 'Spielername wurde aktualisiert.',
     displayNameRealNameWarning: 'Verwenden Sie nicht Ihren echten Namen — benutzen Sie einen fiktiven Alias zum Schutz Ihrer Privatsphäre.',
+    displayNameSharedAcrossServers: 'Ihr Anzeigename wird auf allen Spielservern geteilt.',
     share: 'Profil teilen',
     shareTooltip: 'Profillink in die Zwischenablage kopieren',
     globalRank: 'Globaler Rang',

@@ -13,7 +13,7 @@ It will use real world map. The game will start in single city and later other c
 
 ### Onboarding (100% complete)
 
-- [ ] Allow players to change the personal account name. Make sure in the dashboard for the personal account is tab to change the player name. Store the personal account name in the master database so that the personal account player name is the same in all game servers. If the personal account name already exists in the master database after new game onboarding, do not change it, and make sure the personal account name is preserved.
+- [x] Allow players to change the personal account name. Make sure in the dashboard for the personal account is tab to change the player name. Store the personal account name in the master database so that the personal account player name is the same in all game servers. If the personal account name already exists in the master database after new game onboarding, do not change it, and make sure the personal account name is preserved.
 
 ### Authorization (100% complete)
 

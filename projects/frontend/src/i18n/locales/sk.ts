@@ -691,6 +691,7 @@ export default {
     displayNameSaveError: 'Uloženie mena zlyhalo. Skúste to znova.',
     displayNameSaved: 'Meno hráča bolo aktualizované.',
     displayNameRealNameWarning: 'Nepoužívajte svoje skutočné meno — pre ochranu súkromia použite fiktívny alias.',
+    displayNameSharedAcrossServers: 'Vaše zobrazované meno je zdieľané naprieč všetkými hernými servermi.',
     share: 'Zdieľať profil',
     shareTooltip: 'Kopírovať odkaz na profil do schránky',
     globalRank: 'Globálne poradie',
