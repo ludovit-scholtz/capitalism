@@ -273,7 +273,11 @@ onUnmounted(() => {
               <p class="display-name-real-name-warning text-xs text-amber-400">
                 {{ t('playerProfile.displayNameRealNameWarning') }}
               </p>
+              <p class="display-name-shared-note text-xs text-muted">
+                {{ t('playerProfile.displayNameSharedAcrossServers') }}
+              </p>
               <div class="flex items-center gap-2 justify-center">
+                <span class="text-xs text-muted">{{ displayNameInput.length }}/40</span>
                 <button class="btn btn-primary btn-sm" :disabled="displayNameSaving" @click="saveDisplayName">
                   {{ displayNameSaving ? t('common.saving') : t('common.save') }}
                 </button>

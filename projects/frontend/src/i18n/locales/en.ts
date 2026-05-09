@@ -690,6 +690,7 @@ export default {
     displayNameSaveError: 'Failed to save display name. Please try again.',
     displayNameSaved: 'Player name updated.',
     displayNameRealNameWarning: "Don't use your real name — use a fictional alias to protect your privacy.",
+    displayNameSharedAcrossServers: 'Your display name is shared across all game servers.',
     share: 'Share profile',
     shareTooltip: 'Copy profile link to clipboard',
     globalRank: 'Global Rank',
