@@ -32,6 +32,7 @@ export default defineConfig({
     timeout: 120 * 1000,
     env: {
       VITE_GRAPHQL_URL: process.env.VITE_GRAPHQL_URL ?? 'http://localhost:9999/graphql',
+      VITE_AUTH_PASSWORD_ENABLED: 'true',
     },
   },
 })

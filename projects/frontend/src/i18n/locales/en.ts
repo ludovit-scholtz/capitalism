@@ -265,6 +265,7 @@ export default {
     oidcCallbackLoading: 'We are verifying your Biatec token and loading your game profile…',
     oidcCallbackFailed: 'Biatec sign-in failed. Please try again.',
     redirectingToSignIn: 'Redirecting to sign-in…',
+    signedOut: 'You have been signed out.',
     autoSwitchedToMainCity: 'Switched to {city} — your main city.',
     referralBannerTitle: "You've been invited!",
     referralBannerCode: 'Referral code',

@@ -364,31 +364,30 @@ function formatTargetPercent(wealthUsd: number): string {
 
     <!-- Content -->
     <div class="container mx-auto px-4 pt-10 pb-16">
-      <!-- Tab switcher -->
-      <div class="flex gap-2 max-w-[800px] mx-auto mb-6" role="tablist">
-        <button
-          role="tab"
-          :aria-selected="activeTab === 'players'"
-          class="flex-1 py-3 px-4 border border-divider rounded-xl bg-card font-semibold text-muted cursor-pointer transition-colors hover:border-brand hover:text-body"
-          :class="{ 'bg-brand !text-white border-brand': activeTab === 'players' }"
-          @click="activeTab = 'players'"
-        >
-          👤 {{ t('leaderboard.tabPlayers') }}
-        </button>
-        <button
-          role="tab"
-          :aria-selected="activeTab === 'companies'"
-          class="flex-1 py-3 px-4 border border-divider rounded-xl bg-card font-semibold text-muted cursor-pointer transition-colors hover:border-brand hover:text-body"
-          :class="{ 'bg-brand !text-white border-brand': activeTab === 'companies' }"
-          @click="activeTab = 'companies'"
-        >
-          🏢 {{ t('leaderboard.tabCompanies') }}
-        </button>
-      </div>
+      <div class="max-w-[800px] mx-auto mb-6 flex flex-wrap items-center gap-2">
+        <div class="flex min-w-0 flex-1 gap-2" role="tablist">
+          <button
+            role="tab"
+            :aria-selected="activeTab === 'players'"
+            class="flex-1 py-3 px-4 border border-divider rounded-xl bg-card font-semibold text-muted cursor-pointer transition-colors hover:border-brand hover:text-body"
+            :class="{ 'bg-brand !text-white border-brand': activeTab === 'players' }"
+            @click="activeTab = 'players'"
+          >
+            👤 {{ t('leaderboard.tabPlayers') }}
+          </button>
+          <button
+            role="tab"
+            :aria-selected="activeTab === 'companies'"
+            class="flex-1 py-3 px-4 border border-divider rounded-xl bg-card font-semibold text-muted cursor-pointer transition-colors hover:border-brand hover:text-body"
+            :class="{ 'bg-brand !text-white border-brand': activeTab === 'companies' }"
+            @click="activeTab = 'companies'"
+          >
+            🏢 {{ t('leaderboard.tabCompanies') }}
+          </button>
+        </div>
 
-      <div class="max-w-[800px] mx-auto mb-6 flex justify-end">
         <a
-          class="btn btn-secondary"
+          class="btn btn-secondary w-full justify-center sm:w-auto"
           :href="masterRankingUrl"
           target="_blank"
           rel="noopener noreferrer"

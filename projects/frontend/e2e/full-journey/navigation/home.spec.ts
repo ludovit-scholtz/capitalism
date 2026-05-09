@@ -240,6 +240,27 @@ test.describe('Header navigation', () => {
     await expect(page.getByRole('banner').getByText(player.displayName)).toBeVisible()
   })
 
+  test('logout redirects to landing page and shows signed-out toast', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
+    })
+    setupMockApi(page, {
+      players: [player],
+      currentUserId: player.id,
+      currentToken: `token-${player.id}`,
+    })
+    await authenticate(page, `token-${player.id}`)
+
+    await page.goto('/dashboard')
+    await expect(page).toHaveURL('/dashboard')
+
+    await page.locator('button[title="Logout"]').first().click()
+
+    await expect(page).toHaveURL('/')
+    await expect(page).not.toHaveURL(/\/login/)
+    await expect(page.getByText('You have been signed out.')).toBeVisible()
+  })
+
   test('native login auto-switches city context back to the main factory city', async ({ page }) => {
     const player = makeMainCityPlayer()
     setupMockApi(page, { players: [player] })

@@ -17,8 +17,8 @@ It will use real world map. The game will start in single city and later other c
 
 ### Authorization (100% complete)
 
-- [ ] When I log out from game server, the login is executed. Make sure to show the main page after the logout.
-- [ ] Do login/password authorizaiton only if configuration allows it. Make it disabled by default, but make sure to enable it in the tests. This works now on game server, but user password authentication is still enabled on master server.
+- [x] When I log out from game server, the login is executed. Make sure to show the main page after the logout.
+- [x] Do login/password authorizaiton only if configuration allows it. Make it disabled by default, but make sure to enable it in the tests. This works now on game server, but user password authentication is still enabled on master server.
 
 - [x] Do login/password authorizaiton only if configuration allows it. Make it disabled by default, but make sure to enable it in the tests. Do this on game frontend, master frontend and both backends as well. When biatec oidc is the only authorization method, when user goes to /login page, make sure to automatically follow the authorization process as user would click the authorize with google button.
 - [x] Allow special token based authorizations for bots. Create a form for users to create an API key. Each API key is bound to the personal account and user can impersonalize this key to control his controlled companies. Track the usage of the API keys in the administrators section. Create tests to test also negative scenarios such as user is not allow to control foreign company or he cannot do forex swaps. Make sure the bots console app is using this form of authorization.
@@ -56,7 +56,7 @@ It will use real world map. The game will start in single city and later other c
 
 ### Ranking (100% complete)
 
-- [ ] Move link from game ranking to master ranking next to richest players and richest companies
+- [x] Move link from game ranking to master ranking next to richest players and richest companies
 
 ### Optimize for mobile (100% complete)
 

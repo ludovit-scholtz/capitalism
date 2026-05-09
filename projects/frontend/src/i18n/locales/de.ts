@@ -265,6 +265,7 @@ export default {
     oidcCallbackLoading: 'Ihr Biatec-Token wird geprüft und Ihr Spielprofil geladen…',
     oidcCallbackFailed: 'Die Biatec-Anmeldung ist fehlgeschlagen. Bitte versuchen Sie es erneut.',
     redirectingToSignIn: 'Weiterleitung zur Anmeldung…',
+    signedOut: 'Sie wurden abgemeldet.',
     autoSwitchedToMainCity: 'Zu {city} gewechselt — Ihrer Hauptstadt.',
     referralBannerTitle: 'Sie wurden eingeladen!',
     referralBannerCode: 'Empfehlungscode',

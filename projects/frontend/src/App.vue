@@ -25,14 +25,37 @@ const chatStore = useChatStore()
 const referralStore = useReferralStore()
 const { status: endgameStatus } = useEndgameStatus()
 const endgameOverlayDismissed = ref(false)
+const signedOutNoticeVisible = ref(false)
+const SIGNED_OUT_TOAST_DURATION_MS = 4_000
 gameStateStore.start()
 let citySwitchToastTimer: ReturnType<typeof setTimeout> | null = null
+let signedOutToastTimer: ReturnType<typeof setTimeout> | null = null
 
 function clearCitySwitchToastTimer() {
   if (citySwitchToastTimer) {
     clearTimeout(citySwitchToastTimer)
     citySwitchToastTimer = null
   }
+}
+
+function clearSignedOutToastTimer() {
+  if (signedOutToastTimer) {
+    clearTimeout(signedOutToastTimer)
+    signedOutToastTimer = null
+  }
+}
+
+function showSignedOutToastIfPending() {
+  if (typeof sessionStorage === 'undefined' || sessionStorage.getItem('auth_signed_out_notice') !== '1') {
+    return
+  }
+
+  signedOutNoticeVisible.value = true
+  sessionStorage.removeItem('auth_signed_out_notice')
+  clearSignedOutToastTimer()
+  signedOutToastTimer = setTimeout(() => {
+    signedOutNoticeVisible.value = false
+  }, SIGNED_OUT_TOAST_DURATION_MS)
 }
 
 onMounted(() => {
@@ -46,10 +69,13 @@ onMounted(() => {
     void notificationsStore.fetchUnreadCount()
     void gameAdminStore.fetchSession()
   }
+
+  showSignedOutToastIfPending()
 })
 
 onUnmounted(() => {
   clearCitySwitchToastTimer()
+  clearSignedOutToastTimer()
 })
 
 watch(
@@ -59,6 +85,7 @@ watch(
       newsStore.clear()
       notificationsStore.clear()
       gameAdminStore.clear()
+      showSignedOutToastIfPending()
       return
     }
 
@@ -138,6 +165,21 @@ watch(
         {{ t('auth.autoSwitchedToMainCity', { city: auth.autoSwitchedMainCityName }) }}
       </div>
       <button class="btn btn-ghost btn-sm shrink-0" :aria-label="t('common.close')" @click="auth.clearAutoSwitchedMainCityName()">
+        {{ t('common.close') }}
+      </button>
+    </div>
+
+    <div
+      v-if="signedOutNoticeVisible"
+      class="signed-out-toast fixed right-4 top-20 z-[220] flex max-w-sm items-start gap-3 rounded-xl border border-brand/35 bg-card-raised px-4 py-3 shadow-2xl"
+      role="status"
+      aria-live="polite"
+    >
+      <span aria-hidden="true" class="pt-0.5 text-brand">✅</span>
+      <div class="min-w-0 flex-1 text-sm text-body">
+        {{ t('auth.signedOut') }}
+      </div>
+      <button class="btn btn-ghost btn-sm shrink-0" :aria-label="t('common.close')" @click="signedOutNoticeVisible = false">
         {{ t('common.close') }}
       </button>
     </div>

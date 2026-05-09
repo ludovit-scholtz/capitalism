@@ -98,6 +98,14 @@ async function markAllNotificationsRead() {
   await notificationsStore.markAllRead()
 }
 
+async function handleLogout() {
+  const federatedRedirectStarted = auth.logout({ federated: true })
+  closeMenu()
+  if (!federatedRedirectStarted) {
+    await router.push('/')
+  }
+}
+
 const mobileNavSections = computed(() => {
   const sections = [
     {
@@ -306,12 +314,7 @@ const mobileNavSections = computed(() => {
           <ContextSwitcher @switched="closeMenu" />
           <button
             class="btn btn-secondary h-11 w-11 p-0 justify-center tap-target-44"
-            @click="
-              () => {
-                auth.logout({ federated: true })
-                closeMenu()
-              }
-            "
+            @click="handleLogout"
             :title="t('common.logout')"
           >
             <font-awesome-icon :icon="['fas', 'sign-out-alt']" />
