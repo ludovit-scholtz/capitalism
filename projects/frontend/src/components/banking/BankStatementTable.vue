@@ -68,7 +68,14 @@ function categoryLabel(cat: string): string {
   return map[cat] ?? cat
 }
 
+function isInterestCategory(cat: string): boolean {
+  return cat === 'DEPOSIT_INTEREST_RECEIVED' || cat === 'DEPOSIT_INTEREST_PAID'
+}
+
 function categoryIcon(cat: string): string {
+  if (isInterestCategory(cat)) {
+    return '💰'
+  }
   if (['REVENUE', 'MEDIA_HOUSE_INCOME', 'RENT_INCOME', 'DEPOSIT_INTEREST_RECEIVED', 'LOAN_INTEREST_INCOME', 'STOCK_SALE', 'FOUNDER_CONTRIBUTION', 'IPO_RAISE'].includes(cat)) {
     return '+'
   }
@@ -134,7 +141,12 @@ function categoryIcon(cat: string): string {
             {{ t('bankStatement.noTransactions') }}
           </td>
         </tr>
-        <tr v-for="row in rows" :key="row.id" class="statement-row transition-colors hover:bg-card-raised last:[&>td]:border-b-0" :class="row.amount >= 0 ? 'bg-emerald-500/5' : 'bg-red-400/5'">
+        <tr
+          v-for="row in rows"
+          :key="row.id"
+          class="statement-row transition-colors hover:bg-card-raised last:[&>td]:border-b-0"
+          :class="isInterestCategory(row.category) ? 'bg-emerald-500/10 ring-1 ring-emerald-500/20' : row.amount >= 0 ? 'bg-emerald-500/5' : 'bg-red-400/5'"
+        >
           <td class="border-b border-divider px-3 py-2.5 text-xs text-muted whitespace-nowrap align-middle hidden sm:table-cell">
             {{ formatDate(row.recordedAtUtc) }}
           </td>
@@ -146,7 +158,10 @@ function categoryIcon(cat: string): string {
             <div v-if="row.buildingName" class="description-sub text-xs text-muted mt-0.5">🏭 {{ row.buildingName }}</div>
           </td>
           <td class="border-b border-divider px-3 py-2.5 align-middle">
-            <span class="inline-block text-xs font-semibold text-muted bg-card-raised border border-divider rounded px-1.5 py-0.5 whitespace-nowrap">
+            <span
+              class="inline-flex items-center gap-1 text-xs font-semibold bg-card-raised border border-divider rounded px-1.5 py-0.5 whitespace-nowrap"
+              :class="isInterestCategory(row.category) ? 'text-good border-emerald-500/30 bg-emerald-500/10' : 'text-muted'"
+            >
               {{ categoryLabel(row.category) }}
             </span>
           </td>

@@ -2896,6 +2896,58 @@ test.describe('Personal Ledger view', () => {
     await expect(page.getByText('No dividends received yet')).toBeVisible()
   })
 
+  test('personal ledger can filter passive income by interest payments', async ({ page }) => {
+    const player = makePlayer({
+      companies: [],
+      dividendPayments: [
+        {
+          id: 'div-filter-1',
+          companyId: 'company-div',
+          companyName: 'Dividend Corp',
+          shareCount: 100,
+          amountPerShare: 2,
+          totalAmount: 200,
+          gameYear: 2026,
+          recordedAtTick: 40,
+          recordedAtUtc: '2026-02-10T10:00:00Z',
+          description: 'Quarterly dividend',
+        },
+      ],
+      interestPayments: [
+        {
+          id: 'interest-filter-1',
+          companyId: 'company-int',
+          companyName: 'Savings Holdings',
+          bankBuildingId: 'bank-1',
+          bankBuildingName: 'City Bank',
+          amount: 75,
+          recordedAtTick: 41,
+          recordedAtUtc: '2026-02-10T11:00:00Z',
+          currencyCode: 'EUR',
+          description: 'Deposit interest from City Bank',
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/personal-ledger')
+
+    await expect(page.getByRole('heading', { name: 'Passive income activity' })).toBeVisible()
+    await expect(page.locator('table[aria-label="Passive income activity"]')).toContainText('Dividend Corp')
+    await expect(page.locator('table[aria-label="Passive income activity"]')).toContainText('Savings Holdings · City Bank')
+    await page.getByRole('button', { name: 'Interest' }).click()
+    await expect(page.locator('table[aria-label="Passive income activity"]')).toContainText(
+      'Savings Holdings · City Bank',
+    )
+    await expect(page.locator('table[aria-label="Passive income activity"]')).not.toContainText(
+      'Dividend Corp',
+    )
+  })
+
   test('shows full trade history with BUY and SELL entries', async ({ page }) => {
     const player = makePlayer({
       personalCash: 80_000,

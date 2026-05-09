@@ -37,9 +37,23 @@ export type MockPlayer = {
   onboardingFirstSaleCompletedAtUtc: string | null
   appliedReferralCode: string | null
   proSubscriptionEndsAtUtc: string | null
+  interestPayments: MockPersonalInterestPayment[]
   dividendPayments: MockDividendPayment[]
   stockTrades: MockPersonTradeRecord[]
   companies: MockCompany[]
+}
+
+export type MockPersonalInterestPayment = {
+  id: string
+  companyId: string
+  companyName: string
+  bankBuildingId: string | null
+  bankBuildingName: string | null
+  amount: number
+  recordedAtTick: number
+  recordedAtUtc: string
+  currencyCode: string
+  description: string
 }
 
 export type MockDividendPayment = {
@@ -1944,6 +1958,7 @@ export function makePlayer(overrides?: Partial<MockPlayer>): MockPlayer {
     onboardingFirstSaleCompletedAtUtc: null,
     appliedReferralCode: null,
     proSubscriptionEndsAtUtc: null,
+    interestPayments: [],
     dividendPayments: [],
     stockTrades: [],
     companies: [],
@@ -3125,6 +3140,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             ? input.referralCode.trim().toUpperCase()
             : null,
         proSubscriptionEndsAtUtc: null,
+        interestPayments: [],
         dividendPayments: [],
         stockTrades: [],
         companies: [],
@@ -6030,6 +6046,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               activeAccountType: player.activeAccountType,
               activeCompanyId: player.activeCompanyId,
               shareholdings,
+              interestPayments: player.interestPayments ?? [],
               dividendPayments: player.dividendPayments,
               stockTrades: player.stockTrades,
             },

@@ -17,6 +17,7 @@ const personAccount = ref<PersonAccount | null>(null)
 const endgameStatus = ref<EndgameStatus | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
+const incomeFilter = ref<'ALL' | 'INTEREST' | 'DIVIDEND'>('ALL')
 
 const PERSON_ACCOUNT_QUERY = `
   query PersonAccountLedger {
@@ -36,6 +37,18 @@ const PERSON_ACCOUNT_QUERY = `
         ownershipRatio
         sharePrice
         marketValue
+      }
+      interestPayments {
+        id
+        companyId
+        companyName
+        bankBuildingId
+        bankBuildingName
+        amount
+        recordedAtTick
+        recordedAtUtc
+        currencyCode
+        description
       }
       dividendPayments {
         id
@@ -90,6 +103,41 @@ const portfolioValue = computed(() =>
 const sellTrades = computed(() =>
   (personAccount.value?.stockTrades ?? []).filter((t) => t.direction === 'SELL'),
 )
+
+const incomeRows = computed(() => {
+  const account = personAccount.value
+  if (!account) return []
+  const dividends = account.dividendPayments.map((payment) => ({
+    id: payment.id,
+    type: 'DIVIDEND' as const,
+    source: payment.companyName,
+    description: payment.description,
+    amount: payment.totalAmount,
+    currencyCode: 'EUR',
+    recordedAtTick: payment.recordedAtTick,
+    recordedAtUtc: payment.recordedAtUtc,
+  }))
+  const interests = (account.interestPayments ?? []).map((payment) => ({
+    id: payment.id,
+    type: 'INTEREST' as const,
+    source: payment.bankBuildingName ? `${payment.companyName} · ${payment.bankBuildingName}` : payment.companyName,
+    description: payment.description,
+    amount: payment.amount,
+    currencyCode: payment.currencyCode || 'EUR',
+    recordedAtTick: payment.recordedAtTick,
+    recordedAtUtc: payment.recordedAtUtc,
+  }))
+  return [...dividends, ...interests].sort(
+    (left, right) =>
+      right.recordedAtTick - left.recordedAtTick
+      || new Date(right.recordedAtUtc).getTime() - new Date(left.recordedAtUtc).getTime(),
+  )
+})
+
+const filteredIncomeRows = computed(() => {
+  if (incomeFilter.value === 'ALL') return incomeRows.value
+  return incomeRows.value.filter((row) => row.type === incomeFilter.value)
+})
 
 const raceProgressPercent = computed(() => {
   const threshold = endgameStatus.value?.winningThresholdUsd ?? 0
@@ -426,6 +474,81 @@ useTickRefresh(() => loadData(true))
                   <td class="border-b border-divider px-3 py-[0.55rem] text-right tabular-nums"><CurrencyAmount :amount="trade.pricePerShare" currency="EUR" /></td>
                   <td class="border-b border-divider px-3 py-[0.55rem] text-right tabular-nums"><CurrencyAmount :amount="trade.totalValue" currency="EUR" /></td>
                   <td class="border-b border-divider px-3 py-[0.55rem]">{{ formatDateTime(trade.recordedAtUtc) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Passive income history -->
+        <section class="rounded-2xl border border-divider bg-card p-6 shadow-sm">
+          <div class="mb-4 flex items-start justify-between gap-4">
+            <div>
+              <h2 class="text-lg font-semibold">{{ t('personalLedger.passiveIncomeTitle') }}</h2>
+              <p class="mt-1 text-sm text-muted">{{ t('personalLedger.passiveIncomeDesc') }}</p>
+            </div>
+          </div>
+
+          <div class="mb-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.04em]"
+              :class="incomeFilter === 'ALL' ? 'border-brand bg-brand/10 text-brand' : 'border-divider bg-card-raised text-muted'"
+              @click="incomeFilter = 'ALL'"
+            >
+              {{ t('personalLedger.filterAll') }}
+            </button>
+            <button
+              type="button"
+              class="rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.04em]"
+              :class="incomeFilter === 'INTEREST' ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700' : 'border-divider bg-card-raised text-muted'"
+              @click="incomeFilter = 'INTEREST'"
+            >
+              {{ t('personalLedger.filterInterest') }}
+            </button>
+            <button
+              type="button"
+              class="rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.04em]"
+              :class="incomeFilter === 'DIVIDEND' ? 'border-brand bg-brand/10 text-brand' : 'border-divider bg-card-raised text-muted'"
+              @click="incomeFilter = 'DIVIDEND'"
+            >
+              {{ t('personalLedger.filterDividend') }}
+            </button>
+          </div>
+
+          <p v-if="filteredIncomeRows.length === 0" class="py-6 text-center text-sm text-muted">
+            {{ t('personalLedger.passiveIncomeEmpty') }}
+          </p>
+          <div v-else class="overflow-x-auto">
+            <table class="w-full border-collapse text-sm" :aria-label="t('personalLedger.passiveIncomeTitle')">
+              <thead>
+                <tr>
+                  <th class="border-b border-divider px-3 py-2 text-left text-[0.78rem] font-bold uppercase tracking-[0.06em] text-muted">{{ t('personalLedger.type') }}</th>
+                  <th class="border-b border-divider px-3 py-2 text-left text-[0.78rem] font-bold uppercase tracking-[0.06em] text-muted">{{ t('personalLedger.company') }}</th>
+                  <th class="border-b border-divider px-3 py-2 text-left text-[0.78rem] font-bold uppercase tracking-[0.06em] text-muted">{{ t('bankStatement.columns.tick') }}</th>
+                  <th class="border-b border-divider px-3 py-2 text-right text-[0.78rem] font-bold uppercase tracking-[0.06em] text-muted">{{ t('personalLedger.amount') }}</th>
+                  <th class="border-b border-divider px-3 py-2 text-left text-[0.78rem] font-bold uppercase tracking-[0.06em] text-muted">{{ t('personalLedger.recordedAt') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in filteredIncomeRows" :key="row.id">
+                  <td class="border-b border-divider px-3 py-[0.55rem]">
+                    <span
+                      class="inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[0.72rem] font-bold"
+                      :class="row.type === 'INTEREST' ? 'bg-emerald-500/15 text-emerald-700' : 'bg-brand/15 text-brand'"
+                    >
+                      {{ row.type === 'INTEREST' ? t('personalLedger.filterInterest') : t('personalLedger.filterDividend') }}
+                    </span>
+                  </td>
+                  <td class="border-b border-divider px-3 py-[0.55rem]">{{ row.source }}</td>
+                  <td class="border-b border-divider px-3 py-[0.55rem] text-xs text-muted">#{{ row.recordedAtTick }}</td>
+                  <td class="border-b border-divider px-3 py-[0.55rem] text-right tabular-nums font-semibold text-good">
+                    <CurrencyAmount :amount="row.amount" :currency="row.currencyCode" />
+                  </td>
+                  <td class="border-b border-divider px-3 py-[0.55rem]">
+                    <div>{{ formatDateTime(row.recordedAtUtc) }}</div>
+                    <div class="text-xs text-muted">{{ row.description }}</div>
+                  </td>
                 </tr>
               </tbody>
             </table>

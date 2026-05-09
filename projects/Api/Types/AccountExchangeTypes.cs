@@ -22,8 +22,23 @@ public sealed class PersonAccountResult
     public string ActiveAccountType { get; set; } = string.Empty;
     public Guid? ActiveCompanyId { get; set; }
     public List<PortfolioHoldingResult> Shareholdings { get; set; } = [];
+    public List<PersonalInterestPaymentResult> InterestPayments { get; set; } = [];
     public List<DividendPaymentResult> DividendPayments { get; set; } = [];
     public List<PersonTradeRecordResult> StockTrades { get; set; } = [];
+}
+
+public sealed class PersonalInterestPaymentResult
+{
+    public Guid Id { get; set; }
+    public Guid CompanyId { get; set; }
+    public string CompanyName { get; set; } = string.Empty;
+    public Guid? BankBuildingId { get; set; }
+    public string? BankBuildingName { get; set; }
+    public decimal Amount { get; set; }
+    public long RecordedAtTick { get; set; }
+    public DateTime RecordedAtUtc { get; set; }
+    public string CurrencyCode { get; set; } = "EUR";
+    public string Description { get; set; } = string.Empty;
 }
 
 public sealed class PortfolioHoldingResult

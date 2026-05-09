@@ -500,6 +500,108 @@ test.describe('Forex Exchange page', () => {
     await expect(page.locator('#bank-transfer-from option', { hasText: player.companies[0]?.name ?? 'My Company' })).toHaveCount(0)
   })
 
+  test('transfer success clears amount and does not show invalid amount error', async ({ page }) => {
+    const player = makePlayer()
+    const companyId = player.companies[0]?.id ?? 'comp-1'
+    player.activeAccountType = 'COMPANY'
+    player.activeCompanyId = companyId
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.myBankAccounts = [
+      {
+        id: 'xfer-eur-1',
+        accountNumber: '7777777777777701',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        balance: 2500,
+        companyId,
+        companyName: player.companies[0]?.name ?? 'My Company',
+        ownerType: 'COMPANY',
+        ownerDisplayName: player.companies[0]?.name ?? 'My Company',
+      },
+      {
+        id: 'xfer-eur-2',
+        accountNumber: '7777777777777702',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        balance: 500,
+        companyId,
+        companyName: player.companies[0]?.name ?? 'My Company',
+        ownerType: 'COMPANY',
+        ownerDisplayName: player.companies[0]?.name ?? 'My Company',
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/forex?tab=transfer')
+    await page.getByRole('tab', { name: 'Transfer' }).click()
+
+    await page.getByLabel('From account').selectOption('xfer-eur-1')
+    await page.getByLabel('To account').selectOption('xfer-eur-2')
+    await page.getByLabel('Amount').fill('100')
+    await page.getByRole('button', { name: 'Transfer Funds' }).click()
+
+    await expect(page.getByText('Transfer successful!')).toBeVisible()
+    await expect(page.getByText('Enter a positive amount.')).toHaveCount(0)
+    await expect(page.getByLabel('Amount')).toHaveValue('')
+  })
+
+  test('transfer shows positive amount validation only for invalid submit', async ({ page }) => {
+    const player = makePlayer()
+    const companyId = player.companies[0]?.id ?? 'comp-1'
+    player.activeAccountType = 'COMPANY'
+    player.activeCompanyId = companyId
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.myBankAccounts = [
+      {
+        id: 'xfer-invalid-1',
+        accountNumber: '7777777777777711',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        balance: 1200,
+        companyId,
+        companyName: player.companies[0]?.name ?? 'My Company',
+        ownerType: 'COMPANY',
+        ownerDisplayName: player.companies[0]?.name ?? 'My Company',
+      },
+      {
+        id: 'xfer-invalid-2',
+        accountNumber: '7777777777777712',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        balance: 200,
+        companyId,
+        companyName: player.companies[0]?.name ?? 'My Company',
+        ownerType: 'COMPANY',
+        ownerDisplayName: player.companies[0]?.name ?? 'My Company',
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/forex?tab=transfer')
+    await page.getByRole('tab', { name: 'Transfer' }).click()
+
+    await page.getByLabel('From account').selectOption('xfer-invalid-1')
+    await page.getByLabel('To account').selectOption('xfer-invalid-2')
+    await page.getByLabel('Amount').fill('0')
+    await page.getByRole('button', { name: 'Transfer Funds' }).click()
+
+    await expect(page.getByText('Enter a positive amount.')).toBeVisible()
+  })
+
   test('successfully completes a bank account swap and shows result', async ({ page }) => {
     const player = makePlayer()
     player.personalCash = 0
