@@ -191,6 +191,191 @@ test.describe('Real-world Map Integration', () => {
     await expect(panel.getByText('1.42x')).toBeVisible()
   })
 
+  test('city power planning section shows weather, forecast, and grid guidance', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-power',
+          playerId: 'player-1',
+          name: 'Power Corp',
+          cash: 2000000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [
+            {
+              id: 'plant-1',
+              companyId: 'company-power',
+              cityId: 'city-ba',
+              type: 'POWER_PLANT',
+              name: 'Solar Plant',
+              latitude: 48.155,
+              longitude: 17.115,
+              level: 1,
+              powerConsumption: 0,
+              powerOutput: 20,
+              powerPlantType: 'SOLAR',
+              powerStatus: 'POWERED',
+              isForSale: false,
+              builtAtUtc: '2026-01-01T00:00:00Z',
+              units: [],
+              pendingConfiguration: null,
+            },
+            {
+              id: 'factory-1',
+              companyId: 'company-power',
+              cityId: 'city-ba',
+              type: 'FACTORY',
+              name: 'Factory A',
+              latitude: 48.16,
+              longitude: 17.12,
+              level: 1,
+              powerConsumption: 5,
+              powerStatus: 'POWERED',
+              isForSale: false,
+              builtAtUtc: '2026-01-01T00:00:00Z',
+              units: [],
+              pendingConfiguration: null,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.cityWeatherForecasts['city-ba'] = {
+      cityId: 'city-ba',
+      currentWindPercent: 54,
+      currentSolarPercent: 78,
+      forecast: Array.from({ length: 24 }, (_, index) => ({
+        tick: index + 1,
+        windPercent: 40 + (index % 5) * 5,
+        solarPercent: 60 + (index % 4) * 6,
+      })),
+    }
+    await authenticateViaLocalStorage(page, player.id)
+
+    await page.goto('/city/city-ba')
+
+    const powerSection = page.getByTestId('city-power-section')
+    await powerSection.scrollIntoViewIfNeeded()
+    await expect(powerSection.getByRole('heading', { name: /Weather & Power/i })).toBeVisible()
+
+    const weatherCard = page.getByTestId('city-weather-card')
+    await expect(weatherCard).toBeVisible()
+    await expect(weatherCard.getByTestId('solar-badge')).toContainText('78%')
+    await expect(weatherCard.getByTestId('wind-badge')).toContainText('54%')
+    await expect(weatherCard.locator('.forecast-bar-group')).toHaveCount(24)
+
+    const balanceCard = page.getByTestId('city-power-balance-card')
+    await expect(balanceCard).toBeVisible()
+    await expect(balanceCard.locator('.status-balanced')).toBeVisible()
+    await expect(balanceCard.locator('.balance-guidance')).toContainText(/balanced|surplus|revenue/i)
+
+    const whyCard = page.getByTestId('why-matters-card')
+    await expect(whyCard).toBeVisible()
+    await expect(whyCard.locator('.solar-item')).toBeVisible()
+    await expect(whyCard.locator('.wind-item')).toBeVisible()
+    await expect(whyCard.locator('.power-item')).toBeVisible()
+  })
+
+  test('city power planning section shows constrained shortage state', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-power',
+          playerId: 'player-1',
+          name: 'Power Corp',
+          cash: 2000000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [
+            {
+              id: 'plant-1',
+              companyId: 'company-power',
+              cityId: 'city-ba',
+              type: 'POWER_PLANT',
+              name: 'Small Coal Plant',
+              latitude: 48.155,
+              longitude: 17.115,
+              level: 1,
+              powerConsumption: 0,
+              powerOutput: 8,
+              powerPlantType: 'COAL',
+              powerStatus: 'POWERED',
+              isForSale: false,
+              builtAtUtc: '2026-01-01T00:00:00Z',
+              units: [],
+              pendingConfiguration: null,
+            },
+            {
+              id: 'factory-1',
+              companyId: 'company-power',
+              cityId: 'city-ba',
+              type: 'FACTORY',
+              name: 'Factory A',
+              latitude: 48.16,
+              longitude: 17.12,
+              level: 1,
+              powerConsumption: 5,
+              powerStatus: 'CONSTRAINED',
+              isForSale: false,
+              builtAtUtc: '2026-01-01T00:00:00Z',
+              units: [],
+              pendingConfiguration: null,
+            },
+            {
+              id: 'factory-2',
+              companyId: 'company-power',
+              cityId: 'city-ba',
+              type: 'FACTORY',
+              name: 'Factory B',
+              latitude: 48.17,
+              longitude: 17.13,
+              level: 1,
+              powerConsumption: 5,
+              powerStatus: 'CONSTRAINED',
+              isForSale: false,
+              builtAtUtc: '2026-01-01T00:00:00Z',
+              units: [],
+              pendingConfiguration: null,
+            },
+            {
+              id: 'factory-3',
+              companyId: 'company-power',
+              cityId: 'city-ba',
+              type: 'FACTORY',
+              name: 'Factory C',
+              latitude: 48.18,
+              longitude: 17.14,
+              level: 1,
+              powerConsumption: 5,
+              powerStatus: 'CONSTRAINED',
+              isForSale: false,
+              builtAtUtc: '2026-01-01T00:00:00Z',
+              units: [],
+              pendingConfiguration: null,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await authenticateViaLocalStorage(page, player.id)
+
+    await page.goto('/city/city-ba')
+
+    const balanceCard = page.getByTestId('city-power-balance-card')
+    await balanceCard.scrollIntoViewIfNeeded()
+    await expect(balanceCard).toBeVisible()
+    await expect(balanceCard.locator('.status-constrained')).toBeVisible()
+    await expect(balanceCard.locator('.balance-guidance')).toContainText(/shortage|capacity|returns/i)
+  })
+
   // ── AC7: Performance — 100+ markers load without degradation ─────────────
 
   test('map loads and renders 100+ lot markers without timeout', async ({ page }) => {
