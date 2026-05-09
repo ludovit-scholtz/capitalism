@@ -2166,6 +2166,104 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
     }
 
     /// <summary>
+    /// setPlantDispatch must reject player-owned non-power-plant buildings with INVALID_BUILDING_TYPE.
+    /// This protects the mutation boundary so regular factories cannot be configured as generators.
+    /// </summary>
+    [Fact]
+    public async Task SetPlantDispatch_NonPowerPlant_ReturnsInvalidBuildingType()
+    {
+        var token = await RegisterAndGetTokenAsync($"dispatch_factory_{Guid.NewGuid():N}"[..28] + "@t.com", "DispatchFactoryTester");
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var player = await db.Players.OrderByDescending(p => p.CreatedAtUtc).FirstDeterministicAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
+        var company = await db.Companies.Where(c => c.PlayerId == player.Id).FirstOrDefaultAsync();
+        if (company is null)
+        {
+            company = new Company { Id = Guid.NewGuid(), Name = "Dispatch Factory Co", Cash = 0m, PlayerId = player.Id, FoundedAtUtc = DateTime.UtcNow };
+            db.Companies.Add(company);
+            await db.SaveChangesAsync();
+        }
+
+        var factory = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.Factory, Name = "Dispatch Factory",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerConsumption = GameConstants.PowerDemandMw(BuildingType.Factory, 1),
+            BuiltAtUtc = DateTime.UtcNow
+        };
+        db.Buildings.Add(factory);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation SetDispatch($buildingId: UUID!, $percent: Int!) {
+                setPlantDispatch(input: { buildingId: $buildingId, dispatchTargetPercent: $percent }) {
+                    id
+                }
+            }
+            """,
+            new { buildingId = factory.Id, percent = 50 },
+            token);
+
+        var errorCode = result.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("INVALID_BUILDING_TYPE", errorCode);
+    }
+
+    /// <summary>
+    /// setPlantDispatch must enforce ownership checks and hide foreign plants behind BUILDING_NOT_FOUND.
+    /// </summary>
+    [Fact]
+    public async Task SetPlantDispatch_ForeignPlant_ReturnsBuildingNotFound()
+    {
+        _ = await RegisterAndGetTokenAsync($"dispatch_owner_{Guid.NewGuid():N}"[..28] + "@t.com", "DispatchOwner");
+        var foreignToken = await RegisterAndGetTokenAsync($"dispatch_foreign_{Guid.NewGuid():N}"[..28] + "@t.com", "DispatchForeign");
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var owner = await db.Players.SingleAsync(p => p.Email.StartsWith("dispatch_owner_"));
+        var city = await db.Cities.FirstDeterministicAsync();
+        var company = await db.Companies.Where(c => c.PlayerId == owner.Id).FirstOrDefaultAsync();
+        if (company is null)
+        {
+            company = new Company { Id = Guid.NewGuid(), Name = "Dispatch Owner Co", Cash = 0m, PlayerId = owner.Id, FoundedAtUtc = DateTime.UtcNow };
+            db.Companies.Add(company);
+            await db.SaveChangesAsync();
+        }
+
+        var plant = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.PowerPlant, Name = "Foreign Dispatch Plant",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerPlantType = "COAL", PowerOutput = 50m,
+            DispatchTargetPercent = 100, BuiltAtUtc = DateTime.UtcNow
+        };
+        db.Buildings.Add(plant);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation SetDispatch($buildingId: UUID!, $percent: Int!) {
+                setPlantDispatch(input: { buildingId: $buildingId, dispatchTargetPercent: $percent }) {
+                    id
+                }
+            }
+            """,
+            new { buildingId = plant.Id, percent = 25 },
+            foreignToken);
+
+        var errorCode = result.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("BUILDING_NOT_FOUND", errorCode);
+
+        await db.Entry(plant).ReloadAsync();
+        Assert.Equal(100, plant.DispatchTargetPercent);
+    }
+
+    /// <summary>
     /// powerPlantAnalytics query must return the new fuel-reserve capacity fields:
     /// maxFuelReserveMwh, fuelReservePercent, fuelPurchaseCapacityMwhPerTick,
     /// energyProducingCapacityMw, fuelConstrainedOutputMw, fuelTypeLabel, and fuelCostPerMwhEur.
@@ -2433,6 +2531,99 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
         Assert.Equal("Natural Gas", analytics.GetProperty("fuelTypeLabel").GetString());
         Assert.Equal(GameConstants.FuelCostPerMwhBase * GameConstants.GasFuelCostMultiplier,
             analytics.GetProperty("fuelCostPerMwhEur").GetDecimal());
+    }
+
+    /// <summary>
+    /// powerPlantAnalytics must reject non-power-plant buildings with NOT_A_POWER_PLANT.
+    /// </summary>
+    [Fact]
+    public async Task PowerPlantAnalytics_NonPowerPlant_ReturnsNotAPowerPlant()
+    {
+        var token = await RegisterAndGetTokenAsync($"analytics_factory_{Guid.NewGuid():N}"[..28] + "@t.com", "AnalyticsFactoryTester");
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var player = await db.Players.OrderByDescending(p => p.CreatedAtUtc).FirstDeterministicAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
+        var company = await db.Companies.Where(c => c.PlayerId == player.Id).FirstOrDefaultAsync();
+        if (company is null)
+        {
+            company = new Company { Id = Guid.NewGuid(), Name = "Analytics Factory Co", Cash = 0m, PlayerId = player.Id, FoundedAtUtc = DateTime.UtcNow };
+            db.Companies.Add(company);
+            await db.SaveChangesAsync();
+        }
+
+        var factory = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.Factory, Name = "Analytics Factory",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerConsumption = GameConstants.PowerDemandMw(BuildingType.Factory, 1),
+            BuiltAtUtc = DateTime.UtcNow
+        };
+        db.Buildings.Add(factory);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query Analytics($buildingId: UUID!) {
+                powerPlantAnalytics(buildingId: $buildingId) {
+                    buildingId
+                }
+            }
+            """,
+            new { buildingId = factory.Id },
+            token);
+
+        var errorCode = result.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("NOT_A_POWER_PLANT", errorCode);
+    }
+
+    /// <summary>
+    /// powerPlantAnalytics must enforce ownership checks and hide foreign plants behind BUILDING_NOT_FOUND.
+    /// </summary>
+    [Fact]
+    public async Task PowerPlantAnalytics_ForeignPlant_ReturnsBuildingNotFound()
+    {
+        _ = await RegisterAndGetTokenAsync($"analytics_owner_{Guid.NewGuid():N}"[..28] + "@t.com", "AnalyticsOwner");
+        var foreignToken = await RegisterAndGetTokenAsync($"analytics_foreign_{Guid.NewGuid():N}"[..28] + "@t.com", "AnalyticsForeign");
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var owner = await db.Players.SingleAsync(p => p.Email.StartsWith("analytics_owner_"));
+        var city = await db.Cities.FirstDeterministicAsync();
+        var company = await db.Companies.Where(c => c.PlayerId == owner.Id).FirstOrDefaultAsync();
+        if (company is null)
+        {
+            company = new Company { Id = Guid.NewGuid(), Name = "Analytics Owner Co", Cash = 0m, PlayerId = owner.Id, FoundedAtUtc = DateTime.UtcNow };
+            db.Companies.Add(company);
+            await db.SaveChangesAsync();
+        }
+
+        var plant = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.PowerPlant, Name = "Foreign Analytics Plant",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerPlantType = "WIND", PowerOutput = 25m, BuiltAtUtc = DateTime.UtcNow
+        };
+        db.Buildings.Add(plant);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query Analytics($buildingId: UUID!) {
+                powerPlantAnalytics(buildingId: $buildingId) {
+                    buildingId
+                }
+            }
+            """,
+            new { buildingId = plant.Id },
+            foreignToken);
+
+        var errorCode = result.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("BUILDING_NOT_FOUND", errorCode);
     }
 
     // ── Reserve capacity analytics — non-thermal plant ────────────────────────

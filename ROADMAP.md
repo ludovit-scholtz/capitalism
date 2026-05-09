@@ -33,6 +33,12 @@ It will use real world map. The game will start in single city and later other c
 - [x] In bank building in `operating-account-row` is too much content that does not fit into the row. Add `Bank Statement Review` in second line or somewhere else.
 - [x] Create a workflow to destroy a building. Make sure the button to destroy the building is in the sell building form and show also the refund how much user will receive. When building is destroyed, return the user 80% of the building property value. Make the property available for purchase again. When bank loan is not paid set it for sale for the property market price minus 10%. When the debt from missed payments is not paid in 3 game days (72 ticks), destroy the building and pay any remaining debt from the sale of property to the bank owner.
 
+### Power Plants & Energy System (100% complete)
+
+- [x] Add the city-wide power grid with five power-plant types, weather-aware renewable output, thermal fuel reserve handling, and legacy-grid fallback when a city has no player-owned plants.
+- [x] Show power status and power-balance guidance in the dashboard, city map, and building detail flows, including power-plant analytics and dispatch controls.
+- [x] Cover the power system with backend and Playwright regression tests, including dispatch authorization/validation guardrails and power-plant analytics ownership checks.
+
 
 ### Banks (100% complete)
 
