@@ -42,13 +42,13 @@ It will use real world map. The game will start in single city and later other c
 - [x] Add full city-level company financial widget/tab and dedicated cross-city shipment progress timeline in ledger logistics section.
 - [x] Extend purchase-unit UI with first-class cross-city source selector and landed-cost comparison table in all relevant building flows.
 
-### Consumable Raw Materials & Resource Scarcity Mechanics (90% complete)
+### Consumable Raw Materials & Resource Scarcity Mechanics (100% complete)
 
 - [x] Mining now consumes finite lot deposits each tick with a diminishing-return efficiency curve tied to remaining reserve levels.
 - [x] Added live resource-scarcity GraphQL surfaces (`getLandResourceStatus`, `getCityResourceMap`) with efficiency and depletion estimates.
 - [x] Added mine low-reserve (20%) and critical-reserve (5%) notifications plus stronger map/dashboard depletion visibility.
 - [x] Enforced game-engine safeguard to maintain at least 2 non-depleted purchasable deposits per resource type in each city.
-- [ ] Add full mine-side historical extraction chart UX (30-day sparkline + expanded depletion timeline dialog) in building detail.
+- [x] Added full mine-side historical extraction chart UX (30-day sparkline + expanded depletion timeline dialog) in building detail, backed by `getMineExtractionHistory` and `getMineDepletionForecast` GraphQL queries, with per-tick record persistence in `MiningPhase` and 90-day pruning.
 
 ### Power Plants & Energy System (100% complete)
 
