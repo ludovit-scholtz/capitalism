@@ -4,6 +4,7 @@ using Api.Engine;
 using Api.Engine.Phases;
 using Api.Security;
 using Api.Utilities;
+using HotChocolate;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
 
@@ -96,6 +97,17 @@ public sealed partial class Query
     }
 
     /// <summary>
+    /// Compatibility alias for cross-city shipment list used by expansion flows.
+    /// </summary>
+    [Authorize]
+    [GraphQLName("getCrossCityShipments")]
+    public Task<List<TradeRouteResult>> GetCrossCityShipments(
+        Guid? companyId,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+        => GetMyTradeRoutes(companyId, db, httpContextAccessor);
+
+    /// <summary>
     /// Estimates the shipping cost and transit time for a prospective trade route.
     /// </summary>
     public async Task<TradeRouteEstimate> EstimateTradeRoute(
@@ -143,6 +155,63 @@ public sealed partial class Query
             ShippingCostPerUnit: shippingCostPerUnit,
             TotalShippingCost: shippingCostPerUnit * quantity);
     }
+
+    /// <summary>
+    /// Returns freight estimate for sourcing from an origin building to another city.
+    /// Uses the product-definition transit rule: ceil(distance / 500), minimum 1 tick.
+    /// </summary>
+    [GraphQLName("getLogisticsCostEstimate")]
+    public async Task<LogisticsCostEstimateResult> GetLogisticsCostEstimate(
+        Guid originBuildingId,
+        Guid destinationCityId,
+        Guid? resourceTypeId,
+        Guid? productTypeId,
+        decimal quantity,
+        [Service] AppDbContext db)
+    {
+        if (quantity <= 0m)
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("Quantity must be positive.").SetCode("INVALID_QUANTITY").Build());
+
+        var originBuilding = await db.Buildings
+            .Include(b => b.City)
+            .FirstOrDefaultAsync(b => b.Id == originBuildingId)
+            ?? throw new GraphQLException(ErrorBuilder.New().SetMessage("Origin building not found.").SetCode("BUILDING_NOT_FOUND").Build());
+
+        var destinationCity = await db.Cities
+            .FirstOrDefaultAsync(c => c.Id == destinationCityId)
+            ?? throw new GraphQLException(ErrorBuilder.New().SetMessage("Destination city not found.").SetCode("CITY_NOT_FOUND").Build());
+
+        var resourceTypesById = await db.ResourceTypes.ToDictionaryAsync(r => r.Id);
+        var productTypesById = await db.ProductTypes.ToDictionaryAsync(p => p.Id);
+        var recipesByProduct = (await db.ProductRecipes.ToListAsync())
+            .GroupBy(r => r.ProductTypeId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var itemWeight = GlobalExchangeCalculator.ComputeItemWeightPerUnit(
+            resourceTypeId, productTypeId, resourceTypesById, productTypesById, recipesByProduct);
+
+        var shippingCostPerUnit = GlobalExchangeCalculator.ComputeTransitCostPerUnit(
+            originBuilding.Latitude, originBuilding.Longitude,
+            destinationCity.Latitude, destinationCity.Longitude,
+            itemWeight, destinationCity.FuelPriceIndex);
+
+        var distanceKm = GlobalExchangeCalculator.ComputeDistanceKm(
+            originBuilding.Latitude, originBuilding.Longitude,
+            destinationCity.Latitude, destinationCity.Longitude);
+
+        var transitTicks = ComputeCrossCityTransitTicks(distanceKm);
+        var currentTick = await db.GameStates.Select(gs => gs.CurrentTick).FirstOrDefaultAsync();
+
+        return new LogisticsCostEstimateResult(
+            DistanceKm: (decimal)distanceKm,
+            FreightCostPerUnit: shippingCostPerUnit,
+            TotalFreightCost: shippingCostPerUnit * quantity,
+            TransitTicks: transitTicks,
+            EstimatedArrivalTick: currentTick + transitTicks);
+    }
+
+    private static long ComputeCrossCityTransitTicks(double distanceKm)
+        => Math.Max(1L, (long)Math.Ceiling(distanceKm / 500.0d));
 
     private static TradeRouteResult MapRouteToResult(InterCityTradeRoute r) => new(
         Id: r.Id,
@@ -210,3 +279,11 @@ public record TradeRouteEstimate(
     long TransitTicks,
     decimal ShippingCostPerUnit,
     decimal TotalShippingCost);
+
+/// <summary>Freight estimate payload used by cross-city expansion UX.</summary>
+public record LogisticsCostEstimateResult(
+    decimal DistanceKm,
+    decimal FreightCostPerUnit,
+    decimal TotalFreightCost,
+    long TransitTicks,
+    long EstimatedArrivalTick);

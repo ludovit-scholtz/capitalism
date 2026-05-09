@@ -19,6 +19,7 @@ const router = createRouter({
     },
     { path: '/player/:id', name: 'player-profile', component: () => import('@/views/PlayerProfileView.vue') },
     { path: '/cities', name: 'cities', component: () => import('@/views/CitiesView.vue') },
+    { path: '/map', name: 'world-map', component: () => import('@/views/WorldMapView.vue') },
     { path: '/buildings/market', name: 'building-market', component: () => import('@/views/BuildingMarketView.vue') },
     { path: '/encyclopedia', name: 'encyclopedia', component: () => import('@/views/ManufacturingEncyclopediaView.vue') },
     {
