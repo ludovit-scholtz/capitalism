@@ -212,6 +212,7 @@ test('player A cannot list player B building for sale via GraphQL mutation', asy
 
   expect(result.errors?.length ?? 0).toBeGreaterThan(0)
   expect(result.errors[0].message).toContain('Building not found')
+  expect(result.errors[0].extensions?.code).toBe('BUILDING_NOT_FOUND')
 })
 
 test('hides make offer button for guests', async ({ page }) => {

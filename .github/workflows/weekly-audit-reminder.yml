@@ -18,6 +18,7 @@ jobs:
         with:
           script: |
             function getIsoWeekParts(date) {
+              // ISO 8601: weeks start on Monday and week 1 contains January 4.
               const utc = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
               const day = utc.getUTCDay() || 7
               utc.setUTCDate(utc.getUTCDate() + 4 - day)

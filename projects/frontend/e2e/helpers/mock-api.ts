@@ -4315,7 +4315,18 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const building = player?.companies.flatMap((company) => company.buildings).find((candidate) => candidate.id === input?.buildingId)
 
       if (!building) {
-        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Building not found' }] }) })
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              {
+                message: 'Building not found',
+                extensions: { code: 'BUILDING_NOT_FOUND' },
+              },
+            ],
+          }),
+        })
       }
 
       // Allow tests to force a CONTRADICTORY_LINK error (or any other config error) to verify
@@ -4652,7 +4663,18 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const building = player?.companies.flatMap((company) => company.buildings).find((candidate) => candidate.id === input?.buildingId)
 
       if (!building) {
-        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Building not found' }] }) })
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              {
+                message: 'Building not found',
+                extensions: { code: 'BUILDING_NOT_FOUND' },
+              },
+            ],
+          }),
+        })
       }
 
       if (input?.isForSale === false) {
