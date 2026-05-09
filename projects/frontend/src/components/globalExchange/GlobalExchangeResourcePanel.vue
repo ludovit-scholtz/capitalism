@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import { useAuthStore } from '@/stores/auth'
 import UiStateLoading from '@/components/ui/UiStateLoading.vue'
 import UiStateError from '@/components/ui/UiStateError.vue'
 import UiStateEmpty from '@/components/ui/UiStateEmpty.vue'
@@ -39,9 +40,11 @@ const emit = defineEmits<{
   'update:selectedCategory': [value: string]
   'switch-city': [cityId: string]
   retry: []
+  'buy-offer': [offer: GlobalExchangeOffer & { resourceName: string; unitSymbol: string }]
 }>()
 
 const { t } = useI18n()
+const auth = useAuthStore()
 
 function getResourceTrend(offers: GlobalExchangeOffer[], bestCityId: string): Array<{ tick: number; askPricePerUnit: number }> {
   const bestCityOffer = offers.find((offer) => offer.cityId === bestCityId)
@@ -205,6 +208,16 @@ function sparklineTrendClass(history: Array<{ tick: number; askPricePerUnit: num
                 <span class="metric-label whitespace-nowrap text-muted">{{ t('globalExchange.abundance') }}</span>
                 <span class="metric-value text-right font-medium text-body">{{ formatPercent(offer.localAbundance) }}</span>
               </div>
+            </div>
+
+            <div v-if="auth.isAuthenticated" class="offer-actions mt-3 border-t border-divider pt-3">
+              <button
+                class="buy-btn w-full rounded-md bg-brand px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-brand-hover"
+                :aria-label="`${t('globalExchange.buyButton')} ${row.resourceName} ${t('globalExchange.buyFrom', { cityName: offer.cityName })}`"
+                @click="emit('buy-offer', { ...offer, resourceName: row.resourceName, unitSymbol: row.unitSymbol })"
+              >
+                {{ t('globalExchange.buyButton') }}
+              </button>
             </div>
           </div>
 

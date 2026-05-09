@@ -160,3 +160,76 @@ public sealed class SwitchAccountContextInput
 
     public Guid? CompanyId { get; set; }
 }
+
+
+/// <summary>Input for purchasing resources from the global exchange.</summary>
+public sealed class BuyFromExchangeInput
+{
+    /// <summary>Source city where the exchange offer originates.</summary>
+    public Guid SourceCityId { get; set; }
+
+    /// <summary>Resource type to purchase.</summary>
+    public Guid ResourceTypeId { get; set; }
+
+    /// <summary>Quantity to purchase.</summary>
+    public decimal Quantity { get; set; }
+
+    /// <summary>Target building unit (STORAGE or PURCHASE) that will receive the resources.</summary>
+    public Guid TargetBuildingUnitId { get; set; }
+
+    /// <summary>Company bank account to debit for the purchase (must match the target building's company).</summary>
+    public Guid BankAccountId { get; set; }
+}
+
+/// <summary>Input for selling resources from a building unit's inventory to the exchange.</summary>
+public sealed class SellToExchangeInput
+{
+    /// <summary>Source building unit (STORAGE or PURCHASE) that holds the resources to sell.</summary>
+    public Guid SourceBuildingUnitId { get; set; }
+
+    /// <summary>Resource type to sell.</summary>
+    public Guid ResourceTypeId { get; set; }
+
+    /// <summary>Quantity to sell.</summary>
+    public decimal Quantity { get; set; }
+
+    /// <summary>Company bank account to credit with the sale proceeds.</summary>
+    public Guid BankAccountId { get; set; }
+}
+
+/// <summary>Result of a successful or failed exchange purchase.</summary>
+public sealed class BuyFromExchangeResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+    public string? ErrorCode { get; set; }
+    public string ResourceName { get; set; } = string.Empty;
+    public decimal QuantityPurchased { get; set; }
+    public decimal ExchangePricePerUnit { get; set; }
+    public decimal TransitCostPerUnit { get; set; }
+    public decimal DeliveredPricePerUnit { get; set; }
+    public decimal TotalCost { get; set; }
+    public decimal QualityDelivered { get; set; }
+    public string CurrencyCode { get; set; } = "EUR";
+    public decimal NewBankBalance { get; set; }
+
+    public static BuyFromExchangeResult Fail(string message, string code) =>
+        new() { Success = false, ErrorMessage = message, ErrorCode = code };
+}
+
+/// <summary>Result of a successful or failed exchange sale.</summary>
+public sealed class SellToExchangeResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+    public string? ErrorCode { get; set; }
+    public string ResourceName { get; set; } = string.Empty;
+    public decimal QuantitySold { get; set; }
+    public decimal ExchangePricePerUnit { get; set; }
+    public decimal TotalProceeds { get; set; }
+    public string CurrencyCode { get; set; } = "EUR";
+    public decimal NewBankBalance { get; set; }
+
+    public static SellToExchangeResult Fail(string message, string code) =>
+        new() { Success = false, ErrorMessage = message, ErrorCode = code };
+}
