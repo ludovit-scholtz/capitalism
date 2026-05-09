@@ -342,7 +342,10 @@ function formatIndustryLabel(industry: string): string {
     return t('stockExchange.diversifiedIndustry')
   }
 
-  return industry.split('_').join(' ')
+  return industry
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
 }
 
 function buildPieSlices(ownership: CompanyOwnership): PieSlice[] {

@@ -8,6 +8,14 @@ import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
 const { currentTick, loading, error, personAccount, portfolioValue, recentDividendTotal, locale, filterText, selectedCityFilter, selectedIndustryFilter, availableCityFilters, availableIndustryFilters, filteredAndSortedListings, paginatedListings, totalPages, currentPage, toggleSort, sortIcon, isControlledCompany, actionLoadingKey, activeTradeAccountName, activeTradeAccountType, activeTradeAccountCash, activeSettlementAccounts, selectedSettlementBankAccountId, quantityByCompany, errorByCompany, successByCompany, expandedCompany, priceHistoryByCompany, priceHistoryLoadingByCompany, priceHistoryErrorByCompany, shareholdersByCompany, shareholdersLoadingByCompany, shareholdersErrorByCompany, mergeDialogOpen, mergeDestinationCompanyId, controlledCompanies, mergeLoading, mergeError, mergeSuccess, updateQuantity, estimatedBuyCost, estimatedSellProceeds, toggleTradePanel, switchToCompanyAccount, executeTrade, openMergeDialog, closeMergeDialog, executeMerge, loadData } = useStockExchange()
+
+function formatCityFilterLabel(city: string): string {
+  return city === 'UNKNOWN' ? t('stockExchange.unknownCity') : city
+}
+
+function formatIndustryFilterLabel(industry: string): string {
+  return industry === 'DIVERSIFIED' ? t('stockExchange.diversifiedIndustry') : industry.split('_').join(' ')
+}
 </script>
 
 <template>
@@ -53,14 +61,14 @@ const { currentTick, loading, error, personAccount, portfolioValue, recentDivide
               <span>{{ t('stockExchange.cityFilterLabel') }}</span>
               <select v-model="selectedCityFilter" class="filter-select" :aria-label="t('stockExchange.cityFilterLabel')">
                 <option value="ALL">{{ t('stockExchange.allCities') }}</option>
-                <option v-for="city in availableCityFilters.filter((value) => value !== 'ALL')" :key="city" :value="city">{{ city }}</option>
+                <option v-for="city in availableCityFilters.filter((value) => value !== 'ALL')" :key="city" :value="city">{{ formatCityFilterLabel(city) }}</option>
               </select>
             </label>
             <label class="filter-select-label">
               <span>{{ t('stockExchange.industryFilterLabel') }}</span>
               <select v-model="selectedIndustryFilter" class="filter-select" :aria-label="t('stockExchange.industryFilterLabel')">
                 <option value="ALL">{{ t('stockExchange.allIndustries') }}</option>
-                <option v-for="industry in availableIndustryFilters.filter((value) => value !== 'ALL')" :key="industry" :value="industry">{{ industry }}</option>
+                <option v-for="industry in availableIndustryFilters.filter((value) => value !== 'ALL')" :key="industry" :value="industry">{{ formatIndustryFilterLabel(industry) }}</option>
               </select>
             </label>
           </div>

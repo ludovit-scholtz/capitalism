@@ -1342,7 +1342,37 @@ function computeMockSharePrice(company: MockCompany) {
   return Number(Math.max((company.cash + getCompanyAssetBaseValue(company)) / getCompanyTotalShares(company), 1).toFixed(2))
 }
 
-function deriveMockPrimaryIndustry(company: MockCompany): string {
+function deriveMockPrimaryIndustry(state: MockState, company: MockCompany): string {
+  const productIndustryById = new Map(state.productTypes.map((product) => [product.id, product.industry]))
+  const industryUsage = new Map<string, number>()
+
+  for (const building of company.buildings) {
+    for (const unit of building.units ?? []) {
+      if (unit.productTypeId) {
+        const industry = productIndustryById.get(unit.productTypeId)
+        if (industry) {
+          industryUsage.set(industry, (industryUsage.get(industry) ?? 0) + 1)
+        }
+      }
+
+      for (const inventoryItem of unit.inventoryItems ?? []) {
+        if (inventoryItem.productTypeId) {
+          const industry = productIndustryById.get(inventoryItem.productTypeId)
+          if (industry) {
+            industryUsage.set(industry, (industryUsage.get(industry) ?? 0) + 1)
+          }
+        }
+      }
+    }
+  }
+
+  const topIndustry = [...industryUsage.entries()]
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0]
+
+  if (topIndustry) {
+    return topIndustry
+  }
+
   const firstBuildingType = company.buildings[0]?.type
   if (firstBuildingType === 'FACTORY' || firstBuildingType === 'MINE' || firstBuildingType === 'SALES_SHOP') {
     return 'FURNITURE'
@@ -6091,7 +6121,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             companyId: company.id,
             companyName: company.name,
             primaryCityName: state.cities.find((city) => city.id === company.buildings[0]?.cityId)?.name ?? 'UNKNOWN',
-            primaryIndustry: deriveMockPrimaryIndustry(company),
+            primaryIndustry: deriveMockPrimaryIndustry(state, company),
             totalSharesIssued: getCompanyTotalShares(company),
             publicFloatShares: getPublicFloatShares(state, company),
             sharePrice: computeMockSharePrice(company),

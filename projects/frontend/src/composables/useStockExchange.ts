@@ -86,8 +86,8 @@ export function useStockExchange() {
     return myBankAccounts.value.filter((account) => account.ownerType === 'PERSON' && account.currencyCode === 'USD')
   })
 
-  const availableCityFilters = computed(() => ['ALL', ...new Set(listings.value.map((listing) => listing.primaryCityName).filter((city) => city && city !== 'UNKNOWN')).values()])
-  const availableIndustryFilters = computed(() => ['ALL', ...new Set(listings.value.map((listing) => listing.primaryIndustry).filter((industry) => industry && industry !== 'DIVERSIFIED')).values()])
+  const availableCityFilters = computed(() => ['ALL', ...new Set(listings.value.map((listing) => listing.primaryCityName).filter((city) => city)).values()])
+  const availableIndustryFilters = computed(() => ['ALL', ...new Set(listings.value.map((listing) => listing.primaryIndustry).filter((industry) => industry)).values()])
 
   const filteredAndSortedListings = computed(() => {
     const text = filterText.value.trim().toLowerCase()
