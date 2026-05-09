@@ -168,6 +168,54 @@ test.describe('Dashboard — tick countdown', () => {
 
     await expect(page.locator('.tick-clock-widget')).toHaveAttribute('title', /43/, { timeout: 5000 })
   })
+
+  test('shows economy cycle widget with active market event summary', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [{ id: 'comp-econ', playerId: 'player-1', name: 'Macro Corp', cash: 400000, foundedAtUtc: '2026-01-01T00:00:00Z', buildings: [] }],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.economicCycle = {
+      id: 'eco-1',
+      phase: 'RECESSION',
+      phaseStartedTick: 100,
+      expectedDurationTicks: 200,
+      intensityFactor: 0.7,
+      phaseEndTick: 300,
+      ticksRemaining: 58,
+    }
+    state.activeMarketEvents = [
+      {
+        id: 'event-1',
+        eventType: 'COMMODITY_SHOCK',
+        title: 'Commodity shock: Wood',
+        description: 'Wood prices are spiking due to supply tension.',
+        magnitudeMultiplier: 1.25,
+        startsAtTick: 120,
+        expiresAtTick: 240,
+        ticksRemaining: 78,
+        affectedResourceTypeId: 'res-wood',
+        affectedResourceName: 'Wood',
+        affectedResourceSlug: 'wood',
+        affectedCityId: null,
+        affectedCityName: null,
+      },
+    ]
+    state.economicHistory = [
+      { tick: 120, phase: 'PEAK', intensityFactor: 1.05 },
+      { tick: 140, phase: 'RECESSION', intensityFactor: 0.7 },
+      { tick: 160, phase: 'RECESSION', intensityFactor: 0.7 },
+    ]
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    await expect(page.getByText('Economy cycle')).toBeVisible()
+    await expect(page.getByText('🔴 Recession')).toBeVisible()
+    await expect(page.getByText('Commodity shock: Wood')).toBeVisible()
+  })
 })
 
 test.describe('Dashboard — pending actions timeline', () => {
@@ -351,6 +399,78 @@ test.describe('Dashboard — pending actions timeline', () => {
     // After tick advance, the plan is applied and the action should be gone
     await page.getByRole('tab', { name: 'Activity' }).click()
     await expect(page.getByRole('status')).toContainText('No scheduled actions')
+  })
+})
+
+test.describe('Ledger — macroeconomic annotations', () => {
+  test('shows event badge on drill-down rows affected by market event', async ({ page }) => {
+    const companyId = 'comp-ledger-event'
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: companyId,
+          playerId: 'player-1',
+          name: 'Ledger Macro Co',
+          cash: 500000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.ledgerData[companyId] = {
+      companyId,
+      companyName: 'Ledger Macro Co',
+      currentCash: 500000,
+      totalRevenue: 1000,
+      totalPurchasingCosts: 500,
+      totalLaborCosts: 0,
+      totalEnergyCosts: 0,
+      totalMarketingCosts: 0,
+      totalTaxPaid: 0,
+      totalOtherCosts: 0,
+      netIncome: 500,
+      propertyValue: 0,
+      propertyAppreciation: 0,
+      buildingValue: 0,
+      inventoryValue: 0,
+      totalAssets: 500000,
+      totalPropertyPurchases: 0,
+      cashFromOperations: 500,
+      cashFromInvestments: 0,
+      firstRecordedTick: 1,
+      lastRecordedTick: 42,
+      buildingSummaries: [],
+    }
+    state.drillDownData[`${companyId}:PURCHASING_COST`] = [
+      {
+        id: 'entry-1',
+        category: 'PURCHASING_COST',
+        description: 'Purchase: raw material',
+        amount: -120,
+        recordedAtTick: 42,
+        buildingId: null,
+        buildingName: null,
+        buildingUnitId: null,
+        productTypeId: null,
+        productName: null,
+        resourceTypeId: 'res-wood',
+        resourceName: 'Wood',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        eventTag: '📈 Commodity shock +25%',
+        eventDescription: 'Wood prices are elevated due to supply shock.',
+      },
+    ]
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto(`/ledger/${companyId}`)
+    await page.getByRole('button', { name: /detail: purchasing costs/i }).click()
+
+    await expect(page.locator('.event-tag')).toContainText('Commodity shock')
   })
 })
 

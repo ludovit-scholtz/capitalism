@@ -82,4 +82,6 @@ export interface LedgerEntryResult {
   resourceName: string | null
   currencyCode: string
   currencySymbol: string
+  eventTag?: string | null
+  eventDescription?: string | null
 }

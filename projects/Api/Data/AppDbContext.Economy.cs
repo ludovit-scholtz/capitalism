@@ -209,6 +209,28 @@ public sealed partial class AppDbContext
             e.HasIndex(t => new { t.CityId, t.ItemId }).IsUnique();
         });
 
+        modelBuilder.Entity<EconomicCycle>(e =>
+        {
+            e.HasKey(c => c.Id);
+            e.Property(c => c.Phase).HasMaxLength(24);
+            e.Property(c => c.IntensityFactor).HasPrecision(8, 4);
+            e.HasIndex(c => c.PhaseStartedTick);
+        });
+
+        modelBuilder.Entity<MarketEvent>(e =>
+        {
+            e.HasKey(me => me.Id);
+            e.Property(me => me.EventType).HasMaxLength(48);
+            e.Property(me => me.Title).HasMaxLength(160);
+            e.Property(me => me.Description).HasMaxLength(1000);
+            e.Property(me => me.MagnitudeMultiplier).HasPrecision(8, 4);
+            e.HasOne(me => me.AffectedResourceType).WithMany().HasForeignKey(me => me.AffectedResourceTypeId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(me => me.AffectedCity).WithMany().HasForeignKey(me => me.AffectedCityId).OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(me => new { me.EventType, me.StartsAtTick, me.ExpiresAtTick });
+            e.HasIndex(me => new { me.AffectedCityId, me.ExpiresAtTick });
+            e.HasIndex(me => new { me.AffectedResourceTypeId, me.ExpiresAtTick });
+        });
+
         modelBuilder.Entity<LoanOffer>(e =>
         {
             e.HasKey(o => o.Id);

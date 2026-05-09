@@ -252,6 +252,21 @@ public sealed partial class Query
             .Include(e => e.ResourceType)
             .ToListAsync();
 
+        var minTick = entries.Count > 0 ? entries.Min(e => e.RecordedAtTick) : 0L;
+        var maxTick = entries.Count > 0 ? entries.Max(e => e.RecordedAtTick) : 0L;
+
+        var relevantEvents = entries.Count == 0
+            ? []
+            : await db.MarketEvents
+                .AsNoTracking()
+                .Where(me => me.ExpiresAtTick >= minTick && me.StartsAtTick <= maxTick)
+                .ToListAsync();
+
+        var cycle = await db.EconomicCycles
+            .AsNoTracking()
+            .OrderByDescending(c => c.PhaseStartedTick)
+            .FirstOrDefaultAsync();
+
         return entries.Select(e => new LedgerEntryResult
         {
             Id = e.Id,
@@ -269,6 +284,8 @@ public sealed partial class Query
             ResourceTypeId = e.ResourceTypeId,
             ResourceName = e.ResourceType?.Name,
             CurrencyCode = e.Building?.City?.CurrencyCode ?? "EUR",
+            EventTag = ResolveLedgerEventTag(e, relevantEvents, cycle),
+            EventDescription = ResolveLedgerEventDescription(e, relevantEvents, cycle),
         }).ToList();
     }
 
@@ -346,5 +363,94 @@ public sealed partial class Query
         return CompanyBankingService.GetTotalBalance(company) + company.Buildings.Sum(WealthCalculator.GetBuildingValue) + lotValue + allInventories
             .Where(inventory => buildingIds.Contains(inventory.BuildingId))
             .Sum(inventory => inventory.Quantity * WealthCalculator.GetItemBasePrice(inventory));
+    }
+
+    private static string? ResolveLedgerEventTag(
+        LedgerEntry entry,
+        IReadOnlyCollection<MarketEvent> events,
+        EconomicCycle? cycle)
+    {
+        var marketEvent = ResolveMatchingEvent(entry, events);
+        if (marketEvent is not null)
+        {
+            return marketEvent.EventType switch
+            {
+                MarketEventType.CommodityShock => $"📈 Commodity shock {(marketEvent.MagnitudeMultiplier - 1m) * 100m:+0;-0;0}%",
+                MarketEventType.InterestRateChange => $"🏦 Interest shift {(marketEvent.MagnitudeMultiplier - 1m) * 100m:+0;-0;0}%",
+                MarketEventType.SeasonalDemandSurge => $"🛍️ Seasonal surge {(marketEvent.MagnitudeMultiplier - 1m) * 100m:+0;-0;0}%",
+                _ => null,
+            };
+        }
+
+        if (cycle is not null && entry.Category == LedgerCategory.Revenue)
+        {
+            var phase = ResolveCyclePhaseAtTick(cycle, entry.RecordedAtTick);
+            if (phase == EconomicCyclePhase.Recession)
+                return "📉 Recession";
+        }
+
+        return null;
+    }
+
+    private static string? ResolveLedgerEventDescription(
+        LedgerEntry entry,
+        IReadOnlyCollection<MarketEvent> events,
+        EconomicCycle? cycle)
+    {
+        var marketEvent = ResolveMatchingEvent(entry, events);
+        if (marketEvent is not null)
+            return marketEvent.Description;
+
+        if (cycle is not null && entry.Category == LedgerCategory.Revenue)
+        {
+            var phase = ResolveCyclePhaseAtTick(cycle, entry.RecordedAtTick);
+            if (phase == EconomicCyclePhase.Recession)
+                return "Revenue was recorded during a recession phase.";
+        }
+
+        return null;
+    }
+
+    private static MarketEvent? ResolveMatchingEvent(LedgerEntry entry, IReadOnlyCollection<MarketEvent> events)
+    {
+        return events.FirstOrDefault(me =>
+            me.StartsAtTick <= entry.RecordedAtTick
+            && me.ExpiresAtTick >= entry.RecordedAtTick
+            && (me.AffectedCityId == null || me.AffectedCityId == entry.Building?.CityId)
+            && (me.EventType != MarketEventType.CommodityShock || !me.AffectedResourceTypeId.HasValue || me.AffectedResourceTypeId == entry.ResourceTypeId)
+            && (me.EventType != MarketEventType.InterestRateChange
+                || entry.Category == LedgerCategory.LoanInterestExpense
+                || entry.Category == LedgerCategory.LoanInterestIncome)
+            && (me.EventType != MarketEventType.SeasonalDemandSurge || entry.Category == LedgerCategory.Revenue));
+    }
+
+    private static string ResolveCyclePhaseAtTick(EconomicCycle cycle, long tick)
+    {
+        if (tick >= cycle.PhaseStartedTick)
+            return cycle.Phase;
+
+        var phase = cycle.Phase;
+        var phaseStart = cycle.PhaseStartedTick;
+        var guard = 0;
+        while (tick < phaseStart && guard++ < 32)
+        {
+            var previousPhase = phase switch
+            {
+                EconomicCyclePhase.Expansion => EconomicCyclePhase.Trough,
+                EconomicCyclePhase.Peak => EconomicCyclePhase.Expansion,
+                EconomicCyclePhase.Recession => EconomicCyclePhase.Peak,
+                _ => EconomicCyclePhase.Recession,
+            };
+            phaseStart -= previousPhase switch
+            {
+                EconomicCyclePhase.Expansion => GameConstants.TicksPerMonth * 3,
+                EconomicCyclePhase.Peak => GameConstants.TicksPerMonth,
+                EconomicCyclePhase.Recession => GameConstants.TicksPerMonth * 2,
+                _ => GameConstants.TicksPerMonth,
+            };
+            phase = previousPhase;
+        }
+
+        return phase;
     }
 }

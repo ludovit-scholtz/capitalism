@@ -9,7 +9,9 @@ import GoldAmmSection from '@/components/forex/GoldAmmSection.vue'
 import BankAccountTransferPanel from '@/components/banking/BankAccountTransferPanel.vue'
 import UiStateLoading from '@/components/ui/UiStateLoading.vue'
 import UiStateError from '@/components/ui/UiStateError.vue'
+import { gqlRequest } from '@/lib/graphql'
 import { buildEurPairList, extractQuoteCurrencyFromEurPair } from '@/lib/fxPairFormatter'
+import type { MarketEventView } from '@/types'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -24,6 +26,7 @@ function parseForexTab(value: unknown): ForexTab {
 }
 
 const activeTab = ref<ForexTab>(parseForexTab(route.query.tab))
+const commodityShockEvents = ref<MarketEventView[]>([])
 
 const initialToCurrency = computed(() => {
   const q = route.query.toCurrency
@@ -33,8 +36,24 @@ const initialToCurrency = computed(() => {
 onMounted(async () => {
   if (!auth.isAuthenticated) { router.push('/login'); return }
   await loadData()
+  await loadCommodityEvents()
   activeTab.value = parseForexTab(route.query.tab)
 })
+
+async function loadCommodityEvents() {
+  try {
+    const data = await gqlRequest<{ getActiveMarketEvents: MarketEventView[] }>(`{
+      getActiveMarketEvents {
+        id eventType title description magnitudeMultiplier startsAtTick expiresAtTick ticksRemaining
+        affectedResourceTypeId affectedResourceName affectedResourceSlug
+        affectedCityId affectedCityName
+      }
+    }`)
+    commodityShockEvents.value = (data.getActiveMarketEvents ?? []).filter((event) => event.eventType === 'COMMODITY_SHOCK')
+  } catch {
+    commodityShockEvents.value = []
+  }
+}
 
 watch(activeTab, async (tab) => {
   const nextQuery = { ...route.query }
@@ -81,6 +100,11 @@ watch(activeTab, async (tab) => {
       <div class="forex-hero rounded-2xl border border-divider bg-card px-6 py-6 shadow-sm sm:px-8 sm:py-7">
         <h1 class="text-3xl font-bold text-body">{{ t('forex.title') }}</h1>
         <p class="text-base text-muted">{{ t('forex.subtitle') }}</p>
+      </div>
+
+      <div v-if="commodityShockEvents.length > 0" class="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+        <strong class="block text-xs uppercase tracking-wide text-amber-300">{{ t('forex.commodityShockBanner') }}</strong>
+        <p class="mt-1 m-0">{{ commodityShockEvents[0]?.title }} — {{ commodityShockEvents[0]?.description }}</p>
       </div>
 
       <UiStateLoading v-if="loading" :label="t('common.loading')" />

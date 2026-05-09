@@ -104,6 +104,17 @@ public static partial class GameConstants
     /// <summary>Base demand per capita per product per tick.</summary>
     public const decimal BaseDemandPerCapita = 0.001m;
 
+    /// <summary>Interval used for macro-cycle/event re-evaluation (one in-game month).</summary>
+    public const int EconomicCycleEvaluationIntervalTicks = TicksPerMonth;
+
+    /// <summary>Lead time for recession warning notifications.</summary>
+    public const int RecessionWarningLeadTicks = 48;
+
+    public const decimal EconomicCycleIntensityMin = 0.5m;
+    public const decimal EconomicCycleIntensityMax = 1.5m;
+    public const decimal MarketEventMultiplierMin = 0.3m;
+    public const decimal MarketEventMultiplierMax = 2.0m;
+
     /// <summary>
     /// Reference city salary used to normalise purchasing-power demand.
     /// Cities with a <see cref="Api.Data.Entities.City.BaseSalaryPerManhour"/> equal to this

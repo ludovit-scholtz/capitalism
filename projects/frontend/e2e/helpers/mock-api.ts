@@ -158,6 +158,8 @@ export type MockLedgerEntry = {
   resourceName: string | null
   currencyCode?: string
   currencySymbol?: string
+  eventTag?: string | null
+  eventDescription?: string | null
 }
 
 export type MockCompany = {
@@ -936,6 +938,38 @@ export type MockCityMediaHouseInfo = {
   isGovernmentOwned: boolean
 }
 
+export type MockEconomicCycle = {
+  id: string
+  phase: 'EXPANSION' | 'PEAK' | 'RECESSION' | 'TROUGH'
+  phaseStartedTick: number
+  expectedDurationTicks: number
+  intensityFactor: number
+  phaseEndTick: number
+  ticksRemaining: number
+}
+
+export type MockActiveMarketEvent = {
+  id: string
+  eventType: 'COMMODITY_SHOCK' | 'INTEREST_RATE_CHANGE' | 'SEASONAL_DEMAND_SURGE'
+  title: string
+  description: string
+  magnitudeMultiplier: number
+  startsAtTick: number
+  expiresAtTick: number
+  ticksRemaining: number
+  affectedResourceTypeId: string | null
+  affectedResourceName: string | null
+  affectedResourceSlug: string | null
+  affectedCityId: string | null
+  affectedCityName: string | null
+}
+
+export type MockEconomicHistoryPoint = {
+  tick: number
+  phase: 'EXPANSION' | 'PEAK' | 'RECESSION' | 'TROUGH'
+  intensityFactor: number
+}
+
 export type MockState = {
   serverKey: string
   players: MockPlayer[]
@@ -947,6 +981,9 @@ export type MockState = {
   currentUserId: string | null
   currentToken: string | null
   gameState: { currentTick: number; lastTickAtUtc: string; tickIntervalSeconds: number; taxCycleTicks: number; taxRate: number }
+  economicCycle: MockEconomicCycle | null
+  activeMarketEvents: MockActiveMarketEvent[]
+  economicHistory: MockEconomicHistoryPoint[]
   endgameStatus: {
     gameEnded: boolean
     winnerPlayerId: string | null
@@ -2920,6 +2957,17 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     currentUserId: null,
     currentToken: null,
     gameState: { currentTick: 42, lastTickAtUtc: new Date(Date.now() - 30000).toISOString(), tickIntervalSeconds: 60, taxCycleTicks: 8760, taxRate: 15 },
+    economicCycle: {
+      id: 'eco-cycle-1',
+      phase: 'EXPANSION',
+      phaseStartedTick: 0,
+      expectedDurationTicks: 2160,
+      intensityFactor: 1.2,
+      phaseEndTick: 2160,
+      ticksRemaining: 2118,
+    },
+    activeMarketEvents: [],
+    economicHistory: [],
     endgameStatus: {
       gameEnded: false,
       winnerPlayerId: null,
@@ -6434,6 +6482,15 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       if (query.includes('cities')) {
         responseData.cities = state.cities ?? []
       }
+      if (query.includes('getCurrentEconomicCycle')) {
+        responseData.getCurrentEconomicCycle = state.economicCycle
+      }
+      if (query.includes('getActiveMarketEvents')) {
+        responseData.getActiveMarketEvents = state.activeMarketEvents ?? []
+      }
+      if (query.includes('getEconomicHistory')) {
+        responseData.getEconomicHistory = state.economicHistory ?? []
+      }
       if (query.includes('myLoans')) {
         responseData.myLoans = state.myLoans ?? []
       }
@@ -7118,6 +7175,34 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { gameState: buildMockGameStatePayload(state.gameState) } }),
+      })
+    }
+
+    if (query.includes('getCurrentEconomicCycle')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getCurrentEconomicCycle: state.economicCycle } }),
+      })
+    }
+
+    if (query.includes('getActiveMarketEvents')) {
+      const cityId = body.variables?.cityId ?? null
+      const events = cityId
+        ? (state.activeMarketEvents ?? []).filter((event) => event.affectedCityId == null || event.affectedCityId === cityId)
+        : (state.activeMarketEvents ?? [])
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getActiveMarketEvents: events } }),
+      })
+    }
+
+    if (query.includes('getEconomicHistory')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getEconomicHistory: state.economicHistory ?? [] } }),
       })
     }
 

@@ -262,13 +262,31 @@ public sealed partial class Query
             .OrderBy(resource => resource.Name)
             .ToListAsync();
 
+        var activeCommodityEvents = await db.MarketEvents
+            .Where(me => me.EventType == MarketEventType.CommodityShock
+                && me.StartsAtTick <= currentTick
+                && me.ExpiresAtTick >= currentTick
+                && me.AffectedResourceTypeId.HasValue)
+            .ToListAsync();
+
+        var commodityMultiplierByResourceId = activeCommodityEvents
+            .GroupBy(me => me.AffectedResourceTypeId!.Value)
+            .ToDictionary(
+                group => group.Key,
+                group => Math.Clamp(
+                    group.Aggregate(1m, (acc, next) => acc * next.MagnitudeMultiplier),
+                    GameConstants.MarketEventMultiplierMin,
+                    GameConstants.MarketEventMultiplierMax));
+
         return cities
             .SelectMany(city => resources.Select(resource =>
             {
                 var abundance = city.Resources
                     .FirstOrDefault(entry => entry.ResourceTypeId == resource.Id)?.Abundance
                     ?? GlobalExchangeCalculator.DefaultMissingAbundance;
-                var exchangePrice = GlobalExchangeCalculator.ComputeExchangePrice(city, resource, abundance, fxRate);
+                var commodityMultiplier = commodityMultiplierByResourceId.GetValueOrDefault(resource.Id, 1m);
+                var exchangePrice = GlobalExchangeCalculator.ComputeExchangePrice(city, resource, abundance, fxRate)
+                    * commodityMultiplier;
                 var transitCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(city, destinationCity, resource, fxRate, fuelPriceIndex);
 
                 return new GlobalExchangeOffer

@@ -59,6 +59,38 @@ test.describe('Forex Exchange page', () => {
     await expect(page.getByLabel('Amount')).toBeVisible()
   })
 
+  test('shows commodity shock banner when market event is active', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.activeMarketEvents = [
+      {
+        id: 'shock-1',
+        eventType: 'COMMODITY_SHOCK',
+        title: 'Commodity shock: Gold',
+        description: 'Gold prices are spiking due to supply tension.',
+        magnitudeMultiplier: 1.25,
+        startsAtTick: 10,
+        expiresAtTick: 300,
+        ticksRemaining: 120,
+        affectedResourceTypeId: 'res-gold',
+        affectedResourceName: 'Gold',
+        affectedResourceSlug: 'gold',
+        affectedCityId: null,
+        affectedCityName: null,
+      },
+    ]
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex')
+
+    await expect(page.getByText('Commodity shock alert')).toBeVisible()
+    await expect(page.getByText('Commodity shock: Gold')).toBeVisible()
+  })
+
   test('opens with Swap tab active by default and shows the Rate List tab', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, { players: [player] })

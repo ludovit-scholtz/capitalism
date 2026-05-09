@@ -169,6 +169,38 @@ export interface GameState {
   gameEndedAtUtc?: string | null
 }
 
+export interface EconomicCycleView {
+  id: string
+  phase: 'EXPANSION' | 'PEAK' | 'RECESSION' | 'TROUGH'
+  phaseStartedTick: number
+  expectedDurationTicks: number
+  intensityFactor: number
+  phaseEndTick: number
+  ticksRemaining: number
+}
+
+export interface MarketEventView {
+  id: string
+  eventType: 'COMMODITY_SHOCK' | 'INTEREST_RATE_CHANGE' | 'SEASONAL_DEMAND_SURGE'
+  title: string
+  description: string
+  magnitudeMultiplier: number
+  startsAtTick: number
+  expiresAtTick: number
+  ticksRemaining: number
+  affectedResourceTypeId: string | null
+  affectedResourceName: string | null
+  affectedResourceSlug: string | null
+  affectedCityId: string | null
+  affectedCityName: string | null
+}
+
+export interface EconomicCycleHistoryPoint {
+  tick: number
+  phase: 'EXPANSION' | 'PEAK' | 'RECESSION' | 'TROUGH'
+  intensityFactor: number
+}
+
 export interface RealWorldWealth {
   id: string
   rank: number

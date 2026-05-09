@@ -24,6 +24,7 @@ const {
   recentActivity,
   recentActivityLoading,
   publicSalesAnalytics,
+  publicSalesMarketEvents,
   publicSalesAnalyticsLoading,
   unitProductAnalytics,
   unitProductAnalyticsLoading,
@@ -725,8 +726,12 @@ function buildCompetitionPieGradient(entries: CompetitionLegendEntry[]): string 
               </span>
             </div>
             <p v-if="publicSalesAnalyticsLoading" class="config-help">{{ t('buildingDetail.marketIntelligence.loading') }}</p>
-            <template v-else-if="publicSalesAnalytics"
-              ><!-- Summary metrics -->
+            <template v-else-if="publicSalesAnalytics">
+              <div v-if="publicSalesMarketEvents.length > 0" class="mb-3 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs">
+                <strong class="block uppercase tracking-wide text-amber-300">{{ publicSalesMarketEvents[0]?.title }}</strong>
+                <p class="m-0 mt-1 text-amber-200">{{ publicSalesMarketEvents[0]?.description }}</p>
+              </div>
+              <!-- Summary metrics -->
               <div class="mi-summary-grid grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3 mb-4">
                 <div class="mi-metric rounded-lg border border-divider bg-card px-3 py-2 flex flex-col gap-0.5">
                   <span class="text-[0.7rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.totalRevenue') }}</span

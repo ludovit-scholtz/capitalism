@@ -205,6 +205,7 @@ public sealed partial class AppDbInitializer(
 
         // Idempotent: ensure seasonal demand multipliers exist for all product types.
         await EnsureDemandSeasonalitySeedAsync();
+        await EnsureEconomicCycleSeedAsync();
 
         // Idempotent: ensure resource replenishment schedules exist for all cities.
         await EnsureResourceReplenishmentSchedulesAsync();

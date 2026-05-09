@@ -203,6 +203,8 @@ public sealed class LedgerEntryResult
     public string CurrencyCode { get; set; } = "EUR";
     /// <summary>Display symbol for the entry's currency (e.g. "€", "Kč").</summary>
     public string CurrencySymbol => Mutation.GetCurrencySymbol(CurrencyCode);
+    public string? EventTag { get; set; }
+    public string? EventDescription { get; set; }
 }
 
 public sealed class PublicSalesAnalytics
@@ -347,5 +349,4 @@ public sealed class MarketShareEntry
     /// <summary>True when this entry represents unserved/unmet market demand, not an actual seller.</summary>
     public bool IsUnmet { get; set; }
 }
-
 

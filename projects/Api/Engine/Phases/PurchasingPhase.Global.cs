@@ -27,6 +27,7 @@ public sealed partial class PurchasingPhase
         if (!context.ResourceTypesById.TryGetValue(resourceId, out var resource)) return (0m, 0m, 0m);
         if (!context.CitiesById.TryGetValue(building.CityId, out var destinationCity)) return (0m, 0m, 0m);
 
+        var commodityShockMultiplier = context.GetCommodityShockMultiplier(resourceId);
         var fxRate = context.GetCityFxRate(destinationCity);
         var fuelPriceIndex = destinationCity.FuelPriceIndex;
 
@@ -43,7 +44,8 @@ public sealed partial class PurchasingPhase
                     ?.FirstOrDefault(cr => cr.ResourceTypeId == resourceId)
                     ?.Abundance ?? GlobalExchangeCalculator.DefaultMissingAbundance;
 
-                var exchangePrice = GlobalExchangeCalculator.ComputeExchangePrice(sourceCity, resource, abundance, fxRate);
+                var exchangePrice = GlobalExchangeCalculator.ComputeExchangePrice(sourceCity, resource, abundance, fxRate)
+                    * commodityShockMultiplier;
                 var transitCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(sourceCity, destinationCity, resource, fxRate, fuelPriceIndex);
                 var deliveredPrice = exchangePrice + transitCost;
                 var estimatedQuality = GlobalExchangeCalculator.ComputeExchangeQuality(abundance);

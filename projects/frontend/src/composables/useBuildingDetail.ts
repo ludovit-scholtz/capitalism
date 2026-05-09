@@ -69,8 +69,9 @@ import type {
   PowerPlantAnalytics,
   ProcurementPreview,
   ProductType,
-  PublicSalesAnalytics,
-  RankedProductResult,
+   PublicSalesAnalytics,
+   MarketEventView,
+   RankedProductResult,
   ResearchBrandState,
   ResourceType,
    CityMediaHouseInfo,
@@ -338,6 +339,7 @@ export function useBuildingDetail() {
   // Public Sales market intelligence analytics
   const publicSalesAnalytics = ref<PublicSalesAnalytics | null>(null)
   const publicSalesAnalyticsLoading = ref(false)
+  const publicSalesMarketEvents = ref<MarketEventView[]>([])
   // Manufacturing unit product analytics
   const unitProductAnalytics = ref<UnitProductAnalytics | null>(null)
   const unitProductAnalyticsLoading = ref(false)
@@ -3855,6 +3857,7 @@ export function useBuildingDetail() {
   async function loadPublicSalesAnalytics(unitId: string | null, isRefresh = false) {
     if (!unitId || !auth.token) {
       publicSalesAnalytics.value = null
+      publicSalesMarketEvents.value = []
       publicSalesAnalyticsLoading.value = false
       return
     }
@@ -3916,10 +3919,44 @@ export function useBuildingDetail() {
         { unitId },
       )
       publicSalesAnalytics.value = data.publicSalesAnalytics ?? null
+      await loadPublicSalesMarketEvents()
     } catch {
       publicSalesAnalytics.value = null
+      publicSalesMarketEvents.value = []
     } finally {
       publicSalesAnalyticsLoading.value = false
+    }
+  }
+
+  async function loadPublicSalesMarketEvents() {
+    if (!building.value?.cityId || !auth.token) {
+      publicSalesMarketEvents.value = []
+      return
+    }
+    try {
+      const data = await gqlRequest<{ getActiveMarketEvents: MarketEventView[] }>(
+        `query BuildingMarketEvents($cityId: UUID) {
+          getActiveMarketEvents(cityId: $cityId) {
+            id
+            eventType
+            title
+            description
+            magnitudeMultiplier
+            startsAtTick
+            expiresAtTick
+            ticksRemaining
+            affectedResourceTypeId
+            affectedResourceName
+            affectedResourceSlug
+            affectedCityId
+            affectedCityName
+          }
+        }`,
+        { cityId: building.value.cityId },
+      )
+      publicSalesMarketEvents.value = data.getActiveMarketEvents ?? []
+    } catch {
+      publicSalesMarketEvents.value = []
     }
   }
 
@@ -5062,6 +5099,7 @@ export function useBuildingDetail() {
     cityMediaHouses,
     cityMediaHousesLoading,
     publicSalesAnalytics,
+    publicSalesMarketEvents,
     publicSalesAnalyticsLoading,
     unitProductAnalytics,
     unitProductAnalyticsLoading,

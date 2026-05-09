@@ -48,6 +48,7 @@ const DRILL_QUERY = `
       buildingId buildingName buildingType buildingUnitId
       productTypeId productName resourceTypeId resourceName
       currencyCode currencySymbol
+      eventTag eventDescription
     }
   }
 `

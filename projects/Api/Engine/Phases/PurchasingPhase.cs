@@ -63,6 +63,7 @@ public sealed partial class PurchasingPhase : ITickPhase
         var maxPrice = unit.MaxPrice ?? decimal.MaxValue;
         var minQuality = unit.MinQuality ?? 0m;
         var purchaseSource = unit.PurchaseSource ?? "OPTIMAL";
+        var commodityShockMultiplier = context.GetCommodityShockMultiplier(resourceId);
         var fundingAccount = context.GetBuildingFundingAccount(building);
         if (fundingAccount is null)
         {
@@ -100,13 +101,15 @@ public sealed partial class PurchasingPhase : ITickPhase
                         return false;
                     }
 
-                    var deliveredPricePerUnit = o.PricePerUnit + ComputeBuildingTransitCostPerUnit(exchangeBuilding, building, itemWeightPerUnit, destFuelPriceIndex);
+                    var adjustedOrderPrice = o.PricePerUnit * commodityShockMultiplier;
+                    var deliveredPricePerUnit = adjustedOrderPrice + ComputeBuildingTransitCostPerUnit(exchangeBuilding, building, itemWeightPerUnit, destFuelPriceIndex);
                     return deliveredPricePerUnit <= maxPrice;
                 })
                 .OrderBy(o =>
                 {
                     var exchangeBuilding = context.BuildingsById[o.ExchangeBuildingId];
-                    return o.PricePerUnit + ComputeBuildingTransitCostPerUnit(exchangeBuilding, building, itemWeightPerUnit, destFuelPriceIndex);
+                    var adjustedOrderPrice = o.PricePerUnit * commodityShockMultiplier;
+                    return adjustedOrderPrice + ComputeBuildingTransitCostPerUnit(exchangeBuilding, building, itemWeightPerUnit, destFuelPriceIndex);
                 })
                 .ToList();
 
@@ -129,17 +132,18 @@ public sealed partial class PurchasingPhase : ITickPhase
                     continue;
                 }
 
+                var adjustedOrderPrice = order.PricePerUnit * commodityShockMultiplier;
                 var transitCostPerUnit = ComputeBuildingTransitCostPerUnit(exchangeBuilding, building, itemWeightPerUnit, destFuelPriceIndex);
-                var goodsCost = fill * order.PricePerUnit;
+                var goodsCost = fill * adjustedOrderPrice;
                 var shippingCost = fill * transitCostPerUnit;
                 var totalDeliveredCost = goodsCost + shippingCost;
 
                 if (fundingAccount.Balance < totalDeliveredCost)
                 {
-                    var deliveredPricePerUnit = order.PricePerUnit + transitCostPerUnit;
+                    var deliveredPricePerUnit = adjustedOrderPrice + transitCostPerUnit;
                     fill = fundingAccount.Balance / deliveredPricePerUnit;
                     fill = Math.Floor(fill * 10000m) / 10000m;
-                    goodsCost = fill * order.PricePerUnit;
+                    goodsCost = fill * adjustedOrderPrice;
                     shippingCost = fill * transitCostPerUnit;
                     totalDeliveredCost = goodsCost + shippingCost;
                 }
@@ -208,7 +212,8 @@ public sealed partial class PurchasingPhase : ITickPhase
                 itemWeightPerUnit,
                 maxPrice,
                 minQuality,
-                destFuelPriceIndex);
+                destFuelPriceIndex,
+                commodityShockMultiplier);
 
             foreach (var supply in localSupplies)
             {
