@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
+import { getVisibleBankTransferValidationMessage, resetBankTransferDraftAfterSuccess } from '@/lib/bankTransferForm'
 import ForexBankAccountSelector from '@/components/forex/ForexBankAccountSelector.vue'
 import type { PlayerBankAccountSummary, TransferFundsResult } from '@/types'
 
@@ -30,6 +31,7 @@ const description = ref<string>('')
 const submitting = ref(false)
 const errorMessage = ref<string | null>(null)
 const successResult = ref<TransferFundsResult | null>(null)
+const submitAttempted = ref(false)
 
 function findAccount(id: string): PlayerBankAccountSummary | undefined {
   return props.accounts.find((a) => a.id === id)
@@ -60,6 +62,10 @@ const validationMessage = computed<string | null>(() => {
   return null
 })
 
+const visibleValidationMessage = computed(() =>
+  getVisibleBankTransferValidationMessage(validationMessage.value, submitAttempted.value),
+)
+
 function formatAmount(val: number): string {
   return new Intl.NumberFormat('en', {
     minimumFractionDigits: 2,
@@ -79,6 +85,7 @@ const TRANSFER_MUTATION = `
 `
 
 async function submitTransfer() {
+  submitAttempted.value = true
   if (validationMessage.value || !fromAccount.value || !toAccount.value || !amount.value) {
     return
   }
@@ -95,8 +102,10 @@ async function submitTransfer() {
       },
     })
     successResult.value = result.transferFunds
-    amount.value = null
-    description.value = ''
+    const resetState = resetBankTransferDraftAfterSuccess()
+    amount.value = resetState.amount
+    description.value = resetState.description
+    submitAttempted.value = resetState.submitAttempted
     emit('transferred', result.transferFunds)
   } catch (e: unknown) {
     errorMessage.value = e instanceof Error ? e.message : String(e)
@@ -109,6 +118,7 @@ async function submitTransfer() {
 function onFromChanged(newId: string) {
   fromAccountId.value = newId
   successResult.value = null
+  submitAttempted.value = false
   if (!destinationAccounts.value.some((a) => a.id === toAccountId.value)) {
     toAccountId.value = ''
   }
@@ -170,13 +180,14 @@ function onFromChanged(newId: string) {
       </div>
 
       <div class="md:col-span-2 flex flex-col gap-3">
-        <p v-if="validationMessage" class="text-sm text-caution" role="alert" aria-live="polite">
-          {{ validationMessage }}
+        <p v-if="visibleValidationMessage" class="text-sm text-caution" role="alert" aria-live="polite">
+          {{ visibleValidationMessage }}
         </p>
         <p v-if="errorMessage" class="text-sm text-bad" role="alert" aria-live="polite">
           {{ errorMessage }}
         </p>
         <p v-if="successResult" class="text-sm text-good" role="status" aria-live="polite">
+          <strong class="mr-1">{{ t('bankTransfer.transferSuccessful') }}</strong>
           {{
             t('bankTransfer.success', {
               amount: formatAmount(successResult.amount),
@@ -186,7 +197,7 @@ function onFromChanged(newId: string) {
             })
           }}
         </p>
-        <button type="button" class="btn btn-primary self-start disabled:opacity-50 disabled:cursor-not-allowed" :disabled="submitting || validationMessage !== null" @click="submitTransfer">
+        <button type="button" class="btn btn-primary self-start disabled:opacity-50 disabled:cursor-not-allowed" :disabled="submitting" @click="submitTransfer">
           {{ submitting ? t('bankTransfer.submitting') : t('bankTransfer.submit') }}
         </button>
       </div>

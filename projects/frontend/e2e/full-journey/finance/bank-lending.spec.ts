@@ -1820,6 +1820,56 @@ test.describe('Loan collateral selection', () => {
     await expect(page.getByText('Loan principal payment 10')).toBeVisible()
     await expect(page.getByText('Loan interest payment 10')).toBeVisible()
   })
+
+  test('bank statement shows distinct interest-earned row with running balance', async ({ page }) => {
+    const player = makeBankOwnerPlayer()
+    const company = player.companies[0]
+    expect(company).toBeTruthy()
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.myBankAccounts = [
+      {
+        id: 'interest-company-account-1',
+        accountNumber: '6000000000000001',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        balance: 10125,
+        companyId: company!.id,
+        companyName: company!.name,
+        ownerType: 'COMPANY',
+        ownerDisplayName: company!.name,
+        cityId: 'city-ba',
+      },
+    ]
+    state.bankStatementRows[company!.id] = []
+
+    appendBankStatementRow(state.bankStatementRows[company!.id]!, {
+      id: 'interest-row-1',
+      recordedAtTick: 220,
+      recordedAtUtc: new Date().toISOString(),
+      description: 'Deposit interest from Visibility Bank',
+      category: 'DEPOSIT_INTEREST_RECEIVED',
+      amount: 125,
+      buildingId: null,
+      buildingName: null,
+    })
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/bank-statement/interest-company-account-1')
+    await expect(page.getByRole('heading', { name: /Bank Statement Review/i })).toBeVisible()
+
+    const interestRow = page.locator('tr', { hasText: 'Deposit interest from Visibility Bank' })
+    await expect(interestRow).toBeVisible()
+    await expect(interestRow).toContainText('Interest Received')
+    await expect(interestRow).toContainText('💰')
+    await expect(interestRow).toContainText('€125')
+  })
 })
 
 test.describe('Banking ownership — dashboard link and activation flow', () => {

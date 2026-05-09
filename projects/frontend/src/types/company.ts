@@ -76,6 +76,19 @@ export interface PersonTradeRecord {
   recordedAtUtc: string
 }
 
+export interface PersonalInterestPayment {
+  id: string
+  companyId: string
+  companyName: string
+  bankBuildingId: string | null
+  bankBuildingName: string | null
+  amount: number
+  recordedAtTick: number
+  recordedAtUtc: string
+  currencyCode: string
+  description: string
+}
+
 export interface PersonAccount {
   playerId: string
   displayName: string
@@ -90,6 +103,7 @@ export interface PersonAccount {
   activeAccountType: AccountContextType
   activeCompanyId: string | null
   shareholdings: PortfolioHolding[]
+  interestPayments: PersonalInterestPayment[]
   dividendPayments: DividendPayment[]
   stockTrades: PersonTradeRecord[]
 }

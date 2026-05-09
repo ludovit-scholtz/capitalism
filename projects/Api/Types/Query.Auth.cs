@@ -144,6 +144,17 @@ public sealed partial class Query
             .Take(100)
             .ToListAsync();
 
+        var interestPayments = await db.LedgerEntries
+            .AsNoTracking()
+            .Where(entry => entry.Category == LedgerCategory.DepositInterestReceived && entry.Company.PlayerId == userId)
+            .Include(entry => entry.Company)
+            .Include(entry => entry.Building)
+                .ThenInclude(building => building!.City)
+            .OrderByDescending(entry => entry.RecordedAtTick)
+            .ThenByDescending(entry => entry.RecordedAtUtc)
+            .Take(200)
+            .ToListAsync();
+
         var grossPersonalCashUsd = decimal.Round(
             personalAccounts.Sum(account => ConvertToUsd(account.Balance, account.CurrencyCode, personalEurRatesByCode, usdRate)),
             4,
@@ -161,6 +172,23 @@ public sealed partial class Query
             ActiveAccountType = player.ActiveAccountType,
             ActiveCompanyId = player.ActiveCompanyId,
             Shareholdings = portfolio,
+            InterestPayments = interestPayments
+                .Select(entry => new PersonalInterestPaymentResult
+                {
+                    Id = entry.Id,
+                    CompanyId = entry.CompanyId,
+                    CompanyName = entry.Company?.Name
+                        ?? companiesById.GetValueOrDefault(entry.CompanyId)?.Name
+                        ?? string.Empty,
+                    BankBuildingId = entry.BuildingId,
+                    BankBuildingName = entry.Building?.Name,
+                    Amount = entry.Amount,
+                    RecordedAtTick = entry.RecordedAtTick,
+                    RecordedAtUtc = entry.RecordedAtUtc,
+                    CurrencyCode = entry.Building?.City?.CurrencyCode ?? "EUR",
+                    Description = entry.Description,
+                })
+                .ToList(),
             DividendPayments = dividendPayments
                 .Select(payment => new DividendPaymentResult
                 {
