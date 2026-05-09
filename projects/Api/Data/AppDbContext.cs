@@ -32,6 +32,10 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
 
     /// <summary>Annual dividend settlement records.</summary>
     public DbSet<DividendPayment> DividendPayments => Set<DividendPayment>();
+    /// <summary>Shareholder-governance dividend proposals with voting windows.</summary>
+    public DbSet<DividendProposal> DividendProposals => Set<DividendProposal>();
+    /// <summary>Weighted shareholder votes cast on dividend proposals.</summary>
+    public DbSet<DividendVote> DividendVotes => Set<DividendVote>();
 
     /// <summary>Quoted share-price history recorded for the stock exchange.</summary>
     public DbSet<SharePriceHistoryEntry> SharePriceHistoryEntries => Set<SharePriceHistoryEntry>();

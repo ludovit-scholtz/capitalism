@@ -7,8 +7,25 @@ import { useGameStateStore } from '@/stores/gameState'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { getActiveAccountOption } from '@/lib/accountContext'
 import { deepEqual } from '@/lib/utils'
-import type { CompanyOwnership, MergeCompanyResult, OpenLimitOrder, PlayerBankAccountSummary, PersonAccount, ShareTradeResult, StockExchangeListing, StockExchangePriceHistoryPoint, StockOrderBook, StockTradeExecution } from '@/types'
-import { PERSON_ACCOUNT_QUERY, LISTINGS_QUERY, MY_BANK_ACCOUNTS_QUERY, BUY_MUTATION, SELL_MUTATION, PRICE_HISTORY_QUERY, MERGE_MUTATION, COMPANY_SHAREHOLDERS_QUERY, OPEN_ORDERS_QUERY, ORDER_BOOK_QUERY, STOCK_TRADE_HISTORY_QUERY, PLACE_LIMIT_ORDER_MUTATION, CANCEL_LIMIT_ORDER_MUTATION } from '@/components/stock/stockExchangeQueries'
+import type { CompanyOwnership, DividendProposal, DividendVoteResult, MergeCompanyResult, OpenLimitOrder, PlayerBankAccountSummary, PersonAccount, ShareTradeResult, StockExchangeListing, StockExchangePriceHistoryPoint, StockOrderBook, StockTradeExecution } from '@/types'
+import {
+  PERSON_ACCOUNT_QUERY,
+  LISTINGS_QUERY,
+  MY_BANK_ACCOUNTS_QUERY,
+  BUY_MUTATION,
+  SELL_MUTATION,
+  PRICE_HISTORY_QUERY,
+  MERGE_MUTATION,
+  COMPANY_SHAREHOLDERS_QUERY,
+  OPEN_ORDERS_QUERY,
+  ORDER_BOOK_QUERY,
+  STOCK_TRADE_HISTORY_QUERY,
+  PLACE_LIMIT_ORDER_MUTATION,
+  CANCEL_LIMIT_ORDER_MUTATION,
+  DIVIDEND_PROPOSALS_QUERY,
+  PROPOSE_DIVIDEND_MUTATION,
+  VOTE_DIVIDEND_PROPOSAL_MUTATION,
+} from '@/components/stock/stockExchangeQueries'
 
 type ControlledCompanyAccount = { id: string; name: string; cash: number | null }
 type SortField = 'name' | 'price' | 'marketValue' | 'ownership' | 'dividend'
@@ -46,6 +63,10 @@ export function useStockExchange() {
   const priceHistoryByCompany = ref<Record<string, StockExchangePriceHistoryPoint[]>>({})
   const priceHistoryLoadingByCompany = ref<Record<string, boolean>>({})
   const priceHistoryErrorByCompany = ref<Record<string, string | null>>({})
+  const dividendProposalsByCompany = ref<Record<string, DividendProposal[]>>({})
+  const dividendProposalsLoadingByCompany = ref<Record<string, boolean>>({})
+  const dividendProposalsErrorByCompany = ref<Record<string, string | null>>({})
+  const dividendPerShareDraftByCompany = ref<Record<string, number>>({})
   const shareholdersByCompany = ref<Record<string, CompanyOwnership>>({})
   const shareholdersLoadingByCompany = ref<Record<string, boolean>>({})
   const shareholdersErrorByCompany = ref<Record<string, string | null>>({})
@@ -154,7 +175,10 @@ export function useStockExchange() {
   }
 
   function setDefaultQuantities() {
-    for (const listing of listings.value) { quantityByCompany.value[listing.companyId] ??= 100 }
+    for (const listing of listings.value) {
+      quantityByCompany.value[listing.companyId] ??= 100
+      dividendPerShareDraftByCompany.value[listing.companyId] ??= Number(listing.sharePrice > 0 ? listing.sharePrice * 0.01 : 0.01)
+    }
   }
 
   function isControlledCompany(companyId: string): boolean {
@@ -202,6 +226,32 @@ export function useStockExchange() {
     } finally { shareholdersLoadingByCompany.value[companyId] = false }
   }
 
+  async function loadDividendProposals(companyId: string) {
+    dividendProposalsLoadingByCompany.value[companyId] = true
+    dividendProposalsErrorByCompany.value[companyId] = null
+    try {
+      const listing = listings.value.find((candidate) => candidate.companyId === companyId)
+      if (!listing) {
+        dividendProposalsByCompany.value[companyId] = []
+        return
+      }
+
+      const data = await gqlRequest<{ dividendProposals: DividendProposal[] }>(DIVIDEND_PROPOSALS_QUERY, {
+        stockSymbol: stockSymbolForListing(listing),
+      })
+      dividendProposalsByCompany.value[companyId] = data.dividendProposals
+    } catch (reason: unknown) {
+      dividendProposalsErrorByCompany.value[companyId] = reason instanceof Error ? reason.message : t('stockExchange.dividendGovernanceLoadFailed')
+    } finally {
+      dividendProposalsLoadingByCompany.value[companyId] = false
+    }
+  }
+
+  function updateDividendPerShareDraft(companyId: string, value: number) {
+    const safe = Number.isFinite(value) ? value : 0
+    dividendPerShareDraftByCompany.value[companyId] = Math.max(0, safe)
+  }
+
   async function toggleTradePanel(companyId: string) {
     expandedCompany.value = expandedCompany.value === companyId ? null : companyId
     errorByCompany.value[companyId] = null
@@ -210,6 +260,7 @@ export function useStockExchange() {
       const loadTasks: Promise<void>[] = []
       if (!priceHistoryByCompany.value[companyId]) loadTasks.push(loadPriceHistory(companyId))
       if (!shareholdersByCompany.value[companyId]) loadTasks.push(loadShareholders(companyId))
+      if (!dividendProposalsByCompany.value[companyId]) loadTasks.push(loadDividendProposals(companyId))
       await Promise.all(loadTasks)
     }
   }
@@ -362,6 +413,61 @@ export function useStockExchange() {
     } finally { actionLoadingKey.value = null }
   }
 
+  async function proposeDividend(companyId: string) {
+    const listing = listings.value.find((candidate) => candidate.companyId === companyId)
+    if (!listing) {
+      return
+    }
+
+    const dividendPerShare = Number(dividendPerShareDraftByCompany.value[companyId] ?? 0)
+    if (!Number.isFinite(dividendPerShare) || dividendPerShare <= 0) {
+      errorByCompany.value[companyId] = t('stockExchange.dividendInvalidPerShare')
+      successByCompany.value[companyId] = null
+      return
+    }
+
+    actionLoadingKey.value = `propose-dividend-${companyId}`
+    errorByCompany.value[companyId] = null
+    successByCompany.value[companyId] = null
+    try {
+      await gqlRequest<{ proposeDividend: { id: string } }>(PROPOSE_DIVIDEND_MUTATION, {
+        input: {
+          stockSymbol: stockSymbolForListing(listing),
+          dividendPerShare,
+        },
+      })
+      successByCompany.value[companyId] = t('stockExchange.dividendProposalCreated')
+      await Promise.all([loadDividendProposals(companyId), loadData(true)])
+    } catch (reason: unknown) {
+      errorByCompany.value[companyId] = reason instanceof Error ? reason.message : t('stockExchange.actionFailed')
+    } finally {
+      actionLoadingKey.value = null
+    }
+  }
+
+  async function voteDividendProposal(companyId: string, proposalId: string, choice: 'FOR' | 'AGAINST') {
+    actionLoadingKey.value = `vote-dividend-${proposalId}-${choice}`
+    errorByCompany.value[companyId] = null
+    successByCompany.value[companyId] = null
+    try {
+      const result = await gqlRequest<{ voteDividendProposal: DividendVoteResult }>(VOTE_DIVIDEND_PROPOSAL_MUTATION, {
+        input: {
+          proposalId,
+          choice,
+        },
+      })
+      successByCompany.value[companyId] = t('stockExchange.dividendVoteSuccess', {
+        shares: formatShares(result.voteDividendProposal.sharesVoted),
+        choice: choice === 'FOR' ? t('stockExchange.voteFor') : t('stockExchange.voteAgainst'),
+      })
+      await loadDividendProposals(companyId)
+    } catch (reason: unknown) {
+      errorByCompany.value[companyId] = reason instanceof Error ? reason.message : t('stockExchange.actionFailed')
+    } finally {
+      actionLoadingKey.value = null
+    }
+  }
+
   function openMergeDialog(companyId: string) {
     mergeDialogCompanyId.value = companyId
     mergeDestinationCompanyId.value = controlledCompanies.value[0]?.id ?? ''
@@ -427,6 +533,10 @@ export function useStockExchange() {
     priceHistoryByCompany,
     priceHistoryLoadingByCompany,
     priceHistoryErrorByCompany,
+    dividendProposalsByCompany,
+    dividendProposalsLoadingByCompany,
+    dividendProposalsErrorByCompany,
+    dividendPerShareDraftByCompany,
     shareholdersByCompany,
     shareholdersLoadingByCompany,
     shareholdersErrorByCompany,
@@ -466,6 +576,9 @@ export function useStockExchange() {
     cancelLimitOrder,
     switchToCompanyAccount,
     executeTrade,
+    proposeDividend,
+    voteDividendProposal,
+    updateDividendPerShareDraft,
     openMergeDialog,
     closeMergeDialog,
     executeMerge,

@@ -3,15 +3,17 @@ import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { usesStore } from '@/stores/news'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useGameAdminStore } from '@/stores/gameAdmin'
 import { useChatStore } from '@/stores/chat'
+import { gqlRequest } from '@/lib/graphql'
 import ContextSwitcher from '@/components/layout/ContextSwitcher.vue'
 import GameTimeChip from '@/components/layout/GameTimeChip.vue'
 import ThemeToggle from '@/components/layout/ThemeToggle.vue'
 import { useThemeStore } from '@/stores/theme'
+import { useTickRefresh } from '@/composables/useTickRefresh'
 
 const themeStore = useThemeStore()
 themeStore.init()
@@ -33,6 +35,8 @@ const openMobileSection = ref<'main' | 'economy' | 'build' | 'social' | 'admin'>
 
 const showUnreadBadge = computed(() => auth.isAuthenticated && unreadCount.value > 0)
 const showNotificationBadge = computed(() => auth.isAuthenticated && notificationUnreadCount.value > 0)
+const stockProposalBadgeCount = ref(0)
+const showStockProposalBadge = computed(() => auth.isAuthenticated && stockProposalBadgeCount.value > 0)
 
 const impersonationLabel = computed(() => {
   if (!session.value?.isImpersonating || !session.value.effectivePlayer) {
@@ -98,6 +102,26 @@ async function markAllNotificationsRead() {
   await notificationsStore.markAllRead()
 }
 
+async function refreshStockProposalBadgeCount() {
+  if (!auth.isAuthenticated) {
+    stockProposalBadgeCount.value = 0
+    return
+  }
+
+  try {
+    const result = await gqlRequest<{ myOpenDividendProposalCount: number }>(
+      `
+        query MyOpenDividendProposalCount {
+          myOpenDividendProposalCount
+        }
+      `,
+    )
+    stockProposalBadgeCount.value = Math.max(0, Number(result.myOpenDividendProposalCount ?? 0))
+  } catch {
+    stockProposalBadgeCount.value = 0
+  }
+}
+
 async function handleLogout() {
   const federatedRedirectStarted = auth.logout({ federated: true })
   closeMenu()
@@ -125,7 +149,7 @@ const mobileNavSections = computed(() => {
       label: t('nav.sectionEconomy'),
       links: [
         { key: 'exchange', label: t('nav.exchange'), to: '/exchange', icon: ['fas', 'chart-bar'], visible: true, badge: 0 },
-        { key: 'stocks', label: t('nav.stocks'), to: '/stocks', icon: ['fas', 'wallet'], visible: true, badge: 0 },
+        { key: 'stocks', label: t('nav.stocks'), to: '/stocks', icon: ['fas', 'wallet'], visible: true, badge: showStockProposalBadge.value ? stockProposalBadgeCount.value : 0 },
         { key: 'forex', label: t('nav.forex'), to: '/forex', icon: ['fas', 'coins'], visible: auth.isAuthenticated, badge: 0 },
         { key: 'banking', label: t('nav.banking'), to: '/banking', icon: ['fas', 'landmark'], visible: true, badge: 0 },
         { key: 'bank-statement', label: t('nav.bankStatement'), to: '/bank-statement', icon: ['fas', 'file-invoice-dollar'], visible: auth.isAuthenticated, badge: 0 },
@@ -172,6 +196,14 @@ const mobileNavSections = computed(() => {
     }))
     .filter((section) => section.links.length > 0)
 })
+
+onMounted(() => {
+  void refreshStockProposalBadgeCount()
+})
+
+useTickRefresh(async () => {
+  await refreshStockProposalBadgeCount()
+})
 </script>
 
 <template>
@@ -211,8 +243,9 @@ const mobileNavSections = computed(() => {
           <RouterLink to="/exchange" :title="t('nav.exchange')" class="nav-link" @click="closeMenu">
             <font-awesome-icon :icon="['fas', 'chart-bar']" class="mr-2" />
           </RouterLink>
-          <RouterLink to="/stocks" :title="t('nav.stocks')" class="nav-link" @click="closeMenu">
+          <RouterLink to="/stocks" :title="t('nav.stocks')" class="nav-link nav-link-badge-host" @click="closeMenu">
             <font-awesome-icon :icon="['fas', 'wallet']" class="mr-2" />
+            <span v-if="showStockProposalBadge" class="nav-badge nav-badge-news">{{ stockProposalBadgeCount }}</span>
           </RouterLink>
           <RouterLink v-if="auth.isAuthenticated" to="/forex" :title="t('nav.forex')" class="nav-link" @click="closeMenu">
             <font-awesome-icon :icon="['fas', 'coins']" class="mr-2" />

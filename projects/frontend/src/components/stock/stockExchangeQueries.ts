@@ -63,6 +63,7 @@ export const LISTINGS_QUERY = `
       playerOwnedShares
       controlledCompanyOwnedShares
       combinedControlledOwnershipRatio
+      canProposeDividend
       canClaimControl
       canMerge
     }
@@ -242,5 +243,60 @@ export const COMPANY_SHAREHOLDERS_QUERY = `
         ownershipRatio
       }
     }
+  }
+`
+
+export const DIVIDEND_PROPOSALS_QUERY = `
+  query DividendProposals($stockSymbol: String!) {
+    dividendProposals: getDividendProposals(stockSymbol: $stockSymbol) {
+      id
+      companyId
+      stockSymbol
+      proposedByAccountId
+      proposedByAccountType
+      dividendPerShare
+      totalPayout
+      status
+      outcome
+      proposedAtTick
+      votingOpenTick
+      votingCloseTick
+      settledAtTick
+      ticksRemaining
+      forVotes
+      againstVotes
+      myVoteChoice
+      mySharesVoted
+    }
+  }
+`
+
+export const PROPOSE_DIVIDEND_MUTATION = `
+  mutation ProposeDividend($input: ProposeDividendInput!) {
+    proposeDividend(input: $input) {
+      id
+      companyId
+      stockSymbol
+      status
+      votingCloseTick
+    }
+  }
+`
+
+export const VOTE_DIVIDEND_PROPOSAL_MUTATION = `
+  mutation VoteDividendProposal($input: VoteDividendProposalInput!) {
+    voteDividendProposal(input: $input) {
+      id
+      proposalId
+      voteChoice
+      sharesVoted
+      castAtTick
+    }
+  }
+`
+
+export const OPEN_DIVIDEND_PROPOSAL_COUNT_QUERY = `
+  query MyOpenDividendProposalCount {
+    myOpenDividendProposalCount
   }
 `

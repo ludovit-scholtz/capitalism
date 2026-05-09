@@ -83,6 +83,7 @@ public sealed class StockExchangeListingResult
     public decimal PlayerOwnedShares { get; set; }
     public decimal ControlledCompanyOwnedShares { get; set; }
     public decimal CombinedControlledOwnershipRatio { get; set; }
+    public bool CanProposeDividend { get; set; }
     public bool CanClaimControl { get; set; }
     public bool CanMerge { get; set; }
 }

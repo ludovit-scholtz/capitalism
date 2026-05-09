@@ -7,7 +7,7 @@ import { useStockExchange } from '@/composables/useStockExchange'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
-const { currentTick, loading, error, personAccount, portfolioValue, recentDividendTotal, locale, filterText, selectedCityFilter, selectedIndustryFilter, availableCityFilters, availableIndustryFilters, filteredAndSortedListings, paginatedListings, totalPages, currentPage, toggleSort, sortIcon, isControlledCompany, actionLoadingKey, activeTradeAccountName, activeTradeAccountType, activeTradeAccountCash, activeSettlementAccounts, selectedSettlementBankAccountId, quantityByCompany, errorByCompany, successByCompany, expandedCompany, priceHistoryByCompany, priceHistoryLoadingByCompany, priceHistoryErrorByCompany, shareholdersByCompany, shareholdersLoadingByCompany, shareholdersErrorByCompany, mergeDialogOpen, mergeDestinationCompanyId, controlledCompanies, mergeLoading, mergeError, mergeSuccess, updateQuantity, estimatedBuyCost, estimatedSellProceeds, toggleTradePanel, switchToCompanyAccount, executeTrade, openMergeDialog, closeMergeDialog, executeMerge, loadData, openOrders, selectedOrderBookSymbol, orderBook, tradeHistory, orderSide, orderPrice, orderQuantity, orderLoading, orderError, orderSuccess, selectedOrderListing, stockSymbolForListing, placeLimitOrder, cancelLimitOrder } = useStockExchange()
+const { currentTick, loading, error, personAccount, portfolioValue, recentDividendTotal, locale, filterText, selectedCityFilter, selectedIndustryFilter, availableCityFilters, availableIndustryFilters, filteredAndSortedListings, paginatedListings, totalPages, currentPage, toggleSort, sortIcon, isControlledCompany, actionLoadingKey, activeTradeAccountName, activeTradeAccountType, activeTradeAccountCash, activeSettlementAccounts, selectedSettlementBankAccountId, quantityByCompany, errorByCompany, successByCompany, expandedCompany, priceHistoryByCompany, priceHistoryLoadingByCompany, priceHistoryErrorByCompany, dividendProposalsByCompany, dividendProposalsLoadingByCompany, dividendProposalsErrorByCompany, dividendPerShareDraftByCompany, shareholdersByCompany, shareholdersLoadingByCompany, shareholdersErrorByCompany, mergeDialogOpen, mergeDestinationCompanyId, controlledCompanies, mergeLoading, mergeError, mergeSuccess, updateQuantity, estimatedBuyCost, estimatedSellProceeds, toggleTradePanel, switchToCompanyAccount, executeTrade, proposeDividend, voteDividendProposal, updateDividendPerShareDraft, openMergeDialog, closeMergeDialog, executeMerge, loadData, openOrders, selectedOrderBookSymbol, orderBook, tradeHistory, orderSide, orderPrice, orderQuantity, orderLoading, orderError, orderSuccess, selectedOrderListing, stockSymbolForListing, placeLimitOrder, cancelLimitOrder } = useStockExchange()
 
 function formatCityFilterLabel(city: string): string {
   return city === 'UNKNOWN' ? t('stockExchange.unknownCity') : city
@@ -136,6 +136,10 @@ function formatIndustryFilterLabel(industry: string): string {
                   :price-history="priceHistoryByCompany[listing.companyId] ?? []"
                   :price-history-loading="priceHistoryLoadingByCompany[listing.companyId] ?? false"
                   :price-history-error="priceHistoryErrorByCompany[listing.companyId] ?? null"
+                  :dividend-proposals="dividendProposalsByCompany[listing.companyId] ?? []"
+                  :dividend-proposals-loading="dividendProposalsLoadingByCompany[listing.companyId] ?? false"
+                  :dividend-proposals-error="dividendProposalsErrorByCompany[listing.companyId] ?? null"
+                  :dividend-per-share-draft="dividendPerShareDraftByCompany[listing.companyId] ?? 0"
                   :shareholders="shareholdersByCompany[listing.companyId] ?? null"
                   :shareholders-loading="shareholdersLoadingByCompany[listing.companyId] ?? false"
                   :shareholders-error="shareholdersErrorByCompany[listing.companyId] ?? null"
@@ -146,6 +150,9 @@ function formatIndustryFilterLabel(industry: string): string {
                   @update-quantity="updateQuantity(listing.companyId, $event)"
                   @buy="executeTrade('buy', listing.companyId)"
                   @sell="executeTrade('sell', listing.companyId)"
+                  @update-dividend-per-share="updateDividendPerShareDraft(listing.companyId, $event)"
+                  @propose-dividend="proposeDividend(listing.companyId)"
+                  @vote-dividend="voteDividendProposal(listing.companyId, $event.proposalId, $event.choice)"
                 />
               </tbody>
             </table>
