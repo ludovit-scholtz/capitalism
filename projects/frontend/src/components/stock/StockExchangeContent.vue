@@ -14,7 +14,14 @@ function formatCityFilterLabel(city: string): string {
 }
 
 function formatIndustryFilterLabel(industry: string): string {
-  return industry === 'DIVERSIFIED' ? t('stockExchange.diversifiedIndustry') : industry.split('_').join(' ')
+  if (industry === 'DIVERSIFIED') {
+    return t('stockExchange.diversifiedIndustry')
+  }
+
+  return industry
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
 }
 </script>
 
