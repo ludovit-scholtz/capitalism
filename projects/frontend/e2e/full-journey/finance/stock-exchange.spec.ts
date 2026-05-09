@@ -246,6 +246,86 @@ test.describe('Stock exchange', () => {
     await expect(page.locator('tr.listing-row', { hasText: 'Home Holdings' })).toBeHidden()
   })
 
+  test('city and industry filters narrow stock listings', async ({ page }) => {
+    const player = makePlayer({
+      personalCash: 100000,
+      companies: [
+        makeControlledCompany({
+          buildings: [
+            {
+              id: 'building-home-factory',
+              companyId: 'company-home',
+              cityId: 'city-ba',
+              type: 'FACTORY',
+              name: 'Home Factory',
+              latitude: 48.15,
+              longitude: 17.11,
+              level: 1,
+              powerConsumption: 10,
+              isForSale: false,
+            },
+          ],
+        }),
+      ],
+    })
+    const rival = makePlayer({
+      id: 'player-filter-city',
+      email: 'city-filter-rival@test.com',
+      displayName: 'City Filter Rival',
+      companies: [
+        {
+          id: 'company-prague-bank',
+          playerId: 'player-filter-city',
+          name: 'Prague Capital Bank',
+          cash: 800000,
+          totalSharesIssued: 10000,
+          dividendPayoutRatio: 0.2,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          foundedAtTick: 1,
+          buildings: [
+            {
+              id: 'building-prague-bank',
+              companyId: 'company-prague-bank',
+              cityId: 'city-pr',
+              type: 'BANK',
+              name: 'Prague Bank HQ',
+              latitude: 50.08,
+              longitude: 14.44,
+              level: 1,
+              powerConsumption: 10,
+              isForSale: false,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, {
+      players: [player, rival],
+      shareholdings: [
+        { companyId: 'company-home', ownerPlayerId: 'player-1', ownerCompanyId: null, shareCount: 10000 },
+        { companyId: 'company-prague-bank', ownerPlayerId: 'player-filter-city', ownerCompanyId: null, shareCount: 5000 },
+      ],
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/stocks')
+
+    await expect(page.locator('tr.listing-row', { hasText: 'Home Holdings' })).toBeVisible()
+    await expect(page.locator('tr.listing-row', { hasText: 'Prague Capital Bank' })).toBeVisible()
+
+    await page.getByLabel('City').selectOption('Bratislava')
+    await expect(page.locator('tr.listing-row', { hasText: 'Home Holdings' })).toBeVisible()
+    await expect(page.locator('tr.listing-row', { hasText: 'Prague Capital Bank' })).toHaveCount(0)
+
+    await page.getByLabel('City').selectOption('All cities')
+    await page.getByLabel('Industry').selectOption('FINANCE')
+    await expect(page.locator('tr.listing-row', { hasText: 'Prague Capital Bank' })).toBeVisible()
+    await expect(page.locator('tr.listing-row', { hasText: 'Home Holdings' })).toHaveCount(0)
+  })
+
   test('table can be sorted by market value descending and ascending', async ({ page }) => {
     const player = makePlayer({
       personalCash: 100000,

@@ -7,7 +7,22 @@ import { useStockExchange } from '@/composables/useStockExchange'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
-const { currentTick, loading, error, personAccount, portfolioValue, recentDividendTotal, locale, filterText, filteredAndSortedListings, paginatedListings, totalPages, currentPage, toggleSort, sortIcon, isControlledCompany, actionLoadingKey, activeTradeAccountName, activeTradeAccountType, activeTradeAccountCash, activeSettlementAccounts, selectedSettlementBankAccountId, quantityByCompany, errorByCompany, successByCompany, expandedCompany, priceHistoryByCompany, priceHistoryLoadingByCompany, priceHistoryErrorByCompany, shareholdersByCompany, shareholdersLoadingByCompany, shareholdersErrorByCompany, mergeDialogOpen, mergeDestinationCompanyId, controlledCompanies, mergeLoading, mergeError, mergeSuccess, updateQuantity, estimatedBuyCost, estimatedSellProceeds, toggleTradePanel, switchToCompanyAccount, executeTrade, openMergeDialog, closeMergeDialog, executeMerge, loadData } = useStockExchange()
+const { currentTick, loading, error, personAccount, portfolioValue, recentDividendTotal, locale, filterText, selectedCityFilter, selectedIndustryFilter, availableCityFilters, availableIndustryFilters, filteredAndSortedListings, paginatedListings, totalPages, currentPage, toggleSort, sortIcon, isControlledCompany, actionLoadingKey, activeTradeAccountName, activeTradeAccountType, activeTradeAccountCash, activeSettlementAccounts, selectedSettlementBankAccountId, quantityByCompany, errorByCompany, successByCompany, expandedCompany, priceHistoryByCompany, priceHistoryLoadingByCompany, priceHistoryErrorByCompany, shareholdersByCompany, shareholdersLoadingByCompany, shareholdersErrorByCompany, mergeDialogOpen, mergeDestinationCompanyId, controlledCompanies, mergeLoading, mergeError, mergeSuccess, updateQuantity, estimatedBuyCost, estimatedSellProceeds, toggleTradePanel, switchToCompanyAccount, executeTrade, openMergeDialog, closeMergeDialog, executeMerge, loadData } = useStockExchange()
+
+function formatCityFilterLabel(city: string): string {
+  return city === 'UNKNOWN' ? t('stockExchange.unknownCity') : city
+}
+
+function formatIndustryFilterLabel(industry: string): string {
+  if (industry === 'DIVERSIFIED') {
+    return t('stockExchange.diversifiedIndustry')
+  }
+
+  return industry
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
+}
 </script>
 
 <template>
@@ -49,6 +64,20 @@ const { currentTick, loading, error, personAccount, portfolioValue, recentDivide
           </p>
           <div class="market-controls">
             <input v-model="filterText" type="search" :placeholder="t('stockExchange.filterPlaceholder')" class="filter-input" :aria-label="t('stockExchange.filterLabel')" />
+            <label class="filter-select-label">
+              <span>{{ t('stockExchange.cityFilterLabel') }}</span>
+              <select v-model="selectedCityFilter" class="filter-select" :aria-label="t('stockExchange.cityFilterLabel')">
+                <option value="ALL">{{ t('stockExchange.allCities') }}</option>
+                <option v-for="city in availableCityFilters.filter((value) => value !== 'ALL')" :key="city" :value="city">{{ formatCityFilterLabel(city) }}</option>
+              </select>
+            </label>
+            <label class="filter-select-label">
+              <span>{{ t('stockExchange.industryFilterLabel') }}</span>
+              <select v-model="selectedIndustryFilter" class="filter-select" :aria-label="t('stockExchange.industryFilterLabel')">
+                <option value="ALL">{{ t('stockExchange.allIndustries') }}</option>
+                <option v-for="industry in availableIndustryFilters.filter((value) => value !== 'ALL')" :key="industry" :value="industry">{{ formatIndustryFilterLabel(industry) }}</option>
+              </select>
+            </label>
           </div>
           <div v-if="filteredAndSortedListings.length === 0" class="empty-state">{{ filterText ? t('stockExchange.noListingsFiltered') : t('stockExchange.noListings') }}</div>
           <div v-else class="table-wrapper">
@@ -201,6 +230,25 @@ const { currentTick, loading, error, personAccount, portfolioValue, recentDivide
   min-width: 200px;
   max-width: 360px;
   width: 100%;
+}
+
+.filter-select-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.filter-select {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-background);
+  color: var(--color-text);
+  padding: 0.55rem 0.85rem;
+  font-size: 0.9rem;
+  min-width: 180px;
 }
 
 .filter-input:focus {

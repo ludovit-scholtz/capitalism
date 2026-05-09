@@ -108,6 +108,39 @@ public sealed class StockExchangeGovernmentTradeTests
     }
 
     [Fact]
+    public async Task StockExchangeListings_ReturnsCityIndustryAndDailyChangeFields()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var ownerToken = await RegisterAndGetTokenAsync(client, $"stock-meta-owner-{Guid.NewGuid():N}@test.com", "Stock Meta Owner");
+        var ownerId = await GetCurrentPlayerIdAsync(client, ownerToken);
+        var publicCompanyId = await SeedPublicCompanyAsync(factory, ownerId, "Stock Meta Co");
+        var investorToken = await RegisterAndGetTokenAsync(client, $"stock-meta-investor-{Guid.NewGuid():N}@test.com", "Stock Meta Investor");
+
+        var result = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            """
+            {
+              stockExchangeListings {
+                companyId
+                primaryCityName
+                primaryIndustry
+                dailyChangePercent
+              }
+            }
+            """,
+            token: investorToken);
+
+        var listing = result.GetProperty("data").GetProperty("stockExchangeListings").EnumerateArray()
+            .First(item => item.GetProperty("companyId").GetString() == publicCompanyId.ToString());
+
+        Assert.Equal("UNKNOWN", listing.GetProperty("primaryCityName").GetString());
+        Assert.Equal("DIVERSIFIED", listing.GetProperty("primaryIndustry").GetString());
+        Assert.Equal(0m, listing.GetProperty("dailyChangePercent").GetDecimal());
+    }
+
+    [Fact]
     public async Task BuyShares_GovernmentCompany_ReturnsTradeForbiddenError()
     {
         await using var factory = new ApiWebApplicationFactory();
