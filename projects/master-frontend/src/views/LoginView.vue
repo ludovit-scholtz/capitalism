@@ -12,6 +12,7 @@ const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const passwordAuthEnabled = isPasswordAuthEnabled(import.meta.env.VITE_AUTH_PASSWORD_ENABLED)
+const OIDC_AUTO_REDIRECT_DELAY_MS = 500
 
 const isRegister = ref(false)
 const email = ref('')
@@ -55,7 +56,7 @@ onMounted(() => {
   if (shouldAutoStartOidc(passwordAuthEnabled, requiresConsentRetry.value)) {
     setTimeout(() => {
       handleBiatecSignIn()
-    }, 500)
+    }, OIDC_AUTO_REDIRECT_DELAY_MS)
   }
 })
 </script>

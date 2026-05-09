@@ -26,6 +26,7 @@ const referralStore = useReferralStore()
 const { status: endgameStatus } = useEndgameStatus()
 const endgameOverlayDismissed = ref(false)
 const signedOutNoticeVisible = ref(false)
+const SIGNED_OUT_TOAST_DURATION_MS = 4_000
 gameStateStore.start()
 let citySwitchToastTimer: ReturnType<typeof setTimeout> | null = null
 let signedOutToastTimer: ReturnType<typeof setTimeout> | null = null
@@ -54,7 +55,7 @@ function showSignedOutToastIfPending() {
   clearSignedOutToastTimer()
   signedOutToastTimer = setTimeout(() => {
     signedOutNoticeVisible.value = false
-  }, 4_000)
+  }, SIGNED_OUT_TOAST_DURATION_MS)
 }
 
 onMounted(() => {

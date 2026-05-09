@@ -677,6 +677,11 @@ export const useAuthStore = defineStore('auth', () => {
     autoSwitchedMainCityName.value = null
   }
 
+  /**
+   * Clears local auth state and optionally starts federated logout.
+   * @param options Logout options where `federated` requests OIDC end-session redirect when available.
+   * Returns true when federated redirect navigation was started.
+   */
   function logout(options: LogoutOptions = {}): boolean {
     const shouldFederatedLogout = options.federated === true && getStoredAuthProvider() === AUTH_PROVIDER_BIATEC
     const idTokenHint = token.value
