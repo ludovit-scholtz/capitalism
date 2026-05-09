@@ -14,6 +14,7 @@ import { formatMoney } from '@/lib/currencyFormat'
 import { formatInGameTime } from '@/lib/gameTime'
 import GlobalExchangeResourcePanel from '@/components/globalExchange/GlobalExchangeResourcePanel.vue'
 import GlobalExchangeProductPanel from '@/components/globalExchange/GlobalExchangeProductPanel.vue'
+import GlobalExchangeBuyModal from '@/components/globalExchange/GlobalExchangeBuyModal.vue'
 import type { GlobalExchangeOffer, GlobalExchangeProductListing, GlobalExchangeProductQuote, ResourceType, ProductType } from '@/types'
 
 interface City {
@@ -73,6 +74,26 @@ const selectedCategory = ref('ALL')
 const marketMode = ref<MarketMode>('resources')
 const productSearch = ref('')
 const selectedIndustry = ref('ALL')
+
+// Buy modal state
+const buyModalOpen = ref(false)
+const buyModalOffer = ref<(GlobalExchangeOffer & { resourceName: string; unitSymbol: string }) | null>(null)
+const buySuccessMessage = ref<string | null>(null)
+
+function openBuyModal(offer: GlobalExchangeOffer & { resourceName: string; unitSymbol: string }) {
+  buyModalOffer.value = offer
+  buyModalOpen.value = true
+  buySuccessMessage.value = null
+}
+
+function onBuySuccess(result: { resourceName: string; quantityPurchased: number; currencyCode: string; totalCost: number }) {
+  buySuccessMessage.value = t('globalExchange.buySuccess', {
+    quantity: result.quantityPurchased,
+    unit: buyModalOffer.value?.unitSymbol ?? '',
+    resource: result.resourceName,
+  })
+  void loadOffers(true)
+}
 
 const CITIES_QUERY = `
   {
@@ -463,6 +484,7 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
         @update:selected-category="selectedCategory = $event"
         @switch-city="auth.switchCity($event)"
         @retry="loadOffers"
+        @buy-offer="openBuyModal"
       />
 
       <GlobalExchangeProductPanel
@@ -482,5 +504,24 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
         @retry="loadProductListings"
       />
     </div>
+
+    <!-- Buy success toast -->
+    <div
+      v-if="buySuccessMessage"
+      class="buy-success-toast fixed bottom-6 right-6 z-50 flex max-w-sm items-center gap-3 rounded-xl border border-success/30 bg-success/10 px-5 py-3 shadow-lg"
+      role="status"
+    >
+      <span class="text-success text-lg">✓</span>
+      <span class="text-sm font-semibold text-body">{{ buySuccessMessage }}</span>
+      <button class="ml-auto text-muted hover:text-body" @click="buySuccessMessage = null">✕</button>
+    </div>
+
+    <!-- Buy from exchange modal -->
+    <GlobalExchangeBuyModal
+      :offer="buyModalOffer"
+      :open="buyModalOpen"
+      @close="buyModalOpen = false"
+      @buy-success="onBuySuccess"
+    />
   </div>
 </template>

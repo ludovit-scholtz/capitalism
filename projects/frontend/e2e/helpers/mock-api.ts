@@ -6224,6 +6224,98 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    if (query.includes('buyFromExchange')) {
+      if (!state.currentUserId) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { buyFromExchange: { success: false, errorCode: 'UNAUTHORIZED', errorMessage: 'Not authenticated.' } } }),
+        })
+      }
+      const input = body.variables?.input ?? {}
+      const resource = state.resourceTypes.find((r) => r.id === input.resourceTypeId)
+      const sourceCity = state.cities.find((c) => c.id === input.sourceCityId)
+      const account = state.myBankAccounts.find((a) => a.id === input.bankAccountId)
+      const qty = parseFloat(String(input.quantity ?? 0))
+      if (!resource || !sourceCity) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { buyFromExchange: { success: false, errorCode: 'RESOURCE_NOT_FOUND', errorMessage: 'Resource or city not found.' } } }),
+        })
+      }
+      const abundance = sourceCity.resources.find((e) => e.resourceType.id === resource.id)?.abundance ?? 0.05
+      const destCity = state.cities.find((c) => c.id === state.myBankAccounts.find((a) => a.id === input.bankAccountId)?.cityId) ?? sourceCity
+      const distanceKm = computeDistanceKm(sourceCity.latitude, sourceCity.longitude, destCity.latitude ?? sourceCity.latitude, destCity.longitude ?? sourceCity.longitude)
+      const currencyCode = account?.currencyCode ?? 'EUR'
+      const fxRate = currencyCode === 'EUR' ? 1 : (state.fxRates.find((r) => r.quoteCurrencyCode === currencyCode)?.rate ?? 1)
+      const exchangePrice = computeMockExchangePrice(resource.basePrice, abundance, sourceCity.averageRentPerSqm, fxRate)
+      const transitCost = computeMockTransitCost(resource.weightPerUnit, distanceKm, fxRate)
+      const totalCost = (exchangePrice + transitCost) * qty
+      if (account && account.balance < totalCost) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { buyFromExchange: { success: false, errorCode: 'INSUFFICIENT_FUNDS', errorMessage: 'Insufficient funds.' } } }),
+        })
+      }
+      if (account) {
+        account.balance = Number((account.balance - totalCost).toFixed(2))
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            buyFromExchange: {
+              success: true,
+              errorCode: null,
+              errorMessage: null,
+              resourceName: resource.name,
+              quantityPurchased: qty,
+              exchangePricePerUnit: exchangePrice,
+              transitCostPerUnit: transitCost,
+              deliveredPricePerUnit: Number((exchangePrice + transitCost).toFixed(2)),
+              totalCost: Number(totalCost.toFixed(2)),
+              qualityDelivered: computeMockExchangeQuality(abundance),
+              currencyCode,
+              newBankBalance: account?.balance ?? 0,
+            },
+          },
+        }),
+      })
+    }
+
+    if (query.includes('sellToExchange')) {
+      if (!state.currentUserId) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { sellToExchange: { success: false, errorCode: 'UNAUTHORIZED', errorMessage: 'Not authenticated.' } } }),
+        })
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            sellToExchange: {
+              success: true,
+              errorCode: null,
+              errorMessage: null,
+              resourceName: 'Wood',
+              quantitySold: parseFloat(String(body.variables?.input?.quantity ?? 0)),
+              exchangePricePerUnit: 10,
+              totalProceeds: parseFloat(String(body.variables?.input?.quantity ?? 0)) * 10,
+              currencyCode: 'EUR',
+              newBankBalance: 50000,
+            },
+          },
+        }),
+      })
+    }
+
+
     if (query.includes('chatMessages')) {
       if (!state.currentUserId) {
         return route.fulfill({
