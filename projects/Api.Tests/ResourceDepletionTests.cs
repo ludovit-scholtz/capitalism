@@ -7,6 +7,7 @@ using Api.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Shared.Economy;
 
 namespace Api.Tests;
 
@@ -207,8 +208,8 @@ public sealed class ResourceDepletionTests
 
         var player = await db.Players.FirstDeterministicAsync();
         var city = CreateIsolatedCity(db, "C");
-        // Only 5 tonnes = fully extracted in one tick (MiningRate level 1 = 10).
-        var (company, mine, unit, lot, resource) = CreateMineSeed(db, city, player, materialQuantity: 5m, originalQuantity: 100m);
+        // Only 5 tonnes with original=5 => fully extracted in one tick.
+        var (company, mine, unit, lot, resource) = CreateMineSeed(db, city, player, materialQuantity: 5m, originalQuantity: 5m);
         await db.SaveChangesAsync();
 
         var processor = await CreateProcessorAsync(scope);
@@ -510,6 +511,166 @@ public sealed class ResourceDepletionTests
         Assert.Equal(0m, lotB.MaterialQuantity!.Value);
         // City B schedule should NOT have advanced.
         Assert.Equal(999_999, scheduleB.NextReplenishmentTick);
+    }
+
+    [Fact]
+    public async Task MiningPhase_EmitsReserveWarnings_WhenCrossingTwentyAndFivePercent()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstDeterministicAsync();
+        var city = CreateIsolatedCity(db, "W");
+        var (_, _, _, lot, _) = CreateMineSeed(db, city, player, materialQuantity: 25m, originalQuantity: 100m);
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        for (var i = 0; i < 4; i++)
+        {
+            await processor.ProcessTickAsync();
+        }
+
+        await db.Entry(lot).ReloadAsync();
+
+        var lowWarning = await db.PlayerNotifications
+            .CountAsync(notification => notification.PlayerId == player.Id
+                && notification.Type == PlayerNotificationType.MineLowReserveWarning
+                && notification.BuildingId == lot.BuildingId);
+
+        var criticalWarning = await db.PlayerNotifications
+            .CountAsync(notification => notification.PlayerId == player.Id
+                && notification.Type == PlayerNotificationType.MineCriticalReserveWarning
+                && notification.BuildingId == lot.BuildingId);
+
+        Assert.Equal(1, lowWarning);
+        Assert.Equal(1, criticalWarning);
+        Assert.True(lot.MaterialQuantity is > 0m and < 5m);
+    }
+
+    [Fact]
+    public async Task EnsureMinimumAvailableLots_KeepsAtLeastTwoMineDepositsPerResourceType()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = CreateIsolatedCity(db, "COV");
+        var coal = await db.ResourceTypes.FirstAsync(resource => resource.Slug == "coal");
+        db.CityResources.Add(new CityResource
+        {
+            Id = Guid.NewGuid(),
+            CityId = city.Id,
+            ResourceTypeId = coal.Id,
+            Abundance = 0.6m,
+        });
+        await db.SaveChangesAsync();
+
+        await LandService.EnsureMinimumAvailableLotsAsync(db, currentTick: 0, cityIds: [city.Id]);
+        await db.SaveChangesAsync();
+
+        var availableCoalDeposits = await db.BuildingLots
+            .Where(lot => lot.CityId == city.Id
+                && lot.OwnerCompanyId == null
+                && lot.ResourceTypeId == coal.Id
+                && lot.MaterialQuantity.HasValue
+                && lot.MaterialQuantity > 0m)
+            .CountAsync();
+
+        Assert.True(
+            availableCoalDeposits >= GameConstants.MinimumAvailableMineLotsPerResourceType,
+            $"Expected at least {GameConstants.MinimumAvailableMineLotsPerResourceType} available coal deposits, got {availableCoalDeposits}");
+    }
+
+    [Fact]
+    public async Task GetLandResourceStatus_ReturnsLiveEfficiencyAndTicksRemaining()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstDeterministicAsync();
+        var city = CreateIsolatedCity(db, "Q");
+        var (_, _, _, lot, _) = CreateMineSeed(db, city, player, materialQuantity: 60m, originalQuantity: 100m);
+        await db.SaveChangesAsync();
+
+        var client = factory.CreateClient();
+        var response = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            """
+            query LandResourceStatus($landId: UUID!) {
+              getLandResourceStatus(landId: $landId) {
+                landId
+                quantityRemaining
+                initialQuantity
+                qualityIndex
+                efficiencyFactor
+                estimatedTicksRemaining
+                isDepleted
+              }
+            }
+            """,
+            new { landId = lot.Id });
+
+        if (response.TryGetProperty("errors", out var landErrors))
+        {
+            throw new Exception($"GraphQL errors: {landErrors}");
+        }
+
+        var status = response.GetProperty("data").GetProperty("getLandResourceStatus");
+        Assert.Equal(lot.Id.ToString(), status.GetProperty("landId").GetString());
+        Assert.Equal(60m, status.GetProperty("quantityRemaining").GetDecimal());
+        Assert.Equal(100m, status.GetProperty("initialQuantity").GetDecimal());
+        Assert.Equal(0.7m, status.GetProperty("qualityIndex").GetDecimal());
+        Assert.Equal(MiningScarcityCalculator.ComputeEfficiencyFactor(60m, 100m), status.GetProperty("efficiencyFactor").GetDecimal());
+        Assert.True(status.GetProperty("estimatedTicksRemaining").GetDecimal() > 0m);
+        Assert.False(status.GetProperty("isDepleted").GetBoolean());
+    }
+
+    [Fact]
+    public async Task GetCityResourceMap_ReturnsUpdatedResourceStatus()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstDeterministicAsync();
+        var city = CreateIsolatedCity(db, "RM");
+        var (_, _, _, lot, _) = CreateMineSeed(db, city, player, materialQuantity: 40m, originalQuantity: 100m);
+        await db.SaveChangesAsync();
+
+        var client = factory.CreateClient();
+        var response = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            """
+            query CityResourceMap($cityId: UUID!) {
+              getCityResourceMap(cityId: $cityId) {
+                landId
+                cityId
+                quantityRemaining
+                initialQuantity
+                efficiencyFactor
+                isDepleted
+              }
+            }
+            """,
+            new { cityId = city.Id });
+
+        if (response.TryGetProperty("errors", out var mapErrors))
+        {
+            throw new Exception($"GraphQL errors: {mapErrors}");
+        }
+
+        var entries = response.GetProperty("data").GetProperty("getCityResourceMap")
+            .EnumerateArray()
+            .ToList();
+        var target = entries.First(entry => entry.GetProperty("landId").GetString() == lot.Id.ToString());
+
+        Assert.Equal(city.Id.ToString(), target.GetProperty("cityId").GetString());
+        Assert.Equal(40m, target.GetProperty("quantityRemaining").GetDecimal());
+        Assert.Equal(100m, target.GetProperty("initialQuantity").GetDecimal());
+        Assert.Equal(MiningScarcityCalculator.ComputeEfficiencyFactor(40m, 100m), target.GetProperty("efficiencyFactor").GetDecimal());
+        Assert.False(target.GetProperty("isDepleted").GetBoolean());
     }
 
     // ── Test 11: OriginalMaterialQuantity backfill on startup ─────────────────

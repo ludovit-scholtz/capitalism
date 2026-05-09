@@ -144,6 +144,9 @@ public static partial class GameConstants
     /// <summary>Minimum number of purchasable lands maintained per building type and city.</summary>
     public const int MinimumAvailableLotsPerBuildingType = 10;
 
+    /// <summary>Minimum number of non-depleted purchasable mine deposits per resource type and city.</summary>
+    public const int MinimumAvailableMineLotsPerResourceType = 2;
+
     /// <summary>Brand awareness increment per unit of marketing budget spent.</summary>
     public const decimal BrandAwarenessPerBudget = 0.0001m;
 

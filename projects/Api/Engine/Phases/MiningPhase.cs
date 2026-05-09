@@ -1,5 +1,6 @@
 using Api.Data.Entities;
 using Api.Utilities;
+using Shared.Economy;
 
 namespace Api.Engine.Phases;
 
@@ -37,6 +38,11 @@ public sealed class MiningPhase : ITickPhase
             var depositQuality = lot.MaterialQuality;
             var hasFiniteReserve = lot.MaterialQuantity.HasValue;
             var remainingReserve = lot.MaterialQuantity ?? decimal.MaxValue;
+            var originalReserve = lot.OriginalMaterialQuantity ?? lot.MaterialQuantity;
+            var previousRatio = MiningScarcityCalculator.ComputeRemainingRatio(remainingReserve, originalReserve);
+            var efficiencyFactor = hasFiniteReserve
+                ? MiningScarcityCalculator.ComputeEfficiencyFactor(remainingReserve, originalReserve)
+                : 1m;
 
             // Snapshot to detect depletion transition this tick.
             var wasNonZeroBefore = hasFiniteReserve && remainingReserve > 0m;
@@ -59,7 +65,7 @@ public sealed class MiningPhase : ITickPhase
                 if (unit.ResourceTypeId.Value != lotResourceTypeId.Value) continue;
                 if (hasFiniteReserve && remainingReserve <= 0m) break;
 
-                var production = GameConstants.MiningRate(unit.Level) * efficiency;
+                var production = GameConstants.MiningRate(unit.Level) * efficiency * efficiencyFactor;
                 var space = context.GetUnitFreeSpace(unit);
                 var actual = Math.Min(production, space);
                 if (hasFiniteReserve)
@@ -88,6 +94,9 @@ public sealed class MiningPhase : ITickPhase
             if (hasFiniteReserve)
             {
                 lot.MaterialQuantity = Math.Max(0m, remainingReserve);
+                var currentRatio = MiningScarcityCalculator.ComputeRemainingRatio(lot.MaterialQuantity, originalReserve);
+
+                RecordDepletionThresholdNotifications(context, building, lot, previousRatio, currentRatio);
 
                 // Detect depletion transition: lot went from non-zero to zero this tick.
                 if (wasNonZeroBefore && lot.MaterialQuantity <= 0m)
@@ -98,6 +107,48 @@ public sealed class MiningPhase : ITickPhase
         }
 
         return Task.CompletedTask;
+    }
+
+    private static void RecordDepletionThresholdNotifications(
+        TickContext context,
+        Building building,
+        BuildingLot lot,
+        decimal previousRatio,
+        decimal currentRatio)
+    {
+        if (!context.CompaniesById.TryGetValue(building.CompanyId, out var company))
+            return;
+
+        var resourceName = lot.ResourceTypeId.HasValue
+            && context.ResourceTypesById.TryGetValue(lot.ResourceTypeId.Value, out var rt)
+            ? rt.Name
+            : "resource";
+
+        if (MiningScarcityCalculator.CrossedDownThreshold(previousRatio, currentRatio, 0.20m))
+        {
+            PlayerNotificationService.Add(
+                context.Db,
+                company.PlayerId,
+                PlayerNotificationType.MineLowReserveWarning,
+                $"Mine Reserve Warning: {resourceName}",
+                $"Your mine {building.Name} has fallen below 20% remaining deposit. Remaining: {decimal.Round(currentRatio * 100m, 1):0.#}%.\nPlan replacement lots soon.",
+                context.CurrentTick,
+                company.Id,
+                building.Id);
+        }
+
+        if (MiningScarcityCalculator.CrossedDownThreshold(previousRatio, currentRatio, 0.05m))
+        {
+            PlayerNotificationService.Add(
+                context.Db,
+                company.PlayerId,
+                PlayerNotificationType.MineCriticalReserveWarning,
+                $"Mine Critical Reserve: {resourceName}",
+                $"Your mine {building.Name} has fallen below 5% remaining deposit. Remaining: {decimal.Round(currentRatio * 100m, 1):0.#}%.\nProduction efficiency is now critically reduced.",
+                context.CurrentTick,
+                company.Id,
+                building.Id);
+        }
     }
 
     private static void RecordDepletion(TickContext context, Building building, BuildingLot lot)

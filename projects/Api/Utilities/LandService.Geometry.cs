@@ -21,21 +21,20 @@ public static partial class LandService
 
         foreach (var resource in cityResources)
         {
-            var hasCoverage = availableMineLots.Any(lot =>
+            var availableCoverageCount = availableMineLots.Count(lot =>
                 lot.ResourceTypeId == resource.CityResource.ResourceTypeId
                 && lot.MaterialQuality is > 0m
                 && lot.MaterialQuantity is > 0m);
 
-            if (hasCoverage)
+            while (availableCoverageCount < GameConstants.MinimumAvailableMineLotsPerResourceType)
             {
-                continue;
+                var sequence = cityLots.Count + 1;
+                var generatedLot = CreateGeneratedMineLot(city, resource, sequence, cityBuildings, currentTick, cityFxRate);
+                db.BuildingLots.Add(generatedLot);
+                cityLots.Add(generatedLot);
+                availableMineLots.Add(generatedLot);
+                availableCoverageCount++;
             }
-
-            var sequence = cityLots.Count + 1;
-            var generatedLot = CreateGeneratedMineLot(city, resource, sequence, cityBuildings, currentTick, cityFxRate);
-            db.BuildingLots.Add(generatedLot);
-            cityLots.Add(generatedLot);
-            availableMineLots.Add(generatedLot);
         }
     }
 

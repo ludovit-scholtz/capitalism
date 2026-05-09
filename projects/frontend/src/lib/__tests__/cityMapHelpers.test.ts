@@ -5,6 +5,7 @@ import {
   formatPopulationIndex,
   populationIndexClass,
   populationIndexTierKey,
+  getResourceLayerMarkerColor,
   canPurchaseLot,
   canSubmitPurchaseForm,
 } from '../cityMapHelpers'
@@ -42,6 +43,24 @@ describe('getLotMarkerColor', () => {
 
   it('returns gray for owned (by other)', () => {
     expect(getLotMarkerColor('owned')).toBe('#6B7280')
+  })
+})
+
+describe('getResourceLayerMarkerColor', () => {
+  it('returns null when quantities are missing', () => {
+    expect(getResourceLayerMarkerColor(null, 1000)).toBeNull()
+    expect(getResourceLayerMarkerColor(500, null)).toBeNull()
+    expect(getResourceLayerMarkerColor(500, 0)).toBeNull()
+  })
+
+  it('returns gray for depleted lots', () => {
+    expect(getResourceLayerMarkerColor(0, 1000)).toBe('#6B7280')
+  })
+
+  it('returns red/yellow/green for scarce/moderate/abundant ratios', () => {
+    expect(getResourceLayerMarkerColor(100, 1000)).toBe('#DC2626') // 10%
+    expect(getResourceLayerMarkerColor(500, 1000)).toBe('#F59E0B') // 50%
+    expect(getResourceLayerMarkerColor(900, 1000)).toBe('#16A34A') // 90%
   })
 })
 

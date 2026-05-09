@@ -33,6 +33,14 @@ It will use real world map. The game will start in single city and later other c
 - [x] In bank building in `operating-account-row` is too much content that does not fit into the row. Add `Bank Statement Review` in second line or somewhere else.
 - [x] Create a workflow to destroy a building. Make sure the button to destroy the building is in the sell building form and show also the refund how much user will receive. When building is destroyed, return the user 80% of the building property value. Make the property available for purchase again. When bank loan is not paid set it for sale for the property market price minus 10%. When the debt from missed payments is not paid in 3 game days (72 ticks), destroy the building and pay any remaining debt from the sale of property to the bank owner.
 
+### Consumable Raw Materials & Resource Scarcity Mechanics (90% complete)
+
+- [x] Mining now consumes finite lot deposits each tick with a diminishing-return efficiency curve tied to remaining reserve levels.
+- [x] Added live resource-scarcity GraphQL surfaces (`getLandResourceStatus`, `getCityResourceMap`) with efficiency and depletion estimates.
+- [x] Added mine low-reserve (20%) and critical-reserve (5%) notifications plus stronger map/dashboard depletion visibility.
+- [x] Enforced game-engine safeguard to maintain at least 2 non-depleted purchasable deposits per resource type in each city.
+- [ ] Add full mine-side historical extraction chart UX (30-day sparkline + expanded depletion timeline dialog) in building detail.
+
 ### Power Plants & Energy System (100% complete)
 
 - [x] Add the city-wide power grid with five power-plant types, weather-aware renewable output, thermal fuel reserve handling, and legacy-grid fallback when a city has no player-owned plants.

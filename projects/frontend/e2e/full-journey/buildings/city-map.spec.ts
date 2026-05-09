@@ -57,6 +57,29 @@ test.describe('Real-world Map Integration', () => {
     await expect(page.getByRole('heading', { name: /Bratislava/i })).toBeVisible()
   })
 
+  test('resource layer toggle enables resource-based lot coloring', async ({ page }) => {
+    const { state, player } = setupAuthenticatedPlayer(page)
+    await authenticateViaLocalStorage(page, player.id)
+
+    // Force ownership status color (gray) for all lots, so resource-layer color change is visible.
+    for (const lot of state.buildingLots) {
+      lot.ownerCompanyId = 'other-company'
+    }
+
+    await page.goto('/city/city-ba')
+    const resourceLayerToggle = page.getByRole('button', { name: /Resource Layer/i })
+    await expect(resourceLayerToggle).toBeVisible()
+
+    // Before enabling resource layer, first marker follows ownership status (gray).
+    await expect(page.locator('.lot-marker div').first()).toHaveAttribute('style', /#6B7280/i)
+
+    await resourceLayerToggle.click()
+    await expect(resourceLayerToggle).toHaveClass(/active/)
+
+    // After enabling resource layer, mine-deposit lot switches to abundance color (green).
+    await expect(page.locator('.lot-marker div').first()).toHaveAttribute('style', /#16A34A/i)
+  })
+
   // ── AC1: GPS Storage — lots expose latitude/longitude coordinates ─────────
 
   test('lot detail panel shows GPS latitude and longitude', async ({ page }) => {

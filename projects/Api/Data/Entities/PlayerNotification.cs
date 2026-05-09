@@ -48,6 +48,8 @@ public static class PlayerNotificationType
     public const string BuildingOfferAccepted = "BUILDING_OFFER_ACCEPTED";
     public const string BuildingOfferRejected = "BUILDING_OFFER_REJECTED";
     public const string BuildingSoldSuccessfully = "BUILDING_SOLD_SUCCESSFULLY";
+    public const string MineLowReserveWarning = "MINE_LOW_RESERVE_WARNING";
+    public const string MineCriticalReserveWarning = "MINE_CRITICAL_RESERVE_WARNING";
     public const string MineFullyDepleted = "MINE_FULLY_DEPLETED";
     public const string MineReplenished = "MINE_REPLENISHED";
     public const string BuildingDestroyedByDefault = "BUILDING_DESTROYED_BY_DEFAULT";

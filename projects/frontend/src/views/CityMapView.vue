@@ -15,6 +15,9 @@
           <button class="toggle-btn" :class="{ active: !showAvailableOnly }" @click="showAvailableOnly = false">{{ t('cityMap.filterAll') }}</button>
           <button class="toggle-btn" :class="{ active: showAvailableOnly }" @click="showAvailableOnly = true">{{ t('cityMap.filterAvailable') }}</button>
         </div>
+        <button class="toggle-btn resource-layer-toggle" :class="{ active: showResourceLayer }" @click="showResourceLayer = !showResourceLayer">
+          ⛏️ {{ t('cityMap.resourceLayer') }}
+        </button>
         <span class="lot-count">{{ t('cityMap.lotCount', { count: filteredLots.length }) }}</span>
       </div>
     </div>
@@ -41,6 +44,7 @@
       :media-houses-loading="mediaHousesLoading"
       :highlighted-building-id="highlightedBuildingId"
       :city-id="cityId"
+      :show-resource-layer="showResourceLayer"
       @purchase-complete="handlePurchaseComplete"
       @lot-refreshed="handleLotRefreshed"
     />
@@ -72,6 +76,7 @@ const city = ref<City | null>(null)
 const lots = ref<BuildingLot[]>([])
 const companies = ref<Company[]>([])
 const showAvailableOnly = ref(false)
+const showResourceLayer = ref(false)
 const viewMode = ref<'map' | 'list'>('map')
 
 const cityWeather = ref<CityWeatherForecast | null>(null)
@@ -114,11 +119,11 @@ async function fetchData() {
             populationIndex basePrice price suitableTypes
             ownerCompanyId buildingId
             ownerCompany { id name }
-            building { id name type isUnderConstruction constructionCompletesAtTick constructionCost isForSale askingPrice destroyedAtUtc }
-            resourceType { id name slug }
-            materialQuality materialQuantity
-          }
-        }`,
+             building { id name type isUnderConstruction constructionCompletesAtTick constructionCost isForSale askingPrice destroyedAtUtc }
+             resourceType { id name slug }
+             materialQuality materialQuantity originalMaterialQuantity
+           }
+         }`,
         { cityId: cityId.value },
       ),
       auth.isAuthenticated ? gqlRequest<{ myCompanies: Company[] }>(`{ myCompanies { id name cash foundedAtUtc buildings { id } } }`) : Promise.resolve({ myCompanies: [] as Company[] }),

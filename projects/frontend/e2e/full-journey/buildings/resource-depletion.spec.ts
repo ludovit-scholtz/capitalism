@@ -133,7 +133,7 @@ test.describe('Resource Depletion - Mining Unit Detail Panel', () => {
   })
 
   test('shows estimated ticks until depletion when mining rate is known', async ({ page }) => {
-    // Level-1 mining rate = 10 units/tick → 500 / 10 = 50 ticks to depletion
+    // At 31% remaining, scarcity curve applies (~69% efficiency): 500 / (10 * 0.69) ≈ 73 ticks.
     await setupMineDetailPage(page, { lotMaterialQuantity: 500, lotOriginalMaterialQuantity: 1600 })
 
     await page.goto('/building/building-mine-1')
@@ -143,8 +143,7 @@ test.describe('Resource Depletion - Mining Unit Detail Panel', () => {
 
     // Panel shows estimated depletion count in ticks
     await expect(page.locator('.mining-resource-status-panel')).toContainText('ticks')
-    // Should show exact 50 ticks (500 remaining / 10 per tick); i18n renders as "~50 ticks"
-    await expect(page.locator('.mining-resource-status-panel')).toContainText('~50 ticks')
+    await expect(page.locator('.mining-resource-status-panel')).toContainText('~73 ticks')
   })
 
   test('shows depleted state when materialQuantity is 0', async ({ page }) => {
