@@ -25,7 +25,7 @@ public sealed partial class Mutation
             throw new GraphQLException(ErrorBuilder.New().SetMessage("Limit price must be greater than zero.").SetCode("INVALID_LIMIT_PRICE").Build());
         }
 
-        var side = input.Side.Trim().ToUpperInvariant();
+        var side = LimitOrderSide.Normalize(input.Side);
         if (!LimitOrderSide.IsValid(side))
         {
             throw new GraphQLException(ErrorBuilder.New().SetMessage("Order side must be BUY or SELL.").SetCode("INVALID_ORDER_SIDE").Build());

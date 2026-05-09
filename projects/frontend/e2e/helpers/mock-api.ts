@@ -4341,7 +4341,11 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Company not found.' }] }) })
       }
 
-      const side = String(input?.side ?? '').toUpperCase() as 'BUY' | 'SELL'
+      const rawSide = String(input?.side ?? '').toUpperCase()
+      if (rawSide !== 'BUY' && rawSide !== 'SELL') {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Invalid order side.' }] }) })
+      }
+      const side: 'BUY' | 'SELL' = rawSide
       const limitPrice = Number(input?.limitPrice ?? 0)
       const quantity = Math.max(0, Math.floor(Number(input?.quantity ?? 0)))
       if (quantity <= 0 || limitPrice <= 0) {

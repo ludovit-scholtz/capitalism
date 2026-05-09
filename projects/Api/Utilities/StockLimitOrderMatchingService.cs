@@ -96,9 +96,7 @@ public static class StockLimitOrderMatchingService
             var availableSellSharesDecimal = decimal.Truncate(sellHolding.ShareCount);
             var availableSellShares = availableSellSharesDecimal > int.MaxValue
                 ? int.MaxValue
-                : availableSellSharesDecimal < int.MinValue
-                    ? int.MinValue
-                    : decimal.ToInt32(availableSellSharesDecimal);
+                : decimal.ToInt32(availableSellSharesDecimal);
             if (availableSellShares <= 0)
             {
                 CancelOrderWithoutRelease(sell, currentTick);

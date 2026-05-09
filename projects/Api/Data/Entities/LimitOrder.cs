@@ -55,6 +55,9 @@ public static class LimitOrderSide
     public const string Buy = "BUY";
     public const string Sell = "SELL";
 
+    public static string Normalize(string? side)
+        => side?.Trim().ToUpperInvariant() ?? string.Empty;
+
     public static bool IsValid(string? side)
         => string.Equals(side, Buy, StringComparison.OrdinalIgnoreCase)
             || string.Equals(side, Sell, StringComparison.OrdinalIgnoreCase);
