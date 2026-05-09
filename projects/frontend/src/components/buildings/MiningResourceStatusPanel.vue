@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import type { Building } from '@/types'
 import { computeMiningEfficiencyFactor } from '@/lib/miningScarcity'
+import MineExtractionHistoryPanel from './MineExtractionHistoryPanel.vue'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -150,6 +151,9 @@ function navigateToBuyLot() {
       >
         {{ t('mining.viewAvailableLots') }}
       </button>
+
+      <!-- Extraction history sparkline + dialog trigger -->
+      <MineExtractionHistoryPanel :building="building" />
     </div>
 
     <!-- No deposit data -->

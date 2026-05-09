@@ -206,6 +206,15 @@ public sealed partial class AppDbContext
             e.HasIndex(r => r.DepletedAtTick);
         });
 
+        modelBuilder.Entity<MineExtractionRecord>(e =>
+        {
+            e.HasKey(r => r.Id);
+            e.Property(r => r.ExtractedAmount).HasPrecision(18, 4);
+            e.Property(r => r.EfficiencyPercent).HasPrecision(5, 4);
+            e.Property(r => r.ReserveRemaining).HasPrecision(18, 2);
+            e.HasIndex(r => new { r.BuildingId, r.Tick }).IsDescending(false, true);
+        });
+
         modelBuilder.Entity<ResourceReplenishmentSchedule>(e =>
         {
             e.HasKey(s => s.Id);
