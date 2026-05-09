@@ -69,9 +69,12 @@ public sealed class StockExchangeListingResult
 {
     public Guid CompanyId { get; set; }
     public string CompanyName { get; set; } = string.Empty;
+    public string PrimaryCityName { get; set; } = "UNKNOWN";
+    public string PrimaryIndustry { get; set; } = "DIVERSIFIED";
     public decimal TotalSharesIssued { get; set; }
     public decimal PublicFloatShares { get; set; }
     public decimal SharePrice { get; set; }
+    public decimal DailyChangePercent { get; set; }
     public decimal MarketValue { get; set; }
     public decimal BidPrice { get; set; }
     public decimal AskPrice { get; set; }

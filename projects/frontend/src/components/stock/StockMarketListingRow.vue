@@ -2,6 +2,7 @@
   <tr class="listing-row" :class="{ 'listing-row--expanded': expanded }">
     <td class="company-cell">
       <span class="company-name">{{ listing.companyName }}</span>
+      <span class="company-meta">{{ formatCompanyMeta(listing.primaryCityName, listing.primaryIndustry) }}</span>
       <span v-if="listing.canClaimControl && !isControlledCompany" class="listing-chip listing-chip--control">{{ t('stockExchange.controlReady') }}</span>
       <span v-if="listing.canMerge" class="listing-chip listing-chip--merge">{{ t('stockExchange.mergeReady') }}</span>
       <span v-else-if="listing.playerOwnedShares + listing.controlledCompanyOwnedShares > 0" class="listing-chip listing-chip--owned">{{ t('stockExchange.ownedBadge') }}</span>
@@ -9,6 +10,9 @@
     <td class="price-cell">
       <div class="price-stack">
         <span class="price-main">{{ formatCurrency(listing.sharePrice) }}</span>
+        <span class="price-change" :class="listing.dailyChangePercent >= 0 ? 'price-change--up' : 'price-change--down'">
+          {{ listing.dailyChangePercent >= 0 ? '+' : '' }}{{ listing.dailyChangePercent.toFixed(2) }}%
+        </span>
         <span class="price-meta">{{ t('stockExchange.bidAskHint', { bid: formatCurrency(listing.bidPrice), ask: formatCurrency(listing.askPrice) }) }}</span>
       </div>
     </td>
@@ -327,6 +331,20 @@ function formatShares(value: number): string {
   }).format(value)
 }
 
+function formatCompanyMeta(city: string, industry: string): string {
+  const cityLabel = city === 'UNKNOWN' ? t('stockExchange.unknownCity') : city
+  const industryLabel = formatIndustryLabel(industry)
+  return t('stockExchange.companyMeta', { city: cityLabel, industry: industryLabel })
+}
+
+function formatIndustryLabel(industry: string): string {
+  if (industry === 'DIVERSIFIED') {
+    return t('stockExchange.diversifiedIndustry')
+  }
+
+  return industry.split('_').join(' ')
+}
+
 function buildPieSlices(ownership: CompanyOwnership): PieSlice[] {
   if (ownership.totalSharesIssued <= 0) return []
 
@@ -428,6 +446,11 @@ function buildDonuts(slices: PieSlice[], cx: number, cy: number, r: number, inne
   font-weight: 600;
 }
 
+.company-meta {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
 .price-stack {
   display: grid;
   gap: 0.15rem;
@@ -436,6 +459,19 @@ function buildDonuts(slices: PieSlice[], cx: number, cy: number, r: number, inne
 .price-main {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+.price-change {
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.price-change--up {
+  color: #10b981;
+}
+
+.price-change--down {
+  color: #ef4444;
 }
 
 .price-meta {

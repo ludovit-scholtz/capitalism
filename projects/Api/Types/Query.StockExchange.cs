@@ -38,6 +38,20 @@ public sealed partial class Query
             .Include(inventory => inventory.ProductType)
             .ToListAsync();
         var shareholdings = await db.Shareholdings.AsNoTracking().ToListAsync();
+        var currentTick = await db.GameStates
+            .AsNoTracking()
+            .Select(gameState => (long?)gameState.CurrentTick)
+            .FirstOrDefaultDeterministicAsync() ?? 0L;
+        var companyIds = companies.Select(company => company.Id).ToHashSet();
+        var previousHistoricalPrices = await db.SharePriceHistoryEntries
+            .AsNoTracking()
+            .Where(entry => companyIds.Contains(entry.CompanyId) && entry.RecordedAtTick < currentTick)
+            .OrderByDescending(entry => entry.RecordedAtTick)
+            .ThenByDescending(entry => entry.RecordedAtUtc)
+            .ToListAsync();
+        var previousPriceByCompany = previousHistoricalPrices
+            .GroupBy(entry => entry.CompanyId)
+            .ToDictionary(group => group.Key, group => group.First().SharePrice);
         var localSharePriceByCompany = BuildQuotedSharePriceLookup(companies, buildings, lots, inventories, shareholdings);
         var companyCurrencyById = companies.ToDictionary(
             company => company.Id,
@@ -90,9 +104,12 @@ public sealed partial class Query
                 {
                     CompanyId = company.Id,
                     CompanyName = company.Name,
+                    PrimaryCityName = ResolvePrimaryCityName(company.Id, buildings),
+                    PrimaryIndustry = ResolvePrimaryIndustry(company.Id, buildings, inventories),
                     TotalSharesIssued = company.TotalSharesIssued,
                     PublicFloatShares = SharePriceCalculator.ComputePublicFloat(company, shareholdings.Where(holding => holding.CompanyId == company.Id)),
                     SharePrice = sharePrice,
+                    DailyChangePercent = ComputeDailyChangePercent(sharePrice, previousPriceByCompany.GetValueOrDefault(company.Id)),
                     MarketValue = decimal.Round(company.TotalSharesIssued * sharePrice, 2, MidpointRounding.AwayFromZero),
                     BidPrice = SharePriceCalculator.ComputeBidPrice(sharePrice),
                     AskPrice = SharePriceCalculator.ComputeAskPrice(sharePrice),
@@ -280,5 +297,51 @@ public sealed partial class Query
     {
         var baseEquityByCompany = SharePriceCalculator.ComputeBaseEquityByCompany(companies, buildings, lots, inventories);
         return SharePriceCalculator.ComputeQuotedSharePriceByCompany(companies, baseEquityByCompany, shareholdings);
+    }
+
+    private static string ResolvePrimaryCityName(Guid companyId, IReadOnlyCollection<Building> buildings)
+    {
+        var primaryCity = buildings
+            .Where(building => building.CompanyId == companyId && building.City is not null)
+            .GroupBy(building => building.City.Name)
+            .OrderByDescending(group => group.Count())
+            .ThenBy(group => group.Key)
+            .Select(group => group.Key)
+            .FirstOrDefault();
+
+        return string.IsNullOrWhiteSpace(primaryCity) ? "UNKNOWN" : primaryCity;
+    }
+
+    private static string ResolvePrimaryIndustry(Guid companyId, IReadOnlyCollection<Building> buildings, IReadOnlyCollection<Inventory> inventories)
+    {
+        var buildingIds = buildings
+            .Where(building => building.CompanyId == companyId)
+            .Select(building => building.Id)
+            .ToHashSet();
+
+        if (buildingIds.Count == 0)
+        {
+            return "DIVERSIFIED";
+        }
+
+        var primaryIndustry = inventories
+            .Where(inventory => buildingIds.Contains(inventory.BuildingId) && inventory.ProductType is not null && !string.IsNullOrWhiteSpace(inventory.ProductType.Industry))
+            .GroupBy(inventory => inventory.ProductType!.Industry)
+            .OrderByDescending(group => group.Sum(item => item.Quantity))
+            .ThenBy(group => group.Key)
+            .Select(group => group.Key)
+            .FirstOrDefault();
+
+        return string.IsNullOrWhiteSpace(primaryIndustry) ? "DIVERSIFIED" : primaryIndustry;
+    }
+
+    private static decimal ComputeDailyChangePercent(decimal currentPrice, decimal previousPrice)
+    {
+        if (previousPrice <= 0m)
+        {
+            return 0m;
+        }
+
+        return decimal.Round(((currentPrice - previousPrice) / previousPrice) * 100m, 2, MidpointRounding.AwayFromZero);
     }
 }

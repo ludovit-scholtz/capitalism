@@ -49,9 +49,12 @@ export const LISTINGS_QUERY = `
     stockExchangeListings {
       companyId
       companyName
+      primaryCityName
+      primaryIndustry
       totalSharesIssued
       publicFloatShares
       sharePrice
+      dailyChangePercent
       marketValue
       bidPrice
       askPrice

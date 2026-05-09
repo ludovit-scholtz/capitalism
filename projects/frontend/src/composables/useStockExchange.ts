@@ -49,6 +49,8 @@ export function useStockExchange() {
   const mergeError = ref<string | null>(null)
   const mergeSuccess = ref<MergeCompanyResult | null>(null)
   const filterText = ref('')
+  const selectedCityFilter = ref('ALL')
+  const selectedIndustryFilter = ref('ALL')
   const sortField = ref<SortField>('marketValue')
   const sortDir = ref<SortDir>('desc')
   const currentPage = ref(1)
@@ -84,9 +86,20 @@ export function useStockExchange() {
     return myBankAccounts.value.filter((account) => account.ownerType === 'PERSON' && account.currencyCode === 'USD')
   })
 
+  const availableCityFilters = computed(() => ['ALL', ...new Set(listings.value.map((listing) => listing.primaryCityName).filter((city) => city && city !== 'UNKNOWN')).values()])
+  const availableIndustryFilters = computed(() => ['ALL', ...new Set(listings.value.map((listing) => listing.primaryIndustry).filter((industry) => industry && industry !== 'DIVERSIFIED')).values()])
+
   const filteredAndSortedListings = computed(() => {
     const text = filterText.value.trim().toLowerCase()
-    const filtered = text ? listings.value.filter((listing) => listing.companyName.toLowerCase().includes(text)) : listings.value
+    const filtered = listings.value.filter((listing) => {
+      const matchesText = text.length === 0
+        || listing.companyName.toLowerCase().includes(text)
+        || listing.primaryCityName.toLowerCase().includes(text)
+        || listing.primaryIndustry.toLowerCase().includes(text)
+      const matchesCity = selectedCityFilter.value === 'ALL' || listing.primaryCityName === selectedCityFilter.value
+      const matchesIndustry = selectedIndustryFilter.value === 'ALL' || listing.primaryIndustry === selectedIndustryFilter.value
+      return matchesText && matchesCity && matchesIndustry
+    })
     return [...filtered].sort((a, b) => {
       let cmp = 0
       if (sortField.value === 'name') cmp = a.companyName.localeCompare(b.companyName)
@@ -104,7 +117,7 @@ export function useStockExchange() {
     return filteredAndSortedListings.value.slice(start, start + pageSize)
   })
 
-  watch([filterText, sortField, sortDir], () => { currentPage.value = 1 })
+  watch([filterText, selectedCityFilter, selectedIndustryFilter, sortField, sortDir], () => { currentPage.value = 1 })
   watch(totalPages, (value) => { if (currentPage.value > value) currentPage.value = value })
   watch(activeSettlementAccounts, (accounts) => {
     if (!accounts.some((account) => account.id === selectedSettlementBankAccountId.value))
@@ -288,5 +301,60 @@ export function useStockExchange() {
     await restoreScrollPosition(scrollPos)
   })
 
-  return { currentTick, loading, error, actionLoadingKey, personAccount, listings, selectedSettlementBankAccountId, quantityByCompany, errorByCompany, successByCompany, expandedCompany, priceHistoryByCompany, priceHistoryLoadingByCompany, priceHistoryErrorByCompany, shareholdersByCompany, shareholdersLoadingByCompany, shareholdersErrorByCompany, mergeDialogOpen, mergeDestinationCompanyId, mergeLoading, mergeError, mergeSuccess, filterText, sortField, sortDir, currentPage, controlledCompanies, portfolioValue, recentDividendTotal, activeTradeAccountName, activeTradeAccountType, activeTradeAccountCash, activeSettlementAccounts, filteredAndSortedListings, totalPages, paginatedListings, toggleSort, sortIcon, isControlledCompany, updateQuantity, estimatedBuyCost, estimatedSellProceeds, toggleTradePanel, loadData, switchToCompanyAccount, executeTrade, openMergeDialog, closeMergeDialog, executeMerge, locale }
+  return {
+    currentTick,
+    loading,
+    error,
+    actionLoadingKey,
+    personAccount,
+    listings,
+    selectedSettlementBankAccountId,
+    quantityByCompany,
+    errorByCompany,
+    successByCompany,
+    expandedCompany,
+    priceHistoryByCompany,
+    priceHistoryLoadingByCompany,
+    priceHistoryErrorByCompany,
+    shareholdersByCompany,
+    shareholdersLoadingByCompany,
+    shareholdersErrorByCompany,
+    mergeDialogOpen,
+    mergeDestinationCompanyId,
+    mergeLoading,
+    mergeError,
+    mergeSuccess,
+    filterText,
+    selectedCityFilter,
+    selectedIndustryFilter,
+    availableCityFilters,
+    availableIndustryFilters,
+    sortField,
+    sortDir,
+    currentPage,
+    controlledCompanies,
+    portfolioValue,
+    recentDividendTotal,
+    activeTradeAccountName,
+    activeTradeAccountType,
+    activeTradeAccountCash,
+    activeSettlementAccounts,
+    filteredAndSortedListings,
+    totalPages,
+    paginatedListings,
+    toggleSort,
+    sortIcon,
+    isControlledCompany,
+    updateQuantity,
+    estimatedBuyCost,
+    estimatedSellProceeds,
+    toggleTradePanel,
+    loadData,
+    switchToCompanyAccount,
+    executeTrade,
+    openMergeDialog,
+    closeMergeDialog,
+    executeMerge,
+    locale,
+  }
 }

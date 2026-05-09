@@ -1342,6 +1342,19 @@ function computeMockSharePrice(company: MockCompany) {
   return Number(Math.max((company.cash + getCompanyAssetBaseValue(company)) / getCompanyTotalShares(company), 1).toFixed(2))
 }
 
+function deriveMockPrimaryIndustry(company: MockCompany): string {
+  const firstBuildingType = company.buildings[0]?.type
+  if (firstBuildingType === 'FACTORY' || firstBuildingType === 'MINE' || firstBuildingType === 'SALES_SHOP') {
+    return 'FURNITURE'
+  }
+
+  if (firstBuildingType === 'BANK' || firstBuildingType === 'EXCHANGE') {
+    return 'FINANCE'
+  }
+
+  return 'DIVERSIFIED'
+}
+
 function isGovernmentCompany(state: MockState, company: MockCompany) {
   const owner = state.players.find((player) => player.id === company.playerId)
   return owner?.email === GOVERNMENT_PLAYER_EMAIL
@@ -6077,9 +6090,12 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           return {
             companyId: company.id,
             companyName: company.name,
+            primaryCityName: state.cities.find((city) => city.id === company.buildings[0]?.cityId)?.name ?? 'UNKNOWN',
+            primaryIndustry: deriveMockPrimaryIndustry(company),
             totalSharesIssued: getCompanyTotalShares(company),
             publicFloatShares: getPublicFloatShares(state, company),
             sharePrice: computeMockSharePrice(company),
+            dailyChangePercent: 0,
             marketValue: Number((getCompanyTotalShares(company) * computeMockSharePrice(company)).toFixed(2)),
             bidPrice: Number((computeMockSharePrice(company) * 0.99).toFixed(2)),
             askPrice: Number((computeMockSharePrice(company) * 1.01).toFixed(2)),

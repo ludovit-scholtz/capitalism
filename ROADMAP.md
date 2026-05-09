@@ -64,6 +64,13 @@ It will use real world map. The game will start in single city and later other c
 
 - [x] Move link from game ranking to master ranking next to richest players and richest companies
 
+### Stock Exchange & Company Share Trading (85% complete)
+
+- [x] Deliver the in-game stock exchange with live listings, personal/company account trading, portfolio overview, dividend history, and per-company shareholder breakdown.
+- [x] Extend the exchange listing UX with city/industry filtering metadata and daily change percentages visible in the market table.
+- [ ] Add native limit-order entities and a tick-based price-time priority matching engine with cancellable pending orders and explicit order book depth.
+- [ ] Add dividend-governance proposals and shareholder voting windows (propose, notify, vote, settle after 10 ticks).
+
 ### Optimize for mobile (100% complete)
 
 - [x] Make sure the design is smooth on small mobile devices for all pages. Mainly the content should be visible without the page scroll to the right.

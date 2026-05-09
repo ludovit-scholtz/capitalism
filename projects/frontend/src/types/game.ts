@@ -3,9 +3,12 @@ import type { AccountContextType } from './auth'
 export interface StockExchangeListing {
   companyId: string
   companyName: string
+  primaryCityName: string
+  primaryIndustry: string
   totalSharesIssued: number
   publicFloatShares: number
   sharePrice: number
+  dailyChangePercent: number
   marketValue: number
   bidPrice: number
   askPrice: number
