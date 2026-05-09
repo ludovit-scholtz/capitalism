@@ -29,6 +29,10 @@ describe('ranking i18n keys', () => {
       'pageLabel',
       'previousPage',
       'nextPage',
+      'raceBenchmarkTitle',
+      'percentOfTarget',
+      'distanceToWin',
+      'surpassedMilestone',
     ] as const
 
     for (const key of keys) {

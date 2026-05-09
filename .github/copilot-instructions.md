@@ -1447,6 +1447,18 @@ Root-cause of a recurring quality failure (May 2026, PR #236 NPC bot — repeate
 13. **For any property set during init and must NOT be overwritten during subsequent ticks (e.g., `TrackingStartTick`, `InitialNetWorth`), add an integration test that runs init + one tick and asserts the property matches the init-time value.** This prevents regressions where future refactoring accidentally resets tracking-baseline properties in the tick loop.
 14. **`bot.PendingRecommendation` semantics:** When `ShouldAct=false` (neutral/profitable), `PendingRecommendation` is set to the `NoAction` recommendation (not null). It is only cleared to `null` after a successful `ApplyAdjustmentAsync` call (when `ShouldAct=true`). Tests must distinguish between "PendingRecommendation is null" (action applied and cleared) and "PendingRecommendation.ShouldAct=false" (no action, last evaluation stored).
 
+## E2E DOM-order assertions — wait for post-loading content before `page.evaluate`
+
+Root-cause of a CI failure (May 2026, PR #335 / race benchmark follow-up):
+- `forex-exchange.spec.ts` asserted DOM order using `page.evaluate()` immediately after `page.goto('/forex?tab=rates')`.
+- The Forex page still showed the loading state (`Loading...`) in CI retries, so `.rates-table` and `.rates-chart-section` were both absent.
+- The evaluate callback returned `null`, causing `expect(order).not.toBeNull()` to fail even though UI structure was correct once loading finished.
+
+**Rules to prevent recurrence:**
+1. **Before any DOM-order or structural assertion done via `page.evaluate`, explicitly wait for both target selectors to be visible.** Example: `await expect(page.locator('.rates-table')).toBeVisible()` and `await expect(page.locator('.rates-chart-section')).toBeVisible()`.
+2. **Do not treat `page.goto()` completion as data-load completion** on pages with async GraphQL fetches and loading spinners.
+3. **When a test occasionally returns `null` from `document.querySelector(...)`, first inspect the error-context snapshot for loading state** before changing app logic.
+
 ## NPC bot orchestrator — RunOnboardingAsync internal profile fetch pattern
 
 Root-cause of a test authoring error (May 2026, BotAgentLifecycleTests.cs):
