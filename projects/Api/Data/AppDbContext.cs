@@ -129,6 +129,12 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Records stock-exchange buy/sell executions from the player's personal account.</summary>
     public DbSet<PersonTradeRecord> PersonTradeRecords => Set<PersonTradeRecord>();
 
+    /// <summary>Stock exchange limit orders placed by person/company accounts.</summary>
+    public DbSet<LimitOrder> LimitOrders => Set<LimitOrder>();
+
+    /// <summary>Audit trail of matched stock exchange limit-order executions.</summary>
+    public DbSet<LimitOrderExecution> LimitOrderExecutions => Set<LimitOrderExecution>();
+
     /// <summary>Accumulated R&amp;D research budget per company per product type.</summary>
     public DbSet<ProductResearchBudget> ProductResearchBudgets => Set<ProductResearchBudget>();
 

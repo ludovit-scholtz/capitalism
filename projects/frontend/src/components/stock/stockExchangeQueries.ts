@@ -48,6 +48,7 @@ export const LISTINGS_QUERY = `
   query StockExchangeListings {
     stockExchangeListings {
       companyId
+      stockSymbol
       companyName
       primaryCityName
       primaryIndustry
@@ -64,6 +65,83 @@ export const LISTINGS_QUERY = `
       combinedControlledOwnershipRatio
       canClaimControl
       canMerge
+    }
+  }
+`
+
+export const OPEN_ORDERS_QUERY = `
+  query MyOpenOrders {
+    myOpenOrders {
+      id
+      companyId
+      companyName
+      stockSymbol
+      side
+      limitPrice
+      quantity
+      filledQuantity
+      remainingQuantity
+      status
+      createdAtTick
+      updatedAtTick
+    }
+  }
+`
+
+export const ORDER_BOOK_QUERY = `
+  query GetOrderBook($stockSymbol: String!) {
+    orderBook: getOrderBook(stockSymbol: $stockSymbol) {
+      stockSymbol
+      bids {
+        price
+        totalQuantity
+      }
+      asks {
+        price
+        totalQuantity
+      }
+    }
+  }
+`
+
+export const STOCK_TRADE_HISTORY_QUERY = `
+  query StockTradeHistory($stockSymbol: String!, $limit: Int!) {
+    stockTradeHistory(stockSymbol: $stockSymbol, limit: $limit) {
+      id
+      stockSymbol
+      price
+      quantity
+      executedAtTick
+      executedAtUtc
+    }
+  }
+`
+
+export const PLACE_LIMIT_ORDER_MUTATION = `
+  mutation PlaceLimitOrder($input: PlaceLimitOrderInput!) {
+    placeLimitOrder(input: $input) {
+      id
+      companyId
+      companyName
+      stockSymbol
+      side
+      limitPrice
+      quantity
+      filledQuantity
+      remainingQuantity
+      status
+      createdAtTick
+      updatedAtTick
+    }
+  }
+`
+
+export const CANCEL_LIMIT_ORDER_MUTATION = `
+  mutation CancelLimitOrder($orderId: UUID!) {
+    cancelLimitOrder(orderId: $orderId) {
+      id
+      status
+      remainingQuantity
     }
   }
 `

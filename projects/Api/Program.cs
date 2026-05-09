@@ -262,6 +262,7 @@ public class Program
         builder.Services.AddScoped<ITickPhase, MarketingPhase>();
         builder.Services.AddScoped<ITickPhase, ResearchPhase>();
         builder.Services.AddScoped<ITickPhase, RentPhase>();
+        builder.Services.AddScoped<ITickPhase, StockLimitOrderMatchingPhase>();
         builder.Services.AddScoped<ITickPhase, LoanRepaymentPhase>();
         builder.Services.AddScoped<ITickPhase, BuildingDestructionPhase>();
         builder.Services.AddScoped<ITickPhase, PlayerAlertPhase>();

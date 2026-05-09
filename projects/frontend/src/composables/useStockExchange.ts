@@ -7,8 +7,8 @@ import { useGameStateStore } from '@/stores/gameState'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { getActiveAccountOption } from '@/lib/accountContext'
 import { deepEqual } from '@/lib/utils'
-import type { CompanyOwnership, MergeCompanyResult, PlayerBankAccountSummary, PersonAccount, ShareTradeResult, StockExchangeListing, StockExchangePriceHistoryPoint } from '@/types'
-import { PERSON_ACCOUNT_QUERY, LISTINGS_QUERY, MY_BANK_ACCOUNTS_QUERY, BUY_MUTATION, SELL_MUTATION, PRICE_HISTORY_QUERY, MERGE_MUTATION, COMPANY_SHAREHOLDERS_QUERY } from '@/components/stock/stockExchangeQueries'
+import type { CompanyOwnership, MergeCompanyResult, OpenLimitOrder, PlayerBankAccountSummary, PersonAccount, ShareTradeResult, StockExchangeListing, StockExchangePriceHistoryPoint, StockOrderBook, StockTradeExecution } from '@/types'
+import { PERSON_ACCOUNT_QUERY, LISTINGS_QUERY, MY_BANK_ACCOUNTS_QUERY, BUY_MUTATION, SELL_MUTATION, PRICE_HISTORY_QUERY, MERGE_MUTATION, COMPANY_SHAREHOLDERS_QUERY, OPEN_ORDERS_QUERY, ORDER_BOOK_QUERY, STOCK_TRADE_HISTORY_QUERY, PLACE_LIMIT_ORDER_MUTATION, CANCEL_LIMIT_ORDER_MUTATION } from '@/components/stock/stockExchangeQueries'
 
 type ControlledCompanyAccount = { id: string; name: string; cash: number | null }
 type SortField = 'name' | 'price' | 'marketValue' | 'ownership' | 'dividend'
@@ -29,6 +29,16 @@ export function useStockExchange() {
   const listings = ref<StockExchangeListing[]>([])
   const myBankAccounts = ref<PlayerBankAccountSummary[]>([])
   const selectedSettlementBankAccountId = ref<string>('')
+  const openOrders = ref<OpenLimitOrder[]>([])
+  const selectedOrderBookSymbol = ref<string>('')
+  const orderBook = ref<StockOrderBook>({ stockSymbol: '', bids: [], asks: [] })
+  const tradeHistory = ref<StockTradeExecution[]>([])
+  const orderSide = ref<'BUY' | 'SELL'>('BUY')
+  const orderPrice = ref<number>(0)
+  const orderQuantity = ref<number>(100)
+  const orderLoading = ref(false)
+  const orderError = ref<string | null>(null)
+  const orderSuccess = ref<string | null>(null)
   const quantityByCompany = ref<Record<string, number>>({})
   const errorByCompany = ref<Record<string, string | null>>({})
   const successByCompany = ref<Record<string, string | null>>({})
@@ -88,6 +98,12 @@ export function useStockExchange() {
 
   const availableCityFilters = computed(() => ['ALL', ...new Set(listings.value.map((listing) => listing.primaryCityName).filter((city) => city)).values()])
   const availableIndustryFilters = computed(() => ['ALL', ...new Set(listings.value.map((listing) => listing.primaryIndustry).filter((industry) => industry)).values()])
+  const stockSymbolForListing = (listing: StockExchangeListing): string =>
+    listing.stockSymbol?.trim().length
+      ? listing.stockSymbol
+      : `CMP-${listing.companyId.replace(/-/g, '').toUpperCase()}`
+  const selectedOrderListing = computed(() =>
+    listings.value.find((listing) => stockSymbolForListing(listing) === selectedOrderBookSymbol.value) ?? null)
 
   const filteredAndSortedListings = computed(() => {
     const text = filterText.value.trim().toLowerCase()
@@ -122,6 +138,9 @@ export function useStockExchange() {
   watch(activeSettlementAccounts, (accounts) => {
     if (!accounts.some((account) => account.id === selectedSettlementBankAccountId.value))
       selectedSettlementBankAccountId.value = accounts[0]?.id ?? ''
+  })
+  watch(selectedOrderBookSymbol, () => {
+    void loadOrderBookAndTrades()
   })
 
   function toggleSort(field: SortField) {
@@ -214,12 +233,92 @@ export function useStockExchange() {
       if (!deepEqual(personAccount.value, resolvedPersonAccount)) personAccount.value = resolvedPersonAccount
       if (!deepEqual(listings.value, listingData.stockExchangeListings)) listings.value = listingData.stockExchangeListings
       if (!deepEqual(myBankAccounts.value, accountData.myBankAccounts)) myBankAccounts.value = accountData.myBankAccounts
+      const hasSelectedSymbol = listingData.stockExchangeListings.some((listing) => stockSymbolForListing(listing) === selectedOrderBookSymbol.value)
+      if (!hasSelectedSymbol) {
+        selectedOrderBookSymbol.value = listingData.stockExchangeListings[0] ? stockSymbolForListing(listingData.stockExchangeListings[0]) : ''
+      }
       const hasSelectedSettlement = activeSettlementAccounts.value.some((account) => account.id === selectedSettlementBankAccountId.value)
       if (!hasSelectedSettlement) selectedSettlementBankAccountId.value = activeSettlementAccounts.value[0]?.id ?? ''
       setDefaultQuantities()
+      if (auth.isAuthenticated) {
+        await Promise.all([loadOpenOrders(), loadOrderBookAndTrades()])
+      }
     } catch (reason: unknown) {
       if (!isRefresh) error.value = reason instanceof Error ? reason.message : t('stockExchange.loadFailed')
     } finally { loading.value = false }
+  }
+
+  async function loadOpenOrders() {
+    if (!auth.isAuthenticated) {
+      openOrders.value = []
+      return
+    }
+    const data = await gqlRequest<{ myOpenOrders: OpenLimitOrder[] }>(OPEN_ORDERS_QUERY)
+    openOrders.value = data.myOpenOrders
+  }
+
+  async function loadOrderBookAndTrades() {
+    if (!selectedOrderBookSymbol.value) {
+      orderBook.value = { stockSymbol: '', bids: [], asks: [] }
+      tradeHistory.value = []
+      return
+    }
+
+    const [orderBookData, tradeData] = await Promise.all([
+      gqlRequest<{ orderBook: StockOrderBook }>(ORDER_BOOK_QUERY, { stockSymbol: selectedOrderBookSymbol.value }),
+      gqlRequest<{ stockTradeHistory: StockTradeExecution[] }>(STOCK_TRADE_HISTORY_QUERY, { stockSymbol: selectedOrderBookSymbol.value, limit: 20 }),
+    ])
+    orderBook.value = orderBookData.orderBook
+    tradeHistory.value = tradeData.stockTradeHistory
+  }
+
+  async function placeLimitOrder() {
+    if (!selectedOrderBookSymbol.value) return
+    if (!Number.isFinite(orderPrice.value) || orderPrice.value <= 0) {
+      orderError.value = t('stockExchange.orderInvalidPrice')
+      orderSuccess.value = null
+      return
+    }
+    if (!Number.isFinite(orderQuantity.value) || orderQuantity.value <= 0) {
+      orderError.value = t('stockExchange.orderInvalidQuantity')
+      orderSuccess.value = null
+      return
+    }
+
+    orderLoading.value = true
+    orderError.value = null
+    orderSuccess.value = null
+    try {
+      await gqlRequest<{ placeLimitOrder: OpenLimitOrder }>(PLACE_LIMIT_ORDER_MUTATION, {
+        input: {
+          stockSymbol: selectedOrderBookSymbol.value,
+          side: orderSide.value,
+          limitPrice: Number(orderPrice.value),
+          quantity: Math.floor(orderQuantity.value),
+        },
+      })
+      orderSuccess.value = t('stockExchange.orderPlaced')
+      await Promise.all([loadData(true), auth.fetchMe()])
+    } catch (reason: unknown) {
+      orderError.value = reason instanceof Error ? reason.message : t('stockExchange.orderActionFailed')
+    } finally {
+      orderLoading.value = false
+    }
+  }
+
+  async function cancelLimitOrder(orderId: string) {
+    orderLoading.value = true
+    orderError.value = null
+    orderSuccess.value = null
+    try {
+      await gqlRequest<{ cancelLimitOrder: { id: string } }>(CANCEL_LIMIT_ORDER_MUTATION, { orderId })
+      orderSuccess.value = t('stockExchange.orderCancelled')
+      await Promise.all([loadData(true), auth.fetchMe()])
+    } catch (reason: unknown) {
+      orderError.value = reason instanceof Error ? reason.message : t('stockExchange.orderActionFailed')
+    } finally {
+      orderLoading.value = false
+    }
   }
 
   async function switchToCompanyAccount(companyId: string) {
@@ -308,6 +407,18 @@ export function useStockExchange() {
     actionLoadingKey,
     personAccount,
     listings,
+    openOrders,
+    selectedOrderBookSymbol,
+    orderBook,
+    tradeHistory,
+    orderSide,
+    orderPrice,
+    orderQuantity,
+    orderLoading,
+    orderError,
+    orderSuccess,
+    selectedOrderListing,
+    stockSymbolForListing,
     selectedSettlementBankAccountId,
     quantityByCompany,
     errorByCompany,
@@ -350,6 +461,9 @@ export function useStockExchange() {
     estimatedSellProceeds,
     toggleTradePanel,
     loadData,
+    loadOrderBookAndTrades,
+    placeLimitOrder,
+    cancelLimitOrder,
     switchToCompanyAccount,
     executeTrade,
     openMergeDialog,

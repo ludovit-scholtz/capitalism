@@ -2,6 +2,7 @@ import type { AccountContextType } from './auth'
 
 export interface StockExchangeListing {
   companyId: string
+  stockSymbol: string
   companyName: string
   primaryCityName: string
   primaryIndustry: string
@@ -18,6 +19,41 @@ export interface StockExchangeListing {
   combinedControlledOwnershipRatio: number
   canClaimControl: boolean
   canMerge: boolean
+}
+
+export interface OrderBookLevel {
+  price: number
+  totalQuantity: number
+}
+
+export interface StockOrderBook {
+  stockSymbol: string
+  bids: OrderBookLevel[]
+  asks: OrderBookLevel[]
+}
+
+export interface OpenLimitOrder {
+  id: string
+  companyId: string
+  companyName: string
+  stockSymbol: string
+  side: 'BUY' | 'SELL'
+  limitPrice: number
+  quantity: number
+  filledQuantity: number
+  remainingQuantity: number
+  status: 'OPEN' | 'PARTIALLY_FILLED' | 'FILLED' | 'CANCELLED'
+  createdAtTick: number
+  updatedAtTick: number
+}
+
+export interface StockTradeExecution {
+  id: string
+  stockSymbol: string
+  price: number
+  quantity: number
+  executedAtTick: number
+  executedAtUtc: string
 }
 
 export interface StockExchangePriceHistoryPoint {

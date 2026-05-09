@@ -103,6 +103,7 @@ public sealed partial class Query
                 return new StockExchangeListingResult
                 {
                     CompanyId = company.Id,
+                    StockSymbol = StockSymbolCodec.FromCompanyId(company.Id),
                     CompanyName = company.Name,
                     PrimaryCityName = ResolvePrimaryCityName(company.Id, buildings),
                     PrimaryIndustry = ResolvePrimaryIndustry(company.Id, buildings, inventories),
@@ -124,6 +125,128 @@ public sealed partial class Query
             .OrderByDescending(listing => listing.SharePrice)
             .ThenBy(listing => listing.CompanyName)
             .ToList();
+    }
+
+    [Authorize]
+    public async Task<List<LimitOrderResult>> GetMyOpenOrders(
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+        var companyIds = await db.Companies
+            .AsNoTracking()
+            .Where(company => company.PlayerId == userId)
+            .Select(company => company.Id)
+            .ToListAsync();
+
+        var orders = await db.LimitOrders
+            .AsNoTracking()
+            .Include(order => order.Company)
+            .Where(order =>
+                (order.Status == LimitOrderStatus.Open || order.Status == LimitOrderStatus.PartiallyFilled)
+                && (order.OwnerPlayerId == userId || (order.OwnerCompanyId.HasValue && companyIds.Contains(order.OwnerCompanyId.Value))))
+            .OrderByDescending(order => order.CreatedAtTick)
+            .ThenByDescending(order => order.CreatedAtUtc)
+            .ToListAsync();
+
+        return orders.Select(order => new LimitOrderResult
+        {
+            Id = order.Id,
+            CompanyId = order.CompanyId,
+            CompanyName = order.Company.Name,
+            StockSymbol = order.StockSymbol,
+            Side = order.Side,
+            LimitPrice = order.LimitPrice,
+            Quantity = order.Quantity,
+            FilledQuantity = order.FilledQuantity,
+            RemainingQuantity = Math.Max(0, order.Quantity - order.FilledQuantity),
+            Status = order.Status,
+            CreatedAtTick = order.CreatedAtTick,
+            UpdatedAtTick = order.UpdatedAtTick,
+        }).ToList();
+    }
+
+    public async Task<OrderBookResult> GetOrderBook(
+        string stockSymbol,
+        [Service] AppDbContext db)
+    {
+        if (!StockSymbolCodec.TryParseCompanyId(stockSymbol, out var companyId))
+        {
+            return new OrderBookResult
+            {
+                StockSymbol = stockSymbol,
+                Bids = [],
+                Asks = [],
+            };
+        }
+
+        var orders = await db.LimitOrders
+            .AsNoTracking()
+            .Where(order =>
+                order.CompanyId == companyId
+                && (order.Status == LimitOrderStatus.Open || order.Status == LimitOrderStatus.PartiallyFilled))
+            .ToListAsync();
+
+        var bids = orders
+            .Where(order => order.Side == LimitOrderSide.Buy)
+            .GroupBy(order => order.LimitPrice)
+            .Select(group => new OrderBookLevelResult
+            {
+                Price = group.Key,
+                TotalQuantity = group.Sum(order => Math.Max(0, order.Quantity - order.FilledQuantity)),
+            })
+            .Where(level => level.TotalQuantity > 0)
+            .OrderByDescending(level => level.Price)
+            .ToList();
+
+        var asks = orders
+            .Where(order => order.Side == LimitOrderSide.Sell)
+            .GroupBy(order => order.LimitPrice)
+            .Select(group => new OrderBookLevelResult
+            {
+                Price = group.Key,
+                TotalQuantity = group.Sum(order => Math.Max(0, order.Quantity - order.FilledQuantity)),
+            })
+            .Where(level => level.TotalQuantity > 0)
+            .OrderBy(level => level.Price)
+            .ToList();
+
+        return new OrderBookResult
+        {
+            StockSymbol = stockSymbol.Trim(),
+            Bids = bids,
+            Asks = asks,
+        };
+    }
+
+    public async Task<List<StockTradeExecutionResult>> GetStockTradeHistory(
+        string stockSymbol,
+        int limit,
+        [Service] AppDbContext db)
+    {
+        if (!StockSymbolCodec.TryParseCompanyId(stockSymbol, out var companyId))
+        {
+            return [];
+        }
+
+        var safeLimit = Math.Clamp(limit, 1, 100);
+        var executions = await db.LimitOrderExecutions
+            .AsNoTracking()
+            .Where(execution => execution.CompanyId == companyId)
+            .OrderByDescending(execution => execution.ExecutedAtTick)
+            .ThenByDescending(execution => execution.ExecutedAtUtc)
+            .Take(safeLimit)
+            .ToListAsync();
+
+        return executions.Select(execution => new StockTradeExecutionResult
+        {
+            Id = execution.Id,
+            StockSymbol = execution.StockSymbol,
+            Price = execution.Price,
+            Quantity = execution.Quantity,
+            ExecutedAtTick = execution.ExecutedAtTick,
+            ExecutedAtUtc = execution.ExecutedAtUtc,
+        }).ToList();
     }
 
     /// <summary>Returns recent quoted share-price history for a single company.</summary>

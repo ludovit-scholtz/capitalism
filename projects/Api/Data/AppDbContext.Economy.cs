@@ -133,6 +133,35 @@ public sealed partial class AppDbContext
             e.HasIndex(o => o.IsActive);
         });
 
+        modelBuilder.Entity<LimitOrder>(e =>
+        {
+            e.HasKey(o => o.Id);
+            e.Property(o => o.StockSymbol).HasMaxLength(40);
+            e.Property(o => o.Side).HasMaxLength(10);
+            e.Property(o => o.Status).HasMaxLength(20);
+            e.Property(o => o.LimitPrice).HasPrecision(18, 4);
+            e.Property(o => o.ReservedCashRemaining).HasPrecision(18, 4);
+            e.HasOne(o => o.Company).WithMany().HasForeignKey(o => o.CompanyId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(o => o.OwnerPlayer).WithMany().HasForeignKey(o => o.OwnerPlayerId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(o => o.OwnerCompany).WithMany().HasForeignKey(o => o.OwnerCompanyId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(o => o.SettlementBankAccount).WithMany().HasForeignKey(o => o.SettlementBankAccountId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(o => new { o.CompanyId, o.Status, o.Side, o.LimitPrice, o.CreatedAtTick });
+            e.HasIndex(o => new { o.OwnerPlayerId, o.Status });
+            e.HasIndex(o => new { o.OwnerCompanyId, o.Status });
+        });
+
+        modelBuilder.Entity<LimitOrderExecution>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.StockSymbol).HasMaxLength(40);
+            e.Property(x => x.Price).HasPrecision(18, 4);
+            e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.BuyOrder).WithMany().HasForeignKey(x => x.BuyOrderId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.SellOrder).WithMany().HasForeignKey(x => x.SellOrderId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.CompanyId, x.ExecutedAtTick });
+            e.HasIndex(x => new { x.StockSymbol, x.ExecutedAtTick });
+        });
+
         modelBuilder.Entity<LedgerEntry>(e =>
         {
             e.HasKey(l => l.Id);

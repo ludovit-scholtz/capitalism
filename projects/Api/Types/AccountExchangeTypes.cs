@@ -68,6 +68,7 @@ public sealed class DividendPaymentResult
 public sealed class StockExchangeListingResult
 {
     public Guid CompanyId { get; set; }
+    public string StockSymbol { get; set; } = string.Empty;
     public string CompanyName { get; set; } = string.Empty;
     public string PrimaryCityName { get; set; } = "UNKNOWN";
     public string PrimaryIndustry { get; set; } = "DIVERSIFIED";
@@ -84,6 +85,45 @@ public sealed class StockExchangeListingResult
     public decimal CombinedControlledOwnershipRatio { get; set; }
     public bool CanClaimControl { get; set; }
     public bool CanMerge { get; set; }
+}
+
+public sealed class LimitOrderResult
+{
+    public Guid Id { get; set; }
+    public Guid CompanyId { get; set; }
+    public string CompanyName { get; set; } = string.Empty;
+    public string StockSymbol { get; set; } = string.Empty;
+    public string Side { get; set; } = string.Empty;
+    public decimal LimitPrice { get; set; }
+    public int Quantity { get; set; }
+    public int FilledQuantity { get; set; }
+    public int RemainingQuantity { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public long CreatedAtTick { get; set; }
+    public long UpdatedAtTick { get; set; }
+}
+
+public sealed class OrderBookLevelResult
+{
+    public decimal Price { get; set; }
+    public int TotalQuantity { get; set; }
+}
+
+public sealed class OrderBookResult
+{
+    public string StockSymbol { get; set; } = string.Empty;
+    public List<OrderBookLevelResult> Bids { get; set; } = [];
+    public List<OrderBookLevelResult> Asks { get; set; } = [];
+}
+
+public sealed class StockTradeExecutionResult
+{
+    public Guid Id { get; set; }
+    public string StockSymbol { get; set; } = string.Empty;
+    public decimal Price { get; set; }
+    public int Quantity { get; set; }
+    public long ExecutedAtTick { get; set; }
+    public DateTime ExecutedAtUtc { get; set; }
 }
 
 public sealed class StockExchangePriceHistoryPointResult
