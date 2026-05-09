@@ -279,6 +279,32 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
     }
 
     [Fact]
+    public async Task Login_PasswordAuthDisabled_ReturnsAuthPasswordDisabledError()
+    {
+        using var factory = new MasterApiWebApplicationFactory().WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureAppConfiguration((_, config) =>
+            {
+                config.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Auth:PasswordAuthEnabled"] = "false",
+                });
+            });
+        });
+        using var client = factory.CreateClient();
+
+        var result = await GraphQlAsync(client, """
+            mutation Login($input: LoginInput!) {
+              login(input: $input) { token }
+            }
+            """,
+            new { input = new { email = "disabled@example.com", password = "password123" } });
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Contains("AUTH_PASSWORD_DISABLED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
     public async Task Login_WrongPassword_ReturnsError()
     {
         var email = $"wrongpw-{Guid.NewGuid():N}@example.com";

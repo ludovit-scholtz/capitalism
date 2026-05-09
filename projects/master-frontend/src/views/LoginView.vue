@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import ViewJumbotron from '@/components/layout/ViewJumbotron.vue'
 import ViewSubnav from '@/components/layout/ViewSubnav.vue'
+import { isPasswordAuthEnabled, shouldAutoStartOidc } from '@/lib/authMode'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
+const passwordAuthEnabled = isPasswordAuthEnabled(import.meta.env.VITE_AUTH_PASSWORD_ENABLED)
 
 const isRegister = ref(false)
 const email = ref('')
@@ -48,6 +50,14 @@ function handleBiatecSignIn() {
     typeof redirectPath === 'string' && redirectPath.length > 0 ? redirectPath : '/'
   auth.startBiatecOidcSignIn(targetPath, requiresConsentRetry.value ? { prompt: 'consent' } : undefined)
 }
+
+onMounted(() => {
+  if (shouldAutoStartOidc(passwordAuthEnabled, requiresConsentRetry.value)) {
+    setTimeout(() => {
+      handleBiatecSignIn()
+    }, 500)
+  }
+})
 </script>
 
 <template>
@@ -76,7 +86,15 @@ function handleBiatecSignIn() {
             </p>
           </div>
 
-          <form class="flex flex-col gap-5" @submit.prevent="handleSubmit">
+          <div
+            v-if="shouldAutoStartOidc(passwordAuthEnabled, requiresConsentRetry)"
+            class="flex flex-col items-center gap-4 py-4 text-center"
+          >
+            <div class="h-8 w-8 animate-spin rounded-full border-4 border-brand border-t-transparent" aria-hidden="true" />
+            <p class="text-body">{{ t('login.redirectingToSignIn') }}</p>
+          </div>
+
+          <form v-else class="flex flex-col gap-5" @submit.prevent="handleSubmit">
             <div
               v-if="showsDriveAccessHint"
               class="rounded-md border border-brand/25 bg-brand/10 px-3 py-3 text-sm text-body"
@@ -93,78 +111,80 @@ function handleBiatecSignIn() {
               {{ formError }}
             </div>
 
-            <div class="flex flex-col gap-1.5">
-              <label for="email" class="text-sm font-medium text-muted">{{
-                t('login.email')
-              }}</label>
-              <input
-                id="email"
-                v-model="email"
-                type="email"
-                required
-                autocomplete="email"
-                class="form-input"
-              />
-            </div>
+            <template v-if="passwordAuthEnabled">
+              <div class="flex flex-col gap-1.5">
+                <label for="email" class="text-sm font-medium text-muted">{{
+                  t('login.email')
+                }}</label>
+                <input
+                  id="email"
+                  v-model="email"
+                  type="email"
+                  required
+                  autocomplete="email"
+                  class="form-input"
+                />
+              </div>
 
-            <div v-if="isRegister" class="flex flex-col gap-1.5">
-              <label for="displayName" class="text-sm font-medium text-muted">{{
-                t('login.displayName')
-              }}</label>
-              <input
-                id="displayName"
-                v-model="displayName"
-                type="text"
-                required
-                autocomplete="name"
-                :placeholder="t('login.displayNamePlaceholder')"
-                class="form-input"
-              />
-            </div>
+              <div v-if="isRegister" class="flex flex-col gap-1.5">
+                <label for="displayName" class="text-sm font-medium text-muted">{{
+                  t('login.displayName')
+                }}</label>
+                <input
+                  id="displayName"
+                  v-model="displayName"
+                  type="text"
+                  required
+                  autocomplete="name"
+                  :placeholder="t('login.displayNamePlaceholder')"
+                  class="form-input"
+                />
+              </div>
 
-            <div class="flex flex-col gap-1.5">
-              <label for="password" class="text-sm font-medium text-muted">{{
-                t('login.password')
-              }}</label>
-              <input
-                id="password"
-                v-model="password"
-                type="password"
-                required
-                autocomplete="current-password"
-                class="form-input"
-              />
-            </div>
+              <div class="flex flex-col gap-1.5">
+                <label for="password" class="text-sm font-medium text-muted">{{
+                  t('login.password')
+                }}</label>
+                <input
+                  id="password"
+                  v-model="password"
+                  type="password"
+                  required
+                  autocomplete="current-password"
+                  class="form-input"
+                />
+              </div>
 
-            <button
-              type="submit"
-              class="btn btn-primary w-full justify-center gap-2"
-              :disabled="auth.loading"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
+              <button
+                type="submit"
+                class="btn btn-primary w-full justify-center gap-2"
+                :disabled="auth.loading"
               >
-                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-                <path d="M10 17l5-5-5-5" />
-                <path d="M15 12H3" />
-              </svg>
-              {{
-                auth.loading
-                  ? t('login.wait')
-                  : isRegister
-                    ? t('login.createAccount')
-                    : t('login.signIn')
-              }}
-            </button>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                  <path d="M10 17l5-5-5-5" />
+                  <path d="M15 12H3" />
+                </svg>
+                {{
+                  auth.loading
+                    ? t('login.wait')
+                    : isRegister
+                      ? t('login.createAccount')
+                      : t('login.signIn')
+                }}
+              </button>
+            </template>
 
             <button
               type="button"
@@ -194,7 +214,7 @@ function handleBiatecSignIn() {
             </button>
           </form>
 
-          <div class="text-center text-sm text-muted">
+          <div v-if="passwordAuthEnabled" class="text-center text-sm text-muted">
             {{ isRegister ? t('login.haveAccount') : t('login.noAccount') }}
             <button
               class="border-0 bg-transparent text-sm text-brand underline"

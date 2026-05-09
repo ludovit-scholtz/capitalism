@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { gqlRequest, GraphQLError } from '@/lib/graphql'
 import { gqlRequest as gqlMasterRequest } from '@/lib/graphqlMasterServer'
+import { resolvePostLogoutRedirectUri } from '@/lib/authLogout'
 import { selectMainCity, shouldAutoSwitchCity } from '@/lib/cityContext'
 import { deepEqual } from '@/lib/utils'
 import type { AccountContextResult, AccountContextType, Player, AuthPayload, Building, City } from '@/types'
@@ -19,6 +20,7 @@ const BIATEC_OIDC_ALLOWED_ISSUERS = (import.meta.env.VITE_BIATEC_OIDC_ALLOWED_IS
 const TOKEN_RENEW_BEFORE_MS = 60 * 1000
 const OIDC_STATE_KEY = 'biatec_oidc_state'
 const OIDC_LOGOUT_STATE_KEY = 'biatec_oidc_logout_state'
+const SIGNED_OUT_NOTICE_KEY = 'auth_signed_out_notice'
 const AUTH_PROVIDER_KEY = 'auth_provider'
 const AUTH_PROVIDER_LOCAL = 'local'
 const AUTH_PROVIDER_BIATEC = 'biatec_oidc'
@@ -336,10 +338,10 @@ export const useAuthStore = defineStore('auth', () => {
 
   function getPostLogoutRedirectUri() {
     if (typeof window === 'undefined') {
-      return 'http://localhost:5173/login'
+      return resolvePostLogoutRedirectUri(undefined)
     }
 
-    return `${window.location.origin}/login`
+    return resolvePostLogoutRedirectUri(window.location.origin)
   }
 
   function buildBiatecEndSessionUrl(idTokenHint: string | null, postLogoutRedirectUri = getPostLogoutRedirectUri()) {
@@ -675,7 +677,7 @@ export const useAuthStore = defineStore('auth', () => {
     autoSwitchedMainCityName.value = null
   }
 
-  function logout(options: LogoutOptions = {}) {
+  function logout(options: LogoutOptions = {}): boolean {
     const shouldFederatedLogout = options.federated === true && getStoredAuthProvider() === AUTH_PROVIDER_BIATEC
     const idTokenHint = token.value
     const federatedLogoutUrl = shouldFederatedLogout ? buildBiatecEndSessionUrl(idTokenHint) : null
@@ -685,10 +687,16 @@ export const useAuthStore = defineStore('auth', () => {
     player.value = null
     autoSwitchedMainCityName.value = null
     clearStoredSession()
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem(SIGNED_OUT_NOTICE_KEY, '1')
+    }
 
     if (federatedLogoutUrl) {
       window.location.assign(federatedLogoutUrl)
+      return true
     }
+
+    return false
   }
 
   return {

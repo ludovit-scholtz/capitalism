@@ -144,6 +144,7 @@ export default {
     haveAccount: 'Already have an account?',
     backToDirectory: 'Back to server directory',
     genericError: 'Something went wrong. Please try again.',
+    redirectingToSignIn: 'Redirecting to sign-in…',
     oidcRetryDriveAccessHint:
       'Google Drive file creation access is required for the Biatec wallet setup. Start Google sign-in again and allow the Drive permission to finish authentication.',
     biatecCallbackTitle: 'Completing Biatec sign-in',
