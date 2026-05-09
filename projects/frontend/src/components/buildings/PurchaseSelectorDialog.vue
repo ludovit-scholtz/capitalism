@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { inject } from 'vue'
+import { computed, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
 import AdvancedItemSelector from '@/components/buildings/AdvancedItemSelector.vue'
@@ -13,12 +13,25 @@ const {
   purchaseSelectorItems,
   selectedPurchaseSelection,
   purchaseVendorOptions,
+  sourcingCandidates,
+  sourcingCandidatesLoading,
   closePurchaseSelector,
   applyPurchaseSelection,
   selectPurchaseVendor,
+  lockSourcingCandidate,
   getPurchaseVendorTransitLabel,
   formatCurrency,
 } = bd
+
+const sourcingComparisonRows = computed(() =>
+  sourcingCandidates.value.filter((candidate) => candidate.deliveredPricePerUnit != null),
+)
+
+const bestEligibleDeliveredPrice = computed(() => {
+  const eligible = sourcingComparisonRows.value.filter((candidate) => candidate.isEligible)
+  if (eligible.length === 0) return null
+  return Math.min(...eligible.map((candidate) => candidate.deliveredPricePerUnit ?? Number.POSITIVE_INFINITY))
+})
 </script>
 
 <template>
@@ -99,6 +112,62 @@ const {
             </button>
           </div>
           <p v-else class="config-help mt-3 rounded-lg border border-dashed border-divider bg-surface-muted px-3 py-2 text-sm text-muted">{{ t('buildingDetail.purchaseSelector.vendorEmpty') }}</p>
+
+          <div class="mt-4">
+            <h4 class="text-sm font-semibold text-foreground">{{ t('buildingDetail.purchaseSelector.comparisonTitle') }}</h4>
+            <p class="config-help mt-1 text-sm text-muted">{{ t('buildingDetail.purchaseSelector.comparisonHelp') }}</p>
+            <p v-if="sourcingCandidatesLoading" class="config-help mt-2 text-sm text-muted">{{ t('common.loading') }}</p>
+            <div v-else-if="sourcingComparisonRows.length > 0" class="mt-2 overflow-x-auto">
+              <table class="w-full min-w-[540px] text-sm">
+                <thead>
+                  <tr class="text-left text-xs uppercase tracking-wide text-muted">
+                    <th class="pb-2 pr-2">{{ t('buildingDetail.purchaseSelector.comparisonSource') }}</th>
+                    <th class="pb-2 pr-2">{{ t('buildingDetail.purchaseSelector.comparisonLocalPrice') }}</th>
+                    <th class="pb-2 pr-2">{{ t('buildingDetail.purchaseSelector.comparisonLogistics') }}</th>
+                    <th class="pb-2 pr-2">{{ t('buildingDetail.purchaseSelector.comparisonLanded') }}</th>
+                    <th class="pb-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="candidate in sourcingComparisonRows"
+                    :key="`${candidate.sourceType}-${candidate.rank}-${candidate.sourceCityId ?? 'none'}`"
+                    class="border-t border-divider/70"
+                  >
+                    <td class="py-2 pr-2">
+                      <div class="flex flex-col gap-0.5">
+                        <span>{{ candidate.sourceCityName ?? t('common.notAvailable') }}</span>
+                        <span class="text-xs text-muted">
+                          {{
+                            candidate.sourceCityId && candidate.sourceCityId === building?.cityId
+                              ? t('buildingDetail.purchaseSelector.sourceLocal')
+                              : t('buildingDetail.purchaseSelector.sourceCrossCity')
+                          }}
+                        </span>
+                        <span v-if="candidate.isRecommended || ((candidate.deliveredPricePerUnit ?? 0) === bestEligibleDeliveredPrice && candidate.isEligible)" class="text-xs font-semibold text-success">
+                          {{ t('buildingDetail.purchaseSelector.bestValue') }}
+                        </span>
+                      </div>
+                    </td>
+                    <td class="py-2 pr-2">{{ candidate.exchangePricePerUnit != null ? formatCurrency(candidate.exchangePricePerUnit) : '—' }}</td>
+                    <td class="py-2 pr-2">{{ candidate.transitCostPerUnit != null ? formatCurrency(candidate.transitCostPerUnit) : '—' }}</td>
+                    <td class="py-2 pr-2 font-semibold">{{ candidate.deliveredPricePerUnit != null ? formatCurrency(candidate.deliveredPricePerUnit) : '—' }}</td>
+                    <td class="py-2 text-right">
+                      <button
+                        type="button"
+                        class="btn btn-ghost btn-sm"
+                        :disabled="!candidate.isEligible"
+                        @click="lockSourcingCandidate(candidate)"
+                      >
+                        {{ t('buildingDetail.purchaseSelector.useSource') }}
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p v-else class="config-help mt-2 text-sm text-muted">{{ t('buildingDetail.purchaseSelector.comparisonEmpty') }}</p>
+          </div>
         </section>
       </div>
 

@@ -610,6 +610,98 @@ public sealed class InterCityTradeRouteTests
         Assert.All(revenueLedger, e => Assert.True(e.Amount > 0m, "Revenue ledger entry must be positive."));
     }
 
+    [Fact]
+    public async Task TradeRoutePhase_OnDelivery_CreatesShipmentArrivedNotification()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        _ = factory.CreateClient();
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var s = await SeedScenarioAsync(db, currentTick: 119);
+
+        var route = new InterCityTradeRoute
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = s.SellerCompany.Id,
+            SourceBuildingId = s.SourceBuilding.Id,
+            SourceBuildingUnitId = s.B2BUnit.Id,
+            DestinationBuildingId = s.DestBuilding.Id,
+            DestinationBuildingUnitId = s.PurchaseUnit.Id,
+            ResourceTypeId = s.Wood.Id,
+            Quantity = 10m,
+            Quality = 0.7m,
+            SourcingCostTotal = 5m,
+            PricePerUnit = 20m,
+            ScheduledDepartureTick = 119,
+            ExpectedArrivalTick = 120,
+            TransitTicks = 1,
+            ShippingCostEstimate = 5m,
+            Status = TradeRouteStatus.InTransit,
+            CreatedAtUtc = DateTime.UtcNow,
+            DepartedAtUtc = DateTime.UtcNow,
+        };
+        db.InterCityTradeRoutes.Add(route);
+        await db.SaveChangesAsync();
+
+        var processor = CreateProcessor(scope);
+        await processor.ProcessTickAsync();
+
+        var sellerNotification = await db.PlayerNotifications
+            .AsNoTracking()
+            .FirstOrDefaultAsync(notification =>
+                notification.PlayerId == s.SellerPlayer.Id
+                && notification.Type == PlayerNotificationType.ShipmentArrived);
+        Assert.NotNull(sellerNotification);
+        Assert.Equal(s.DestBuilding.Id, sellerNotification!.BuildingId);
+    }
+
+    [Fact]
+    public async Task TradeRoutePhase_HighShippingShare_CreatesMarginErosionNotification()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        _ = factory.CreateClient();
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var s = await SeedScenarioAsync(db, currentTick: 129);
+
+        var route = new InterCityTradeRoute
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = s.SellerCompany.Id,
+            SourceBuildingId = s.SourceBuilding.Id,
+            SourceBuildingUnitId = s.B2BUnit.Id,
+            DestinationBuildingId = s.DestBuilding.Id,
+            DestinationBuildingUnitId = s.PurchaseUnit.Id,
+            ResourceTypeId = s.Wood.Id,
+            Quantity = 10m,
+            Quality = 0.7m,
+            SourcingCostTotal = 5m,
+            PricePerUnit = 1m,
+            ScheduledDepartureTick = 129,
+            ExpectedArrivalTick = 130,
+            TransitTicks = 1,
+            ShippingCostEstimate = 5m,
+            Status = TradeRouteStatus.InTransit,
+            CreatedAtUtc = DateTime.UtcNow,
+            DepartedAtUtc = DateTime.UtcNow,
+        };
+        db.InterCityTradeRoutes.Add(route);
+        await db.SaveChangesAsync();
+
+        var processor = CreateProcessor(scope);
+        await processor.ProcessTickAsync();
+
+        var erosionNotification = await db.PlayerNotifications
+            .AsNoTracking()
+            .FirstOrDefaultAsync(notification =>
+                notification.PlayerId == s.SellerPlayer.Id
+                && notification.Type == PlayerNotificationType.LogisticsMarginErosion);
+        Assert.NotNull(erosionNotification);
+        Assert.Equal(s.SourceBuilding.Id, erosionNotification!.BuildingId);
+    }
+
     // ── FuelPriceIndex from destination city ──────────────────────────────────
 
     [Fact]

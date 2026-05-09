@@ -10904,6 +10904,26 @@ test.describe('Purchase selector dialog — navbar visibility and z-index', () =
     await expect(dialog.getByRole('button', { name: /Auto-select best source/i })).toBeVisible()
     await expect(dialog.getByRole('button', { name: /Your own company/i })).toBeVisible()
   })
+
+  test('purchase selector dialog shows landed-cost comparison section with empty-state fallback', async ({ page }) => {
+    const player = makePurchaseFactory()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-ps-z')
+    await page.getByRole('button', { name: /Edit Building/i }).click()
+    const plannedSection = page.locator('.grid-section').filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) }).first()
+    await plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+
+    const dialog = await openPurchaseSelector(page)
+    await expect(dialog.getByRole('heading', { name: 'Landed-cost comparison' })).toBeVisible()
+    await expect(dialog).toContainText('No sourcing comparison is available for this selection yet.')
+  })
 })
 
 test.describe('Purchase selector list visuals and same-city vendor context', () => {

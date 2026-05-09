@@ -7188,7 +7188,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
-    if (query.includes('gameState')) {
+    if (query.includes('gameState') && !query.includes('companyLedger')) {
       applyDueBuildingUpgrades(state)
       return route.fulfill({
         status: 200,
@@ -8255,6 +8255,10 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       return routeJson({ myTradeRoutes: state.tradeRoutes })
     }
 
+    if (query.includes('getCrossCityShipments') && !query.includes('companyLedger')) {
+      return routeJson({ getCrossCityShipments: state.tradeRoutes })
+    }
+
     // ── Tutorial Progress ──────────────────────────────────────────────────────
     if (query.includes('tutorialProgress') && !query.includes('markTutorialMilestoneComplete')) {
       const player = state.players.find((p) => p.id === state.currentUserId)
@@ -8844,6 +8848,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       !q.includes('gameAdminSession') &&
       !q.includes('gameAdminDashboard') &&
       !q.includes('companyLedger') &&
+      !q.includes('gameState') &&
       !q.includes('ledgerDrillDown') &&
       !q.includes('companyBrands') &&
       !q.includes('publicSalesAnalytics') &&
@@ -8962,16 +8967,68 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           history: [],
           buildingSummaries: [],
         }
+        const autoLedger = buildMockLedgerSummaryPayload(auto, state.gameState)
+        const responseData: Record<string, unknown> = { companyLedger: autoLedger }
+        if (query.includes('companyCityFinancialBreakdown')) {
+          responseData.companyCityFinancialBreakdown = []
+        }
+        if (query.includes('getCrossCityShipments')) {
+          responseData.logisticsShipments = state.tradeRoutes
+        }
+        if (query.includes('gameState')) {
+          responseData.gameState = buildMockGameStatePayload(state.gameState)
+        }
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ data: { companyLedger: buildMockLedgerSummaryPayload(auto, state.gameState) } }),
+          body: JSON.stringify({ data: responseData }),
         })
+      }
+      const ledger = buildMockLedgerSummaryPayload(summary, state.gameState)
+      const responseData: Record<string, unknown> = { companyLedger: ledger }
+      if (query.includes('companyCityFinancialBreakdown')) {
+        const cityByBuildingId = new Map(
+          state.players
+            .flatMap((player) => player.companies)
+            .flatMap((company) => company.buildings)
+            .map((building) => [building.id, state.cities.find((city) => city.id === building.cityId)]),
+        )
+        const grouped = new Map<string, { cityId: string; cityName: string; currencyCode: string; currencySymbol: string; revenue: number; costs: number; revenueTrend: Array<{ tick: number; revenue: number }> }>()
+        for (const buildingSummary of ledger.buildingSummaries ?? []) {
+          const city = cityByBuildingId.get(buildingSummary.buildingId)
+          if (!city) continue
+          const existing = grouped.get(city.id) ?? {
+            cityId: city.id,
+            cityName: city.name,
+            currencyCode: city.currencyCode ?? 'EUR',
+            currencySymbol: city.currencyCode === 'CZK' ? 'Kč' : city.currencyCode === 'USD' ? '$' : city.currencyCode === 'GBP' ? '£' : city.currencyCode === 'INR' ? '₹' : '€',
+            revenue: 0,
+            costs: 0,
+            revenueTrend: [],
+          }
+          existing.revenue += Number(buildingSummary.revenue ?? 0)
+          existing.costs += Number(buildingSummary.costs ?? 0)
+          existing.revenueTrend.push({
+            tick: state.gameState.currentTick,
+            revenue: Number(buildingSummary.revenue ?? 0),
+          })
+          grouped.set(city.id, existing)
+        }
+        responseData.companyCityFinancialBreakdown = Array.from(grouped.values()).map((entry) => ({
+          ...entry,
+          profit: entry.revenue - entry.costs,
+        }))
+      }
+      if (query.includes('getCrossCityShipments')) {
+        responseData.logisticsShipments = state.tradeRoutes
+      }
+      if (query.includes('gameState')) {
+        responseData.gameState = buildMockGameStatePayload(state.gameState)
       }
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { companyLedger: buildMockLedgerSummaryPayload(summary, state.gameState) } }),
+        body: JSON.stringify({ data: responseData }),
       })
     }
 

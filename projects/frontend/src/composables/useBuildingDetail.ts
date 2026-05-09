@@ -2727,6 +2727,28 @@ export function useBuildingDetail() {
     }
   }
 
+  function lockSourcingCandidate(candidate: SourcingCandidate) {
+    const unit = selectedDraftPurchaseUnit.value
+    if (!unit) return
+
+    if (candidate.sourceType === 'LOCAL_B2B' || candidate.sourceType === 'LOCKED_VENDOR') {
+      unit.purchaseSource = 'LOCAL'
+      unit.vendorLockCompanyId = candidate.sourceVendorCompanyId ?? null
+      unit.lockedCityId = null
+      return
+    }
+
+    if (candidate.sourceCityId) {
+      unit.purchaseSource = 'EXCHANGE'
+      unit.lockedCityId = candidate.sourceCityId
+      unit.vendorLockCompanyId = null
+      return
+    }
+
+    unit.purchaseSource = 'OPTIMAL'
+    unit.lockedCityId = null
+  }
+
   function getFactoryPurchaseSelectableItems(): SelectorItem[] {
     if (building.value?.type !== 'FACTORY') {
       return allSelectableItems.value
@@ -5319,6 +5341,7 @@ export function useBuildingDetail() {
     closePurchaseSelector,
     applyPurchaseSelection,
     selectPurchaseVendor,
+    lockSourcingCandidate,
     getFactoryPurchaseSelectableItems,
     getManufacturingSelectableItems,
     getPurchaseVendorTransitLabel,

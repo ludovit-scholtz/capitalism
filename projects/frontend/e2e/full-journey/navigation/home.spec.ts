@@ -419,4 +419,51 @@ test.describe('Header navigation', () => {
     await expect(page.locator('.notification-badge')).toHaveCount(0)
     await expect(panel.locator('.notification-item-unread')).toHaveCount(0)
   })
+
+  test('shows shipment and margin warning notification icons with deep links', async ({ page }) => {
+    const player = makePlayer()
+    const now = new Date().toISOString()
+    setupMockApi(page, {
+      players: [player],
+      currentUserId: player.id,
+      currentToken: `token-${player.id}`,
+      playerNotifications: [
+        {
+          id: 'notif-shipment',
+          type: 'SHIPMENT_ARRIVED',
+          title: 'Shipment arrived',
+          message: 'Shipment arrived at Prague Factory.',
+          isRead: false,
+          createdAtTick: 75,
+          createdAtUtc: now,
+          buildingId: 'building-1',
+        },
+        {
+          id: 'notif-margin',
+          type: 'LOGISTICS_MARGIN_EROSION',
+          title: 'Logistics cost warning',
+          message: 'Shipping costs are eroding your margins.',
+          isRead: false,
+          createdAtTick: 74,
+          createdAtUtc: now,
+        },
+      ],
+    })
+    await authenticate(page, `token-${player.id}`)
+
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Notifications' }).click()
+
+    const panel = page.locator('.notification-panel')
+    await expect(panel.locator('.notification-icon-shipment')).toBeVisible()
+    await expect(panel.locator('.notification-icon-margin')).toBeVisible()
+
+    await panel.getByRole('button', { name: /shipment arrived/i }).click()
+    await expect(page).toHaveURL('/building/building-1')
+
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Notifications' }).click()
+    await panel.getByRole('button', { name: /logistics cost warning/i }).click()
+    await expect(page).toHaveURL('/trade-routes')
+  })
 })

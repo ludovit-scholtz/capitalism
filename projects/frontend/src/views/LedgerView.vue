@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { gqlRequest } from '@/lib/graphql'
-import type { CompanyLedgerSummary, LedgerEntryResult } from '@/types'
+import type { CompanyCityFinancialSummary, CompanyLedgerSummary, LedgerEntryResult, TradeRouteResult } from '@/types'
 import LedgerMainContent from '@/components/ledger/LedgerMainContent.vue'
 
 const { t } = useI18n()
@@ -15,6 +15,9 @@ const { saveScrollPosition, restoreScrollPosition } = useScrollPreservation()
 
 const companyId = computed(() => route.params.companyId as string)
 const ledger = ref<CompanyLedgerSummary | null>(null)
+const cityFinancialBreakdown = ref<CompanyCityFinancialSummary[]>([])
+const logisticsShipments = ref<TradeRouteResult[]>([])
+const currentTick = ref<number | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 const drillCategory = ref<string | null>(null)
@@ -25,6 +28,9 @@ const selectedResolvedGameYear = computed(() => selectedGameYear.value ?? ledger
 
 const LEDGER_QUERY = `
   query GetCompanyLedger($companyId: UUID!, $gameYear: Int) {
+    gameState {
+      currentTick
+    }
     companyLedger(companyId: $companyId, gameYear: $gameYear) {
       companyId companyName gameYear isCurrentGameYear currentCash
       primaryCurrencyCode primaryCurrencySymbol hasMixedCurrencies
@@ -37,6 +43,34 @@ const LEDGER_QUERY = `
         gameYear isCurrentGameYear totalRevenue totalLaborCosts totalEnergyCosts netIncome totalTaxPaid taxableIncome estimatedIncomeTax firstRecordedTick lastRecordedTick
       }
       buildingSummaries { buildingId buildingName buildingType revenue costs currencyCode currencySymbol }
+    }
+    companyCityFinancialBreakdown(companyId: $companyId, gameYear: $gameYear) {
+      cityId
+      cityName
+      currencyCode
+      currencySymbol
+      revenue
+      costs
+      profit
+      revenueTrend {
+        tick
+        revenue
+      }
+    }
+    logisticsShipments: getCrossCityShipments(companyId: $companyId) {
+      id
+      sourceCityName
+      destinationCityName
+      sourceBuildingName
+      destinationBuildingName
+      productTypeName
+      resourceTypeName
+      quantity
+      expectedArrivalTick
+      scheduledDepartureTick
+      transitTicks
+      status
+      failureReason
     }
   }
 `
@@ -57,10 +91,18 @@ async function fetchLedger(isRefresh = false) {
   if (!isRefresh) loading.value = true
   error.value = null
   try {
-    const data = await gqlRequest<{ companyLedger: CompanyLedgerSummary | null }>(LEDGER_QUERY, {
+    const data = await gqlRequest<{
+      gameState: { currentTick: number } | null
+      companyLedger: CompanyLedgerSummary | null
+      companyCityFinancialBreakdown: CompanyCityFinancialSummary[]
+      logisticsShipments: TradeRouteResult[]
+    }>(LEDGER_QUERY, {
       companyId: companyId.value,
       gameYear: selectedGameYear.value,
     })
+    currentTick.value = data.gameState?.currentTick ?? null
+    cityFinancialBreakdown.value = data.companyCityFinancialBreakdown ?? []
+    logisticsShipments.value = data.logisticsShipments ?? []
     if (!data.companyLedger) {
       error.value = t('ledger.notFound')
       return
@@ -152,6 +194,9 @@ useTickRefresh(async () => {
     <LedgerMainContent
       v-else-if="ledger"
       :ledger="ledger"
+      :city-financial-breakdown="cityFinancialBreakdown"
+      :logistics-shipments="logisticsShipments"
+      :current-tick="currentTick"
       :drill-category="drillCategory"
       :drill-entries="drillEntries"
       :drill-loading="drillLoading"

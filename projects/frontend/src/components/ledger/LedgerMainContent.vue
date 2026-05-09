@@ -3,12 +3,16 @@ import { useI18n } from 'vue-i18n'
 import { formatInGameTime, formatGameTickTime } from '@/lib/gameTime'
 import { formatMoney } from '@/lib/currencyFormat'
 import CurrencyAmount from '@/components/numbers/CurrencyAmount.vue'
-import type { CompanyLedgerSummary, LedgerEntryResult } from '@/types'
+import { computed } from 'vue'
+import type { CompanyCityFinancialSummary, CompanyLedgerSummary, LedgerEntryResult, TradeRouteResult } from '@/types'
 
-const { locale } = useI18n()
+const { locale, t } = useI18n()
 
 const props = defineProps<{
   ledger: CompanyLedgerSummary
+  cityFinancialBreakdown: CompanyCityFinancialSummary[]
+  logisticsShipments: TradeRouteResult[]
+  currentTick: number | null
   drillCategory: string | null
   drillEntries: LedgerEntryResult[]
   drillLoading: boolean
@@ -40,6 +44,43 @@ function amountClass(amount: number): string {
 
 function formatGameTime(value: string): string {
   return formatInGameTime(value, locale.value)
+}
+
+const logisticsShipmentsActive = computed(() =>
+  props.logisticsShipments.filter(
+    (shipment) => shipment.status === 'SCHEDULED' || shipment.status === 'IN_TRANSIT',
+  ),
+)
+
+function getShipmentProgress(shipment: TradeRouteResult): number {
+  if (shipment.status === 'DELIVERED') return 100
+  if (shipment.status === 'FAILED') return 100
+  const total = Math.max(1, shipment.expectedArrivalTick - shipment.scheduledDepartureTick)
+  const elapsed = Math.max(0, (props.currentTick ?? shipment.scheduledDepartureTick) - shipment.scheduledDepartureTick)
+  return Math.max(0, Math.min(100, Math.round((elapsed / total) * 100)))
+}
+
+function isShipmentDelayed(shipment: TradeRouteResult): boolean {
+  return shipment.status === 'IN_TRANSIT'
+    && props.currentTick != null
+    && props.currentTick > shipment.expectedArrivalTick
+}
+
+function getShipmentStatusText(shipment: TradeRouteResult): string {
+  if (isShipmentDelayed(shipment)) return t('ledger.logisticsStatusDelayed')
+  return shipment.status === 'SCHEDULED'
+    ? t('ledger.logisticsStatusOnSchedule')
+    : t('ledger.logisticsStatusInTransit')
+}
+
+function sparklineMax(summary: CompanyCityFinancialSummary): number {
+  return summary.revenueTrend.reduce((max, point) => Math.max(max, point.revenue), 0)
+}
+
+function sparklineHeight(summary: CompanyCityFinancialSummary, revenue: number): number {
+  const max = sparklineMax(summary)
+  if (max <= 0) return 8
+  return Math.max(8, Math.round((revenue / max) * 32))
 }
 </script>
 
@@ -382,6 +423,81 @@ function formatGameTime(value: string): string {
       </div>
     </div>
 
+    <div class="statement-card logistics-section">
+      <h2 class="statement-title">🚚 {{ $t('ledger.logisticsTitle') }}</h2>
+      <p class="meta-copy">{{ $t('ledger.logisticsSubtitle') }}</p>
+      <div v-if="logisticsShipmentsActive.length === 0" class="state-box-sm">
+        {{ $t('ledger.logisticsEmpty') }}
+      </div>
+      <div v-else class="drill-table-wrapper">
+        <table class="drill-table logistics-table" :aria-label="$t('ledger.logisticsTitle')">
+          <thead>
+            <tr>
+              <th>{{ $t('ledger.logisticsRoute') }}</th>
+              <th>{{ $t('tradeRoutes.item') }}</th>
+              <th>{{ $t('tradeRoutes.quantity') }}</th>
+              <th>{{ $t('tradeRoutes.arrivalTick') }}</th>
+              <th>{{ $t('ledger.logisticsProgress') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="shipment in logisticsShipmentsActive" :key="shipment.id">
+              <td>
+                <div class="flex flex-col gap-1">
+                  <span>{{ shipment.sourceCityName }} → {{ shipment.destinationCityName }}</span>
+                  <span class="text-xs text-muted">{{ shipment.sourceBuildingName }} → {{ shipment.destinationBuildingName }}</span>
+                </div>
+              </td>
+              <td>{{ shipment.productTypeName ?? shipment.resourceTypeName ?? '—' }}</td>
+              <td>{{ shipment.quantity }}</td>
+              <td>{{ shipment.expectedArrivalTick }}</td>
+              <td>
+                <div class="shipment-progress">
+                  <div class="shipment-progress-bar" :class="{ delayed: isShipmentDelayed(shipment) }" :style="{ width: `${getShipmentProgress(shipment)}%` }"></div>
+                </div>
+                <span class="shipment-progress-label" :class="{ delayed: isShipmentDelayed(shipment) }">{{ getShipmentStatusText(shipment) }}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div v-if="cityFinancialBreakdown.length > 0" class="statement-card city-financial-section">
+      <h2 class="statement-title">🏙️ {{ $t('ledger.cityFinancialTitle') }}</h2>
+      <p class="meta-copy">{{ $t('ledger.cityFinancialSubtitle') }}</p>
+      <div class="city-financial-grid">
+        <article v-for="summary in cityFinancialBreakdown" :key="summary.cityId" class="city-financial-card">
+          <div class="city-financial-header">
+            <strong>{{ summary.cityName }}</strong>
+            <span class="currency-badge">{{ summary.currencyCode }}</span>
+          </div>
+          <div class="city-financial-metrics">
+            <div class="city-financial-row">
+              <span>{{ $t('ledger.revenue') }}</span>
+              <span class="amount-positive">{{ formatAmount(summary.revenue, summary.currencyCode) }}</span>
+            </div>
+            <div class="city-financial-row">
+              <span>{{ $t('ledger.costs') }}</span>
+              <span class="amount-negative">{{ formatAmount(-summary.costs, summary.currencyCode) }}</span>
+            </div>
+            <div class="city-financial-row">
+              <span>{{ $t('ledger.profit') }}</span>
+              <span :class="amountClass(summary.profit)">{{ formatAmount(summary.profit, summary.currencyCode) }}</span>
+            </div>
+          </div>
+          <div v-if="summary.revenueTrend.length > 0" class="city-revenue-sparkline" :aria-label="$t('ledger.cityRevenueTrend')">
+            <span
+              v-for="point in summary.revenueTrend"
+              :key="`${summary.cityId}-${point.tick}`"
+              class="city-revenue-bar"
+              :style="{ height: `${sparklineHeight(summary, point.revenue)}px` }"
+            ></span>
+          </div>
+        </article>
+      </div>
+    </div>
+
     <div v-if="drillCategory" class="drill-panel">
       <div class="drill-header">
         <h3>{{ $t('ledger.drillDown') }}: {{ $t(`ledger.category.${drillCategory}`) }}</h3>
@@ -721,5 +837,73 @@ function formatGameTime(value: string): string {
   font-size: 0.7rem;
   color: var(--color-text-secondary);
   margin-top: 0.15rem;
+}
+.logistics-section {
+  margin-bottom: 1.5rem;
+}
+.logistics-table .shipment-progress {
+  width: 100%;
+  max-width: 180px;
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-border) 60%, transparent);
+  overflow: hidden;
+  margin-bottom: 0.25rem;
+}
+.logistics-table .shipment-progress-bar {
+  height: 100%;
+  background: color-mix(in srgb, var(--color-success, #22c55e) 70%, transparent);
+}
+.logistics-table .shipment-progress-bar.delayed {
+  background: color-mix(in srgb, var(--color-danger, #ef4444) 70%, transparent);
+}
+.shipment-progress-label {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+.shipment-progress-label.delayed {
+  color: var(--color-danger, #ef4444);
+}
+.city-financial-section {
+  margin-bottom: 1.5rem;
+}
+.city-financial-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.city-financial-card {
+  border: 1px solid var(--color-border);
+  border-radius: 0.65rem;
+  padding: 0.85rem;
+  background: var(--color-surface-hover, rgba(0, 0, 0, 0.03));
+}
+.city-financial-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.city-financial-metrics {
+  display: grid;
+  gap: 0.3rem;
+}
+.city-financial-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+}
+.city-revenue-sparkline {
+  margin-top: 0.6rem;
+  display: flex;
+  align-items: end;
+  gap: 3px;
+  min-height: 36px;
+}
+.city-revenue-bar {
+  width: 8px;
+  border-radius: 3px 3px 0 0;
+  background: color-mix(in srgb, var(--color-primary) 75%, transparent);
 }
 </style>

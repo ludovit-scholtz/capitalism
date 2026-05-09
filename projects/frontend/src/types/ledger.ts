@@ -66,6 +66,22 @@ export interface CompanyLedgerHistoryYear {
   lastRecordedTick: number
 }
 
+export interface CityRevenueTrendPoint {
+  tick: number
+  revenue: number
+}
+
+export interface CompanyCityFinancialSummary {
+  cityId: string
+  cityName: string
+  currencyCode: string
+  currencySymbol: string
+  revenue: number
+  costs: number
+  profit: number
+  revenueTrend: CityRevenueTrendPoint[]
+}
+
 export interface LedgerEntryResult {
   id: string
   category: string

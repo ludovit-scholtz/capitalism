@@ -108,6 +108,8 @@ public sealed class TradeRoutePhase : ITickPhase
         // Mark delivered.
         route.Status = TradeRouteStatus.Delivered;
         route.CompletedAtUtc = DateTime.UtcNow;
+
+        EmitDeliveryNotifications(context, route, sourceBuilding, destBuilding);
     }
 
     private static void ReturnInventoryToSource(TickContext context, InterCityTradeRoute route, Building sourceBuilding)
@@ -255,6 +257,72 @@ public sealed class TradeRoutePhase : ITickPhase
         route.Status = TradeRouteStatus.Failed;
         route.FailureReason = reason;
         route.CompletedAtUtc = DateTime.UtcNow;
+    }
+
+    private static void EmitDeliveryNotifications(
+        TickContext context,
+        InterCityTradeRoute route,
+        Building sourceBuilding,
+        Building destBuilding)
+    {
+        if (!context.CompaniesById.TryGetValue(route.CompanyId, out var sellerCompany))
+            return;
+
+        var itemName = route.ResourceTypeId.HasValue && context.ResourceTypesById.TryGetValue(route.ResourceTypeId.Value, out var resource)
+            ? resource.Name
+            : (route.ProductTypeId.HasValue && context.ProductTypesById.TryGetValue(route.ProductTypeId.Value, out var product)
+                ? product.Name
+                : "item");
+
+        var shipmentMessage = $"Shipment arrived at {destBuilding.Name}: {route.Quantity:0.####} {itemName} from {sourceBuilding.Name}.";
+        PlayerNotificationService.Add(
+            context.Db,
+            sellerCompany.PlayerId,
+            PlayerNotificationType.ShipmentArrived,
+            "Shipment arrived",
+            shipmentMessage,
+            context.CurrentTick,
+            sellerCompany.Id,
+            destBuilding.Id,
+            route.DestinationBuildingUnitId,
+            bankAccountId: destBuilding.BankAccountId);
+
+        if (context.CompaniesById.TryGetValue(destBuilding.CompanyId, out var buyerCompany)
+            && buyerCompany.PlayerId != sellerCompany.PlayerId)
+        {
+            PlayerNotificationService.Add(
+                context.Db,
+                buyerCompany.PlayerId,
+                PlayerNotificationType.ShipmentArrived,
+                "Shipment arrived",
+                $"{sellerCompany.Name} delivered {route.Quantity:0.####} {itemName} to {destBuilding.Name}.",
+                context.CurrentTick,
+                buyerCompany.Id,
+                destBuilding.Id,
+                route.DestinationBuildingUnitId,
+                bankAccountId: destBuilding.BankAccountId);
+        }
+
+        if (route.Quantity <= 0m || route.PricePerUnit <= 0m || route.ShippingCostActual <= 0m)
+            return;
+
+        var shippingCostPerUnit = route.ShippingCostActual / route.Quantity;
+        var shippingCostShare = shippingCostPerUnit / route.PricePerUnit;
+        const decimal marginErosionThreshold = 0.15m;
+        if (shippingCostShare <= marginErosionThreshold)
+            return;
+
+        PlayerNotificationService.Add(
+            context.Db,
+            sellerCompany.PlayerId,
+            PlayerNotificationType.LogisticsMarginErosion,
+            "Logistics cost warning",
+            $"Shipping cost reached {(shippingCostShare * 100m):0.#}% of sale price on shipment to {destBuilding.Name}.",
+            context.CurrentTick,
+            sellerCompany.Id,
+            sourceBuilding.Id,
+            route.SourceBuildingUnitId,
+            bankAccountId: sourceBuilding.BankAccountId);
     }
 
     private static decimal ComputeItemWeight(

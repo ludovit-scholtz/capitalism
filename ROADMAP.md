@@ -33,14 +33,14 @@ It will use real world map. The game will start in single city and later other c
 - [x] In bank building in `operating-account-row` is too much content that does not fit into the row. Add `Bank Statement Review` in second line or somewhere else.
 - [x] Create a workflow to destroy a building. Make sure the button to destroy the building is in the sell building form and show also the refund how much user will receive. When building is destroyed, return the user 80% of the building property value. Make the property available for purchase again. When bank loan is not paid set it for sale for the property market price minus 10%. When the debt from missed payments is not paid in 3 game days (72 ticks), destroy the building and pay any remaining debt from the sale of property to the bank owner.
 
-### Multi-City Expansion & Cross-City Trade Logistics (35% complete)
+### Multi-City Expansion & Cross-City Trade Logistics (100% complete)
 
 - [x] Added `/map` world map view with city pins, city details, unlock-state color coding, and expansion modal/CTA flow.
 - [x] Added GraphQL compatibility surfaces for expansion logistics: `getCities`, `getCrossCityShipments`, `getLogisticsCostEstimate`, and `unlockCity`.
 - [x] Added backend integration tests for the new cross-city GraphQL surfaces and transport tick-estimate rule (`ceil(distance/500)`).
-- [ ] Add explicit player notifications for shipment arrival and logistics-cost margin-erosion warnings.
-- [ ] Add full city-level company financial widget/tab and dedicated cross-city shipment progress timeline in ledger logistics section.
-- [ ] Extend purchase-unit UI with first-class cross-city source selector and landed-cost comparison table in all relevant building flows.
+- [x] Add explicit player notifications for shipment arrival and logistics-cost margin-erosion warnings.
+- [x] Add full city-level company financial widget/tab and dedicated cross-city shipment progress timeline in ledger logistics section.
+- [x] Extend purchase-unit UI with first-class cross-city source selector and landed-cost comparison table in all relevant building flows.
 
 ### Consumable Raw Materials & Resource Scarcity Mechanics (90% complete)
 

@@ -216,6 +216,99 @@ public sealed partial class Query
         return summary;
     }
 
+    [Authorize]
+    public async Task<List<CompanyCityFinancialSummary>> GetCompanyCityFinancialBreakdown(
+        Guid companyId,
+        int? gameYear,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var company = await db.Companies
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == companyId && c.PlayerId == userId);
+        if (company is null)
+        {
+            return [];
+        }
+
+        var gameState = await db.GameStates
+            .AsNoTracking()
+            .FirstOrDefaultDeterministicAsync();
+        var selectedGameYear = gameYear ?? GameTime.GetGameYear(gameState?.CurrentTick ?? 0L);
+        var startTick = GameTime.GetStartTickForGameYear(selectedGameYear);
+        var endTick = GameTime.GetEndTickForGameYear(selectedGameYear);
+
+        var buildings = await db.Buildings
+            .AsNoTracking()
+            .Include(b => b.City)
+            .Where(b => b.CompanyId == companyId)
+            .ToListAsync();
+        if (buildings.Count == 0)
+        {
+            return [];
+        }
+
+        var cityByBuildingId = buildings
+            .Where(b => b.City != null)
+            .GroupBy(b => b.Id)
+            .ToDictionary(group => group.Key, group => group.First().City!);
+
+        var entries = await db.LedgerEntries
+            .AsNoTracking()
+            .Where(e => e.CompanyId == companyId
+                && e.BuildingId.HasValue
+                && e.RecordedAtTick >= startTick
+                && e.RecordedAtTick <= endTick)
+            .Select(e => new { e.BuildingId, e.Amount, e.RecordedAtTick })
+            .ToListAsync();
+
+        var summaries = new List<CompanyCityFinancialSummary>();
+        foreach (var city in buildings
+                     .Where(b => b.City != null)
+                     .Select(b => b.City!)
+                     .GroupBy(c => c.Id)
+                     .Select(group => group.First()))
+        {
+            var cityEntries = entries
+                .Where(e => e.BuildingId.HasValue
+                    && cityByBuildingId.TryGetValue(e.BuildingId.Value, out var mappedCity)
+                    && mappedCity.Id == city.Id)
+                .ToList();
+
+            var revenue = cityEntries.Where(e => e.Amount > 0m).Sum(e => e.Amount);
+            var costs = Math.Abs(cityEntries.Where(e => e.Amount < 0m).Sum(e => e.Amount));
+            var revenueTrend = cityEntries
+                .Where(e => e.Amount > 0m)
+                .GroupBy(e => e.RecordedAtTick)
+                .Select(group => new CityRevenueTrendPoint
+                {
+                    Tick = group.Key,
+                    Revenue = group.Sum(entry => entry.Amount),
+                })
+                .OrderBy(point => point.Tick)
+                .TakeLast(12)
+                .ToList();
+
+            summaries.Add(new CompanyCityFinancialSummary
+            {
+                CityId = city.Id,
+                CityName = city.Name,
+                CurrencyCode = city.CurrencyCode,
+                Revenue = revenue,
+                Costs = costs,
+                Profit = revenue - costs,
+                RevenueTrend = revenueTrend,
+            });
+        }
+
+        return summaries
+            .OrderByDescending(summary => summary.Profit)
+            .ThenBy(summary => summary.CityName)
+            .ToList();
+    }
+
     /// <summary>Returns drill-down entries for a specific ledger category.</summary>
     [Authorize]
     public async Task<List<LedgerEntryResult>> GetLedgerDrillDown(

@@ -85,6 +85,8 @@ async function handleNotificationClick(notificationId: string, isRead: boolean, 
 
   if (buildingId) {
     await router.push(`/building/${buildingId}`)
+  } else if (type === 'SHIPMENT_ARRIVED' || type === 'LOGISTICS_MARGIN_EROSION') {
+    await router.push('/trade-routes')
   } else if (type === 'LOAN_REPAYMENT_DUE_SOON') {
     await router.push('/banking')
   } else if (type === 'LOAN_PAYMENT_MISSED') {
@@ -96,6 +98,25 @@ async function handleNotificationClick(notificationId: string, isRead: boolean, 
   }
 
   closeNotificationsPanel()
+}
+
+function getNotificationIcon(type: string) {
+  if (type === 'SHIPMENT_ARRIVED') {
+    return {
+      symbol: '✅',
+      className: 'notification-icon-shipment',
+    }
+  }
+  if (type === 'LOGISTICS_MARGIN_EROSION') {
+    return {
+      symbol: '⚠️',
+      className: 'notification-icon-margin',
+    }
+  }
+  return {
+    symbol: '🔔',
+    className: 'notification-icon-default',
+  }
 }
 
 async function markAllNotificationsRead() {
@@ -381,7 +402,10 @@ useTickRefresh(async () => {
       <ul v-else class="notification-list">
         <li v-for="item in notificationsInbox.items" :key="item.id" class="notification-item" :class="{ 'notification-item-unread': !item.isRead }">
           <button class="notification-item-btn" @click="handleNotificationClick(item.id, item.isRead, item.buildingId, item.type)">
-            <span class="notification-item-title">{{ item.title }}</span>
+            <div class="notification-item-top">
+              <span class="notification-item-icon" :class="getNotificationIcon(item.type).className">{{ getNotificationIcon(item.type).symbol }}</span>
+              <span class="notification-item-title">{{ item.title }}</span>
+            </div>
             <span class="notification-item-message">{{ item.message }}</span>
             <span class="notification-item-time">{{ new Date(item.createdAtUtc).toLocaleString() }}</span>
           </button>
@@ -525,6 +549,24 @@ useTickRefresh(async () => {
   justify-content: center;
   padding: 0 0.28rem;
   box-shadow: 0 4px 10px rgba(244, 63, 94, 0.35);
+}
+.notification-item-top {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.notification-item-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+.notification-icon-shipment {
+  color: #16a34a;
+}
+.notification-icon-margin {
+  color: #f59e0b;
+}
+.notification-icon-default {
+  color: var(--color-text-secondary);
 }
 
 .notification-overlay {
