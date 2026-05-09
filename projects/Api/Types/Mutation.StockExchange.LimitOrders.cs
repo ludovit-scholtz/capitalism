@@ -26,7 +26,7 @@ public sealed partial class Mutation
         }
 
         var side = input.Side.Trim().ToUpperInvariant();
-        if (side is not (LimitOrderSide.Buy or LimitOrderSide.Sell))
+        if (!LimitOrderSide.IsValid(side))
         {
             throw new GraphQLException(ErrorBuilder.New().SetMessage("Order side must be BUY or SELL.").SetCode("INVALID_ORDER_SIDE").Build());
         }
