@@ -85,6 +85,24 @@ public sealed class BuildingLedgerSummary
     public string CurrencySymbol => Mutation.GetCurrencySymbol(CurrencyCode);
 }
 
+public sealed class CompanyCityFinancialSummary
+{
+    public Guid CityId { get; set; }
+    public string CityName { get; set; } = string.Empty;
+    public string CurrencyCode { get; set; } = "EUR";
+    public string CurrencySymbol => Mutation.GetCurrencySymbol(CurrencyCode);
+    public decimal Revenue { get; set; }
+    public decimal Costs { get; set; }
+    public decimal Profit { get; set; }
+    public List<CityRevenueTrendPoint> RevenueTrend { get; set; } = [];
+}
+
+public sealed class CityRevenueTrendPoint
+{
+    public long Tick { get; set; }
+    public decimal Revenue { get; set; }
+}
+
 public sealed class BuildingFinancialTimeline
 {
     public Guid BuildingId { get; set; }
@@ -349,4 +367,3 @@ public sealed class MarketShareEntry
     /// <summary>True when this entry represents unserved/unmet market demand, not an actual seller.</summary>
     public bool IsUnmet { get; set; }
 }
-
