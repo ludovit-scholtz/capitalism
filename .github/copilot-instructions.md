@@ -504,6 +504,20 @@ Root-cause of a past quality failure (March 2026, PR #46):
 - E2E: golden path + at least one interruption/resume test + at least one skip-path or error-recovery test.
 - All tests must pass locally before pushing; never push with known failures.
 
+## Power-grid follow-up quality — do not stop at roadmap/docs plus backend guardrails
+
+Root-cause of a quality failure (May 2026, PR #345 / Power Plants & Energy System):
+- The power-grid implementation was already on `main`, so the follow-up branch only added roadmap tracking plus a few backend guardrail tests.
+- That was useful, but it was not enough proof for a large user-facing infrastructure feature whose PRODUCT-DEFINITION.md requirements also include visible weather/power-planning UX and authenticated API boundaries.
+- The product owner correctly asked for better build/test proof, stronger PRODUCT-DEFINITION.md alignment, more coverage, and an explicit lesson so the same “already on main, minimal follow-up only” mistake does not repeat.
+
+**Rules to prevent recurrence:**
+1. **When a major feature is already on `main`, do not stop after adding roadmap text and a couple of backend tests.** Add at least one more coverage layer that proves the shipped user-visible behavior still matches PRODUCT-DEFINITION.md or ROADMAP.md (for example an active full-journey Playwright spec migrated out of archive).
+2. **For authenticated GraphQL power/admin/economy surfaces, the minimum backend mutation/query coverage must include unauthenticated rejection in addition to validation and foreign-ownership checks.** A feature is not fully covered until anonymous access is proven blocked where required.
+3. **If archived Playwright tests already cover the relevant PRODUCT-DEFINITION.md behavior, migrate the most important ones into `e2e/full-journey/**` instead of writing only backend tests.** Archived-only coverage does not protect default CI.
+4. **Before replying to “fix build and tests,” run the real local pipelines from a clean dependency state** (`npm ci`, then `npm run lint`, `npm run test:unit`, `npm run build`, plus the relevant Playwright specs and backend Release tests). Do not assume prior-session installs still exist.
+5. **For infrastructure/economy features with visible dashboards or planning panels, always include a fresh screenshot of the shipped UI in the reply.** Backend-only proof is not enough when the product requirement is partly visual.
+
 ## Onboarding product-proof quality — green CI is not enough
 
 Root-cause of a quality failure (March 2026, PR #51 onboarding follow-up):

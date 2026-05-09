@@ -2166,6 +2166,26 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
     }
 
     /// <summary>
+    /// setPlantDispatch is an authenticated mutation and must reject anonymous calls.
+    /// </summary>
+    [Fact]
+    public async Task SetPlantDispatch_Unauthenticated_ReturnsAuthError()
+    {
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation SetDispatch($buildingId: UUID!, $percent: Int!) {
+                setPlantDispatch(input: { buildingId: $buildingId, dispatchTargetPercent: $percent }) {
+                    id
+                }
+            }
+            """,
+            new { buildingId = Guid.NewGuid(), percent = 50 });
+
+        var errorCode = result.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("AUTH_NOT_AUTHENTICATED", errorCode);
+    }
+
+    /// <summary>
     /// setPlantDispatch must reject player-owned non-power-plant buildings with INVALID_BUILDING_TYPE.
     /// This protects the mutation boundary so regular factories cannot be configured as generators.
     /// </summary>
@@ -2624,6 +2644,26 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
 
         var errorCode = result.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString();
         Assert.Equal("BUILDING_NOT_FOUND", errorCode);
+    }
+
+    /// <summary>
+    /// powerPlantAnalytics is an authenticated query and must reject anonymous calls.
+    /// </summary>
+    [Fact]
+    public async Task PowerPlantAnalytics_Unauthenticated_ReturnsAuthError()
+    {
+        var result = await ExecuteGraphQlAsync(
+            """
+            query Analytics($buildingId: UUID!) {
+                powerPlantAnalytics(buildingId: $buildingId) {
+                    buildingId
+                }
+            }
+            """,
+            new { buildingId = Guid.NewGuid() });
+
+        var errorCode = result.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("AUTH_NOT_AUTHENTICATED", errorCode);
     }
 
     // ── Reserve capacity analytics — non-thermal plant ────────────────────────
