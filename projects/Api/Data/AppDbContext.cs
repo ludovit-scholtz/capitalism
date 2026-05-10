@@ -159,6 +159,8 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
 
     /// <summary>Completed forex currency swap audit trail.</summary>
     public DbSet<ForexTradeRecord> ForexTradeRecords => Set<ForexTradeRecord>();
+    public DbSet<FxQuoteNonce> FxQuoteNonces => Set<FxQuoteNonce>();
+    public DbSet<FxSecurityAuditLog> FxSecurityAuditLogs => Set<FxSecurityAuditLog>();
 
     /// <summary>Per-player XAU (gold token) balance on this game server.</summary>
     public DbSet<PlayerGoldBalance> PlayerGoldBalances => Set<PlayerGoldBalance>();

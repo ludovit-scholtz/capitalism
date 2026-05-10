@@ -11,9 +11,12 @@ public sealed partial class Query
 {
     private const decimal ForexFeePercent = 1m;
     private const string EurCurrencyCode = "EUR";
+    internal const int QuoteTtlSeconds = 30;
 
     /// <summary>
     /// Returns a forex swap quote showing the exchange rate, fee, and expected output amount.
+    /// Also issues a single-use <c>quoteNonce</c> that must be passed back to <c>executeForexSwap</c>
+    /// to prove the quote is fresh and unmodified. The nonce expires after 30 seconds.
     /// Does not execute the trade. Requires authentication (personal account).
     /// </summary>
     [Authorize]
@@ -81,6 +84,21 @@ public sealed partial class Query
                     "CURRENCY_MISMATCH"));
         }
 
+        // Issue a single-use quote nonce and persist it for execution-time validation.
+        var nonce = Guid.NewGuid();
+        var issuedAt = DateTime.UtcNow;
+        db.FxQuoteNonces.Add(new FxQuoteNonce
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = playerId,
+            Nonce = nonce,
+            FromCurrencyCode = fromCode,
+            ToCurrencyCode = toCode,
+            Rate = Math.Round(rate, 6),
+            IssuedAtUtc = issuedAt
+        });
+        await db.SaveChangesAsync();
+
         return new ForexQuoteResult
         {
             FromCurrencyCode = fromCode,
@@ -90,7 +108,10 @@ public sealed partial class Query
             FeeAmount = feeAmount,
             FeePercent = ForexFeePercent,
             Rate = Math.Round(rate, 6),
-            AvailableFromBalance = availableBalance
+            AvailableFromBalance = availableBalance,
+            QuoteNonce = nonce,
+            QuotedAtUtc = issuedAt,
+            QuoteExpiresInSeconds = QuoteTtlSeconds
         };
     }
 

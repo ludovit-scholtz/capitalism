@@ -597,6 +597,9 @@ public sealed class GlobalCitiesAndFxRatesTests
                     availableFromBalance
                     fromCurrencySymbol
                     toCurrencySymbol
+                    quoteNonce
+                    quotedAtUtc
+                    quoteExpiresInSeconds
                 }
             }
             """,
@@ -624,6 +627,13 @@ public sealed class GlobalCitiesAndFxRatesTests
         // Symbols
         Assert.Equal("€", quote.GetProperty("fromCurrencySymbol").GetString());
         Assert.Equal("Kč", quote.GetProperty("toCurrencySymbol").GetString());
+
+        // Nonce fields — must be a valid non-empty GUID and a recent UTC timestamp.
+        var nonceStr = quote.GetProperty("quoteNonce").GetString();
+        Assert.True(Guid.TryParse(nonceStr, out var nonce) && nonce != Guid.Empty, "quoteNonce must be a valid non-empty GUID");
+        var quotedAt = quote.GetProperty("quotedAtUtc").GetString();
+        Assert.True(DateTime.TryParse(quotedAt, out _), "quotedAtUtc must be a valid timestamp");
+        Assert.Equal(30, quote.GetProperty("quoteExpiresInSeconds").GetInt32());
     }
 
     [Fact]
@@ -1442,6 +1452,242 @@ public sealed class GlobalCitiesAndFxRatesTests
         Assert.Equal(200m, quote.GetProperty("fromAmount").GetDecimal());
         Assert.Equal(2500m, quote.GetProperty("availableFromBalance").GetDecimal());
         Assert.True(quote.GetProperty("toAmount").GetDecimal() > 0);
+    }
+
+    // ── Quote nonce lifecycle & slippage guard ────────────────────────────────
+
+    [Fact]
+    public async Task ExecuteForexSwap_WithValidQuoteNonce_Succeeds()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndLoginAsync(client, $"nonce-valid-{Guid.NewGuid():N}@example.com");
+
+        var meResult = await ExecuteGraphQlAsync(client, "{ me { id } }", token: token);
+        var playerId = Guid.Parse(meResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await SetPersonalSettlementBalanceAsync(db, playerId, 1000m);
+        await db.SaveChangesAsync();
+
+        // Obtain a quote (generates a nonce).
+        var quoteResult = await ExecuteGraphQlAsync(client,
+            """
+            query Q($input: GetForexQuoteInput!) {
+                forexQuote(input: $input) { quoteNonce rate }
+            }
+            """,
+            new { input = new { fromCurrencyCode = "EUR", toCurrencyCode = "CZK", amount = 50m } },
+            token);
+        var nonce = quoteResult.GetProperty("data").GetProperty("forexQuote").GetProperty("quoteNonce").GetString();
+        Assert.False(string.IsNullOrEmpty(nonce));
+
+        // Execute the swap using the nonce.
+        var swapResult = await ExecuteGraphQlAsync(client,
+            """
+            mutation M($input: ExecuteForexSwapInput!) {
+                executeForexSwap(input: $input) { tradeId fromCurrencyCode toAmount }
+            }
+            """,
+            new { input = new { fromCurrencyCode = "EUR", toCurrencyCode = "CZK", amount = 50m, quoteNonce = nonce } },
+            token);
+
+        var trade = swapResult.GetProperty("data").GetProperty("executeForexSwap");
+        Assert.Equal("EUR", trade.GetProperty("fromCurrencyCode").GetString());
+        Assert.True(trade.GetProperty("toAmount").GetDecimal() > 0);
+    }
+
+    [Fact]
+    public async Task ExecuteForexSwap_ReplayAttack_SecondCallReturnQuoteAlreadyUsed()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndLoginAsync(client, $"nonce-replay-{Guid.NewGuid():N}@example.com");
+
+        var meResult = await ExecuteGraphQlAsync(client, "{ me { id } }", token: token);
+        var playerId = Guid.Parse(meResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await SetPersonalSettlementBalanceAsync(db, playerId, 2000m);
+        await db.SaveChangesAsync();
+
+        // Obtain a quote.
+        var quoteResult = await ExecuteGraphQlAsync(client,
+            """
+            query Q($input: GetForexQuoteInput!) { forexQuote(input: $input) { quoteNonce } }
+            """,
+            new { input = new { fromCurrencyCode = "EUR", toCurrencyCode = "CZK", amount = 100m } },
+            token);
+        var nonce = quoteResult.GetProperty("data").GetProperty("forexQuote").GetProperty("quoteNonce").GetString();
+
+        // First execution — should succeed.
+        var first = await ExecuteGraphQlAsync(client,
+            """
+            mutation M($input: ExecuteForexSwapInput!) { executeForexSwap(input: $input) { tradeId } }
+            """,
+            new { input = new { fromCurrencyCode = "EUR", toCurrencyCode = "CZK", amount = 100m, quoteNonce = nonce } },
+            token);
+        Assert.True(first.GetProperty("data").TryGetProperty("executeForexSwap", out _));
+
+        // Second execution with the same nonce — must be rejected.
+        var second = await ExecuteGraphQlAsync(client,
+            """
+            mutation M($input: ExecuteForexSwapInput!) { executeForexSwap(input: $input) { tradeId } }
+            """,
+            new { input = new { fromCurrencyCode = "EUR", toCurrencyCode = "CZK", amount = 100m, quoteNonce = nonce } },
+            token);
+        var errors = second.GetProperty("errors");
+        Assert.Equal(JsonValueKind.Array, errors.ValueKind);
+        Assert.Equal("QUOTE_ALREADY_USED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task ExecuteForexSwap_StaleQuote_ReturnsQuoteExpired()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndLoginAsync(client, $"nonce-stale-{Guid.NewGuid():N}@example.com");
+
+        var meResult = await ExecuteGraphQlAsync(client, "{ me { id } }", token: token);
+        var playerId = Guid.Parse(meResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await SetPersonalSettlementBalanceAsync(db, playerId, 500m);
+
+        // Manually insert an expired nonce (issued 31 seconds ago).
+        var expiredNonce = Guid.NewGuid();
+        db.FxQuoteNonces.Add(new FxQuoteNonce
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = playerId,
+            Nonce = expiredNonce,
+            FromCurrencyCode = "EUR",
+            ToCurrencyCode = "CZK",
+            Rate = 25m,
+            IssuedAtUtc = DateTime.UtcNow.AddSeconds(-(Api.Types.Query.QuoteTtlSeconds + 1)),
+        });
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(client,
+            """
+            mutation M($input: ExecuteForexSwapInput!) { executeForexSwap(input: $input) { tradeId } }
+            """,
+            new { input = new { fromCurrencyCode = "EUR", toCurrencyCode = "CZK", amount = 100m, quoteNonce = expiredNonce } },
+            token);
+
+        var errors = result.GetProperty("errors");
+        Assert.Equal(JsonValueKind.Array, errors.ValueKind);
+        Assert.Equal("QUOTE_EXPIRED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task ExecuteForexSwap_SlippageExceeded_ReturnsSlippageExceeded()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndLoginAsync(client, $"slippage-{Guid.NewGuid():N}@example.com");
+
+        var meResult = await ExecuteGraphQlAsync(client, "{ me { id } }", token: token);
+        var playerId = Guid.Parse(meResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await SetPersonalSettlementBalanceAsync(db, playerId, 500m);
+
+        // Insert a nonce with a quoted rate that is 10% different from the current market rate.
+        // Any slippage tolerance < 1000 BPS should trigger rejection.
+        var nonce = Guid.NewGuid();
+        db.FxQuoteNonces.Add(new FxQuoteNonce
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = playerId,
+            Nonce = nonce,
+            FromCurrencyCode = "EUR",
+            ToCurrencyCode = "CZK",
+            Rate = 0.0001m,  // absurdly low; the real rate is ~25, so deviation is >>100%
+            IssuedAtUtc = DateTime.UtcNow,
+        });
+        await db.SaveChangesAsync();
+
+        // acceptedSlippageBps = 50 (0.5%) but actual deviation is >100%, so must be rejected.
+        var result = await ExecuteGraphQlAsync(client,
+            """
+            mutation M($input: ExecuteForexSwapInput!) { executeForexSwap(input: $input) { tradeId } }
+            """,
+            new { input = new { fromCurrencyCode = "EUR", toCurrencyCode = "CZK", amount = 100m, quoteNonce = nonce, acceptedSlippageBps = 50 } },
+            token);
+
+        var errors = result.GetProperty("errors");
+        Assert.Equal(JsonValueKind.Array, errors.ValueKind);
+        Assert.Equal("SLIPPAGE_EXCEEDED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task ExecuteForexSwap_FreshQuoteWithinSlippage_Succeeds()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndLoginAsync(client, $"slippage-ok-{Guid.NewGuid():N}@example.com");
+
+        var meResult = await ExecuteGraphQlAsync(client, "{ me { id } }", token: token);
+        var playerId = Guid.Parse(meResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await SetPersonalSettlementBalanceAsync(db, playerId, 500m);
+        await db.SaveChangesAsync();
+
+        // Get an actual quote so the nonce rate matches the real market rate.
+        var quoteResult = await ExecuteGraphQlAsync(client,
+            """
+            query Q($input: GetForexQuoteInput!) { forexQuote(input: $input) { quoteNonce rate } }
+            """,
+            new { input = new { fromCurrencyCode = "EUR", toCurrencyCode = "CZK", amount = 100m } },
+            token);
+        var nonce = quoteResult.GetProperty("data").GetProperty("forexQuote").GetProperty("quoteNonce").GetString();
+
+        // With 10 000 BPS slippage tolerance (100%), even a large rate move won't be rejected.
+        var swapResult = await ExecuteGraphQlAsync(client,
+            """
+            mutation M($input: ExecuteForexSwapInput!) { executeForexSwap(input: $input) { tradeId toAmount } }
+            """,
+            new { input = new { fromCurrencyCode = "EUR", toCurrencyCode = "CZK", amount = 100m, quoteNonce = nonce, acceptedSlippageBps = 10000 } },
+            token);
+
+        var trade = swapResult.GetProperty("data").GetProperty("executeForexSwap");
+        Assert.True(trade.GetProperty("toAmount").GetDecimal() > 0);
+    }
+
+    [Fact]
+    public async Task ExecuteForexSwap_UnknownNonce_ReturnsQuoteNonceNotFound()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndLoginAsync(client, $"nonce-unknown-{Guid.NewGuid():N}@example.com");
+
+        var meResult = await ExecuteGraphQlAsync(client, "{ me { id } }", token: token);
+        var playerId = Guid.Parse(meResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await SetPersonalSettlementBalanceAsync(db, playerId, 500m);
+        await db.SaveChangesAsync();
+
+        var fakeNonce = Guid.NewGuid();
+
+        var result = await ExecuteGraphQlAsync(client,
+            """
+            mutation M($input: ExecuteForexSwapInput!) { executeForexSwap(input: $input) { tradeId } }
+            """,
+            new { input = new { fromCurrencyCode = "EUR", toCurrencyCode = "CZK", amount = 100m, quoteNonce = fakeNonce } },
+            token);
+
+        var errors = result.GetProperty("errors");
+        Assert.Equal(JsonValueKind.Array, errors.ValueKind);
+        Assert.Equal("QUOTE_NONCE_NOT_FOUND", errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
 

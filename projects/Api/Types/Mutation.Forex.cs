@@ -19,6 +19,11 @@ public sealed partial class Mutation
     /// When <c>toBankAccountId</c> is provided the proceeds are deposited into that bank account;
     /// otherwise the player's personal currency wallet is credited.
     ///
+    /// When <c>quoteNonce</c> is provided the server validates that the nonce is fresh (issued within
+    /// the 30-second TTL) and has not already been consumed, preventing replay attacks.
+    /// When <c>acceptedSlippageBps</c> is provided (basis points, 1 BPS = 0.01%) the settlement is
+    /// rejected with <c>SLIPPAGE_EXCEEDED</c> if the current rate deviates from the quoted rate by more.
+    ///
     /// A <see cref="ForexTradeRecord"/> is persisted for auditing.
     ///
     /// Concurrency safety: runs inside a serializable transaction; the player's ConcurrencyToken
@@ -38,6 +43,12 @@ public sealed partial class Mutation
 
         var fromCode = input.FromCurrencyCode.ToUpperInvariant();
         var toCode = input.ToCurrencyCode.ToUpperInvariant();
+
+        // ── Quote nonce validation ─────────────────────────────────────────────
+        if (input.QuoteNonce.HasValue)
+        {
+            await ValidateAndConsumeQuoteNonceAsync(db, playerId, input.QuoteNonce.Value);
+        }
 
         // Pre-read the current tick outside the transaction (read-only, cheap).
         var currentTick = await db.GameStates
@@ -64,6 +75,20 @@ public sealed partial class Mutation
             }
 
             var rate = await Query.ComputeForexRateAsync(db, fromCode, toCode);
+
+            // ── Slippage guard ─────────────────────────────────────────────────
+            if ((input.AcceptedSlippageBps ?? 0) > 0 && input.QuoteNonce.HasValue)
+            {
+                // Re-read the consumed nonce record to get the quoted rate.
+                var nonceRecord = await db.FxQuoteNonces
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(n => n.Nonce == input.QuoteNonce.Value && n.PlayerId == playerId);
+                if (nonceRecord is not null && nonceRecord.Rate > 0)
+                {
+                    ValidateSlippage(nonceRecord.Rate, rate, input.AcceptedSlippageBps!.Value, playerId, fromCode, toCode);
+                }
+            }
+
             var feeAmount = Math.Round(input.Amount * (1m / 100m), 4);
             var netFromAmount = input.Amount - feeAmount;
             var toAmount = Math.Round(netFromAmount * rate, 4);
@@ -278,6 +303,90 @@ public sealed partial class Mutation
             NewFromBalance = newFromBalance,
             NewToBalance = newToBalance
         };
+    }
+
+    // ── Quote nonce & slippage helpers ────────────────────────────────────────
+
+    /// <summary>
+    /// Validates that the given quote nonce: (1) exists in the database for this player,
+    /// (2) has not already been consumed (replay protection), and (3) was issued within
+    /// the configurable TTL window (stale-quote protection).
+    /// On success, atomically marks the nonce as consumed.
+    /// </summary>
+    private static async Task ValidateAndConsumeQuoteNonceAsync(AppDbContext db, Guid playerId, Guid quoteNonce)
+    {
+        var nonceRecord = await db.FxQuoteNonces
+            .FirstOrDefaultAsync(n => n.Nonce == quoteNonce && n.PlayerId == playerId);
+
+        if (nonceRecord is null)
+        {
+            // Log the rejection before throwing.
+            await LogFxSecurityRejectionAsync(db, playerId, quoteNonce, "QUOTE_NONCE_NOT_FOUND");
+            throw new GraphQLException(new Error(
+                "Quote nonce not found. Please request a new quote.",
+                "QUOTE_NONCE_NOT_FOUND"));
+        }
+
+        if (nonceRecord.ConsumedAtUtc.HasValue)
+        {
+            await LogFxSecurityRejectionAsync(db, playerId, quoteNonce, "QUOTE_ALREADY_USED");
+            throw new GraphQLException(new Error(
+                "This quote has already been used. Please request a new quote.",
+                "QUOTE_ALREADY_USED"));
+        }
+
+        var age = DateTime.UtcNow - nonceRecord.IssuedAtUtc;
+        if (age.TotalSeconds > Query.QuoteTtlSeconds)
+        {
+            await LogFxSecurityRejectionAsync(db, playerId, quoteNonce, "QUOTE_EXPIRED");
+            throw new GraphQLException(new Error(
+                $"Quote expired ({age.TotalSeconds:F0}s old). Please request a fresh quote.",
+                "QUOTE_EXPIRED"));
+        }
+
+        // Mark consumed.
+        nonceRecord.ConsumedAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Validates that the current settlement rate does not deviate from the quoted rate
+    /// by more than the accepted slippage expressed in basis points (1 BPS = 0.01%).
+    /// Throws <c>SLIPPAGE_EXCEEDED</c> if the deviation is too large.
+    /// </summary>
+    private static void ValidateSlippage(
+        decimal quotedRate,
+        decimal currentRate,
+        int acceptedSlippageBps,
+        Guid playerId,
+        string fromCode,
+        string toCode)
+    {
+        if (quotedRate <= 0 || currentRate <= 0) return;
+
+        var deviationBps = Math.Abs((currentRate - quotedRate) / quotedRate) * 10_000m;
+        if (deviationBps > acceptedSlippageBps)
+        {
+            throw new GraphQLException(new Error(
+                $"Market moved too far. Rate deviation {deviationBps:F1} BPS exceeds your accepted slippage of {acceptedSlippageBps} BPS. " +
+                $"Quoted: {quotedRate:F6} {toCode}/{fromCode}, current: {currentRate:F6}. " +
+                "Please request a new quote or increase your slippage tolerance.",
+                "SLIPPAGE_EXCEEDED"));
+        }
+    }
+
+    /// <summary>Appends a structured security-rejection record to the audit log.</summary>
+    private static async Task LogFxSecurityRejectionAsync(AppDbContext db, Guid playerId, Guid nonce, string reason)
+    {
+        db.FxSecurityAuditLogs.Add(new FxSecurityAuditLog
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = playerId,
+            NonceHash = nonce.ToString("N"),
+            RejectionReason = reason,
+            OccurredAtUtc = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
     }
 
     private static async Task<BankAccount?> GetAccountInActiveContextAsync(AppDbContext db, Guid bankAccountId, Player player)

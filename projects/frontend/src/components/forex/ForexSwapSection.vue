@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
@@ -37,6 +37,70 @@ const swapResult = ref<ForexTradeResult | null>(null)
 const swapError = ref<string | null>(null)
 const swapLoading = ref(false)
 const showConfirm = ref(false)
+
+// ── Slippage tolerance ────────────────────────────────────────────────────────
+const SLIPPAGE_PRESETS = [10, 50, 100, 500] // BPS
+const slippageBps = ref<number>(50) // default 0.5%
+const customSlippageInput = ref<number | null>(null)
+const showCustomSlippage = ref(false)
+
+function setSlippage(bps: number) {
+  slippageBps.value = bps
+  showCustomSlippage.value = false
+  customSlippageInput.value = null
+}
+
+function applyCustomSlippage() {
+  const v = customSlippageInput.value
+  if (v && v > 0 && v <= 5000) {
+    slippageBps.value = v
+    showCustomSlippage.value = false
+  }
+}
+
+// ── Quote countdown timer ─────────────────────────────────────────────────────
+const quoteSecondsRemaining = ref<number>(0)
+let countdownTimer: ReturnType<typeof setInterval> | null = null
+
+function startCountdown(expiresInSeconds: number) {
+  stopCountdown()
+  quoteSecondsRemaining.value = expiresInSeconds
+  countdownTimer = setInterval(() => {
+    quoteSecondsRemaining.value = Math.max(0, quoteSecondsRemaining.value - 1)
+    if (quoteSecondsRemaining.value === 0) {
+      stopCountdown()
+      // Auto-dismiss the quote panel and show a gentle expiry notice
+      if (showConfirm.value) {
+        showConfirm.value = false
+        quote.value = null
+        quoteError.value = t('forex.quoteExpiredNotice')
+      }
+    }
+  }, 1000)
+}
+
+function stopCountdown() {
+  if (countdownTimer !== null) {
+    clearInterval(countdownTimer)
+    countdownTimer = null
+  }
+}
+
+onUnmounted(stopCountdown)
+
+const countdownColor = computed(() => {
+  if (quoteSecondsRemaining.value <= 5) return 'text-bad'
+  if (quoteSecondsRemaining.value <= 10) return 'text-caution'
+  return 'text-good'
+})
+
+// ── Error code translation ────────────────────────────────────────────────────
+function translateFxError(raw: string): string {
+  if (raw.includes('QUOTE_EXPIRED')) return t('forex.errorQuoteExpired')
+  if (raw.includes('QUOTE_ALREADY_USED')) return t('forex.errorQuoteAlreadyUsed')
+  if (raw.includes('SLIPPAGE_EXCEEDED')) return t('forex.errorSlippageExceeded')
+  return raw
+}
 
 function findAccountById(id: string): PlayerBankAccountSummary | undefined {
   return props.contextScopedBankAccounts.find((a) => a.id === id)
@@ -113,9 +177,14 @@ function formatAmount(val: number): string {
   return val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })
 }
 
+function formatSlippageBps(bps: number): string {
+  return (bps / 100).toFixed(bps % 100 === 0 ? 1 : 2) + '%'
+}
+
 async function fetchQuote() {
   if (validationError.value) return
   quoteLoading.value = true; quoteError.value = null; quote.value = null; showConfirm.value = false; swapResult.value = null; swapError.value = null
+  stopCountdown()
   try {
     const inputVars: Record<string, unknown> = { fromCurrencyCode: resolvedFromCurrency.value, toCurrencyCode: resolvedToCurrency.value, amount: amount.value }
     if (props.hasBankAccounts && fromBankAccountId.value) inputVars.fromBankAccountId = fromBankAccountId.value
@@ -125,11 +194,13 @@ async function fetchQuote() {
         forexQuote(input: $input) {
           fromCurrencyCode toCurrencyCode fromAmount toAmount feeAmount feePercent rate
           availableFromBalance fromCurrencySymbol toCurrencySymbol
+          quoteNonce quotedAtUtc quoteExpiresInSeconds
         }
       }
     `, { input: inputVars })
     quote.value = result.forexQuote
     showConfirm.value = true
+    startCountdown(result.forexQuote.quoteExpiresInSeconds ?? 30)
   } catch (e: unknown) {
     quoteError.value = e instanceof Error ? e.message : t('forex.swapFailed')
   } finally { quoteLoading.value = false }
@@ -138,8 +209,15 @@ async function fetchQuote() {
 async function executeSwap() {
   if (!quote.value) return
   swapLoading.value = true; swapError.value = null; swapResult.value = null
+  stopCountdown()
   try {
-    const inputVars: Record<string, unknown> = { fromCurrencyCode: resolvedFromCurrency.value, toCurrencyCode: resolvedToCurrency.value, amount: amount.value }
+    const inputVars: Record<string, unknown> = {
+      fromCurrencyCode: resolvedFromCurrency.value,
+      toCurrencyCode: resolvedToCurrency.value,
+      amount: amount.value,
+      quoteNonce: quote.value.quoteNonce,
+      acceptedSlippageBps: slippageBps.value,
+    }
     if (props.hasBankAccounts && fromBankAccountId.value) inputVars.fromBankAccountId = fromBankAccountId.value
     if (props.hasBankAccounts && toBankAccountId.value) inputVars.toBankAccountId = toBankAccountId.value
     const result = await gqlRequest<{ executeForexSwap: ForexTradeResult }>(`
@@ -154,16 +232,22 @@ async function executeSwap() {
     showConfirm.value = false; quote.value = null; amount.value = null
     emit('refresh')
   } catch (e: unknown) {
-    swapError.value = e instanceof Error ? e.message : t('forex.swapFailed')
+    const rawMsg = e instanceof Error ? e.message : t('forex.swapFailed')
+    swapError.value = translateFxError(rawMsg)
+    // If the quote expired or was already used, dismiss the stale quote panel.
+    if (rawMsg.includes('QUOTE_EXPIRED') || rawMsg.includes('QUOTE_ALREADY_USED')) {
+      showConfirm.value = false
+      quote.value = null
+    }
   } finally { swapLoading.value = false }
 }
 
-function cancelQuote() { showConfirm.value = false; quote.value = null }
+function cancelQuote() { stopCountdown(); showConfirm.value = false; quote.value = null }
 
 function swapCurrencies() {
   if (props.hasBankAccounts) { const tmp = fromBankAccountId.value; fromBankAccountId.value = toBankAccountId.value; toBankAccountId.value = tmp }
   else { const tmp = fromCurrency.value; fromCurrency.value = toCurrency.value; toCurrency.value = tmp }
-  quote.value = null; showConfirm.value = false
+  quote.value = null; showConfirm.value = false; stopCountdown()
 }
 </script>
 
@@ -257,6 +341,41 @@ function swapCurrencies() {
         </div>
       </div>
 
+      <!-- Slippage tolerance selector -->
+      <div class="slippage-selector flex flex-col gap-1.5">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-semibold text-muted uppercase tracking-wide">{{ t('forex.slippageTolerance') }}</span>
+          <span class="text-xs text-brand font-bold">{{ formatSlippageBps(slippageBps) }}</span>
+          <span class="text-xs text-subtle italic">{{ t('forex.slippageHint') }}</span>
+        </div>
+        <div class="flex flex-wrap gap-2 items-center">
+          <button
+            v-for="preset in SLIPPAGE_PRESETS"
+            :key="preset"
+            class="slippage-preset rounded-full border px-3 py-0.5 text-xs font-semibold transition-colors"
+            :class="slippageBps === preset && !showCustomSlippage ? 'border-brand bg-brand text-white' : 'border-divider bg-card-raised text-muted hover:border-brand hover:text-brand'"
+            @click="setSlippage(preset)"
+          >{{ formatSlippageBps(preset) }}</button>
+          <button
+            class="slippage-custom-btn rounded-full border px-3 py-0.5 text-xs font-semibold transition-colors"
+            :class="showCustomSlippage ? 'border-brand bg-brand text-white' : 'border-divider bg-card-raised text-muted hover:border-brand hover:text-brand'"
+            @click="showCustomSlippage = !showCustomSlippage"
+          >{{ t('forex.slippageCustom') }}</button>
+        </div>
+        <div v-if="showCustomSlippage" class="flex items-center gap-2 mt-1">
+          <input
+            v-model.number="customSlippageInput"
+            type="number"
+            min="1"
+            max="5000"
+            :placeholder="t('forex.slippageCustomPlaceholder')"
+            class="w-24 rounded-md border border-divider bg-page px-2 py-1 text-sm text-body focus:outline-none focus:border-brand"
+          />
+          <span class="text-xs text-muted">BPS (1 BPS = 0.01%)</span>
+          <button class="btn btn-primary py-1 px-3 text-xs" @click="applyCustomSlippage">{{ t('common.apply') }}</button>
+        </div>
+      </div>
+
       <div v-if="validationError && amount" class="validation-error text-sm text-bad px-3 py-2 bg-bad/10 rounded-md" role="alert">{{ validationError }}</div>
       <div v-if="quoteError" class="text-sm text-bad px-3 py-2 bg-bad/10 rounded-md" role="alert">{{ quoteError }}</div>
 
@@ -268,7 +387,14 @@ function swapCurrencies() {
     </div>
 
     <div v-if="showConfirm && quote" class="space-y-4 rounded-2xl border border-brand bg-card-raised p-6 sm:p-7" role="region" aria-label="Exchange Quote">
-      <h3 class="text-base font-bold text-body">{{ t('forex.quoteTitle') }}</h3>
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-body">{{ t('forex.quoteTitle') }}</h3>
+        <!-- Quote countdown timer -->
+        <div class="quote-timer flex items-center gap-1.5 text-sm font-semibold" :class="countdownColor" aria-label="Quote expires in">
+          <span>⏱</span>
+          <span class="quote-countdown">{{ quoteSecondsRemaining }}s</span>
+        </div>
+      </div>
       <table class="quote-table w-full border-collapse text-sm">
         <tbody>
           <tr>
@@ -283,12 +409,16 @@ function swapCurrencies() {
             <td class="py-1.5 text-muted">{{ t('forex.youReceive') }}</td>
             <td class="py-1.5 text-right text-base font-bold text-good">{{ quote.toCurrencySymbol }}{{ formatAmount(quote.toAmount) }}</td>
           </tr>
+          <tr>
+            <td class="py-1.5 text-muted">{{ t('forex.slippageTolerance') }}</td>
+            <td class="py-1.5 text-right text-sm font-semibold text-body">{{ formatSlippageBps(slippageBps) }}</td>
+          </tr>
         </tbody>
       </table>
       <div v-if="swapError" class="rounded-md bg-bad/10 px-3 py-2 text-sm text-bad" role="alert">{{ swapError }}</div>
       <div class="flex justify-end gap-3">
         <button class="btn btn-secondary" :disabled="swapLoading" @click="cancelQuote">{{ t('forex.cancel') }}</button>
-        <button class="btn btn-primary" :disabled="swapLoading" @click="executeSwap">{{ swapLoading ? t('common.loading') : t('forex.confirmSwap') }}</button>
+        <button class="btn btn-primary" :disabled="swapLoading || quoteSecondsRemaining === 0" @click="executeSwap">{{ swapLoading ? t('common.loading') : t('forex.confirmSwap') }}</button>
       </div>
     </div>
   </section>
