@@ -830,7 +830,12 @@ public sealed class BuildingSecondaryMarketTests
         var errors = result.GetProperty("errors");
         Assert.True(errors.GetArrayLength() > 0);
         var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
-        Assert.Equal("BUILDING_IS_COLLATERAL", code);
+        Assert.Equal("BUILDING_LOCKED_AS_COLLATERAL", code);
+
+        var auditLogs = await db.LoanCollateralSecurityAuditLogs
+            .Where(log => log.BuildingId == buildingId && log.RejectionReason == "BUILDING_LOCKED_AS_COLLATERAL")
+            .ToListAsync();
+        Assert.NotEmpty(auditLogs);
     }
 
     [Fact]
@@ -1208,7 +1213,12 @@ public sealed class BuildingSecondaryMarketTests
         var errors = result.GetProperty("errors");
         Assert.True(errors.GetArrayLength() > 0);
         var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
-        Assert.Equal("BUILDING_IS_COLLATERAL", code);
+        Assert.Equal("BUILDING_LOCKED_AS_COLLATERAL", code);
+
+        var auditLogs = await db.LoanCollateralSecurityAuditLogs
+            .Where(log => log.BuildingId == buildingId && log.RejectionReason == "BUILDING_LOCKED_AS_COLLATERAL")
+            .ToListAsync();
+        Assert.NotEmpty(auditLogs);
     }
 
     [Fact]
@@ -1258,7 +1268,7 @@ public sealed class BuildingSecondaryMarketTests
         var errors = result.GetProperty("errors");
         Assert.True(errors.GetArrayLength() > 0);
         var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
-        Assert.Equal("BUILDING_SALE_LOCKED_BY_UNPAID_COLLATERAL", code);
+        Assert.Equal("BUILDING_LOCKED_AS_COLLATERAL", code);
     }
 
     [Fact]
@@ -1375,7 +1385,7 @@ public sealed class BuildingSecondaryMarketTests
         var errors = result.GetProperty("errors");
         Assert.True(errors.GetArrayLength() > 0);
         var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
-        Assert.Equal("BUILDING_HAS_UNPAID_COLLATERAL_LOAN", code);
+        Assert.Equal("BUILDING_LOCKED_AS_COLLATERAL", code);
     }
 
     [Fact]
@@ -1730,6 +1740,124 @@ public sealed class BuildingSecondaryMarketTests
             .Where(log => log.OfferId == offerId && log.Action == "ACCEPT")
             .ToListAsync();
         Assert.NotEmpty(securityLogs);
+    }
+
+    [Fact]
+    public async Task AcceptLoan_AndAcceptBuildingOffer_InParallel_PreventsDoubleCollateralSpend()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var sellerToken = await RegisterAsync(client, "seller-race-collateral@market.test");
+        var buyerToken = await RegisterAsync(client, "buyer-race-collateral@market.test");
+        var lenderToken = await RegisterAsync(client, "lender-race-collateral@market.test");
+
+        var (buildingId, sellerCompanyId, _) = await SeedOwnerWithBuildingAsync(factory, sellerToken);
+        var (_, buyerCompanyId, _) = await SeedOwnerWithBuildingAsync(factory, buyerToken, 5_000_000m);
+        var (_, lenderCompanyId, _) = await SeedOwnerWithBuildingAsync(factory, lenderToken, 5_000_000m);
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+            var lenderBank = new Building
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = lenderCompanyId,
+                CityId = city.Id,
+                Type = BuildingType.Bank,
+                Name = "Race Lender Bank",
+                Level = 1,
+                BaseCapitalDeposited = true,
+                TotalDeposits = 2_000_000m,
+                LendingInterestRatePercent = 8m,
+            };
+            db.Buildings.Add(lenderBank);
+            db.BankAccounts.Add(new BankAccount
+            {
+                Id = Guid.NewGuid(),
+                AccountNumber = NewAccountNumber(),
+                CurrencyCode = city.CurrencyCode,
+                Balance = 2_000_000m,
+                CompanyId = lenderCompanyId,
+            });
+            await db.SaveChangesAsync();
+
+            var lenderBankId = lenderBank.Id;
+            await ExecAsync(client,
+                "mutation S($input: SetBuildingForSaleInput!) { setBuildingForSale(input: $input) { id } }",
+                new { input = new { buildingId, isForSale = true, askingPrice = 1_000_000m } },
+                sellerToken);
+
+            var offerResult = await ExecAsync(client,
+                "mutation O($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id offerVersion } }",
+                new { input = new { buildingId, buyerCompanyId, offeredPrice = 1_000_000m } },
+                buyerToken);
+            var offerId = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("id").GetString()!);
+            var offerVersion = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("offerVersion").GetString()!);
+
+            var acceptLoanTask = ExecAsync(client,
+                """
+                mutation A($input: AcceptLoanInput!) {
+                  acceptLoan(input: $input) { id status collateralBuildingId }
+                }
+                """,
+                new
+                {
+                    input = new
+                    {
+                        loanOfferId = lenderBankId,
+                        borrowerCompanyId = sellerCompanyId,
+                        principalAmount = 200_000m,
+                        collateralBuildingId = buildingId,
+                    }
+                },
+                sellerToken);
+
+            var acceptOfferTask = ExecAsync(client,
+                "mutation A($input: AcceptBuildingOfferInput!) { acceptBuildingOffer(input: $input) { offer { id status } } }",
+                new { input = new { offerId, offerVersion } },
+                sellerToken);
+
+            var results = await Task.WhenAll(acceptLoanTask, acceptOfferTask);
+
+            var loanSuccess = results[0].TryGetProperty("data", out var loanData)
+                && loanData.ValueKind == JsonValueKind.Object
+                && loanData.TryGetProperty("acceptLoan", out var acceptLoanData)
+                && acceptLoanData.ValueKind == JsonValueKind.Object;
+            var offerSuccess = results[1].TryGetProperty("data", out var offerData)
+                && offerData.ValueKind == JsonValueKind.Object
+                && offerData.TryGetProperty("acceptBuildingOffer", out var acceptOfferData)
+                && acceptOfferData.ValueKind == JsonValueKind.Object;
+
+            Assert.NotEqual(loanSuccess, offerSuccess);
+
+            var offerErrorCodes = results[1].TryGetProperty("errors", out var offerErrors)
+                ? offerErrors.EnumerateArray().Select(e => e.GetProperty("extensions").GetProperty("code").GetString()).ToList()
+                : [];
+            var loanErrorCodes = results[0].TryGetProperty("errors", out var loanErrors)
+                ? loanErrors.EnumerateArray().Select(e => e.GetProperty("extensions").GetProperty("code").GetString()).ToList()
+                : [];
+
+            Assert.True(
+                offerSuccess
+                || offerErrorCodes.Contains("BUILDING_LOCKED_AS_COLLATERAL")
+                || loanErrorCodes.Contains("COLLATERAL_OWNERSHIP_CONFLICT")
+                || loanErrorCodes.Contains("COLLATERAL_NOT_OWNED"));
+
+            var building = await db.Buildings.FirstAsync(b => b.Id == buildingId);
+            var activeLoan = await db.Loans
+                .AsNoTracking()
+                .FirstOrDefaultAsync(l => l.CollateralBuildingId == buildingId && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue));
+
+            if (activeLoan is not null)
+            {
+                Assert.Equal(sellerCompanyId, building.CompanyId);
+            }
+            else
+            {
+                Assert.Equal(buyerCompanyId, building.CompanyId);
+            }
+        }
     }
 
     [Fact]

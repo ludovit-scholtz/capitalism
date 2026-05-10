@@ -30785,7 +30785,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     public async Task AcceptLoan_LenderHasNoActualFunds_ReturnsError_BorrowerBalanceUnchanged()
     {
         // Lender bank has TotalDeposits (capacity check passes) but zero account balance.
-        // The LENDER_INSUFFICIENT_FUNDS guard must fire and leave the borrower's balance untouched.
+        // Commit-time balance revalidation must fail and leave the borrower's balance untouched.
         var lenderEmail = $"lender-no-funds-{Guid.NewGuid():N}@test.com";
         var borrowerEmail = $"borrower-no-funds-{Guid.NewGuid():N}@test.com";
         await RegisterAndGetTokenAsync(lenderEmail, "Lender");
@@ -30837,7 +30837,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         // Mutation must fail.
         Assert.True(result.TryGetProperty("errors", out var errors) && errors.GetArrayLength() > 0);
         var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
-        Assert.Equal("LENDER_INSUFFICIENT_FUNDS", code);
+        Assert.Equal("INSUFFICIENT_BALANCE_AT_COMMIT", code);
 
         // Borrower balance must be unchanged — no money was minted.
         await db.Entry(borrowerAccount).ReloadAsync();

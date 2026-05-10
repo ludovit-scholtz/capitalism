@@ -118,6 +118,13 @@ const emit = defineEmits<{
           <div class="listing-header">
             <span class="building-type-badge">{{ t(`buildings.types.${item.building.type}`) }}</span>
             <span class="for-sale-badge">{{ t('buildingMarket.forSaleBadge') }}</span>
+            <span
+              v-if="item.building.isCollateralized"
+              class="collateral-locked-badge"
+              :title="t('buildingDetail.collateralLockedTooltip')"
+            >
+              🔒 {{ t('buildingDetail.collateralLockedBadge') }}
+            </span>
           </div>
           <h3 class="building-name">{{ item.building.name }}</h3>
           <dl class="listing-details">
@@ -131,10 +138,28 @@ const emit = defineEmits<{
             </dd>
             <dt>{{ t('buildingMarket.pendingOffers') }}</dt>
             <dd>{{ item.pendingOfferCount }}</dd>
+            <template
+              v-if="
+                item.building.isCollateralized &&
+                item.building.foreclosureTicksRemaining !== null &&
+                item.building.foreclosureTicksRemaining !== undefined
+              "
+            >
+              <dt>{{ t('bank.foreclosureCountdown') }}</dt>
+              <dd>
+                {{
+                  t('buildingDetail.loanDefaultDestruction', {
+                    ticks: item.building.foreclosureTicksRemaining,
+                  })
+                }}
+              </dd>
+            </template>
           </dl>
           <button
             v-if="isAuthenticated"
             class="btn btn-primary make-offer-btn"
+            :disabled="item.building.isCollateralized"
+            :title="item.building.isCollateralized ? t('buildingDetail.collateralLockedTooltip') : ''"
             @click="emit('open-offer-modal', item)"
           >
             {{ t('buildingMarket.makeOffer') }}
@@ -300,6 +325,16 @@ const emit = defineEmits<{
   font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
+}
+
+.collateral-locked-badge {
+  background: rgba(251, 191, 36, 0.15);
+  color: #b45309;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  border-radius: 4px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
 .building-name {

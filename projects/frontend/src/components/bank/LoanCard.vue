@@ -32,6 +32,11 @@
       <span v-if="loan.collateralAppraisedValue" class="collateral-badge-value text-muted">
         ({{ t('bank.collateralAppraisedValue') }}: {{ formatCurrency(loan.collateralAppraisedValue, loan.loanCurrencyCode) }})
       </span>
+      <div v-if="loan.collateralBuildingId" class="mt-1">
+        <RouterLink class="collateral-link text-xs font-semibold" :to="`/building/${loan.collateralBuildingId}`">
+          {{ t('bank.openCollateralBuilding') }}
+        </RouterLink>
+      </div>
       <div
         v-if="loan.collateralListingPrice && loan.collateralListingCurrencyCode"
         class="collateral-badge-listing mt-1 text-muted"
@@ -39,20 +44,37 @@
         {{ t('bank.forcedSaleListingPrice') }}:
         {{ formatCurrency(loan.collateralListingPrice, loan.collateralListingCurrencyCode) }}
       </div>
+      <div
+        v-if="foreclosureTicksRemaining !== null"
+        class="collateral-badge-listing mt-1 text-muted"
+      >
+        {{ t('bank.foreclosureCountdown') }}: {{ t('buildingDetail.loanDefaultDestruction', { ticks: foreclosureTicksRemaining }) }}
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { LoanSummary } from '@/types'
 import { formatCurrency, formatPercent, loanStatusClass } from '@/lib/loanHelpers'
+import { useGameStateStore } from '@/stores/gameState'
 
 const { t } = useI18n()
+const gameStateStore = useGameStateStore()
 
-defineProps<{
+const props = defineProps<{
   loan: LoanSummary
 }>()
+
+const FORECLOSURE_WINDOW_TICKS = 72
+
+const foreclosureTicksRemaining = computed<number | null>(() => {
+  if (props.loan.defaultedAtTick === null || props.loan.defaultedAtTick === undefined) return null
+  const currentTick = gameStateStore.gameState?.currentTick ?? 0
+  return Math.max(0, props.loan.defaultedAtTick + FORECLOSURE_WINDOW_TICKS - currentTick)
+})
 </script>
 
 <style scoped>
@@ -93,5 +115,9 @@ defineProps<{
   background: rgba(59, 130, 246, 0.1);
   color: var(--color-primary, #3b82f6);
   border-color: rgba(59, 130, 246, 0.2);
+}
+
+.collateral-link {
+  color: inherit;
 }
 </style>

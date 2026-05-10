@@ -311,6 +311,10 @@ export type MockBuilding = {
   lotMaterialQuality?: number | null
   /** UTC timestamp when building was destroyed (by loan default); null for active buildings. */
   destroyedAtUtc?: string | null
+  /** True when this building is locked as loan collateral. */
+  isCollateralized?: boolean
+  /** Foreclosure countdown in ticks for defaulted collateral buildings. */
+  foreclosureTicksRemaining?: number | null
   units: MockBuildingUnit[]
   pendingConfiguration: MockBuildingConfigurationPlan | null
 }
@@ -1324,6 +1328,8 @@ export interface MockBuildingMarketListing {
     askingPrice: number | null
     listedAtUtc: string | null
     level: number
+    isCollateralized?: boolean
+    foreclosureTicksRemaining?: number | null
     city: { id: string; name: string; currencyCode: string; countryCode: string }
     company: { id: string; name: string; player: { displayName: string } }
   }
@@ -1350,6 +1356,8 @@ export interface MockBuildingMarketMyListing {
     askingPrice: number | null
     listedAtUtc: string | null
     level: number
+    isCollateralized?: boolean
+    foreclosureTicksRemaining?: number | null
     city: { id: string; name: string; currencyCode: string }
     company: { id: string; name: string }
   }
@@ -5201,7 +5209,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               errors: [
                 {
                   message: 'Sale cannot be cancelled because this building is collateral for an unpaid loan.',
-                  extensions: { code: 'BUILDING_SALE_LOCKED_BY_UNPAID_COLLATERAL' },
+                  extensions: { code: 'BUILDING_LOCKED_AS_COLLATERAL' },
                 },
               ],
             }),
@@ -5283,7 +5291,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             errors: [
               {
                 message: 'Building cannot be destroyed while it is collateral for an unpaid loan.',
-                extensions: { code: 'BUILDING_HAS_UNPAID_COLLATERAL_LOAN' },
+                extensions: { code: 'BUILDING_LOCKED_AS_COLLATERAL' },
               },
             ],
           }),

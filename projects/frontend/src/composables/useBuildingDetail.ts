@@ -4569,6 +4569,8 @@ export function useBuildingDetail() {
               isSuspendedForFunds
               suspendedReason
               destroyedAtUtc
+              isCollateralized
+              foreclosureTicksRemaining
               dispatchTargetPercent
               fuelReserveMwh
               cityReferenceRentPerSqm

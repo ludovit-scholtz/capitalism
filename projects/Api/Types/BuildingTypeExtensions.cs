@@ -190,6 +190,50 @@ public sealed class BuildingTypeExtensions
             .AnyAsync(l => l.CollateralBuildingId == building.Id && l.Status == LoanStatus.Defaulted, cancellationToken);
     }
 
+    /// <summary>
+    /// Returns true when this building is currently locked as collateral by any unpaid loan.
+    /// </summary>
+    public async Task<bool> GetIsCollateralized(
+        [Parent] Building building,
+        [Service] AppDbContext db,
+        CancellationToken cancellationToken)
+    {
+        return await db.Loans
+            .AsNoTracking()
+            .AnyAsync(l =>
+                l.CollateralBuildingId == building.Id
+                && l.RemainingPrincipal > 0m
+                && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue || l.Status == LoanStatus.Defaulted),
+                cancellationToken);
+    }
+
+    /// <summary>
+    /// Tick countdown to foreclosure destruction for DEFAULTED collateral loans.
+    /// Null when no defaulted collateral loan exists.
+    /// </summary>
+    public async Task<long?> GetForeclosureTicksRemaining(
+        [Parent] Building building,
+        [Service] AppDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var defaultedAtTick = await db.Loans
+            .AsNoTracking()
+            .Where(l => l.CollateralBuildingId == building.Id && l.Status == LoanStatus.Defaulted && l.DefaultedAtTick.HasValue)
+            .Select(l => l.DefaultedAtTick)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (!defaultedAtTick.HasValue)
+        {
+            return null;
+        }
+
+        var currentTick = await db.GameStates
+            .AsNoTracking()
+            .Select(gs => gs.CurrentTick)
+            .FirstOrDefaultDeterministicAsync(cancellationToken);
+        return Math.Max(0L, defaultedAtTick.Value + GameConstants.ForeclosureWindowTicks - currentTick);
+    }
+
     public async Task<BuildingMarketValuation> GetMarketValuation(
         [Parent] Building building,
         [Service] AppDbContext db,

@@ -19,6 +19,8 @@ export interface MarketBuilding {
   isForSale: boolean
   askingPrice: number | null
   listedAtUtc: string | null
+  isCollateralized?: boolean
+  foreclosureTicksRemaining?: number | null
   city: MarketCity
   company: MarketCompany
 }

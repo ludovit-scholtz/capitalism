@@ -26,6 +26,7 @@ public sealed partial class AppDbContext
             e.Property(b => b.TotalDeposits).HasPrecision(18, 2);
             e.Property(b => b.ConstructionCost).HasPrecision(18, 2);
             e.Property(b => b.SuspendedReason).HasMaxLength(200);
+            e.Property(b => b.ConcurrencyToken).IsConcurrencyToken();
             e.HasOne(b => b.Company).WithMany(c => c.Buildings).HasForeignKey(b => b.CompanyId);
             e.HasOne(b => b.City).WithMany(c => c.Buildings).HasForeignKey(b => b.CityId);
             e.HasMany(b => b.MediaHouseUnits)

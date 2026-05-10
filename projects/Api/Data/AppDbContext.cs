@@ -126,6 +126,7 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
 
     /// <summary>Active and historical loans between companies.</summary>
     public DbSet<Loan> Loans => Set<Loan>();
+    public DbSet<LoanCollateralSecurityAuditLog> LoanCollateralSecurityAuditLogs => Set<LoanCollateralSecurityAuditLog>();
 
     /// <summary>Audit trail for administrator actions performed while impersonating players.</summary>
     public DbSet<AdminActionAuditLog> AdminActionAuditLogs => Set<AdminActionAuditLog>();
