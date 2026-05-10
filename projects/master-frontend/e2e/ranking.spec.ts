@@ -180,8 +180,29 @@ test.describe('Ranking pages', () => {
       rankingModerationEvents: [moderationEvent],
       rankingBounties: [bounty],
       rankingRuns: [],
+      rankingTelemetryBatches: [
+        {
+          batchId: 'batch-1',
+          serverKeyMasked: 'capi****eu-1',
+          flagReasonCode: 'DUPLICATE_EVENT_SIGNATURE',
+          eventCount: 2,
+          isQuarantined: false,
+          hasAppliedLeaderboardImpact: true,
+          quarantineReason: null,
+          clearJustification: null,
+          createdAtUtc: '2026-04-30T11:00:00.000Z',
+          lastAttemptAtUtc: '2026-04-30T11:01:00.000Z',
+        },
+      ],
     })
     await loginAs(page, state, admin)
+    await page.addInitScript(() => {
+      window.prompt = (message?: string) => {
+        if (message?.includes('quarantine')) return 'Replay attack suspected'
+        if (message?.includes('clear')) return 'False positive after review'
+        return 'note'
+      }
+    })
 
     await page.goto('/ranking/admin')
     await expect(page.getByRole('heading', { name: 'Ranking Administration' })).toBeVisible()
@@ -197,6 +218,14 @@ test.describe('Ranking pages', () => {
 
     await page.getByRole('button', { name: 'Run daily decay now' }).click()
     await expect(page.getByRole('status')).toContainText('Daily decay run created')
+
+    await expect(page.locator('table[aria-label="Ranking integrity batch table"]')).toContainText(
+      'DUPLICATE_EVENT_SIGNATURE',
+    )
+    await page.getByRole('button', { name: 'Quarantine', exact: true }).click()
+    await expect(page.getByRole('status')).toContainText('Telemetry batch quarantined.')
+    await page.getByRole('button', { name: 'Clear quarantine', exact: true }).click()
+    await expect(page.getByRole('status')).toContainText('Telemetry batch quarantine cleared.')
   })
 
   test('player can submit Discord bounty proof via the bounty code selector', async ({ page }) => {

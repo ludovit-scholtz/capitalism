@@ -1,5 +1,6 @@
 using MasterApi.Data.Entities;
 using Capitalism.Shared.Ranking;
+using MasterApi.Utilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace MasterApi.Data;
@@ -21,6 +22,8 @@ public sealed class MasterDbInitializer(MasterDbContext db, ILogger<MasterDbInit
         {
             await db.Database.EnsureCreatedAsync(cancellationToken);
         }
+
+        await EnsureDefaultTelemetryShardAsync(cancellationToken);
 
         await SeedRankingBountyDefinitionsAsync(cancellationToken);
 
@@ -144,6 +147,48 @@ public sealed class MasterDbInitializer(MasterDbContext db, ILogger<MasterDbInit
                 HtmlContent = "<p>Die In-Game-Zeitung ist wieder in vollem Betrieb.</p><ul><li>Alle veröffentlichten Changelog- und Neuigkeitseinträge werden jetzt von der Master-API geladen und im Bereich Nachrichten angezeigt.</li><li>Ungelesene Zählungen in der Navigationsleiste werden korrekt aktualisiert, wenn neue Einträge veröffentlicht werden.</li><li>Durch Öffnen der Nachrichtenseite werden alle sichtbaren Einträge als gelesen markiert und das Abzeichen wird gelöscht.</li><li>Nicht authentifizierte Spieler können den Changelog ohne Anmeldung durchsuchen.</li><li>Fehler- und leere Zustände werden mit klaren Erklärungen anstelle eines leeren Bildschirms angezeigt.</li></ul>",
             },
             cancellationToken);
+    }
+
+    private async Task EnsureDefaultTelemetryShardAsync(CancellationToken cancellationToken)
+    {
+        const string defaultServerKey = "capitalism-eu-1";
+        var server = await db.GameServers.FirstOrDefaultAsync(item => item.ServerKey == defaultServerKey, cancellationToken);
+        var now = DateTime.UtcNow;
+        var defaultExpiry = now.AddHours(4);
+        if (server is null)
+        {
+            db.GameServers.Add(new GameServerNode
+            {
+                Id = Guid.NewGuid(),
+                ServerKey = defaultServerKey,
+                ServerKeyHash = ShardKeyProtector.ComputeHash(defaultServerKey),
+                DisplayName = "Capitalism EU #1",
+                Description = "Default seeded telemetry shard for ranking validation.",
+                Region = "EU",
+                Environment = "testing",
+                BackendUrl = "https://capitalism.example.com",
+                GraphqlUrl = "https://capitalism.example.com/graphql",
+                FrontendUrl = "https://capitalism.example.com/app",
+                Version = "1.0.0",
+                IsActive = true,
+                ExpiresAtUtc = defaultExpiry,
+                RegisteredAtUtc = now,
+                LastHeartbeatAtUtc = now,
+                UpdatedAtUtc = now,
+            });
+            await db.SaveChangesAsync(cancellationToken);
+            return;
+        }
+
+        server.ServerKeyHash = ShardKeyProtector.ComputeHash(defaultServerKey);
+        server.IsActive = true;
+        if (server.ExpiresAtUtc < now.AddMinutes(30))
+        {
+            server.ExpiresAtUtc = defaultExpiry;
+        }
+        server.LastHeartbeatAtUtc = now;
+        server.UpdatedAtUtc = now;
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private async Task SeedChangelogEntryAsync(

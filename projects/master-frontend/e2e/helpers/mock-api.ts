@@ -17,6 +17,9 @@ export interface MockGameServer {
   registeredAtUtc: string
   lastHeartbeatAtUtc: string
   isOnline: boolean
+  isActive?: boolean
+  expiresAtUtc?: string
+  keyStatus?: string
 }
 
 export interface MockSubscription {
@@ -220,6 +223,19 @@ export interface MockRankingRunInfo {
   notes: string
 }
 
+export interface MockRankingTelemetryBatchInfo {
+  batchId: string
+  serverKeyMasked: string
+  flagReasonCode: string
+  eventCount: number
+  isQuarantined: boolean
+  hasAppliedLeaderboardImpact: boolean
+  quarantineReason: string | null
+  clearJustification: string | null
+  createdAtUtc: string
+  lastAttemptAtUtc: string
+}
+
 export interface MockState {
   servers: MockGameServer[]
   currentToken: string | null
@@ -245,6 +261,7 @@ export interface MockState {
   rankingBounties: MockRankingBountyDefinition[]
   rankingModerationEvents: MockRankingEventModerationItem[]
   rankingRuns: MockRankingRunInfo[]
+  rankingTelemetryBatches: MockRankingTelemetryBatchInfo[]
 }
 
 export function makeSupportTicket(overrides: Partial<MockSupportTicket> = {}): MockSupportTicket {
@@ -292,6 +309,9 @@ export function makeServer(overrides: Partial<MockGameServer> = {}): MockGameSer
     registeredAtUtc: '2026-04-01T00:00:00.000Z',
     lastHeartbeatAtUtc: new Date().toISOString(),
     isOnline: true,
+    isActive: true,
+    expiresAtUtc: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    keyStatus: 'ACTIVE',
     ...overrides,
   }
 }
@@ -455,6 +475,7 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
     ],
     rankingModerationEvents: initialState.rankingModerationEvents ?? [],
     rankingRuns: initialState.rankingRuns ?? [],
+    rankingTelemetryBatches: initialState.rankingTelemetryBatches ?? [],
   }
 
   page.route('**/graphql', async (route) => {
@@ -984,7 +1005,23 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
               bounties: state.rankingBounties,
               pendingModerationEvents: state.rankingModerationEvents,
               recentRuns: state.rankingRuns,
+              flaggedTelemetryBatches: state.rankingTelemetryBatches,
             },
+          },
+        }),
+      })
+      return
+    }
+
+    if (query.includes('quarantinedTelemetryBatches')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            quarantinedTelemetryBatches: state.rankingTelemetryBatches.filter(
+              (item) => item.isQuarantined,
+            ),
           },
         }),
       })
@@ -1086,6 +1123,55 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { moderateRankingEvent: item } }),
+      })
+      return
+    }
+
+    if (query.includes('mutation') && query.includes('quarantineTelemetryBatch')) {
+      const vars = body.variables as { batchId: string; reason: string }
+      const batch = state.rankingTelemetryBatches.find((item) => item.batchId === vars.batchId)
+      if (!batch) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [{ message: 'Telemetry batch not found.', extensions: { code: 'TELEMETRY_BATCH_NOT_FOUND' } }],
+          }),
+        })
+        return
+      }
+
+      batch.isQuarantined = true
+      batch.quarantineReason = vars.reason
+      batch.clearJustification = null
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { quarantineTelemetryBatch: batch } }),
+      })
+      return
+    }
+
+    if (query.includes('mutation') && query.includes('clearQuarantine')) {
+      const vars = body.variables as { batchId: string; justification: string }
+      const batch = state.rankingTelemetryBatches.find((item) => item.batchId === vars.batchId)
+      if (!batch) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [{ message: 'Telemetry batch not found.', extensions: { code: 'TELEMETRY_BATCH_NOT_FOUND' } }],
+          }),
+        })
+        return
+      }
+
+      batch.isQuarantined = false
+      batch.clearJustification = vars.justification
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { clearQuarantine: batch } }),
       })
       return
     }

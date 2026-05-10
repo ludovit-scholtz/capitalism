@@ -39,14 +39,20 @@ public sealed class MasterDbContext(DbContextOptions<MasterDbContext> options) :
 
     public DbSet<MasterRankingBountyAudit> MasterRankingBountyAudits => Set<MasterRankingBountyAudit>();
 
+    public DbSet<RankingTelemetryEventSignature> RankingTelemetryEventSignatures => Set<RankingTelemetryEventSignature>();
+
+    public DbSet<RankingTelemetryAuditLog> RankingTelemetryAuditLogs => Set<RankingTelemetryAuditLog>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         var gameServer = modelBuilder.Entity<GameServerNode>();
 
         gameServer.HasKey(server => server.Id);
         gameServer.HasIndex(server => server.ServerKey).IsUnique();
+        gameServer.HasIndex(server => server.ServerKeyHash).IsUnique();
 
         gameServer.Property(server => server.ServerKey).HasMaxLength(120);
+        gameServer.Property(server => server.ServerKeyHash).HasMaxLength(128);
         gameServer.Property(server => server.DisplayName).HasMaxLength(160);
         gameServer.Property(server => server.Description).HasMaxLength(320);
         gameServer.Property(server => server.Region).HasMaxLength(80);
@@ -187,13 +193,21 @@ public sealed class MasterDbContext(DbContextOptions<MasterDbContext> options) :
         rankingEvent.Property(entry => entry.PlayerEmail).HasMaxLength(200);
         rankingEvent.Property(entry => entry.EventType).HasMaxLength(120);
         rankingEvent.Property(entry => entry.ServerKey).HasMaxLength(120);
+        rankingEvent.Property(entry => entry.ServerKeyHash).HasMaxLength(128);
         rankingEvent.Property(entry => entry.ExternalEventId).HasMaxLength(220);
         rankingEvent.Property(entry => entry.UniqueScopeKey).HasMaxLength(220);
+        rankingEvent.Property(entry => entry.TelemetryNonce).HasMaxLength(220);
+        rankingEvent.Property(entry => entry.PayloadHash).HasMaxLength(128);
+        rankingEvent.Property(entry => entry.TelemetrySignatureHash).HasMaxLength(128);
         rankingEvent.Property(entry => entry.Status).HasMaxLength(40);
         rankingEvent.Property(entry => entry.PayloadJson).HasMaxLength(20000);
         rankingEvent.Property(entry => entry.ProofReference).HasMaxLength(1500);
         rankingEvent.Property(entry => entry.ModerationReason).HasMaxLength(1000);
         rankingEvent.Property(entry => entry.ModeratedByEmail).HasMaxLength(200);
+        rankingEvent.Property(entry => entry.QuarantineReason).HasMaxLength(1000);
+        rankingEvent.Property(entry => entry.QuarantinedByEmail).HasMaxLength(200);
+        rankingEvent.Property(entry => entry.QuarantineClearJustification).HasMaxLength(1000);
+        rankingEvent.Property(entry => entry.QuarantineClearedByEmail).HasMaxLength(200);
         rankingEvent.HasOne(entry => entry.PlayerAccount)
             .WithMany(playerAccount => playerAccount.RankingEvents)
             .HasForeignKey(entry => entry.PlayerAccountId)
@@ -253,5 +267,27 @@ public sealed class MasterDbContext(DbContextOptions<MasterDbContext> options) :
             .WithMany(definition => definition.AuditTrail)
             .HasForeignKey(audit => audit.BountyDefinitionId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        var telemetrySignature = modelBuilder.Entity<RankingTelemetryEventSignature>();
+        telemetrySignature.HasKey(item => item.Id);
+        telemetrySignature.HasIndex(item => item.SignatureHash).IsUnique();
+        telemetrySignature.Property(item => item.SignatureHash).HasMaxLength(128);
+        telemetrySignature.HasIndex(item => item.ExpiresAtUtc);
+
+        var telemetryAudit = modelBuilder.Entity<RankingTelemetryAuditLog>();
+        telemetryAudit.HasKey(item => item.Id);
+        telemetryAudit.HasIndex(item => new { item.BatchId, item.CreatedAtUtc });
+        telemetryAudit.HasIndex(item => item.ReasonCode);
+        telemetryAudit.Property(item => item.ServerKeyHash).HasMaxLength(128);
+        telemetryAudit.Property(item => item.ServerKeyMasked).HasMaxLength(32);
+        telemetryAudit.Property(item => item.EventType).HasMaxLength(120);
+        telemetryAudit.Property(item => item.PlayerEmail).HasMaxLength(200);
+        telemetryAudit.Property(item => item.EventNonce).HasMaxLength(220);
+        telemetryAudit.Property(item => item.PayloadHash).HasMaxLength(128);
+        telemetryAudit.Property(item => item.ReasonCode).HasMaxLength(80);
+        telemetryAudit.Property(item => item.RawPayloadJson).HasMaxLength(20000);
+        telemetryAudit.Property(item => item.QuarantineReason).HasMaxLength(1000);
+        telemetryAudit.Property(item => item.QuarantineUpdatedByEmail).HasMaxLength(200);
+        telemetryAudit.Property(item => item.ClearJustification).HasMaxLength(1000);
     }
 }

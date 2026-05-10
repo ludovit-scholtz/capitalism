@@ -15,6 +15,7 @@ public sealed partial class Mutation
         IngestRankingEventInput input,
         [Service] MasterDbContext db,
         [Service] MasterRankingService rankingService,
+        [Service] RankingTelemetryValidator telemetryValidator,
         [Service] IOptions<MasterServerOptions> masterServerOptions)
     {
         Query.EnsureServiceAccess(input, masterServerOptions, requireRegistrationKey: true, requireServerKey: true);
@@ -31,6 +32,14 @@ public sealed partial class Mutation
 
         var playerEmail = Query.NormalizeEmail(input.PlayerEmail, "INVALID_PLAYER_EMAIL");
         var occurredAtUtc = input.OccurredAtUtc == default ? DateTime.UtcNow : input.OccurredAtUtc;
+        var telemetryValidation = await telemetryValidator.ValidateAndTrackAsync(
+            input.ServerKey,
+            eventType,
+            playerEmail,
+            input.ExternalEventId,
+            input.UniqueScopeKey,
+            input.PayloadJson,
+            CancellationToken.None);
 
         var rankingEvent = await rankingService.IngestEventAsync(
             eventType,
@@ -41,6 +50,7 @@ public sealed partial class Mutation
             input.ProofReference,
             input.PayloadJson,
             occurredAtUtc,
+            telemetryValidation,
             CancellationToken.None);
 
         return new RankingEventModerationItem
@@ -55,6 +65,153 @@ public sealed partial class Mutation
             OccurredAtUtc = rankingEvent.OccurredAtUtc,
             CreatedAtUtc = rankingEvent.CreatedAtUtc,
         };
+    }
+
+    [HotChocolate.Authorization.Authorize]
+    public async Task<RankingTelemetryBatchInfo> QuarantineTelemetryBatch(
+        Guid batchId,
+        string reason,
+        ClaimsPrincipal claimsPrincipal,
+        [Service] MasterDbContext db,
+        [Service] IOptions<GameAdministrationOptions> gameAdministrationOptions,
+        [Service] MasterRankingService rankingService)
+    {
+        var callerEmail = Query.GetEmailFromClaims(claimsPrincipal);
+        var access = await Query.BuildGameAdministrationAccessAsync(db, gameAdministrationOptions.Value, callerEmail);
+        if (!access.CanAccessEveryGameDashboard)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Ranking telemetry quarantine requires global admin access.")
+                    .SetCode("GLOBAL_ADMIN_REQUIRED")
+                    .Build());
+        }
+
+        var trimmedReason = reason.Trim();
+        if (string.IsNullOrWhiteSpace(trimmedReason))
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Quarantine reason is required.")
+                    .SetCode("QUARANTINE_REASON_REQUIRED")
+                    .Build());
+        }
+
+        var now = DateTime.UtcNow;
+        var events = await db.MasterRankingEvents
+            .Where(entry => entry.TelemetryBatchId == batchId)
+            .ToListAsync();
+        if (events.Count == 0)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Telemetry batch not found.")
+                    .SetCode("TELEMETRY_BATCH_NOT_FOUND")
+                    .Build());
+        }
+
+        foreach (var entry in events)
+        {
+            entry.IsQuarantined = true;
+            entry.QuarantineReason = trimmedReason;
+            entry.QuarantinedByEmail = callerEmail;
+            entry.QuarantinedAtUtc = now;
+            entry.Status = RankingEventStatus.Rejected;
+            entry.ProcessedAtUtc = now;
+        }
+
+        var auditRows = await db.RankingTelemetryAuditLogs
+            .Where(item => item.BatchId == batchId)
+            .ToListAsync();
+        foreach (var audit in auditRows)
+        {
+            audit.IsQuarantined = true;
+            audit.QuarantineReason = trimmedReason;
+            audit.QuarantineUpdatedAtUtc = now;
+            audit.QuarantineUpdatedByEmail = callerEmail;
+            audit.ClearJustification = null;
+        }
+
+        var eventIds = events.Select(item => item.Id).ToList();
+        var rewardRows = await db.MasterRankingRewardRecords
+            .Where(item => item.RankingEventId.HasValue && eventIds.Contains(item.RankingEventId.Value))
+            .ToListAsync();
+        if (rewardRows.Count > 0)
+        {
+            db.MasterRankingRewardRecords.RemoveRange(rewardRows);
+        }
+
+        await db.SaveChangesAsync();
+        await rankingService.RebuildSnapshotsFromRewardsAsync();
+
+        return await Query.BuildTelemetryBatchInfoAsync(db, batchId, includeOnlyQuarantined: false);
+    }
+
+    [HotChocolate.Authorization.Authorize]
+    public async Task<RankingTelemetryBatchInfo> ClearQuarantine(
+        Guid batchId,
+        string justification,
+        ClaimsPrincipal claimsPrincipal,
+        [Service] MasterDbContext db,
+        [Service] IOptions<GameAdministrationOptions> gameAdministrationOptions)
+    {
+        var callerEmail = Query.GetEmailFromClaims(claimsPrincipal);
+        var access = await Query.BuildGameAdministrationAccessAsync(db, gameAdministrationOptions.Value, callerEmail);
+        if (!access.CanAccessEveryGameDashboard)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Clearing quarantine requires global admin access.")
+                    .SetCode("GLOBAL_ADMIN_REQUIRED")
+                    .Build());
+        }
+
+        var trimmedJustification = justification.Trim();
+        if (string.IsNullOrWhiteSpace(trimmedJustification))
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("A justification note is required.")
+                    .SetCode("CLEAR_QUARANTINE_JUSTIFICATION_REQUIRED")
+                    .Build());
+        }
+
+        var now = DateTime.UtcNow;
+        var events = await db.MasterRankingEvents
+            .Where(entry => entry.TelemetryBatchId == batchId)
+            .ToListAsync();
+        if (events.Count == 0)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Telemetry batch not found.")
+                    .SetCode("TELEMETRY_BATCH_NOT_FOUND")
+                    .Build());
+        }
+
+        foreach (var entry in events)
+        {
+            entry.IsQuarantined = false;
+            entry.QuarantineClearJustification = trimmedJustification;
+            entry.QuarantineClearedByEmail = callerEmail;
+            entry.QuarantineClearedAtUtc = now;
+            entry.Status = RankingEventStatus.Pending;
+            entry.ProcessedAtUtc = null;
+        }
+
+        var auditRows = await db.RankingTelemetryAuditLogs
+            .Where(item => item.BatchId == batchId)
+            .ToListAsync();
+        foreach (var audit in auditRows)
+        {
+            audit.IsQuarantined = false;
+            audit.QuarantineUpdatedAtUtc = now;
+            audit.QuarantineUpdatedByEmail = callerEmail;
+            audit.ClearJustification = trimmedJustification;
+        }
+
+        await db.SaveChangesAsync();
+        return await Query.BuildTelemetryBatchInfoAsync(db, batchId, includeOnlyQuarantined: false);
     }
 
     [HotChocolate.Authorization.Authorize]
@@ -95,7 +252,7 @@ public sealed partial class Mutation
             proofReference,
             JsonSerializer.Serialize(new { bountyCode = normalizedBountyCode }),
             DateTime.UtcNow,
-            CancellationToken.None);
+            cancellationToken: CancellationToken.None);
 
         if (definition.RequiresModeration)
         {
