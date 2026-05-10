@@ -77,11 +77,39 @@ function makeDepletionForecast(tick = 1030) {
   }
 }
 
+function makeExtractionIntelligence(
+  tick = 1030,
+  records: ReturnType<typeof makeExtractionRecords> = makeExtractionRecords(),
+  forecast: ReturnType<typeof makeDepletionForecast> | null = makeDepletionForecast(tick),
+) {
+  return {
+    currentTick: tick,
+    burnRatePerTick: forecast?.averageExtractionRatePerTick ?? null,
+    burnRatePerDay:
+      forecast?.averageExtractionRatePerTick !== null &&
+      forecast?.averageExtractionRatePerTick !== undefined
+        ? forecast.averageExtractionRatePerTick * 24
+        : null,
+    expectedDepletionTick: forecast?.depletionTick ?? null,
+    qualityDecayInflectionTick: forecast?.critical20PctTick ?? null,
+    estimatedGameDaysRemaining: forecast?.estimatedGameDaysRemaining ?? null,
+    currentReserve: forecast?.currentReserve ?? null,
+    originalReserve: forecast?.originalReserve ?? null,
+    dailyExtraction: records.map((record) => ({
+      dayIndex: Math.floor(record.tick / 24),
+      extractedAmount: record.extractedAmount,
+      efficiencyPercent: record.efficiencyPercent,
+      reserveRemaining: record.reserveRemaining,
+    })),
+  }
+}
+
 async function setupMineHistoryPage(
   page: Parameters<typeof setupMockApi>[0],
   opts: {
     records?: ReturnType<typeof makeExtractionRecords>
     forecast?: ReturnType<typeof makeDepletionForecast> | null
+    intelligence?: ReturnType<typeof makeExtractionIntelligence> | null
     lotMaterialQuantity?: number | null
     lotOriginalMaterialQuantity?: number | null
   } = {},
@@ -106,8 +134,12 @@ async function setupMineHistoryPage(
   const state = setupMockApi(page, { players: [player] })
   state.currentUserId = player.id
   state.currentToken = `token-${player.id}`
-  state.mineExtractionRecords = opts.records ?? makeExtractionRecords()
-  state.mineDepletionForecast = opts.forecast !== undefined ? opts.forecast : makeDepletionForecast()
+  const records = opts.records ?? makeExtractionRecords()
+  const forecast = opts.forecast !== undefined ? opts.forecast : makeDepletionForecast()
+  state.mineExtractionRecords = records
+  state.mineDepletionForecast = forecast
+  state.mineExtractionIntelligence =
+    opts.intelligence !== undefined ? opts.intelligence : makeExtractionIntelligence(1030, records, forecast)
 
   await page.addInitScript((token) => {
     localStorage.setItem('auth_token', token)
@@ -141,10 +173,10 @@ test.describe('Mine Extraction History Panel', () => {
     await expect(emptyMsg).toBeVisible()
   })
 
-  test('"View Extraction History" button opens the dialog', async ({ page }) => {
+  test('"View Extraction Intelligence" button opens the dialog', async ({ page }) => {
     await setupMineHistoryPage(page)
 
-    const btn = page.getByRole('button', { name: 'View Extraction History' })
+    const btn = page.getByRole('button', { name: 'View Extraction Intelligence' })
     await expect(btn).toBeVisible()
     await btn.click()
 
@@ -156,7 +188,7 @@ test.describe('Mine Extraction History Panel', () => {
   test('dialog bar chart renders per-tick extraction bars', async ({ page }) => {
     await setupMineHistoryPage(page)
 
-    await page.getByRole('button', { name: 'View Extraction History' }).click()
+    await page.getByRole('button', { name: 'View Extraction Intelligence' }).click()
     const dialog = page.locator('.mine-history-dialog')
     await expect(dialog).toBeVisible()
 
@@ -165,21 +197,21 @@ test.describe('Mine Extraction History Panel', () => {
     await expect(bars).not.toHaveCount(0)
   })
 
-  test('depletion timeline shows milestone markers', async ({ page }) => {
+  test('depletion timeline shows extraction intelligence markers', async ({ page }) => {
     await setupMineHistoryPage(page)
 
-    await page.getByRole('button', { name: 'View Extraction History' }).click()
+    await page.getByRole('button', { name: 'View Extraction Intelligence' }).click()
     const dialog = page.locator('.mine-history-dialog')
     await expect(dialog).toBeVisible()
 
-    // Wait for forecast to load (dialog fetches forecast in onMounted)
-    // Timeline section should be visible
     const timeline = dialog.locator('.depletion-timeline')
     await expect(timeline).toBeVisible({ timeout: 5000 })
 
     // At least one milestone marker
     const milestones = dialog.locator('.depletion-milestone')
     await expect(milestones).not.toHaveCount(0)
+    await expect(dialog.getByText('Burn Rate', { exact: true })).toBeVisible()
+    await expect(dialog.getByText('Quality Decay Inflection')).toBeVisible()
   })
 
   test('"Find New Deposit" CTA is visible and navigates to /buy-building with MINE type', async ({
@@ -187,7 +219,7 @@ test.describe('Mine Extraction History Panel', () => {
   }) => {
     await setupMineHistoryPage(page)
 
-    await page.getByRole('button', { name: 'View Extraction History' }).click()
+    await page.getByRole('button', { name: 'View Extraction Intelligence' }).click()
     const dialog = page.locator('.mine-history-dialog')
     await expect(dialog).toBeVisible()
 
@@ -202,9 +234,9 @@ test.describe('Mine Extraction History Panel', () => {
   })
 
   test('dialog shows no-forecast message when forecast is null', async ({ page }) => {
-    await setupMineHistoryPage(page, { forecast: null })
+    await setupMineHistoryPage(page, { intelligence: null, forecast: null })
 
-    await page.getByRole('button', { name: 'View Extraction History' }).click()
+    await page.getByRole('button', { name: 'View Extraction Intelligence' }).click()
     const dialog = page.locator('.mine-history-dialog')
     await expect(dialog).toBeVisible()
 
@@ -214,7 +246,7 @@ test.describe('Mine Extraction History Panel', () => {
   test('dialog close button closes the dialog', async ({ page }) => {
     await setupMineHistoryPage(page)
 
-    await page.getByRole('button', { name: 'View Extraction History' }).click()
+    await page.getByRole('button', { name: 'View Extraction Intelligence' }).click()
     const dialog = page.locator('.mine-history-dialog')
     await expect(dialog).toBeVisible()
 
