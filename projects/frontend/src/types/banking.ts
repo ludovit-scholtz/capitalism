@@ -171,6 +171,12 @@ export interface ForexQuote {
   availableFromBalance: number
   fromCurrencySymbol: string
   toCurrencySymbol: string
+  /** Single-use UUID v4 nonce for replay protection. Pass back to executeForexSwap. */
+  quoteNonce: string
+  /** UTC timestamp when the quote was issued by the server (ISO 8601). */
+  quotedAtUtc: string
+  /** Number of seconds the quote is valid (default 30). */
+  quoteExpiresInSeconds: number
 }
 
 /** Result of a successfully executed forex trade. */

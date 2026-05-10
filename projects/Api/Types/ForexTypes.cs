@@ -38,6 +38,18 @@ public sealed class ForexQuoteResult
 
     /// <summary>Symbol for the target currency (e.g. "Kč", "£").</summary>
     public string ToCurrencySymbol => Mutation.GetCurrencySymbol(ToCurrencyCode);
+
+    /// <summary>
+    /// Single-use UUID v4 nonce identifying this quote. Must be passed back in
+    /// <c>ExecuteForexSwapInput.QuoteNonce</c> to prove the quote is fresh and unmodified.
+    /// </summary>
+    public Guid QuoteNonce { get; set; }
+
+    /// <summary>UTC timestamp when this quote was issued by the server.</summary>
+    public DateTime QuotedAtUtc { get; set; }
+
+    /// <summary>Number of seconds the quote remains valid (default 30).</summary>
+    public int QuoteExpiresInSeconds { get; set; } = 30;
 }
 
 /// <summary>Result of a successfully executed forex swap.</summary>

@@ -28,6 +28,7 @@ export default {
     unknownError: 'Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.',
     ticks: 'Ticks',
     step: 'Schritt {step}/{total}',
+    apply: 'Anwenden',
   },
   languages: {
     en: 'English',
@@ -3289,6 +3290,14 @@ export default {
     rateBuy: 'Kauf',
     rateMid: 'Mitte',
     rateSell: 'Verkauf',
+    slippageTolerance: 'Slippage-Toleranz',
+    slippageHint: 'Maximale Preisbewegung, die Sie vor Handelsabbruch akzeptieren.',
+    slippageCustom: 'Benutzerdefiniert',
+    slippageCustomPlaceholder: 'BPS (z. B. 50)',
+    quoteExpiredNotice: 'Kursangebot abgelaufen — bitte neuen Kurs anfordern.',
+    errorQuoteExpired: 'Kursangebot abgelaufen — bitte neuen Kurs anfordern.',
+    errorQuoteAlreadyUsed: 'Dieses Kursangebot wurde bereits verwendet. Bitte neuen Kurs anfordern.',
+    errorSlippageExceeded: 'Der Markt hat sich zu schnell bewegt — erhöhen Sie die Slippage-Toleranz oder versuchen Sie es erneut.',
   },
   bankStatement: {
     title: 'Kontoauszug',

@@ -59,6 +59,21 @@ public sealed class ExecuteForexSwapInput
     /// The account's <c>CurrencyCode</c> must match <see cref="ToCurrencyCode"/>.
     /// </summary>
     public Guid? ToBankAccountId { get; set; }
+
+    /// <summary>
+    /// Optional: The nonce returned by <c>getForexQuote</c>.
+    /// When provided, the server validates that the nonce is fresh (issued within the TTL window)
+    /// and has not already been consumed, preventing replay attacks and stale-quote exploitation.
+    /// </summary>
+    public Guid? QuoteNonce { get; set; }
+
+    /// <summary>
+    /// Optional: Maximum acceptable rate deviation expressed in basis points (1 BPS = 0.01%).
+    /// When provided, the mutation rejects the trade if the current settlement rate deviates
+    /// from the quoted rate by more than this many BPS, protecting against slippage exploitation.
+    /// Defaults to 0 (no slippage guard) when omitted.
+    /// </summary>
+    public int AcceptedSlippageBps { get; set; } = 0;
 }
 
 /// <summary>Input for getting a gold AMM swap quote.</summary>

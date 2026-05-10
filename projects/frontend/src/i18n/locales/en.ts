@@ -28,6 +28,7 @@ export default {
     unknownError: 'Something went wrong. Please try again.',
     ticks: 'ticks',
     step: 'Step {step}/{total}',
+    apply: 'Apply',
   },
   languages: {
     en: 'English',
@@ -3288,6 +3289,14 @@ export default {
     rateBuy: 'Buy',
     rateMid: 'Mid',
     rateSell: 'Sell',
+    slippageTolerance: 'Slippage tolerance',
+    slippageHint: 'Max price movement you accept before the trade is cancelled.',
+    slippageCustom: 'Custom',
+    slippageCustomPlaceholder: 'BPS (e.g. 50)',
+    quoteExpiredNotice: 'Quote expired — please request a new rate.',
+    errorQuoteExpired: 'Quote expired — please request a new rate.',
+    errorQuoteAlreadyUsed: 'This quote has already been used. Please request a new rate.',
+    errorSlippageExceeded: 'Market moved too fast — increase slippage tolerance or try again.',
   },
   bankStatement: {
     title: 'Bank Statement Review',

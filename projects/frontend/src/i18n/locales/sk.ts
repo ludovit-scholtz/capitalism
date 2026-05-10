@@ -28,6 +28,7 @@ export default {
     unknownError: 'Niečo sa pokazilo. Skúste to znova.',
     ticks: 'tikov',
     step: 'Krok {step}/{total}',
+    apply: 'Použiť',
   },
   languages: {
     en: 'English',
@@ -3276,6 +3277,14 @@ export default {
     rateBuy: 'Nákup',
     rateMid: 'Stred',
     rateSell: 'Predaj',
+    slippageTolerance: 'Tolerancia sklzu',
+    slippageHint: 'Max. pohyb ceny, ktorý akceptujete pred zrušením obchodu.',
+    slippageCustom: 'Vlastný',
+    slippageCustomPlaceholder: 'BPS (napr. 50)',
+    quoteExpiredNotice: 'Kotácia vypršala — požiadajte o nový kurz.',
+    errorQuoteExpired: 'Kotácia vypršala — požiadajte o nový kurz.',
+    errorQuoteAlreadyUsed: 'Táto kotácia bola už použitá. Požiadajte o nový kurz.',
+    errorSlippageExceeded: 'Trh sa pohol príliš rýchlo — zvýšte toleranciu sklzu alebo skúste znovu.',
   },
   bankStatement: {
     title: 'Prehľad bankového výpisu',
