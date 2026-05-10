@@ -73,7 +73,7 @@ public sealed class ExecuteForexSwapInput
     /// from the quoted rate by more than this many BPS, protecting against slippage exploitation.
     /// Defaults to 0 (no slippage guard) when omitted.
     /// </summary>
-    public int AcceptedSlippageBps { get; set; } = 0;
+    public int? AcceptedSlippageBps { get; set; }
 }
 
 /// <summary>Input for getting a gold AMM swap quote.</summary>

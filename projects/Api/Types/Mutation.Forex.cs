@@ -77,7 +77,7 @@ public sealed partial class Mutation
             var rate = await Query.ComputeForexRateAsync(db, fromCode, toCode);
 
             // ── Slippage guard ─────────────────────────────────────────────────
-            if (input.AcceptedSlippageBps > 0 && input.QuoteNonce.HasValue)
+            if ((input.AcceptedSlippageBps ?? 0) > 0 && input.QuoteNonce.HasValue)
             {
                 // Re-read the consumed nonce record to get the quoted rate.
                 var nonceRecord = await db.FxQuoteNonces
@@ -85,7 +85,7 @@ public sealed partial class Mutation
                     .FirstOrDefaultAsync(n => n.Nonce == input.QuoteNonce.Value && n.PlayerId == playerId);
                 if (nonceRecord is not null && nonceRecord.Rate > 0)
                 {
-                    ValidateSlippage(nonceRecord.Rate, rate, input.AcceptedSlippageBps, playerId, fromCode, toCode);
+                    ValidateSlippage(nonceRecord.Rate, rate, input.AcceptedSlippageBps!.Value, playerId, fromCode, toCode);
                 }
             }
 
@@ -321,7 +321,7 @@ public sealed partial class Mutation
         if (nonceRecord is null)
         {
             // Log the rejection before throwing.
-            LogFxSecurityRejection(db, playerId, quoteNonce, "QUOTE_NONCE_NOT_FOUND");
+            await LogFxSecurityRejectionAsync(db, playerId, quoteNonce, "QUOTE_NONCE_NOT_FOUND");
             throw new GraphQLException(new Error(
                 "Quote nonce not found. Please request a new quote.",
                 "QUOTE_NONCE_NOT_FOUND"));
@@ -329,7 +329,7 @@ public sealed partial class Mutation
 
         if (nonceRecord.ConsumedAtUtc.HasValue)
         {
-            LogFxSecurityRejection(db, playerId, quoteNonce, "QUOTE_ALREADY_USED");
+            await LogFxSecurityRejectionAsync(db, playerId, quoteNonce, "QUOTE_ALREADY_USED");
             throw new GraphQLException(new Error(
                 "This quote has already been used. Please request a new quote.",
                 "QUOTE_ALREADY_USED"));
@@ -338,7 +338,7 @@ public sealed partial class Mutation
         var age = DateTime.UtcNow - nonceRecord.IssuedAtUtc;
         if (age.TotalSeconds > Query.QuoteTtlSeconds)
         {
-            LogFxSecurityRejection(db, playerId, quoteNonce, "QUOTE_EXPIRED");
+            await LogFxSecurityRejectionAsync(db, playerId, quoteNonce, "QUOTE_EXPIRED");
             throw new GraphQLException(new Error(
                 $"Quote expired ({age.TotalSeconds:F0}s old). Please request a fresh quote.",
                 "QUOTE_EXPIRED"));
@@ -375,8 +375,8 @@ public sealed partial class Mutation
         }
     }
 
-    /// <summary>Appends a structured security-rejection record to the audit log (fire-and-forget persist).</summary>
-    private static void LogFxSecurityRejection(AppDbContext db, Guid playerId, Guid nonce, string reason)
+    /// <summary>Appends a structured security-rejection record to the audit log.</summary>
+    private static async Task LogFxSecurityRejectionAsync(AppDbContext db, Guid playerId, Guid nonce, string reason)
     {
         db.FxSecurityAuditLogs.Add(new FxSecurityAuditLog
         {
@@ -386,9 +386,7 @@ public sealed partial class Mutation
             RejectionReason = reason,
             OccurredAtUtc = DateTime.UtcNow
         });
-        // SaveChangesAsync is not awaited here; caller will invoke it as part of the normal flow or
-        // the entry will be persisted when the next SaveChanges runs in this scope. This keeps the
-        // audit trail best-effort without blocking the error response path.
+        await db.SaveChangesAsync();
     }
 
     private static async Task<BankAccount?> GetAccountInActiveContextAsync(AppDbContext db, Guid bankAccountId, Player player)
