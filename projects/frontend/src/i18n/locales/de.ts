@@ -3623,6 +3623,9 @@ export default {
     rejectOffer: 'Ablehnen',
     offerAccepted: 'Angebot angenommen. Gebäude an Käufer übertragen.',
     offerRejected: 'Angebot abgelehnt.',
+    offerConflictRefreshing:
+      'Angebot bereits vergeben — Markt wird aktualisiert…',
+    processingOffer: 'Wird verarbeitet…',
     offerStatus: {
       PENDING: 'Ausstehend',
       ACCEPTED: 'Angenommen',

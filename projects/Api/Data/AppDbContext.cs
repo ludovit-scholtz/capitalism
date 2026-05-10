@@ -138,6 +138,7 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
 
     /// <summary>Buyer offers on buildings listed for player-to-player sale.</summary>
     public DbSet<BuildingSaleOffer> BuildingSaleOffers => Set<BuildingSaleOffer>();
+    public DbSet<BuildingOfferSecurityAuditLog> BuildingOfferSecurityAuditLogs => Set<BuildingOfferSecurityAuditLog>();
 
     /// <summary>Records stock-exchange buy/sell executions from the player's personal account.</summary>
     public DbSet<PersonTradeRecord> PersonTradeRecords => Set<PersonTradeRecord>();

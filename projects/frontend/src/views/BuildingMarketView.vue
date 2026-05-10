@@ -23,6 +23,7 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const actionError = ref<string | null>(null)
 const actionSuccess = ref<string | null>(null)
+const offerActionPendingId = ref<string | null>(null)
 
 const marketListings = ref<BuildingMarketListing[]>([])
 const myListings = ref<BuildingMarketMyListing[]>([])
@@ -62,7 +63,7 @@ const MY_BUILDING_LISTINGS_QUERY = `
         company { id name }
       }
       offers {
-        id offeredPrice status negotiationNote createdAtUtc resolvedAtUtc
+        id offerVersion offeredPrice status negotiationNote createdAtUtc resolvedAtUtc
         buyerPlayer { displayName }
         buyerCompany { id name }
       }
@@ -89,13 +90,18 @@ const ACCEPT_OFFER_MUTATION = `
   }
 `
 
-const REJECT_OFFER_MUTATION = `
-  mutation RejectOffer($input: RejectBuildingOfferInput!) {
-    rejectBuildingOffer(input: $input) {
+const CANCEL_OFFER_MUTATION = `
+  mutation CancelOffer($input: CancelBuildingOfferInput!) {
+    cancelBuildingOffer(input: $input) {
       id status
     }
   }
 `
+
+function isOfferVersionConflict(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  return msg.includes('OFFER_VERSION_CONFLICT') || msg.toLowerCase().includes('offer version conflict')
+}
 
 // ── Data loading ──────────────────────────────────────────────────────────────
 
@@ -213,31 +219,59 @@ const submitOffer = async () => {
 }
 
 const acceptOffer = async (offer: MarketOffer) => {
+  if (offerActionPendingId.value) return
+  offerActionPendingId.value = offer.id
   actionError.value = null
   actionSuccess.value = null
   try {
     await gqlRequest<{ acceptBuildingOffer: { building: { id: string }; offer: { id: string } } }>(
       ACCEPT_OFFER_MUTATION,
-      { input: { offerId: offer.id } },
+      { input: { offerId: offer.id, offerVersion: offer.offerVersion } },
     )
     actionSuccess.value = t('buildingMarket.offerAccepted')
     await loadMyListings()
   } catch (err: unknown) {
-    actionError.value = err instanceof Error ? err.message : String(err)
+    if (isOfferVersionConflict(err)) {
+      actionError.value = t('buildingMarket.offerConflictRefreshing')
+      await Promise.all([loadMyListings(), loadMarket()])
+      setTimeout(() => {
+        if (actionError.value === t('buildingMarket.offerConflictRefreshing')) {
+          actionError.value = null
+        }
+      }, 4000)
+    } else {
+      actionError.value = err instanceof Error ? err.message : String(err)
+    }
+  } finally {
+    offerActionPendingId.value = null
   }
 }
 
 const rejectOffer = async (offer: MarketOffer) => {
+  if (offerActionPendingId.value) return
+  offerActionPendingId.value = offer.id
   actionError.value = null
   actionSuccess.value = null
   try {
-    await gqlRequest<{ rejectBuildingOffer: { id: string; status: string } }>(REJECT_OFFER_MUTATION, {
-      input: { offerId: offer.id },
+    await gqlRequest<{ cancelBuildingOffer: { id: string; status: string } }>(CANCEL_OFFER_MUTATION, {
+      input: { offerId: offer.id, offerVersion: offer.offerVersion },
     })
     actionSuccess.value = t('buildingMarket.offerRejected')
     await loadMyListings()
   } catch (err: unknown) {
-    actionError.value = err instanceof Error ? err.message : String(err)
+    if (isOfferVersionConflict(err)) {
+      actionError.value = t('buildingMarket.offerConflictRefreshing')
+      await Promise.all([loadMyListings(), loadMarket()])
+      setTimeout(() => {
+        if (actionError.value === t('buildingMarket.offerConflictRefreshing')) {
+          actionError.value = null
+        }
+      }, 4000)
+    } else {
+      actionError.value = err instanceof Error ? err.message : String(err)
+    }
+  } finally {
+    offerActionPendingId.value = null
   }
 }
 
@@ -315,6 +349,7 @@ watch(offerBuyerCompanies, (companies) => {
       :offer-buyer-company-id="offerBuyerCompanyId"
       :offer-buyer-companies="offerBuyerCompanies"
       :offer-submitting="offerSubmitting"
+      :offer-action-pending-id="offerActionPendingId"
       :building-types="buildingTypes"
       :locale="locale"
       :is-authenticated="isAuthenticated"
@@ -383,4 +418,3 @@ watch(offerBuyerCompanies, (companies) => {
   border-bottom-color: var(--color-primary);
 }
 </style>
-

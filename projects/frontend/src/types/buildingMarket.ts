@@ -25,6 +25,7 @@ export interface MarketBuilding {
 
 export interface MarketOffer {
   id: string
+  offerVersion: string
   offeredPrice: number
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED'
   negotiationNote: string | null

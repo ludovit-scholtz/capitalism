@@ -66,6 +66,7 @@ function makeMyListing(overrides?: Partial<MockBuildingMarketMyListing>): MockBu
 function makePendingOffer(id = 'offer-1', price = 280000): MockBuildingMarketOffer {
   return {
     id,
+    offerVersion: '11111111-1111-1111-1111-111111111111',
     offeredPrice: price,
     status: 'PENDING',
     negotiationNote: 'Please accept my offer',
@@ -339,6 +340,76 @@ test('can reject a pending offer from my listings tab', async ({ page }) => {
   await page.getByRole('button', { name: 'Reject' }).click()
   await expect(page.locator('.alert-success')).toBeVisible()
   await expect(page.locator('.alert-success')).toContainText('rejected')
+})
+
+test('shows conflict message and refreshes listings on stale offer version', async ({ page }) => {
+  const player = makePlayerWithCompany()
+  const conflictOffer = makePendingOffer('offer-conflict', 275000)
+  const listing = makeMyListing({ offers: [conflictOffer] })
+  const state = setupMockApi(page, {
+    players: [player],
+    myBuildingListings: [listing],
+  })
+  state.currentUserId = player.id
+  state.currentToken = `token-${player.id}`
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${player.id}`)
+
+  await page.goto('/buildings/market')
+  await page.getByRole('tab', { name: 'My Listings' }).click()
+
+  conflictOffer.offerVersion = '22222222-2222-2222-2222-222222222222'
+  await page.getByRole('button', { name: 'Accept' }).click()
+
+  await expect(page.locator('.alert-error')).toContainText('refreshing market')
+})
+
+test('accept button is disabled during offer submission', async ({ page }) => {
+  const player = makePlayerWithCompany()
+  const listing = makeMyListing({ offers: [makePendingOffer('offer-slow', 290000)] })
+  const state = setupMockApi(page, {
+    players: [player],
+    myBuildingListings: [listing],
+  })
+  state.currentUserId = player.id
+  state.currentToken = `token-${player.id}`
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${player.id}`)
+
+  await page.route('**/graphql', async (route) => {
+    const body = route.request().postDataJSON() as {
+      query?: string
+      variables?: { input?: { offerId?: string; offerVersion?: string } }
+    }
+    if (body.query?.includes('acceptBuildingOffer')) {
+      await new Promise((resolve) => setTimeout(resolve, 250))
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            acceptBuildingOffer: {
+              building: { id: 'b-1', name: 'Test Building', companyId: 'co-2', isForSale: false },
+              offer: { id: body.variables?.input?.offerId ?? 'offer-slow', status: 'ACCEPTED' },
+            },
+          },
+        }),
+      })
+      return
+    }
+    await route.fallback()
+  })
+
+  await page.goto('/buildings/market')
+  await page.getByRole('tab', { name: 'My Listings' }).click()
+  const acceptButton = page.getByRole('button', { name: 'Accept' })
+  await acceptButton.click()
+  await expect(page.locator('.offer-row').first().getByRole('button', { name: 'Processing…' }).first()).toBeDisabled()
+  await expect(page.locator('.alert-success')).toContainText('accepted')
 })
 
 test('shows CZK asking price for Prague listing', async ({ page }) => {

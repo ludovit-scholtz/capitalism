@@ -36,6 +36,7 @@ defineProps<{
   offerBuyerCompanyId: string
   offerBuyerCompanies: BuyerCompany[]
   offerSubmitting: boolean
+  offerActionPendingId: string | null
   buildingTypes: string[]
   locale: string
   isAuthenticated: boolean
@@ -186,14 +187,31 @@ const emit = defineEmits<{
               <div class="offer-price">
                 {{ formatCompactMoney(offer.offeredPrice, item.building.city.currencyCode, locale) }}
               </div>
+              <div class="offer-version">v{{ offer.offerVersion.slice(0, 8) }}</div>
               <div class="offer-status">{{ t(`buildingMarket.offerStatus.${offer.status}`) }}</div>
               <div v-if="offer.negotiationNote" class="offer-note">{{ offer.negotiationNote }}</div>
               <div v-if="offer.status === 'PENDING'" class="offer-actions">
-                <button class="btn btn-primary btn-sm" @click="emit('accept-offer', offer)">
-                  {{ t('buildingMarket.acceptOffer') }}
+                <button
+                  class="btn btn-primary btn-sm"
+                  :disabled="offerActionPendingId === offer.id"
+                  @click="emit('accept-offer', offer)"
+                >
+                  {{
+                    offerActionPendingId === offer.id
+                      ? t('buildingMarket.processingOffer')
+                      : t('buildingMarket.acceptOffer')
+                  }}
                 </button>
-                <button class="btn btn-secondary btn-sm" @click="emit('reject-offer', offer)">
-                  {{ t('buildingMarket.rejectOffer') }}
+                <button
+                  class="btn btn-secondary btn-sm"
+                  :disabled="offerActionPendingId === offer.id"
+                  @click="emit('reject-offer', offer)"
+                >
+                  {{
+                    offerActionPendingId === offer.id
+                      ? t('buildingMarket.processingOffer')
+                      : t('buildingMarket.rejectOffer')
+                  }}
                 </button>
               </div>
             </div>
@@ -339,7 +357,7 @@ const emit = defineEmits<{
 
 .offer-row {
   display: grid;
-  grid-template-columns: 1fr auto auto auto;
+  grid-template-columns: 1fr auto auto auto auto;
   gap: 0.5rem;
   align-items: center;
   padding: 0.5rem 0;
@@ -354,6 +372,11 @@ const emit = defineEmits<{
 .offer-price {
   font-weight: 700;
   color: var(--color-primary);
+}
+
+.offer-version {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
 }
 
 .offer-status {
