@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Api.Data;
 using Api.Data.Entities;
 using Api.Utilities;
+using Capitalism.Shared.Security;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Microsoft.AspNetCore.Identity;
@@ -22,9 +23,14 @@ public sealed class AuthenticatedPlayerClaimsSyncService(AppDbContext db)
         }
 
         var normalizedEmail = email.ToLowerInvariant();
+        var subjectClaim = principal.FindFirstValue(ClaimTypes.NameIdentifier);
         var claimedDisplayName = principal.FindFirstValue(ClaimsPrincipalExtensions.EffectivePlayerNameClaimType)
             ?? principal.FindFirstValue(ClaimTypes.Name)
             ?? normalizedEmail;
+        var resolvedDisplayName = PlayerDisplayNameProvisioning.ResolveDisplayName(
+            claimedDisplayName,
+            normalizedEmail,
+            subjectClaim);
 
         var player = await db.Players.FirstOrDefaultAsync(
             candidate => candidate.Email == email || candidate.Email.ToLower() == normalizedEmail,
@@ -34,15 +40,13 @@ public sealed class AuthenticatedPlayerClaimsSyncService(AppDbContext db)
         var createdPlayer = false;
         if (player is null)
         {
-            var actorIdClaim = principal.FindFirstValue(ClaimTypes.NameIdentifier);
-            var playerId = Guid.TryParse(actorIdClaim, out var parsedId) ? parsedId : Guid.NewGuid();
-            var displayName = claimedDisplayName.Trim();
+            var playerId = Guid.TryParse(subjectClaim, out var parsedId) ? parsedId : Guid.NewGuid();
 
             player = new Player
             {
                 Id = playerId,
                 Email = normalizedEmail,
-                DisplayName = displayName,
+                DisplayName = resolvedDisplayName,
                 Role = PlayerRole.Player,
                 ActiveAccountType = AccountContextType.Person,
                 CreatedAtUtc = DateTime.UtcNow,
@@ -61,8 +65,11 @@ public sealed class AuthenticatedPlayerClaimsSyncService(AppDbContext db)
                 changed = true;
             }
 
-            // Keep an already chosen in-game alias stable across future sign-ins.
-            // The player can explicitly change this value via profile settings/onboarding.
+            if (PlayerDisplayNameProvisioning.ShouldReplaceExistingDisplayName(player.DisplayName, normalizedEmail))
+            {
+                player.DisplayName = resolvedDisplayName;
+                changed = true;
+            }
         }
 
         var settlementAccount = createdPlayer

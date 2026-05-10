@@ -1563,6 +1563,37 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task MeAndRankings_MasterStyleTokenRawIdentifier_UsesGeneratedAlias()
+    {
+        var email = $"rank-safe-{Guid.NewGuid():N}@example.com";
+        var token = CreateSharedToken(Guid.NewGuid().ToString(), email, email);
+
+        var meResult = await ExecuteGraphQlAsync("{ me { id email displayName role } }", token: token);
+        Assert.False(meResult.TryGetProperty("errors", out _));
+        var me = meResult.GetProperty("data").GetProperty("me");
+        var generatedAlias = me.GetProperty("displayName").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(generatedAlias));
+        Assert.Equal(email, me.GetProperty("email").GetString());
+        Assert.False(string.Equals(email, generatedAlias, StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain('@', generatedAlias, StringComparison.Ordinal);
+
+        var rankingsResult = await ExecuteGraphQlAsync("{ rankings { playerId displayName personalAccountName } }");
+        Assert.False(rankingsResult.TryGetProperty("errors", out _));
+        var rankings = rankingsResult.GetProperty("data").GetProperty("rankings");
+        var rankingEntry = rankings.EnumerateArray()
+            .FirstOrDefault(entry => string.Equals(entry.GetProperty("playerId").GetString(), me.GetProperty("id").GetString(), StringComparison.Ordinal));
+
+        Assert.True(rankingEntry.ValueKind != JsonValueKind.Undefined, "Expected the provisioned player to appear in rankings.");
+        Assert.Equal(generatedAlias, rankingEntry.GetProperty("displayName").GetString());
+        Assert.Equal(generatedAlias, rankingEntry.GetProperty("personalAccountName").GetString());
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var storedPlayer = await db.Players.SingleAsync(player => player.Email == email);
+        Assert.Equal(generatedAlias, storedPlayer.DisplayName);
+    }
+
+    [Fact]
     public void IsImpersonating_FalseWhenEffectiveAndActorIdsMatch()
     {
         var playerId = Guid.NewGuid();

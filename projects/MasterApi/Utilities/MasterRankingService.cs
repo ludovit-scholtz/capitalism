@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Capitalism.Shared.Security;
 using MasterApi.Data;
 using MasterApi.Data.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -404,8 +405,10 @@ public sealed class MasterRankingService(MasterDbContext db, ILogger<MasterRanki
         }
 
         var now = DateTime.UtcNow;
-        var localPart = normalizedEmail.Split('@', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-        var fallbackDisplayName = string.IsNullOrWhiteSpace(localPart) ? "Player" : localPart;
+        var fallbackDisplayName = PlayerDisplayNameProvisioning.ResolveDisplayName(
+            claimedDisplayName: null,
+            normalizedEmail: normalizedEmail,
+            subjectClaim: null);
 
         var shadowAccount = new PlayerAccount
         {

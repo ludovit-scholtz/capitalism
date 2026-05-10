@@ -442,6 +442,48 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
     }
 
     [Fact]
+    public async Task SharedAuthSync_RawIdentifierDisplayName_GeneratesAndPersistsAlias()
+    {
+        var email = $"alias-generate-{Guid.NewGuid():N}@example.com";
+        var token = CreateSharedToken(Guid.NewGuid().ToString(), email, email);
+
+        var firstResult = await GraphQlAsync("""
+            query {
+              me {
+                email
+                displayName
+                personalAccountName
+              }
+            }
+            """, token: token);
+
+        Assert.False(firstResult.TryGetProperty("errors", out _));
+        var firstMe = firstResult.GetProperty("data").GetProperty("me");
+        var generatedAlias = firstMe.GetProperty("displayName").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(generatedAlias));
+        Assert.Equal(email, firstMe.GetProperty("email").GetString());
+        Assert.Equal(generatedAlias, firstMe.GetProperty("personalAccountName").GetString());
+        Assert.False(string.Equals(email, generatedAlias, StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain("@", generatedAlias);
+
+        var secondToken = CreateSharedToken(Guid.NewGuid().ToString(), email, "0x1234567890123456789012345678901234567890");
+        var secondResult = await GraphQlAsync("""
+            query {
+              me {
+                displayName
+                personalAccountName
+              }
+            }
+            """, token: secondToken);
+
+        Assert.False(secondResult.TryGetProperty("errors", out _));
+        var secondMe = secondResult.GetProperty("data").GetProperty("me");
+        Assert.Equal(generatedAlias, secondMe.GetProperty("displayName").GetString());
+        Assert.Equal(generatedAlias, secondMe.GetProperty("personalAccountName").GetString());
+
+    }
+
+    [Fact]
     public async Task UpdatePersonalAccountName_Unauthenticated_ReturnsAuthError()
     {
         var result = await GraphQlAsync("""
