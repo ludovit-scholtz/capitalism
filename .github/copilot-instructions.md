@@ -1545,3 +1545,26 @@ Root-cause of a quality failure (May 2026, PR #315 follow-up):
 2. **Temporary screenshot specs must never stay in the repository.** If you create a `tmp-*.spec.ts` to capture proof, delete it in the same session before committing.
 3. **After touching any Playwright spec file, run that specific spec in CI mode before pushing.** If a changed file is unrelated to the issue scope, restore it instead of carrying it into the PR.
 4. **When CI fails on a PR, first classify whether the failure is in-scope or unrelated drift.** Fix the failing test if in-scope; if unrelated and introduced accidentally, revert that file to keep the PR surgical.
+
+## Weekly security audit recurrence prevention — authorization and fairness hardening
+
+Root-cause of the 2026-W19 audit findings (`audits/2026-W19-security-audit.md`):
+- Several economically sensitive read surfaces were left open by default because query methods were added without explicit `[Authorize]` decisions and without unauthenticated regression tests.
+- Telemetry ingestion relied on shared registration secrets but lacked strict shard identity requirements, which weakened event attribution and moderation confidence.
+- API keys effectively inherited full account power, so a leaked key had the same blast radius as a stolen primary session token.
+- Some fairness-critical flows (FX execution windows, market concurrency, foreclosure transitions) relied on happy-path validation but lacked adversarial replay/race-condition coverage.
+- Error responses in object-authorization boundaries sometimes exposed business detail useful for foreign-object enumeration.
+
+Rules to prevent recurrence:
+1. **Every new GraphQL query and mutation must declare explicit auth intent in code review:** either `[Authorize]` or documented public/service access rationale. "No attribute" must never be accidental.
+2. **For every finance, shareholder, ranking, collateral, or admin surface, add the full boundary test triad:** unauthenticated rejection, foreign-owner rejection, and authorized-owner success.
+3. **Apply deny-by-default for sensitive read APIs.** If endpoint content can provide competitive intelligence, require auth first and then narrow with ownership or role checks.
+4. **Telemetry mutations that affect cross-server ranking must require both registration key and non-empty `serverKey`, and must validate that `serverKey` belongs to an active registered shard.**
+5. **Any API key feature must be scope-bound.** Never ship "full-account" keys without explicit granular scopes and middleware enforcement.
+6. **Any execution flow that uses quotes or market snapshots (FX, exchange, loan repricing) must include replay-resistant inputs** (issuedAt/expiry/nonce/idempotency key) and server-side freshness checks.
+7. **Concurrency-sensitive economic mutations must enforce optimistic concurrency tokens at commit-time** and must include integration tests with simultaneous requests proving deterministic winner/loser outcomes.
+8. **MasterApi and game Api token boundaries are privilege-critical.** Always validate issuer/audience separation and ensure impersonation detection compares actor vs effective identities, not just claim presence.
+9. **Bot automation paths must never trust client-provided company or account identifiers alone.** Resolve ownership from authenticated principal and reject cross-owner operations on every mutation path.
+10. **Object-level authorization failures should return minimally revealing messages** (for example "not found or not owned") while logging full internal context for administrators.
+11. **Before closing any security PR, map each changed endpoint to OWASP API Top 10 categories** (API1 BOLA, API5 BFLA, API6 business-flow abuse, API10 unsafe integrations) and confirm at least one regression test per applicable category.
+12. **Weekly audit follow-ups must produce implementation issues, not only narrative reports.** Every High/Critical finding must be linked to a roadmap task and a tracked test gap before the audit is marked complete.

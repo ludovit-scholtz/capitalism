@@ -1,4 +1,4 @@
-const GRAPHQL_URL = import.meta.env.VITE_GRAPHQL_URL || 'https://capitalism.de-4.biatec.io/graphql'
+const GRAPHQL_URL = import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:44356/graphql'
 
 export interface GraphQLResponse<T> {
   data?: T
@@ -25,10 +25,7 @@ export class GraphQLError extends Error {
  * Automatically attaches the JWT bearer token from localStorage when available.
  * Throws `GraphQLError` (with `.code` from `extensions.code`) on API errors.
  */
-export async function gqlRequest<T>(
-  query: string,
-  variables?: Record<string, unknown>,
-): Promise<T> {
+export async function gqlRequest<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   }
