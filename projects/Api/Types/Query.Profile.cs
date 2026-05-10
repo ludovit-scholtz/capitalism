@@ -1,6 +1,7 @@
 using Api.Data;
 using Api.Data.Entities;
 using Api.Engine;
+using Capitalism.Shared.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace Api.Types;
@@ -260,10 +261,15 @@ public sealed partial class Query
         // Account age in ticks since the player first joined the game.
         var accountAgeTicks = Math.Max(0L, currentTick - estimatedJoinTick);
 
+        var publicDisplayName = PlayerDisplayNameProvisioning.ResolveDisplayName(
+            player.DisplayName,
+            player.Email,
+            player.Id.ToString());
+
         return new PlayerProfileResult
         {
             PlayerId = player.Id,
-            DisplayName = player.DisplayName,
+            DisplayName = publicDisplayName,
             Bio = player.Bio,
             CreatedAtUtc = player.CreatedAtUtc,
             JoinGameYear = gameJoinYear,

@@ -3,6 +3,7 @@ using Api.Data.Entities;
 using Api.Engine;
 using Api.Security;
 using Api.Utilities;
+using Capitalism.Shared.Security;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -103,12 +104,16 @@ public sealed partial class Query
                         sh.ShareCount * sharePriceUsdByCompany.GetValueOrDefault(sh.CompanyId),
                         4,
                         MidpointRounding.AwayFromZero));
+                var publicDisplayName = PlayerDisplayNameProvisioning.ResolveDisplayName(
+                    p.DisplayName,
+                    p.Email,
+                    p.Id.ToString());
 
                 return new PlayerRanking
                 {
                     PlayerId = p.Id,
-                    DisplayName = p.DisplayName,
-                    PersonalAccountName = p.DisplayName,
+                    DisplayName = publicDisplayName,
+                    PersonalAccountName = publicDisplayName,
                     PersonalCash = personalCashUsd,
                     SharesValue = sharesValue,
                     TotalWealth = decimal.Round(personalCashUsd + sharesValue, 4, MidpointRounding.AwayFromZero),
@@ -177,14 +182,18 @@ public sealed partial class Query
                 var buildingValueUsd = decimal.Round(ConvertToUsd(buildingValue, currencyCode, eurRatesByCode, usdRate), 4, MidpointRounding.AwayFromZero);
                 var inventoryValueUsd = decimal.Round(ConvertToUsd(inventoryValue, currencyCode, eurRatesByCode, usdRate), 4, MidpointRounding.AwayFromZero);
                 var totalWealthUsd = companyCashUsd + buildingValueUsd + inventoryValueUsd;
+                var ownerDisplayName = PlayerDisplayNameProvisioning.ResolveDisplayName(
+                    c.Player?.DisplayName,
+                    c.Player?.Email,
+                    c.PlayerId.ToString());
 
                 return new CompanyRanking
                 {
                     CompanyId = c.Id,
                     CompanyName = c.Name,
                     PlayerId = c.PlayerId,
-                    OwnerDisplayName = c.Player?.DisplayName ?? "Unknown",
-                    OwnerPersonalAccountName = c.Player?.DisplayName ?? "Unknown",
+                    OwnerDisplayName = ownerDisplayName,
+                    OwnerPersonalAccountName = ownerDisplayName,
                     Cash = companyCashUsd,
                     CurrencyCode = "USD",
                     BuildingValue = buildingValueUsd,

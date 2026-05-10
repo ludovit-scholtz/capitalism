@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Capitalism.Shared.Security;
 using MasterApi.Data;
 using MasterApi.Data.Entities;
 using Microsoft.AspNetCore.Identity;
@@ -18,11 +19,11 @@ public sealed class AuthenticatedMasterPlayerClaimsSyncService(
             return;
         }
 
-        var displayName = principal.FindFirstValue(ClaimTypes.Name)?.Trim();
-        if (string.IsNullOrWhiteSpace(displayName))
-        {
-            displayName = email;
-        }
+        var subjectClaim = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        var displayName = PlayerDisplayNameProvisioning.ResolveDisplayName(
+            principal.FindFirstValue(ClaimTypes.Name),
+            email,
+            subjectClaim);
 
         var now = DateTime.UtcNow;
 
@@ -45,6 +46,10 @@ public sealed class AuthenticatedMasterPlayerClaimsSyncService(
         else
         {
             player.LastLoginAtUtc = now;
+            if (PlayerDisplayNameProvisioning.ShouldReplaceExistingDisplayName(player.DisplayName, email))
+            {
+                player.DisplayName = displayName;
+            }
         }
 
         await db.SaveChangesAsync(cancellationToken);

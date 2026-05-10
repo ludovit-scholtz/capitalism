@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Capitalism.Shared.Ranking;
+using Capitalism.Shared.Security;
 using MasterApi.Configuration;
 using MasterApi.Data;
 using MasterApi.Data.Entities;
@@ -53,8 +54,14 @@ public sealed partial class Query
             .Select(snapshot => new RankingLeaderboardEntryInfo
             {
                 PlayerId = snapshot.PlayerAccountId,
-                DisplayName = snapshot.PlayerAccount.DisplayName,
-                PersonalAccountName = snapshot.PlayerAccount.DisplayName,
+                DisplayName = PlayerDisplayNameProvisioning.ResolveDisplayName(
+                    snapshot.PlayerAccount.DisplayName,
+                    snapshot.PlayerAccount.Email,
+                    snapshot.PlayerAccountId.ToString()),
+                PersonalAccountName = PlayerDisplayNameProvisioning.ResolveDisplayName(
+                    snapshot.PlayerAccount.DisplayName,
+                    snapshot.PlayerAccount.Email,
+                    snapshot.PlayerAccountId.ToString()),
                 TotalPoints = snapshot.TotalPoints,
                 GlobalRank = snapshot.GlobalRank,
                 RankMovement = snapshot.PreviousGlobalRank - snapshot.GlobalRank,
