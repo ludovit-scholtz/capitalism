@@ -87,6 +87,12 @@ public sealed class GameServerSummary
     public DateTime LastHeartbeatAtUtc { get; init; }
 
     public bool IsOnline { get; init; }
+
+    public bool IsActive { get; init; }
+
+    public DateTime ExpiresAtUtc { get; init; }
+
+    public string KeyStatus { get; init; } = "ACTIVE";
 }
 
 public sealed class MasterAuthPayload

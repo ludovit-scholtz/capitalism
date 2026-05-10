@@ -643,10 +643,24 @@ export interface RankingRunInfo {
   notes: string
 }
 
+export interface RankingTelemetryBatchInfo {
+  batchId: string
+  serverKeyMasked: string
+  flagReasonCode: string
+  eventCount: number
+  isQuarantined: boolean
+  hasAppliedLeaderboardImpact: boolean
+  quarantineReason: string | null
+  clearJustification: string | null
+  createdAtUtc: string
+  lastAttemptAtUtc: string
+}
+
 export interface RankingAdminDashboardInfo {
   bounties: RankingBountyDefinitionInfo[]
   pendingModerationEvents: RankingEventModerationItem[]
   recentRuns: RankingRunInfo[]
+  flaggedTelemetryBatches: RankingTelemetryBatchInfo[]
 }
 
 export interface RankingHistoryFilterInput {
@@ -763,6 +777,35 @@ const RANKING_ADMIN_DASHBOARD_QUERY = `
         totalPointsAfterDecay
         notes
       }
+      flaggedTelemetryBatches {
+        batchId
+        serverKeyMasked
+        flagReasonCode
+        eventCount
+        isQuarantined
+        hasAppliedLeaderboardImpact
+        quarantineReason
+        clearJustification
+        createdAtUtc
+        lastAttemptAtUtc
+      }
+    }
+  }
+`
+
+const QUARANTINED_TELEMETRY_BATCHES_QUERY = `
+  query QuarantinedTelemetryBatches {
+    quarantinedTelemetryBatches {
+      batchId
+      serverKeyMasked
+      flagReasonCode
+      eventCount
+      isQuarantined
+      hasAppliedLeaderboardImpact
+      quarantineReason
+      clearJustification
+      createdAtUtc
+      lastAttemptAtUtc
     }
   }
 `
@@ -852,6 +895,40 @@ const RUN_RANKING_DAILY_DECAY_NOW_MUTATION = `
       totalPointsBeforeDecay
       totalPointsAfterDecay
       notes
+    }
+  }
+`
+
+const QUARANTINE_TELEMETRY_BATCH_MUTATION = `
+  mutation QuarantineTelemetryBatch($batchId: UUID!, $reason: String!) {
+    quarantineTelemetryBatch(batchId: $batchId, reason: $reason) {
+      batchId
+      serverKeyMasked
+      flagReasonCode
+      eventCount
+      isQuarantined
+      hasAppliedLeaderboardImpact
+      quarantineReason
+      clearJustification
+      createdAtUtc
+      lastAttemptAtUtc
+    }
+  }
+`
+
+const CLEAR_QUARANTINE_MUTATION = `
+  mutation ClearQuarantine($batchId: UUID!, $justification: String!) {
+    clearQuarantine(batchId: $batchId, justification: $justification) {
+      batchId
+      serverKeyMasked
+      flagReasonCode
+      eventCount
+      isQuarantined
+      hasAppliedLeaderboardImpact
+      quarantineReason
+      clearJustification
+      createdAtUtc
+      lastAttemptAtUtc
     }
   }
 `
@@ -983,6 +1060,43 @@ export async function runRankingDailyDecayNow(token: string): Promise<RankingRun
     token,
   )
   return data.runRankingDailyDecayNow
+}
+
+export async function fetchQuarantinedTelemetryBatches(
+  token: string,
+): Promise<RankingTelemetryBatchInfo[]> {
+  const data = await gqlRequest<{ quarantinedTelemetryBatches: RankingTelemetryBatchInfo[] }>(
+    QUARANTINED_TELEMETRY_BATCHES_QUERY,
+    undefined,
+    token,
+  )
+  return data.quarantinedTelemetryBatches
+}
+
+export async function quarantineTelemetryBatch(
+  token: string,
+  batchId: string,
+  reason: string,
+): Promise<RankingTelemetryBatchInfo> {
+  const data = await gqlRequest<{ quarantineTelemetryBatch: RankingTelemetryBatchInfo }>(
+    QUARANTINE_TELEMETRY_BATCH_MUTATION,
+    { batchId, reason },
+    token,
+  )
+  return data.quarantineTelemetryBatch
+}
+
+export async function clearTelemetryQuarantine(
+  token: string,
+  batchId: string,
+  justification: string,
+): Promise<RankingTelemetryBatchInfo> {
+  const data = await gqlRequest<{ clearQuarantine: RankingTelemetryBatchInfo }>(
+    CLEAR_QUARANTINE_MUTATION,
+    { batchId, justification },
+    token,
+  )
+  return data.clearQuarantine
 }
 
 export async function probeGameAdminAccess(token: string): Promise<boolean> {

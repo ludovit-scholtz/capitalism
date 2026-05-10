@@ -17,7 +17,7 @@ Create a fun game in the style of Capitalism II, where players experience realis
 ### Security Fairness Hardening
 
 - [x] (100%) Introduce API key scopes and enforcement gates so leaked keys cannot act as full-account impersonation; support read-only, bot-only, trading-only, and company-bound scopes with deny-by-default middleware enforcement and audit logging.
-- [ ] Implement shard-verified ranking telemetry by validating `serverKey` against active server registration metadata, rejecting unknown or stale shard keys, and logging replay or duplicate event signatures for moderation review.
+- [x] (100%) Implement shard-verified ranking telemetry by validating `serverKey` against active server registration metadata, rejecting unknown or stale shard keys, and logging replay or duplicate event signatures for moderation review.
 - [ ] Harden FX execution fairness by adding quote nonce, quote-issued timestamp, strict expiration, and explicit slippage tolerance so stale quotes and replayed execution payloads cannot extract better-than-market settlement.
 - [ ] Expand building secondary market race-condition defenses using optimistic concurrency tokens on offer accept/cancel/buy paths and add parallel integration tests proving no double-fill or stale ownership transfer can occur.
 - [ ] Strengthen loan collateral and foreclosure invariants by revalidating ownership, collateral lock, and payable balance at commit-time on every refinance, sale, destroy, and default transition path with overdue lifecycle tests.

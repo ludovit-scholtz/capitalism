@@ -192,6 +192,14 @@ public sealed partial class Query
 
     internal static GameServerSummary ToSummary(Data.Entities.GameServerNode server, DateTime cutoff)
     {
+        var keyStatus = !server.IsActive
+            ? "REVOKED"
+            : server.ExpiresAtUtc <= DateTime.UtcNow
+                ? "EXPIRED"
+                : server.ExpiresAtUtc <= DateTime.UtcNow.AddMinutes(10)
+                    ? "EXPIRING_SOON"
+                    : "ACTIVE";
+
         return new GameServerSummary
         {
             Id = server.Id,
@@ -210,6 +218,9 @@ public sealed partial class Query
             RegisteredAtUtc = server.RegisteredAtUtc,
             LastHeartbeatAtUtc = server.LastHeartbeatAtUtc,
             IsOnline = server.LastHeartbeatAtUtc >= cutoff,
+            IsActive = server.IsActive,
+            ExpiresAtUtc = server.ExpiresAtUtc,
+            KeyStatus = keyStatus,
         };
     }
 

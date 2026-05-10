@@ -2,6 +2,7 @@ using System.Security.Claims;
 using MasterApi.Configuration;
 using MasterApi.Data;
 using MasterApi.Data.Entities;
+using MasterApi.Utilities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -123,7 +124,23 @@ public sealed partial class Mutation
         var frontendUrl = NormalizeRequiredUrl(input.FrontendUrl, "FRONTEND_URL_REQUIRED");
 
         var now = DateTime.UtcNow;
+        var expiresAtUtc = now.AddSeconds(Math.Max(30, options.Value.ActiveThresholdSeconds * 2));
+        var serverKeyHash = ShardKeyProtector.ComputeHash(serverKey);
         var server = await db.GameServers.FirstOrDefaultAsync(candidate => candidate.ServerKey == serverKey);
+
+        var rotatingServers = await db.GameServers
+            .Where(candidate => candidate.ServerKey != serverKey)
+            .Where(candidate =>
+                candidate.BackendUrl == backendUrl
+                || candidate.GraphqlUrl == graphqlUrl
+                || candidate.FrontendUrl == frontendUrl)
+            .ToListAsync();
+        foreach (var rotatingServer in rotatingServers)
+        {
+            rotatingServer.IsActive = false;
+            rotatingServer.ExpiresAtUtc = now;
+            rotatingServer.UpdatedAtUtc = now;
+        }
 
         if (server is null)
         {
@@ -131,6 +148,7 @@ public sealed partial class Mutation
             {
                 Id = Guid.NewGuid(),
                 ServerKey = serverKey,
+                ServerKeyHash = serverKeyHash,
                 RegisteredAtUtc = now,
             };
 
@@ -148,6 +166,9 @@ public sealed partial class Mutation
         server.PlayerCount = Math.Max(0, input.PlayerCount);
         server.CompanyCount = Math.Max(0, input.CompanyCount);
         server.CurrentTick = Math.Max(0, input.CurrentTick);
+        server.ServerKeyHash = serverKeyHash;
+        server.IsActive = true;
+        server.ExpiresAtUtc = expiresAtUtc;
         server.LastHeartbeatAtUtc = now;
         server.UpdatedAtUtc = now;
 

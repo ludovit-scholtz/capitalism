@@ -14,9 +14,19 @@ public sealed class MasterRankingEvent
 
     public string? ServerKey { get; set; }
 
+    public string? ServerKeyHash { get; set; }
+
     public string? ExternalEventId { get; set; }
 
     public string? UniqueScopeKey { get; set; }
+
+    public string? TelemetryNonce { get; set; }
+
+    public string? PayloadHash { get; set; }
+
+    public string? TelemetrySignatureHash { get; set; }
+
+    public Guid? TelemetryBatchId { get; set; }
 
     public string PayloadJson { get; set; } = "{}";
 
@@ -29,6 +39,20 @@ public sealed class MasterRankingEvent
     public string? ModeratedByEmail { get; set; }
 
     public DateTime? ModeratedAtUtc { get; set; }
+
+    public bool IsQuarantined { get; set; }
+
+    public string? QuarantineReason { get; set; }
+
+    public string? QuarantinedByEmail { get; set; }
+
+    public DateTime? QuarantinedAtUtc { get; set; }
+
+    public string? QuarantineClearJustification { get; set; }
+
+    public string? QuarantineClearedByEmail { get; set; }
+
+    public DateTime? QuarantineClearedAtUtc { get; set; }
 
     public DateTime OccurredAtUtc { get; set; }
 

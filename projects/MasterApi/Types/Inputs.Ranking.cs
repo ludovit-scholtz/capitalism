@@ -156,6 +156,31 @@ public sealed class RankingAdminDashboardInfo
     public List<RankingEventModerationItem> PendingModerationEvents { get; set; } = [];
 
     public List<RankingRunInfo> RecentRuns { get; set; } = [];
+
+    public List<RankingTelemetryBatchInfo> FlaggedTelemetryBatches { get; set; } = [];
+}
+
+public sealed class RankingTelemetryBatchInfo
+{
+    public Guid BatchId { get; set; }
+
+    public string ServerKeyMasked { get; set; } = string.Empty;
+
+    public string FlagReasonCode { get; set; } = string.Empty;
+
+    public int EventCount { get; set; }
+
+    public bool IsQuarantined { get; set; }
+
+    public bool HasAppliedLeaderboardImpact { get; set; }
+
+    public string? QuarantineReason { get; set; }
+
+    public string? ClearJustification { get; set; }
+
+    public DateTime CreatedAtUtc { get; set; }
+
+    public DateTime LastAttemptAtUtc { get; set; }
 }
 
 public sealed class RankingRunInfo

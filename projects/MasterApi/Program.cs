@@ -214,6 +214,7 @@ public class Program
         builder.Services.AddScoped<AuthenticatedMasterPlayerClaimsSyncService>();
         builder.Services.AddScoped<IPasswordHasher<PlayerAccount>, PasswordHasher<PlayerAccount>>();
         builder.Services.AddScoped<MasterRankingService>();
+        builder.Services.AddScoped<RankingTelemetryValidator>();
         builder.Services.AddHostedService<MasterRankingSchedulerHostedService>();
 
         builder.Services

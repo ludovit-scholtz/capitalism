@@ -264,6 +264,41 @@ public sealed partial class Query
     }
 
     [HotChocolate.Authorization.Authorize]
+    public async Task<List<RankingTelemetryBatchInfo>> GetQuarantinedTelemetryBatches(
+        ClaimsPrincipal claimsPrincipal,
+        [Service] MasterDbContext db,
+        [Service] IOptions<GameAdministrationOptions> gameAdministrationOptions)
+    {
+        var callerEmail = GetEmailFromClaims(claimsPrincipal);
+        var access = await BuildGameAdministrationAccessAsync(db, gameAdministrationOptions.Value, callerEmail);
+        if (!access.CanAccessEveryGameDashboard)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Ranking administration requires global admin access.")
+                    .SetCode("GLOBAL_ADMIN_REQUIRED")
+                    .Build());
+        }
+
+        var batchIds = await db.RankingTelemetryAuditLogs
+            .AsNoTracking()
+            .Where(item => item.IsQuarantined)
+            .OrderByDescending(item => item.CreatedAtUtc)
+            .Select(item => item.BatchId)
+            .Distinct()
+            .Take(200)
+            .ToListAsync();
+
+        var result = new List<RankingTelemetryBatchInfo>(batchIds.Count);
+        foreach (var batchId in batchIds)
+        {
+            result.Add(await BuildTelemetryBatchInfoAsync(db, batchId, includeOnlyQuarantined: true));
+        }
+
+        return result;
+    }
+
+    [HotChocolate.Authorization.Authorize]
     public async Task<RankingAdminDashboardInfo> GetRankingAdminDashboard(
         ClaimsPrincipal claimsPrincipal,
         [Service] MasterDbContext db,
@@ -341,11 +376,74 @@ public sealed partial class Query
             })
             .ToListAsync();
 
+        var flaggedBatchIds = await db.RankingTelemetryAuditLogs
+            .AsNoTracking()
+            .OrderByDescending(item => item.CreatedAtUtc)
+            .Select(item => item.BatchId)
+            .Distinct()
+            .Take(200)
+            .ToListAsync();
+        var flaggedBatches = new List<RankingTelemetryBatchInfo>(flaggedBatchIds.Count);
+        foreach (var batchId in flaggedBatchIds)
+        {
+            flaggedBatches.Add(await BuildTelemetryBatchInfoAsync(db, batchId, includeOnlyQuarantined: false));
+        }
+
         return new RankingAdminDashboardInfo
         {
             Bounties = definitions,
             PendingModerationEvents = moderationQueue,
             RecentRuns = runs,
+            FlaggedTelemetryBatches = flaggedBatches,
+        };
+    }
+
+    internal static async Task<RankingTelemetryBatchInfo> BuildTelemetryBatchInfoAsync(
+        MasterDbContext db,
+        Guid batchId,
+        bool includeOnlyQuarantined)
+    {
+        var batchItems = await db.RankingTelemetryAuditLogs
+            .AsNoTracking()
+            .Where(item => item.BatchId == batchId)
+            .Where(item => !includeOnlyQuarantined || item.IsQuarantined)
+            .OrderBy(item => item.CreatedAtUtc)
+            .ToListAsync();
+        if (batchItems.Count == 0)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Telemetry batch not found.")
+                    .SetCode("TELEMETRY_BATCH_NOT_FOUND")
+                    .Build());
+        }
+
+        var first = batchItems[0];
+        var last = batchItems[^1];
+        var reason = batchItems
+            .Select(item => item.ReasonCode)
+            .FirstOrDefault(code => !string.Equals(code, RankingTelemetryAuditReason.Accepted, StringComparison.Ordinal))
+            ?? last.ReasonCode;
+        var isQuarantined = batchItems.Any(item => item.IsQuarantined);
+        var hasAppliedImpact = await db.MasterRankingEvents
+            .AsNoTracking()
+            .AnyAsync(entry =>
+                entry.TelemetryBatchId == batchId
+                && !entry.IsQuarantined
+                && (entry.Status == RankingEventStatus.Processed || entry.Status == RankingEventStatus.Approved));
+
+        return new RankingTelemetryBatchInfo
+        {
+            BatchId = batchId,
+            ServerKeyMasked = first.ServerKeyMasked,
+            FlagReasonCode = reason,
+            EventCount = batchItems.Count,
+            IsQuarantined = isQuarantined,
+            HasAppliedLeaderboardImpact = hasAppliedImpact,
+            QuarantineReason = batchItems.LastOrDefault(item => item.IsQuarantined)?.QuarantineReason,
+            ClearJustification = batchItems.LastOrDefault(item => !string.IsNullOrWhiteSpace(item.ClearJustification))?.ClearJustification,
+            CreatedAtUtc = first.CreatedAtUtc,
+            LastAttemptAtUtc = last.CreatedAtUtc,
         };
     }
 

@@ -49,7 +49,9 @@ public sealed class MasterRankingService(MasterDbContext db, ILogger<MasterRanki
                 .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.Ordinal);
 
             var pendingEvents = await db.MasterRankingEvents
-                .Where(entry => entry.Status == RankingEventStatus.Pending || entry.Status == RankingEventStatus.Approved)
+                .Where(entry =>
+                    (entry.Status == RankingEventStatus.Pending || entry.Status == RankingEventStatus.Approved)
+                    && !entry.IsQuarantined)
                 .OrderBy(entry => entry.CreatedAtUtc)
                 .Take(5000)
                 .ToListAsync(cancellationToken);
@@ -249,6 +251,7 @@ public sealed class MasterRankingService(MasterDbContext db, ILogger<MasterRanki
         string? proofReference,
         string payloadJson,
         DateTime occurredAtUtc,
+        RankingTelemetryValidationResult? telemetryValidation = null,
         CancellationToken cancellationToken = default)
     {
         var normalizedEmail = playerEmail.Trim().ToLowerInvariant();
@@ -261,8 +264,13 @@ public sealed class MasterRankingService(MasterDbContext db, ILogger<MasterRanki
             PlayerEmail = normalizedEmail,
             EventType = eventType,
             ServerKey = string.IsNullOrWhiteSpace(serverKey) ? null : serverKey.Trim(),
+            ServerKeyHash = telemetryValidation?.ServerKeyHash,
             ExternalEventId = string.IsNullOrWhiteSpace(externalEventId) ? null : externalEventId.Trim(),
             UniqueScopeKey = string.IsNullOrWhiteSpace(uniqueScopeKey) ? null : uniqueScopeKey.Trim(),
+            TelemetryNonce = telemetryValidation?.TelemetryNonce,
+            PayloadHash = telemetryValidation?.PayloadHash,
+            TelemetrySignatureHash = telemetryValidation?.SignatureHash,
+            TelemetryBatchId = telemetryValidation?.BatchId,
             ProofReference = string.IsNullOrWhiteSpace(proofReference) ? null : proofReference.Trim(),
             PayloadJson = string.IsNullOrWhiteSpace(payloadJson) ? "{}" : payloadJson,
             Status = RankingEventStatus.Pending,
@@ -273,6 +281,58 @@ public sealed class MasterRankingService(MasterDbContext db, ILogger<MasterRanki
         db.MasterRankingEvents.Add(rankingEvent);
         await db.SaveChangesAsync(cancellationToken);
         return rankingEvent;
+    }
+
+    public async Task RebuildSnapshotsFromRewardsAsync(CancellationToken cancellationToken = default)
+    {
+        var rewardTotalsByPlayer = await db.MasterRankingRewardRecords
+            .AsNoTracking()
+            .GroupBy(record => record.PlayerAccountId)
+            .Select(group => new { PlayerAccountId = group.Key, TotalPoints = group.Sum(item => item.PointsAwarded) })
+            .ToListAsync(cancellationToken);
+
+        var snapshots = await db.MasterRankingPlayerSnapshots.ToListAsync(cancellationToken);
+        var snapshotsByPlayerId = snapshots.ToDictionary(snapshot => snapshot.PlayerAccountId);
+        var now = DateTime.UtcNow;
+
+        foreach (var rewardTotal in rewardTotalsByPlayer)
+        {
+            if (!snapshotsByPlayerId.TryGetValue(rewardTotal.PlayerAccountId, out var snapshot))
+            {
+                snapshot = new MasterRankingPlayerSnapshot
+                {
+                    Id = Guid.NewGuid(),
+                    PlayerAccountId = rewardTotal.PlayerAccountId,
+                };
+                db.MasterRankingPlayerSnapshots.Add(snapshot);
+                snapshotsByPlayerId.Add(snapshot.PlayerAccountId, snapshot);
+            }
+
+            snapshot.TotalPoints = rewardTotal.TotalPoints;
+            snapshot.UpdatedAtUtc = now;
+        }
+
+        var activePlayerIds = rewardTotalsByPlayer.Select(item => item.PlayerAccountId).ToHashSet();
+        var staleSnapshots = snapshots.Where(snapshot => !activePlayerIds.Contains(snapshot.PlayerAccountId)).ToList();
+        if (staleSnapshots.Count > 0)
+        {
+            db.MasterRankingPlayerSnapshots.RemoveRange(staleSnapshots);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        var ordered = await db.MasterRankingPlayerSnapshots
+            .OrderByDescending(snapshot => snapshot.TotalPoints)
+            .ThenBy(snapshot => snapshot.PlayerAccountId)
+            .ToListAsync(cancellationToken);
+        for (var index = 0; index < ordered.Count; index++)
+        {
+            ordered[index].PreviousGlobalRank = ordered[index].GlobalRank;
+            ordered[index].GlobalRank = index + 1;
+            ordered[index].UpdatedAtUtc = now;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private async Task AwardLeaderboardBountiesAsync(

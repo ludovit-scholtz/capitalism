@@ -3,8 +3,11 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import {
+  clearTelemetryQuarantine,
   fetchRankingAdminDashboard,
+  fetchQuarantinedTelemetryBatches,
   moderateRankingEvent,
+  quarantineTelemetryBatch,
   runRankingDailyDecayNow,
   runRankingEvaluationNow,
   upsertRankingBountyDefinition,
@@ -145,6 +148,62 @@ async function saveDefinition(definition: RankingBountyDefinitionInfo) {
   } catch (error) {
     errorMessage.value =
       error instanceof Error ? error.message : t('rankingAdmin.saveDefinitionError')
+  }
+}
+
+async function quarantineBatch(batchId: string) {
+  if (!auth.token) return
+
+  const reason = window.prompt(t('rankingAdmin.quarantineReasonPrompt'))?.trim()
+  if (!reason) {
+    return
+  }
+
+  errorMessage.value = ''
+  successMessage.value = ''
+
+  try {
+    await quarantineTelemetryBatch(auth.token, batchId, reason)
+    successMessage.value = t('rankingAdmin.quarantineSuccess')
+    await loadDashboard()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : t('rankingAdmin.quarantineError')
+  }
+}
+
+async function clearBatch(batchId: string) {
+  if (!auth.token) return
+
+  const justification = window.prompt(t('rankingAdmin.clearQuarantinePrompt'))?.trim()
+  if (!justification) {
+    return
+  }
+
+  errorMessage.value = ''
+  successMessage.value = ''
+
+  try {
+    await clearTelemetryQuarantine(auth.token, batchId, justification)
+    successMessage.value = t('rankingAdmin.clearQuarantineSuccess')
+    await loadDashboard()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : t('rankingAdmin.clearQuarantineError')
+  }
+}
+
+async function loadQuarantinedOnly() {
+  if (!auth.token) return
+
+  errorMessage.value = ''
+  successMessage.value = ''
+
+  try {
+    const batches = await fetchQuarantinedTelemetryBatches(auth.token)
+    if (dashboard.value) {
+      dashboard.value.flaggedTelemetryBatches = batches
+    }
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : t('rankingAdmin.loadError')
   }
 }
 
@@ -290,6 +349,71 @@ onMounted(async () => {
                   >
                     {{ t('rankingAdmin.saveDefinition') }}
                   </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card mt-5 p-6" aria-label="Ranking integrity telemetry batches">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h2 class="text-xl font-semibold">{{ t('rankingAdmin.rankingIntegrity') }}</h2>
+          <button type="button" class="btn btn-secondary" @click="loadQuarantinedOnly">
+            {{ t('rankingAdmin.showQuarantinedOnly') }}
+          </button>
+        </div>
+        <p v-if="(dashboard?.flaggedTelemetryBatches?.length ?? 0) === 0" class="state-message mt-3">
+          {{ t('common.noData') }}
+        </p>
+        <div v-else class="mt-4 overflow-x-auto rounded-xl border border-divider">
+          <table class="min-w-full border-collapse text-sm" aria-label="Ranking integrity batch table">
+            <thead>
+              <tr class="bg-overlay/40 text-left text-xs uppercase tracking-[0.08em] text-muted">
+                <th class="px-4 py-3">{{ t('rankingAdmin.server') }}</th>
+                <th class="px-4 py-3">{{ t('rankingAdmin.reasonCode') }}</th>
+                <th class="px-4 py-3">{{ t('rankingAdmin.eventCount') }}</th>
+                <th class="px-4 py-3">{{ t('rankingAdmin.status') }}</th>
+                <th class="px-4 py-3">{{ t('rankingAdmin.lastAttemptAt') }}</th>
+                <th class="px-4 py-3">{{ t('rankingAdmin.actions') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="batch in dashboard?.flaggedTelemetryBatches ?? []"
+                :key="batch.batchId"
+                class="border-t border-divider/70"
+              >
+                <td class="px-4 py-3">{{ batch.serverKeyMasked }}</td>
+                <td class="px-4 py-3">{{ batch.flagReasonCode }}</td>
+                <td class="px-4 py-3">{{ batch.eventCount }}</td>
+                <td class="px-4 py-3">
+                  {{
+                    batch.isQuarantined
+                      ? t('rankingAdmin.quarantined')
+                      : t('rankingAdmin.notQuarantined')
+                  }}
+                </td>
+                <td class="px-4 py-3">{{ formatDate(batch.lastAttemptAtUtc) }}</td>
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-2">
+                    <button
+                      v-if="!batch.isQuarantined"
+                      class="btn btn-secondary"
+                      type="button"
+                      @click="quarantineBatch(batch.batchId)"
+                    >
+                      {{ t('rankingAdmin.quarantine') }}
+                    </button>
+                    <button
+                      v-else
+                      class="btn btn-secondary"
+                      type="button"
+                      @click="clearBatch(batch.batchId)"
+                    >
+                      {{ t('rankingAdmin.clearQuarantine') }}
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>

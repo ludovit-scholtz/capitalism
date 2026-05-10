@@ -6,6 +6,12 @@ public sealed class GameServerNode
 
     public string ServerKey { get; set; } = string.Empty;
 
+    public string ServerKeyHash { get; set; } = string.Empty;
+
+    public bool IsActive { get; set; } = true;
+
+    public DateTime ExpiresAtUtc { get; set; }
+
     public string DisplayName { get; set; } = string.Empty;
 
     public string Description { get; set; } = string.Empty;

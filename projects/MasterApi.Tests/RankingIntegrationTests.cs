@@ -3,7 +3,10 @@ using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using MasterApi.Data;
+using MasterApi.Data.Entities;
 using MasterApi.Tests.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 
 namespace MasterApi.Tests;
@@ -43,6 +46,342 @@ public sealed class RankingIntegrationTests
 
         var errors = result.GetProperty("errors").EnumerateArray().ToList();
         Assert.Contains(errors, error => error.GetProperty("extensions").GetProperty("code").GetString() == "SERVER_KEY_REQUIRED");
+    }
+
+    [Fact]
+    public async Task IngestRankingEvent_UnknownShardKey_ReturnsForbiddenAndWritesAudit()
+    {
+        await using var factory = new MasterApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var result = await GraphQlAsync(
+            client,
+            """
+            mutation Ingest($input: IngestRankingEventInput!) {
+              ingestRankingEvent(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey = $"unknown-{Guid.NewGuid():N}",
+                    eventType = MasterRankingBountyCodes.FxTrader,
+                    playerEmail = $"rank-unknown-{Guid.NewGuid():N}@example.com",
+                    occurredAtUtc = DateTime.UtcNow,
+                    externalEventId = $"unknown-{Guid.NewGuid():N}",
+                    payloadJson = "{\"value\":1}",
+                }
+            });
+
+        var errors = result.GetProperty("errors").EnumerateArray().ToList();
+        Assert.Contains(errors, error => error.GetProperty("extensions").GetProperty("code").GetString() == "UNKNOWN_SHARD_KEY");
+        Assert.Contains(errors, error => error.GetProperty("extensions").GetProperty("httpStatus").GetInt32() == 403);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
+        var audit = db.RankingTelemetryAuditLogs
+            .OrderByDescending(item => item.CreatedAtUtc)
+            .FirstOrDefault();
+        Assert.NotNull(audit);
+        Assert.Equal(RankingTelemetryAuditReason.UnknownShardKey, audit!.ReasonCode);
+        Assert.True(audit.IsRejected);
+    }
+
+    [Fact]
+    public async Task IngestRankingEvent_StaleShardKey_ReturnsStaleCodeAndWritesAudit()
+    {
+        await using var factory = new MasterApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var serverKey = $"stale-{Guid.NewGuid():N}";
+        await GraphQlAsync(
+            client,
+            """
+            mutation RegisterServer($input: RegisterGameServerInput!) {
+              registerGameServer(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey,
+                    displayName = "Stale Server",
+                    description = "Stale key test",
+                    region = "EU",
+                    environment = "test",
+                    backendUrl = "https://stale.example.com",
+                    graphqlUrl = "https://stale.example.com/graphql",
+                    frontendUrl = "https://stale.example.com/app",
+                    version = "1.0.0",
+                    playerCount = 0,
+                    companyCount = 0,
+                    currentTick = 0,
+                }
+            });
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
+            var server = db.GameServers.First(item => item.ServerKey == serverKey);
+            server.IsActive = false;
+            server.ExpiresAtUtc = DateTime.UtcNow.AddMinutes(-1);
+            await db.SaveChangesAsync();
+        }
+
+        var result = await GraphQlAsync(
+            client,
+            """
+            mutation Ingest($input: IngestRankingEventInput!) {
+              ingestRankingEvent(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey,
+                    eventType = MasterRankingBountyCodes.FxTrader,
+                    playerEmail = $"rank-stale-{Guid.NewGuid():N}@example.com",
+                    occurredAtUtc = DateTime.UtcNow,
+                    externalEventId = $"stale-{Guid.NewGuid():N}",
+                    payloadJson = "{}",
+                }
+            });
+
+        var errors = result.GetProperty("errors").EnumerateArray().ToList();
+        Assert.Contains(errors, error => error.GetProperty("extensions").GetProperty("code").GetString() == "STALE_SHARD_KEY");
+
+        using var verifyScope = factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<MasterDbContext>();
+        var audit = verifyDb.RankingTelemetryAuditLogs
+            .OrderByDescending(item => item.CreatedAtUtc)
+            .FirstOrDefault();
+        Assert.NotNull(audit);
+        Assert.Equal(RankingTelemetryAuditReason.StaleShardKey, audit!.ReasonCode);
+    }
+
+    [Fact]
+    public async Task IngestRankingEvent_DuplicateSignature_IsRejectedAndAudited()
+    {
+        await using var factory = new MasterApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var serverKey = $"dup-{Guid.NewGuid():N}";
+        await GraphQlAsync(
+            client,
+            """
+            mutation RegisterServer($input: RegisterGameServerInput!) {
+              registerGameServer(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey,
+                    displayName = "Duplicate Server",
+                    description = "Duplicate key test",
+                    region = "EU",
+                    environment = "test",
+                    backendUrl = "https://dup.example.com",
+                    graphqlUrl = "https://dup.example.com/graphql",
+                    frontendUrl = "https://dup.example.com/app",
+                    version = "1.0.0",
+                    playerCount = 1,
+                    companyCount = 1,
+                    currentTick = 100,
+                }
+            });
+
+        var nonce = $"nonce-{Guid.NewGuid():N}";
+        var payloadJson = "{\"price\":42}";
+        var email = $"rank-dup-{Guid.NewGuid():N}@example.com";
+
+        var first = await GraphQlAsync(
+            client,
+            """
+            mutation Ingest($input: IngestRankingEventInput!) {
+              ingestRankingEvent(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey,
+                    eventType = MasterRankingBountyCodes.FxTrader,
+                    playerEmail = email,
+                    occurredAtUtc = DateTime.UtcNow,
+                    externalEventId = nonce,
+                    payloadJson,
+                }
+            });
+        Assert.False(first.TryGetProperty("errors", out _));
+
+        var duplicate = await GraphQlAsync(
+            client,
+            """
+            mutation Ingest($input: IngestRankingEventInput!) {
+              ingestRankingEvent(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey,
+                    eventType = MasterRankingBountyCodes.FxTrader,
+                    playerEmail = email,
+                    occurredAtUtc = DateTime.UtcNow,
+                    externalEventId = nonce,
+                    payloadJson,
+                }
+            });
+
+        var errors = duplicate.GetProperty("errors").EnumerateArray().ToList();
+        Assert.Contains(errors, error => error.GetProperty("extensions").GetProperty("code").GetString() == "DUPLICATE_EVENT_SIGNATURE");
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
+        Assert.True(db.RankingTelemetryAuditLogs.Any(item => item.ReasonCode == RankingTelemetryAuditReason.DuplicateEventSignature));
+    }
+
+    [Fact]
+    public async Task RankingTelemetryBatch_CanBeQuarantinedAndCleared_ByGlobalAdmin()
+    {
+        await using var factory = new MasterApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var userEmail = $"rank-quarantine-{Guid.NewGuid():N}@example.com";
+        var (userToken, _) = await RegisterAsync(client, userEmail, "Quarantine Player");
+        var rootToken = CreateRootAdminToken();
+        var serverKey = $"quarantine-{Guid.NewGuid():N}";
+
+        await GraphQlAsync(
+            client,
+            """
+            mutation RegisterServer($input: RegisterGameServerInput!) {
+              registerGameServer(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey,
+                    displayName = "Quarantine Server",
+                    description = "Quarantine batch test",
+                    region = "EU",
+                    environment = "test",
+                    backendUrl = "https://quarantine.example.com",
+                    graphqlUrl = "https://quarantine.example.com/graphql",
+                    frontendUrl = "https://quarantine.example.com/app",
+                    version = "1.0.0",
+                    playerCount = 1,
+                    companyCount = 1,
+                    currentTick = 1,
+                }
+            });
+
+        await GraphQlAsync(
+            client,
+            """
+            mutation Ingest($input: IngestRankingEventInput!) {
+              ingestRankingEvent(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey,
+                    eventType = MasterRankingBountyCodes.FxTrader,
+                    playerEmail = userEmail,
+                    occurredAtUtc = DateTime.UtcNow,
+                    externalEventId = $"fx-{Guid.NewGuid():N}",
+                    payloadJson = "{\"ok\":true}",
+                }
+            });
+
+        var dashboard = await GraphQlAsync(
+            client,
+            """
+            query {
+              rankingAdminDashboard {
+                flaggedTelemetryBatches {
+                  batchId
+                  serverKeyMasked
+                  isQuarantined
+                }
+              }
+            }
+            """,
+            token: rootToken);
+        Assert.False(dashboard.TryGetProperty("errors", out _));
+
+        var batches = dashboard.GetProperty("data").GetProperty("rankingAdminDashboard").GetProperty("flaggedTelemetryBatches").EnumerateArray().ToList();
+        var maskedPrefix = serverKey[..4];
+        var batch = batches.First(item =>
+            item.GetProperty("serverKeyMasked").GetString()?.StartsWith(maskedPrefix, StringComparison.Ordinal) == true);
+        var batchId = batch.GetProperty("batchId").GetString()!;
+
+        var quarantined = await GraphQlAsync(
+            client,
+            """
+            mutation Quarantine($batchId: UUID!, $reason: String!) {
+              quarantineTelemetryBatch(batchId: $batchId, reason: $reason) {
+                batchId
+                isQuarantined
+                quarantineReason
+              }
+            }
+            """,
+            new { batchId, reason = "Suspicious replay pattern" },
+            token: rootToken);
+        Assert.False(quarantined.TryGetProperty("errors", out _));
+        Assert.True(quarantined.GetProperty("data").GetProperty("quarantineTelemetryBatch").GetProperty("isQuarantined").GetBoolean());
+
+        await GraphQlAsync(client, "mutation { runRankingEvaluationNow { id } }", token: rootToken);
+        var summaryAfterQuarantine = await GraphQlAsync(
+            client,
+            "query { myRankingSummary { totalPoints } }",
+            token: userToken);
+        Assert.False(summaryAfterQuarantine.TryGetProperty("errors", out _));
+        Assert.Equal(0m, summaryAfterQuarantine.GetProperty("data").GetProperty("myRankingSummary").GetProperty("totalPoints").GetDecimal());
+
+        var cleared = await GraphQlAsync(
+            client,
+            """
+            mutation Clear($batchId: UUID!, $justification: String!) {
+              clearQuarantine(batchId: $batchId, justification: $justification) {
+                batchId
+                isQuarantined
+                clearJustification
+              }
+            }
+            """,
+            new { batchId, justification = "Validated source integrity." },
+            token: rootToken);
+        Assert.False(cleared.TryGetProperty("errors", out _));
+        Assert.False(cleared.GetProperty("data").GetProperty("clearQuarantine").GetProperty("isQuarantined").GetBoolean());
+
+        await GraphQlAsync(client, "mutation { runRankingEvaluationNow { id } }", token: rootToken);
+        var summaryAfterClear = await GraphQlAsync(
+            client,
+            "query { myRankingSummary { totalPoints } }",
+            token: userToken);
+        Assert.False(summaryAfterClear.TryGetProperty("errors", out _));
+        Assert.True(summaryAfterClear.GetProperty("data").GetProperty("myRankingSummary").GetProperty("totalPoints").GetDecimal() > 0m);
     }
 
     [Fact]
@@ -843,6 +1182,8 @@ public sealed class RankingIntegrationTests
         var userEmail = $"rank-cross-server-{Guid.NewGuid():N}@example.com";
         var (userToken, _) = await RegisterAsync(client, userEmail, "Cross Server User");
         var rootToken = CreateRootAdminToken();
+        await RegisterServerAsync(client, "server-eu");
+        await RegisterServerAsync(client, "server-us");
 
         // Ingest MANUFACTURER from two different servers on same day.
         await GraphQlAsync(
@@ -919,6 +1260,8 @@ public sealed class RankingIntegrationTests
         var userEmail = $"rank-login-cross-server-{Guid.NewGuid():N}@example.com";
         var (userToken, _) = await RegisterAsync(client, userEmail, "Cross Server Login User");
         var rootToken = CreateRootAdminToken();
+        await RegisterServerAsync(client, "server-eu");
+        await RegisterServerAsync(client, "server-us");
 
         await GraphQlAsync(
           client,
@@ -1289,6 +1632,36 @@ public sealed class RankingIntegrationTests
         return (
             payload.GetProperty("token").GetString()!,
             payload.GetProperty("player").GetProperty("id").GetString()!);
+    }
+
+    private async Task RegisterServerAsync(HttpClient client, string serverKey)
+    {
+        await GraphQlAsync(
+            client,
+            """
+            mutation RegisterServer($input: RegisterGameServerInput!) {
+              registerGameServer(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey,
+                    displayName = $"Server {serverKey}",
+                    description = "Test shard registration",
+                    region = "EU",
+                    environment = "test",
+                    backendUrl = $"https://{serverKey}.example.com",
+                    graphqlUrl = $"https://{serverKey}.example.com/graphql",
+                    frontendUrl = $"https://{serverKey}.example.com/app",
+                    version = "1.0.0",
+                    playerCount = 1,
+                    companyCount = 1,
+                    currentTick = 1,
+                }
+            });
     }
 
     private async Task<JsonElement> GraphQlAsync(HttpClient client, string query, object? variables = null, string? token = null)
