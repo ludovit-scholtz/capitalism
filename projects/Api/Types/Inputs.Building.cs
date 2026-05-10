@@ -269,6 +269,7 @@ public sealed class AcceptBuildingOfferInput
 {
     /// <summary>The offer to accept.</summary>
     public Guid OfferId { get; set; }
+    public Guid OfferVersion { get; set; }
 }
 
 /// <summary>Input for a seller to reject a pending offer.</summary>
@@ -276,4 +277,13 @@ public sealed class RejectBuildingOfferInput
 {
     /// <summary>The offer to reject.</summary>
     public Guid OfferId { get; set; }
+    public Guid OfferVersion { get; set; }
+}
+
+/// <summary>Input for a seller to cancel a pending offer.</summary>
+public sealed class CancelBuildingOfferInput
+{
+    /// <summary>The offer to cancel.</summary>
+    public Guid OfferId { get; set; }
+    public Guid OfferVersion { get; set; }
 }

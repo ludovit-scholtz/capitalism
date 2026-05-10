@@ -318,10 +318,11 @@ public sealed class BuildingSecondaryMarketTests
             sellerToken);
 
         var offerResult = await ExecAsync(client,
-            "mutation MakeOffer($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id } }",
+            "mutation MakeOffer($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id offerVersion } }",
             new { input = new { buildingId, buyerCompanyId, offeredPrice = 1_000_000m } },
             buyerToken);
         var offerId = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("id").GetString()!);
+        var offerVersion = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("offerVersion").GetString()!);
 
         var acceptResult = await ExecAsync(client,
             """
@@ -332,7 +333,7 @@ public sealed class BuildingSecondaryMarketTests
                 }
             }
             """,
-            new { input = new { offerId } },
+            new { input = new { offerId, offerVersion } },
             sellerToken);
 
         var accData = acceptResult.GetProperty("data").GetProperty("acceptBuildingOffer");
@@ -380,13 +381,14 @@ public sealed class BuildingSecondaryMarketTests
             sellerToken);
 
         var offer1Result = await ExecAsync(client,
-            "mutation MakeOffer($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id } }",
+            "mutation MakeOffer($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id offerVersion } }",
             new { input = new { buildingId, buyerCompanyId = buyer1CompanyId, offeredPrice = 1_800_000m } },
             buyer1Token);
         var offer1Id = Guid.Parse(offer1Result.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("id").GetString()!);
+        var offer1Version = Guid.Parse(offer1Result.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("offerVersion").GetString()!);
 
         var offer2Result = await ExecAsync(client,
-            "mutation MakeOffer($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id } }",
+            "mutation MakeOffer($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id offerVersion } }",
             new { input = new { buildingId, buyerCompanyId = buyer2CompanyId, offeredPrice = 2_000_000m } },
             buyer2Token);
         var offer2Id = Guid.Parse(offer2Result.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("id").GetString()!);
@@ -394,7 +396,7 @@ public sealed class BuildingSecondaryMarketTests
         // Accept offer1
         await ExecAsync(client,
             "mutation Accept($input: AcceptBuildingOfferInput!) { acceptBuildingOffer(input: $input) { building { id } } }",
-            new { input = new { offerId = offer1Id } },
+            new { input = new { offerId = offer1Id, offerVersion = offer1Version } },
             sellerToken);
 
         // Verify offer2 was auto-rejected
@@ -421,21 +423,22 @@ public sealed class BuildingSecondaryMarketTests
             sellerToken);
 
         var offerResult = await ExecAsync(client,
-            "mutation MakeOffer($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id } }",
+            "mutation MakeOffer($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id offerVersion } }",
             new { input = new { buildingId, buyerCompanyId, offeredPrice = 1_800_000m } },
             buyerToken);
         var offerId = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("id").GetString()!);
+        var offerVersion = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("offerVersion").GetString()!);
 
         var rejectResult = await ExecAsync(client,
             """
-            mutation Reject($input: RejectBuildingOfferInput!) {
-                rejectBuildingOffer(input: $input) { id status resolvedAtUtc }
+            mutation Reject($input: CancelBuildingOfferInput!) {
+                cancelBuildingOffer(input: $input) { id status resolvedAtUtc }
             }
             """,
-            new { input = new { offerId } },
+            new { input = new { offerId, offerVersion } },
             sellerToken);
 
-        var rejectedOffer = rejectResult.GetProperty("data").GetProperty("rejectBuildingOffer");
+        var rejectedOffer = rejectResult.GetProperty("data").GetProperty("cancelBuildingOffer");
         Assert.Equal("REJECTED", rejectedOffer.GetProperty("status").GetString());
         Assert.NotEqual(JsonValueKind.Null, rejectedOffer.GetProperty("resolvedAtUtc").ValueKind);
 
@@ -463,10 +466,11 @@ public sealed class BuildingSecondaryMarketTests
             sellerToken);
 
         var offerResult = await ExecAsync(client,
-            "mutation MakeOffer($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id } }",
+            "mutation MakeOffer($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id offerVersion } }",
             new { input = new { buildingId, buyerCompanyId, offeredPrice = 1_000_000m } },
             buyerToken);
         var offerId = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("id").GetString()!);
+        var offerVersion = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("offerVersion").GetString()!);
 
         // Drain buyer's bank account
         await using var scope = factory.Services.CreateAsyncScope();
@@ -477,7 +481,7 @@ public sealed class BuildingSecondaryMarketTests
 
         var result = await ExecAsync(client,
             "mutation Accept($input: AcceptBuildingOfferInput!) { acceptBuildingOffer(input: $input) { building { id } } }",
-            new { input = new { offerId } },
+            new { input = new { offerId, offerVersion } },
             sellerToken);
 
         var errors = result.GetProperty("errors");
@@ -641,14 +645,15 @@ public sealed class BuildingSecondaryMarketTests
             sellerToken);
 
         var offerResult = await ExecAsync(client,
-            "mutation MakeOffer($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id } }",
+            "mutation MakeOffer($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id offerVersion } }",
             new { input = new { buildingId = building.Id, buyerCompanyId, offeredPrice = 1_000_000m } },
             buyerToken);
         var offerId = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("id").GetString()!);
+        var offerVersion = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("offerVersion").GetString()!);
 
         await ExecAsync(client,
             "mutation Accept($input: AcceptBuildingOfferInput!) { acceptBuildingOffer(input: $input) { building { id companyId } } }",
-            new { input = new { offerId } },
+            new { input = new { offerId, offerVersion } },
             sellerToken);
 
         // Verify the unit is now owned by the buyer's building
@@ -1488,14 +1493,15 @@ public sealed class BuildingSecondaryMarketTests
             sellerToken);
 
         var offerResult = await ExecAsync(client,
-            "mutation O($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id } }",
+            "mutation O($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id offerVersion } }",
             new { input = new { buildingId = sellerBuildingId, buyerCompanyId, offeredPrice = 10_000_000m, negotiationNote = "FX settlement offer" } },
             buyerToken);
         var offerId = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("id").GetString()!);
+        var offerVersion = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("offerVersion").GetString()!);
 
         await ExecAsync(client,
             "mutation A($input: AcceptBuildingOfferInput!) { acceptBuildingOffer(input: $input) { building { id } } }",
-            new { input = new { offerId } },
+            new { input = new { offerId, offerVersion } },
             sellerToken);
 
         await using var verifyScope = factory.Services.CreateAsyncScope();
@@ -1667,5 +1673,189 @@ public sealed class BuildingSecondaryMarketTests
         Assert.Equal(sellerBuildingId.ToString(), loan.GetProperty("collateralBuildingId").GetString());
         Assert.Equal(10_000_000m, loan.GetProperty("collateralListingPrice").GetDecimal());
         Assert.Equal("CZK", loan.GetProperty("collateralListingCurrencyCode").GetString());
+    }
+
+    [Fact]
+    public async Task AcceptBuildingOffer_ConcurrentRequests_OneSucceedsAndOneConflicts()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var sellerToken = await RegisterAsync(client, "seller-race-accept@market.test");
+        var buyerToken = await RegisterAsync(client, "buyer-race-accept@market.test");
+        var (buildingId, _, _) = await SeedOwnerWithBuildingAsync(factory, sellerToken);
+        var (_, buyerCompanyId, _) = await SeedOwnerWithBuildingAsync(factory, buyerToken, 5_000_000m);
+
+        await ExecAsync(client,
+            "mutation S($input: SetBuildingForSaleInput!) { setBuildingForSale(input: $input) { id } }",
+            new { input = new { buildingId, isForSale = true, askingPrice = 1_000_000m } },
+            sellerToken);
+
+        var offerResult = await ExecAsync(client,
+            "mutation O($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id offerVersion } }",
+            new { input = new { buildingId, buyerCompanyId, offeredPrice = 1_000_000m } },
+            buyerToken);
+        var offerId = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("id").GetString()!);
+        var offerVersion = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("offerVersion").GetString()!);
+
+        var acceptMutation = "mutation A($input: AcceptBuildingOfferInput!) { acceptBuildingOffer(input: $input) { offer { id status } } }";
+        var acceptTask1 = ExecAsync(client, acceptMutation, new { input = new { offerId, offerVersion } }, sellerToken);
+        var acceptTask2 = ExecAsync(client, acceptMutation, new { input = new { offerId, offerVersion } }, sellerToken);
+        var results = await Task.WhenAll(acceptTask1, acceptTask2);
+        static IEnumerable<string?> GetCodes(JsonElement response) =>
+            response.TryGetProperty("errors", out var errors) && errors.ValueKind == JsonValueKind.Array
+                ? errors.EnumerateArray()
+                    .Select(e =>
+                        e.TryGetProperty("extensions", out var ext) && ext.TryGetProperty("code", out var code)
+                            ? code.GetString()
+                            : null)
+                : [];
+
+        var successCount = results.Count(r =>
+            r.TryGetProperty("data", out var data)
+            && data.ValueKind == JsonValueKind.Object
+            && data.TryGetProperty("acceptBuildingOffer", out var accepted)
+            && accepted.ValueKind == JsonValueKind.Object);
+        var conflictCount = results.Count(r => GetCodes(r).Contains("OFFER_VERSION_CONFLICT"));
+
+        Assert.Equal(1, successCount);
+        Assert.Equal(1, conflictCount);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var building = await db.Buildings.FirstAsync(b => b.Id == buildingId);
+        Assert.False(building.IsForSale);
+        Assert.Equal(buyerCompanyId, building.CompanyId);
+
+        var securityLogs = await db.BuildingOfferSecurityAuditLogs
+            .Where(log => log.OfferId == offerId && log.Action == "ACCEPT")
+            .ToListAsync();
+        Assert.NotEmpty(securityLogs);
+    }
+
+    [Fact]
+    public async Task AcceptBuildingOffer_StaleVersion_DoesNotTransferOwnershipOrFunds()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var sellerToken = await RegisterAsync(client, "seller-stale-version@market.test");
+        var buyer1Token = await RegisterAsync(client, "buyer-stale-version-a@market.test");
+        var buyer2Token = await RegisterAsync(client, "buyer-stale-version-b@market.test");
+        var (buildingId, sellerCompanyId, _) = await SeedOwnerWithBuildingAsync(factory, sellerToken);
+        var (_, buyer1CompanyId, _) = await SeedOwnerWithBuildingAsync(factory, buyer1Token, 5_000_000m);
+        var (_, buyer2CompanyId, _) = await SeedOwnerWithBuildingAsync(factory, buyer2Token, 5_000_000m);
+
+        await ExecAsync(client,
+            "mutation S($input: SetBuildingForSaleInput!) { setBuildingForSale(input: $input) { id } }",
+            new { input = new { buildingId, isForSale = true, askingPrice = 1_000_000m } },
+            sellerToken);
+
+        var offer1 = await ExecAsync(client,
+            "mutation O($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id offerVersion } }",
+            new { input = new { buildingId, buyerCompanyId = buyer1CompanyId, offeredPrice = 1_000_000m } },
+            buyer1Token);
+        var offer1Id = Guid.Parse(offer1.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("id").GetString()!);
+        var offer1Version = Guid.Parse(offer1.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("offerVersion").GetString()!);
+
+        var offer2 = await ExecAsync(client,
+            "mutation O($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id offerVersion } }",
+            new { input = new { buildingId, buyerCompanyId = buyer2CompanyId, offeredPrice = 1_050_000m } },
+            buyer2Token);
+        var offer2Id = Guid.Parse(offer2.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("id").GetString()!);
+        var staleOffer2Version = Guid.Parse(offer2.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("offerVersion").GetString()!);
+
+        await using (var preScope = factory.Services.CreateAsyncScope())
+        {
+            var db = preScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var buyer2AccountBefore = await db.BankAccounts.FirstAsync(a => a.CompanyId == buyer2CompanyId && a.CurrencyCode == "EUR");
+            Assert.Equal(5_000_000m, buyer2AccountBefore.Balance);
+        }
+
+        await ExecAsync(client,
+            "mutation A($input: AcceptBuildingOfferInput!) { acceptBuildingOffer(input: $input) { offer { id status } } }",
+            new { input = new { offerId = offer1Id, offerVersion = offer1Version } },
+            sellerToken);
+
+        var staleAccept = await ExecAsync(client,
+            "mutation A($input: AcceptBuildingOfferInput!) { acceptBuildingOffer(input: $input) { offer { id status } } }",
+            new { input = new { offerId = offer2Id, offerVersion = staleOffer2Version } },
+            sellerToken);
+        Assert.True(staleAccept.TryGetProperty("errors", out var staleErrors));
+        Assert.Contains(
+            "OFFER_VERSION_CONFLICT",
+            staleErrors.EnumerateArray().Select(e =>
+                e.TryGetProperty("extensions", out var ext) && ext.TryGetProperty("code", out var code)
+                    ? code.GetString()
+                    : null));
+
+        await using var verifyScope = factory.Services.CreateAsyncScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var building = await verifyDb.Buildings.FirstAsync(b => b.Id == buildingId);
+        Assert.Equal(buyer1CompanyId, building.CompanyId);
+
+        var buyer2AccountAfter = await verifyDb.BankAccounts.FirstAsync(a => a.CompanyId == buyer2CompanyId && a.CurrencyCode == "EUR");
+        Assert.Equal(5_000_000m, buyer2AccountAfter.Balance);
+
+        var buyer2AcquisitionEntries = await verifyDb.LedgerEntries
+            .Where(e => e.CompanyId == buyer2CompanyId && e.Category == LedgerCategory.BuildingAcquisition)
+            .ToListAsync();
+        Assert.Empty(buyer2AcquisitionEntries);
+        var sellerSaleEntries = await verifyDb.LedgerEntries
+            .Where(e => e.CompanyId == sellerCompanyId && e.Category == LedgerCategory.BuildingSale && e.BuildingId == buildingId)
+            .ToListAsync();
+        Assert.Single(sellerSaleEntries);
+    }
+
+    [Fact]
+    public async Task CancelBuildingOffer_ConcurrentWithAccept_SecondCommitConflicts()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var sellerToken = await RegisterAsync(client, "seller-cancel-race@market.test");
+        var buyerToken = await RegisterAsync(client, "buyer-cancel-race@market.test");
+        var (buildingId, _, _) = await SeedOwnerWithBuildingAsync(factory, sellerToken);
+        var (_, buyerCompanyId, _) = await SeedOwnerWithBuildingAsync(factory, buyerToken, 5_000_000m);
+
+        await ExecAsync(client,
+            "mutation S($input: SetBuildingForSaleInput!) { setBuildingForSale(input: $input) { id } }",
+            new { input = new { buildingId, isForSale = true, askingPrice = 1_000_000m } },
+            sellerToken);
+
+        var offerResult = await ExecAsync(client,
+            "mutation O($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id offerVersion } }",
+            new { input = new { buildingId, buyerCompanyId, offeredPrice = 980_000m } },
+            buyerToken);
+        var offerId = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("id").GetString()!);
+        var offerVersion = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("offerVersion").GetString()!);
+
+        var acceptTask = ExecAsync(
+            client,
+            "mutation A($input: AcceptBuildingOfferInput!) { acceptBuildingOffer(input: $input) { offer { id status } } }",
+            new { input = new { offerId, offerVersion } },
+            sellerToken);
+        var cancelTask = ExecAsync(
+            client,
+            "mutation C($input: CancelBuildingOfferInput!) { cancelBuildingOffer(input: $input) { id status } }",
+            new { input = new { offerId, offerVersion } },
+            sellerToken);
+        var raceResults = await Task.WhenAll(acceptTask, cancelTask);
+        static IEnumerable<string?> GetCodes(JsonElement response) =>
+            response.TryGetProperty("errors", out var errors) && errors.ValueKind == JsonValueKind.Array
+                ? errors.EnumerateArray()
+                    .Select(e =>
+                        e.TryGetProperty("extensions", out var ext) && ext.TryGetProperty("code", out var code)
+                            ? code.GetString()
+                            : null)
+                : [];
+
+        var successCount = raceResults.Count(r =>
+            (r.TryGetProperty("data", out var data)
+             && data.ValueKind == JsonValueKind.Object
+             && (
+                 (data.TryGetProperty("acceptBuildingOffer", out var a) && a.ValueKind == JsonValueKind.Object)
+                 || (data.TryGetProperty("cancelBuildingOffer", out var c) && c.ValueKind == JsonValueKind.Object))));
+        var conflictCount = raceResults.Count(r => GetCodes(r).Contains("OFFER_VERSION_CONFLICT"));
+
+        Assert.Equal(1, successCount);
+        Assert.Equal(1, conflictCount);
     }
 }

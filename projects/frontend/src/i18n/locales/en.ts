@@ -3620,6 +3620,9 @@ export default {
     rejectOffer: 'Reject',
     offerAccepted: 'Offer accepted. Building transferred to buyer.',
     offerRejected: 'Offer rejected.',
+    offerConflictRefreshing:
+      'Offer already taken — refreshing market…',
+    processingOffer: 'Processing…',
     offerStatus: {
       PENDING: 'Pending',
       ACCEPTED: 'Accepted',

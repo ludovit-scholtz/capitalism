@@ -1331,6 +1331,7 @@ export interface MockBuildingMarketListing {
 
 export interface MockBuildingMarketOffer {
   id: string
+  offerVersion: string
   offeredPrice: number
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED'
   negotiationNote: string | null
@@ -8390,6 +8391,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const input = body.variables?.input ?? {}
       const newOffer: MockBuildingMarketOffer = {
         id: `offer-${Date.now()}`,
+        offerVersion: crypto.randomUUID(),
         offeredPrice: input.offeredPrice ?? 0,
         status: 'PENDING',
         negotiationNote: input.negotiationNote ?? null,
@@ -8403,12 +8405,17 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
     if (query.includes('acceptBuildingOffer')) {
       const offerId = body.variables?.input?.offerId
+      const offerVersion = body.variables?.input?.offerVersion
       // Update myBuildingListings mock state
       for (const listing of state.myBuildingListings) {
         const offer = listing.offers.find((o) => o.id === offerId)
         if (offer) {
+          if (offerVersion && offer.offerVersion !== offerVersion) {
+            return routeJsonError('Offer version conflict', 'OFFER_VERSION_CONFLICT')
+          }
           offer.status = 'ACCEPTED'
           offer.resolvedAtUtc = new Date().toISOString()
+          offer.offerVersion = crypto.randomUUID()
           listing.building.isForSale = false
           break
         }
@@ -8421,13 +8428,18 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
-    if (query.includes('rejectBuildingOffer')) {
+    if (query.includes('cancelBuildingOffer') || query.includes('rejectBuildingOffer')) {
       const offerId = body.variables?.input?.offerId
+      const offerVersion = body.variables?.input?.offerVersion
       for (const listing of state.myBuildingListings) {
         const offer = listing.offers.find((o) => o.id === offerId)
         if (offer) {
+          if (offerVersion && offer.offerVersion !== offerVersion) {
+            return routeJsonError('Offer version conflict', 'OFFER_VERSION_CONFLICT')
+          }
           offer.status = 'REJECTED'
           offer.resolvedAtUtc = new Date().toISOString()
+          offer.offerVersion = crypto.randomUUID()
           break
         }
       }

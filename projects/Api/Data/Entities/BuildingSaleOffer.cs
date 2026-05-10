@@ -11,6 +11,7 @@ namespace Api.Data.Entities;
 public sealed class BuildingSaleOffer
 {
     public Guid Id { get; set; }
+    public Guid OfferVersion { get; set; } = Guid.NewGuid();
 
     /// <summary>The building this offer targets.</summary>
     public Guid BuildingId { get; set; }

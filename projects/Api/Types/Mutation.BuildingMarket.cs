@@ -101,6 +101,7 @@ public sealed partial class Mutation
         var offer = new BuildingSaleOffer
         {
             Id = Guid.NewGuid(),
+            OfferVersion = Guid.NewGuid(),
             BuildingId = building.Id,
             BuyerPlayerId = userId,
             BuyerCompanyId = buyerCompany.Id,
@@ -158,13 +159,39 @@ public sealed partial class Mutation
             .ThenInclude(c => c.BankAccounts)
             .FirstOrDefaultAsync(o => o.Id == input.OfferId);
 
-        if (offer is null || offer.Status != BuildingSaleOfferStatus.Pending)
+        if (offer is null)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
                     .SetMessage("Offer not found or no longer pending.")
                     .SetCode("OFFER_NOT_FOUND")
                     .Build());
+        }
+
+        if (offer.Status != BuildingSaleOfferStatus.Pending)
+        {
+            await LogOfferVersionConflictAsync(
+                db,
+                action: "ACCEPT",
+                actorPlayerId: userId,
+                offerId: input.OfferId,
+                buyerPlayerId: offer.BuyerPlayerId,
+                expectedVersion: input.OfferVersion,
+                actualVersion: offer.OfferVersion);
+            throw BuildOfferVersionConflictException();
+        }
+
+        if (offer.OfferVersion != input.OfferVersion)
+        {
+            await LogOfferVersionConflictAsync(
+                db,
+                action: "ACCEPT",
+                actorPlayerId: userId,
+                offerId: input.OfferId,
+                buyerPlayerId: offer.BuyerPlayerId,
+                expectedVersion: input.OfferVersion,
+                actualVersion: offer.OfferVersion);
+            throw BuildOfferVersionConflictException();
         }
 
         var building = offer.Building;
@@ -324,14 +351,68 @@ public sealed partial class Mutation
                 building.Name)
             : null;
 
+        await using var tx = db.Database.IsRelational()
+            ? await db.Database.BeginTransactionAsync()
+            : null;
+
+        var acceptedOfferVersion = Guid.NewGuid();
+        var acceptedRows = 0;
+        if (db.Database.IsRelational())
+        {
+            acceptedRows = await db.BuildingSaleOffers
+                .Where(o =>
+                    o.Id == input.OfferId
+                    && o.Status == BuildingSaleOfferStatus.Pending
+                    && o.OfferVersion == input.OfferVersion)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(o => o.Status, BuildingSaleOfferStatus.Accepted)
+                    .SetProperty(o => o.ResolvedAtUtc, nowUtc)
+                    .SetProperty(o => o.OfferVersion, acceptedOfferVersion));
+        }
+        else
+        {
+            var matchingOffer = await db.BuildingSaleOffers
+                .FirstOrDefaultAsync(o =>
+                    o.Id == input.OfferId
+                    && o.Status == BuildingSaleOfferStatus.Pending
+                    && o.OfferVersion == input.OfferVersion);
+            if (matchingOffer is not null)
+            {
+                matchingOffer.Status = BuildingSaleOfferStatus.Accepted;
+                matchingOffer.ResolvedAtUtc = nowUtc;
+                matchingOffer.OfferVersion = acceptedOfferVersion;
+                acceptedRows = 1;
+            }
+        }
+
+        if (acceptedRows != 1)
+        {
+            var latest = await db.BuildingSaleOffers
+                .AsNoTracking()
+                .Where(o => o.Id == input.OfferId)
+                .Select(o => new { o.BuyerPlayerId, o.OfferVersion })
+                .FirstOrDefaultAsync();
+            await LogOfferVersionConflictAsync(
+                db,
+                action: "ACCEPT",
+                actorPlayerId: userId,
+                offerId: input.OfferId,
+                buyerPlayerId: latest?.BuyerPlayerId ?? offer.BuyerPlayerId,
+                expectedVersion: input.OfferVersion,
+                actualVersion: latest?.OfferVersion);
+            if (tx is not null)
+            {
+                await tx.CommitAsync();
+            }
+            throw BuildOfferVersionConflictException();
+        }
+
         // Transfer building ownership
         building.CompanyId = offer.BuyerCompanyId;
         building.IsForSale = false;
         building.AskingPrice = null;
 
         // Mark this offer as accepted
-        offer.Status = BuildingSaleOfferStatus.Accepted;
-        offer.ResolvedAtUtc = nowUtc;
 
         // Reject all other pending offers for this building
         var otherOffers = await db.BuildingSaleOffers
@@ -346,6 +427,7 @@ public sealed partial class Mutation
         {
             rejected.Status = BuildingSaleOfferStatus.Rejected;
             rejected.ResolvedAtUtc = nowUtc;
+            rejected.OfferVersion = Guid.NewGuid();
 
             // Notify other buyers of rejection
             db.PlayerNotifications.Add(new PlayerNotification
@@ -443,19 +525,52 @@ public sealed partial class Mutation
             CreatedAtTick = currentTick,
         });
 
-        await db.SaveChangesAsync();
+        try
+        {
+            await db.SaveChangesAsync();
+            if (tx is not null)
+            {
+                await tx.CommitAsync();
+            }
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            if (tx is not null)
+            {
+                await tx.RollbackAsync();
+            }
+
+            db.ChangeTracker.Clear();
+            var latest = await db.BuildingSaleOffers
+                .AsNoTracking()
+                .Where(o => o.Id == input.OfferId)
+                .Select(o => new { o.BuyerPlayerId, o.OfferVersion })
+                .FirstOrDefaultAsync();
+            await LogOfferVersionConflictAsync(
+                db,
+                action: "ACCEPT",
+                actorPlayerId: userId,
+                offerId: input.OfferId,
+                buyerPlayerId: latest?.BuyerPlayerId ?? offer.BuyerPlayerId,
+                expectedVersion: input.OfferVersion,
+                actualVersion: latest?.OfferVersion);
+            throw BuildOfferVersionConflictException();
+        }
+        var acceptedOffer = await db.BuildingSaleOffers
+            .AsNoTracking()
+            .FirstAsync(o => o.Id == offer.Id);
 
         return new AcceptBuildingOfferResult
         {
             Building = building,
-            Offer = offer,
+            Offer = acceptedOffer,
         };
     }
 
-    /// <summary>Seller rejects a pending offer.</summary>
+    /// <summary>Seller cancels a pending offer.</summary>
     [Authorize]
-    public async Task<BuildingSaleOffer> RejectBuildingOffer(
-        RejectBuildingOfferInput input,
+    public async Task<BuildingSaleOffer> CancelBuildingOffer(
+        CancelBuildingOfferInput input,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
@@ -470,13 +585,39 @@ public sealed partial class Mutation
             .Include(o => o.BuyerCompany)
             .FirstOrDefaultAsync(o => o.Id == input.OfferId);
 
-        if (offer is null || offer.Status != BuildingSaleOfferStatus.Pending)
+        if (offer is null)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
                     .SetMessage("Offer not found or no longer pending.")
                     .SetCode("OFFER_NOT_FOUND")
                     .Build());
+        }
+
+        if (offer.Status != BuildingSaleOfferStatus.Pending)
+        {
+            await LogOfferVersionConflictAsync(
+                db,
+                action: "CANCEL",
+                actorPlayerId: userId,
+                offerId: input.OfferId,
+                buyerPlayerId: offer.BuyerPlayerId,
+                expectedVersion: input.OfferVersion,
+                actualVersion: offer.OfferVersion);
+            throw BuildOfferVersionConflictException();
+        }
+
+        if (offer.OfferVersion != input.OfferVersion)
+        {
+            await LogOfferVersionConflictAsync(
+                db,
+                action: "CANCEL",
+                actorPlayerId: userId,
+                offerId: input.OfferId,
+                buyerPlayerId: offer.BuyerPlayerId,
+                expectedVersion: input.OfferVersion,
+                actualVersion: offer.OfferVersion);
+            throw BuildOfferVersionConflictException();
         }
 
         if (offer.Building.Company.PlayerId != userId)
@@ -491,9 +632,63 @@ public sealed partial class Mutation
         var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync();
         var city = offer.Building.City;
         var currencyCode = city.CurrencyCode;
+        var nowUtc = DateTime.UtcNow;
 
-        offer.Status = BuildingSaleOfferStatus.Rejected;
-        offer.ResolvedAtUtc = DateTime.UtcNow;
+        await using var tx = db.Database.IsRelational()
+            ? await db.Database.BeginTransactionAsync()
+            : null;
+
+        var cancelledOfferVersion = Guid.NewGuid();
+        var cancelledRows = 0;
+        if (db.Database.IsRelational())
+        {
+            cancelledRows = await db.BuildingSaleOffers
+                .Where(o =>
+                    o.Id == input.OfferId
+                    && o.Status == BuildingSaleOfferStatus.Pending
+                    && o.OfferVersion == input.OfferVersion)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(o => o.Status, BuildingSaleOfferStatus.Rejected)
+                    .SetProperty(o => o.ResolvedAtUtc, nowUtc)
+                    .SetProperty(o => o.OfferVersion, cancelledOfferVersion));
+        }
+        else
+        {
+            var matchingOffer = await db.BuildingSaleOffers
+                .FirstOrDefaultAsync(o =>
+                    o.Id == input.OfferId
+                    && o.Status == BuildingSaleOfferStatus.Pending
+                    && o.OfferVersion == input.OfferVersion);
+            if (matchingOffer is not null)
+            {
+                matchingOffer.Status = BuildingSaleOfferStatus.Rejected;
+                matchingOffer.ResolvedAtUtc = nowUtc;
+                matchingOffer.OfferVersion = cancelledOfferVersion;
+                cancelledRows = 1;
+            }
+        }
+
+        if (cancelledRows != 1)
+        {
+            var latest = await db.BuildingSaleOffers
+                .AsNoTracking()
+                .Where(o => o.Id == input.OfferId)
+                .Select(o => new { o.BuyerPlayerId, o.OfferVersion })
+                .FirstOrDefaultAsync();
+            await LogOfferVersionConflictAsync(
+                db,
+                action: "CANCEL",
+                actorPlayerId: userId,
+                offerId: input.OfferId,
+                buyerPlayerId: latest?.BuyerPlayerId ?? offer.BuyerPlayerId,
+                expectedVersion: input.OfferVersion,
+                actualVersion: latest?.OfferVersion);
+            if (tx is not null)
+            {
+                await tx.CommitAsync();
+            }
+            throw BuildOfferVersionConflictException();
+        }
 
         db.PlayerNotifications.Add(new PlayerNotification
         {
@@ -506,8 +701,85 @@ public sealed partial class Mutation
             CreatedAtTick = gameState?.CurrentTick ?? 0,
         });
 
+        try
+        {
+            await db.SaveChangesAsync();
+            if (tx is not null)
+            {
+                await tx.CommitAsync();
+            }
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            if (tx is not null)
+            {
+                await tx.RollbackAsync();
+            }
+
+            db.ChangeTracker.Clear();
+            var latest = await db.BuildingSaleOffers
+                .AsNoTracking()
+                .Where(o => o.Id == input.OfferId)
+                .Select(o => new { o.BuyerPlayerId, o.OfferVersion })
+                .FirstOrDefaultAsync();
+            await LogOfferVersionConflictAsync(
+                db,
+                action: "CANCEL",
+                actorPlayerId: userId,
+                offerId: input.OfferId,
+                buyerPlayerId: latest?.BuyerPlayerId ?? offer.BuyerPlayerId,
+                expectedVersion: input.OfferVersion,
+                actualVersion: latest?.OfferVersion);
+            throw BuildOfferVersionConflictException();
+        }
+        return await db.BuildingSaleOffers
+            .AsNoTracking()
+            .FirstAsync(o => o.Id == input.OfferId);
+    }
+
+    /// <summary>Seller rejects a pending offer.</summary>
+    [Authorize]
+    public Task<BuildingSaleOffer> RejectBuildingOffer(
+        RejectBuildingOfferInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor) =>
+        CancelBuildingOffer(
+            new CancelBuildingOfferInput
+            {
+                OfferId = input.OfferId,
+                OfferVersion = input.OfferVersion,
+            },
+            db,
+            httpContextAccessor);
+
+    private static GraphQLException BuildOfferVersionConflictException() =>
+        new(
+            ErrorBuilder.New()
+                .SetMessage("This building was just sold or the offer changed — please refresh the market listing.")
+                .SetCode("OFFER_VERSION_CONFLICT")
+                .Build());
+
+    private static async Task LogOfferVersionConflictAsync(
+        AppDbContext db,
+        string action,
+        Guid actorPlayerId,
+        Guid offerId,
+        Guid buyerPlayerId,
+        Guid expectedVersion,
+        Guid? actualVersion)
+    {
+        db.BuildingOfferSecurityAuditLogs.Add(new BuildingOfferSecurityAuditLog
+        {
+            Id = Guid.NewGuid(),
+            OfferId = offerId,
+            BuyerPlayerId = buyerPlayerId,
+            ActorPlayerId = actorPlayerId,
+            Action = action,
+            ExpectedOfferVersion = expectedVersion,
+            ActualOfferVersion = actualVersion,
+            OccurredAtUtc = DateTime.UtcNow,
+        });
         await db.SaveChangesAsync();
-        return offer;
     }
 }
 

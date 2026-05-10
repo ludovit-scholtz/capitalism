@@ -3608,6 +3608,9 @@ export default {
     rejectOffer: 'Odmietnuť',
     offerAccepted: 'Ponuka prijatá. Budova prevedená na kupujúceho.',
     offerRejected: 'Ponuka odmietnutá.',
+    offerConflictRefreshing:
+      'Ponuka už bola obsadená — obnovujem trh…',
+    processingOffer: 'Spracováva sa…',
     offerStatus: {
       PENDING: 'Čakajúca',
       ACCEPTED: 'Prijatá',

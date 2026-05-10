@@ -236,6 +236,7 @@ public sealed partial class AppDbContext
             e.HasKey(o => o.Id);
             e.Property(o => o.OfferedPrice).HasPrecision(18, 2);
             e.Property(o => o.Status).HasMaxLength(20);
+            e.Property(o => o.OfferVersion).IsConcurrencyToken();
             e.Property(o => o.NegotiationNote).HasMaxLength(500);
             e.HasIndex(o => o.BuildingId);
             e.HasIndex(o => o.BuyerPlayerId);
@@ -243,6 +244,14 @@ public sealed partial class AppDbContext
             e.HasOne(o => o.Building).WithMany().HasForeignKey(o => o.BuildingId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(o => o.BuyerPlayer).WithMany().HasForeignKey(o => o.BuyerPlayerId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(o => o.BuyerCompany).WithMany().HasForeignKey(o => o.BuyerCompanyId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<BuildingOfferSecurityAuditLog>(e =>
+        {
+            e.HasKey(log => log.Id);
+            e.Property(log => log.Action).HasMaxLength(40);
+            e.HasIndex(log => new { log.OfferId, log.OccurredAtUtc });
+            e.HasIndex(log => new { log.BuyerPlayerId, log.OccurredAtUtc });
         });
     }
 }
