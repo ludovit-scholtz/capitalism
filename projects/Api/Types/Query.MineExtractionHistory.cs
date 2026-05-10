@@ -1,6 +1,7 @@
 using Api.Data;
 using Api.Engine;
 using Api.Security;
+using Api.Utilities;
 using HotChocolate;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +11,92 @@ namespace Api.Types;
 
 public sealed partial class Query
 {
+    [GraphQLName("getMineExtractionIntelligence")]
+    [Authorize]
+    public async Task<MineExtractionIntelligence?> GetMineExtractionIntelligence(
+        Guid buildingId,
+        int days,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var effectiveDays = Math.Clamp(days <= 0 ? 30 : days, 1, 90);
+        var maxRecords = effectiveDays * GameConstants.TicksPerDay;
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var building = await db.Buildings
+            .AsNoTracking()
+            .Include(b => b.Company)
+            .FirstOrDefaultAsync(b => b.Id == buildingId);
+
+        if (building is null || building.Company.PlayerId != userId)
+            return null;
+
+        var gameState = await db.GameStates.AsNoTracking().FirstOrDefaultAsync();
+        var currentTick = gameState?.CurrentTick ?? 0L;
+
+        var lot = await db.BuildingLots
+            .AsNoTracking()
+            .FirstOrDefaultAsync(l => l.BuildingId == buildingId);
+
+        var currentReserve = lot?.MaterialQuantity;
+        var originalReserve = lot?.OriginalMaterialQuantity ?? lot?.MaterialQuantity;
+
+        var extractionRecords = await db.MineExtractionRecords
+            .AsNoTracking()
+            .Where(r => r.BuildingId == buildingId)
+            .OrderByDescending(r => r.Tick)
+            .Take(maxRecords)
+            .ToListAsync();
+
+        var dailyExtraction = extractionRecords
+            .GroupBy(r => (int)(r.Tick / GameConstants.TicksPerDay))
+            .OrderBy(g => g.Key)
+            .Select(g => new MineExtractionDailyPoint
+            {
+                DayIndex = g.Key,
+                ExtractedAmount = g.Sum(x => x.ExtractedAmount),
+                EfficiencyPercent = g.Average(x => x.EfficiencyPercent),
+                ReserveRemaining = g.OrderByDescending(x => x.Tick).First().ReserveRemaining,
+            })
+            .ToList();
+
+        var rollingWindowTicks = 7 * GameConstants.TicksPerDay;
+        var rollingWindow = extractionRecords.Take(rollingWindowTicks).Select(r => r.ExtractedAmount);
+        var burnRatePerTick = MineExtractionIntelligenceCalculator.ComputeBurnRatePerTick(rollingWindow);
+        decimal? burnRatePerDay = burnRatePerTick.HasValue
+            ? burnRatePerTick.Value * GameConstants.TicksPerDay
+            : null;
+        var expectedDepletionTick = MineExtractionIntelligenceCalculator.ComputeExpectedDepletionTick(
+            currentTick,
+            currentReserve ?? 0m,
+            burnRatePerTick);
+        var qualityDecayInflectionTick = MineExtractionIntelligenceCalculator.ComputeQualityDecayInflectionTick(
+            currentTick,
+            currentReserve ?? 0m,
+            originalReserve,
+            burnRatePerTick);
+
+        decimal? estimatedGameDaysRemaining = null;
+        if (expectedDepletionTick.HasValue)
+        {
+            var ticksRemaining = Math.Max(0L, expectedDepletionTick.Value - currentTick);
+            estimatedGameDaysRemaining = (decimal)ticksRemaining / GameConstants.TicksPerDay;
+        }
+
+        return new MineExtractionIntelligence
+        {
+            DailyExtraction = dailyExtraction,
+            BurnRatePerTick = burnRatePerTick,
+            BurnRatePerDay = burnRatePerDay,
+            ExpectedDepletionTick = expectedDepletionTick,
+            QualityDecayInflectionTick = qualityDecayInflectionTick,
+            EstimatedGameDaysRemaining = estimatedGameDaysRemaining,
+            CurrentReserve = currentReserve,
+            OriginalReserve = originalReserve,
+            CurrentTick = currentTick,
+        };
+    }
+
     /// <summary>
     /// Returns per-tick extraction history for a mine building, ordered by tick descending.
     /// </summary>

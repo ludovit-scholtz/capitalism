@@ -12,7 +12,7 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 ### Consumable Raw Materials & Resource Scarcity Mechanics
 
-- [ ] Add a mine-side extraction history experience in building detail with a 30-day sparkline, depletion trendline, and an expanded dialog that explains reserve burn rate, expected depletion tick, and quality decay inflection points.
+- [x] (100%) Add a mine-side extraction history experience in building detail with a 30-day sparkline, depletion trendline, and an expanded dialog that explains reserve burn rate, expected depletion tick, and quality decay inflection points.
 
 ### Security Fairness Hardening
 

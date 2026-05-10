@@ -5,6 +5,7 @@ using Api.Data;
 using Api.Data.Entities;
 using Api.Engine;
 using Api.Tests.Infrastructure;
+using Api.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -168,6 +169,50 @@ public sealed class MineExtractionHistoryTests
     // ── Tests ──────────────────────────────────────────────────────────────────
 
     [Fact]
+    public void MineExtractionIntelligenceCalculator_BurnRateAndDepletionCalculations_WorkAcrossEdgeCases()
+    {
+        var uniformRate = MineExtractionIntelligenceCalculator.ComputeBurnRatePerTick([8m, 8m, 8m, 8m]);
+        Assert.Equal(8m, uniformRate);
+
+        var zeroRate = MineExtractionIntelligenceCalculator.ComputeBurnRatePerTick([0m, 0m, 0m]);
+        Assert.Equal(0m, zeroRate);
+
+        var mixedRate = MineExtractionIntelligenceCalculator.ComputeBurnRatePerTick([0m, 10m, 20m, 30m]);
+        Assert.Equal(15m, mixedRate);
+
+        var expectedTick = MineExtractionIntelligenceCalculator.ComputeExpectedDepletionTick(
+            currentTick: 1000,
+            currentReserve: 500m,
+            burnRatePerTick: 10m);
+        Assert.Equal(1050, expectedTick);
+
+        var depletedTick = MineExtractionIntelligenceCalculator.ComputeExpectedDepletionTick(
+            currentTick: 2000,
+            currentReserve: 0m,
+            burnRatePerTick: 5m);
+        Assert.Equal(1999, depletedTick);
+    }
+
+    [Fact]
+    public void MineExtractionIntelligenceCalculator_QualityInflectionTick_IsComputedFromThreshold()
+    {
+        var inflectionTick = MineExtractionIntelligenceCalculator.ComputeQualityDecayInflectionTick(
+            currentTick: 100,
+            currentReserve: 900m,
+            originalReserve: 1000m,
+            burnRatePerTick: 10m);
+
+        Assert.Equal(120, inflectionTick);
+
+        var alreadyPastInflection = MineExtractionIntelligenceCalculator.ComputeQualityDecayInflectionTick(
+            currentTick: 400,
+            currentReserve: 650m,
+            originalReserve: 1000m,
+            burnRatePerTick: 10m);
+        Assert.Equal(400, alreadyPastInflection);
+    }
+
+    [Fact]
     public async Task GetMineExtractionHistory_ReturnsRecordsSortedByTickDescending()
     {
         await using var factory = new ApiWebApplicationFactory();
@@ -198,6 +243,133 @@ public sealed class MineExtractionHistoryTests
         // Ordered descending
         Assert.True(records[0].GetProperty("tick").GetInt64() > records[1].GetProperty("tick").GetInt64());
         Assert.True(records[1].GetProperty("tick").GetInt64() > records[2].GetProperty("tick").GetInt64());
+    }
+
+    [Fact]
+    public async Task GetMineExtractionIntelligence_ReturnsDailySeriesAndForecast()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, "intel");
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var playerId = GetPlayerIdFromToken(token);
+
+        var (buildingId, _) = await SeedMineBuildingAsync(db, playerId, quantity: 900m, originalQuantity: 1000m);
+        await SeedExtractionRecordsAsync(db, buildingId, [
+            (tick: 12, amount: 12m, efficiency: 1.0m, reserve: 988m),
+            (tick: 24, amount: 8m, efficiency: 1.0m, reserve: 980m),
+            (tick: 36, amount: 10m, efficiency: 0.95m, reserve: 970m),
+            (tick: 48, amount: 10m, efficiency: 0.95m, reserve: 960m),
+        ]);
+
+        var result = await ExecuteGraphQlAsync(client, """
+            query GetIntelligence($buildingId: UUID!, $days: Int!) {
+              getMineExtractionIntelligence(buildingId: $buildingId, days: $days) {
+                burnRatePerTick
+                burnRatePerDay
+                expectedDepletionTick
+                qualityDecayInflectionTick
+                estimatedGameDaysRemaining
+                currentReserve
+                originalReserve
+                dailyExtraction {
+                  dayIndex
+                  extractedAmount
+                  efficiencyPercent
+                  reserveRemaining
+                }
+              }
+            }
+            """, new { buildingId, days = 30 }, token);
+
+        var intelligence = result.GetProperty("data").GetProperty("getMineExtractionIntelligence");
+        Assert.True(intelligence.GetProperty("burnRatePerTick").GetDecimal() > 0m);
+        Assert.True(intelligence.GetProperty("burnRatePerDay").GetDecimal() > 0m);
+        Assert.True(intelligence.GetProperty("expectedDepletionTick").GetInt64() > 0);
+        Assert.True(intelligence.GetProperty("qualityDecayInflectionTick").GetInt64() > 0);
+
+        var dailyExtraction = intelligence.GetProperty("dailyExtraction").EnumerateArray().ToList();
+        Assert.NotEmpty(dailyExtraction);
+        Assert.All(dailyExtraction, item => Assert.True(item.GetProperty("extractedAmount").GetDecimal() > 0m));
+    }
+
+    [Fact]
+    public async Task GetMineExtractionIntelligence_DifferentOwnerGetsNull()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var ownerToken = await RegisterAndGetTokenAsync(client, "intel-owner");
+        var otherToken = await RegisterAndGetTokenAsync(client, "intel-other");
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var ownerId = GetPlayerIdFromToken(ownerToken);
+
+        var (buildingId, _) = await SeedMineBuildingAsync(db, ownerId, quantity: 900m, originalQuantity: 1000m);
+        await SeedExtractionRecordsAsync(db, buildingId, [
+            (tick: 12, amount: 12m, efficiency: 1.0m, reserve: 988m),
+        ]);
+
+        var result = await ExecuteGraphQlAsync(client, """
+            query GetIntelligence($buildingId: UUID!, $days: Int!) {
+              getMineExtractionIntelligence(buildingId: $buildingId, days: $days) {
+                burnRatePerTick
+              }
+            }
+            """, new { buildingId, days = 30 }, otherToken);
+
+        Assert.Equal(JsonValueKind.Null, result.GetProperty("data").GetProperty("getMineExtractionIntelligence").ValueKind);
+    }
+
+    [Fact]
+    public async Task GetMineExtractionIntelligence_UnauthenticatedReturnsError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var result = await ExecuteGraphQlAsync(client, """
+            query GetIntelligence($buildingId: UUID!, $days: Int!) {
+              getMineExtractionIntelligence(buildingId: $buildingId, days: $days) {
+                burnRatePerTick
+              }
+            }
+            """, new { buildingId = Guid.NewGuid(), days = 30 });
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.NotEmpty(errors.EnumerateArray());
+    }
+
+    [Fact]
+    public async Task GetMineExtractionIntelligence_DepletedMineReportsPastDepletionTick()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, "intel-depleted");
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var playerId = GetPlayerIdFromToken(token);
+
+        var (buildingId, _) = await SeedMineBuildingAsync(db, playerId, quantity: 0m, originalQuantity: 1000m);
+        await SeedExtractionRecordsAsync(db, buildingId, [
+            (tick: 10, amount: 12m, efficiency: 1.0m, reserve: 988m),
+            (tick: 11, amount: 15m, efficiency: 1.0m, reserve: 973m),
+        ]);
+
+        var result = await ExecuteGraphQlAsync(client, """
+            query GetIntelligence($buildingId: UUID!, $days: Int!) {
+              getMineExtractionIntelligence(buildingId: $buildingId, days: $days) {
+                currentTick
+                expectedDepletionTick
+              }
+            }
+            """, new { buildingId, days = 30 }, token);
+
+        var intelligence = result.GetProperty("data").GetProperty("getMineExtractionIntelligence");
+        var currentTick = intelligence.GetProperty("currentTick").GetInt64();
+        var depletionTick = intelligence.GetProperty("expectedDepletionTick").GetInt64();
+        Assert.True(depletionTick < currentTick);
     }
 
     [Fact]

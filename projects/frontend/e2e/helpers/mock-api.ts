@@ -1296,6 +1296,22 @@ export type MockState = {
     currentReserve: number | null
     originalReserve: number | null
   } | null
+  mineExtractionIntelligence?: {
+    currentTick: number
+    burnRatePerTick: number | null
+    burnRatePerDay: number | null
+    expectedDepletionTick: number | null
+    qualityDecayInflectionTick: number | null
+    estimatedGameDaysRemaining: number | null
+    currentReserve: number | null
+    originalReserve: number | null
+    dailyExtraction: Array<{
+      dayIndex: number
+      extractedAmount: number
+      efficiencyPercent: number
+      reserveRemaining: number
+    }>
+  } | null
 }
 
 export interface MockBuildingMarketListing {
@@ -8892,7 +8908,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       // transferFunds mutation response includes companyName/currencySymbol/accountNumber which contain 'me' as substring
       !q.includes('transferFunds') &&
       // getMineDepletionForecast has estimatedGameDaysRemaining field which contains 'me' via 'Game'
-      !q.includes('getMineDepletionForecast')
+      !q.includes('getMineDepletionForecast') &&
+      !q.includes('getMineExtractionIntelligence')
 
     if (isStandaloneMeQuery(query)) {
       const player = resolveCurrentPlayer()
@@ -10224,6 +10241,62 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { getMineDepletionForecast: mockForecast } }),
+      })
+    }
+
+    if (query.includes('getMineExtractionIntelligence')) {
+      const mockRecords = state.mineExtractionRecords ?? []
+      const dailyMap = new Map<number, { extractedAmount: number; efficiencyTotal: number; points: number; reserveRemaining: number }>()
+      for (const record of mockRecords) {
+        const dayIndex = Math.floor(record.tick / 24)
+        const existing = dailyMap.get(dayIndex)
+        if (existing) {
+          existing.extractedAmount += record.extractedAmount
+          existing.efficiencyTotal += record.efficiencyPercent
+          existing.points += 1
+          existing.reserveRemaining = record.reserveRemaining
+        } else {
+          dailyMap.set(dayIndex, {
+            extractedAmount: record.extractedAmount,
+            efficiencyTotal: record.efficiencyPercent,
+            points: 1,
+            reserveRemaining: record.reserveRemaining,
+          })
+        }
+      }
+
+      const dailyExtraction = [...dailyMap.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .map(([dayIndex, value]) => ({
+          dayIndex,
+          extractedAmount: value.extractedAmount,
+          efficiencyPercent: value.points > 0 ? value.efficiencyTotal / value.points : 0,
+          reserveRemaining: value.reserveRemaining,
+        }))
+
+      const forecast = state.mineDepletionForecast
+      const mockIntelligence = state.mineExtractionIntelligence !== undefined
+        ? state.mineExtractionIntelligence
+        : {
+        currentTick: (mockRecords[0]?.tick ?? 0) + 1,
+        burnRatePerTick: forecast?.averageExtractionRatePerTick ?? null,
+        burnRatePerDay:
+          forecast?.averageExtractionRatePerTick !== null &&
+          forecast?.averageExtractionRatePerTick !== undefined
+            ? forecast.averageExtractionRatePerTick * 24
+            : null,
+        expectedDepletionTick: forecast?.depletionTick ?? null,
+        qualityDecayInflectionTick: forecast?.critical20PctTick ?? null,
+        estimatedGameDaysRemaining: forecast?.estimatedGameDaysRemaining ?? null,
+        currentReserve: forecast?.currentReserve ?? null,
+        originalReserve: forecast?.originalReserve ?? null,
+        dailyExtraction,
+      }
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getMineExtractionIntelligence: mockIntelligence } }),
       })
     }
 

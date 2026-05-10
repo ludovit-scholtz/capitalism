@@ -1,35 +1,31 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { gqlRequest } from '@/lib/graphql'
 import type { Building } from '@/types'
+import type { MineExtractionDailyPoint } from '@/lib/mineExtractionIntelligence'
 
 const { t } = useI18n()
 const router = useRouter()
 
 // ── Props & emits ─────────────────────────────────────────────────────────────
 
-interface ExtractionRecord {
-  tick: number
-  extractedAmount: number
-  efficiencyPercent: number
-  reserveRemaining: number
-}
-
-interface DepletionForecast {
-  averageExtractionRatePerTick: number | null
-  depletionTick: number | null
-  critical5PctTick: number | null
-  critical20PctTick: number | null
+interface ExtractionIntelligence {
+  currentTick: number
+  burnRatePerTick: number | null
+  burnRatePerDay: number | null
+  expectedDepletionTick: number | null
+  qualityDecayInflectionTick: number | null
   estimatedGameDaysRemaining: number | null
   currentReserve: number | null
   originalReserve: number | null
+  dailyExtraction: MineExtractionDailyPoint[]
 }
 
 const props = defineProps<{
   building: Building
-  initialRecords: ExtractionRecord[]
+  intelligence: ExtractionIntelligence | null
+  loading: boolean
 }>()
 
 const emit = defineEmits<{
@@ -38,51 +34,10 @@ const emit = defineEmits<{
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
-const records = ref<ExtractionRecord[]>(props.initialRecords)
-const forecast = ref<DepletionForecast | null>(null)
-const loadingForecast = ref(false)
-
-// ── Load forecast on mount ────────────────────────────────────────────────────
-
-onMounted(() => {
-  void loadForecast()
-})
-
-watch(() => props.building.id, () => { void loadForecast() })
-
-async function loadForecast() {
-  loadingForecast.value = true
-  try {
-    const result = await gqlRequest<{ getMineDepletionForecast: DepletionForecast | null }>(`
-      query GetMineDepletionForecast($buildingId: UUID!) {
-        getMineDepletionForecast(buildingId: $buildingId) {
-          averageExtractionRatePerTick
-          depletionTick
-          critical5PctTick
-          critical20PctTick
-          estimatedGameDaysRemaining
-          currentReserve
-          originalReserve
-        }
-      }
-    `, { buildingId: props.building.id })
-    forecast.value = result.getMineDepletionForecast ?? null
-  } catch {
-    forecast.value = null
-  } finally {
-    loadingForecast.value = false
-  }
-}
-
-// ── Bar chart: per-tick extraction (last 720 ticks = 30 game days) ────────────
-
-/** Records sorted ascending for chart */
-const sortedRecords = computed(() =>
-  [...records.value].sort((a, b) => a.tick - b.tick)
-)
+const dailyRecords = computed(() => props.intelligence?.dailyExtraction ?? [])
 
 const maxExtracted = computed(() => {
-  const vals = sortedRecords.value.map((r) => r.extractedAmount)
+  const vals = dailyRecords.value.map((r) => r.extractedAmount)
   return vals.length ? Math.max(...vals, 0.001) : 1
 })
 
@@ -92,8 +47,8 @@ function barHeight(extracted: number): number {
   return Math.max(2, (extracted / maxExtracted.value) * CHART_H)
 }
 
-function barColor(record: ExtractionRecord): string {
-  const original = props.building.lotOriginalMaterialQuantity ?? null
+function barColor(record: MineExtractionDailyPoint): string {
+  const original = props.intelligence?.originalReserve ?? props.building.lotOriginalMaterialQuantity ?? null
   if (!original || original <= 0) return '#22c55e'
   const pct = (record.reserveRemaining / original) * 100
   if (pct < 5) return '#ef4444'
@@ -103,73 +58,21 @@ function barColor(record: ExtractionRecord): string {
 
 // ── Depletion timeline ────────────────────────────────────────────────────────
 
-interface Milestone {
-  key: string
-  label: string
-  tick: number | null
-  gameDays: number | null
-  colorClass: string
-  icon: string
-}
-
-const currentTick = computed(() => {
-  if (records.value.length === 0) return 0
-  return Math.max(...records.value.map((r) => r.tick))
-})
-
-const milestones = computed<Milestone[]>(() => {
-  const f = forecast.value
-  if (!f) return []
-
-  const ticksPerDay = 24
-
-  function daysFromNow(tick: number | null): number | null {
-    if (tick === null) return null
-    return Math.ceil((tick - currentTick.value) / ticksPerDay)
+const intelligenceAdvice = computed(() => {
+  const remainingDays = props.intelligence?.estimatedGameDaysRemaining ?? null
+  if (remainingDays === null || remainingDays === undefined) {
+    return t('mining.intelligenceAdviceNoData')
   }
-
-  return [
-    {
-      key: 'today',
-      label: t('mining.milestoneToday'),
-      tick: currentTick.value,
-      gameDays: 0,
-      colorClass: 'text-body',
-      icon: '📍',
-    },
-    {
-      key: '20pct',
-      label: t('mining.milestone20pct'),
-      tick: f.critical20PctTick,
-      gameDays: daysFromNow(f.critical20PctTick),
-      colorClass: 'text-warning',
-      icon: '⚠️',
-    },
-    {
-      key: '5pct',
-      label: t('mining.milestone5pct'),
-      tick: f.critical5PctTick,
-      gameDays: daysFromNow(f.critical5PctTick),
-      colorClass: 'text-error',
-      icon: '🚨',
-    },
-    {
-      key: 'depletion',
-      label: t('mining.milestoneDepletion'),
-      tick: f.depletionTick,
-      gameDays: daysFromNow(f.depletionTick),
-      colorClass: 'text-error font-bold',
-      icon: '💀',
-    },
-  ].filter((m) => m.tick !== null || m.key === 'today')
+  return t('mining.intelligenceAdvice', { days: Math.ceil(remainingDays).toLocaleString() })
 })
 
 // ── Reserve percent ───────────────────────────────────────────────────────────
 
 const reservePercent = computed<number | null>(() => {
-  const f = forecast.value
-  if (!f?.currentReserve || !f.originalReserve || f.originalReserve <= 0) return null
-  return Math.round((f.currentReserve / f.originalReserve) * 100)
+  const currentReserve = props.intelligence?.currentReserve
+  const originalReserve = props.intelligence?.originalReserve
+  if (currentReserve === null || currentReserve === undefined || !originalReserve || originalReserve <= 0) return null
+  return Math.round((currentReserve / originalReserve) * 100)
 })
 
 // ── CTA: find new deposit ──────────────────────────────────────────────────────
@@ -191,12 +94,12 @@ function findNewDeposit() {
     <div
       class="mine-history-dialog relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl bg-card sm:rounded-2xl"
       role="dialog"
-      :aria-label="t('mining.depletionTimelineTitle')"
+      :aria-label="t('mining.extractionIntelligenceTitle')"
     >
       <!-- Header -->
       <div class="flex items-start justify-between border-b border-divider px-5 py-4">
         <div>
-          <h3 class="text-base font-bold text-heading">{{ t('mining.depletionTimelineTitle') }}</h3>
+          <h3 class="text-base font-bold text-heading">{{ t('mining.extractionIntelligenceTitle') }}</h3>
           <p class="mt-0.5 text-sm text-muted">{{ building.name }}</p>
         </div>
         <div class="flex items-center gap-3">
@@ -226,14 +129,14 @@ function findNewDeposit() {
       <div class="flex-1 overflow-y-auto px-5 py-4">
 
         <!-- Forecast summary -->
-        <div v-if="loadingForecast" class="mb-5 text-sm text-muted">{{ t('common.loading') }}</div>
-        <div v-else-if="forecast?.estimatedGameDaysRemaining !== null && forecast?.estimatedGameDaysRemaining !== undefined" class="mb-5 rounded-lg border border-divider bg-surface p-4">
+        <div v-if="loading" class="mb-5 text-sm text-muted">{{ t('common.loading') }}</div>
+        <div v-else-if="intelligence" class="mb-5 rounded-lg border border-divider bg-surface p-4">
           <div class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
             <div>
-              <span class="block text-xs text-muted">{{ t('mining.avgExtractionRate') }}</span>
+              <span class="block text-xs text-muted">{{ t('mining.burnRatePerDay') }}</span>
               <strong class="text-body">
                 {{ t('mining.avgExtractionRateValue', {
-                  rate: forecast.averageExtractionRatePerTick?.toLocaleString(undefined, { maximumFractionDigits: 2 }) ?? '—',
+                  rate: intelligence.burnRatePerDay?.toLocaleString(undefined, { maximumFractionDigits: 2 }) ?? '—',
                   unit: 't',
                 }) }}
               </strong>
@@ -241,74 +144,99 @@ function findNewDeposit() {
             <div>
               <span class="block text-xs text-muted">{{ t('mining.estimatedDepletion') }}</span>
               <strong class="text-body">
-                {{ t('mining.gameDaysRemaining', { days: Math.ceil(forecast.estimatedGameDaysRemaining ?? 0).toLocaleString() }) }}
+                <template v-if="intelligence.expectedDepletionTick !== null">
+                  {{ t('mining.tickWithGameDays', {
+                    tick: intelligence.expectedDepletionTick.toLocaleString(),
+                    days: Math.ceil(intelligence.estimatedGameDaysRemaining ?? 0).toLocaleString(),
+                  }) }}
+                </template>
+                <template v-else>—</template>
               </strong>
             </div>
-            <div v-if="forecast.currentReserve !== null">
+            <div v-if="intelligence.currentReserve !== null">
               <span class="block text-xs text-muted">{{ t('mining.remainingQuantity', { quantity: '', unit: '' }).trim() }}</span>
               <strong class="text-body">
-                {{ forecast.currentReserve?.toLocaleString(undefined, { maximumFractionDigits: 1 }) ?? '—' }} t
+                {{ intelligence.currentReserve?.toLocaleString(undefined, { maximumFractionDigits: 1 }) ?? '—' }} t
               </strong>
             </div>
           </div>
+          <p class="mt-3 rounded-md border border-divider bg-card px-3 py-2 text-xs text-muted">
+            {{ intelligenceAdvice }}
+          </p>
         </div>
-        <div v-else-if="!loadingForecast" class="mb-5 rounded-lg border border-divider bg-surface px-4 py-3 text-sm text-muted">
+        <div v-else-if="!loading" class="mb-5 rounded-lg border border-divider bg-surface px-4 py-3 text-sm text-muted">
           {{ t('mining.noForecastData') }}
         </div>
 
-        <!-- Depletion timeline -->
-        <section v-if="milestones.length > 0" class="depletion-timeline mb-6">
+        <section v-if="intelligence" class="depletion-timeline mb-6">
           <h4 class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
-            {{ t('mining.depletionTimeline') }}
+            {{ t('mining.extractionIntelligenceTitle') }}
           </h4>
           <div class="flex flex-col gap-2">
-            <div
-              v-for="m in milestones"
-              :key="m.key"
-              class="depletion-milestone flex items-start gap-3 rounded-lg border border-divider bg-surface px-4 py-2.5"
-            >
-              <span class="mt-0.5 text-base">{{ m.icon }}</span>
+            <div class="depletion-milestone flex items-start gap-3 rounded-lg border border-divider bg-surface px-4 py-2.5">
+              <span class="mt-0.5 text-base">📉</span>
               <div class="flex-1">
-                <span class="font-medium text-sm" :class="m.colorClass">{{ m.label }}</span>
-                <span v-if="m.gameDays !== null && m.gameDays > 0" class="ml-2 text-xs text-muted">
-                  (+{{ m.gameDays.toLocaleString() }} {{ t('mining.extractionHistoryDays', { days: '' }).trim() }})
-                </span>
-                <span v-else-if="m.gameDays === 0" class="ml-2 text-xs text-muted">
-                  {{ t('mining.milestoneToday') }}
-                </span>
+                <span class="font-medium text-sm text-body">{{ t('mining.burnRatePerTick') }}</span>
               </div>
-              <span v-if="m.tick !== null" class="text-xs text-muted">tick {{ m.tick.toLocaleString() }}</span>
+              <span class="text-xs text-muted">
+                {{ intelligence.burnRatePerTick?.toLocaleString(undefined, { maximumFractionDigits: 2 }) ?? '—' }} t/tick
+              </span>
+            </div>
+            <div class="depletion-milestone flex items-start gap-3 rounded-lg border border-divider bg-surface px-4 py-2.5">
+              <span class="mt-0.5 text-base">⏳</span>
+              <div class="flex-1">
+                <span class="font-medium text-sm text-warning">{{ t('mining.depletionTick') }}</span>
+              </div>
+              <span class="text-xs text-muted">
+                <template v-if="intelligence.expectedDepletionTick !== null">
+                  tick {{ intelligence.expectedDepletionTick.toLocaleString() }}
+                </template>
+                <template v-else>—</template>
+              </span>
+            </div>
+            <div class="depletion-milestone flex items-start gap-3 rounded-lg border border-divider bg-surface px-4 py-2.5">
+              <span class="mt-0.5 text-base">🧪</span>
+              <div class="flex-1">
+                <span class="font-medium text-sm text-warning">{{ t('mining.qualityDecayInflectionTitle') }}</span>
+                <p class="text-xs text-muted">{{ t('mining.qualityDecayInflectionDescription') }}</p>
+              </div>
+              <span class="text-xs text-muted">
+                <template v-if="intelligence.qualityDecayInflectionTick !== null">
+                  tick {{ intelligence.qualityDecayInflectionTick.toLocaleString() }}
+                </template>
+                <template v-else>—</template>
+              </span>
             </div>
           </div>
         </section>
 
-        <!-- Bar chart: per-tick extraction -->
+        <!-- Bar chart: per-day extraction -->
         <section class="mb-4">
           <h4 class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
-            {{ t('mining.perTickExtraction') }}
+            {{ t('mining.perDayExtraction') }}
           </h4>
 
-          <div v-if="sortedRecords.length === 0" class="rounded-lg border border-divider bg-surface px-4 py-6 text-center text-sm text-muted">
+          <div v-if="dailyRecords.length === 0" class="rounded-lg border border-divider bg-surface px-4 py-6 text-center text-sm text-muted">
             {{ t('mining.extractionHistoryEmpty') }}
           </div>
 
           <div v-else class="extraction-bar-chart overflow-x-auto">
             <svg
-              :width="Math.max(sortedRecords.length * 6, 300)"
+              :width="Math.max(dailyRecords.length * 10, 300)"
               :height="CHART_H + 16"
               role="img"
               :aria-label="t('mining.extractionHistoryTitle')"
             >
               <g>
                 <rect
-                  v-for="(record, i) in sortedRecords"
-                  :key="record.tick"
-                  :x="i * 6"
+                  v-for="(record, i) in dailyRecords"
+                  :key="record.dayIndex"
+                  :x="i * 10"
                   :y="CHART_H - barHeight(record.extractedAmount)"
-                  :width="5"
+                  :width="8"
                   :height="barHeight(record.extractedAmount)"
                   :fill="barColor(record)"
-                  :title="`Tick ${record.tick}: ${record.extractedAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })} t`"
+                  :title="`${t('mining.gameDayLabel', { day: record.dayIndex.toLocaleString() })}: ${record.extractedAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })} t`"
                   opacity="0.85"
                 />
               </g>
