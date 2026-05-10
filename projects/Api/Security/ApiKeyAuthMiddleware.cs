@@ -68,6 +68,12 @@ public sealed class ApiKeyAuthMiddleware(RequestDelegate next)
             return;
         }
 
+        context.Items[ApiKeyRequestContext.HttpContextItemKey] = new ApiKeyRequestContext(
+            apiKey.Id,
+            apiKey.PlayerId,
+            apiKey.Scopes ?? [],
+            apiKey.CompanyIds ?? []);
+
         // Fire-and-forget usage tracking (best effort, non-blocking).
         _ = Task.Run(async () =>
         {

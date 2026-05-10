@@ -38,6 +38,41 @@ export interface MockPlayer {
   canClaimStartupPack: boolean
 }
 
+export interface MockGameCompany {
+  id: string
+  name: string
+}
+
+export interface MockApiKey {
+  id: string
+  name: string
+  createdAtUtc: string
+  lastUsedAtUtc: string | null
+  totalCallCount: number
+  revokedAtUtc: string | null
+  scopes: string[]
+  companyIds: string[]
+  playerId: string
+  playerEmail: string
+  playerDisplayName: string
+}
+
+export interface MockApiKeyAuditLog {
+  id: string
+  keyId: string
+  keyName: string
+  playerId: string
+  playerEmail: string
+  playerDisplayName: string
+  operationName: string
+  operationType: string
+  scopeUsed: string
+  wasAllowed: boolean
+  denialCode: string | null
+  ipAddress: string | null
+  occurredAtUtc: string
+}
+
 export interface MockGoldBalance {
   playerId: string
   email: string
@@ -200,6 +235,9 @@ export interface MockState {
     recentTransactions: MockPlayerGoldTransaction[]
   } | null
   supportTickets: MockSupportTicket[]
+  myCompanies: MockGameCompany[]
+  apiKeys: MockApiKey[]
+  apiKeyAuditLogs: MockApiKeyAuditLog[]
   rankingSummary: MockRankingSummary | null
   rankingLeaderboard: MockRankingLeaderboardEntry[]
   rankingBountyDashboard: MockRankingBountyDashboardItem[]
@@ -270,6 +308,50 @@ export function makePlayer(overrides: Partial<MockPlayer> = {}): MockPlayer {
   }
 }
 
+export function makeGameCompany(overrides: Partial<MockGameCompany> = {}): MockGameCompany {
+  return {
+    id: `company-${Math.random().toString(36).slice(2)}`,
+    name: 'Example Company',
+    ...overrides,
+  }
+}
+
+export function makeApiKey(overrides: Partial<MockApiKey> = {}): MockApiKey {
+  return {
+    id: `api-key-${Math.random().toString(36).slice(2)}`,
+    name: 'Example API Key',
+    createdAtUtc: new Date().toISOString(),
+    lastUsedAtUtc: null,
+    totalCallCount: 0,
+    revokedAtUtc: null,
+    scopes: ['read-only'],
+    companyIds: [],
+    playerId: overrides.playerId ?? 'player-001',
+    playerEmail: overrides.playerEmail ?? 'alice@example.com',
+    playerDisplayName: overrides.playerDisplayName ?? 'Alice',
+    ...overrides,
+  }
+}
+
+export function makeApiKeyAuditLog(overrides: Partial<MockApiKeyAuditLog> = {}): MockApiKeyAuditLog {
+  return {
+    id: `api-audit-${Math.random().toString(36).slice(2)}`,
+    keyId: overrides.keyId ?? 'api-key-001',
+    keyName: overrides.keyName ?? 'Example API Key',
+    playerId: overrides.playerId ?? 'player-001',
+    playerEmail: overrides.playerEmail ?? 'alice@example.com',
+    playerDisplayName: overrides.playerDisplayName ?? 'Alice',
+    operationName: 'me',
+    operationType: 'query',
+    scopeUsed: 'read-only',
+    wasAllowed: true,
+    denialCode: null,
+    ipAddress: '127.0.0.1',
+    occurredAtUtc: new Date().toISOString(),
+    ...overrides,
+  }
+}
+
 export function makeSubscription(overrides: Partial<MockSubscription> = {}): MockSubscription {
   const expiresAtUtc = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
   return {
@@ -297,6 +379,9 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
     isGlobalAdmin: initialState.isGlobalAdmin ?? false,
     playerGoldAccount: initialState.playerGoldAccount ?? null,
     supportTickets: initialState.supportTickets ?? [],
+    myCompanies: initialState.myCompanies ?? [],
+    apiKeys: initialState.apiKeys ?? [],
+    apiKeyAuditLogs: initialState.apiKeyAuditLogs ?? [],
     rankingSummary: initialState.rankingSummary ?? {
       totalPoints: 125,
       globalRank: 4,
@@ -1193,6 +1278,204 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { claimStartupPack: state.subscription } }),
+      })
+      return
+    }
+
+    if (query.includes('generateApiKey')) {
+      const vars = body.variables as
+        | { input?: { name?: string; scopes?: string[]; companyIds?: string[] } }
+        | undefined
+      const created = makeApiKey({
+        name: vars?.input?.name ?? 'Generated Key',
+        scopes: vars?.input?.scopes ?? ['read-only'],
+        companyIds: vars?.input?.companyIds ?? [],
+        playerId: state.currentPlayer?.id ?? 'player-001',
+        playerEmail: state.currentPlayer?.email ?? 'alice@example.com',
+        playerDisplayName: state.currentPlayer?.displayName ?? 'Alice',
+      })
+      state.apiKeys = [created, ...state.apiKeys]
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            generateApiKey: {
+              apiKey: created,
+              plaintextKey: `plain-${created.id}`,
+            },
+          },
+        }),
+      })
+      return
+    }
+
+    if (query.includes('forceRevokeApiKey')) {
+      const vars = body.variables as { keyId?: string } | undefined
+      state.apiKeys = state.apiKeys.map((key) =>
+        key.id === vars?.keyId ? { ...key, revokedAtUtc: new Date().toISOString() } : key,
+      )
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { forceRevokeApiKey: true } }),
+      })
+      return
+    }
+
+    if (query.includes('revokeAllPlayerApiKeys')) {
+      const vars = body.variables as { playerId?: string } | undefined
+      let revokedCount = 0
+      state.apiKeys = state.apiKeys.map((key) => {
+        if (key.playerId === vars?.playerId && !key.revokedAtUtc) {
+          revokedCount += 1
+          return { ...key, revokedAtUtc: new Date().toISOString() }
+        }
+        return key
+      })
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { revokeAllPlayerApiKeys: revokedCount } }),
+      })
+      return
+    }
+
+    if (query.includes('revokeApiKey')) {
+      const vars = body.variables as { input?: { keyId?: string } } | undefined
+      state.apiKeys = state.apiKeys.map((key) =>
+        key.id === vars?.input?.keyId ? { ...key, revokedAtUtc: new Date().toISOString() } : key,
+      )
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { revokeApiKey: true } }),
+      })
+      return
+    }
+
+    if (query.includes('executeForexSwap')) {
+      const authorization = route.request().headers().authorization ?? ''
+      if (authorization.startsWith('ApiKey ')) {
+        const rawKey = authorization.slice('ApiKey '.length)
+        const matchedKey = state.apiKeys.find((key) => `plain-${key.id}` === rawKey)
+        if (!matchedKey) {
+          await route.fulfill({
+            status: 403,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              data: null,
+              errors: [{ message: 'Forbidden.', extensions: { code: 'API_KEY_SCOPE_FORBIDDEN' } }],
+            }),
+          })
+          return
+        }
+
+        const allowed = matchedKey.scopes.includes('trading-only')
+        const usedScope =
+          matchedKey.scopes.find((scope) => scope !== 'company-bound') ?? matchedKey.scopes[0] ?? 'none'
+        state.apiKeyAuditLogs = [
+          makeApiKeyAuditLog({
+            keyId: matchedKey.id,
+            keyName: matchedKey.name,
+            playerId: matchedKey.playerId,
+            playerEmail: matchedKey.playerEmail,
+            playerDisplayName: matchedKey.playerDisplayName,
+            operationName: 'executeForexSwap',
+            operationType: 'mutation',
+            scopeUsed: allowed ? 'trading-only' : usedScope,
+            wasAllowed: allowed,
+            denialCode: allowed ? null : 'API_KEY_SCOPE_FORBIDDEN',
+          }),
+          ...state.apiKeyAuditLogs,
+        ]
+
+        await route.fulfill({
+          status: allowed ? 200 : 403,
+          contentType: 'application/json',
+          body: JSON.stringify(
+            allowed
+              ? { data: { executeForexSwap: { fromAmount: 100 } } }
+              : {
+                  data: null,
+                  errors: [
+                    { message: 'Forbidden.', extensions: { code: 'API_KEY_SCOPE_FORBIDDEN' } },
+                  ],
+                },
+          ),
+        })
+        return
+      }
+    }
+
+    if (query.includes('myCompanies')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { myCompanies: state.myCompanies } }),
+      })
+      return
+    }
+
+    if (query.includes('myApiKeys')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            myApiKeys: state.apiKeys.filter((key) => key.playerId === state.currentPlayer?.id),
+          },
+        }),
+      })
+      return
+    }
+
+    if (query.includes('myApiKeyAuditLog')) {
+      const vars = body.variables as { keyId?: string } | undefined
+      const items = state.apiKeyAuditLogs.filter(
+        (entry) =>
+          entry.playerId === state.currentPlayer?.id &&
+          (!vars?.keyId || entry.keyId === vars.keyId),
+      )
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { myApiKeyAuditLog: items } }),
+      })
+      return
+    }
+
+    if (query.includes('adminApiKeys')) {
+      const vars = body.variables as { playerEmail?: string | null } | undefined
+      const filter = vars?.playerEmail?.toLowerCase()
+      const items = state.apiKeys
+        .filter((key) => !filter || key.playerEmail.toLowerCase().includes(filter))
+        .map((key) => ({
+          playerId: key.playerId,
+          playerEmail: key.playerEmail,
+          playerDisplayName: key.playerDisplayName,
+          key,
+        }))
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { adminApiKeys: items } }),
+      })
+      return
+    }
+
+    if (query.includes('adminApiKeyAuditLog')) {
+      const vars = body.variables as { playerEmail?: string | null; keyId?: string | null } | undefined
+      const filter = vars?.playerEmail?.toLowerCase()
+      const items = state.apiKeyAuditLogs.filter(
+        (entry) =>
+          (!filter || entry.playerEmail.toLowerCase().includes(filter)) &&
+          (!vars?.keyId || entry.keyId === vars.keyId),
+      )
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { adminApiKeyAuditLog: items } }),
       })
       return
     }

@@ -26,6 +26,12 @@ public sealed class PlayerApiKey
     [Required, MaxLength(64)]
     public string KeyHash { get; set; } = string.Empty;
 
+    /// <summary>Granted scope codes such as read-only, bot-only, trading-only, and company-bound.</summary>
+    public string[] Scopes { get; set; } = [];
+
+    /// <summary>Allowed company IDs when the company-bound scope is granted.</summary>
+    public Guid[] CompanyIds { get; set; } = [];
+
     /// <summary>UTC timestamp when the key was created.</summary>
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
