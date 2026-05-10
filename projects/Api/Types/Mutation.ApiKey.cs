@@ -54,6 +54,52 @@ public sealed partial class Mutation
                     .Build());
         }
 
+        var normalizedScopes = NormalizeScopes(input.Scopes);
+        if (normalizedScopes.Count == 0)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("At least one API key scope is required.")
+                    .SetCode("API_KEY_SCOPE_REQUIRED")
+                    .Build());
+        }
+
+        var normalizedCompanyIds = NormalizeCompanyIds(input.CompanyIds);
+        var hasCompanyBoundScope = normalizedScopes.Contains(ApiKeyScopes.CompanyBound, StringComparer.Ordinal);
+        if (hasCompanyBoundScope && normalizedCompanyIds.Length == 0)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Company-bound API keys must include at least one allowed company.")
+                    .SetCode("API_KEY_COMPANY_REQUIRED")
+                    .Build());
+        }
+
+        if (!hasCompanyBoundScope && normalizedCompanyIds.Length > 0)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Allowed company IDs can be set only for company-bound API keys.")
+                    .SetCode("API_KEY_COMPANY_SCOPE_REQUIRED")
+                    .Build());
+        }
+
+        if (normalizedCompanyIds.Length > 0)
+        {
+            var ownedCompanyCount = await db.Companies
+                .CountAsync(
+                    company => company.PlayerId == playerId && normalizedCompanyIds.Contains(company.Id),
+                    ct);
+            if (ownedCompanyCount != normalizedCompanyIds.Length)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("One or more allowed company IDs do not belong to you.")
+                        .SetCode("COMPANY_NOT_FOUND")
+                        .Build());
+            }
+        }
+
         var (plaintext, hash) = ApiKeyAuthMiddleware.GenerateNewKey();
 
         var apiKey = new PlayerApiKey
@@ -62,6 +108,8 @@ public sealed partial class Mutation
             PlayerId = playerId,
             Name = trimmedName,
             KeyHash = hash,
+            Scopes = normalizedScopes.ToArray(),
+            CompanyIds = normalizedCompanyIds,
             CreatedAtUtc = DateTime.UtcNow,
         };
 
@@ -77,6 +125,8 @@ public sealed partial class Mutation
                 CreatedAtUtc = apiKey.CreatedAtUtc,
                 LastUsedAtUtc = apiKey.LastUsedAtUtc,
                 TotalCallCount = apiKey.TotalCallCount,
+                Scopes = apiKey.Scopes,
+                CompanyIds = apiKey.CompanyIds,
             },
             // Shown exactly once.
             PlaintextKey = plaintext,
@@ -117,11 +167,93 @@ public sealed partial class Mutation
         await db.SaveChangesAsync(ct);
         return true;
     }
+
+    [Authorize(Policy = Policies.Admin)]
+    public async Task<bool> ForceRevokeApiKey(
+        Guid keyId,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var ct = httpContextAccessor.HttpContext!.RequestAborted;
+        var apiKey = await db.PlayerApiKeys.FirstOrDefaultAsync(key => key.Id == keyId, ct)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("API key not found.")
+                    .SetCode("NOT_FOUND")
+                    .Build());
+
+        if (apiKey.RevokedAtUtc is null)
+        {
+            apiKey.RevokedAtUtc = DateTime.UtcNow;
+            await db.SaveChangesAsync(ct);
+        }
+
+        return true;
+    }
+
+    [Authorize(Policy = Policies.Admin)]
+    public async Task<int> RevokeAllPlayerApiKeys(
+        Guid playerId,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var ct = httpContextAccessor.HttpContext!.RequestAborted;
+        var now = DateTime.UtcNow;
+        var affectedRows = await db.PlayerApiKeys
+            .Where(key => key.PlayerId == playerId && key.RevokedAtUtc == null)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(key => key.RevokedAtUtc, now),
+                ct);
+        return affectedRows;
+    }
+
+    private static List<string> NormalizeScopes(IReadOnlyCollection<string>? scopes)
+    {
+        var normalized = new List<string>();
+        if (scopes is null)
+        {
+            return normalized;
+        }
+
+        foreach (var scope in scopes)
+        {
+            var normalizedScope = ApiKeyScopes.Normalize(scope);
+            if (normalizedScope is null)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage($"Invalid API key scope '{scope}'.")
+                        .SetCode("INVALID_API_KEY_SCOPE")
+                        .Build());
+            }
+
+            if (!normalized.Contains(normalizedScope, StringComparer.Ordinal))
+            {
+                normalized.Add(normalizedScope);
+            }
+        }
+
+        return normalized;
+    }
+
+    private static Guid[] NormalizeCompanyIds(IReadOnlyCollection<Guid>? companyIds)
+        => companyIds?
+            .Where(id => id != Guid.Empty)
+            .Distinct()
+            .ToArray()
+            ?? [];
 }
 
 // ─── Input / Payload types ───────────────────────────────────────────────────
 
-public sealed record GenerateApiKeyInput(string? Name);
+public sealed class GenerateApiKeyInput
+{
+    public string? Name { get; init; }
+
+    public IReadOnlyCollection<string>? Scopes { get; init; }
+
+    public IReadOnlyCollection<Guid>? CompanyIds { get; init; }
+}
 
 public sealed record RevokeApiKeyInput(Guid KeyId);
 
@@ -142,4 +274,6 @@ public sealed class ApiKeyResult
     public DateTime? LastUsedAtUtc { get; init; }
     public long TotalCallCount { get; init; }
     public DateTime? RevokedAtUtc { get; init; }
+    public IReadOnlyList<string> Scopes { get; init; } = [];
+    public IReadOnlyList<Guid> CompanyIds { get; init; } = [];
 }

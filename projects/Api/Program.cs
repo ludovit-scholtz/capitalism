@@ -287,6 +287,7 @@ public class Program
         app.UseMiddleware<ApiKeyAuthMiddleware>();
         app.UseAuthentication();
         app.UseAuthorization();
+        app.UseMiddleware<ApiKeyScopeMiddleware>();
         app.UseMiddleware<GameEndedMutationGuardMiddleware>();
         app.UseMiddleware<AdminAuditLoggingMiddleware>();
 

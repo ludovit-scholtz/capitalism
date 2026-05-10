@@ -27,9 +27,27 @@ public sealed partial class AppDbContext
             e.HasIndex(k => k.PlayerId);
             e.Property(k => k.Name).HasMaxLength(80);
             e.Property(k => k.KeyHash).HasMaxLength(64);
+            e.Property(k => k.Scopes).HasColumnType("text[]");
+            e.Property(k => k.CompanyIds).HasColumnType("uuid[]");
             e.HasOne(k => k.Player)
                 .WithMany()
                 .HasForeignKey(k => k.PlayerId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PlayerApiKeyAuditLog>(e =>
+        {
+            e.HasKey(log => log.Id);
+            e.Property(log => log.OperationName).HasMaxLength(160);
+            e.Property(log => log.OperationType).HasMaxLength(16);
+            e.Property(log => log.ScopeUsed).HasMaxLength(40);
+            e.Property(log => log.DenialCode).HasMaxLength(80);
+            e.Property(log => log.IpAddress).HasMaxLength(64);
+            e.HasIndex(log => new { log.PlayerApiKeyId, log.OccurredAtUtc });
+            e.HasIndex(log => new { log.PlayerId, log.OccurredAtUtc });
+            e.HasOne(log => log.PlayerApiKey)
+                .WithMany()
+                .HasForeignKey(log => log.PlayerApiKeyId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
