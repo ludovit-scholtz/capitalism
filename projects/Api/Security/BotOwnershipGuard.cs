@@ -12,7 +12,6 @@ namespace Api.Security;
 public sealed class BotOwnershipGuard(AppDbContext db)
 {
     public const string NotFoundOrNotOwnedCode = "NOT_FOUND_OR_NOT_OWNED";
-    public const string NotOwnedOrNotFoundCode = NotFoundOrNotOwnedCode;
     public const string AuthorizationReasonNotFound = "NOT_FOUND";
     public const string AuthorizationReasonNotOwned = "NOT_OWNED";
 

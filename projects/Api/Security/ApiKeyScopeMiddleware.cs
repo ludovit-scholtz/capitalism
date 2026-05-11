@@ -300,7 +300,7 @@ public sealed class ApiKeyScopeMiddleware(RequestDelegate next)
             {
                 await ownershipGuard.EnsureMutationOwnershipAsync(rootField, variables, apiKeyContext.PlayerId, cancellationToken);
             }
-            catch (GraphQLException ex) when (TryGetErrorCode(ex) == BotOwnershipGuard.NotOwnedOrNotFoundCode)
+            catch (GraphQLException ex) when (TryGetErrorCode(ex) == BotOwnershipGuard.NotFoundOrNotOwnedCode)
             {
                 var denialReason = TryGetErrorExtension(ex, "authorizationReason");
                 var attemptedObjectId = TryGetErrorExtension(ex, "attemptedObjectId");
@@ -309,7 +309,7 @@ public sealed class ApiKeyScopeMiddleware(RequestDelegate next)
                     rootField,
                     "mutation",
                     scopeUsed,
-                    BotOwnershipGuard.NotOwnedOrNotFoundCode,
+                    BotOwnershipGuard.NotFoundOrNotOwnedCode,
                     denialReason,
                     attemptedObjectId));
                 continue;

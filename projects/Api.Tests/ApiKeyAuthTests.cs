@@ -818,7 +818,7 @@ public sealed class ApiKeyAuthTests : IClassFixture<ApiWebApplicationFactory>
 
         Assert.Equal(HttpStatusCode.Forbidden, foreignResponse.StatusCode);
         Assert.Equal(
-            BotOwnershipGuard.NotOwnedOrNotFoundCode,
+            BotOwnershipGuard.NotFoundOrNotOwnedCode,
             foreignBody.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
 
         var (missingResponse, missingBody) = await SendWithStatusAsync(
@@ -840,7 +840,7 @@ public sealed class ApiKeyAuthTests : IClassFixture<ApiWebApplicationFactory>
 
         Assert.Equal(HttpStatusCode.Forbidden, missingResponse.StatusCode);
         Assert.Equal(
-            BotOwnershipGuard.NotOwnedOrNotFoundCode,
+            BotOwnershipGuard.NotFoundOrNotOwnedCode,
             missingBody.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
 
         var auditResult = await SendAsync(
@@ -863,15 +863,15 @@ public sealed class ApiKeyAuthTests : IClassFixture<ApiWebApplicationFactory>
             entry.GetProperty("keyId").GetString() == keyId.ToString()
             && entry.GetProperty("operationName").GetString() == "executeForexSwap"
             && !entry.GetProperty("wasAllowed").GetBoolean()
-            && entry.GetProperty("denialCode").GetString() == BotOwnershipGuard.NotOwnedOrNotFoundCode);
+            && entry.GetProperty("denialCode").GetString() == BotOwnershipGuard.NotFoundOrNotOwnedCode);
         Assert.Contains(entries, entry =>
             entry.GetProperty("attemptedObjectId").GetString() == foreignAccountId.ToString()
             && entry.GetProperty("denialReason").GetString() == BotOwnershipGuard.AuthorizationReasonNotOwned
-            && entry.GetProperty("denialCode").GetString() == BotOwnershipGuard.NotOwnedOrNotFoundCode);
+            && entry.GetProperty("denialCode").GetString() == BotOwnershipGuard.NotFoundOrNotOwnedCode);
         Assert.Contains(entries, entry =>
             entry.GetProperty("attemptedObjectId").GetString() == missingAccountId.ToString()
             && entry.GetProperty("denialReason").GetString() == BotOwnershipGuard.AuthorizationReasonNotFound
-            && entry.GetProperty("denialCode").GetString() == BotOwnershipGuard.NotOwnedOrNotFoundCode);
+            && entry.GetProperty("denialCode").GetString() == BotOwnershipGuard.NotFoundOrNotOwnedCode);
         Assert.NotEqual(ownerPlayerId, foreignPlayerId);
     }
 
@@ -903,7 +903,7 @@ public sealed class ApiKeyAuthTests : IClassFixture<ApiWebApplicationFactory>
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal(
-            BotOwnershipGuard.NotOwnedOrNotFoundCode,
+            BotOwnershipGuard.NotFoundOrNotOwnedCode,
             body.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
@@ -935,7 +935,7 @@ public sealed class ApiKeyAuthTests : IClassFixture<ApiWebApplicationFactory>
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal(
-            BotOwnershipGuard.NotOwnedOrNotFoundCode,
+            BotOwnershipGuard.NotFoundOrNotOwnedCode,
             body.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
@@ -965,7 +965,7 @@ public sealed class ApiKeyAuthTests : IClassFixture<ApiWebApplicationFactory>
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal(
-            BotOwnershipGuard.NotOwnedOrNotFoundCode,
+            BotOwnershipGuard.NotFoundOrNotOwnedCode,
             body.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
@@ -999,7 +999,7 @@ public sealed class ApiKeyAuthTests : IClassFixture<ApiWebApplicationFactory>
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal(
-            BotOwnershipGuard.NotOwnedOrNotFoundCode,
+            BotOwnershipGuard.NotFoundOrNotOwnedCode,
             body.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
@@ -1030,7 +1030,7 @@ public sealed class ApiKeyAuthTests : IClassFixture<ApiWebApplicationFactory>
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal(
-            BotOwnershipGuard.NotOwnedOrNotFoundCode,
+            BotOwnershipGuard.NotFoundOrNotOwnedCode,
             body.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
@@ -1059,7 +1059,7 @@ public sealed class ApiKeyAuthTests : IClassFixture<ApiWebApplicationFactory>
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal(
-            BotOwnershipGuard.NotOwnedOrNotFoundCode,
+            BotOwnershipGuard.NotFoundOrNotOwnedCode,
             body.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
