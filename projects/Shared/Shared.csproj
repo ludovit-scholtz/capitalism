@@ -6,4 +6,7 @@
     <LangVersion>preview</LangVersion>
     <RootNamespace>Capitalism.Shared</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="HtmlSanitizer" Version="9.0.892" />
+  </ItemGroup>
 </Project>

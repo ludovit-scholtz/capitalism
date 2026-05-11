@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Capitalism.Shared.Security;
 using Markdig;
 
 namespace MasterApi.Utilities;
@@ -21,24 +22,12 @@ public static class SupportTicketMarkdownProcessor
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
     private static readonly Regex ScriptLikeRegex = new(
-        @"<\s*(script|iframe|object|embed)|javascript:\s*|data:\s*text/html",
+        @"<\s*(script|iframe|object|embed|svg)|javascript:\s*|data:\s*text/html|on[a-z]+\s*=",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
         .Build();
-
-    private static readonly Regex ScriptTagRegex = new(
-        @"<\s*/?\s*(script|iframe|object|embed)[^>]*>",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
-
-    private static readonly Regex EventAttributeRegex = new(
-        @"\s+on[a-z]+\s*=\s*(['""]).*?\1",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
-
-    private static readonly Regex JsProtocolRegex = new(
-        @"(href|src)\s*=\s*(['""])\s*javascript:[^\2]*\2",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
     public static SupportTicketMarkdownProcessingResult Process(string markdown)
     {
@@ -114,9 +103,6 @@ public static class SupportTicketMarkdownProcessor
 
     private static string SanitizeHtml(string html)
     {
-        var noScripts = ScriptTagRegex.Replace(html, string.Empty);
-        var noEvents = EventAttributeRegex.Replace(noScripts, string.Empty);
-        var noJsProtocols = JsProtocolRegex.Replace(noEvents, string.Empty);
-        return noJsProtocols;
+        return AllowlistHtmlSanitizer.Sanitize(html);
     }
 }

@@ -2042,6 +2042,54 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
         Assert.Equal("capitalism-local", upserted.GetProperty("targetServerKey").GetString());
     }
 
+    [Fact]
+    public async Task UpsertGameNewsEntry_SanitizesDangerousHtmlContent()
+    {
+        await RegisterDefaultGameServerAsync();
+
+        var result = await GraphQlAsync("""
+            mutation Upsert($input: UpsertGameNewsEntryInput!) {
+              upsertGameNewsEntry(input: $input) {
+                localizations {
+                  locale
+                  htmlContent
+                }
+              }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey = "capitalism-local",
+                    entryType = "NEWS",
+                    status = "DRAFT",
+                    localizations = new[]
+                    {
+                        new
+                        {
+                            locale = "en",
+                            title = "Dangerous html payload",
+                            summary = "Summary",
+                            htmlContent = "<svg onload=alert(1)></svg><a href=\"javascript:alert(1)\">x</a><p><strong>Safe</strong></p>",
+                        }
+                    }
+                }
+            });
+
+        Assert.False(result.TryGetProperty("errors", out _));
+        var htmlContent = result.GetProperty("data")
+            .GetProperty("upsertGameNewsEntry")
+            .GetProperty("localizations")[0]
+            .GetProperty("htmlContent")
+            .GetString() ?? string.Empty;
+        Assert.DoesNotContain("<svg", htmlContent, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("onload=", htmlContent, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("javascript:", htmlContent, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<strong>Safe</strong>", htmlContent);
+    }
+
     #endregion
 
     #region Additional edge-case tests

@@ -10,6 +10,7 @@ import {
   updateSupportTicketStatus,
   type SupportTicketInfo,
 } from '@/lib/masterApi'
+import { sanitizeRichHtml } from '@/lib/htmlSanitizer'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
@@ -130,6 +131,10 @@ function replaceTicket(ticket: SupportTicketInfo) {
   if (index >= 0) {
     tickets.value[index] = ticket
   }
+}
+
+function sanitizePreviewHtml(html: string): string {
+  return sanitizeRichHtml(html)
 }
 
 onMounted(async () => {
@@ -309,11 +314,11 @@ onMounted(async () => {
 
             <section class="preview-panel">
               <h3>{{ t('supportAdmin.sanitizedPreview') }}</h3>
-              <div
-                v-if="selectedTicket.sanitizedPreviewHtml"
-                class="preview-html"
-                v-html="selectedTicket.sanitizedPreviewHtml"
-              ></div>
+                <div
+                  v-if="selectedTicket.sanitizedPreviewHtml"
+                  class="preview-html"
+                  v-html="sanitizePreviewHtml(selectedTicket.sanitizedPreviewHtml)"
+                ></div>
               <p v-else class="state-message">{{ t('supportAdmin.moderationGated') }}</p>
             </section>
 

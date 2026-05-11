@@ -150,6 +150,41 @@ test.describe('Support tickets', () => {
     await expect(page.locator('.preview-html')).toBeVisible()
   })
 
+  test('support preview neutralizes injected image onerror payload', async ({ page }) => {
+    const player = makePlayer({
+      id: 'player-user-xss',
+      email: 'xss-user@example.com',
+      displayName: 'Xss User',
+    })
+    const state = setupMockApi(page, {
+      supportTickets: [
+        makeSupportTicket({
+          id: 'ticket-xss-preview',
+          createdByPlayerId: player.id,
+          createdByEmail: player.email,
+          createdByDisplayName: player.displayName,
+          moderationState: 'APPROVED',
+          sanitizedPreviewHtml: '<img src=x onerror=alert(1)><p>Safe preview</p>',
+        }),
+      ],
+    })
+    await page.addInitScript(() => {
+      ;(window as Window & { __alerts: string[] }).__alerts = []
+      window.alert = (message?: string) => {
+        ;(window as Window & { __alerts: string[] }).__alerts.push(String(message ?? ''))
+      }
+    })
+    await loginAs(page, state, player)
+
+    await page.goto('/support/tickets/ticket-xss-preview')
+
+    await expect(page.locator('.preview-html')).toContainText('Safe preview')
+    const alertCount = await page.evaluate(
+      () => (window as Window & { __alerts?: string[] }).__alerts?.length ?? 0,
+    )
+    expect(alertCount).toBe(0)
+  })
+
   test('visibility differs between user and admin ticket pages', async ({ page }) => {
     const user = makePlayer({
       id: 'player-user-3',
