@@ -7,7 +7,7 @@ Create a fun game in the style of Capitalism II, where players experience realis
 ### Onboarding
 
 - [x] (100%) The generated user name - the personal account name is not stored properly. Make sure to store it in the master server if the server does not already contain this information.
-- [x] (100%) Generated user personal account name is not used in the game ranking. Make sure to use it in the ranking in the game server. Do not use the jwt name anywhere. All Algorand wallet identifiers (58-char addresses, NFD `.algo` domains, etc.) are now detected as sensitive and replaced by a generated alias before being stored or returned in any ranking query.
+- [ ] Personal account name is generated in the onboarding process before user signs in. However in the game server the name displayed is different. It is the JWT auth name, not the generated personal account name. Make sure to use proper personal account name in the ranking in the game server. Do not use the jwt name anywhere. 
 - [x] (100%) Generated user personal account name is not used in the ranking. Make sure to use it in the ranking.
 - [x] (100%) Do not show the jwt user name anywhere to other players. The user name is generated from the user's algorand address, so for the privacy purposes it is not good to use it
 
