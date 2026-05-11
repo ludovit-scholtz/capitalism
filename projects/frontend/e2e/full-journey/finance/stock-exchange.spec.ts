@@ -679,6 +679,74 @@ test.describe('Stock exchange', () => {
     await expect(page.locator('.data-table').nth(0)).toContainText('1,250')
   })
 
+  test('tampered buyShares payload rejection shows friendly stock exchange error', async ({ page }) => {
+    const player = makePlayer({
+      personalCash: 150000,
+      companies: [makeControlledCompany()],
+    })
+    const rival = makePlayer({
+      id: 'player-tamper',
+      email: 'tamper@test.com',
+      displayName: 'Tamper Target',
+      companies: [
+        {
+          id: 'company-tamper',
+          playerId: 'player-tamper',
+          name: 'Tamper Foods',
+          cash: 800000,
+          totalSharesIssued: 10000,
+          dividendPayoutRatio: 0.35,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          foundedAtTick: 42,
+          buildings: [],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, {
+      players: [player, rival],
+      shareholdings: [
+        { companyId: 'company-home', ownerPlayerId: 'player-1', ownerCompanyId: null, shareCount: 10000 },
+        { companyId: 'company-tamper', ownerPlayerId: 'player-tamper', ownerCompanyId: null, shareCount: 4000 },
+      ],
+    })
+    player.activeAccountType = 'PERSON'
+    player.activeCompanyId = null
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    seedPersonalUsdSettlementAccount(state, player, 200_000)
+
+    await page.route('**/graphql', async (route) => {
+      const body = route.request().postDataJSON() as { query?: string }
+      if (body.query?.includes('buyShares(input: $input)')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              {
+                message: 'Rejected client override for tradeAccountCompanyId.',
+                extensions: { code: 'INVALID_CLIENT_OVERRIDE' },
+              },
+            ],
+          }),
+        })
+        return
+      }
+
+      await route.fallback()
+    })
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/stocks')
+    await openTradePanel(page, 'Tamper Foods')
+
+    const tradePanel = page.locator('.trade-panel')
+    await tradePanel.getByLabel(/Share quantity Tamper Foods/).fill('250')
+    await tradePanel.getByRole('button', { name: /Buy @ / }).click()
+    await expect(tradePanel.getByRole('alert')).toContainText('The stock exchange action could not be completed.')
+  })
+
   test('person account can sell shares via inline trade panel', async ({ page }) => {
     const player = makePlayer({
       personalCash: 150000,

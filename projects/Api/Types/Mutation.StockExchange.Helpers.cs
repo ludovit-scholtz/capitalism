@@ -8,6 +8,7 @@ using Api.Security;
 using Api.Utilities;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Api.Types;
@@ -258,19 +259,62 @@ public sealed partial class Mutation
         AppDbContext db,
         Player player,
         string accountType,
-        Guid? companyId)
+        Guid? companyId,
+        string mutationName,
+        ILogger<Mutation> logger)
     {
-        if (string.Equals(accountType, AccountContextType.Company, StringComparison.Ordinal) && companyId.HasValue)
+        if (string.Equals(accountType, AccountContextType.Company, StringComparison.Ordinal))
         {
+            if (!companyId.HasValue)
+            {
+                throw CreateInvalidClientOverrideException(
+                    logger,
+                    mutationName,
+                    player,
+                    accountType,
+                    companyId,
+                    "tradeAccountCompanyId is required when tradeAccountType is COMPANY.");
+            }
+
             var company = await db.Companies.FirstOrDefaultAsync(candidate =>
                 candidate.Id == companyId.Value && candidate.PlayerId == player.Id);
-            if (company is not null)
+            if (company is null)
             {
-                return new ActiveTradingAccount(AccountContextType.Company, company, company.Name);
+                throw CreateInvalidClientOverrideException(
+                    logger,
+                    mutationName,
+                    player,
+                    accountType,
+                    companyId,
+                    "tradeAccountCompanyId does not belong to the authenticated player.");
             }
+
+            return new ActiveTradingAccount(AccountContextType.Company, company, company.Name);
         }
 
-        return new ActiveTradingAccount(AccountContextType.Person, null, player.DisplayName);
+        if (string.Equals(accountType, AccountContextType.Person, StringComparison.Ordinal))
+        {
+            if (companyId.HasValue)
+            {
+                throw CreateInvalidClientOverrideException(
+                    logger,
+                    mutationName,
+                    player,
+                    accountType,
+                    companyId,
+                    "tradeAccountCompanyId must be null when tradeAccountType is PERSON.");
+            }
+
+            return new ActiveTradingAccount(AccountContextType.Person, null, player.DisplayName);
+        }
+
+        throw CreateInvalidClientOverrideException(
+            logger,
+            mutationName,
+            player,
+            accountType,
+            companyId,
+            "tradeAccountType must be PERSON or COMPANY.");
     }
 
     private static async Task<ActiveTradingAccount> ResolveActiveTradingAccountAsync(AppDbContext db, Player player, ClaimsPrincipal principal)
@@ -354,4 +398,28 @@ public sealed partial class Mutation
     }
 
     private sealed record ActiveTradingAccount(string AccountType, Company? Company, string AccountName);
+
+    private static GraphQLException CreateInvalidClientOverrideException(
+        ILogger<Mutation> logger,
+        string mutationName,
+        Player player,
+        string? requestedAccountType,
+        Guid? requestedCompanyId,
+        string reason)
+    {
+        logger.LogWarning(
+            "Rejected stock trade client override. Mutation: {MutationName}, PlayerId: {PlayerId}, RequestedAccountType: {RequestedAccountType}, RequestedCompanyId: {RequestedCompanyId}, Reason: {Reason}, OccurredAtUtc: {OccurredAtUtc}",
+            mutationName,
+            player.Id,
+            requestedAccountType,
+            requestedCompanyId,
+            reason,
+            DateTime.UtcNow);
+
+        return new GraphQLException(
+            ErrorBuilder.New()
+                .SetMessage("This action could not be completed. Please refresh and try again.")
+                .SetCode("INVALID_CLIENT_OVERRIDE")
+                .Build());
+    }
 }

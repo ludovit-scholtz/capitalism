@@ -8,6 +8,7 @@ using Api.Security;
 using Api.Utilities;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Api.Types;
@@ -27,6 +28,7 @@ public sealed partial class Mutation
         BuySharesInput input,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ILogger<Mutation> logger,
         [Service] IMasterRankingTelemetryService rankingTelemetry,
         [Service] IOptions<MasterServerRegistrationOptions> masterOptions)
     {
@@ -47,9 +49,12 @@ public sealed partial class Mutation
                     .SetCode("PLAYER_NOT_FOUND")
                     .Build());
 
-        var account = !string.IsNullOrEmpty(input.TradeAccountType)
-        ? await ResolveRequestedTradingAccountAsync(db, player, input.TradeAccountType, input.TradeAccountCompanyId)
-        : await ResolveActiveTradingAccountAsync(db, player, httpContextAccessor.HttpContext!.User);
+        var normalizedTradeAccountType = string.IsNullOrWhiteSpace(input.TradeAccountType)
+            ? null
+            : input.TradeAccountType.Trim().ToUpperInvariant();
+        var account = !string.IsNullOrEmpty(normalizedTradeAccountType) || input.TradeAccountCompanyId.HasValue
+            ? await ResolveRequestedTradingAccountAsync(db, player, normalizedTradeAccountType ?? string.Empty, input.TradeAccountCompanyId, "buyShares", logger)
+            : await ResolveActiveTradingAccountAsync(db, player, httpContextAccessor.HttpContext!.User);
         var (companies, shareholdings, sharePrices, governmentCompanyIds) = await LoadSharePricingSnapshotAsync(db);
         if (IsGovernmentCompany(governmentCompanyIds, account.Company))
         {
@@ -213,6 +218,7 @@ public sealed partial class Mutation
         SellSharesInput input,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ILogger<Mutation> logger,
         [Service] IMasterRankingTelemetryService rankingTelemetry,
         [Service] IOptions<MasterServerRegistrationOptions> masterOptions)
     {
@@ -233,9 +239,12 @@ public sealed partial class Mutation
                     .SetCode("PLAYER_NOT_FOUND")
                     .Build());
 
-        var account = !string.IsNullOrEmpty(input.TradeAccountType)
-        ? await ResolveRequestedTradingAccountAsync(db, player, input.TradeAccountType, input.TradeAccountCompanyId)
-        : await ResolveActiveTradingAccountAsync(db, player, httpContextAccessor.HttpContext!.User);
+        var normalizedTradeAccountType = string.IsNullOrWhiteSpace(input.TradeAccountType)
+            ? null
+            : input.TradeAccountType.Trim().ToUpperInvariant();
+        var account = !string.IsNullOrEmpty(normalizedTradeAccountType) || input.TradeAccountCompanyId.HasValue
+            ? await ResolveRequestedTradingAccountAsync(db, player, normalizedTradeAccountType ?? string.Empty, input.TradeAccountCompanyId, "sellShares", logger)
+            : await ResolveActiveTradingAccountAsync(db, player, httpContextAccessor.HttpContext!.User);
         var (companies, shareholdings, sharePrices, governmentCompanyIds) = await LoadSharePricingSnapshotAsync(db);
         if (IsGovernmentCompany(governmentCompanyIds, account.Company))
         {

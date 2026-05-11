@@ -24,7 +24,7 @@ Create a fun game in the style of Capitalism II, where players experience realis
 - [x] (100%) Add strict token-boundary tests and middleware assertions so MasterApi privilege cannot be granted from game-issued tokens, and impersonation is recognized only when actor and effective-player claims differ.
 - [x] (100%) Enforce bot company/account boundaries in every bot-eligible mutation by resolving ownership server-side, rejecting foreign-company identifiers with `NOT_OWNED_OR_NOT_FOUND`, auditing rejected API-key attempts, and covering forex, building, lending, and stock violations with regression tests.
 - [x] (100%) Complete ranking manipulation safeguards with idempotency keys, proof-reference deduplication, suspicious-pattern moderation queues, and admin review tooling that can quarantine telemetry batches before leaderboard publication.
-- [ ] Keep frontend trust non-authoritative by validating all economy-sensitive fields server-side, rejecting client overrides for ownership, pricing, and timing values, and adding regression tests for tampered GraphQL payload attempts.
+- [x] (100%) Keep frontend trust non-authoritative by validating economy-sensitive stock trade ownership overrides server-side, rejecting tampered account-type/company payloads with `INVALID_CLIENT_OVERRIDE`, and adding backend plus Playwright regressions proving friendly client-error handling.
 - [ ] Standardize object-authorization failure responses to "not found or not owned" semantics to reduce resource enumeration risk while preserving internal audit visibility through structured security logs.
 
 ### Security Operations & Audit Cadence

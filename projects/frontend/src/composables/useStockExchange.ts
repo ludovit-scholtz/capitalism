@@ -1,6 +1,6 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { gqlRequest } from '@/lib/graphql'
+import { GraphQLError, gqlRequest } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
 import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useGameStateStore } from '@/stores/gameState'
@@ -198,12 +198,6 @@ export function useStockExchange() {
   function estimatedBuyCost(listing: StockExchangeListing): number { return getQuantity(listing.companyId) * listing.askPrice }
   function estimatedSellProceeds(listing: StockExchangeListing): number { return getQuantity(listing.companyId) * listing.bidPrice }
 
-  function resolveTradeAccount(): { tradeAccountType: string; tradeAccountCompanyId: string | null } {
-    if (activeTradeAccountType.value === 'COMPANY')
-      return { tradeAccountType: 'COMPANY', tradeAccountCompanyId: activeTradeAccount.value?.companyId ?? auth.player?.activeCompanyId ?? null }
-    return { tradeAccountType: 'PERSON', tradeAccountCompanyId: null }
-  }
-
   async function loadPriceHistory(companyId: string) {
     priceHistoryLoadingByCompany.value[companyId] = true
     priceHistoryErrorByCompany.value[companyId] = null
@@ -393,23 +387,26 @@ export function useStockExchange() {
     actionLoadingKey.value = `${kind}-${companyId}`
     errorByCompany.value[companyId] = null
     successByCompany.value[companyId] = null
-    const { tradeAccountType, tradeAccountCompanyId } = resolveTradeAccount()
     if (!selectedSettlementBankAccountId.value) { errorByCompany.value[companyId] = t('stockExchange.selectSettlementAccount'); successByCompany.value[companyId] = null; return }
     try {
       let result: ShareTradeResult
       if (kind === 'buy') {
-        const data = await gqlRequest<{ buyShares: ShareTradeResult }>(BUY_MUTATION, { input: { companyId, shareCount, tradeAccountType, tradeAccountCompanyId, bankAccountId: selectedSettlementBankAccountId.value } })
+        const data = await gqlRequest<{ buyShares: ShareTradeResult }>(BUY_MUTATION, { input: { companyId, shareCount, bankAccountId: selectedSettlementBankAccountId.value } })
         result = data.buyShares
         successByCompany.value[companyId] = t('stockExchange.buySuccess', { company: result.companyName, shares: formatShares(result.shareCount) })
       } else {
-        const data = await gqlRequest<{ sellShares: ShareTradeResult }>(SELL_MUTATION, { input: { companyId, shareCount, tradeAccountType, tradeAccountCompanyId, bankAccountId: selectedSettlementBankAccountId.value } })
+        const data = await gqlRequest<{ sellShares: ShareTradeResult }>(SELL_MUTATION, { input: { companyId, shareCount, bankAccountId: selectedSettlementBankAccountId.value } })
         result = data.sellShares
         if (result.taxReserved > 0) successByCompany.value[companyId] = t('stockExchange.sellSuccessWithTax', { company: result.companyName, shares: formatShares(result.shareCount), tax: formatCurrency(result.taxReserved) })
         else successByCompany.value[companyId] = t('stockExchange.sellSuccess', { company: result.companyName, shares: formatShares(result.shareCount) })
       }
       await Promise.all([loadData(true), auth.fetchMe()])
     } catch (reason: unknown) {
-      errorByCompany.value[companyId] = reason instanceof Error ? reason.message : t('stockExchange.actionFailed')
+      if (reason instanceof GraphQLError && reason.code === 'INVALID_CLIENT_OVERRIDE') {
+        errorByCompany.value[companyId] = t('stockExchange.actionFailed')
+      } else {
+        errorByCompany.value[companyId] = reason instanceof Error ? reason.message : t('stockExchange.actionFailed')
+      }
     } finally { actionLoadingKey.value = null }
   }
 
