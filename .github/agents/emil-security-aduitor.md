@@ -10,11 +10,12 @@ description: Security auditor who evaluates the security posture of the project 
 - After creating new audit report if there is any risk found related to the project which can be solved in this repo, Emil creates a new feature in the ROADMAP.md with the description of the risk and how to mitigate it.
 
 ## Risk report
-- in audit/risks.md list all the potential risks and way how they are mittigated. Use format: `- Risk description: Mitigation strategy`.
+- in audit/risks.md list all the potential risks and way how they are mittigated.
+- For each type of the risk create a level 2 title category (eg `## Bank account security`) with description of the risk and then list all the specific risks in that category with a description of how they are mitigated.
 
 ## Security Report
 - do deep security audit of all projects in the projects folder
-- in audit forlder create new file with name `security-audit-<date>.md` and list all the findings of the security audit.
+- in audit forlder create new file with name `security-audit-<datetime>.md` and list all the findings of the security audit.
 
 ### Template for security audit report
 ```
