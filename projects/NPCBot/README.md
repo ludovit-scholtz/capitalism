@@ -45,28 +45,53 @@ Override them with environment variables (`NPCBOT_NpcBot__<Key>`) or CLI flags (
 | `BotCount` | `3` | Number of NPC accounts to manage (1–20) |
 | `Enabled` | `true` | Master on/off switch |
 | `BotNamePrefix` | `NPC` | Prefix for generated display names and e-mails |
-| `BotPassword` | *(see below)* | Shared password for all bot accounts |
+| `BotPassword` | *(empty — see below)* | Shared password for all bot accounts |
+| `ApiKey` | *(empty — see below)* | API key for key-based authentication (preferred) |
 | `BotEmailDomain` | `npcbot.capitalism.local` | Domain for generated bot e-mails |
 | `PollIntervalSeconds` | `60` | How often the orchestrator polls each bot |
 | `MaxConsecutiveErrors` | `5` | Errors before a bot is skipped |
 | `TokenRefreshBufferMinutes` | `5` | Proactive re-auth before token expiry |
 | `AllowedIndustries` | `FURNITURE, FOOD_PROCESSING, HEALTHCARE` | Free-tier industries bots may use |
 
-### Password security
+### Credential configuration
 
-The default password in `appsettings.json` is a development placeholder.  
-**Override it in production** using:
+The bot supports two authentication modes.  Choose **one**:
+
+#### Option A — API-key authentication (recommended for production)
+
+Generate an API key from the admin dashboard and set it via an environment variable:
 
 ```bash
-export NPCBOT_NpcBot__BotPassword="<strong-secret>"
+export NPCBOT_NpcBot__ApiKey="<your-api-key-from-admin-dashboard>"
 dotnet run
 ```
 
-Or create an `appsettings.Local.json` (already in `.gitignore`):
+In API-key mode the `BotPassword` field is ignored entirely.
+
+#### Option B — Password authentication (development / self-hosted)
+
+Supply a strong, unique password that is **not** one of the reserved placeholder
+values (`""`, `"changeme"`, `"default"`, `"password"`, `"secret"`, or the old
+committed default `"NpcBot!2025"`).
+
+```bash
+# Generate a strong secret
+export NPCBOT_NpcBot__BotPassword="$(openssl rand -hex 32)"
+dotnet run
+```
+
+Or create an `appsettings.Local.json` (already in `.gitignore`) based on the
+provided `appsettings.example.json`:
 
 ```json
 { "NpcBot": { "BotPassword": "<strong-secret>" } }
 ```
+
+> **Startup guard** — The bot will refuse to start outside the `Development`
+> environment when `BotPassword` is empty or equals a known placeholder value and
+> no `ApiKey` is configured.  This prevents accidental production deployments with
+> insecure credentials.  Set `DOTNET_ENVIRONMENT=Development` to bypass the guard
+> during local testing.
 
 ## Project layout
 

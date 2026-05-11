@@ -66,6 +66,12 @@ public static class Program
 
         var logger = host.Services.GetRequiredService<ILogger<BotOrchestrator>>();
         var options = host.Services.GetRequiredService<IOptions<BotOptions>>().Value;
+        var hostEnv = host.Services.GetRequiredService<IHostEnvironment>();
+
+        // ── Startup credential guard ──────────────────────────────────────────
+        // Fails fast with a descriptive error when a known placeholder password
+        // is configured outside the Development environment.
+        BotStartupValidator.Validate(options, hostEnv);
 
         logger.LogInformation("=== Capitalism NPC Bot Runner ===");
         logger.LogInformation("API: {Url}", options.GraphqlUrl);

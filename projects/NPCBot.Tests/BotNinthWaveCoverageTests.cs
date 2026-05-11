@@ -331,12 +331,12 @@ public sealed class BotNinthWaveCoverageTests
     }
 
     [Fact]
-    public void BotOptions_BotPassword_DefaultIsNotNullOrEmpty()
+    public void BotOptions_BotPassword_DefaultIsEmpty()
     {
-        // A null/empty default password would cause registration to fail at the API level
-        // with a 400 Bad Request before any game logic runs.
+        // The committed placeholder was removed. The default is now an empty string
+        // so operators are forced to set a real credential via environment variable.
         var opts = new BotOptions();
-        Assert.False(string.IsNullOrWhiteSpace(opts.BotPassword));
+        Assert.Equal("", opts.BotPassword);
     }
 
     [Fact]

@@ -22,12 +22,17 @@ public sealed class BotOptions
     public string BotNamePrefix { get; set; } = "NPC";
 
     /// <summary>
-    /// Shared password used for all NPC bot accounts.
-    /// Must be at least 8 characters.
-    /// In production override via environment variable <c>NPCBOT_NpcBot__BotPassword</c>
-    /// or <c>appsettings.Local.json</c> — do not commit real credentials.
+    /// Shared password used for all NPC bot accounts when using password-based
+    /// authentication.  Defaults to an empty string — you MUST supply a value via
+    /// the <c>NPCBOT_NpcBot__BotPassword</c> environment variable (or
+    /// <c>appsettings.Local.json</c>) before starting the bot outside the
+    /// <c>Development</c> environment.
+    /// <para>
+    /// Alternatively, set <see cref="ApiKey"/> and leave this empty; the bot will
+    /// then use API-key authentication and skip password-based login entirely.
+    /// </para>
     /// </summary>
-    public string BotPassword { get; set; } = "NpcBot!2025";
+    public string BotPassword { get; set; } = "";
 
     /// <summary>
     /// E-mail domain used when registering NPC accounts.

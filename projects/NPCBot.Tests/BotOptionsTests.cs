@@ -132,12 +132,13 @@ public sealed class BotOptionsTests
     }
 
     [Fact]
-    public void Defaults_BotPassword_IsNonEmpty()
+    public void Defaults_BotPassword_IsEmpty()
     {
-        // The default password is a dev placeholder that must be non-empty.
-        // A null/empty password would cause registration to fail immediately.
+        // The default password is intentionally empty so the bot never ships a committed
+        // credential. Operators must supply NpcBot__BotPassword (or NpcBot__ApiKey) via
+        // environment variables before running outside the Development environment.
         var opts = new BotOptions();
-        Assert.False(string.IsNullOrWhiteSpace(opts.BotPassword));
+        Assert.Equal("", opts.BotPassword);
     }
 
     [Fact]
