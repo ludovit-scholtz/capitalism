@@ -377,13 +377,14 @@ public sealed class BotThirdWaveCoverageTests
     }
 
     /// <summary>
-    /// The password default must be at least 8 characters to meet the game's minimum.
+    /// The default password is now intentionally empty — the committed placeholder was
+    /// removed as a security hardening measure. The startup guard enforces a non-placeholder
+    /// value outside the Development environment.
     /// </summary>
     [Fact]
-    public void BotOptions_DefaultPassword_IsAtLeastEightCharacters()
+    public void BotOptions_DefaultPassword_IsEmpty()
     {
         var opts = new BotOptions();
-        Assert.True(opts.BotPassword.Length >= 8,
-            $"BotPassword must be at least 8 chars. Got length {opts.BotPassword.Length}.");
+        Assert.Equal("", opts.BotPassword);
     }
 }

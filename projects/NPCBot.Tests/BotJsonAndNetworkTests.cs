@@ -232,11 +232,12 @@ public sealed class BotJsonAndNetworkTests
     // ── BotOptions additional validation ─────────────────────────────────────
 
     [Fact]
-    public void BotOptions_BotPassword_HasMinimumLength()
+    public void BotOptions_BotPassword_DefaultIsEmpty()
     {
+        // The committed placeholder was removed. Default is empty so operators must
+        // set a real credential via environment variable before production use.
         var opts = new BotOptions();
-        Assert.True(opts.BotPassword.Length >= 8,
-            $"BotPassword should be at least 8 characters but was '{opts.BotPassword}'");
+        Assert.Equal("", opts.BotPassword);
     }
 
     [Fact]
