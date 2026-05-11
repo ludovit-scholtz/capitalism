@@ -216,13 +216,19 @@ public sealed class AuthenticatedPlayerClaimsSyncService(
             }
 
             var payload = await response.Content.ReadFromJsonAsync<MasterMeGraphQlResponse>(JsonOptions, cancellationToken);
+            if (payload?.Errors is { Count: > 0 })
+            {
+                logger.LogWarning("Master display name lookup returned GraphQL error: {GraphQlErrorMessage}", payload.Errors[0].Message);
+                return null;
+            }
+
             var masterDisplayName = payload?.Data?.Me?.DisplayName?.Trim();
             if (string.IsNullOrWhiteSpace(masterDisplayName))
             {
                 return null;
             }
 
-            cache.Set(GetMasterDisplayNameCacheKey(normalizedEmail), masterDisplayName, TimeSpan.FromMinutes(15));
+            cache.Set(GetMasterDisplayNameCacheKey(normalizedEmail), masterDisplayName, TimeSpan.FromMinutes(5));
             return masterDisplayName;
         }
         catch (Exception exception)
@@ -251,6 +257,8 @@ public sealed class AuthenticatedPlayerClaimsSyncService(
     private sealed class MasterMeGraphQlResponse
     {
         public MasterMePayload? Data { get; init; }
+
+        public List<MasterMeError>? Errors { get; init; }
     }
 
     private sealed class MasterMePayload
@@ -261,5 +269,10 @@ public sealed class AuthenticatedPlayerClaimsSyncService(
     private sealed class MasterMeResult
     {
         public string? DisplayName { get; init; }
+    }
+
+    private sealed class MasterMeError
+    {
+        public string Message { get; init; } = string.Empty;
     }
 }
