@@ -7,6 +7,7 @@ using Capitalism.Shared.Security;
 using MasterApi.Data;
 using MasterApi.Data.Entities;
 using MasterApi.Tests.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 
@@ -253,6 +254,288 @@ public sealed class RankingIntegrationTests
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
         Assert.True(db.RankingTelemetryAuditLogs.Any(item => item.ReasonCode == RankingTelemetryAuditReason.DuplicateEventSignature));
+    }
+
+    [Fact]
+    public async Task IngestRankingEvent_WithSameIdempotencyKey_ReturnsOriginalResponse()
+    {
+        await using var factory = new MasterApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var userEmail = $"rank-idempotency-{Guid.NewGuid():N}@example.com";
+        var idempotencyKey = $"idem-{Guid.NewGuid():N}";
+
+        var first = await GraphQlAsync(
+            client,
+            """
+            mutation Ingest($input: IngestRankingEventInput!) {
+              ingestRankingEvent(input: $input) { id status createdAtUtc }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey = "capitalism-eu-1",
+                    eventType = MasterRankingBountyCodes.FxTrader,
+                    playerEmail = userEmail,
+                    occurredAtUtc = DateTime.UtcNow,
+                    externalEventId = $"idem-first-{Guid.NewGuid():N}",
+                    uniqueScopeKey = "idem-scope",
+                    idempotencyKey,
+                    payloadJson = "{\"netWorthUsd\":1000}",
+                }
+            });
+        Assert.False(first.TryGetProperty("errors", out _));
+        var firstPayload = first.GetProperty("data").GetProperty("ingestRankingEvent");
+        var firstId = firstPayload.GetProperty("id").GetString();
+
+        var second = await GraphQlAsync(
+            client,
+            """
+            mutation Ingest($input: IngestRankingEventInput!) {
+              ingestRankingEvent(input: $input) { id status createdAtUtc }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey = "capitalism-eu-1",
+                    eventType = MasterRankingBountyCodes.FxTrader,
+                    playerEmail = userEmail,
+                    occurredAtUtc = DateTime.UtcNow.AddMinutes(5),
+                    externalEventId = $"idem-second-{Guid.NewGuid():N}",
+                    uniqueScopeKey = "idem-scope-2",
+                    idempotencyKey,
+                    payloadJson = "{\"netWorthUsd\":1500}",
+                }
+            });
+        Assert.False(second.TryGetProperty("errors", out _));
+        var secondPayload = second.GetProperty("data").GetProperty("ingestRankingEvent");
+        Assert.Equal(firstId, secondPayload.GetProperty("id").GetString());
+        Assert.Equal(firstPayload.GetProperty("createdAtUtc").GetString(), secondPayload.GetProperty("createdAtUtc").GetString());
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
+        var events = await db.MasterRankingEvents
+            .Where(item => item.PlayerEmail == userEmail)
+            .ToListAsync();
+        Assert.Single(events);
+    }
+
+    [Fact]
+    public async Task SubmitRankingProofEvent_DuplicateProofReference_ReturnsConflict()
+    {
+        await using var factory = new MasterApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var proofReference = $"https://x.com/player/status/{Guid.NewGuid():N}";
+        var (firstToken, _) = await RegisterAsync(client, $"rank-proof-first-{Guid.NewGuid():N}@example.com", "Proof First");
+        var (secondToken, _) = await RegisterAsync(client, $"rank-proof-second-{Guid.NewGuid():N}@example.com", "Proof Second");
+
+        var firstSubmit = await GraphQlAsync(
+            client,
+            """
+            mutation($bountyCode: String!, $proofReference: String!, $idempotencyKey: String) {
+              submitRankingProofEvent(
+                bountyCode: $bountyCode
+                proofReference: $proofReference
+                idempotencyKey: $idempotencyKey
+              ) {
+                id
+                status
+              }
+            }
+            """,
+            new { bountyCode = MasterRankingBountyCodes.RetweetXPost, proofReference, idempotencyKey = $"proof-{Guid.NewGuid():N}" },
+            firstToken);
+        Assert.False(firstSubmit.TryGetProperty("errors", out _));
+
+        var duplicateSubmit = await GraphQlAsync(
+            client,
+            """
+            mutation($bountyCode: String!, $proofReference: String!) {
+              submitRankingProofEvent(
+                bountyCode: $bountyCode
+                proofReference: $proofReference
+              ) {
+                id
+              }
+            }
+            """,
+            new { bountyCode = MasterRankingBountyCodes.RetweetXPost, proofReference },
+            secondToken);
+
+        var errors = duplicateSubmit.GetProperty("errors").EnumerateArray().ToList();
+        Assert.Contains(errors, error => error.GetProperty("extensions").GetProperty("code").GetString() == "PROOF_REFERENCE_CONFLICT");
+        Assert.Contains(errors, error => error.GetProperty("extensions").GetProperty("httpStatus").GetInt32() == 409);
+    }
+
+    [Fact]
+    public async Task IngestRankingEvent_NonMonotonicNetWorth_IsQuarantinedForModeration()
+    {
+        await using var factory = new MasterApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var userEmail = $"rank-monotonic-{Guid.NewGuid():N}@example.com";
+
+        var first = await GraphQlAsync(
+            client,
+            """
+            mutation Ingest($input: IngestRankingEventInput!) {
+              ingestRankingEvent(input: $input) { id status }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey = "capitalism-eu-1",
+                    eventType = MasterRankingBountyCodes.FxTrader,
+                    playerEmail = userEmail,
+                    occurredAtUtc = DateTime.UtcNow,
+                    externalEventId = $"mono-a-{Guid.NewGuid():N}",
+                    payloadJson = "{\"netWorthUsd\":2000}",
+                }
+            });
+        Assert.False(first.TryGetProperty("errors", out _));
+
+        var second = await GraphQlAsync(
+            client,
+            """
+            mutation Ingest($input: IngestRankingEventInput!) {
+              ingestRankingEvent(input: $input) { id status }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey = "capitalism-eu-1",
+                    eventType = MasterRankingBountyCodes.FxTrader,
+                    playerEmail = userEmail,
+                    occurredAtUtc = DateTime.UtcNow.AddMinutes(1),
+                    externalEventId = $"mono-b-{Guid.NewGuid():N}",
+                    payloadJson = "{\"netWorthUsd\":1900}",
+                }
+            });
+        Assert.False(second.TryGetProperty("errors", out _));
+        Assert.Equal(
+            RankingEventStatus.PendingModeration,
+            second.GetProperty("data").GetProperty("ingestRankingEvent").GetProperty("status").GetString());
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
+        Assert.True(db.RankingTelemetryAuditLogs.Any(item => item.ReasonCode == RankingTelemetryAuditReason.NonMonotonicNetWorth));
+        Assert.True(db.MasterRankingEvents.Any(item => item.PlayerEmail == userEmail && item.IsQuarantined));
+    }
+
+    [Fact]
+    public async Task IngestRankingEvent_MismatchedShardKey_IsQuarantinedForModeration()
+    {
+        await using var factory = new MasterApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var userEmail = $"rank-shard-mismatch-{Guid.NewGuid():N}@example.com";
+        await RegisterServerAsync(client, "rank-server-eu");
+        await RegisterServerAsync(client, "rank-server-us");
+        var sharedNonce = $"shared-nonce-{Guid.NewGuid():N}";
+
+        await GraphQlAsync(
+            client,
+            """
+            mutation Ingest($input: IngestRankingEventInput!) {
+              ingestRankingEvent(input: $input) { id status }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey = "rank-server-eu",
+                    eventType = MasterRankingBountyCodes.FxTrader,
+                    playerEmail = userEmail,
+                    occurredAtUtc = DateTime.UtcNow,
+                    externalEventId = sharedNonce,
+                    payloadJson = "{}",
+                }
+            });
+
+        var second = await GraphQlAsync(
+            client,
+            """
+            mutation Ingest($input: IngestRankingEventInput!) {
+              ingestRankingEvent(input: $input) { id status }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey = "rank-server-us",
+                    eventType = MasterRankingBountyCodes.FxTrader,
+                    playerEmail = userEmail,
+                    occurredAtUtc = DateTime.UtcNow.AddMinutes(1),
+                    externalEventId = sharedNonce,
+                    payloadJson = "{}",
+                }
+            });
+        Assert.False(second.TryGetProperty("errors", out _));
+        Assert.Equal(
+            RankingEventStatus.PendingModeration,
+            second.GetProperty("data").GetProperty("ingestRankingEvent").GetProperty("status").GetString());
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
+        Assert.True(db.RankingTelemetryAuditLogs.Any(item => item.ReasonCode == RankingTelemetryAuditReason.MismatchedShardKey));
+    }
+
+    [Fact]
+    public async Task IngestRankingEvent_BurstSubmissions_AreQuarantinedForModeration()
+    {
+        await using var factory = new MasterApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var userEmail = $"rank-burst-{Guid.NewGuid():N}@example.com";
+        var occurredAtUtc = DateTime.UtcNow;
+
+        for (var index = 0; index < 9; index++)
+        {
+            var result = await GraphQlAsync(
+                client,
+                """
+                mutation Ingest($input: IngestRankingEventInput!) {
+                  ingestRankingEvent(input: $input) { id status }
+                }
+                """,
+                new
+                {
+                    input = new
+                    {
+                        registrationKey = "test-registration-key",
+                        serverKey = "capitalism-eu-1",
+                        eventType = MasterRankingBountyCodes.FxTrader,
+                        playerEmail = userEmail,
+                        occurredAtUtc,
+                        externalEventId = $"burst-{index}-{Guid.NewGuid():N}",
+                        payloadJson = "{}",
+                    }
+                });
+
+            Assert.False(result.TryGetProperty("errors", out _));
+        }
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
+        Assert.True(db.RankingTelemetryAuditLogs.Any(item => item.ReasonCode == RankingTelemetryAuditReason.BurstSubmissionPattern));
+        Assert.True(db.MasterRankingEvents.Any(item => item.PlayerEmail == userEmail && item.Status == RankingEventStatus.PendingModeration));
     }
 
     [Fact]
@@ -1076,7 +1359,7 @@ public sealed class RankingIntegrationTests
                     externalEventId = $"discord-{Guid.NewGuid():N}",
                     uniqueScopeKey = "discord-handle-unique-1",
                     payloadJson = "{}",
-                    proofReference = "PlayerHandle#1234",
+                    proofReference = "PlayerHandle#5678",
                 }
             });
 

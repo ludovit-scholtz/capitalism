@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Capitalism.Shared.Security;
+using HotChocolate;
 using MasterApi.Data;
 using MasterApi.Data.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -248,6 +249,7 @@ public sealed class MasterRankingService(MasterDbContext db, ILogger<MasterRanki
         string? serverKey,
         string? externalEventId,
         string? uniqueScopeKey,
+        string? idempotencyKey,
         string? proofReference,
         string payloadJson,
         DateTime occurredAtUtc,
@@ -256,6 +258,24 @@ public sealed class MasterRankingService(MasterDbContext db, ILogger<MasterRanki
     {
         var normalizedEmail = playerEmail.Trim().ToLowerInvariant();
         var playerId = await EnsureTelemetryPlayerAccountAsync(normalizedEmail, cancellationToken);
+        var normalizedIdempotencyKey = NormalizeIdempotencyKey(idempotencyKey);
+        var normalizedServerKey = string.IsNullOrWhiteSpace(serverKey) ? null : serverKey.Trim();
+        var normalizedProofReference = string.IsNullOrWhiteSpace(proofReference) ? null : proofReference.Trim();
+
+        if (!string.IsNullOrWhiteSpace(normalizedProofReference))
+        {
+            var duplicateProofEvent = await db.MasterRankingEvents
+                .AsNoTracking()
+                .FirstOrDefaultAsync(entry => entry.ProofReference == normalizedProofReference, cancellationToken);
+            if (duplicateProofEvent is not null)
+            {
+                logger.LogWarning(
+                    "Ranking proof reference duplicate detected. proofReference={ProofReference}, existingEventId={ExistingEventId}",
+                    normalizedProofReference,
+                    duplicateProofEvent.Id);
+                throw BuildProofReferenceConflictError();
+            }
+        }
 
         var rankingEvent = new MasterRankingEvent
         {
@@ -263,17 +283,24 @@ public sealed class MasterRankingService(MasterDbContext db, ILogger<MasterRanki
             PlayerAccountId = playerId,
             PlayerEmail = normalizedEmail,
             EventType = eventType,
-            ServerKey = string.IsNullOrWhiteSpace(serverKey) ? null : serverKey.Trim(),
+            ServerKey = normalizedServerKey,
             ServerKeyHash = telemetryValidation?.ServerKeyHash,
             ExternalEventId = string.IsNullOrWhiteSpace(externalEventId) ? null : externalEventId.Trim(),
             UniqueScopeKey = string.IsNullOrWhiteSpace(uniqueScopeKey) ? null : uniqueScopeKey.Trim(),
+            IdempotencyKey = normalizedIdempotencyKey,
             TelemetryNonce = telemetryValidation?.TelemetryNonce,
             PayloadHash = telemetryValidation?.PayloadHash,
             TelemetrySignatureHash = telemetryValidation?.SignatureHash,
             TelemetryBatchId = telemetryValidation?.BatchId,
-            ProofReference = string.IsNullOrWhiteSpace(proofReference) ? null : proofReference.Trim(),
+            ProofReference = normalizedProofReference,
             PayloadJson = string.IsNullOrWhiteSpace(payloadJson) ? "{}" : payloadJson,
-            Status = RankingEventStatus.Pending,
+            Status = telemetryValidation?.IsSuspicious == true
+                ? RankingEventStatus.PendingModeration
+                : RankingEventStatus.Pending,
+            IsQuarantined = telemetryValidation?.IsSuspicious == true,
+            QuarantineReason = telemetryValidation?.QuarantineReason,
+            QuarantinedByEmail = telemetryValidation?.IsSuspicious == true ? "telemetry-system" : null,
+            QuarantinedAtUtc = telemetryValidation?.IsSuspicious == true ? DateTime.UtcNow : null,
             OccurredAtUtc = occurredAtUtc,
             CreatedAtUtc = DateTime.UtcNow,
         };
@@ -281,6 +308,34 @@ public sealed class MasterRankingService(MasterDbContext db, ILogger<MasterRanki
         db.MasterRankingEvents.Add(rankingEvent);
         await db.SaveChangesAsync(cancellationToken);
         return rankingEvent;
+    }
+
+    public async Task<MasterRankingEvent?> FindIdempotentEventAsync(
+        string eventType,
+        string playerEmail,
+        string? serverKey,
+        string? idempotencyKey,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedIdempotencyKey = NormalizeIdempotencyKey(idempotencyKey);
+        if (normalizedIdempotencyKey is null)
+        {
+            return null;
+        }
+
+        var normalizedEmail = playerEmail.Trim().ToLowerInvariant();
+        var normalizedEventType = eventType.Trim().ToUpperInvariant();
+        var normalizedServerKey = string.IsNullOrWhiteSpace(serverKey) ? null : serverKey.Trim();
+
+        return await db.MasterRankingEvents
+            .AsNoTracking()
+            .Where(entry =>
+                entry.IdempotencyKey == normalizedIdempotencyKey
+                && entry.PlayerEmail == normalizedEmail
+                && entry.EventType == normalizedEventType
+                && entry.ServerKey == normalizedServerKey)
+            .OrderBy(entry => entry.CreatedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     public async Task RebuildSnapshotsFromRewardsAsync(CancellationToken cancellationToken = default)
@@ -505,5 +560,21 @@ public sealed class MasterRankingService(MasterDbContext db, ILogger<MasterRanki
         }
 
         return "Hourly ranking evaluation completed successfully.";
+    }
+
+    private static string? NormalizeIdempotencyKey(string? idempotencyKey)
+    {
+        var normalized = idempotencyKey?.Trim();
+        return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
+    }
+
+    private static GraphQLException BuildProofReferenceConflictError()
+    {
+        return new GraphQLException(
+            ErrorBuilder.New()
+                .SetMessage("Proof reference already used.")
+                .SetCode("PROOF_REFERENCE_CONFLICT")
+                .SetExtension("httpStatus", 409)
+                .Build());
     }
 }

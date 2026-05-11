@@ -220,6 +220,8 @@ public sealed class IngestRankingEventInput : MasterServerServiceInput
 
     public string? UniqueScopeKey { get; set; }
 
+    public string? IdempotencyKey { get; set; }
+
     public string PayloadJson { get; set; } = "{}";
 
     public string? ProofReference { get; set; }

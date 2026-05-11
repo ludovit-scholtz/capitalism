@@ -71,6 +71,7 @@ public sealed partial class Mutation
                 serverKey: null,
                 externalEventId: $"support-ticket:{ticket.Id}",
                 uniqueScopeKey: $"support-ticket:{ticket.Id}",
+                idempotencyKey: null,
                 proofReference: null,
                 payloadJson: JsonSerializer.Serialize(new { ticketId = ticket.Id, ticketType = ticketType }),
                 occurredAtUtc: now);

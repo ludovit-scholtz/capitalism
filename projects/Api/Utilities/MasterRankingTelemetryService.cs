@@ -1,4 +1,6 @@
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Api.Configuration;
 using Microsoft.Extensions.Logging;
@@ -68,6 +70,12 @@ public sealed class MasterRankingTelemetryService(
         {
             var normalizedEventType = eventType.Trim().ToUpperInvariant();
             var normalizedPlayerEmail = playerEmail.Trim().ToLowerInvariant();
+            var idempotencyKey = BuildIdempotencyKey(
+                normalizedEventType,
+                normalizedPlayerEmail,
+                options.Value.ServerKey,
+                uniqueScopeKey,
+                externalEventId);
             var client = httpClientFactory.CreateClient("master-server");
             var body = new
             {
@@ -89,6 +97,7 @@ public sealed class MasterRankingTelemetryService(
                         playerEmail = normalizedPlayerEmail,
                         uniqueScopeKey = uniqueScopeKey,
                         externalEventId = externalEventId,
+                        idempotencyKey,
                         payloadJson = "{}",
                         occurredAtUtc = DateTime.UtcNow,
                     }
@@ -173,6 +182,24 @@ public sealed class MasterRankingTelemetryService(
         return value.Length <= maxLength
             ? value
             : value[..maxLength] + "...";
+    }
+
+    private static string BuildIdempotencyKey(
+        string eventType,
+        string playerEmail,
+        string? serverKey,
+        string? uniqueScopeKey,
+        string? externalEventId)
+    {
+        var raw = string.Join(
+            "|",
+            eventType.Trim().ToUpperInvariant(),
+            playerEmail.Trim().ToLowerInvariant(),
+            (serverKey ?? string.Empty).Trim(),
+            (uniqueScopeKey ?? string.Empty).Trim(),
+            (externalEventId ?? string.Empty).Trim());
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(raw));
+        return Convert.ToHexString(hash);
     }
 
     private sealed class GraphQlResponse

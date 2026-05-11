@@ -44,6 +44,15 @@ function formatPoints(value: number): string {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value)
 }
 
+function buildProofIdempotencyKey(
+  bountyCode: string,
+  proofRef: string,
+  scopeKey?: string,
+): string {
+  return [bountyCode.trim().toUpperCase(), proofRef.trim(), scopeKey?.trim() ?? '']
+    .join('|')
+}
+
 async function loadHistory() {
   if (!auth.token) return
 
@@ -82,6 +91,11 @@ async function submitProof() {
       proofBountyCode.value,
       proofReference.value.trim(),
       proofUniqueScopeKey.value.trim() || undefined,
+      buildProofIdempotencyKey(
+        proofBountyCode.value,
+        proofReference.value,
+        proofUniqueScopeKey.value,
+      ),
     )
     successMessage.value = t('rankingHistory.proofSubmitted')
     proofReference.value = ''
