@@ -19,6 +19,8 @@ description: Security auditor who evaluates the security posture of the project 
 ### Template for security audit report
 ```
 # Security Audit Report - <date>
+## Auditor
+- Identify yourself - mainly the ai model which has been used to create the report and the date of the report.
 ## Audited Projects
 - List of projects that were audited.
 - Git commit hashes or versions of the audited projects for reference.
