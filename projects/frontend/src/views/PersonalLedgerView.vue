@@ -1,23 +1,31 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 import { gqlRequest } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
 import { useTickRefresh } from '@/composables/useTickRefresh'
 import CurrencyAmount from '@/components/numbers/CurrencyAmount.vue'
-import type { EndgameStatus, PersonAccount } from '@/types/index'
+import { useEndgameStore, ENDGAME_MILESTONES } from '@/stores/endgame'
+import type { PersonAccount } from '@/types/index'
 
 const PERSONAL_STOCK_SALE_TAX_RATE = 0.15
 
 const { t, locale } = useI18n()
 const auth = useAuthStore()
+const endgameStore = useEndgameStore()
 
 const personAccount = ref<PersonAccount | null>(null)
-const endgameStatus = ref<EndgameStatus | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const incomeFilter = ref<'ALL' | 'INTEREST' | 'DIVIDEND'>('ALL')
+
+/** Milestone toast queue — each entry is the i18n key to show. */
+const milestoneToasts = ref<string[]>([])
+
+function dismissMilestoneToast() {
+  milestoneToasts.value.shift()
+}
 
 const PERSON_ACCOUNT_QUERY = `
   query PersonAccountLedger {
@@ -77,25 +85,6 @@ const PERSON_ACCOUNT_QUERY = `
   }
 `
 
-const ENDGAME_STATUS_QUERY = `
-  {
-    endgameStatus {
-      gameEnded
-      winnerPlayerId
-      winnerDisplayName
-      winnerCompanyName
-      gameEndedAtUtc
-      winningThresholdUsd
-      topRealWorldRichest {
-        id
-        rank
-        name
-        wealthUsd
-      }
-    }
-  }
-`
-
 const portfolioValue = computed(() =>
   (personAccount.value?.shareholdings ?? []).reduce((sum, h) => sum + h.marketValue, 0),
 )
@@ -140,16 +129,45 @@ const filteredIncomeRows = computed(() => {
 })
 
 const raceProgressPercent = computed(() => {
-  const threshold = endgameStatus.value?.winningThresholdUsd ?? 0
+  const threshold = endgameStore.winningThresholdUsd
   if (threshold <= 0 || !personAccount.value) return 0
   return Math.min(100, Math.round((personAccount.value.totalNetWealth / threshold) * 100))
 })
 
 const raceGapUsd = computed(() => {
-  const threshold = endgameStatus.value?.winningThresholdUsd ?? 0
+  const threshold = endgameStore.winningThresholdUsd
   const current = personAccount.value?.totalNetWealth ?? 0
   return Math.max(0, threshold - current)
 })
+
+/** Map milestone fraction → i18n key */
+const MILESTONE_TOAST_KEYS: Record<number, string> = {
+  0.01: 'endgame.milestoneToast1',
+  0.1: 'endgame.milestoneToast10',
+  0.25: 'endgame.milestoneToast25',
+  0.5: 'endgame.milestoneToast50',
+  0.75: 'endgame.milestoneToast75',
+  0.9: 'endgame.milestoneToast90',
+}
+
+// Watch for new milestone toasts when player wealth or endgame status updates
+watch(
+  () => [personAccount.value?.totalNetWealth, endgameStore.winningThresholdUsd] as [number | undefined, number],
+  ([netWorth]) => {
+    if (netWorth == null) return
+    const newMilestones = endgameStore.checkMilestones(netWorth)
+    for (const milestone of newMilestones) {
+      const key = MILESTONE_TOAST_KEYS[milestone]
+      if (key) {
+        milestoneToasts.value.push(key)
+        // Auto-dismiss each toast after 6 seconds
+        setTimeout(() => {
+          dismissMilestoneToast()
+        }, 6_000)
+      }
+    }
+  },
+)
 
 async function loadData(isRefresh = false) {
   if (!isRefresh) loading.value = true
@@ -161,8 +179,8 @@ async function loadData(isRefresh = false) {
     }
     const data = await gqlRequest<{ personAccount: PersonAccount | null }>(PERSON_ACCOUNT_QUERY)
     personAccount.value = data.personAccount
-    const endgameData = await gqlRequest<{ endgameStatus: EndgameStatus }>(ENDGAME_STATUS_QUERY)
-    endgameStatus.value = endgameData.endgameStatus
+    // Also refresh endgame status from store (will also trigger milestone check via watcher)
+    await endgameStore.fetchStatus()
   } catch (reason: unknown) {
     if (!isRefresh) {
       error.value = reason instanceof Error ? reason.message : t('personalLedger.loadFailed')
@@ -189,6 +207,9 @@ function formatDateTime(value: string): string {
 onMounted(() => void loadData())
 
 useTickRefresh(() => loadData(true))
+
+// Expose endgame status from store for template (used for backward-compatible access)
+const endgameStatus = computed(() => endgameStore.status)
 </script>
 
 <template>
@@ -196,6 +217,29 @@ useTickRefresh(() => loadData(true))
     class="min-h-screen"
     style="background: radial-gradient(circle at top, color-mix(in srgb, var(--color-primary) 10%, transparent), transparent 35%), var(--color-background);"
   >
+    <!-- Milestone Toast Notifications -->
+    <Transition name="milestone-toast">
+      <div
+        v-if="milestoneToasts.length > 0"
+        class="fixed bottom-6 right-6 z-50 flex max-w-sm items-start gap-3 rounded-2xl border border-good bg-card px-5 py-4 shadow-lg"
+        role="status"
+        aria-live="polite"
+      >
+        <span class="text-2xl" aria-hidden="true">🏆</span>
+        <div class="flex-1">
+          <p class="font-semibold text-good">{{ t('endgame.milestoneTitle') }}</p>
+          <p class="mt-0.5 text-sm text-muted">{{ t(milestoneToasts[0]!) }}</p>
+        </div>
+        <button
+          class="ml-2 text-muted hover:text-brand"
+          :aria-label="t('common.dismiss')"
+          @click="dismissMilestoneToast"
+        >
+          ✕
+        </button>
+      </div>
+    </Transition>
+
     <!-- Hero -->
     <section class="pb-8 pt-14">
       <div class="container">
@@ -343,7 +387,14 @@ useTickRefresh(() => loadData(true))
               <p class="text-lg font-bold text-brand">{{ raceProgressPercent }}%</p>
             </div>
           </div>
-          <div class="mt-4 h-2.5 overflow-hidden rounded-full bg-card-raised">
+          <div
+            class="mt-4 h-2.5 overflow-hidden rounded-full bg-card-raised"
+            role="progressbar"
+            :aria-valuenow="raceProgressPercent"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            :aria-label="t('endgame.progressBarLabel', { percent: raceProgressPercent })"
+          >
             <div class="h-full bg-brand transition-all" :style="{ width: `${raceProgressPercent}%` }" />
           </div>
           <div class="mt-3 grid gap-2 text-sm sm:grid-cols-3">
@@ -596,3 +647,15 @@ useTickRefresh(() => loadData(true))
     </div>
   </div>
 </template>
+
+<style scoped>
+.milestone-toast-enter-active,
+.milestone-toast-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.milestone-toast-enter-from,
+.milestone-toast-leave-to {
+  opacity: 0;
+  transform: translateY(1rem);
+}
+</style>

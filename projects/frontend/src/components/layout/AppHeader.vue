@@ -14,6 +14,7 @@ import GameTimeChip from '@/components/layout/GameTimeChip.vue'
 import ThemeToggle from '@/components/layout/ThemeToggle.vue'
 import { useThemeStore } from '@/stores/theme'
 import { useTickRefresh } from '@/composables/useTickRefresh'
+import { useEndgameStore } from '@/stores/endgame'
 
 const themeStore = useThemeStore()
 themeStore.init()
@@ -25,6 +26,7 @@ const newsStore = usesStore()
 const notificationsStore = useNotificationsStore()
 const gameAdminStore = useGameAdminStore()
 const chatStore = useChatStore()
+const endgameStore = useEndgameStore()
 const { unreadCount } = storeToRefs(newsStore)
 const { inbox: notificationsInbox, unreadCount: notificationUnreadCount, loading: notificationsLoading } = storeToRefs(notificationsStore)
 const { session } = storeToRefs(gameAdminStore)
@@ -344,6 +346,16 @@ useTickRefresh(async () => {
       <div class="header-actions flex items-center gap-3 shrink-0">
         <div class="hidden xl:block">
           <GameTimeChip />
+        </div>
+
+        <!-- Game-ended lock indicator -->
+        <div
+          v-if="endgameStore.isGameEnded"
+          class="hidden sm:flex items-center gap-1.5 rounded-full border border-divider bg-card-raised px-3 py-1.5 text-xs text-muted"
+          :title="t('endgame.readOnlyNavHint', { winner: endgameStore.winnerDisplayName ?? '' })"
+        >
+          <font-awesome-icon :icon="['fas', 'lock']" class="text-muted" aria-hidden="true" />
+          <span>{{ t('endgame.readOnlyNavHint', { winner: endgameStore.winnerDisplayName ?? '' }) }}</span>
         </div>
 
         <!-- Impersonation chip -->

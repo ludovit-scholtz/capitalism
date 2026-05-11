@@ -34,3 +34,22 @@ Create a fun game in the style of Capitalism II, where players experience realis
 - [x] (100%) Create a weekly security action board that mirrors `/audits/*.md` findings, tracks owner plus due tick, and blocks release sign-off when any High or Critical finding from the latest audit has no linked implementation issue.
 - [x] (100%) Add an automated GraphQL surface inventory report in CI that flags newly added finance, shareholder, ranking, lending, and admin queries or mutations missing explicit auth and ownership tests.
 - [x] (100%) Add a frontend dependency-audit release gate that runs `npm audit --omit=dev` for both frontends, tracks reachable rich-content sinks such as `dompurify` plus `v-html`, and blocks release validation while known high-severity production advisories remain unresolved.
+
+### Endgame & Win Condition — "Race to the Top"
+
+- [x] (100%) Backend win detection via `EndgamePhase` (Order=1200): wealth calculated from cash, shares, gold, LP positions; winner recorded in `GameState`.
+- [x] (100%) `GameEndedMutationGuardMiddleware` blocks all GraphQL mutations with `GAME_ENDED` error code once the shard is over.
+- [x] (100%) `RealWorldBillionaire` entity seeded with top-10 real-world billionaires; Elon Musk at $430B as winning threshold.
+- [x] (100%) `GetEndgameStatus` GraphQL query returning game-ended state, winner details, threshold, and real-world leaderboard.
+- [x] (100%) `UpdateRealWorldBillionaire` admin mutation for updating benchmark entries.
+- [x] (100%) `EndShardManually` admin mutation: force-ends the shard, crowns the current bank-balance leader, publishes 3-locale newsletter.
+- [x] (100%) `useEndgameStore` Pinia store with 60-second polling, `progressPercent()`, and `checkMilestones()` milestone tracker.
+- [x] (100%) Milestone toast notifications at 1%, 10%, 25%, 50%, 75%, and 90% of winning threshold in `PersonalLedgerView`.
+- [x] (100%) "Race to the Top" panel in `PersonalLedgerView` with ARIA-accessible progress bar, benchmark table, and gap calculation.
+- [x] (100%) Winner overlay and read-only banner in `App.vue` using `useEndgameStatus` composable.
+- [x] (100%) Lock icon in `AppHeader` navbar with tooltip when shard has ended.
+- [x] (100%) Admin "End Shard" control in `AdminDashboardContent` with confirmation dialog and reason field.
+- [x] (100%) i18n keys for all endgame UI in en, sk, and de locales.
+- [x] (100%) 9 backend integration tests covering win detection, mutation guard, benchmark admin, and manual shard end.
+- [x] (100%) 11 frontend unit tests for `useEndgameStore` covering polling, milestone logic, and progress computation.
+- [x] (100%) E2E Playwright tests in `finance/endgame.spec.ts`.

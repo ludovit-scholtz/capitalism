@@ -92,6 +92,27 @@ async function saveBillionaire(row: { id: string; rank: number; name: string; we
     pendingBenchmarkSaveId.value = null
   }
 }
+
+const endShardReason = ref('')
+const endShardPending = ref(false)
+const endShardConfirmOpen = ref(false)
+
+async function confirmEndShard() {
+  endShardConfirmOpen.value = false
+  endShardPending.value = true
+  actionError.value = null
+  actionMessage.value = null
+
+  try {
+    await adminStore.endShardManually(endShardReason.value || undefined)
+    actionMessage.value = t('endgame.endShardSuccess')
+    endShardReason.value = ''
+  } catch (caughtError) {
+    actionError.value = caughtError instanceof Error ? caughtError.message : t('endgame.endShardFailed')
+  } finally {
+    endShardPending.value = false
+  }
+}
 </script>
 
 <template>
@@ -222,6 +243,51 @@ async function saveBillionaire(row: { id: string; rank: number; name: string; we
             @click="() => void saveBillionaire(row)"
           >
             {{ pendingBenchmarkSaveId === row.id ? t('common.loading') : t('common.save') }}
+          </button>
+        </div>
+      </div>
+    </article>
+
+    <!-- End Shard section -->
+    <article class="card admin-panel admin-panel-wide">
+      <div class="admin-panel-header">
+        <div>
+          <h2>{{ t('endgame.endShardTitle') }}</h2>
+          <p>{{ t('endgame.endShardBody') }}</p>
+        </div>
+      </div>
+
+      <div v-if="!endShardConfirmOpen" class="admin-list-item" style="padding: 1rem 0 0;">
+        <div class="flex flex-col gap-3">
+          <label class="text-sm text-muted" for="endShardReasonInput">{{ t('endgame.endShardReason') }}</label>
+          <input
+            id="endShardReasonInput"
+            v-model="endShardReason"
+            class="form-input"
+            type="text"
+            maxlength="500"
+            :placeholder="t('common.optional')"
+          />
+          <button
+            type="button"
+            class="btn btn-secondary self-start"
+            :disabled="endShardPending"
+            @click="endShardConfirmOpen = true"
+          >
+            {{ endShardPending ? t('common.loading') : t('endgame.endShardButton') }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Confirm dialog -->
+      <div v-else class="admin-list-item" style="padding: 1rem 0 0;">
+        <p class="text-sm text-muted mb-4">{{ t('endgame.endShardConfirm') }}</p>
+        <div class="flex gap-3">
+          <button type="button" class="btn btn-secondary" :disabled="endShardPending" @click="() => void confirmEndShard()">
+            {{ t('common.confirm') }}
+          </button>
+          <button type="button" class="btn btn-ghost" :disabled="endShardPending" @click="endShardConfirmOpen = false">
+            {{ t('common.cancel') }}
           </button>
         </div>
       </div>

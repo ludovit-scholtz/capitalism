@@ -290,4 +290,67 @@ public sealed class EndgameFeatureTests
         Assert.Equal("Elon Musk Updated", updated.GetProperty("name").GetString());
         Assert.Equal(431_000_000_000m, updated.GetProperty("wealthUsd").GetDecimal());
     }
+
+    [Fact]
+    public async Task AdminCanEndShardManually()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var (token, playerId) = await RegisterAndGetTokenAsync(client, "admin-endshard@endgame.test");
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.FirstAsync(p => p.Id == playerId);
+            player.Role = PlayerRole.Admin;
+            // Give the player some money so they become the leader
+            var account = await db.BankAccounts.FirstOrDefaultAsync(a => a.PlayerId == playerId);
+            if (account != null) account.Balance = 1_000_000;
+            await db.SaveChangesAsync();
+        }
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            mutation EndShard($input: EndShardManuallyInput!) {
+              endShardManually(input: $input) {
+                gameEnded
+                winnerDisplayName
+              }
+            }
+            """,
+            new { input = new { reason = "Test end" } },
+            token);
+
+        var data = result.GetProperty("data").GetProperty("endShardManually");
+        Assert.True(data.GetProperty("gameEnded").GetBoolean());
+    }
+
+    [Fact]
+    public async Task NonAdminCannotEndShardManually()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var (token, _) = await RegisterAndGetTokenAsync(client, "player-endshard@endgame.test");
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            mutation EndShard($input: EndShardManuallyInput!) {
+              endShardManually(input: $input) {
+                gameEnded
+              }
+            }
+            """,
+            new { input = new { reason = (string?)null } },
+            token);
+
+        // Expect either an auth error or errors array
+        var hasErrors = result.TryGetProperty("errors", out var errors) && errors.GetArrayLength() > 0;
+        var hasNullData = result.TryGetProperty("data", out var data)
+            && data.ValueKind == JsonValueKind.Object
+            && data.TryGetProperty("endShardManually", out var ended)
+            && ended.ValueKind == JsonValueKind.Null;
+        Assert.True(hasErrors || hasNullData, "Non-admin should not be able to end the shard.");
+    }
 }

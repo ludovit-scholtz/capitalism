@@ -5,6 +5,7 @@ import { gqlRequest } from '@/lib/graphql'
 import type {
   AccountContextType,
   AuthPayload,
+  EndgameStatus,
   GameAdminDashboard,
   GameAdminPlayer,
   GameAdminSession,
@@ -410,6 +411,23 @@ export const useGameAdminStore = defineStore('gameAdmin', () => {
     return data.updateRealWorldBillionaire
   }
 
+  async function endShardManually(reason?: string): Promise<EndgameStatus> {
+    const data = await gqlRequest<{ endShardManually: EndgameStatus }>(
+      `mutation EndShardManually($input: EndShardManuallyInput!) {
+        endShardManually(input: $input) {
+          gameEnded
+          winnerPlayerId
+          winnerDisplayName
+          winnerCompanyName
+          gameEndedAtUtc
+          winningThresholdUsd
+        }
+      }`,
+      { input: { reason: reason ?? null } },
+    )
+    return data.endShardManually
+  }
+
   function replaceDashboardPlayer(updatedPlayer: GameAdminPlayer) {
     if (!dashboard.value) {
       return
@@ -451,6 +469,7 @@ export const useGameAdminStore = defineStore('gameAdmin', () => {
     removeGlobalGameAdminRole,
     upsertGamesEntry,
     updateRealWorldBillionaire,
+    endShardManually,
     clear,
   }
 })
