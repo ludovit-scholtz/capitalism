@@ -47,7 +47,10 @@ export async function gqlRequest<T>(query: string, variables?: Record<string, un
     const firstError = json.errors[0]!
     const code = firstError.extensions?.code as string | undefined
     if (code === 'NOT_FOUND_OR_NOT_OWNED' || code === 'NOT_OWNED_OR_NOT_FOUND') {
-      throw new GraphQLError('This item is no longer available. Please refresh to see the latest state.', code)
+      throw new GraphQLError(
+        "This item could not be found or you don't have permission to access it.",
+        code,
+      )
     }
     throw new GraphQLError(firstError.message, code)
   }

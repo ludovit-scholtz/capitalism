@@ -294,4 +294,72 @@ public sealed class StockLimitOrderIntegrationTests
         Assert.Equal(LimitOrderStatus.Cancelled, order.Status);
         Assert.Equal(0m, order.ReservedCashRemaining);
     }
+
+    [Fact]
+    public async Task CancelLimitOrder_ForeignAndMissingOrder_UseSameNotFoundOrNotOwnedCode()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var ownerToken = await RegisterAndGetTokenAsync(client, $"limit-owner4-{Guid.NewGuid():N}@test.com", "Owner");
+        var ownerId = await GetCurrentPlayerIdAsync(client, ownerToken);
+        var companyId = await SeedPublicCompanyAsync(factory, ownerId, "Owner Corp");
+        var ownerSettlementId = await EnsureUsdSettlementAccountAsync(factory, ownerId, 5_000m);
+
+        var attackerToken = await RegisterAndGetTokenAsync(client, $"limit-attacker-{Guid.NewGuid():N}@test.com", "Attacker");
+        var attackerId = await GetCurrentPlayerIdAsync(client, attackerToken);
+        await EnsureUsdSettlementAccountAsync(factory, attackerId, 5_000m);
+
+        var symbol = $"CMP-{companyId:N}".ToUpperInvariant();
+        var place = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            """
+            mutation Place($input: PlaceLimitOrderInput!) {
+              placeLimitOrder(input: $input) { id }
+            }
+            """,
+            new { input = new { stockSymbol = symbol, side = "BUY", limitPrice = 10m, quantity = 10 } },
+            ownerToken);
+        var ownerOrderId = Guid.Parse(place.GetProperty("data").GetProperty("placeLimitOrder").GetProperty("id").GetString()!);
+
+        var foreignCancel = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            """
+            mutation Cancel($orderId: UUID!) {
+              cancelLimitOrder(orderId: $orderId) { status }
+            }
+            """,
+            new { orderId = ownerOrderId },
+            attackerToken);
+        var foreignError = foreignCancel.GetProperty("errors")[0];
+
+        var missingCancel = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            """
+            mutation Cancel($orderId: UUID!) {
+              cancelLimitOrder(orderId: $orderId) { status }
+            }
+            """,
+            new { orderId = Guid.NewGuid() },
+            attackerToken);
+        var missingError = missingCancel.GetProperty("errors")[0];
+
+        Assert.Equal(
+            "NOT_FOUND_OR_NOT_OWNED",
+            foreignError.GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal(
+            "NOT_FOUND_OR_NOT_OWNED",
+            missingError.GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal(
+            "This item could not be found or you don't have permission to access it.",
+            foreignError.GetProperty("message").GetString());
+        Assert.Equal(
+            "This item could not be found or you don't have permission to access it.",
+            missingError.GetProperty("message").GetString());
+
+        await using var assertScope = factory.Services.CreateAsyncScope();
+        var db = assertScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var settlement = await db.BankAccounts.AsNoTracking().FirstAsync(candidate => candidate.Id == ownerSettlementId);
+        Assert.Equal(4_900m, settlement.Balance);
+    }
 }

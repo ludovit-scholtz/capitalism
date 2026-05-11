@@ -29,7 +29,8 @@ public sealed partial class Mutation
     public async Task<Loan> AcceptLoan(
         AcceptLoanInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
@@ -46,7 +47,7 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        return await AcceptLoanFromBankDirectAsync(input, borrower, db, userId, httpContextAccessor);
+        return await AcceptLoanFromBankDirectAsync(input, borrower, db, userId, httpContextAccessor, objectAuthorization);
     }
 
     /// <param name="userId">Pre-extracted from the JWT claim to avoid double-extraction; also used for player-level self-lending check (bank.Company.PlayerId).</param>
@@ -56,7 +57,8 @@ public sealed partial class Mutation
         Company borrower,
         AppDbContext db,
         Guid userId,
-        IHttpContextAccessor httpContextAccessor)
+        IHttpContextAccessor httpContextAccessor,
+        ObjectAuthorizationService objectAuthorization)
     {
         var bank = await db.Buildings
             .Include(b => b.Company)
@@ -146,18 +148,15 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        var collateralBuilding = await db.Buildings
-            .Include(b => b.City)
-            .FirstOrDefaultAsync(b => b.Id == input.CollateralBuildingId.Value && b.CompanyId == borrower.Id);
-
-        if (collateralBuilding is null)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Collateral building not found or is not owned by your company.")
-                    .SetCode("COLLATERAL_NOT_OWNED")
-                    .Build());
-        }
+        var collateralBuilding = await objectAuthorization.RequireOwnedAsync(
+            actorUserId: userId,
+            requestedObjectType: "building",
+            requestedObjectId: input.CollateralBuildingId.Value,
+            loadEntityAsync: token => db.Buildings
+                .Include(b => b.City)
+                .FirstOrDefaultAsync(b => b.Id == input.CollateralBuildingId.Value, token),
+            isOwnedByActor: building => building.CompanyId == borrower.Id,
+            cancellationToken: httpContextAccessor.HttpContext!.RequestAborted);
 
         var alreadyPledged = await db.Loans
             .AnyAsync(l => l.CollateralBuildingId == input.CollateralBuildingId.Value

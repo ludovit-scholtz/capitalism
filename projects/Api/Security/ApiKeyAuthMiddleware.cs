@@ -4,6 +4,7 @@ using System.Text;
 using Api.Data;
 using Api.Security;
 using Capitalism.Shared.Security;
+using Microsoft.AspNetCore.Http.Features.Authentication;
 using Microsoft.EntityFrameworkCore;
 
 namespace Api.Security;
@@ -111,7 +112,15 @@ public sealed class ApiKeyAuthMiddleware(RequestDelegate next)
         };
 
         var identity = new ClaimsIdentity(claims, "ApiKey");
-        context.User = new ClaimsPrincipal(identity);
+        var principal = new ClaimsPrincipal(identity);
+        var authenticationFeature = context.Features.Get<IHttpAuthenticationFeature>();
+        if (authenticationFeature is null)
+        {
+            authenticationFeature = new ApiKeyAuthenticationFeature();
+            context.Features.Set(authenticationFeature);
+        }
+
+        authenticationFeature.User = principal;
     }
 
     /// <summary>
@@ -138,5 +147,10 @@ public sealed class ApiKeyAuthMiddleware(RequestDelegate next)
             .TrimEnd('=');
         var hash = ComputeHash(plaintext);
         return (plaintext, hash);
+    }
+
+    private sealed class ApiKeyAuthenticationFeature : IHttpAuthenticationFeature
+    {
+        public ClaimsPrincipal? User { get; set; } = new(new ClaimsIdentity());
     }
 }

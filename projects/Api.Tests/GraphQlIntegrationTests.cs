@@ -30247,7 +30247,33 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         var errors = result.GetProperty("errors");
         Assert.True(errors.GetArrayLength() > 0, "Should reject pledge of a building not owned by borrower.");
-        Assert.Equal("COLLATERAL_NOT_OWNED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal("This item could not be found or you don't have permission to access it.", errors[0].GetProperty("message").GetString());
+
+        var missingResult = await ExecuteGraphQlAsync(
+            """
+            mutation Accept($input: AcceptLoanInput!) {
+              acceptLoan(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    loanOfferId = bank.Id.ToString(),
+                    borrowerCompanyId = borrowerCompany.Id.ToString(),
+                    principalAmount = 50_000m,
+                    collateralBuildingId = Guid.NewGuid().ToString(),
+                }
+            },
+            borrowerToken);
+
+        var missingErrors = missingResult.GetProperty("errors");
+        Assert.True(missingErrors.GetArrayLength() > 0, "Should hide whether missing collateral exists.");
+        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", missingErrors[0].GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal(
+            "This item could not be found or you don't have permission to access it.",
+            missingErrors[0].GetProperty("message").GetString());
     }
 
     [Fact]

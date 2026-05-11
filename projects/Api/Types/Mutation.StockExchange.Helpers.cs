@@ -77,7 +77,9 @@ public sealed partial class Mutation
         Player player,
         ActiveTradingAccount account,
         Guid? bankAccountId,
-        string requiredCurrencyCode)
+        string requiredCurrencyCode,
+        ObjectAuthorizationService objectAuthorization,
+        CancellationToken cancellationToken)
     {
         if (!bankAccountId.HasValue)
         {
@@ -100,13 +102,16 @@ public sealed partial class Mutation
             return companyEurAccount;
         }
 
-        var settlementAccount = await db.BankAccounts
-            .FirstOrDefaultAsync(candidate => candidate.Id == bankAccountId.Value)
-            ?? throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Selected settlement bank account was not found.")
-                    .SetCode("BANK_ACCOUNT_NOT_FOUND")
-                    .Build());
+        var settlementAccount = await objectAuthorization.RequireOwnedAsync(
+            actorUserId: player.Id,
+            requestedObjectType: "bank_account",
+            requestedObjectId: bankAccountId.Value,
+            loadEntityAsync: token => db.BankAccounts
+                .FirstOrDefaultAsync(candidate => candidate.Id == bankAccountId.Value, token),
+            isOwnedByActor: candidate => account.Company is null
+                ? candidate.PlayerId == player.Id
+                : candidate.CompanyId == account.Company.Id,
+            cancellationToken: cancellationToken);
 
         if (settlementAccount.ClosedAtUtc.HasValue)
         {
@@ -123,26 +128,6 @@ public sealed partial class Mutation
                 ErrorBuilder.New()
                     .SetMessage($"Stock trading settlement supports only {requiredCurrencyCode} accounts.")
                     .SetCode("INVALID_SETTLEMENT_CURRENCY")
-                    .Build());
-        }
-
-        if (account.Company is null)
-        {
-            if (settlementAccount.PlayerId != player.Id)
-            {
-                throw new GraphQLException(
-                    ErrorBuilder.New()
-                        .SetMessage("Selected settlement account does not belong to the active personal account.")
-                        .SetCode("BANK_ACCOUNT_NOT_OWNED")
-                        .Build());
-            }
-        }
-        else if (settlementAccount.CompanyId != account.Company.Id)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Selected settlement account does not belong to the active company account.")
-                    .SetCode("BANK_ACCOUNT_NOT_OWNED")
                     .Build());
         }
 
