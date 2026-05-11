@@ -290,7 +290,7 @@ public sealed partial class Mutation
                     "tradeAccountCompanyId must be null when tradeAccountType is PERSON.");
             }
 
-            return new ActiveTradingAccount(AccountContextType.Person, null, player.DisplayName);
+            return new ActiveTradingAccount(AccountContextType.Person, null, PublicPlayerDisplayName.Resolve(player));
         }
 
         throw CreateInvalidClientOverrideException(
@@ -324,7 +324,7 @@ public sealed partial class Mutation
             player.ActiveCompanyId = null;
         }
 
-        return new ActiveTradingAccount(AccountContextType.Person, null, player.DisplayName);
+        return new ActiveTradingAccount(AccountContextType.Person, null, PublicPlayerDisplayName.Resolve(player));
     }
 
     private static Shareholding GetOrCreateShareholding(

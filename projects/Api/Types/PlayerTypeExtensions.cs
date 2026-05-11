@@ -9,6 +9,12 @@ namespace Api.Types;
 [ExtendObjectType<Player>]
 public sealed class PlayerTypeExtensions
 {
+    public string GetDisplayName([Parent] Player player)
+        => PublicPlayerDisplayName.Resolve(player);
+
+    public string GetPersonalAccountName([Parent] Player player)
+        => PublicPlayerDisplayName.Resolve(player);
+
     public Task<decimal> GetPersonalCash(
         [Parent] Player player,
         [Service] AppDbContext db)

@@ -1,6 +1,7 @@
 using Api.Data;
 using Api.Data.Entities;
 using Api.Security;
+using Api.Utilities;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
 
@@ -203,7 +204,7 @@ public sealed partial class Query
             CompanyId = a.CompanyId,
             CompanyName = a.Company?.Name,
             OwnerType = a.CompanyId.HasValue ? "COMPANY" : "PERSON",
-            OwnerDisplayName = a.Company?.Name ?? a.Player?.DisplayName ?? string.Empty,
+            OwnerDisplayName = a.Company?.Name ?? PublicPlayerDisplayName.Resolve(a.Player),
             BankBuildingId = ResolveBankBuildingId(a),
             CityId = ResolveCityId(a),
             IsDepositAccount = a.BankBuildingId.HasValue,

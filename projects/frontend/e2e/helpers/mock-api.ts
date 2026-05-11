@@ -19,6 +19,7 @@ export type MockPlayer = {
   email: string
   password: string
   displayName: string
+  personalAccountName?: string
   role: 'PLAYER' | 'ADMIN'
   isInvisibleInChat: boolean
   createdAtUtc: string
@@ -2117,7 +2118,7 @@ function computeAvailableCash(player: MockPlayer): number {
 }
 
 export function makePlayer(overrides?: Partial<MockPlayer>): MockPlayer {
-  return {
+  const player: MockPlayer = {
     id: 'player-1',
     email: 'player@test.com',
     password: 'TestPass1!',
@@ -2146,6 +2147,8 @@ export function makePlayer(overrides?: Partial<MockPlayer>): MockPlayer {
     companies: [],
     ...overrides,
   }
+
+  return player
 }
 
 function applyImplicitCompanyAccountContext(player: MockPlayer) {
@@ -6941,7 +6944,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           return {
             playerId: p.id,
             displayName: p.displayName,
-            personalAccountName: p.displayName,
+            personalAccountName: p.personalAccountName ?? p.displayName,
             personalCash,
             sharesValue,
             totalWealth,
@@ -7110,7 +7113,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const duplicate = state.players.some(
         (player) =>
           player.id !== state.currentUserId
-          && player.displayName.toLowerCase() === personalAccountName.toLowerCase(),
+          && (player.personalAccountName ?? player.displayName).toLowerCase() === personalAccountName.toLowerCase(),
       )
       if (duplicate) {
         return route.fulfill({
@@ -7124,7 +7127,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
       const player = state.players.find((p) => p.id === state.currentUserId)
       if (player) {
-        player.displayName = personalAccountName
+        player.personalAccountName = personalAccountName
       }
 
       return route.fulfill({

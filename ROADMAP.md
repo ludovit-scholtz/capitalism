@@ -6,7 +6,7 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 ### Onboarding
 
-- [ ] Personal account name is generated in the onboarding process before user signs in. However in the game server the name displayed is different. It is the JWT auth name, not the generated personal account name. Make sure to use proper personal account name in the ranking in the game server. Do not use the jwt name anywhere.
+- [x] (100%) Personal account name is generated in the onboarding process before user signs in. The game server now resolves public player labels from the stored player profile across rankings, chat, account ownership labels, and player GraphQL surfaces instead of exposing JWT auth names.
 
 ### Security Follow-Ups
 
@@ -21,4 +21,3 @@ Create a fun game in the style of Capitalism II, where players experience realis
 - [ ] Remove `unsafe-inline` from `script-src` in `projects/frontend/nginx.conf` CSP header; verify production Vite bundle works without it and implement nonce-based CSP if inline scripts are required.
 - [ ] Implement a time-limited email-based password reset flow (or document OIDC re-linkage as the only recovery path) to prevent permanent player lock-out on credential loss.
 - [ ] Move `RootAdministratorEmails` and database credentials out of committed `appsettings.json` into environment-variable configuration or a secrets manager.
-

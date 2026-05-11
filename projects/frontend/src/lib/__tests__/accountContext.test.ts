@@ -46,6 +46,34 @@ describe('accountContext', () => {
     ).toBe('Alice Founder')
   })
 
+  it('prefers the personal account name for the active account label in person mode', () => {
+    expect(
+      getActiveAccountName(
+        {
+          displayName: 'OIDC Subject User',
+          personalAccountName: 'Alice Founder',
+          activeAccountType: 'PERSON',
+          activeCompanyId: null,
+        },
+        companies,
+      ),
+    ).toBe('Alice Founder')
+  })
+
+  it('falls back to displayName when personalAccountName is missing', () => {
+    expect(
+      getActiveAccountName(
+        {
+          displayName: 'Fallback Name',
+          personalAccountName: undefined,
+          activeAccountType: 'PERSON',
+          activeCompanyId: null,
+        },
+        companies,
+      ),
+    ).toBe('Fallback Name')
+  })
+
   it('uses the company name for the active account label in company mode', () => {
     expect(
       getActiveAccountName(
@@ -145,5 +173,23 @@ describe('accountContext', () => {
         isActive: false,
       },
     ])
+  })
+
+  it('uses the personal account name for the person option when available', () => {
+    const options = buildAccountOptions(
+      {
+        displayName: 'OIDC Subject User',
+        personalAccountName: 'Alice Founder',
+        activeAccountType: 'PERSON',
+        activeCompanyId: null,
+      },
+      companies,
+    )
+
+    expect(options[0]).toMatchObject({
+      key: 'person',
+      name: 'Alice Founder',
+      isActive: true,
+    })
   })
 })

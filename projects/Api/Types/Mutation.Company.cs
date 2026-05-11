@@ -316,7 +316,7 @@ public sealed partial class Mutation
             {
                 ActiveAccountType = AccountContextType.Person,
                 ActiveCompanyId = null,
-                ActiveAccountName = player.DisplayName,
+                ActiveAccountName = PublicPlayerDisplayName.Resolve(player),
             };
         }
 
