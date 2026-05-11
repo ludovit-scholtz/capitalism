@@ -1569,6 +1569,22 @@ Rules to prevent recurrence:
 11. **Before closing any security PR, map each changed endpoint to OWASP API Top 10 categories** (API1 BOLA, API5 BFLA, API6 business-flow abuse, API10 unsafe integrations) and confirm at least one regression test per applicable category.
 12. **Weekly audit follow-ups must produce implementation issues, not only narrative reports.** Every High/Critical finding must be linked to a roadmap task and a tracked test gap before the audit is marked complete.
 
+## Security audit CI gate — `<!-- issue: #NNN -->` annotations are mandatory
+
+Root-cause of a CI gate failure (May 2026, PR #391 security board):
+- The `security-audit-board` workflow runs a `--gate` check on every PR to `main`.
+- Seven High/Critical findings in `audits/2026-W19-security-audit.md` had no linked implementation issue, so the gate failed with exit code 1.
+- Findings with status `In-Progress` still fail the gate unless they have a `<!-- issue: #NNN -->` annotation. The gate only exempts `Resolved` findings.
+- The script logic: `status !== 'Resolved' && issues.length === 0` → gate fails.
+
+**Rules to prevent recurrence:**
+1. **When a new audit file is added (e.g., `audits/YYYY-WNN-security-audit.md`), annotate every High/Critical finding's Status line with `<!-- issue: #NNN -->` before merging.** The annotation format is: `- **Status:** Open <!-- issue: #391 -->`.
+2. **`In-Progress` is NOT sufficient to pass the gate.** Only `Resolved` bypasses the issue-link requirement. An `In-Progress` finding without an issue link will still fail CI.
+3. **Use the relevant PR or issue number that tracks the fix implementation.** PR numbers and issue numbers share the same GitHub number pool, so both are valid.
+4. **Multiple issues on one finding are supported:** `- **Status:** Open <!-- issues: #389, #391 -->`.
+5. **When adding a new `audits/*.md` file, run `node .github/scripts/audit-board.mjs --gate` locally before committing** to verify the gate would pass. This is a zero-dependency Node.js script with no install required.
+6. **The gate only checks the latest audit file** (lexicographically last `*.md` filename in `audits/`). Older audits with unlinked findings do NOT cause gate failures once a newer audit exists.
+
 ## Collateral hardening follow-up — race outcomes and lock-copy assertions must match runtime behavior
 
 Root-cause of repeated CI failures (May 2026, PR #379 collateral hardening):

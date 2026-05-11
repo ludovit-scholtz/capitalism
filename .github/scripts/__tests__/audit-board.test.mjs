@@ -444,4 +444,269 @@ describe('collectAllFindings', () => {
     assert.equal(findings[0].owner, '@charlie')
     rmSync(dir, { recursive: true })
   })
+
+  it('ignores non-.md files in the audits directory', () => {
+    const dir = makeTmpDir()
+    writeFile(dir, 'owners.yml', '# no findings here\n')
+    writeFile(dir, 'README.txt', 'This is not a markdown audit file\n')
+    writeFile(
+      dir,
+      '2026-W06-audit.md',
+      `# Audit W06\n\n## Risk register\n\n### 1) Real finding\n\n- **Severity:** High\n- **Status:** Open\n`,
+    )
+    const findings = collectAllFindings(dir, resolve(dir, 'owners.yml'))
+    assert.equal(findings.length, 1)
+    assert.equal(findings[0].fileStem, '2026-W06-audit')
+    rmSync(dir, { recursive: true })
+  })
+
+  it('gate checks only latest file when multiple audits exist', () => {
+    const dir = makeTmpDir()
+    // Older audit with unlinked High finding — gate should ignore it
+    writeFile(
+      dir,
+      '2026-W01-audit.md',
+      `# Old\n\n## Risk register\n\n### 1) Old finding\n\n- **Severity:** High\n- **Status:** Open\n`,
+    )
+    // Latest audit with all findings linked
+    writeFile(
+      dir,
+      '2026-W20-audit.md',
+      `# New\n\n## Risk register\n\n### 1) New finding\n\n- **Severity:** Critical\n- **Status:** Open <!-- issue: #99 -->\n`,
+    )
+    const findings = collectAllFindings(dir, resolve(dir, 'owners.yml'))
+    const { failing, latestStem } = runGateCheck(findings)
+    assert.equal(latestStem, '2026-W20-audit')
+    assert.equal(failing.length, 0, 'Gate should pass because latest audit has all findings linked')
+    rmSync(dir, { recursive: true })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// parseAuditFile — inline issue annotation on Status line
+// ---------------------------------------------------------------------------
+
+describe('parseAuditFile - inline issue annotation on Status line', () => {
+  it('strips HTML comment from status text but keeps issue ref', () => {
+    const dir = makeTmpDir()
+    writeFile(
+      dir,
+      '2026-W10-audit.md',
+      `# Audit\n\n## Risk register\n\n### 1) Race condition\n\n- **Severity:** High\n- **Status:** In-Progress <!-- issue: #389 -->\n`,
+    )
+    const findings = parseAuditFile(resolve(dir, '2026-W10-audit.md'))
+    assert.equal(findings.length, 1)
+    assert.equal(findings[0].status, 'In-Progress')
+    assert.deepEqual(findings[0].issues, [389])
+    rmSync(dir, { recursive: true })
+  })
+
+  it('strips HTML comment from Open status text but keeps issue ref', () => {
+    const dir = makeTmpDir()
+    writeFile(
+      dir,
+      '2026-W11-audit.md',
+      `# Audit\n\n## Risk register\n\n### 1) Token boundary\n\n- **Severity:** Critical\n- **Status:** Open <!-- issue: #313 -->\n`,
+    )
+    const findings = parseAuditFile(resolve(dir, '2026-W11-audit.md'))
+    assert.equal(findings.length, 1)
+    assert.equal(findings[0].status, 'Open', 'Status should be cleaned of HTML comment')
+    assert.deepEqual(findings[0].issues, [313])
+    rmSync(dir, { recursive: true })
+  })
+
+  it('In-Progress finding with issue ref passes gate', () => {
+    const dir = makeTmpDir()
+    writeFile(
+      dir,
+      '2026-W12-audit.md',
+      `# Audit\n\n## Risk register\n\n### 1) Race condition\n\n- **Severity:** High\n- **Status:** In-Progress <!-- issue: #389 -->\n`,
+    )
+    const findings = parseAuditFile(resolve(dir, '2026-W12-audit.md'))
+    const { failing } = runGateCheck(findings)
+    assert.equal(failing.length, 0, 'In-Progress + linked issue should pass gate')
+    rmSync(dir, { recursive: true })
+  })
+
+  it('In-Progress finding WITHOUT issue ref fails gate', () => {
+    const dir = makeTmpDir()
+    writeFile(
+      dir,
+      '2026-W13-audit.md',
+      `# Audit\n\n## Risk register\n\n### 1) Race condition\n\n- **Severity:** High\n- **Status:** In-Progress\n`,
+    )
+    const findings = parseAuditFile(resolve(dir, '2026-W13-audit.md'))
+    const { failing } = runGateCheck(findings)
+    assert.equal(failing.length, 1, 'In-Progress without linked issue should still fail gate')
+    rmSync(dir, { recursive: true })
+  })
+
+  it('extracts multiple issues from single finding', () => {
+    const dir = makeTmpDir()
+    writeFile(
+      dir,
+      '2026-W14-audit.md',
+      `# Audit\n\n## Risk register\n\n### 1) Complex finding\n\n- **Severity:** High\n- **Status:** Open <!-- issues: #10, #20 -->\n`,
+    )
+    const findings = parseAuditFile(resolve(dir, '2026-W14-audit.md'))
+    assert.equal(findings.length, 1)
+    assert.deepEqual(findings[0].issues, [10, 20])
+    rmSync(dir, { recursive: true })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// runGateCheck — owner presence does not bypass issue requirement
+// ---------------------------------------------------------------------------
+
+describe('runGateCheck - owner does not bypass issue requirement', () => {
+  function makeFinding(overrides = {}) {
+    return {
+      slug: 'test-audit/finding',
+      fileStem: 'test-audit',
+      filePath: '/audits/test-audit.md',
+      number: 1,
+      title: 'Test Finding',
+      severity: 'High',
+      status: 'Open',
+      issues: [],
+      owner: '',
+      ...overrides,
+    }
+  }
+
+  it('fails gate for Open finding with owner but no issue', () => {
+    const findings = [makeFinding({ owner: '@alice', issues: [] })]
+    const { failing } = runGateCheck(findings)
+    assert.equal(failing.length, 1, 'Owner alone is not enough to pass gate — issue link is required')
+  })
+
+  it('passes gate for Open finding with owner AND linked issue', () => {
+    const findings = [makeFinding({ owner: '@alice', issues: [42] })]
+    const { failing } = runGateCheck(findings)
+    assert.equal(failing.length, 0, 'Owner + linked issue should pass gate')
+  })
+
+  it('passes gate for Resolved finding with no owner and no issue', () => {
+    const findings = [makeFinding({ status: 'Resolved', owner: '', issues: [] })]
+    const { failing } = runGateCheck(findings)
+    assert.equal(failing.length, 0, 'Resolved findings always pass regardless of owner/issue')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// buildBoard — issue links in generated Markdown
+// ---------------------------------------------------------------------------
+
+describe('buildBoard - issue links', () => {
+  it('includes issue hyperlinks for linked findings', () => {
+    const findings = [
+      {
+        slug: 'audit/linked-finding',
+        fileStem: 'audit',
+        filePath: '/audits/audit.md',
+        number: 1,
+        title: 'Linked Finding',
+        severity: 'High',
+        status: 'Open',
+        issues: [42, 99],
+        owner: '@alice',
+      },
+    ]
+    const board = buildBoard(findings)
+    assert.ok(board.includes('[#42](https://github.com/ludovit-scholtz/capitalism/issues/42)'), 'Board should contain hyperlink for issue 42')
+    assert.ok(board.includes('[#99](https://github.com/ludovit-scholtz/capitalism/issues/99)'), 'Board should contain hyperlink for issue 99')
+  })
+
+  it('renders em-dash for finding with no issues', () => {
+    const findings = [
+      {
+        slug: 'audit/unlinked',
+        fileStem: 'audit',
+        filePath: '/audits/audit.md',
+        number: 1,
+        title: 'Unlinked',
+        severity: 'High',
+        status: 'Open',
+        issues: [],
+        owner: '',
+      },
+    ]
+    const board = buildBoard(findings)
+    // The em-dash placeholder should appear in the issues column
+    assert.ok(board.includes('| — |') || board.includes('|—|') || board.match(/\|\s*—\s*\|/), 'Board should render em-dash for missing issues')
+  })
+
+  it('renders all-clear banner when all findings are resolved or linked', () => {
+    const findings = [
+      {
+        slug: 'audit/resolved',
+        fileStem: 'audit',
+        filePath: '/audits/audit.md',
+        number: 1,
+        title: 'Resolved Finding',
+        severity: 'High',
+        status: 'Resolved',
+        issues: [10],
+        owner: '@bob',
+      },
+    ]
+    const board = buildBoard(findings)
+    assert.ok(board.includes('All clear'), 'Board should show All clear banner')
+    assert.ok(!board.includes('require linked implementation issues'), 'Board should not show unlinked warning')
+  })
+
+  it('sorts Medium after High in board output', () => {
+    const findings = [
+      {
+        slug: 'a/medium',
+        fileStem: 'a',
+        filePath: '/audits/a.md',
+        number: 2,
+        title: 'Medium Issue',
+        severity: 'Medium',
+        status: 'Open',
+        issues: [],
+        owner: '',
+      },
+      {
+        slug: 'a/high',
+        fileStem: 'a',
+        filePath: '/audits/a.md',
+        number: 1,
+        title: 'High Issue',
+        severity: 'High',
+        status: 'Open',
+        issues: [5],
+        owner: '',
+      },
+    ]
+    const board = buildBoard(findings)
+    const highIdx = board.indexOf('High Issue')
+    const medIdx = board.indexOf('Medium Issue')
+    assert.ok(highIdx < medIdx, 'High should appear before Medium')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// loadOwners — edge cases
+// ---------------------------------------------------------------------------
+
+describe('loadOwners - edge cases', () => {
+  it('handles value with colon in it', () => {
+    const dir = makeTmpDir()
+    writeFile(dir, 'owners.yml', `2026-W01-audit/some-finding: @user:alias\n`)
+    const owners = loadOwners(resolve(dir, 'owners.yml'))
+    // First colon splits key/value; the rest of the value (including colon) stays
+    assert.equal(owners['2026-W01-audit/some-finding'], '@user:alias')
+    rmSync(dir, { recursive: true })
+  })
+
+  it('returns empty for file with only comments', () => {
+    const dir = makeTmpDir()
+    writeFile(dir, 'owners.yml', `# comment 1\n# comment 2\n`)
+    const owners = loadOwners(resolve(dir, 'owners.yml'))
+    assert.equal(Object.keys(owners).length, 0)
+    rmSync(dir, { recursive: true })
+  })
 })
