@@ -18,7 +18,10 @@ namespace Api.Types;
 /// </summary>
 public sealed partial class Mutation
 {
-    /// <summary>Purchases shares from public investors using either the personal account or the selected company account.</summary>
+    /// <summary>
+    /// Purchases shares from public investors using either the personal account or the selected company account.
+    /// API-key callers can trade only through company/account identifiers owned by the authenticated principal.
+    /// </summary>
     [Authorize]
     public async Task<ShareTradeResult> BuyShares(
         BuySharesInput input,
@@ -201,7 +204,10 @@ public sealed partial class Mutation
         };
     }
 
-    /// <summary>Sells shares back to the public exchange using either the personal account or the selected company account.</summary>
+    /// <summary>
+    /// Sells shares back to the public exchange using either the personal account or the selected company account.
+    /// API-key callers can trade only through company/account identifiers owned by the authenticated principal.
+    /// </summary>
     [Authorize]
     public async Task<ShareTradeResult> SellShares(
         SellSharesInput input,

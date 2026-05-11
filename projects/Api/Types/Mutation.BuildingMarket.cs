@@ -14,6 +14,7 @@ public sealed partial class Mutation
     /// Allows a buyer to submit a purchase offer on a building listed for sale.
     /// The buyer must own the target company and the company must have sufficient funds.
     /// The buyer cannot make an offer on their own building.
+    /// API-key callers can submit offers only for buyer companies owned by the authenticated principal.
     /// </summary>
     [Authorize]
     public async Task<BuildingSaleOffer> MakeOfferOnBuilding(
@@ -139,6 +140,7 @@ public sealed partial class Mutation
     /// Seller accepts an offer: atomically debits the buyer's account,
     /// credits the seller's account, transfers building ownership, and writes ledger entries.
     /// All pending offers on the building are rejected after the accepted transfer.
+    /// API-key callers can accept only offers for buildings owned by the authenticated principal.
     /// </summary>
     [Authorize]
     public async Task<AcceptBuildingOfferResult> AcceptBuildingOffer(
@@ -591,7 +593,10 @@ public sealed partial class Mutation
         };
     }
 
-    /// <summary>Seller cancels a pending offer.</summary>
+    /// <summary>
+    /// Seller cancels a pending offer.
+    /// API-key callers can cancel only offers for buildings owned by the authenticated principal.
+    /// </summary>
     [Authorize]
     public async Task<BuildingSaleOffer> CancelBuildingOffer(
         CancelBuildingOfferInput input,

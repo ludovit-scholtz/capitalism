@@ -83,6 +83,7 @@ public class Program
         });
         builder.Services.AddScoped<AppDbInitializer>();
         builder.Services.AddScoped<AuthenticatedPlayerClaimsSyncService>();
+        builder.Services.AddScoped<BotOwnershipGuard>();
         builder.Services.AddScoped<NbsExchangeRateService>();
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddHttpClient("push");

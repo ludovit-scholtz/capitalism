@@ -11,7 +11,10 @@ namespace Api.Types;
 
 public sealed partial class Mutation
 {
-    /// <summary>Sets or clears the for-sale status and asking price of a building.</summary>
+    /// <summary>
+    /// Sets or clears the for-sale status and asking price of a building.
+    /// API-key callers can mutate only buildings owned by the authenticated principal.
+    /// </summary>
     [Authorize]
     public async Task<Building> SetBuildingForSale(
         SetBuildingForSaleInput input,
@@ -109,6 +112,7 @@ public sealed partial class Mutation
     /// <summary>
     /// Permanently destroys a building, releases its lot, and pays an 80% refund to the owner.
     /// Destruction is blocked while the building is collateral for an unpaid loan.
+    /// API-key callers can destroy only buildings owned by the authenticated principal.
     /// </summary>
     [Authorize]
     public async Task<DestroyBuildingResult> DestroyBuilding(

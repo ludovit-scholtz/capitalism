@@ -22,6 +22,8 @@ public sealed partial class Mutation
     /// The borrower must own the company; a collateral building is required; the bank must be open
     /// (BaseCapitalDeposited = true) and have sufficient deposit capacity (90% of TotalDeposits).
     /// Self-lending is blocked at both company and player level.
+    /// API-key callers can reference only borrower companies, collateral buildings, and settlement
+    /// accounts owned by the authenticated principal.
     /// </summary>
     [Authorize]
     public async Task<Loan> AcceptLoan(
@@ -407,6 +409,7 @@ public sealed partial class Mutation
     /// <summary>
     /// Repays the full remaining debt of an overdue/defaulted loan immediately.
     /// The authenticated borrower must own the loan's borrower company.
+    /// API-key callers can target only loans owned by the authenticated principal.
     /// </summary>
     [Authorize]
     public async Task<Loan> RepayLoanDebt(
