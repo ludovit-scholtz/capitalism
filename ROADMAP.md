@@ -15,6 +15,10 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 - [x] (100%) Add a mine-side extraction history experience in building detail with a 30-day sparkline, depletion trendline, and an expanded dialog that explains reserve burn rate, expected depletion tick, and quality decay inflection points.
 
+### Power Plant & Energy Management
+
+- [x] (100%) Deliver foundational city power-grid gameplay with buildable power plants, per-building power demand/online states, tick-based production and fuel economics, city energy planning UI, and full backend/frontend regression coverage.
+
 ### Security Fairness Hardening
 
 - [x] (100%) Introduce API key scopes and enforcement gates so leaked keys cannot act as full-account impersonation; support read-only, bot-only, trading-only, and company-bound scopes with deny-by-default middleware enforcement and audit logging.
