@@ -296,15 +296,19 @@ public sealed class EndgameFeatureTests
     {
         await using var factory = new ApiWebApplicationFactory();
         var client = factory.CreateClient();
-        var (token, playerId) = await RegisterAndGetTokenAsync(client, "admin-endshard@endgame.test");
+        var (token, _) = await RegisterAndGetTokenAsync(client, "admin-endshard@endgame.test");
+
+        // Also register a regular player who will become the leader
+        var (_, playerUserId) = await RegisterAndGetTokenAsync(client, "richplayer-endshard@endgame.test");
 
         await using (var scope = factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var player = await db.Players.FirstAsync(p => p.Id == playerId);
-            player.Role = PlayerRole.Admin;
-            // Give the player some money so they become the leader
-            var account = await db.BankAccounts.FirstOrDefaultAsync(a => a.PlayerId == playerId);
+            // Promote the first user to admin
+            var adminPlayer = await db.Players.FirstAsync(p => p.Email == "admin-endshard@endgame.test");
+            adminPlayer.Role = PlayerRole.Admin;
+            // Give the regular player some money so they become the leader
+            var account = await db.BankAccounts.FirstOrDefaultAsync(a => a.PlayerId == playerUserId);
             if (account != null) account.Balance = 1_000_000;
             await db.SaveChangesAsync();
         }
@@ -324,6 +328,9 @@ public sealed class EndgameFeatureTests
 
         var data = result.GetProperty("data").GetProperty("endShardManually");
         Assert.True(data.GetProperty("gameEnded").GetBoolean());
+        // The regular player should be identified as the leader (highest bank balance)
+        var winnerName = data.GetProperty("winnerDisplayName").GetString();
+        Assert.NotNull(winnerName);
     }
 
     [Fact]

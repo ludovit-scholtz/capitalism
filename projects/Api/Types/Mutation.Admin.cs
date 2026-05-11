@@ -289,7 +289,7 @@ public sealed partial class Mutation
 
         if (players.Count > 0)
         {
-            var currencies = new[] { "USD", "EUR" };
+            var currencies = FxRateHelper.FallbackEurRates.Keys.Concat(new[] { "USD" }).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
             var eurRates = await FxRateHelper.BuildEurRatesLookupAsync(db, currencies);
             var playerIds = players.Select(p => p.Id).ToList();
             var personalAccounts = await db.BankAccounts

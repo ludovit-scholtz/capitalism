@@ -6,7 +6,7 @@ import { gqlRequest } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
 import { useTickRefresh } from '@/composables/useTickRefresh'
 import CurrencyAmount from '@/components/numbers/CurrencyAmount.vue'
-import { useEndgameStore, ENDGAME_MILESTONES } from '@/stores/endgame'
+import { useEndgameStore } from '@/stores/endgame'
 import type { PersonAccount } from '@/types/index'
 
 const PERSONAL_STOCK_SALE_TAX_RATE = 0.15
@@ -27,6 +27,9 @@ const milestoneTimers = ref<ReturnType<typeof setTimeout>[]>([])
 
 function dismissMilestoneToast() {
   milestoneToasts.value.shift()
+  // Also cancel the corresponding auto-dismiss timer to prevent double-dismiss
+  const timer = milestoneTimers.value.shift()
+  if (timer != null) clearTimeout(timer)
 }
 
 onBeforeUnmount(() => {
@@ -169,10 +172,11 @@ watch(
       const key = MILESTONE_TOAST_KEYS[milestone]
       if (key) {
         milestoneToasts.value.push(key)
-        // Auto-dismiss each toast after 6 seconds; track timer for cleanup on unmount
+        // Auto-dismiss each toast after 6 seconds; track timer for cleanup on unmount.
+        // milestoneToasts and milestoneTimers are parallel arrays; shift both together.
         const timer = setTimeout(() => {
-          dismissMilestoneToast()
-          milestoneTimers.value = milestoneTimers.value.filter((t) => t !== timer)
+          milestoneToasts.value.shift()
+          milestoneTimers.value.shift()
         }, 6_000)
         milestoneTimers.value.push(timer)
       }
