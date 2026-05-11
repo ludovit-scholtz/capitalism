@@ -26,8 +26,11 @@ Create a fun game in the style of Capitalism II, where players experience realis
 - [x] (100%) Complete ranking manipulation safeguards with idempotency keys, proof-reference deduplication, suspicious-pattern moderation queues, and admin review tooling that can quarantine telemetry batches before leaderboard publication.
 - [x] (100%) Keep frontend trust non-authoritative by validating economy-sensitive stock trade ownership overrides server-side, rejecting tampered account-type/company payloads with `INVALID_CLIENT_OVERRIDE`, and adding backend plus Playwright regressions proving friendly client-error handling.
 - [ ] (55%) Standardize object-authorization failure responses to "not found or not owned" semantics to reduce resource enumeration risk while preserving internal audit visibility through structured security logs.
+- [ ] Close the MasterApi news-service trust-boundary gap by requiring validated game-server credentials or authenticated root/global admin claims for `gameNewsFeed(includeDrafts: true)` and `upsertGameNewsEntry`, rejecting caller-supplied email spoofing, and covering anonymous draft read/write rejection with regression tests.
+- [ ] Finish the error-surface hardening pass across building, banking, lending, and stock mutations so unauthorized probes no longer distinguish foreign-object existence, listing state, or precise available-balance details.
 
 ### Security Operations & Audit Cadence
 
 - [x] (100%) Create a weekly security action board that mirrors `/audits/*.md` findings, tracks owner plus due tick, and blocks release sign-off when any High or Critical finding from the latest audit has no linked implementation issue.
 - [ ] Add an automated GraphQL surface inventory report in CI that flags newly added finance, shareholder, ranking, lending, and admin queries or mutations missing explicit auth and ownership tests.
+- [ ] Add a frontend dependency-audit release gate that runs `npm audit --omit=dev` for both frontends, tracks reachable rich-content sinks such as `dompurify` plus `v-html`, and blocks release validation while known high-severity production advisories remain unresolved.
