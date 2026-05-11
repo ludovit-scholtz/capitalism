@@ -429,6 +429,8 @@ export default {
     rankingCopy:
       'Verwalte Regeln für Ranking-Belohnungen, Moderationsereignisse und Evaluator-Läufe.',
     goldCopy: 'Passe tokenisierte Goldguthaben mit vollständiger Audit-Spur an.',
+    securityBoardCopy:
+      'Verfolge offene High/Critical Audit-Befunde, Verantwortliche und verknüpfte Implementierungs-Issues.',
   },
   rankingHistory: {
     title: 'Belohnungsverlauf',
@@ -619,5 +621,28 @@ export default {
       tradingOnly: 'Erlaubt nur Forex- und Aktienhandels-Mutationen. Admin-, Kredit- und Gebäudeoperationen bleiben blockiert.',
       companyBound: 'Fügt eine deny-by-default-Unternehmensgrenze hinzu. Der Schlüssel darf nur für die ausgewählten Unternehmens-IDs handeln.',
     },
+  },
+  securityBoard: {
+    kicker: 'Sicherheitsbetrieb',
+    title: 'Sicherheits-Aktionstafel',
+    subtitle:
+      'Live-Ansicht aller Audit-Befunde aus /audits/*.md. Befunde mit hoher und kritischer Schwere erfordern ein verknüpftes Implementierungs-Issue vor der Freigabe.',
+    allClearTitle: 'Alles klar 🎉',
+    lastRun: 'Zuletzt aktualisiert: {date}',
+    gateWarning:
+      '{count} nicht verknüpfte(r) High/Critical Befund(e) blockiert den Release-Freigabe-Gate.',
+    gateHint:
+      'Fügen Sie <!-- issue: #NNN --> in die Statuszeile des Befunds in der Audit-.md-Datei ein, um ein Implementierungs-Issue zu verknüpfen.',
+    filterSeverity: 'Schweregrad',
+    filterStatus: 'Status',
+    findingCount: '{count} von {total} Befunden angezeigt',
+    colSeverity: 'Schweregrad',
+    colFinding: 'Befund',
+    colStatus: 'Status',
+    colOwner: 'Verantwortlicher',
+    colIssues: 'Issues',
+    colSource: 'Quelle',
+    loadError:
+      'Sicherheitstafel-Daten konnten nicht geladen werden. Die Berichtsdatei wurde möglicherweise noch nicht generiert.',
   },
 } as const

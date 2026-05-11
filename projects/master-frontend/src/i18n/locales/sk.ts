@@ -422,6 +422,8 @@ export default {
     supportCopy: 'Kontroluj a moderuj prichádzajúce tikety podpory od hráčov.',
     rankingCopy: 'Spravuj pravidlá ranking odmien, moderácie udalostí a behy evaluátora.',
     goldCopy: 'Upravuj zostatky tokenizovaného zlata s kompletnou auditnou stopou.',
+    securityBoardCopy:
+      'Sleduj otvorené High/Critical audítorské zistenia, zodpovedných a prepojené implementačné issues.',
   },
   rankingHistory: {
     title: 'História odmien',
@@ -610,5 +612,28 @@ export default {
       tradingOnly: 'Povoľuje iba forexové a akciové obchodné mutácie. Administrátorské, úverové a stavebné operácie ostávajú blokované.',
       companyBound: 'Pridáva deny-by-default firemnú hranicu. Kľúč môže konať iba za vybrané identifikátory firiem.',
     },
+  },
+  securityBoard: {
+    kicker: 'Bezpečnostné operácie',
+    title: 'Bezpečnostná akčná tabuľa',
+    subtitle:
+      'Živý pohľad na všetky zistenia auditu z /audits/*.md. Zistenia s vysokou a kritickou závažnosťou vyžadujú prepojenie s implementačným issues pred podpisom vydania.',
+    allClearTitle: 'Všetko v poriadku 🎉',
+    lastRun: 'Naposledy aktualizované: {date}',
+    gateWarning:
+      '{count} neprepojených High/Critical zistenie(í) blokuje bránu podpisu vydania.',
+    gateHint:
+      'Pridajte <!-- issue: #NNN --> do riadku Stav zistenia v súbore audit .md na prepojenie implementačného issues.',
+    filterSeverity: 'Závažnosť',
+    filterStatus: 'Stav',
+    findingCount: 'Zobrazuje sa {count} z {total} zistení',
+    colSeverity: 'Závažnosť',
+    colFinding: 'Zistenie',
+    colStatus: 'Stav',
+    colOwner: 'Zodpovedný',
+    colIssues: 'Issues',
+    colSource: 'Zdroj',
+    loadError:
+      'Nepodarilo sa načítať dáta bezpečnostnej tabule. Súbor reportu nemusel byť ešte vygenerovaný.',
   },
 } as const

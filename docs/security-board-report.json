@@ -1,0 +1,140 @@
+{
+  "generatedAt": "2026-05-11T07:15:01.835Z",
+  "totalFindings": 12,
+  "gateStatus": "fail",
+  "failingCount": 7,
+  "findings": [
+    {
+      "slug": "2026-W19-security-audit/unauthenticated-loan-offer-intelligence-leak",
+      "fileStem": "2026-W19-security-audit",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/2026-W19-security-audit.md",
+      "number": 1,
+      "title": "Unauthenticated loan-offer intelligence leak",
+      "severity": "High",
+      "status": "Resolved",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "2026-W19-security-audit/unauthenticated-shareholder-graph-leak",
+      "fileStem": "2026-W19-security-audit",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/2026-W19-security-audit.md",
+      "number": 2,
+      "title": "Unauthenticated shareholder-graph leak",
+      "severity": "High",
+      "status": "Resolved",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "2026-W19-security-audit/ranking-telemetry-accepted-events-without-shard-identity",
+      "fileStem": "2026-W19-security-audit",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/2026-W19-security-audit.md",
+      "number": 3,
+      "title": "Ranking telemetry accepted events without shard identity",
+      "severity": "High",
+      "status": "Resolved",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "2026-W19-security-audit/player-api-keys-still-have-full-account-scope",
+      "fileStem": "2026-W19-security-audit",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/2026-W19-security-audit.md",
+      "number": 4,
+      "title": "Player API keys still have full-account scope",
+      "severity": "High",
+      "status": "Open",
+      "issues": [],
+      "owner": "@ludovit-scholtz"
+    },
+    {
+      "slug": "2026-W19-security-audit/fx-execution-fairness-depends-on-stale-quote-handling",
+      "fileStem": "2026-W19-security-audit",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/2026-W19-security-audit.md",
+      "number": 5,
+      "title": "FX execution fairness depends on stale-quote handling",
+      "severity": "High",
+      "status": "Open",
+      "issues": [],
+      "owner": "@ludovit-scholtz"
+    },
+    {
+      "slug": "2026-W19-security-audit/building-secondary-market-race-conditions-need-continuous-review",
+      "fileStem": "2026-W19-security-audit",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/2026-W19-security-audit.md",
+      "number": 6,
+      "title": "Building secondary-market race conditions need continuous review",
+      "severity": "High",
+      "status": "In-Progress",
+      "issues": [],
+      "owner": "@ludovit-scholtz"
+    },
+    {
+      "slug": "2026-W19-security-audit/loan-collateral-and-missed-payment-foreclosure-remain-exploit-sensitive",
+      "fileStem": "2026-W19-security-audit",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/2026-W19-security-audit.md",
+      "number": 7,
+      "title": "Loan collateral and missed-payment foreclosure remain exploit-sensitive",
+      "severity": "High",
+      "status": "In-Progress",
+      "issues": [],
+      "owner": "@ludovit-scholtz"
+    },
+    {
+      "slug": "2026-W19-security-audit/master-vs-game-token-boundary-confusion-would-be-privilege-critical",
+      "fileStem": "2026-W19-security-audit",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/2026-W19-security-audit.md",
+      "number": 8,
+      "title": "Master-vs-game token boundary confusion would be privilege-critical",
+      "severity": "Critical",
+      "status": "Open",
+      "issues": [],
+      "owner": "@ludovit-scholtz"
+    },
+    {
+      "slug": "2026-W19-security-audit/bot-automation-can-still-overreach-if-company-boundaries-drift",
+      "fileStem": "2026-W19-security-audit",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/2026-W19-security-audit.md",
+      "number": 9,
+      "title": "Bot automation can still overreach if company boundaries drift",
+      "severity": "High",
+      "status": "Open",
+      "issues": [],
+      "owner": "@ludovit-scholtz"
+    },
+    {
+      "slug": "2026-W19-security-audit/leaderboard-and-ranking-manipulation-risk-remains-proof-sensitive",
+      "fileStem": "2026-W19-security-audit",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/2026-W19-security-audit.md",
+      "number": 10,
+      "title": "Leaderboard and ranking manipulation risk remains proof-sensitive",
+      "severity": "Medium",
+      "status": "In-Progress",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "2026-W19-security-audit/frontend-trust-boundaries-must-stay-non-authoritative",
+      "fileStem": "2026-W19-security-audit",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/2026-W19-security-audit.md",
+      "number": 11,
+      "title": "Frontend trust boundaries must stay non-authoritative",
+      "severity": "High",
+      "status": "Open",
+      "issues": [],
+      "owner": "@ludovit-scholtz"
+    },
+    {
+      "slug": "2026-W19-security-audit/error-message-detail-must-stay-minimally-revealing",
+      "fileStem": "2026-W19-security-audit",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/2026-W19-security-audit.md",
+      "number": 12,
+      "title": "Error-message detail must stay minimally revealing",
+      "severity": "Medium",
+      "status": "In-Progress",
+      "issues": [],
+      "owner": ""
+    }
+  ]
+}

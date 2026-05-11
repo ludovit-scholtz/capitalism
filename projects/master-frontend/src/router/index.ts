@@ -103,6 +103,11 @@ const router = createRouter({
       name: 'api-keys',
       component: () => import('@/views/ApiKeyManagementView.vue'),
     },
+    {
+      path: '/admin/security-board',
+      name: 'security-board',
+      component: () => import('@/views/SecurityBoardView.vue'),
+    },
   ],
   scrollBehavior(to) {
     if (to.hash) {
