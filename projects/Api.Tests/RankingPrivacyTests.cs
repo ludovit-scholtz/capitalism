@@ -54,6 +54,8 @@ public sealed class RankingPrivacyTests
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtSigningKey));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        // Intentionally no capitalism/token_type claim:
+        // this simulates a third-party identity JWT that is neither game nor master scoped.
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, userId),

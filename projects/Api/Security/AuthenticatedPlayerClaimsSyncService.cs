@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -55,8 +57,8 @@ public sealed class AuthenticatedPlayerClaimsSyncService(
                 if (string.IsNullOrWhiteSpace(claimedDisplayName))
                 {
                     logger.LogWarning(
-                        "Falling back to generated display name alias for player {Email} because master display name could not be resolved.",
-                        normalizedEmail);
+                        "Falling back to generated display name alias for player hash {PlayerHash} because master display name could not be resolved.",
+                        HashForLog(normalizedEmail));
                 }
             }
         }
@@ -210,8 +212,10 @@ public sealed class AuthenticatedPlayerClaimsSyncService(
             if (!response.IsSuccessStatusCode)
             {
                 logger.LogWarning(
-                    "Master display name lookup failed with status {StatusCode}.",
-                    (int)response.StatusCode);
+                    "Master display name lookup failed for player hash {PlayerHash} with status {StatusCode} via {MasterApiUrl}.",
+                    HashForLog(normalizedEmail),
+                    (int)response.StatusCode,
+                    masterOptions.Value.ApiUrl);
                 return null;
             }
 
@@ -253,6 +257,12 @@ public sealed class AuthenticatedPlayerClaimsSyncService(
 
     private static string GetMasterDisplayNameCacheKey(string normalizedEmail)
         => $"master-display-name:{normalizedEmail}";
+
+    private static string HashForLog(string value)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(value));
+        return Convert.ToHexString(bytes[..6]);
+    }
 
     private sealed class MasterMeGraphQlResponse
     {
