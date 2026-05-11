@@ -11,6 +11,7 @@ using Api.Engine.Phases;
 using Api.Security;
 using Api.Utilities;
 using Api.Types;
+using Capitalism.Shared.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -169,6 +170,11 @@ public class Program
                         {
                             var synchronizer = context.HttpContext.RequestServices.GetRequiredService<AuthenticatedPlayerClaimsSyncService>();
                             await synchronizer.SyncAsync(context.Principal, identity, context.HttpContext.RequestAborted);
+
+                            if (context.Principal.IsImpersonating() && !TokenBoundaryClaims.HasImpersonationGrant(context.Principal))
+                            {
+                                context.Fail("Impersonation token is missing an explicit grant.");
+                            }
                         }
                     }
                 };

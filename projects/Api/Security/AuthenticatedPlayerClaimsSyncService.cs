@@ -116,7 +116,16 @@ public sealed class AuthenticatedPlayerClaimsSyncService(AppDbContext db)
             EnsureClaim(identity, ClaimsPrincipalExtensions.EffectivePlayerNameClaimType, player.DisplayName);
         }
 
-        if (!principal.HasClaim(claim => claim.Type == ClaimTypes.Role))
+        if (TokenBoundaryClaims.IsMasterToken(principal))
+        {
+            foreach (var claim in identity.FindAll(ClaimTypes.Role).ToList())
+            {
+                identity.RemoveClaim(claim);
+            }
+
+            EnsureClaim(identity, ClaimTypes.Role, PlayerRole.Player);
+        }
+        else if (!principal.HasClaim(claim => claim.Type == ClaimTypes.Role))
         {
             EnsureClaim(identity, ClaimTypes.Role, player.Role);
         }

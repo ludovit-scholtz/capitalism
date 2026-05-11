@@ -2,6 +2,7 @@ using System.Security.Claims;
 using MasterApi.Configuration;
 using MasterApi.Data;
 using MasterApi.Data.Entities;
+using Capitalism.Shared.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -533,6 +534,18 @@ public sealed partial class Query
     /// <summary>Extracts the normalized email from JWT claims for admin-only operations.</summary>
     internal static string GetEmailFromClaims(ClaimsPrincipal principal)
     {
+        if (!string.Equals(
+                principal.FindFirstValue(TokenBoundaryClaims.MasterPrivilegeEligibleClaimType),
+                bool.TrueString,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("You don't have permission to perform this action.")
+                    .SetCode("TOKEN_BOUNDARY_FORBIDDEN")
+                    .Build());
+        }
+
         var email = principal.FindFirstValue(ClaimTypes.Email)?.Trim().ToLowerInvariant();
         if (string.IsNullOrWhiteSpace(email))
         {

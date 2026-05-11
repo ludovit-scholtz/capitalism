@@ -3,6 +3,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using Capitalism.Shared.Security;
 using MasterApi.Tests.Infrastructure;
 using Microsoft.IdentityModel.Tokens;
 
@@ -33,6 +34,7 @@ public sealed class SupportTicketIntegrationTests : IClassFixture<MasterApiWebAp
                 new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
                 new Claim(ClaimTypes.Email, "root@example.com"),
                 new Claim(ClaimTypes.Name, "Root Admin"),
+                new Claim(TokenBoundaryClaims.TokenTypeClaimType, TokenBoundaryClaims.TokenTypeMaster),
             ],
             expires: DateTime.UtcNow.AddMinutes(30),
             signingCredentials: credentials);

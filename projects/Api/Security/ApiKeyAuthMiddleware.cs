@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Api.Data;
 using Api.Security;
+using Capitalism.Shared.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace Api.Security;
@@ -106,6 +107,7 @@ public sealed class ApiKeyAuthMiddleware(RequestDelegate next)
             new(ClaimsPrincipalExtensions.EffectivePlayerIdClaimType, player.Id.ToString()),
             new(ClaimsPrincipalExtensions.EffectivePlayerEmailClaimType, player.Email),
             new(ClaimsPrincipalExtensions.EffectivePlayerNameClaimType, player.DisplayName),
+            new(TokenBoundaryClaims.TokenTypeClaimType, TokenBoundaryClaims.TokenTypeGame),
         };
 
         var identity = new ClaimsIdentity(claims, "ApiKey");

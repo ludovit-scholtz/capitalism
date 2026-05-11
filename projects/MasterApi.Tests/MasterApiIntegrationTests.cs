@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using MasterApi.Tests.Infrastructure;
+using Capitalism.Shared.Security;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -82,6 +83,11 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
             new(ClaimTypes.Email, email),
             new(ClaimTypes.Name, displayName),
         };
+        if (!extraClaims.Any(claim => claim.Type == TokenBoundaryClaims.TokenTypeClaimType))
+        {
+            claims.Add(new Claim(TokenBoundaryClaims.TokenTypeClaimType, TokenBoundaryClaims.TokenTypeMaster));
+        }
+
         claims.AddRange(extraClaims);
 
         var token = new JwtSecurityToken(
@@ -3074,6 +3080,23 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
 
         Assert.True(result.TryGetProperty("errors", out var errors));
         Assert.Contains("GLOBAL_ADMIN_REQUIRED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task GoldTokenBalances_GameToken_ReturnsTokenBoundaryForbidden()
+    {
+        var gameToken = CreateSharedToken(
+            Guid.NewGuid().ToString(),
+            "root@example.com",
+            "Root Admin",
+            new Claim(TokenBoundaryClaims.TokenTypeClaimType, TokenBoundaryClaims.TokenTypeGame));
+
+        var result = await GraphQlAsync("""
+            query { goldTokenBalances { email goldTokenBalance } }
+            """, token: gameToken);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Contains("TOKEN_BOUNDARY_FORBIDDEN", errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
     [Fact]

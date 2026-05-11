@@ -7,6 +7,7 @@ using Api.Data.Entities;
 using Api.Engine;
 using Api.Security;
 using Api.Utilities;
+using Capitalism.Shared.Security;
 using HotChocolate.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -31,7 +32,8 @@ public sealed partial class Mutation
             new Claim(ClaimTypes.NameIdentifier, player.Id.ToString()),
             new Claim(ClaimTypes.Email, player.Email),
             new Claim(ClaimTypes.Name, player.DisplayName),
-            new Claim(ClaimTypes.Role, player.Role)
+            new Claim(ClaimTypes.Role, player.Role),
+            new Claim(TokenBoundaryClaims.TokenTypeClaimType, TokenBoundaryClaims.TokenTypeGame),
         };
 
         if (impersonation is not null)
@@ -50,6 +52,8 @@ public sealed partial class Mutation
             {
                 claims.Add(new Claim(ClaimsPrincipalExtensions.EffectiveCompanyNameClaimType, impersonation.EffectiveCompanyName));
             }
+
+            claims.Add(new Claim(TokenBoundaryClaims.ImpersonationGrantClaimType, bool.TrueString));
         }
 
         var token = new JwtSecurityToken(
