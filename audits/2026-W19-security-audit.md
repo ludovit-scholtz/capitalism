@@ -48,7 +48,7 @@ Can one player gain an unfair advantage over another player by executing an API 
 - **Affected endpoint or mechanic:** `projects/Api/Security/ApiKeyAuthMiddleware.cs`, `projects/Api/Types/Mutation.ApiKey.cs`
 - **Risk description:** API keys currently inherit the full effective player identity. A leaked bot/API key can still operate every company and personal action the player can perform, rather than being restricted to a narrow automation scope.
 - **Recommended fix:** Add per-key scopes (read-only, company-bound, bot-only, trading-only), expose them in issuance/revocation UI, and enforce them in middleware plus sensitive mutations.
-- **Status:** Open
+- **Status:** Open <!-- issue: #391 -->
 
 ### 5) FX execution fairness depends on stale-quote handling
 
@@ -56,7 +56,7 @@ Can one player gain an unfair advantage over another player by executing an API 
 - **Affected endpoint or mechanic:** `projects/Api/Types/Mutation.Forex.cs`, `projects/Api/Types/Query.Forex.cs`
 - **Risk description:** If quote freshness, slippage tolerance, or replay resistance is too loose, players can race stale quotes or script around UI latency to gain better-than-intended execution.
 - **Recommended fix:** Keep all settlement server-priced, require quote timestamps/slippage bounds on execution inputs, and add explicit replay/race-condition tests around concurrent swaps.
-- **Status:** Open
+- **Status:** Open <!-- issue: #391 -->
 
 ### 6) Building secondary-market race conditions need continuous review
 
@@ -64,7 +64,7 @@ Can one player gain an unfair advantage over another player by executing an API 
 - **Affected endpoint or mechanic:** `projects/Api/Types/Mutation.BuildingMarket.cs`, `projects/Api/Types/Mutation.RealEstate.cs`
 - **Risk description:** A concurrent buy/offer/cancel sequence on the same asset can create unfair outcomes if listing state, offer state, or collateral state is not rechecked atomically at commit time.
 - **Recommended fix:** Preserve optimistic/concurrency checks on listing acceptance paths and add more multi-request integration tests for simultaneous buyers.
-- **Status:** In-Progress
+- **Status:** In-Progress <!-- issue: #389 -->
 
 ### 7) Loan collateral and missed-payment foreclosure remain exploit-sensitive
 
@@ -72,7 +72,7 @@ Can one player gain an unfair advantage over another player by executing an API 
 - **Affected endpoint or mechanic:** `projects/Api/Types/Mutation.Lending.cs`, `projects/Api/Types/Mutation.RealEstate.cs`, loan/tax phases
 - **Risk description:** Collateral state, foreclosure listing locks, and missed-payment handling are economically sensitive. Any stale ownership check or missing balance revalidation could let borrowers shield assets or escape penalties.
 - **Recommended fix:** Keep collateral checks on every listing/destroy/refinance path and expand regression coverage for overdue/defaulted transitions.
-- **Status:** In-Progress
+- **Status:** In-Progress <!-- issue: #379 -->
 
 ### 8) Master-vs-game token boundary confusion would be privilege-critical
 
@@ -80,7 +80,7 @@ Can one player gain an unfair advantage over another player by executing an API 
 - **Affected endpoint or mechanic:** shared auth claims, effective-player mapping, MasterApi admin access
 - **Risk description:** Any future regression that treats any effective-player claim as impersonation or accepts the wrong issuer/audience would let users cross privilege boundaries between the game shard and the master admin surface.
 - **Recommended fix:** Keep issuer/audience separation strict, verify effective-vs-actor claim comparisons in tests, and reject master-only privilege on game tokens unless explicitly mapped.
-- **Status:** Open
+- **Status:** Open <!-- issue: #313 -->
 
 ### 9) Bot automation can still overreach if company boundaries drift
 
@@ -88,7 +88,7 @@ Can one player gain an unfair advantage over another player by executing an API 
 - **Affected endpoint or mechanic:** API keys, bot automation flows, company/account mutations
 - **Risk description:** Bots are valuable automation tools but become unfair if a bot key can execute swaps, building changes, or company actions outside its intended owner or account context.
 - **Recommended fix:** Add negative tests for foreign-company access on all bot-eligible flows and bind future bot keys to explicit company/account scopes.
-- **Status:** Open
+- **Status:** Open <!-- issue: #389 -->
 
 ### 10) Leaderboard and ranking manipulation risk remains proof-sensitive
 
@@ -104,7 +104,7 @@ Can one player gain an unfair advantage over another player by executing an API 
 - **Affected endpoint or mechanic:** Vue forms for prices, layouts, account selection, and bank/FX/stock actions
 - **Risk description:** If the backend ever starts trusting client-supplied prices, ownership IDs, or upgrade timing fields, a player could bypass economic rules from browser devtools or scripted calls.
 - **Recommended fix:** Keep all derived prices, timing, balances, ownership, and progression state server-controlled and continue rejecting client attempts to override them.
-- **Status:** Open
+- **Status:** Open <!-- issue: #391 -->
 
 ### 12) Error-message detail must stay minimally revealing
 

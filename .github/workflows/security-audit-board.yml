@@ -1,0 +1,73 @@
+name: security-audit-board
+
+on:
+  schedule:
+    # Run every Monday at 08:00 UTC (after the audit reminder)
+    - cron: '0 8 * * 1'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Unit tests for the parser script
+  # -------------------------------------------------------------------------
+  test-parser:
+    name: Test audit-board parser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run parser unit tests
+        run: node --test .github/scripts/__tests__/audit-board.test.mjs
+
+  # -------------------------------------------------------------------------
+  # Security gate — fails PR if unlinked High/Critical findings exist
+  # -------------------------------------------------------------------------
+  gate:
+    name: Security sign-off gate
+    runs-on: ubuntu-latest
+    needs: test-parser
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run security gate check
+        run: node .github/scripts/audit-board.mjs --gate
+
+  # -------------------------------------------------------------------------
+  # Board update — only on schedule/dispatch, writes docs/security-board.md
+  # and commits it back to main
+  # -------------------------------------------------------------------------
+  update-board:
+    name: Update security board document
+    runs-on: ubuntu-latest
+    needs: test-parser
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Regenerate docs/security-board.md
+        run: node .github/scripts/audit-board.mjs --write-board
+
+      - name: Regenerate docs/security-board-report.json
+        run: node .github/scripts/audit-board.mjs --write-report
+
+      - name: Commit updated board (if changed)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/security-board.md docs/security-board-report.json
+          if git diff --cached --quiet; then
+            echo "No changes to security board."
+          else
+            git commit -m "chore: update security-board.md and report [skip ci]"
+            git push
+          fi

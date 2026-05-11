@@ -1,0 +1,20 @@
+# Security audit finding owner assignments
+#
+# Format: <audit-file-stem>/<finding-heading-anchor>: @github-username
+#
+# The heading anchor is derived from the finding title using GitHub's anchor
+# format: lowercase, spaces and special chars replaced with hyphens.
+#
+# Example — to assign finding "### 4) Player API keys still have full-account scope":
+#   2026-W19-security-audit/player-api-keys-still-have-full-account-scope: @your-username
+#
+# Run  node .github/scripts/audit-board.mjs --report  to see current slugs.
+
+# 2026-W19 findings
+2026-W19-security-audit/player-api-keys-still-have-full-account-scope: @ludovit-scholtz
+2026-W19-security-audit/fx-execution-fairness-depends-on-stale-quote-handling: @ludovit-scholtz
+2026-W19-security-audit/building-secondary-market-race-conditions-need-continuous-review: @ludovit-scholtz
+2026-W19-security-audit/loan-collateral-and-missed-payment-foreclosure-remain-exploit-sensitive: @ludovit-scholtz
+2026-W19-security-audit/master-vs-game-token-boundary-confusion-would-be-privilege-critical: @ludovit-scholtz
+2026-W19-security-audit/bot-automation-can-still-overreach-if-company-boundaries-drift: @ludovit-scholtz
+2026-W19-security-audit/frontend-trust-boundaries-must-stay-non-authoritative: @ludovit-scholtz

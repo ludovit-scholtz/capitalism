@@ -425,6 +425,8 @@ export default {
     supportCopy: 'Review and moderate incoming support tickets from players.',
     rankingCopy: 'Manage ranking bounty rules, moderation events, and evaluator runs.',
     goldCopy: 'Adjust tokenized gold balances with a complete audit trail.',
+    securityBoardCopy:
+      'Track open High/Critical audit findings, owner assignments, and linked implementation issues.',
   },
   rankingHistory: {
     title: 'Bounty History',
@@ -612,5 +614,27 @@ export default {
       tradingOnly: 'Allows forex and stock trading mutations only. Admin, lending, and building operations stay blocked.',
       companyBound: 'Adds a deny-by-default company fence. The key may act only on the selected company IDs.',
     },
+  },
+  securityBoard: {
+    kicker: 'Security Operations',
+    title: 'Security Action Board',
+    subtitle:
+      'Live view of all audit findings parsed from /audits/*.md. High and Critical findings require a linked implementation issue before a release can be signed off.',
+    allClearTitle: 'All clear 🎉',
+    lastRun: 'Last updated: {date}',
+    gateWarning: '{count} unlinked High/Critical finding(s) are blocking the release sign-off gate.',
+    gateHint:
+      'Add <!-- issue: #NNN --> to the finding\'s Status line in the audit .md file to link an implementation issue.',
+    filterSeverity: 'Severity',
+    filterStatus: 'Status',
+    findingCount: 'Showing {count} of {total} findings',
+    colSeverity: 'Severity',
+    colFinding: 'Finding',
+    colStatus: 'Status',
+    colOwner: 'Owner',
+    colIssues: 'Issues',
+    colSource: 'Source',
+    loadError:
+      'Failed to load security board data. The report file may not have been generated yet.',
   },
 } as const

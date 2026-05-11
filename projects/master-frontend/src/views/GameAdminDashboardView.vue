@@ -28,6 +28,7 @@ const navItems = computed(() => [
   { label: t('home.supportAdmin'), to: '/support/admin' },
   { label: t('home.rankingAdmin'), to: '/ranking/admin' },
   { label: t('home.goldAdmin'), to: '/gold-admin' },
+  { label: t('securityBoard.title'), to: '/admin/security-board' },
 ])
 </script>
 
@@ -55,6 +56,11 @@ const navItems = computed(() => [
       <RouterLink class="admin-card" to="/gold-admin">
         <h2>{{ t('home.goldAdmin') }}</h2>
         <p>{{ t('gameAdmin.goldCopy') }}</p>
+      </RouterLink>
+
+      <RouterLink class="admin-card" to="/admin/security-board">
+        <h2>{{ t('securityBoard.title') }}</h2>
+        <p>{{ t('gameAdmin.securityBoardCopy') }}</p>
       </RouterLink>
     </section>
   </main>
