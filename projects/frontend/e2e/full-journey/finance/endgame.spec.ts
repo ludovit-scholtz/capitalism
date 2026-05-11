@@ -161,7 +161,9 @@ test.describe('Endgame UI', () => {
     }, `token-${player.id}`)
     await page.goto('/admin')
 
-    // Non-admin should be redirected or see access denied
+    // Non-admin sees the access denied heading in the operations dashboard
+    await expect(page.getByRole('heading', { name: 'Administrator access required' })).toBeVisible()
+    // The End Shard button must not be visible
     await expect(page.getByRole('button', { name: 'End Shard' })).toBeHidden()
   })
 
