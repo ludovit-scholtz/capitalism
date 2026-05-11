@@ -222,6 +222,7 @@ const mobileNavSections = computed(() => {
 
 onMounted(() => {
   void refreshStockProposalBadgeCount()
+  endgameStore.startPolling()
 })
 
 useTickRefresh(async () => {

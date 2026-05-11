@@ -257,6 +257,15 @@ public sealed partial class Mutation
             httpContextAccessor.HttpContext!.User,
             httpContextAccessor.HttpContext.RequestAborted);
 
+        if (input.Reason is { Length: > 500 })
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Reason must not exceed 500 characters.")
+                    .SetCode("REASON_TOO_LONG")
+                    .Build());
+        }
+
         var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync(httpContextAccessor.HttpContext.RequestAborted)
             ?? throw new GraphQLException(
                 ErrorBuilder.New()

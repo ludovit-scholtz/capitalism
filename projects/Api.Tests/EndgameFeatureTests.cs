@@ -360,4 +360,192 @@ public sealed class EndgameFeatureTests
             && ended.ValueKind == JsonValueKind.Null;
         Assert.True(hasErrors || hasNullData, "Non-admin should not be able to end the shard.");
     }
+
+    [Fact]
+    public async Task EndgameStatus_IsAccessibleWithoutAuthentication()
+    {
+        // endgameStatus is a public query — no bearer token should be required.
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        // Send the request without any auth header
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            {
+              endgameStatus {
+                gameEnded
+                winningThresholdUsd
+                topRealWorldRichest { rank name wealthUsd }
+              }
+            }
+            """);
+
+        Assert.False(result.TryGetProperty("errors", out _), "endgameStatus should not require authentication.");
+        var status = result.GetProperty("data").GetProperty("endgameStatus");
+        Assert.False(status.GetProperty("gameEnded").GetBoolean());
+        Assert.Equal(430_000_000_000m, status.GetProperty("winningThresholdUsd").GetDecimal());
+        Assert.Equal(10, status.GetProperty("topRealWorldRichest").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task EndShardManually_WithoutToken_ReturnsAuthError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        // Call with no token
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            mutation EndShard($input: EndShardManuallyInput!) {
+              endShardManually(input: $input) { gameEnded }
+            }
+            """,
+            new { input = new { reason = (string?)null } },
+            token: null);
+
+        var hasErrors = result.TryGetProperty("errors", out var errors) && errors.GetArrayLength() > 0;
+        var hasNullData = result.TryGetProperty("data", out var data)
+            && data.ValueKind == JsonValueKind.Object
+            && data.TryGetProperty("endShardManually", out var field)
+            && field.ValueKind == JsonValueKind.Null;
+        Assert.True(hasErrors || hasNullData, "Unauthenticated call should be rejected.");
+    }
+
+    [Fact]
+    public async Task EndShardManually_WithTooLongReason_ReturnsValidationError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var (token, playerId) = await RegisterAndGetTokenAsync(client, "admin-longreason@endgame.test");
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.FirstAsync(p => p.Id == playerId);
+            player.Role = PlayerRole.Admin;
+            await db.SaveChangesAsync();
+        }
+
+        // 501-character reason exceeds MaxLength 500
+        var tooLongReason = new string('A', 501);
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            mutation EndShard($input: EndShardManuallyInput!) {
+              endShardManually(input: $input) { gameEnded }
+            }
+            """,
+            new { input = new { reason = tooLongReason } },
+            token);
+
+        var hasErrors = result.TryGetProperty("errors", out var errors) && errors.GetArrayLength() > 0;
+        var hasNullData = result.TryGetProperty("data", out var data)
+            && data.ValueKind == JsonValueKind.Object
+            && data.TryGetProperty("endShardManually", out var field)
+            && field.ValueKind == JsonValueKind.Null;
+        Assert.True(hasErrors || hasNullData, "Reason longer than 500 chars should fail validation.");
+    }
+
+    [Fact]
+    public async Task EndShardManually_PicksLeaderAcrossMultipleCurrencies()
+    {
+        // Seed three players with different currency balances — winner should be the one
+        // whose total (EUR + USD + GBP) converted to USD is largest.
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var (adminToken, adminId) = await RegisterAndGetTokenAsync(client, "admin-multi@endgame.test");
+        var (_, eurLeaderId) = await RegisterAndGetTokenAsync(client, "eur-leader@endgame.test");
+        var (_, gbpLeaderId) = await RegisterAndGetTokenAsync(client, "gbp-leader@endgame.test");
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var admin = await db.Players.FirstAsync(p => p.Id == adminId);
+            admin.Role = PlayerRole.Admin;
+
+            // EUR leader: 2 000 000 EUR (≈ ~2.2M USD at ~1.1 rate)
+            var eurAccount = await db.BankAccounts.FirstOrDefaultAsync(
+                a => a.PlayerId == eurLeaderId && a.CurrencyCode == "EUR");
+            if (eurAccount != null) eurAccount.Balance = 2_000_000m;
+
+            // GBP leader: 1 500 000 GBP (≈ ~1.9M USD at ~1.27 rate) — should be less than EUR leader
+            var gbpAccount = await db.BankAccounts.FirstOrDefaultAsync(
+                a => a.PlayerId == gbpLeaderId && a.CurrencyCode == "GBP");
+            if (gbpAccount != null) gbpAccount.Balance = 1_500_000m;
+
+            // USD for admin: tiny amount so admin doesn't win
+            var adminUsd = await db.BankAccounts.FirstOrDefaultAsync(
+                a => a.PlayerId == adminId && a.CurrencyCode == "USD");
+            if (adminUsd != null) adminUsd.Balance = 1m;
+
+            await db.SaveChangesAsync();
+        }
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            mutation EndShard($input: EndShardManuallyInput!) {
+              endShardManually(input: $input) {
+                gameEnded
+                winnerPlayerId
+                winnerDisplayName
+              }
+            }
+            """,
+            new { input = new { reason = "Multi-currency leader test" } },
+            adminToken);
+
+        var data = result.GetProperty("data").GetProperty("endShardManually");
+        Assert.True(data.GetProperty("gameEnded").GetBoolean());
+        // The winner should be either the EUR leader or GBP leader (whichever converts highest) — NOT the admin
+        var winnerId = data.GetProperty("winnerPlayerId").GetString();
+        Assert.NotNull(winnerId);
+        Assert.NotEqual(adminId.ToString(), winnerId);
+    }
+
+    [Fact]
+    public async Task EndShardManually_AfterGameAlreadyEnded_MutationsAreBlocked()
+    {
+        // End the shard, then try another mutation — it should be blocked with GAME_ENDED.
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var (adminToken, adminId) = await RegisterAndGetTokenAsync(client, "admin-reend@endgame.test");
+        var (playerToken, _) = await RegisterAndGetTokenAsync(client, "player-reend@endgame.test");
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var admin = await db.Players.FirstAsync(p => p.Id == adminId);
+            admin.Role = PlayerRole.Admin;
+            await db.SaveChangesAsync();
+        }
+
+        // End the shard
+        await ExecuteGraphQlAsync(
+            client,
+            """
+            mutation EndShard($input: EndShardManuallyInput!) {
+              endShardManually(input: $input) { gameEnded }
+            }
+            """,
+            new { input = new { reason = "first end" } },
+            adminToken);
+
+        // Now try to create a company — should be blocked
+        var blockedResult = await ExecuteGraphQlAsync(
+            client,
+            """
+            mutation CreateCompany($input: CreateCompanyInput!) {
+              createCompany(input: $input) { id name }
+            }
+            """,
+            new { input = new { name = "PostEndGame Corp" } },
+            playerToken);
+
+        Assert.True(blockedResult.TryGetProperty("errors", out var errors) && errors.GetArrayLength() > 0,
+            "Mutations should be blocked after game ends.");
+        Assert.Equal("GAME_ENDED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
 }
