@@ -227,6 +227,11 @@ public sealed class Building
     /// </summary>
     public DateTime? DestroyedAtUtc { get; set; }
 
+    /// <summary>
+    /// Optimistic concurrency token for commit-time ownership and collateral-lock revalidation.
+    /// </summary>
+    public Guid ConcurrencyToken { get; set; } = Guid.NewGuid();
+
     /// <summary>Units installed in this building's 4x4 grid.</summary>
     public ICollection<BuildingUnit> Units { get; set; } = [];
 

@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { gqlRequest } from '@/lib/graphql'
+import { GraphQLError } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
 import { getActiveCompany } from '@/lib/accountContext'
 import type { BankInfoSummary, CollateralEligibilitySummary, Company, CompanyBankAccountSummary } from '@/types'
@@ -296,7 +297,13 @@ async function submitLoanRequest() {
     success.value = true
     await router.push({ name: 'bank-management', params: { buildingId: bankBuildingId.value } })
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
+    if (err instanceof GraphQLError && err.code === 'COLLATERAL_OWNERSHIP_CONFLICT') {
+      error.value = t('buildingDetail.collateralOwnershipConflictToast')
+    } else if (err instanceof GraphQLError && err.code === 'INSUFFICIENT_BALANCE_AT_COMMIT') {
+      error.value = t('bank.insufficientBalanceAtCommit')
+    } else {
+      error.value = err instanceof Error ? err.message : String(err)
+    }
   } finally {
     submitting.value = false
   }

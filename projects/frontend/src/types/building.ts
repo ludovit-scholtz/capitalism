@@ -165,6 +165,10 @@ export interface Building {
   destroyedAtUtc: string | null
   /** True when at least one DEFAULTED loan uses this building as collateral. */
   hasDefaultedCollateralLoan?: boolean
+  /** True when this building is currently locked as unpaid loan collateral. */
+  isCollateralized?: boolean
+  /** Foreclosure countdown in ticks when collateral is in DEFAULTED status. */
+  foreclosureTicksRemaining?: number | null
   marketValuation?: {
     landValue: number
     structureValue: number

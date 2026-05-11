@@ -73,11 +73,19 @@ const {
       >
         {{ building?.isForSale ? t('buildingDetail.forSale') : t('buildingDetail.notForSale') }}
       </span>
+      <span
+        v-if="building?.isCollateralized && !building?.destroyedAtUtc"
+        class="meta-pill inline-flex items-center gap-1 rounded-full border border-amber-300/60 bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-700 dark:text-amber-300"
+        :title="t('buildingDetail.collateralLockedTooltip')"
+      >
+        🔒 {{ t('buildingDetail.collateralLockedBadge') }}
+      </span>
       <!-- Sell button — hidden for destroyed buildings -->
       <button
         v-if="!building?.destroyedAtUtc"
         class="btn btn-secondary btn-sm ml-auto"
-        :disabled="isBuildingUsedAsCollateral"
+        :disabled="isBuildingUsedAsCollateral || building?.isCollateralized"
+        :title="isBuildingUsedAsCollateral || building?.isCollateralized ? t('buildingDetail.collateralLockedTooltip') : ''"
         @click="router.push(`/building/${building?.id}/sell`)"
       >
         {{ building?.isForSale ? t('buildingDetail.editSale') : t('buildingDetail.sellBuilding') }}
@@ -106,6 +114,9 @@ const {
     <p v-if="isBuildingUsedAsCollateral && !building?.destroyedAtUtc" class="collateral-warning mt-2 rounded-lg border border-amber-300/60 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
       <font-awesome-icon icon="lock" class="mr-1" />
       {{ t('buildingDetail.collateralBlockedByLoans', { count: collateralLoanCount }) }}
+      <span v-if="building?.foreclosureTicksRemaining !== null && building?.foreclosureTicksRemaining !== undefined" class="ml-1">
+        {{ t('buildingDetail.loanDefaultDestruction', { ticks: building.foreclosureTicksRemaining }) }}
+      </span>
     </p>
 
     <!-- Destroyed notice -->

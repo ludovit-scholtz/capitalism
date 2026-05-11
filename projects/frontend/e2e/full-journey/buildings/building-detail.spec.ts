@@ -637,6 +637,7 @@ test.describe('Building detail upgrades', () => {
           level: 1,
           powerConsumption: 2,
           isForSale: false,
+          isCollateralized: true,
           builtAtUtc: '2026-01-01T00:00:00Z',
           pendingConfiguration: null,
           units: [],
@@ -693,6 +694,7 @@ test.describe('Building detail upgrades', () => {
 
     // Warning message should be visible
     await expect(page.locator('.collateral-warning')).toBeVisible()
+    await expect(page.getByText('Collateral Locked')).toBeVisible()
   })
 
   test('sell building form validates that asking price must be positive', async ({ page }) => {
@@ -23328,7 +23330,7 @@ test.describe('Supply chain tab', () => {
     await expect(cancelBtn).toBeDisabled()
     await expect(cancelBtn).toHaveAttribute(
       'title',
-      /Sale cannot be cancelled — this building is collateral for an unpaid loan./i,
+      /Sale cannot be cancelled/i,
     )
   })
 

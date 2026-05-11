@@ -1568,3 +1568,29 @@ Rules to prevent recurrence:
 10. **Object-level authorization failures should return minimally revealing messages** (for example "not found or not owned") while logging full internal context for administrators.
 11. **Before closing any security PR, map each changed endpoint to OWASP API Top 10 categories** (API1 BOLA, API5 BFLA, API6 business-flow abuse, API10 unsafe integrations) and confirm at least one regression test per applicable category.
 12. **Weekly audit follow-ups must produce implementation issues, not only narrative reports.** Every High/Critical finding must be linked to a roadmap task and a tracked test gap before the audit is marked complete.
+
+## Collateral hardening follow-up — race outcomes and lock-copy assertions must match runtime behavior
+
+Root-cause of repeated CI failures (May 2026, PR #379 collateral hardening):
+- A concurrency test (`AcceptBuildingOffer_ConcurrentRequests_OneSucceedsAndOneConflicts`) assumed the losing request always returns `OFFER_VERSION_CONFLICT`.
+- After commit-time hardening, the losing path can also legitimately fail as `BUILDING_NOT_FOR_SALE` or `OFFER_NOT_FOUND` depending on interleaving, while still preserving the core invariant (exactly one successful acceptance).
+- Two Playwright assertions used stale lock text assumptions (`Collateral Locked` badge and `Sale cannot be cancelled`) without aligning fixtures/copy to the updated collateral-lock UX.
+
+**Rules to prevent recurrence:**
+1. **For backend race-condition tests, assert invariants first (exactly one success, final owner/state, audit log), then allow the expected set of loser error codes when multiple commit-time checks can race.** Do not overfit to a single code when equivalent safety outcomes are valid.
+2. **When a frontend lock state is now server-sourced (`building.isCollateralized`), E2E fixtures must explicitly seed that field when asserting lock badges.** Loan fixtures alone are not always sufficient to render badge-only UI branches.
+3. **For sell/cancel-lock UX, assert the exact i18n key currently rendered by the view (`cancelSaleLockedTooltip` for unpaid default/overdue lock, `collateralLockedTooltip` for generic collateral lock).** Do not keep legacy text expectations after copy/UX split.
+4. **When CI reports one backend race test and one lock-copy E2E failure together, triage both as assertion-drift first, not implementation regressions, after confirming core ownership/collateral invariants still hold.**
+
+## Building-offer concurrency tests — assert persisted invariants, not only response shape
+
+Root-cause of recurring CI failure (May 2026, PR #379 follow-up):
+- `AcceptBuildingOffer_ConcurrentRequests_OneSucceedsAndOneConflicts` assumed exactly one GraphQL success payload and one specific loser code.
+- Under commit-time concurrency, the persisted state still settles correctly (single accepted transfer), but response payloads can vary (`OFFER_VERSION_CONFLICT`, `BUILDING_NOT_FOR_SALE`, `OFFER_NOT_FOUND`, `BUILDING_NOT_FOUND`) depending on timing.
+- This made the test flaky in CI even when the core invariant (single transfer, accepted offer, no double-spend) held.
+
+**Rules to prevent recurrence:**
+1. **For concurrent mutation tests, primary assertions must target persisted invariants** (final owner, sale flag, accepted offer status, audit log), not a single response-code pair.
+2. **Treat loser responses as an allowed set of conflict-like errors when multiple commit-time guards can race.** Do not overfit to one error code.
+3. **If response-level success count is timing-sensitive, add a deterministic follow-up accept attempt (with latest `offerVersion`) when the first concurrent pair returns no success payload, then enforce exactly one success and exactly one committed transfer in persisted state.**
+4. **Always include `BUILDING_NOT_FOUND` in conflict-like loser code sets for post-transfer ownership revalidation paths.**

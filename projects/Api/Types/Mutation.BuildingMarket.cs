@@ -215,6 +215,28 @@ public sealed partial class Mutation
                     .Build());
         }
 
+        var hasCollateralLock = await db.Loans
+            .AsNoTracking()
+            .AnyAsync(loan =>
+                loan.CollateralBuildingId == building.Id
+                && loan.RemainingPrincipal > 0m
+                && (loan.Status == LoanStatus.Active || loan.Status == LoanStatus.Overdue));
+        if (hasCollateralLock)
+        {
+            LoanCollateralSecurityAuditLogger.Add(
+                db,
+                userId,
+                action: "BUILDING_TRANSFER",
+                reason: "BUILDING_LOCKED_AS_COLLATERAL",
+                buildingId: building.Id);
+            await db.SaveChangesAsync();
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Building is locked as loan collateral.")
+                    .SetCode("BUILDING_LOCKED_AS_COLLATERAL")
+                    .Build());
+        }
+
         var city = building.City;
         var currencyCode = city.CurrencyCode;
         var salePrice = offer.OfferedPrice;
@@ -308,6 +330,7 @@ public sealed partial class Mutation
 
             collateralLoan.RemainingPrincipal = Math.Max(0m, collateralLoan.RemainingPrincipal - debtPaidInLoanCurrency);
             collateralLoan.CollateralBuildingId = null;
+            collateralLoan.ConcurrencyToken = Guid.NewGuid();
             if (collateralLoan.RemainingPrincipal <= 0m)
             {
                 collateralLoan.RemainingPrincipal = 0m;
@@ -411,6 +434,7 @@ public sealed partial class Mutation
         building.CompanyId = offer.BuyerCompanyId;
         building.IsForSale = false;
         building.AskingPrice = null;
+        building.ConcurrencyToken = Guid.NewGuid();
 
         // Mark this offer as accepted
 

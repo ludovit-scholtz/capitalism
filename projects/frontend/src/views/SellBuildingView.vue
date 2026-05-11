@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
+import { GraphQLError } from '@/lib/graphql'
 import { formatCurrency } from '@/lib/loanHelpers'
 import { computeEstimatedMarketValue, isAskingPriceTooHigh } from '@/lib/sellBuilding'
 
@@ -21,6 +22,8 @@ interface CompanyBuilding {
   askingPrice: number | null
   listedAtUtc: string | null
   cityId: string
+  isCollateralized?: boolean
+  foreclosureTicksRemaining?: number | null
   populationIndex?: number | null
   units: Array<{ id: string }>
   marketValuation?: {
@@ -74,7 +77,7 @@ const lastAction = ref<'list' | 'cancel' | 'destroy'>('list')
 
 const DATA_QUERY = `
   {
-    myCompanies { id name buildings { id name type level isForSale askingPrice listedAtUtc cityId populationIndex marketValuation { landValue structureValue unitsValue totalValue minimumSalePrice currencyCode } units { id } } }
+    myCompanies { id name buildings { id name type level isForSale askingPrice listedAtUtc cityId isCollateralized foreclosureTicksRemaining populationIndex marketValuation { landValue structureValue unitsValue totalValue minimumSalePrice currencyCode } units { id } } }
     cities { id name currencyCode }
     myLoans { id status missedPayments remainingPrincipal collateralBuildingId }
   }
@@ -136,15 +139,15 @@ async function submitListing() {
     saveSuccess.value = true
     await router.push(`/building/${building.value!.id}`)
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err)
-    if (msg.includes('BUILDING_IS_COLLATERAL')) {
-      saveError.value = t('buildingDetail.collateralBlockedByLoans', { count: 1 })
-    } else if (msg.includes('ASKING_PRICE_BELOW_MINIMUM')) {
+    const code = err instanceof GraphQLError ? err.code : undefined
+    if (code === 'BUILDING_LOCKED_AS_COLLATERAL' || code === 'BUILDING_IS_COLLATERAL') {
+      saveError.value = t('buildingDetail.collateralLockedToast')
+    } else if (code === 'ASKING_PRICE_BELOW_MINIMUM') {
       saveError.value = t('buildingDetail.minimumSalePriceError', {
         minimum: formatCurrency(minimumSalePrice.value ?? 0, currencyCode.value),
         marketValue: formatCurrency(estimatedMarketValue.value ?? 0, currencyCode.value),
       })
-    } else if (msg.includes('INVALID_ASKING_PRICE')) {
+    } else if (code === 'INVALID_ASKING_PRICE') {
       saveError.value = t('buildingDetail.askingPriceMustBePositive')
     } else {
       saveError.value = t('buildingDetail.saleFailed')
@@ -167,9 +170,9 @@ async function cancelListing() {
     saveSuccess.value = true
     await router.push(`/building/${building.value!.id}`)
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    if (msg.includes('BUILDING_SALE_LOCKED_BY_UNPAID_COLLATERAL')) {
-      saveError.value = t('buildingDetail.cancelSaleLockedTooltip')
+    const code = err instanceof GraphQLError ? err.code : undefined
+    if (code === 'BUILDING_LOCKED_AS_COLLATERAL' || code === 'BUILDING_SALE_LOCKED_BY_UNPAID_COLLATERAL') {
+      saveError.value = t('buildingDetail.collateralLockedToast')
     } else {
       saveError.value = t('buildingDetail.saleFailed')
     }
@@ -192,9 +195,9 @@ async function confirmDestroy() {
     saveSuccess.value = true
     showDestroyConfirm.value = false
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err)
-    if (msg.includes('BUILDING_HAS_UNPAID_COLLATERAL_LOAN')) {
-      destroyError.value = t('buildingDetail.destroyBlockedByUnpaidLoan')
+    const code = err instanceof GraphQLError ? err.code : undefined
+    if (code === 'BUILDING_LOCKED_AS_COLLATERAL' || code === 'BUILDING_HAS_UNPAID_COLLATERAL_LOAN') {
+      destroyError.value = t('buildingDetail.collateralLockedToast')
     } else {
       destroyError.value = t('buildingDetail.destroyFailed')
     }
@@ -338,16 +341,25 @@ onMounted(loadData)
             </p>
             <p v-if="cityName" class="mt-0.5 text-sm text-muted">{{ cityName }}</p>
           </div>
-          <span
-            class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold"
-            :class="
-              building.isForSale
-                ? 'border-green-300/60 bg-green-500/10 text-green-700 dark:text-green-300'
-                : 'border-divider bg-surface text-muted'
-            "
-          >
-            {{ building.isForSale ? t('buildingDetail.forSale') : t('buildingDetail.notForSale') }}
-          </span>
+          <div class="flex flex-wrap items-center justify-end gap-2">
+            <span
+              class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold"
+              :class="
+                building.isForSale
+                  ? 'border-green-300/60 bg-green-500/10 text-green-700 dark:text-green-300'
+                  : 'border-divider bg-surface text-muted'
+              "
+            >
+              {{ building.isForSale ? t('buildingDetail.forSale') : t('buildingDetail.notForSale') }}
+            </span>
+            <span
+              v-if="building.isCollateralized"
+              class="inline-flex items-center gap-1 rounded-full border border-amber-300/60 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300"
+              :title="t('buildingDetail.collateralLockedTooltip')"
+            >
+              🔒 {{ t('buildingDetail.collateralLockedBadge') }}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -384,15 +396,25 @@ onMounted(loadData)
         <p class="mt-1 text-xs text-muted">{{ t('buildingDetail.cancelListingHint') }}</p>
         <button
           class="cancel-listing-btn btn btn-danger mt-3 w-full"
-          :disabled="saving || cancelSaleLockedByUnpaidLoan"
-          :title="cancelSaleLockedByUnpaidLoan ? t('buildingDetail.cancelSaleLockedTooltip') : ''"
+          :disabled="saving || cancelSaleLockedByUnpaidLoan || building.isCollateralized"
+          :title="
+            cancelSaleLockedByUnpaidLoan
+              ? t('buildingDetail.cancelSaleLockedTooltip')
+              : building.isCollateralized
+                ? t('buildingDetail.collateralLockedTooltip')
+                : ''
+          "
           @click="cancelListing"
         >
           <font-awesome-icon v-if="saving" icon="spinner" spin class="mr-2" />
           {{ t('buildingDetail.cancelSale') }}
         </button>
-        <p v-if="cancelSaleLockedByUnpaidLoan" class="mt-2 text-xs text-amber-700 dark:text-amber-300">
-          {{ t('buildingDetail.cancelSaleLockedTooltip') }}
+        <p v-if="cancelSaleLockedByUnpaidLoan || building.isCollateralized" class="mt-2 text-xs text-amber-700 dark:text-amber-300">
+          {{
+            cancelSaleLockedByUnpaidLoan
+              ? t('buildingDetail.cancelSaleLockedTooltip')
+              : t('buildingDetail.collateralLockedTooltip')
+          }}
         </p>
       </div>
 
@@ -481,9 +503,17 @@ onMounted(loadData)
           <p class="text-xs text-muted">{{ t('buildingDetail.destroyCurrency', { currency: currencyCode }) }}</p>
         </div>
         <p v-if="destroyError" class="mt-2 text-sm text-red-700 dark:text-red-300">{{ destroyError }}</p>
-        <button class="open-destroy-confirm-btn btn btn-danger mt-3 w-full" :disabled="destroying" @click="showDestroyConfirm = true">
+        <button
+          class="open-destroy-confirm-btn btn btn-danger mt-3 w-full"
+          :disabled="destroying || building.isCollateralized"
+          :title="building.isCollateralized ? t('buildingDetail.collateralLockedTooltip') : ''"
+          @click="showDestroyConfirm = true"
+        >
           {{ t('buildingDetail.destroyBuilding') }}
         </button>
+        <p v-if="building.isCollateralized" class="mt-2 text-xs text-amber-700 dark:text-amber-300">
+          {{ t('buildingDetail.collateralLockedTooltip') }}
+        </p>
       </div>
     </template>
 

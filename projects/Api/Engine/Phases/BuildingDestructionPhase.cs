@@ -48,6 +48,46 @@ public sealed class BuildingDestructionPhase : ITickPhase
             {
                 // Already destroyed or manually sold — clear the reference so we don't recheck.
                 loan.CollateralBuildingId = null;
+                loan.ConcurrencyToken = Guid.NewGuid();
+                continue;
+            }
+
+            if (building.CompanyId != loan.BorrowerCompanyId)
+            {
+                LoanCollateralSecurityAuditLogger.Add(
+                    context.Db,
+                    Guid.Empty,
+                    action: "FORECLOSURE",
+                    reason: "COLLATERAL_OWNERSHIP_CONFLICT",
+                    loanId: loan.Id,
+                    buildingId: building.Id,
+                    detail: $"Borrower company {loan.BorrowerCompanyId} does not own collateral building (owner {building.CompanyId}).",
+                    isDeadLetter: true);
+                continue;
+            }
+
+            var latestLoanToken = await context.Db.Loans
+                .AsNoTracking()
+                .Where(candidate => candidate.Id == loan.Id)
+                .Select(candidate => candidate.ConcurrencyToken)
+                .FirstOrDefaultAsync();
+            var latestBuildingToken = await context.Db.Buildings
+                .AsNoTracking()
+                .Where(candidate => candidate.Id == building.Id)
+                .Select(candidate => candidate.ConcurrencyToken)
+                .FirstOrDefaultAsync();
+            if (latestLoanToken != loan.ConcurrencyToken
+                || latestBuildingToken != building.ConcurrencyToken)
+            {
+                LoanCollateralSecurityAuditLogger.Add(
+                    context.Db,
+                    Guid.Empty,
+                    action: "FORECLOSURE",
+                    reason: "FORECLOSURE_CONCURRENT_MODIFICATION",
+                    loanId: loan.Id,
+                    buildingId: building.Id,
+                    detail: "Loan/building token mismatch before foreclosure commit.",
+                    isDeadLetter: true);
                 continue;
             }
 
@@ -56,6 +96,7 @@ public sealed class BuildingDestructionPhase : ITickPhase
             {
                 // Sold — clear so we don't keep re-checking.
                 loan.CollateralBuildingId = null;
+                loan.ConcurrencyToken = Guid.NewGuid();
                 continue;
             }
 
@@ -159,6 +200,7 @@ public sealed class BuildingDestructionPhase : ITickPhase
             {
                 lot.OwnerCompanyId = null;
                 lot.BuildingId = null;
+                lot.ConcurrencyToken = Guid.NewGuid();
             }
 
             // Mark the building as destroyed.
@@ -166,10 +208,12 @@ public sealed class BuildingDestructionPhase : ITickPhase
             building.AskingPrice = null;
             building.ListedAtUtc = null;
             building.DestroyedAtUtc = DateTime.UtcNow;
+            building.ConcurrencyToken = Guid.NewGuid();
 
             // Clear the collateral reference on the loan so we don't reprocess.
             loan.RemainingPrincipal = Math.Max(0m, debtOutstandingLoanCurrency - debtPayoutInLoanCurrency);
             loan.CollateralBuildingId = null;
+            loan.ConcurrencyToken = Guid.NewGuid();
             if (loan.RemainingPrincipal <= 0m)
             {
                 loan.RemainingPrincipal = 0m;

@@ -121,6 +121,11 @@ public sealed class Loan
     /// Null for unsecured loans.
     /// </summary>
     public decimal? CollateralAppraisedValue { get; set; }
+
+    /// <summary>
+    /// Optimistic concurrency token for commit-time collateral/default transition invariants.
+    /// </summary>
+    public Guid ConcurrencyToken { get; set; } = Guid.NewGuid();
 }
 
 /// <summary>Loan status values.</summary>

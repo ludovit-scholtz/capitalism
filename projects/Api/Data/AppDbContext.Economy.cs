@@ -252,6 +252,7 @@ public sealed partial class AppDbContext
             e.Property(l => l.PaymentAmount).HasPrecision(18, 4);
             e.Property(l => l.AccumulatedPenalty).HasPrecision(18, 4);
             e.Property(l => l.Status).HasMaxLength(20);
+            e.Property(l => l.ConcurrencyToken).IsConcurrencyToken();
             e.HasOne(l => l.LoanOffer).WithMany(o => o.Loans).HasForeignKey(l => l.LoanOfferId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(l => l.BorrowerCompany).WithMany().HasForeignKey(l => l.BorrowerCompanyId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(l => l.BorrowerBankAccount).WithMany().HasForeignKey(l => l.BorrowerBankAccountId).OnDelete(DeleteBehavior.SetNull);
@@ -262,6 +263,17 @@ public sealed partial class AppDbContext
             e.HasIndex(l => l.BorrowerBankAccountId);
             e.HasIndex(l => l.NextPaymentTick);
             e.HasIndex(l => l.DueSoonAlertForPaymentTick);
+        });
+
+        modelBuilder.Entity<LoanCollateralSecurityAuditLog>(e =>
+        {
+            e.HasKey(log => log.Id);
+            e.Property(log => log.Action).HasMaxLength(40);
+            e.Property(log => log.RejectionReason).HasMaxLength(80);
+            e.Property(log => log.Detail).HasMaxLength(500);
+            e.HasIndex(log => new { log.LoanId, log.OccurredAtUtc });
+            e.HasIndex(log => new { log.BuildingId, log.OccurredAtUtc });
+            e.HasIndex(log => new { log.PlayerId, log.OccurredAtUtc });
         });
 
         modelBuilder.Entity<FxRate>(e =>

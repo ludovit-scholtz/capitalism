@@ -60,36 +60,39 @@ public sealed partial class Mutation
                         .Build());
             }
 
-            // Prevent listing a building that is pledged as collateral on an active or overdue loan.
-            // Defaulted loans are excluded: a building with a defaulted loan must be sold to repay the debt.
-            var isCollateral = await db.Loans.AnyAsync(l =>
-                l.CollateralBuildingId == input.BuildingId &&
-                (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue));
-
-            if (isCollateral)
+            var isCollateralLocked = await IsCollateralLockedAtCommitAsync(db, input.BuildingId);
+            if (isCollateralLocked)
             {
+                LoanCollateralSecurityAuditLogger.Add(
+                    db,
+                    userId,
+                    action: "BUILDING_SALE",
+                    reason: "BUILDING_LOCKED_AS_COLLATERAL",
+                    buildingId: input.BuildingId);
+                await db.SaveChangesAsync();
                 throw new GraphQLException(
                     ErrorBuilder.New()
-                        .SetMessage("This building is pledged as collateral for an active loan and cannot be listed for sale.")
-                        .SetCode("BUILDING_IS_COLLATERAL")
+                        .SetMessage("Building is locked as loan collateral.")
+                        .SetCode("BUILDING_LOCKED_AS_COLLATERAL")
                         .Build());
             }
         }
         else
         {
-            // During a missed-payment foreclosure flow, the collateral listing cannot be cancelled.
-            var isForeclosureLocked = await db.Loans.AnyAsync(l =>
-                l.CollateralBuildingId == input.BuildingId
-                && l.RemainingPrincipal > 0m
-                && (l.Status == LoanStatus.Overdue || l.Status == LoanStatus.Defaulted)
-                && l.MissedPayments > 0);
-
-            if (isForeclosureLocked)
+            var isCollateralLocked = await IsCollateralLockedAtCommitAsync(db, input.BuildingId);
+            if (isCollateralLocked)
             {
+                LoanCollateralSecurityAuditLogger.Add(
+                    db,
+                    userId,
+                    action: "BUILDING_SALE",
+                    reason: "BUILDING_LOCKED_AS_COLLATERAL",
+                    buildingId: input.BuildingId);
+                await db.SaveChangesAsync();
                 throw new GraphQLException(
                     ErrorBuilder.New()
-                        .SetMessage("Sale cannot be cancelled because this building is collateral for an unpaid loan.")
-                        .SetCode("BUILDING_SALE_LOCKED_BY_UNPAID_COLLATERAL")
+                        .SetMessage("Building is locked as loan collateral.")
+                        .SetCode("BUILDING_LOCKED_AS_COLLATERAL")
                         .Build());
             }
         }
@@ -97,6 +100,7 @@ public sealed partial class Mutation
         building.IsForSale = input.IsForSale;
         building.AskingPrice = input.IsForSale ? input.AskingPrice : null;
         building.ListedAtUtc = input.IsForSale ? DateTime.UtcNow : null;
+        building.ConcurrencyToken = Guid.NewGuid();
 
         await db.SaveChangesAsync();
         return building;
@@ -138,17 +142,20 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        var hasUnpaidCollateralLoan = await db.Loans.AnyAsync(loan =>
-            loan.CollateralBuildingId == building.Id
-            && loan.RemainingPrincipal > 0m
-            && (loan.Status == LoanStatus.Active || loan.Status == LoanStatus.Overdue || loan.Status == LoanStatus.Defaulted));
-
-        if (hasUnpaidCollateralLoan)
+        var hasCollateralLock = await IsCollateralLockedAtCommitAsync(db, building.Id);
+        if (hasCollateralLock)
         {
+            LoanCollateralSecurityAuditLogger.Add(
+                db,
+                userId,
+                action: "BUILDING_DESTROY",
+                reason: "BUILDING_LOCKED_AS_COLLATERAL",
+                buildingId: building.Id);
+            await db.SaveChangesAsync();
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("Building cannot be destroyed while it is collateral for an unpaid loan.")
-                    .SetCode("BUILDING_HAS_UNPAID_COLLATERAL_LOAN")
+                    .SetMessage("Building is locked as loan collateral.")
+                    .SetCode("BUILDING_LOCKED_AS_COLLATERAL")
                     .Build());
         }
 
@@ -183,6 +190,7 @@ public sealed partial class Mutation
         building.AskingPrice = null;
         building.ListedAtUtc = null;
         building.DestroyedAtUtc = DateTime.UtcNow;
+        building.ConcurrencyToken = Guid.NewGuid();
 
         db.LedgerEntries.Add(new LedgerEntry
         {
@@ -232,6 +240,14 @@ public sealed partial class Mutation
             RefundAmount = refundAmount,
             CurrencyCode = marketValuation.CurrencyCode,
         };
+    }
+
+    private static async Task<bool> IsCollateralLockedAtCommitAsync(AppDbContext db, Guid buildingId)
+    {
+        return await db.Loans.AnyAsync(loan =>
+            loan.CollateralBuildingId == buildingId
+            && loan.RemainingPrincipal > 0m
+            && (loan.Status == LoanStatus.Active || loan.Status == LoanStatus.Overdue));
     }
 
     /// <summary>

@@ -169,6 +169,28 @@ public sealed partial class Mutation
                     .Build());
         }
 
+        var ownershipAtCommit = await db.Buildings
+            .AsNoTracking()
+            .Where(b => b.Id == collateralBuilding.Id)
+            .Select(b => b.CompanyId)
+            .FirstOrDefaultAsync();
+        if (ownershipAtCommit != borrower.Id)
+        {
+            LoanCollateralSecurityAuditLogger.Add(
+                db,
+                userId,
+                action: "LOAN_ORIGINATION",
+                reason: "COLLATERAL_OWNERSHIP_CONFLICT",
+                buildingId: collateralBuilding.Id,
+                detail: $"Expected owner {borrower.Id}, actual owner {ownershipAtCommit}.");
+            await db.SaveChangesAsync();
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Collateral ownership changed before the loan could be committed.")
+                    .SetCode("COLLATERAL_OWNERSHIP_CONFLICT")
+                    .Build());
+        }
+
         var collateralCityCurrencyCode = collateralBuilding.City?.CurrencyCode ?? "EUR";
         var bankCurrencyCode = bank.City?.CurrencyCode ?? "EUR";
         var collateralFxRates = await FxRateHelper.BuildEurRatesLookupAsync(
@@ -228,10 +250,18 @@ public sealed partial class Mutation
         var debitSucceeded = CompanyBankingService.TryDebit(lenderAccounts, input.PrincipalAmount);
         if (!debitSucceeded)
         {
+            LoanCollateralSecurityAuditLogger.Add(
+                db,
+                userId,
+                action: "LOAN_ORIGINATION",
+                reason: "INSUFFICIENT_BALANCE_AT_COMMIT",
+                buildingId: collateralBuilding.Id,
+                detail: "Lender balance dropped below requested principal before debit staging.");
+            await db.SaveChangesAsync();
             throw new GraphQLException(
                 ErrorBuilder.New()
                     .SetMessage("The lender does not have sufficient funds to complete this loan disbursement at execution time.")
-                    .SetCode("LENDER_INSUFFICIENT_FUNDS")
+                    .SetCode("INSUFFICIENT_BALANCE_AT_COMMIT")
                     .Build());
         }
 
@@ -269,6 +299,7 @@ public sealed partial class Mutation
         var loan = new Loan
         {
             Id = Guid.NewGuid(),
+            ConcurrencyToken = Guid.NewGuid(),
             LoanOfferId = internalOffer.Id,
             BorrowerCompanyId = borrower.Id,
             BankBuildingId = bank.Id,
@@ -294,6 +325,7 @@ public sealed partial class Mutation
 
         db.LoanOffers.Add(internalOffer);
         db.Loans.Add(loan);
+        collateralBuilding.ConcurrencyToken = Guid.NewGuid();
 
         // Borrower ledger — cash inflow
         db.LedgerEntries.Add(new LedgerEntry
@@ -327,13 +359,24 @@ public sealed partial class Mutation
         }
         catch (DbUpdateConcurrencyException)
         {
-            // Another concurrent loan request modified the same lender account between our balance
-            // check and SaveChangesAsync. The ConcurrencyToken mismatch means EF could not persist
-            // the debit, so no funds moved and no loan was created. The caller should retry.
+            db.ChangeTracker.Clear();
+            var lenderBalancesAtCommit = await db.BankAccounts
+                .AsNoTracking()
+                .Where(account => account.CompanyId == bank.CompanyId && account.ClosedAtUtc == null)
+                .SumAsync(account => account.Balance);
+            LoanCollateralSecurityAuditLogger.Add(
+                db,
+                userId,
+                action: "LOAN_ORIGINATION",
+                reason: "INSUFFICIENT_BALANCE_AT_COMMIT",
+                loanId: loan.Id,
+                buildingId: collateralBuilding.Id,
+                detail: $"Commit-time lender balance {lenderBalancesAtCommit} {bankCurrencyCode}, required {input.PrincipalAmount} {bankCurrencyCode}.");
+            await db.SaveChangesAsync();
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("The bank account was modified by a concurrent transaction. Please try again.")
-                    .SetCode("CONCURRENT_MODIFICATION")
+                    .SetMessage("Insufficient payable balance at commit time.")
+                    .SetCode("INSUFFICIENT_BALANCE_AT_COMMIT")
                     .Build());
         }
 
@@ -397,6 +440,32 @@ public sealed partial class Mutation
         if (loan.Status == LoanStatus.Repaid || loan.RemainingPrincipal <= 0m)
         {
             return loan;
+        }
+
+        if (loan.CollateralBuildingId.HasValue)
+        {
+            var collateralOwnerId = await db.Buildings
+                .AsNoTracking()
+                .Where(b => b.Id == loan.CollateralBuildingId.Value)
+                .Select(b => b.CompanyId)
+                .FirstOrDefaultAsync();
+            if (collateralOwnerId != loan.BorrowerCompanyId)
+            {
+                LoanCollateralSecurityAuditLogger.Add(
+                    db,
+                    userId,
+                    action: "LOAN_RELEASE",
+                    reason: "COLLATERAL_OWNERSHIP_CONFLICT",
+                    loanId: loan.Id,
+                    buildingId: loan.CollateralBuildingId,
+                    detail: $"Expected borrower company {loan.BorrowerCompanyId}, actual owner {collateralOwnerId}.");
+                await db.SaveChangesAsync();
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("Collateral ownership changed before debt repayment could be committed.")
+                        .SetCode("COLLATERAL_OWNERSHIP_CONFLICT")
+                        .Build());
+            }
         }
 
         var borrowerSettlementAccount = loan.BorrowerBankAccountId.HasValue
@@ -464,12 +533,14 @@ public sealed partial class Mutation
         loan.ClosedAtUtc = nowUtc;
         loan.DefaultedAtTick = null;
         loan.LoanOffer.UsedCapacity = Math.Max(0m, loan.LoanOffer.UsedCapacity - loan.OriginalPrincipal);
+        loan.ConcurrencyToken = Guid.NewGuid();
 
         if (loan.CollateralBuilding is not null && loan.CollateralBuilding.DestroyedAtUtc == null)
         {
             loan.CollateralBuilding.IsForSale = false;
             loan.CollateralBuilding.AskingPrice = null;
             loan.CollateralBuilding.ListedAtUtc = null;
+            loan.CollateralBuilding.ConcurrencyToken = Guid.NewGuid();
         }
 
         await db.SaveChangesAsync();

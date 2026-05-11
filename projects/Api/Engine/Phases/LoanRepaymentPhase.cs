@@ -150,6 +150,7 @@ public sealed class LoanRepaymentPhase : ITickPhase
                 loan.MissedPayments = 0;
                 loan.DefaultedAtTick = null;
             }
+            loan.ConcurrencyToken = Guid.NewGuid();
 
             // Borrower ledger: principal repayment.
             context.Db.LedgerEntries.Add(new LedgerEntry
@@ -293,6 +294,7 @@ public sealed class LoanRepaymentPhase : ITickPhase
                         2,
                         MidpointRounding.AwayFromZero);
                     collateralBuilding.ListedAtUtc = DateTime.UtcNow;
+                    collateralBuilding.ConcurrencyToken = Guid.NewGuid();
                 }
             }
 
@@ -301,6 +303,7 @@ public sealed class LoanRepaymentPhase : ITickPhase
                 // Capacity remains locked (lender is owed money but capacity was consumed).
                 loan.ClosedAtUtc = DateTime.UtcNow;
             }
+            loan.ConcurrencyToken = Guid.NewGuid();
 
             var overdueAmount = decimal.Round(principalPayment + interestPayment + penalty, 2, MidpointRounding.AwayFromZero);
             var bankBuildingName = context.BuildingsById.TryGetValue(loan.BankBuildingId, out var bankBuilding)

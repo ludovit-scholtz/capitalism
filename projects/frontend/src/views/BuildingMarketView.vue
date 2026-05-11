@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
+import { GraphQLError } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
 import BuildingMarketContent from '@/components/buildings/BuildingMarketContent.vue'
 import type {
@@ -46,7 +47,7 @@ const BUILDING_MARKET_QUERY = `
     buildingMarket(cityId: $cityId, buildingType: $buildingType, maxPrice: $maxPrice) {
       pendingOfferCount
       building {
-        id name type isForSale askingPrice level
+        id name type isForSale askingPrice level isCollateralized foreclosureTicksRemaining
         city { id name currencyCode countryCode }
         company { id name player { displayName } }
       }
@@ -58,7 +59,7 @@ const MY_BUILDING_LISTINGS_QUERY = `
   query {
     myBuildingListings {
       building {
-        id name type isForSale askingPrice level
+        id name type isForSale askingPrice level isCollateralized foreclosureTicksRemaining
         city { id name currencyCode }
         company { id name }
       }
@@ -239,6 +240,12 @@ const acceptOffer = async (offer: MarketOffer) => {
           actionError.value = null
         }
       }, 4000)
+    } else if (err instanceof GraphQLError && err.code === 'BUILDING_LOCKED_AS_COLLATERAL') {
+      actionError.value = t('buildingDetail.collateralLockedToast')
+      await Promise.all([loadMyListings(), loadMarket()])
+    } else if (err instanceof GraphQLError && err.code === 'COLLATERAL_OWNERSHIP_CONFLICT') {
+      actionError.value = t('buildingDetail.collateralOwnershipConflictToast')
+      await Promise.all([loadMyListings(), loadMarket()])
     } else {
       actionError.value = err instanceof Error ? err.message : String(err)
     }
