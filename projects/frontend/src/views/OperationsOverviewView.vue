@@ -13,6 +13,9 @@ const error = ref<string | null>(null)
 const actionMessage = ref<string | null>(null)
 const actionError = ref<string | null>(null)
 const globalAdminEmail = ref('')
+const endShardReason = ref('')
+const endShardPending = ref(false)
+const endShardConfirmOpen = ref(false)
 
 const canManageRootFeatures = computed(() => adminStore.session?.isRootAdministrator ?? false)
 
@@ -78,6 +81,23 @@ async function removeGlobalAdmin(email: string) {
     actionMessage.value = t('admin.globalAdminRemoved')
   } catch (caughtError) {
     actionError.value = caughtError instanceof Error ? caughtError.message : t('admin.globalAdminFailed')
+  }
+}
+
+async function confirmEndShard() {
+  endShardConfirmOpen.value = false
+  endShardPending.value = true
+  actionError.value = null
+  actionMessage.value = null
+
+  try {
+    await adminStore.endShardManually(endShardReason.value || undefined)
+    actionMessage.value = t('endgame.endShardSuccess')
+    endShardReason.value = ''
+  } catch (caughtError) {
+    actionError.value = caughtError instanceof Error ? caughtError.message : t('endgame.endShardFailed')
+  } finally {
+    endShardPending.value = false
   }
 }
 
@@ -278,6 +298,57 @@ onMounted(loadOverview)
           </div>
         </article>
       </section>
+
+      <section class="ops-grid ops-grid-wide">
+        <article class="card ops-panel">
+          <div class="ops-panel-header">
+            <div>
+              <h3>{{ t('endgame.endShardTitle') }}</h3>
+              <p>{{ t('endgame.endShardBody') }}</p>
+            </div>
+          </div>
+          <div v-if="!endShardConfirmOpen" class="ops-end-shard-form">
+            <label class="ops-field-label" for="endShardReasonInput">{{ t('endgame.endShardReason') }}</label>
+            <input
+              id="endShardReasonInput"
+              v-model="endShardReason"
+              class="form-input"
+              type="text"
+              maxlength="500"
+              :placeholder="t('common.optional')"
+            />
+            <button
+              type="button"
+              class="btn btn-secondary"
+              :disabled="endShardPending"
+              @click="endShardConfirmOpen = true"
+            >
+              {{ endShardPending ? t('common.loading') : t('endgame.endShardButton') }}
+            </button>
+          </div>
+          <div v-else class="ops-end-shard-confirm">
+            <p class="ops-confirm-text">{{ t('endgame.endShardConfirm') }}</p>
+            <div class="ops-confirm-actions">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                :disabled="endShardPending"
+                @click="() => void confirmEndShard()"
+              >
+                {{ t('common.confirm') }}
+              </button>
+              <button
+                type="button"
+                class="btn btn-ghost"
+                :disabled="endShardPending"
+                @click="endShardConfirmOpen = false"
+              >
+                {{ t('common.cancel') }}
+              </button>
+            </div>
+          </div>
+        </article>
+      </section>
     </template>
   </div>
 </template>
@@ -426,6 +497,37 @@ onMounted(loadOverview)
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.75rem;
   margin-bottom: 0.9rem;
+}
+
+.ops-grid-wide {
+  grid-template-columns: 1fr;
+}
+
+.ops-end-shard-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 480px;
+}
+
+.ops-field-label {
+  font-size: 0.88rem;
+  color: var(--color-text-secondary);
+}
+
+.ops-end-shard-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ops-confirm-text {
+  color: var(--color-text-secondary);
+}
+
+.ops-confirm-actions {
+  display: flex;
+  gap: 0.75rem;
 }
 
 @media (max-width: 900px) {
