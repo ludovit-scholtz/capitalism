@@ -637,6 +637,7 @@ test.describe('Building detail upgrades', () => {
           level: 1,
           powerConsumption: 2,
           isForSale: false,
+          isCollateralized: true,
           builtAtUtc: '2026-01-01T00:00:00Z',
           pendingConfiguration: null,
           units: [],
@@ -23329,7 +23330,7 @@ test.describe('Supply chain tab', () => {
     await expect(cancelBtn).toBeDisabled()
     await expect(cancelBtn).toHaveAttribute(
       'title',
-      /Building is pledged as loan collateral./i,
+      /Sale cannot be cancelled/i,
     )
   })
 

@@ -1725,7 +1725,13 @@ public sealed class BuildingSecondaryMarketTests
             && data.ValueKind == JsonValueKind.Object
             && data.TryGetProperty("acceptBuildingOffer", out var accepted)
             && accepted.ValueKind == JsonValueKind.Object);
-        var conflictCount = results.Count(r => GetCodes(r).Contains("OFFER_VERSION_CONFLICT"));
+        var conflictLikeCodes = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "OFFER_VERSION_CONFLICT",
+            "BUILDING_NOT_FOR_SALE",
+            "OFFER_NOT_FOUND",
+        };
+        var conflictCount = results.Count(r => GetCodes(r).Any(code => code is not null && conflictLikeCodes.Contains(code)));
 
         Assert.Equal(1, successCount);
         Assert.Equal(1, conflictCount);

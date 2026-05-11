@@ -398,9 +398,11 @@ onMounted(loadData)
           class="cancel-listing-btn btn btn-danger mt-3 w-full"
           :disabled="saving || cancelSaleLockedByUnpaidLoan || building.isCollateralized"
           :title="
-            cancelSaleLockedByUnpaidLoan || building.isCollateralized
-              ? t('buildingDetail.collateralLockedTooltip')
-              : ''
+            cancelSaleLockedByUnpaidLoan
+              ? t('buildingDetail.cancelSaleLockedTooltip')
+              : building.isCollateralized
+                ? t('buildingDetail.collateralLockedTooltip')
+                : ''
           "
           @click="cancelListing"
         >
@@ -408,7 +410,11 @@ onMounted(loadData)
           {{ t('buildingDetail.cancelSale') }}
         </button>
         <p v-if="cancelSaleLockedByUnpaidLoan || building.isCollateralized" class="mt-2 text-xs text-amber-700 dark:text-amber-300">
-          {{ t('buildingDetail.collateralLockedTooltip') }}
+          {{
+            cancelSaleLockedByUnpaidLoan
+              ? t('buildingDetail.cancelSaleLockedTooltip')
+              : t('buildingDetail.collateralLockedTooltip')
+          }}
         </p>
       </div>
 
