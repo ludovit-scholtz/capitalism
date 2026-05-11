@@ -7,6 +7,7 @@ Create a fun game in the style of Capitalism II, where players experience realis
 ### Onboarding
 
 - [x] (100%) The generated user name - the personal account name is not stored properly. Make sure to store it in the master server if the server does not already contain this information.
+- [ ] (0%) Generated user personal account name is not used in the game ranking. Make sure to use it in the ranking in the game server. Do not use the jwt name anywhere.
 - [x] (100%) Generated user personal account name is not used in the ranking. Make sure to use it in the ranking.
 - [x] (100%) Do not show the jwt user name anywhere to other players. The user name is generated from the user's algorand address, so for the privacy purposes it is not good to use it
 
