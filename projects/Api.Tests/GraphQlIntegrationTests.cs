@@ -1698,6 +1698,53 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.True(dashboardResult.TryGetProperty("errors", out _));
     }
 
+    [Fact]
+    public async Task SetPlayerInvisibleInChat_MasterTokenWithAdminRole_IsRestrictedToPlayerScope()
+    {
+        var email = $"master-admin-mutation-{Guid.NewGuid():N}@example.com";
+        await RegisterAndGetTokenAsync(email, "Master Mutation Scope User");
+
+        Guid playerId;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(candidate => candidate.Email == email);
+            player.Role = PlayerRole.Admin;
+            playerId = player.Id;
+            await db.SaveChangesAsync();
+        }
+
+        var masterToken = CreateSharedToken(
+            Guid.NewGuid().ToString(),
+            email,
+            "Master Mutation Scope User",
+            new Claim(TokenBoundaryClaims.TokenTypeClaimType, TokenBoundaryClaims.TokenTypeMaster),
+            new Claim(ClaimTypes.Role, PlayerRole.Admin));
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation SetInvisible($input: SetPlayerInvisibleInChatInput!) {
+              setPlayerInvisibleInChat(input: $input) {
+                id
+              }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    playerId,
+                    isInvisibleInChat = true,
+                }
+            },
+            masterToken);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Contains(
+            errors.EnumerateArray(),
+            error => error.GetProperty("extensions").GetProperty("code").GetString() == "ADMIN_ACCESS_REQUIRED");
+    }
+
     #endregion
 
     #region Game Data Queries

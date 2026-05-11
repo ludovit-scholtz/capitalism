@@ -4,6 +4,7 @@ namespace Capitalism.Shared.Security;
 
 public static class TokenBoundaryClaims
 {
+    public const string IssuerClaimType = "iss";
     public const string TokenTypeClaimType = "capitalism/token_type";
     public const string ImpersonationGrantClaimType = "capitalism/impersonation-granted";
     public const string MasterPrivilegeEligibleClaimType = "capitalism/master-privilege-eligible";
@@ -26,7 +27,7 @@ public static class TokenBoundaryClaims
     public static bool IsMasterPrivilegeEligible(ClaimsPrincipal principal, string expectedIssuer)
     {
         var tokenType = GetTokenType(principal);
-        var issuer = principal.FindFirst("iss")?.Value;
+        var issuer = principal.FindFirst(IssuerClaimType)?.Value;
 
         return string.Equals(tokenType, TokenTypeMaster, StringComparison.OrdinalIgnoreCase)
             && string.Equals(NormalizeIssuer(issuer), NormalizeIssuer(expectedIssuer), StringComparison.OrdinalIgnoreCase);
