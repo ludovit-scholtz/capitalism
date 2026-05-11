@@ -256,4 +256,83 @@ public sealed class StockExchangeGovernmentTradeTests
 
         Assert.Equal(JsonValueKind.Null, result.GetProperty("data").GetProperty("companyShareholders").ValueKind);
     }
+
+    [Fact]
+    public async Task BuyShares_ForeignCompanyTradeOverride_ReturnsInvalidClientOverrideAndDoesNotCreateHolding()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var ownerToken = await RegisterAndGetTokenAsync(client, $"stock-override-owner-{Guid.NewGuid():N}@test.com", "Stock Override Owner");
+        var ownerId = await GetCurrentPlayerIdAsync(client, ownerToken);
+        var publicCompanyId = await SeedPublicCompanyAsync(factory, ownerId, "Override Public Co");
+
+        var attackerToken = await RegisterAndGetTokenAsync(client, $"stock-override-attacker-{Guid.NewGuid():N}@test.com", "Stock Override Attacker");
+        var attackerId = await GetCurrentPlayerIdAsync(client, attackerToken);
+
+        var result = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            """
+            mutation BuyShares($input: BuySharesInput!) {
+              buyShares(input: $input) { shareCount }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    companyId = publicCompanyId,
+                    shareCount = 10m,
+                    tradeAccountType = "COMPANY",
+                    tradeAccountCompanyId = publicCompanyId
+                }
+            },
+            attackerToken);
+
+        var error = result.GetProperty("errors")[0];
+        Assert.Equal("INVALID_CLIENT_OVERRIDE", error.GetProperty("extensions").GetProperty("code").GetString());
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var attackerHolding = await db.Shareholdings.FirstOrDefaultAsync(holding =>
+            holding.CompanyId == publicCompanyId
+            && holding.OwnerPlayerId == attackerId
+            && holding.OwnerCompanyId == null);
+        Assert.Null(attackerHolding);
+    }
+
+    [Fact]
+    public async Task BuyShares_PersonTradeTypeWithCompanyIdOverride_ReturnsInvalidClientOverride()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var ownerToken = await RegisterAndGetTokenAsync(client, $"stock-person-override-owner-{Guid.NewGuid():N}@test.com", "Stock Person Override Owner");
+        var ownerId = await GetCurrentPlayerIdAsync(client, ownerToken);
+        var publicCompanyId = await SeedPublicCompanyAsync(factory, ownerId, "Person Override Public Co");
+
+        var investorToken = await RegisterAndGetTokenAsync(client, $"stock-person-override-investor-{Guid.NewGuid():N}@test.com", "Stock Person Override Investor");
+
+        var result = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            """
+            mutation BuyShares($input: BuySharesInput!) {
+              buyShares(input: $input) { shareCount }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    companyId = publicCompanyId,
+                    shareCount = 10m,
+                    tradeAccountType = "PERSON",
+                    tradeAccountCompanyId = publicCompanyId
+                }
+            },
+            investorToken);
+
+        var error = result.GetProperty("errors")[0];
+        Assert.Equal("INVALID_CLIENT_OVERRIDE", error.GetProperty("extensions").GetProperty("code").GetString());
+    }
 }
