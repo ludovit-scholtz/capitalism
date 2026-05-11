@@ -50,6 +50,27 @@ public sealed class RankingPrivacyTests
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
+    private static string CreateExternalToken(string userId, string email, string jwtName)
+    {
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtSigningKey));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, userId),
+            new(ClaimTypes.Email, email),
+            new(ClaimTypes.Name, jwtName),
+        };
+
+        var token = new JwtSecurityToken(
+            issuer: JwtIssuer,
+            audience: JwtAudience,
+            claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(30),
+            signingCredentials: creds);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
     private static async Task<JsonElement> ExecuteGraphQlAsync(
         HttpClient client,
         string query,
@@ -240,5 +261,38 @@ public sealed class RankingPrivacyTests
                 Assert.Equal(3, name.Trim().Split(' ').Length);
             }
         }
+    }
+
+    [Fact]
+    public async Task MeAndRankings_ExternalJwtName_DoesNotUseJwtIdentityName()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var email = $"external-name-{Guid.NewGuid():N}@example.com";
+        const string jwtIdentityName = "wallet-handle-987";
+        var token = CreateExternalToken(Guid.NewGuid().ToString(), email, jwtIdentityName);
+
+        var meResult = await ExecuteGraphQlAsync(client, "{ me { id displayName } }", token: token);
+        Assert.False(meResult.TryGetProperty("errors", out _), "me query should succeed");
+
+        var me = meResult.GetProperty("data").GetProperty("me");
+        var resolvedDisplayName = me.GetProperty("displayName").GetString();
+
+        Assert.False(string.IsNullOrWhiteSpace(resolvedDisplayName));
+        Assert.NotEqual(jwtIdentityName, resolvedDisplayName);
+        Assert.Equal(3, resolvedDisplayName!.Trim().Split(' ').Length);
+
+        var rankingsResult = await ExecuteGraphQlAsync(client, "{ rankings { playerId displayName personalAccountName } }");
+        Assert.False(rankingsResult.TryGetProperty("errors", out _));
+
+        var rankings = rankingsResult.GetProperty("data").GetProperty("rankings").EnumerateArray().ToList();
+        var playerId = me.GetProperty("id").GetString();
+        var entry = rankings.FirstOrDefault(e =>
+            string.Equals(e.GetProperty("playerId").GetString(), playerId, StringComparison.Ordinal));
+
+        Assert.True(entry.ValueKind != JsonValueKind.Undefined, "Player must appear in rankings.");
+        Assert.NotEqual(jwtIdentityName, entry.GetProperty("displayName").GetString());
+        Assert.NotEqual(jwtIdentityName, entry.GetProperty("personalAccountName").GetString());
     }
 }
