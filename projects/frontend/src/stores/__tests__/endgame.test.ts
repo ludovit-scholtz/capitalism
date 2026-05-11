@@ -130,13 +130,10 @@ describe('useEndgameStore', () => {
 
     store.startPolling(30_000)
     // Wait for the initial async fetchStatus to complete
-    await Promise.resolve()
-    await Promise.resolve()
-    expect(gqlRequestMock).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(gqlRequestMock).toHaveBeenCalledTimes(1))
 
     await vi.advanceTimersByTimeAsync(30_000)
-    await Promise.resolve()
-    expect(gqlRequestMock).toHaveBeenCalledTimes(2)
+    await vi.waitFor(() => expect(gqlRequestMock).toHaveBeenCalledTimes(2))
 
     store.stopPolling()
     vi.useRealTimers()
@@ -148,12 +145,10 @@ describe('useEndgameStore', () => {
     const store = useEndgameStore()
 
     store.startPolling(10_000)
-    await Promise.resolve()
-    await Promise.resolve()
+    await vi.waitFor(() => expect(gqlRequestMock).toHaveBeenCalledTimes(1))
 
     store.stopPolling()
     await vi.advanceTimersByTimeAsync(100_000)
-    await Promise.resolve()
 
     // Only 1 call: the immediate one; nothing after stop
     expect(gqlRequestMock).toHaveBeenCalledTimes(1)

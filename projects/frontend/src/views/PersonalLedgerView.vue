@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 import { gqlRequest } from '@/lib/graphql'
@@ -22,10 +22,19 @@ const incomeFilter = ref<'ALL' | 'INTEREST' | 'DIVIDEND'>('ALL')
 
 /** Milestone toast queue — each entry is the i18n key to show. */
 const milestoneToasts = ref<string[]>([])
+/** Track pending auto-dismiss timers so we can clear them on unmount. */
+const milestoneTimers = ref<ReturnType<typeof setTimeout>[]>([])
 
 function dismissMilestoneToast() {
   milestoneToasts.value.shift()
 }
+
+onBeforeUnmount(() => {
+  for (const timer of milestoneTimers.value) {
+    clearTimeout(timer)
+  }
+  milestoneTimers.value = []
+})
 
 const PERSON_ACCOUNT_QUERY = `
   query PersonAccountLedger {
@@ -160,10 +169,12 @@ watch(
       const key = MILESTONE_TOAST_KEYS[milestone]
       if (key) {
         milestoneToasts.value.push(key)
-        // Auto-dismiss each toast after 6 seconds
-        setTimeout(() => {
+        // Auto-dismiss each toast after 6 seconds; track timer for cleanup on unmount
+        const timer = setTimeout(() => {
           dismissMilestoneToast()
+          milestoneTimers.value = milestoneTimers.value.filter((t) => t !== timer)
         }, 6_000)
+        milestoneTimers.value.push(timer)
       }
     }
   },
@@ -228,7 +239,7 @@ const endgameStatus = computed(() => endgameStore.status)
         <span class="text-2xl" aria-hidden="true">🏆</span>
         <div class="flex-1">
           <p class="font-semibold text-good">{{ t('endgame.milestoneTitle') }}</p>
-          <p class="mt-0.5 text-sm text-muted">{{ t(milestoneToasts[0]!) }}</p>
+          <p class="mt-0.5 text-sm text-muted">{{ milestoneToasts[0] ? t(milestoneToasts[0]) : '' }}</p>
         </div>
         <button
           class="ml-2 text-muted hover:text-brand"
