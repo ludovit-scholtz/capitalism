@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Api.Data;
 using Api.Data.Entities;
+using HotChocolate;
 using HotChocolate.Language;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -52,6 +53,9 @@ public sealed class ApiKeyScopeMiddleware(RequestDelegate next)
             ["acceptLoan"] = new(ApiKeyScopes.BotOnly, true, ResolveAcceptLoanCompanyIdsAsync),
             ["repayLoanDebt"] = new(ApiKeyScopes.BotOnly, true, ResolveLoanBorrowerCompanyIdsAsync),
             ["setBuildingForSale"] = new(ApiKeyScopes.BotOnly, true, ResolveBuildingCompanyIdsAsync),
+            ["makeOfferOnBuilding"] = new(ApiKeyScopes.BotOnly, true, ResolveMakeOfferBuyerCompanyIdsAsync),
+            ["acceptBuildingOffer"] = new(ApiKeyScopes.BotOnly, true, ResolveBuildingOfferSellerCompanyIdsAsync),
+            ["cancelBuildingOffer"] = new(ApiKeyScopes.BotOnly, true, ResolveBuildingOfferSellerCompanyIdsAsync),
             ["destroyBuilding"] = new(ApiKeyScopes.BotOnly, true, ResolveBuildingCompanyIdsAsync),
             ["setRentPerSqm"] = new(ApiKeyScopes.BotOnly, true, ResolveBuildingCompanyIdsAsync),
             ["fundBuildingBankAccount"] = new(ApiKeyScopes.BotOnly, true, ResolveBuildingCompanyIdsAsync),
@@ -86,7 +90,7 @@ public sealed class ApiKeyScopeMiddleware(RequestDelegate next)
         _logger = logger;
     }
 
-    public async Task InvokeAsync(HttpContext context, AppDbContext db)
+    public async Task InvokeAsync(HttpContext context, AppDbContext db, BotOwnershipGuard ownershipGuard)
     {
         if (!ShouldInspect(context)
             || context.Items[ApiKeyRequestContext.HttpContextItemKey] is not ApiKeyRequestContext apiKeyContext)
@@ -114,6 +118,7 @@ public sealed class ApiKeyScopeMiddleware(RequestDelegate next)
             normalizedScopes,
             apiKeyContext,
             db,
+            ownershipGuard,
             context.RequestAborted);
 
         if (scopeDecisions.Count == 0)
@@ -143,6 +148,7 @@ public sealed class ApiKeyScopeMiddleware(RequestDelegate next)
         IReadOnlyCollection<string> normalizedScopes,
         ApiKeyRequestContext apiKeyContext,
         AppDbContext db,
+        BotOwnershipGuard ownershipGuard,
         CancellationToken cancellationToken)
     {
         var results = new List<ScopeDecision>();
@@ -158,7 +164,7 @@ public sealed class ApiKeyScopeMiddleware(RequestDelegate next)
             {
                 foreach (var entry in document.RootElement.EnumerateArray())
                 {
-                    var decision = await EvaluateSingleRequestAsync(entry, normalizedScopes, apiKeyContext, db, cancellationToken);
+                    var decision = await EvaluateSingleRequestAsync(entry, normalizedScopes, apiKeyContext, db, ownershipGuard, cancellationToken);
                     if (decision is not null)
                     {
                         results.AddRange(decision);
@@ -168,7 +174,7 @@ public sealed class ApiKeyScopeMiddleware(RequestDelegate next)
                 return results;
             }
 
-            var singleResult = await EvaluateSingleRequestAsync(document.RootElement, normalizedScopes, apiKeyContext, db, cancellationToken);
+            var singleResult = await EvaluateSingleRequestAsync(document.RootElement, normalizedScopes, apiKeyContext, db, ownershipGuard, cancellationToken);
             if (singleResult is not null)
             {
                 results.AddRange(singleResult);
@@ -187,6 +193,7 @@ public sealed class ApiKeyScopeMiddleware(RequestDelegate next)
         IReadOnlyCollection<string> normalizedScopes,
         ApiKeyRequestContext apiKeyContext,
         AppDbContext db,
+        BotOwnershipGuard ownershipGuard,
         CancellationToken cancellationToken)
     {
         if (requestRoot.ValueKind != JsonValueKind.Object
@@ -285,6 +292,21 @@ public sealed class ApiKeyScopeMiddleware(RequestDelegate next)
                 }
 
                 scopeUsed = $"{rule.RequiredPrimaryScope},{ApiKeyScopes.CompanyBound}";
+            }
+
+            try
+            {
+                await ownershipGuard.EnsureMutationOwnershipAsync(rootField, variables, apiKeyContext.PlayerId, cancellationToken);
+            }
+            catch (GraphQLException ex) when (TryGetErrorCode(ex) == BotOwnershipGuard.NotOwnedOrNotFoundCode)
+            {
+                decisions.Add(new ScopeDecision(
+                    false,
+                    rootField,
+                    "mutation",
+                    scopeUsed,
+                    BotOwnershipGuard.NotOwnedOrNotFoundCode));
+                continue;
             }
 
             decisions.Add(new ScopeDecision(true, rootField, "mutation", scopeUsed, null));
@@ -394,6 +416,9 @@ public sealed class ApiKeyScopeMiddleware(RequestDelegate next)
             cancellationToken: context.RequestAborted);
     }
 
+    private static string? TryGetErrorCode(GraphQLException ex)
+        => ex.Errors.FirstOrDefault()?.Code;
+
     private static ValueTask<IReadOnlyCollection<Guid>> ResolveDirectCompanyIdsAsync(
         JsonElement variables,
         AppDbContext _,
@@ -428,6 +453,13 @@ public sealed class ApiKeyScopeMiddleware(RequestDelegate next)
             .Distinct()
             .ToListAsync(cancellationToken);
     }
+
+    private static ValueTask<IReadOnlyCollection<Guid>> ResolveMakeOfferBuyerCompanyIdsAsync(
+        JsonElement variables,
+        AppDbContext db,
+        Guid playerId,
+        CancellationToken cancellationToken)
+        => ResolveDirectCompanyIdsAsync(variables, db, playerId, cancellationToken);
 
     private static async ValueTask<IReadOnlyCollection<Guid>> ResolveBankAccountCompanyIdsAsync(
         JsonElement variables,
@@ -552,6 +584,27 @@ public sealed class ApiKeyScopeMiddleware(RequestDelegate next)
             .AsNoTracking()
             .Where(loan => loanIds.Contains(loan.Id))
             .Select(loan => loan.BorrowerCompanyId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+    }
+
+    private static async ValueTask<IReadOnlyCollection<Guid>> ResolveBuildingOfferSellerCompanyIdsAsync(
+        JsonElement variables,
+        AppDbContext db,
+        Guid _,
+        CancellationToken cancellationToken)
+    {
+        var offerIds = new List<Guid>();
+        AddGuidIfPresent(offerIds, variables, "input", "offerId");
+        if (offerIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await db.BuildingSaleOffers
+            .AsNoTracking()
+            .Where(offer => offerIds.Contains(offer.Id))
+            .Select(offer => offer.Building.CompanyId)
             .Distinct()
             .ToListAsync(cancellationToken);
     }

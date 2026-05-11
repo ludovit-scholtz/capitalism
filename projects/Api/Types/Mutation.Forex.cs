@@ -28,6 +28,8 @@ public sealed partial class Mutation
     ///
     /// Concurrency safety: runs inside a serializable transaction; the player's ConcurrencyToken
     /// is refreshed on save so that EF's optimistic-concurrency check fires on racing requests.
+    /// API-key callers can swap only through accounts they own; server-side ownership is resolved
+    /// from the authenticated principal and foreign account identifiers are rejected.
     /// </summary>
     [Authorize]
     public async Task<ForexTradeResult> ExecuteForexSwap(

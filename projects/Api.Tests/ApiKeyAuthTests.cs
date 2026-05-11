@@ -2,10 +2,14 @@ using System.Net.Http.Headers;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using Api.Data;
+using Api.Data.Entities;
 using Api.Security;
 using Api.Tests.Infrastructure;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Api.Tests;
 
@@ -14,10 +18,12 @@ namespace Api.Tests;
 /// </summary>
 public sealed class ApiKeyAuthTests : IClassFixture<ApiWebApplicationFactory>
 {
+    private readonly ApiWebApplicationFactory _factory;
     private readonly HttpClient _client;
 
     public ApiKeyAuthTests(ApiWebApplicationFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateClient();
     }
 
@@ -108,6 +114,179 @@ public sealed class ApiKeyAuthTests : IClassFixture<ApiWebApplicationFactory>
         return (
             payload.GetProperty("plaintextKey").GetString()!,
             Guid.Parse(payload.GetProperty("apiKey").GetProperty("id").GetString()!));
+    }
+
+    private async Task<T> WithDbContextAsync<T>(Func<AppDbContext, Task<T>> action)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await action(db);
+    }
+
+    private async Task WithDbContextAsync(Func<AppDbContext, Task> action)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await action(db);
+    }
+
+    private async Task<Guid> GetPlayerIdByEmailAsync(string email)
+        => await WithDbContextAsync(db => db.Players
+            .Where(player => player.Email == email)
+            .Select(player => player.Id)
+            .SingleAsync());
+
+    private async Task<Guid> GetBratislavaCityIdAsync()
+        => await WithDbContextAsync(db => db.Cities
+            .Where(city => city.Name == "Bratislava")
+            .Select(city => city.Id)
+            .SingleAsync());
+
+    private static string GenerateTestAccountNumber()
+    {
+        var raw = Math.Abs(BitConverter.ToInt64(Guid.NewGuid().ToByteArray(), 0)) % 1_000_000_000_000_000L;
+        return raw.ToString("D16");
+    }
+
+    private async Task<Guid> SeedPlayerAsync(string email, string displayName)
+        => await WithDbContextAsync(async db =>
+        {
+            var player = new Player
+            {
+                Id = Guid.NewGuid(),
+                Email = email,
+                DisplayName = displayName,
+                PasswordHash = "hash",
+                Role = PlayerRole.Player,
+            };
+            db.Players.Add(player);
+            await db.SaveChangesAsync();
+            return player.Id;
+        });
+
+    private async Task<Guid> SeedCompanyAsync(Guid playerId, string name)
+        => await WithDbContextAsync(async db =>
+        {
+            var company = new Company
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = playerId,
+                Name = name,
+                FoundedAtTick = 0,
+            };
+            db.Companies.Add(company);
+            await db.SaveChangesAsync();
+            return company.Id;
+        });
+
+    private async Task<Guid> SeedBankAccountAsync(Guid? playerId = null, Guid? companyId = null, string currencyCode = "EUR", decimal balance = 10_000m)
+        => await WithDbContextAsync(async db =>
+        {
+            var account = new BankAccount
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = playerId,
+                CompanyId = companyId,
+                AccountNumber = GenerateTestAccountNumber(),
+                CurrencyCode = currencyCode,
+                Balance = balance,
+                CreatedAtUtc = DateTime.UtcNow,
+            };
+            db.BankAccounts.Add(account);
+            await db.SaveChangesAsync();
+            return account.Id;
+        });
+
+    private async Task<Guid> SeedBuildingAsync(Guid companyId, string name, bool isForSale = false, decimal? askingPrice = null, string type = "FACTORY")
+    {
+        var cityId = await GetBratislavaCityIdAsync();
+        return await WithDbContextAsync(async db =>
+        {
+            var building = new Building
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = companyId,
+                CityId = cityId,
+                Type = type,
+                Name = name,
+                Latitude = 48.1486,
+                Longitude = 17.1077,
+                IsForSale = isForSale,
+                AskingPrice = askingPrice,
+            };
+            db.Buildings.Add(building);
+            await db.SaveChangesAsync();
+            return building.Id;
+        });
+    }
+
+    private async Task<(Guid OfferId, Guid OfferVersion)> SeedBuildingOfferAsync(Guid buildingId, Guid buyerPlayerId, Guid buyerCompanyId, decimal offeredPrice = 5_000m)
+        => await WithDbContextAsync(async db =>
+        {
+            var offer = new BuildingSaleOffer
+            {
+                Id = Guid.NewGuid(),
+                OfferVersion = Guid.NewGuid(),
+                BuildingId = buildingId,
+                BuyerPlayerId = buyerPlayerId,
+                BuyerCompanyId = buyerCompanyId,
+                OfferedPrice = offeredPrice,
+                Status = BuildingSaleOfferStatus.Pending,
+                CreatedAtUtc = DateTime.UtcNow,
+            };
+            db.BuildingSaleOffers.Add(offer);
+            await db.SaveChangesAsync();
+            return (offer.Id, offer.OfferVersion);
+        });
+
+    private async Task<Guid> SeedLoanAsync(Guid borrowerCompanyId)
+    {
+        var lenderPlayerId = await SeedPlayerAsync($"lender-{Guid.NewGuid():N}@test.com", "Lender");
+        var lenderCompanyId = await SeedCompanyAsync(lenderPlayerId, $"Lender Co {Guid.NewGuid():N}");
+        var bankBuildingId = await SeedBuildingAsync(lenderCompanyId, $"Lender Bank {Guid.NewGuid():N}", type: "BANK");
+        return await WithDbContextAsync(async db =>
+        {
+            var loanOffer = new LoanOffer
+            {
+                Id = Guid.NewGuid(),
+                BankBuildingId = bankBuildingId,
+                LenderCompanyId = lenderCompanyId,
+                AnnualInterestRatePercent = 12m,
+                MaxPrincipalPerLoan = 10_000m,
+                TotalCapacity = 20_000m,
+                UsedCapacity = 5_000m,
+                DurationTicks = 24,
+                IsActive = true,
+                CreatedAtTick = 0,
+                CreatedAtUtc = DateTime.UtcNow,
+            };
+
+            var loan = new Loan
+            {
+                Id = Guid.NewGuid(),
+                LoanOfferId = loanOffer.Id,
+                BorrowerCompanyId = borrowerCompanyId,
+                BankBuildingId = bankBuildingId,
+                LenderCompanyId = lenderCompanyId,
+                OriginalPrincipal = 5_000m,
+                RemainingPrincipal = 4_000m,
+                AnnualInterestRatePercent = 12m,
+                DurationTicks = 24,
+                StartTick = 0,
+                DueTick = 24,
+                NextPaymentTick = 1,
+                PaymentAmount = 200m,
+                PaymentsMade = 0,
+                TotalPayments = 24,
+                Status = LoanStatus.Overdue,
+                AcceptedAtUtc = DateTime.UtcNow,
+            };
+
+            db.LoanOffers.Add(loanOffer);
+            db.Loans.Add(loan);
+            await db.SaveChangesAsync();
+            return loan.Id;
+        });
     }
 
     // ─── Unit-style tests for ComputeHash and GenerateNewKey ────────────────
@@ -607,6 +786,280 @@ public sealed class ApiKeyAuthTests : IClassFixture<ApiWebApplicationFactory>
         Assert.Equal(
             "API_KEY_SCOPE_FORBIDDEN",
             body.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task TradingOnlyApiKey_ForexMutation_ForeignBankAccount_ReturnsNotOwnedOrNotFoundAndAudits()
+    {
+        const string ownerEmail = "ak-forex-owner@test.com";
+        var token = await RegisterAndLoginAsync(ownerEmail, "ForexOwner");
+        var ownerPlayerId = await GetPlayerIdByEmailAsync(ownerEmail);
+        var foreignPlayerId = await SeedPlayerAsync("ak-forex-foreign@test.com", "ForexForeign");
+        var foreignAccountId = await SeedBankAccountAsync(playerId: foreignPlayerId, currencyCode: "EUR", balance: 5_000m);
+        var (plaintext, keyId) = await GenerateApiKeyAsync(token, "Trading Key", [ApiKeyScopes.TradingOnly]);
+
+        var (response, body) = await SendWithStatusAsync(
+            _client,
+            @"mutation ExecuteForexSwap($input: ExecuteForexSwapInput!) {
+                executeForexSwap(input: $input) { fromAmount }
+            }",
+            new
+            {
+                input = new
+                {
+                    fromCurrencyCode = "EUR",
+                    toCurrencyCode = "USD",
+                    amount = 100m,
+                    fromBankAccountId = foreignAccountId,
+                }
+            },
+            apiKey: plaintext);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(
+            BotOwnershipGuard.NotOwnedOrNotFoundCode,
+            body.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
+
+        var auditResult = await SendAsync(
+            _client,
+            @"query Audit($limit: Int!, $keyId: UUID) {
+                myApiKeyAuditLog(limit: $limit, keyId: $keyId) {
+                    keyId
+                    operationName
+                    wasAllowed
+                    denialCode
+                }
+            }",
+            new { limit = 20, keyId },
+            token: token);
+
+        var entries = auditResult.GetProperty("data").GetProperty("myApiKeyAuditLog").EnumerateArray().ToList();
+        Assert.Contains(entries, entry =>
+            entry.GetProperty("keyId").GetString() == keyId.ToString()
+            && entry.GetProperty("operationName").GetString() == "executeForexSwap"
+            && !entry.GetProperty("wasAllowed").GetBoolean()
+            && entry.GetProperty("denialCode").GetString() == BotOwnershipGuard.NotOwnedOrNotFoundCode);
+        Assert.NotEqual(ownerPlayerId, foreignPlayerId);
+    }
+
+    [Fact]
+    public async Task TradingOnlyApiKey_StockMutation_ForeignTradeAccountCompany_ReturnsNotOwnedOrNotFound()
+    {
+        const string ownerEmail = "ak-stock-owner@test.com";
+        var token = await RegisterAndLoginAsync(ownerEmail, "StockOwner");
+        var foreignPlayerId = await SeedPlayerAsync("ak-stock-foreign@test.com", "StockForeign");
+        var foreignCompanyId = await SeedCompanyAsync(foreignPlayerId, "Foreign Trade Co");
+        var (plaintext, _) = await GenerateApiKeyAsync(token, "Trading Key", [ApiKeyScopes.TradingOnly]);
+
+        var (response, body) = await SendWithStatusAsync(
+            _client,
+            @"mutation BuyShares($input: BuySharesInput!) {
+                buyShares(input: $input) { companyId }
+            }",
+            new
+            {
+                input = new
+                {
+                    companyId = Guid.NewGuid(),
+                    shareCount = 1m,
+                    tradeAccountType = AccountContextType.Company,
+                    tradeAccountCompanyId = foreignCompanyId,
+                }
+            },
+            apiKey: plaintext);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(
+            BotOwnershipGuard.NotOwnedOrNotFoundCode,
+            body.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task BotOnlyApiKey_SetBuildingForSale_ForeignBuilding_ReturnsNotOwnedOrNotFound()
+    {
+        const string ownerEmail = "ak-building-owner@test.com";
+        var token = await RegisterAndLoginAsync(ownerEmail, "BuildingOwner");
+        var foreignPlayerId = await SeedPlayerAsync("ak-building-foreign@test.com", "BuildingForeign");
+        var foreignCompanyId = await SeedCompanyAsync(foreignPlayerId, "Foreign Building Co");
+        var foreignBuildingId = await SeedBuildingAsync(foreignCompanyId, "Foreign Factory");
+        var (plaintext, _) = await GenerateApiKeyAsync(token, "Bot Key", [ApiKeyScopes.BotOnly]);
+
+        var (response, body) = await SendWithStatusAsync(
+            _client,
+            @"mutation SetBuildingForSale($input: SetBuildingForSaleInput!) {
+                setBuildingForSale(input: $input) { id }
+            }",
+            new
+            {
+                input = new
+                {
+                    buildingId = foreignBuildingId,
+                    isForSale = true,
+                    askingPrice = 25_000m,
+                }
+            },
+            apiKey: plaintext);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(
+            BotOwnershipGuard.NotOwnedOrNotFoundCode,
+            body.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task BotOnlyApiKey_MakeOfferOnBuilding_ForeignBuyerCompany_ReturnsNotOwnedOrNotFound()
+    {
+        var token = await RegisterAndLoginAsync("ak-offer-owner@test.com", "OfferOwner");
+        var foreignPlayerId = await SeedPlayerAsync("ak-offer-foreign@test.com", "OfferForeign");
+        var foreignCompanyId = await SeedCompanyAsync(foreignPlayerId, "Foreign Buyer Co");
+        var (plaintext, _) = await GenerateApiKeyAsync(token, "Bot Key", [ApiKeyScopes.BotOnly]);
+
+        var (response, body) = await SendWithStatusAsync(
+            _client,
+            @"mutation MakeOffer($input: MakeOfferOnBuildingInput!) {
+                makeOfferOnBuilding(input: $input) { id }
+            }",
+            new
+            {
+                input = new
+                {
+                    buildingId = Guid.NewGuid(),
+                    buyerCompanyId = foreignCompanyId,
+                    offeredPrice = 8_000m,
+                }
+            },
+            apiKey: plaintext);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(
+            BotOwnershipGuard.NotOwnedOrNotFoundCode,
+            body.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task BotOnlyApiKey_AcceptBuildingOffer_ForeignOffer_ReturnsNotOwnedOrNotFound()
+    {
+        const string ownerEmail = "ak-accept-owner@test.com";
+        var token = await RegisterAndLoginAsync(ownerEmail, "AcceptOwner");
+        var foreignSellerPlayerId = await SeedPlayerAsync("ak-accept-foreign@test.com", "AcceptForeign");
+        var foreignSellerCompanyId = await SeedCompanyAsync(foreignSellerPlayerId, "Foreign Seller Co");
+        var foreignBuildingId = await SeedBuildingAsync(foreignSellerCompanyId, "Foreign Listed Factory", isForSale: true, askingPrice: 9_000m);
+        var foreignBuyerPlayerId = await SeedPlayerAsync("ak-accept-buyer@test.com", "AcceptBuyer");
+        var foreignBuyerCompanyId = await SeedCompanyAsync(foreignBuyerPlayerId, "Foreign Buyer Co");
+        var (offerId, offerVersion) = await SeedBuildingOfferAsync(foreignBuildingId, foreignBuyerPlayerId, foreignBuyerCompanyId, 9_500m);
+        var (plaintext, _) = await GenerateApiKeyAsync(token, "Bot Key", [ApiKeyScopes.BotOnly]);
+
+        var (response, body) = await SendWithStatusAsync(
+            _client,
+            @"mutation AcceptOffer($input: AcceptBuildingOfferInput!) {
+                acceptBuildingOffer(input: $input) { offer { id } }
+            }",
+            new
+            {
+                input = new
+                {
+                    offerId,
+                    offerVersion,
+                }
+            },
+            apiKey: plaintext);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(
+            BotOwnershipGuard.NotOwnedOrNotFoundCode,
+            body.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task BotOnlyApiKey_LoanMutation_ForeignBorrowerCompany_ReturnsNotOwnedOrNotFound()
+    {
+        var token = await RegisterAndLoginAsync("ak-loan-owner@test.com", "LoanOwner");
+        var foreignPlayerId = await SeedPlayerAsync("ak-loan-foreign@test.com", "LoanForeign");
+        var foreignBorrowerCompanyId = await SeedCompanyAsync(foreignPlayerId, "Foreign Borrower Co");
+        var (plaintext, _) = await GenerateApiKeyAsync(token, "Bot Key", [ApiKeyScopes.BotOnly]);
+
+        var (response, body) = await SendWithStatusAsync(
+            _client,
+            @"mutation AcceptLoan($input: AcceptLoanInput!) {
+                acceptLoan(input: $input) { id }
+            }",
+            new
+            {
+                input = new
+                {
+                    loanOfferId = Guid.NewGuid(),
+                    borrowerCompanyId = foreignBorrowerCompanyId,
+                    principalAmount = 10_000m,
+                    durationTicks = 24L,
+                }
+            },
+            apiKey: plaintext);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(
+            BotOwnershipGuard.NotOwnedOrNotFoundCode,
+            body.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task BotOnlyApiKey_RepayLoanDebt_ForeignLoan_ReturnsNotOwnedOrNotFound()
+    {
+        var token = await RegisterAndLoginAsync("ak-repay-owner@test.com", "RepayOwner");
+        var foreignPlayerId = await SeedPlayerAsync("ak-repay-foreign@test.com", "RepayForeign");
+        var foreignBorrowerCompanyId = await SeedCompanyAsync(foreignPlayerId, "Foreign Borrower Co");
+        var foreignLoanId = await SeedLoanAsync(foreignBorrowerCompanyId);
+        var (plaintext, _) = await GenerateApiKeyAsync(token, "Bot Key", [ApiKeyScopes.BotOnly]);
+
+        var (response, body) = await SendWithStatusAsync(
+            _client,
+            @"mutation RepayLoanDebt($input: RepayLoanDebtInput!) {
+                repayLoanDebt(input: $input) { id }
+            }",
+            new
+            {
+                input = new
+                {
+                    loanId = foreignLoanId,
+                }
+            },
+            apiKey: plaintext);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(
+            BotOwnershipGuard.NotOwnedOrNotFoundCode,
+            body.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task BotOnlyApiKey_SetBuildingForSale_OwnedBuilding_Succeeds()
+    {
+        const string ownerEmail = "ak-building-owned@test.com";
+        var token = await RegisterAndLoginAsync(ownerEmail, "OwnedBuildingOwner");
+        var ownerPlayerId = await GetPlayerIdByEmailAsync(ownerEmail);
+        var ownedCompanyId = await SeedCompanyAsync(ownerPlayerId, "Owned Building Co");
+        var ownedBuildingId = await SeedBuildingAsync(ownedCompanyId, "Owned Factory");
+        var (plaintext, _) = await GenerateApiKeyAsync(token, "Bot Key", [ApiKeyScopes.BotOnly]);
+
+        var body = await SendAsync(
+            _client,
+            @"mutation SetBuildingForSale($input: SetBuildingForSaleInput!) {
+                setBuildingForSale(input: $input) { id isForSale askingPrice }
+            }",
+            new
+            {
+                input = new
+                {
+                    buildingId = ownedBuildingId,
+                    isForSale = true,
+                    askingPrice = 100_000_000m,
+                }
+            },
+            apiKey: plaintext);
+
+        var result = body.GetProperty("data").GetProperty("setBuildingForSale");
+        Assert.Equal(ownedBuildingId.ToString(), result.GetProperty("id").GetString());
+        Assert.True(result.GetProperty("isForSale").GetBoolean());
+        Assert.Equal(100_000_000m, result.GetProperty("askingPrice").GetDecimal());
     }
 
     [Fact]
