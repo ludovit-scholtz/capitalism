@@ -192,7 +192,10 @@ public sealed partial class Query
         ScopeUsed = log.ScopeUsed,
         WasAllowed = log.WasAllowed,
         DenialCode = log.DenialCode,
+        DenialReason = log.DenialReason,
+        AttemptedObjectId = log.AttemptedObjectId,
         IpAddress = log.IpAddress,
+        SessionContext = log.SessionContext,
         OccurredAtUtc = log.OccurredAtUtc,
     };
 }
@@ -222,7 +225,10 @@ public sealed class ApiKeyAuditLogResult
     public string ScopeUsed { get; init; } = string.Empty;
     public bool WasAllowed { get; init; }
     public string? DenialCode { get; init; }
+    public string? DenialReason { get; init; }
+    public string? AttemptedObjectId { get; init; }
     public string? IpAddress { get; init; }
+    public string? SessionContext { get; init; }
     public DateTime OccurredAtUtc { get; init; }
 }
 

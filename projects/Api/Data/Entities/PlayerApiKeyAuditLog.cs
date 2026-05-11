@@ -27,8 +27,17 @@ public sealed class PlayerApiKeyAuditLog
     [MaxLength(80)]
     public string? DenialCode { get; set; }
 
+    [MaxLength(40)]
+    public string? DenialReason { get; set; }
+
+    [MaxLength(64)]
+    public string? AttemptedObjectId { get; set; }
+
     [MaxLength(64)]
     public string? IpAddress { get; set; }
+
+    [MaxLength(128)]
+    public string? SessionContext { get; set; }
 
     public DateTime OccurredAtUtc { get; set; } = DateTime.UtcNow;
 

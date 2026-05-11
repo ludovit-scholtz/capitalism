@@ -11,7 +11,10 @@ namespace Api.Security;
 /// </summary>
 public sealed class BotOwnershipGuard(AppDbContext db)
 {
-    public const string NotOwnedOrNotFoundCode = "NOT_OWNED_OR_NOT_FOUND";
+    public const string NotFoundOrNotOwnedCode = "NOT_FOUND_OR_NOT_OWNED";
+    public const string NotOwnedOrNotFoundCode = NotFoundOrNotOwnedCode;
+    public const string AuthorizationReasonNotFound = "NOT_FOUND";
+    public const string AuthorizationReasonNotOwned = "NOT_OWNED";
 
     public async Task EnsureMutationOwnershipAsync(
         string operationName,
@@ -75,16 +78,20 @@ public sealed class BotOwnershipGuard(AppDbContext db)
     {
         if (!companyId.HasValue)
         {
-            throw CreateNotOwnedOrNotFoundException();
+            throw CreateNotOwnedOrNotFoundException(AuthorizationReasonNotFound, null);
         }
 
-        var isOwned = await db.Companies
+        var ownerId = await db.Companies
             .AsNoTracking()
-            .AnyAsync(company => company.Id == companyId.Value && company.PlayerId == playerId, cancellationToken);
+            .Where(company => company.Id == companyId.Value)
+            .Select(company => (Guid?)company.PlayerId)
+            .FirstOrDefaultAsync(cancellationToken);
 
-        if (!isOwned)
+        if (ownerId != playerId)
         {
-            throw CreateNotOwnedOrNotFoundException();
+            throw CreateNotOwnedOrNotFoundException(
+                ownerId is null ? AuthorizationReasonNotFound : AuthorizationReasonNotOwned,
+                companyId);
         }
     }
 
@@ -92,7 +99,7 @@ public sealed class BotOwnershipGuard(AppDbContext db)
     {
         if (!bankAccountId.HasValue)
         {
-            throw CreateNotOwnedOrNotFoundException();
+            throw CreateNotOwnedOrNotFoundException(AuthorizationReasonNotFound, null);
         }
 
         var isOwned = await db.BankAccounts
@@ -105,7 +112,12 @@ public sealed class BotOwnershipGuard(AppDbContext db)
 
         if (!isOwned)
         {
-            throw CreateNotOwnedOrNotFoundException();
+            var exists = await db.BankAccounts
+                .AsNoTracking()
+                .AnyAsync(account => account.Id == bankAccountId.Value, cancellationToken);
+            throw CreateNotOwnedOrNotFoundException(
+                exists ? AuthorizationReasonNotOwned : AuthorizationReasonNotFound,
+                bankAccountId);
         }
     }
 
@@ -113,20 +125,20 @@ public sealed class BotOwnershipGuard(AppDbContext db)
     {
         if (!buildingId.HasValue)
         {
-            throw CreateNotOwnedOrNotFoundException();
+            throw CreateNotOwnedOrNotFoundException(AuthorizationReasonNotFound, null);
         }
 
-        var isOwned = await db.Buildings
+        var ownerId = await db.Buildings
             .AsNoTracking()
-            .AnyAsync(building =>
-                    building.Id == buildingId.Value
-                    && building.Company != null
-                    && building.Company.PlayerId == playerId,
-                cancellationToken);
+            .Where(building => building.Id == buildingId.Value)
+            .Select(building => (Guid?)building.Company!.PlayerId)
+            .FirstOrDefaultAsync(cancellationToken);
 
-        if (!isOwned)
+        if (ownerId != playerId)
         {
-            throw CreateNotOwnedOrNotFoundException();
+            throw CreateNotOwnedOrNotFoundException(
+                ownerId is null ? AuthorizationReasonNotFound : AuthorizationReasonNotOwned,
+                buildingId);
         }
     }
 
@@ -134,20 +146,20 @@ public sealed class BotOwnershipGuard(AppDbContext db)
     {
         if (!loanId.HasValue)
         {
-            throw CreateNotOwnedOrNotFoundException();
+            throw CreateNotOwnedOrNotFoundException(AuthorizationReasonNotFound, null);
         }
 
-        var isOwned = await db.Loans
+        var ownerId = await db.Loans
             .AsNoTracking()
-            .AnyAsync(loan =>
-                    loan.Id == loanId.Value
-                    && loan.BorrowerCompany != null
-                    && loan.BorrowerCompany.PlayerId == playerId,
-                cancellationToken);
+            .Where(loan => loan.Id == loanId.Value)
+            .Select(loan => (Guid?)loan.BorrowerCompany!.PlayerId)
+            .FirstOrDefaultAsync(cancellationToken);
 
-        if (!isOwned)
+        if (ownerId != playerId)
         {
-            throw CreateNotOwnedOrNotFoundException();
+            throw CreateNotOwnedOrNotFoundException(
+                ownerId is null ? AuthorizationReasonNotFound : AuthorizationReasonNotOwned,
+                loanId);
         }
     }
 
@@ -155,21 +167,20 @@ public sealed class BotOwnershipGuard(AppDbContext db)
     {
         if (!offerId.HasValue)
         {
-            throw CreateNotOwnedOrNotFoundException();
+            throw CreateNotOwnedOrNotFoundException(AuthorizationReasonNotFound, null);
         }
 
-        var isOwned = await db.BuildingSaleOffers
+        var ownerId = await db.BuildingSaleOffers
             .AsNoTracking()
-            .AnyAsync(offer =>
-                    offer.Id == offerId.Value
-                    && offer.Building != null
-                    && offer.Building.Company != null
-                    && offer.Building.Company.PlayerId == playerId,
-                cancellationToken);
+            .Where(offer => offer.Id == offerId.Value)
+            .Select(offer => (Guid?)offer.Building!.Company!.PlayerId)
+            .FirstOrDefaultAsync(cancellationToken);
 
-        if (!isOwned)
+        if (ownerId != playerId)
         {
-            throw CreateNotOwnedOrNotFoundException();
+            throw CreateNotOwnedOrNotFoundException(
+                ownerId is null ? AuthorizationReasonNotFound : AuthorizationReasonNotOwned,
+                offerId);
         }
     }
 
@@ -189,7 +200,7 @@ public sealed class BotOwnershipGuard(AppDbContext db)
     {
         if (!companyId.HasValue || !bankAccountId.HasValue)
         {
-            throw CreateNotOwnedOrNotFoundException();
+            throw CreateNotOwnedOrNotFoundException(AuthorizationReasonNotFound, null);
         }
 
         var isOwned = await db.BankAccounts
@@ -203,15 +214,22 @@ public sealed class BotOwnershipGuard(AppDbContext db)
 
         if (!isOwned)
         {
-            throw CreateNotOwnedOrNotFoundException();
+            var exists = await db.BankAccounts
+                .AsNoTracking()
+                .AnyAsync(account => account.Id == bankAccountId.Value, cancellationToken);
+            throw CreateNotOwnedOrNotFoundException(
+                exists ? AuthorizationReasonNotOwned : AuthorizationReasonNotFound,
+                bankAccountId);
         }
     }
 
-    private static GraphQLException CreateNotOwnedOrNotFoundException()
+    private static GraphQLException CreateNotOwnedOrNotFoundException(string reason, Guid? attemptedObjectId)
         => new(
             ErrorBuilder.New()
                 .SetMessage("The requested company, account, loan, or offer was not found for the authenticated API-key owner.")
-                .SetCode(NotOwnedOrNotFoundCode)
+                .SetCode(NotFoundOrNotOwnedCode)
+                .SetExtension("authorizationReason", reason)
+                .SetExtension("attemptedObjectId", attemptedObjectId?.ToString())
                 .Build());
 
     private static Guid? GetGuidPath(JsonElement root, params string[] path)

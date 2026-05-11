@@ -789,16 +789,17 @@ public sealed class ApiKeyAuthTests : IClassFixture<ApiWebApplicationFactory>
     }
 
     [Fact]
-    public async Task TradingOnlyApiKey_ForexMutation_ForeignBankAccount_ReturnsNotOwnedOrNotFoundAndAudits()
+    public async Task TradingOnlyApiKey_ForexMutation_NotFoundVsNotOwned_ReturnsSameClientCodeAndDistinctAuditReasons()
     {
         const string ownerEmail = "ak-forex-owner@test.com";
         var token = await RegisterAndLoginAsync(ownerEmail, "ForexOwner");
         var ownerPlayerId = await GetPlayerIdByEmailAsync(ownerEmail);
         var foreignPlayerId = await SeedPlayerAsync("ak-forex-foreign@test.com", "ForexForeign");
         var foreignAccountId = await SeedBankAccountAsync(playerId: foreignPlayerId, currencyCode: "EUR", balance: 5_000m);
+        var missingAccountId = Guid.NewGuid();
         var (plaintext, keyId) = await GenerateApiKeyAsync(token, "Trading Key", [ApiKeyScopes.TradingOnly]);
 
-        var (response, body) = await SendWithStatusAsync(
+        var (foreignResponse, foreignBody) = await SendWithStatusAsync(
             _client,
             @"mutation ExecuteForexSwap($input: ExecuteForexSwapInput!) {
                 executeForexSwap(input: $input) { fromAmount }
@@ -815,10 +816,32 @@ public sealed class ApiKeyAuthTests : IClassFixture<ApiWebApplicationFactory>
             },
             apiKey: plaintext);
 
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, foreignResponse.StatusCode);
         Assert.Equal(
             BotOwnershipGuard.NotOwnedOrNotFoundCode,
-            body.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
+            foreignBody.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
+
+        var (missingResponse, missingBody) = await SendWithStatusAsync(
+            _client,
+            @"mutation ExecuteForexSwap($input: ExecuteForexSwapInput!) {
+                executeForexSwap(input: $input) { fromAmount }
+            }",
+            new
+            {
+                input = new
+                {
+                    fromCurrencyCode = "EUR",
+                    toCurrencyCode = "USD",
+                    amount = 100m,
+                    fromBankAccountId = missingAccountId,
+                }
+            },
+            apiKey: plaintext);
+
+        Assert.Equal(HttpStatusCode.Forbidden, missingResponse.StatusCode);
+        Assert.Equal(
+            BotOwnershipGuard.NotOwnedOrNotFoundCode,
+            missingBody.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
 
         var auditResult = await SendAsync(
             _client,
@@ -828,6 +851,8 @@ public sealed class ApiKeyAuthTests : IClassFixture<ApiWebApplicationFactory>
                     operationName
                     wasAllowed
                     denialCode
+                    denialReason
+                    attemptedObjectId
                 }
             }",
             new { limit = 20, keyId },
@@ -838,6 +863,14 @@ public sealed class ApiKeyAuthTests : IClassFixture<ApiWebApplicationFactory>
             entry.GetProperty("keyId").GetString() == keyId.ToString()
             && entry.GetProperty("operationName").GetString() == "executeForexSwap"
             && !entry.GetProperty("wasAllowed").GetBoolean()
+            && entry.GetProperty("denialCode").GetString() == BotOwnershipGuard.NotOwnedOrNotFoundCode);
+        Assert.Contains(entries, entry =>
+            entry.GetProperty("attemptedObjectId").GetString() == foreignAccountId.ToString()
+            && entry.GetProperty("denialReason").GetString() == BotOwnershipGuard.AuthorizationReasonNotOwned
+            && entry.GetProperty("denialCode").GetString() == BotOwnershipGuard.NotOwnedOrNotFoundCode);
+        Assert.Contains(entries, entry =>
+            entry.GetProperty("attemptedObjectId").GetString() == missingAccountId.ToString()
+            && entry.GetProperty("denialReason").GetString() == BotOwnershipGuard.AuthorizationReasonNotFound
             && entry.GetProperty("denialCode").GetString() == BotOwnershipGuard.NotOwnedOrNotFoundCode);
         Assert.NotEqual(ownerPlayerId, foreignPlayerId);
     }

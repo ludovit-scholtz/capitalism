@@ -22,10 +22,10 @@ Create a fun game in the style of Capitalism II, where players experience realis
 - [x] (100%) Expand building secondary market race-condition defenses using optimistic concurrency tokens on offer accept/cancel/buy paths and add parallel integration tests proving no double-fill or stale ownership transfer can occur.
 - [x] (100%) Strengthen loan collateral and foreclosure invariants by revalidating ownership, collateral lock, and payable balance at commit-time on every refinance, sale, destroy, and default transition path with overdue lifecycle tests.
 - [x] (100%) Add strict token-boundary tests and middleware assertions so MasterApi privilege cannot be granted from game-issued tokens, and impersonation is recognized only when actor and effective-player claims differ.
-- [x] (100%) Enforce bot company/account boundaries in every bot-eligible mutation by resolving ownership server-side, rejecting foreign-company identifiers with `NOT_OWNED_OR_NOT_FOUND`, auditing rejected API-key attempts, and covering forex, building, lending, and stock violations with regression tests.
+- [x] (100%) Enforce bot company/account boundaries in every bot-eligible mutation by resolving ownership server-side, rejecting foreign-company identifiers with `NOT_FOUND_OR_NOT_OWNED`, auditing rejected API-key attempts, and covering forex, building, lending, and stock violations with regression tests.
 - [x] (100%) Complete ranking manipulation safeguards with idempotency keys, proof-reference deduplication, suspicious-pattern moderation queues, and admin review tooling that can quarantine telemetry batches before leaderboard publication.
 - [x] (100%) Keep frontend trust non-authoritative by validating economy-sensitive stock trade ownership overrides server-side, rejecting tampered account-type/company payloads with `INVALID_CLIENT_OVERRIDE`, and adding backend plus Playwright regressions proving friendly client-error handling.
-- [ ] Standardize object-authorization failure responses to "not found or not owned" semantics to reduce resource enumeration risk while preserving internal audit visibility through structured security logs.
+- [ ] (55%) Standardize object-authorization failure responses to "not found or not owned" semantics to reduce resource enumeration risk while preserving internal audit visibility through structured security logs.
 
 ### Security Operations & Audit Cadence
 

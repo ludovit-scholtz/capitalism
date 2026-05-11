@@ -29,6 +29,8 @@ function formatDate(iso: string): string {
           <th class="px-4 py-3">{{ t('apiKeys.auditOperation') }}</th>
           <th class="px-4 py-3">{{ t('apiKeys.auditScope') }}</th>
           <th v-if="!props.showPlayer" class="px-4 py-3">{{ t('apiKeys.auditResult') }}</th>
+          <th class="px-4 py-3">{{ t('apiKeys.auditReason') }}</th>
+          <th class="px-4 py-3">{{ t('apiKeys.auditObjectId') }}</th>
           <th class="px-4 py-3">{{ t('apiKeys.auditTimestamp') }}</th>
           <th v-if="!props.showPlayer" class="px-4 py-3">{{ t('apiKeys.auditIp') }}</th>
         </tr>
@@ -40,6 +42,12 @@ function formatDate(iso: string): string {
           <td class="px-4 py-3 text-muted">{{ entry.scopeUsed }}</td>
           <td v-if="!props.showPlayer" class="px-4 py-3 text-muted">
             {{ entry.wasAllowed ? t('apiKeys.auditAllowed') : t('apiKeys.auditDenied') }}
+          </td>
+          <td class="px-4 py-3 text-muted">
+            {{ entry.denialReason || t('apiKeys.auditReasonNone') }}
+          </td>
+          <td class="px-4 py-3 text-muted">
+            {{ entry.attemptedObjectId || t('apiKeys.auditObjectIdNone') }}
           </td>
           <td class="px-4 py-3 text-muted">{{ formatDate(entry.occurredAtUtc) }}</td>
           <td v-if="!props.showPlayer" class="px-4 py-3 text-muted">
