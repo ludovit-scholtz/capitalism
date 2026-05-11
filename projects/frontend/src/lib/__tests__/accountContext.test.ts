@@ -60,6 +60,20 @@ describe('accountContext', () => {
     ).toBe('Alice Founder')
   })
 
+  it('falls back to displayName when personalAccountName is missing', () => {
+    expect(
+      getActiveAccountName(
+        {
+          displayName: 'Fallback Name',
+          personalAccountName: undefined,
+          activeAccountType: 'PERSON',
+          activeCompanyId: null,
+        },
+        companies,
+      ),
+    ).toBe('Fallback Name')
+  })
+
   it('uses the company name for the active account label in company mode', () => {
     expect(
       getActiveAccountName(
