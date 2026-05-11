@@ -205,7 +205,7 @@ public sealed class UpsertGameNewsEntryInput : MasterServerServiceInput
 {
     public Guid? EntryId { get; set; }
 
-    public string RequesterEmail { get; set; } = string.Empty;
+    public string? RequesterEmail { get; set; }
 
     public string EntryType { get; set; } = string.Empty;
 

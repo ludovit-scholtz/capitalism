@@ -6,6 +6,7 @@ using Api.Data;
 using Api.Data.Entities;
 using Api.Security;
 using Api.Tests.Infrastructure;
+using Api.Utilities;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -286,6 +287,85 @@ public sealed class ApiKeyAuthTests : IClassFixture<ApiWebApplicationFactory>
             db.Loans.Add(loan);
             await db.SaveChangesAsync();
             return loan.Id;
+        });
+    }
+
+    private async Task<(Guid PoolId, Guid PositionId)> SeedGoldAmmPoolWithPositionAsync(Guid playerId, string currencyCode = "EUR")
+        => await WithDbContextAsync(async db =>
+        {
+            var pool = new GoldAmmPool
+            {
+                Id = Guid.NewGuid(),
+                CurrencyCode = currencyCode,
+                FiatReserve = 10_000m,
+                GoldReserve = 50m,
+                TotalLiquidityShares = 1_000m,
+            };
+            var position = new GoldAmmPosition
+            {
+                Id = Guid.NewGuid(),
+                PoolId = pool.Id,
+                PlayerId = playerId,
+                LiquidityShares = 1_000m,
+                FiatProvided = 10_000m,
+                GoldProvided = 50m,
+            };
+            db.GoldAmmPools.Add(pool);
+            db.GoldAmmPositions.Add(position);
+            await db.SaveChangesAsync();
+            return (pool.Id, position.Id);
+        });
+
+    private async Task<Guid> SeedLimitOrderAsync(Guid ownerPlayerId)
+    {
+        var ownerCompanyId = await SeedCompanyAsync(ownerPlayerId, $"Limit Owner Co {Guid.NewGuid():N}");
+        var settlementAccountId = await SeedBankAccountAsync(companyId: ownerCompanyId, currencyCode: "USD", balance: 20_000m);
+        return await WithDbContextAsync(async db =>
+        {
+            var order = new LimitOrder
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = ownerCompanyId,
+                StockSymbol = StockSymbolCodec.FromCompanyId(ownerCompanyId),
+                Side = LimitOrderSide.Buy,
+                LimitPrice = 12m,
+                Quantity = 100,
+                FilledQuantity = 0,
+                Status = LimitOrderStatus.Open,
+                OwnerCompanyId = ownerCompanyId,
+                SettlementBankAccountId = settlementAccountId,
+                ReservedCashRemaining = 1_200m,
+                CreatedAtTick = 0,
+                UpdatedAtTick = 0,
+            };
+            db.LimitOrders.Add(order);
+            await db.SaveChangesAsync();
+            return order.Id;
+        });
+    }
+
+    private async Task<Guid> SeedDividendProposalAsync(Guid ownerPlayerId)
+    {
+        var ownerCompanyId = await SeedCompanyAsync(ownerPlayerId, $"Dividend Owner Co {Guid.NewGuid():N}");
+        return await WithDbContextAsync(async db =>
+        {
+            var proposal = new DividendProposal
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = ownerCompanyId,
+                StockSymbol = StockSymbolCodec.FromCompanyId(ownerCompanyId),
+                ProposedByAccountId = ownerCompanyId,
+                ProposedByAccountType = AccountContextType.Company,
+                DividendPerShare = 1m,
+                TotalPayout = 1_000m,
+                Status = DividendProposalStatus.Voting,
+                ProposedAtTick = 0,
+                VotingOpenTick = 0,
+                VotingCloseTick = 100,
+            };
+            db.DividendProposals.Add(proposal);
+            await db.SaveChangesAsync();
+            return proposal.Id;
         });
     }
 
@@ -897,6 +977,147 @@ public sealed class ApiKeyAuthTests : IClassFixture<ApiWebApplicationFactory>
                     shareCount = 1m,
                     tradeAccountType = AccountContextType.Company,
                     tradeAccountCompanyId = foreignCompanyId,
+                }
+            },
+            apiKey: plaintext);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(
+            BotOwnershipGuard.NotFoundOrNotOwnedCode,
+            body.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task TradingOnlyApiKey_AddGoldAmmLiquidity_ForeignPool_ReturnsNotOwnedOrNotFound()
+    {
+        const string ownerEmail = "ak-gold-amm-owner@test.com";
+        var token = await RegisterAndLoginAsync(ownerEmail, "GoldAmmOwner");
+        var foreignPlayerId = await SeedPlayerAsync("ak-gold-amm-foreign@test.com", "GoldAmmForeign");
+        var (foreignPoolId, _) = await SeedGoldAmmPoolWithPositionAsync(foreignPlayerId);
+        var (plaintext, _) = await GenerateApiKeyAsync(token, "Trading Key", [ApiKeyScopes.TradingOnly]);
+
+        var (response, body) = await SendWithStatusAsync(
+            _client,
+            @"mutation AddGoldAmmLiquidity($input: AddGoldAmmLiquidityInput!) {
+                addGoldAmmLiquidity(input: $input) { poolId }
+            }",
+            new
+            {
+                input = new
+                {
+                    poolId = foreignPoolId,
+                    fiatAmount = 100m,
+                    maxGoldAmount = 1m,
+                }
+            },
+            apiKey: plaintext);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(
+            BotOwnershipGuard.NotFoundOrNotOwnedCode,
+            body.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task TradingOnlyApiKey_RemoveGoldAmmLiquidity_ForeignPosition_ReturnsNotOwnedOrNotFound()
+    {
+        const string ownerEmail = "ak-gold-remove-owner@test.com";
+        var token = await RegisterAndLoginAsync(ownerEmail, "GoldRemoveOwner");
+        var foreignPlayerId = await SeedPlayerAsync("ak-gold-remove-foreign@test.com", "GoldRemoveForeign");
+        var (_, foreignPositionId) = await SeedGoldAmmPoolWithPositionAsync(foreignPlayerId);
+        var (plaintext, _) = await GenerateApiKeyAsync(token, "Trading Key", [ApiKeyScopes.TradingOnly]);
+
+        var (response, body) = await SendWithStatusAsync(
+            _client,
+            @"mutation RemoveGoldAmmLiquidity($input: RemoveGoldAmmLiquidityInput!) {
+                removeGoldAmmLiquidity(input: $input) { positionId }
+            }",
+            new
+            {
+                input = new
+                {
+                    positionId = foreignPositionId,
+                    shareFraction = 1m,
+                }
+            },
+            apiKey: plaintext);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(
+            BotOwnershipGuard.NotFoundOrNotOwnedCode,
+            body.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task TradingOnlyApiKey_CancelLimitOrder_ForeignOrder_ReturnsNotOwnedOrNotFound()
+    {
+        var token = await RegisterAndLoginAsync("ak-limit-owner@test.com", "LimitOwner");
+        var foreignPlayerId = await SeedPlayerAsync("ak-limit-foreign@test.com", "LimitForeign");
+        var foreignOrderId = await SeedLimitOrderAsync(foreignPlayerId);
+        var (plaintext, _) = await GenerateApiKeyAsync(token, "Trading Key", [ApiKeyScopes.TradingOnly]);
+
+        var (response, body) = await SendWithStatusAsync(
+            _client,
+            @"mutation CancelLimitOrder($orderId: UUID!) {
+                cancelLimitOrder(orderId: $orderId) { id }
+            }",
+            new { orderId = foreignOrderId },
+            apiKey: plaintext);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(
+            BotOwnershipGuard.NotFoundOrNotOwnedCode,
+            body.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task TradingOnlyApiKey_ProposeDividend_ForeignCompanyWithoutShares_ReturnsNotOwnedOrNotFound()
+    {
+        var token = await RegisterAndLoginAsync("ak-dividend-owner@test.com", "DividendOwner");
+        var foreignPlayerId = await SeedPlayerAsync("ak-dividend-foreign@test.com", "DividendForeign");
+        var foreignCompanyId = await SeedCompanyAsync(foreignPlayerId, "Dividend Foreign Co");
+        var (plaintext, _) = await GenerateApiKeyAsync(token, "Trading Key", [ApiKeyScopes.TradingOnly]);
+
+        var (response, body) = await SendWithStatusAsync(
+            _client,
+            @"mutation ProposeDividend($input: ProposeDividendInput!) {
+                proposeDividend(input: $input) { id }
+            }",
+            new
+            {
+                input = new
+                {
+                    stockSymbol = StockSymbolCodec.FromCompanyId(foreignCompanyId),
+                    dividendPerShare = 1m,
+                }
+            },
+            apiKey: plaintext);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(
+            BotOwnershipGuard.NotFoundOrNotOwnedCode,
+            body.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task TradingOnlyApiKey_VoteDividendProposal_ForeignProposal_ReturnsNotOwnedOrNotFound()
+    {
+        var token = await RegisterAndLoginAsync("ak-dividend-vote-owner@test.com", "DividendVoteOwner");
+        var foreignPlayerId = await SeedPlayerAsync("ak-dividend-vote-foreign@test.com", "DividendVoteForeign");
+        var foreignProposalId = await SeedDividendProposalAsync(foreignPlayerId);
+        var (plaintext, _) = await GenerateApiKeyAsync(token, "Trading Key", [ApiKeyScopes.TradingOnly]);
+
+        var (response, body) = await SendWithStatusAsync(
+            _client,
+            @"mutation VoteDividendProposal($input: VoteDividendProposalInput!) {
+                voteDividendProposal(input: $input) { id }
+            }",
+            new
+            {
+                input = new
+                {
+                    proposalId = foreignProposalId,
+                    choice = "FOR",
                 }
             },
             apiKey: plaintext);
