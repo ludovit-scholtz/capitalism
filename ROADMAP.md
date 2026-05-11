@@ -19,27 +19,6 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 - [x] (100%) Deliver foundational city power-grid gameplay with buildable power plants, per-building power demand/online states, tick-based production and fuel economics, city energy planning UI, and full backend/frontend regression coverage.
 
-### Security Fairness Hardening
-
-- [x] (100%) Introduce API key scopes and enforcement gates so leaked keys cannot act as full-account impersonation; support read-only, bot-only, trading-only, and company-bound scopes with deny-by-default middleware enforcement and audit logging.
-- [x] (100%) Implement shard-verified ranking telemetry by validating `serverKey` against active server registration metadata, rejecting unknown or stale shard keys, and logging replay or duplicate event signatures for moderation review.
-- [x] (100%) Harden FX execution fairness by adding quote nonce, quote-issued timestamp, strict expiration, and explicit slippage tolerance so stale quotes and replayed execution payloads cannot extract better-than-market settlement.
-- [x] (100%) Expand building secondary market race-condition defenses using optimistic concurrency tokens on offer accept/cancel/buy paths and add parallel integration tests proving no double-fill or stale ownership transfer can occur.
-- [x] (100%) Strengthen loan collateral and foreclosure invariants by revalidating ownership, collateral lock, and payable balance at commit-time on every refinance, sale, destroy, and default transition path with overdue lifecycle tests.
-- [x] (100%) Add strict token-boundary tests and middleware assertions so MasterApi privilege cannot be granted from game-issued tokens, and impersonation is recognized only when actor and effective-player claims differ.
-- [x] (100%) Enforce bot company/account boundaries in every bot-eligible mutation by resolving ownership server-side, rejecting foreign-company identifiers with `NOT_FOUND_OR_NOT_OWNED`, auditing rejected API-key attempts, and covering forex, building, lending, and stock violations with regression tests.
-- [x] (100%) Complete ranking manipulation safeguards with idempotency keys, proof-reference deduplication, suspicious-pattern moderation queues, and admin review tooling that can quarantine telemetry batches before leaderboard publication.
-- [x] (100%) Keep frontend trust non-authoritative by validating economy-sensitive stock trade ownership overrides server-side, rejecting tampered account-type/company payloads with `INVALID_CLIENT_OVERRIDE`, and adding backend plus Playwright regressions proving friendly client-error handling.
-- [x] (100%) Standardize object-authorization failure responses to "not found or not owned" semantics to reduce resource enumeration risk while preserving internal audit visibility through structured security logs.
-- [x] (100%) Close the MasterApi news-service trust-boundary gap by requiring validated game-server credentials or authenticated root/global admin claims for `gameNewsFeed(includeDrafts: true)` and `upsertGameNewsEntry`, rejecting caller-supplied email spoofing, and covering anonymous draft read/write rejection with regression tests.
-- [x] (100%) Finish the error-surface hardening pass across building, banking, lending, and stock mutations so unauthorized probes no longer distinguish foreign-object existence, listing state, or precise available-balance details.
-
-### Security Operations & Audit Cadence
-
-- [x] (100%) Create a weekly security action board that mirrors `/audits/*.md` findings, tracks owner plus due tick, and blocks release sign-off when any High or Critical finding from the latest audit has no linked implementation issue.
-- [x] (100%) Add an automated GraphQL surface inventory report in CI that flags newly added finance, shareholder, ranking, lending, and admin queries or mutations missing explicit auth and ownership tests.
-- [x] (100%) Add a frontend dependency-audit release gate that runs `npm audit --omit=dev` for both frontends, tracks reachable rich-content sinks such as `dompurify` plus `v-html`, and blocks release validation while known high-severity production advisories remain unresolved.
-
 ### Endgame & Win Condition — "Race to the Top"
 
 - [x] (100%) Backend win detection via `EndgamePhase` (Order=1200): wealth calculated from cash, shares, gold, LP positions; winner recorded in `GameState`.
@@ -61,8 +40,5 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 ### Security Follow-Ups
 
-- [x] (100%) Replace the regex-based support markdown sanitizer with an allowlist HTML sanitizer, and add stored-XSS regression payloads that cover SVG, attribute, protocol, and malformed-markup bypass attempts before any `v-html` support preview is rendered.
 - [ ] Finish `NOT_FOUND_OR_NOT_OWNED` plus balance-redaction normalization across building-market, exchange, and bank-transfer mutations so authenticated probes cannot infer foreign object existence, listing state, company linkage, or exact available funds.
-- [ ] Add dedicated MasterApi security regression tests for `gameNewsFeed(includeDrafts)` and `upsertGameNewsEntry`, covering anonymous draft reads, invalid registration keys, inactive server keys, spoofed requester identity, trusted server success, and privileged admin success.
-- [x] (100%) Remove the committed NPC bot shared default password, require an environment-provided secret or API-key mode outside local development, and fail startup when the placeholder credential is still configured.
 - [ ] Upgrade `postcss` in `projects/master-frontend` to `>= 8.5.10` and keep both frontends on a zero known production dependency advisory baseline in CI.
