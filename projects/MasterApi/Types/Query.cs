@@ -2,6 +2,7 @@ using System.Security.Claims;
 using MasterApi.Configuration;
 using MasterApi.Data;
 using MasterApi.Data.Entities;
+using MasterApi.Utilities;
 using Capitalism.Shared.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -116,6 +117,8 @@ public sealed partial class Query
     public async Task<GameNewsFeedResult> GetGameNewsFeed(
         [Service] MasterDbContext db,
         [Service] IOptions<MasterServerOptions> masterServerOptions,
+        [Service] IOptions<GameAdministrationOptions> gameAdministrationOptions,
+        ClaimsPrincipal claimsPrincipal,
         GetGameNewsFeedInput? input = null
         )
     {
@@ -128,16 +131,9 @@ public sealed partial class Query
                 Limit = 20,
             };
         }
-        EnsureServiceAccess(input, masterServerOptions, false, false);
-
-        if (input.IncludeDrafts && string.IsNullOrWhiteSpace(input.RequesterEmail))
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Requester email is required when draft entries are requested.")
-                    .SetCode("REQUESTER_EMAIL_REQUIRED")
-                    .Build());
-        }
+        var trustedServer = await TryResolveTrustedNewsServerIdentityAsync(db, masterServerOptions.Value, input);
+        var trustedAdmin = await TryResolvePrivilegedNewsAdminIdentityAsync(db, gameAdministrationOptions.Value, claimsPrincipal);
+        var includeDrafts = input.IncludeDrafts && (trustedServer is not null || trustedAdmin is not null);
 
         var playerEmail = string.IsNullOrWhiteSpace(input.PlayerEmail)
             ? null
@@ -149,7 +145,7 @@ public sealed partial class Query
             .Include(entry => entry.Localizations)
             .Include(entry => entry.ReadReceipts)
             .Where(entry => entry.TargetServerKey == null || entry.TargetServerKey == input.ServerKey)
-            .Where(entry => input.IncludeDrafts || entry.Status == GameNewsEntryStatus.Published)
+            .Where(entry => includeDrafts || entry.Status == GameNewsEntryStatus.Published)
             .OrderByDescending(entry => entry.PublishedAtUtc ?? entry.UpdatedAtUtc)
             .ThenByDescending(entry => entry.CreatedAtUtc)
             .Take(limit)
@@ -324,6 +320,75 @@ public sealed partial class Query
             .Where(email => !string.IsNullOrWhiteSpace(email))
             .Cast<string>()
             .ToHashSet(StringComparer.Ordinal);
+    }
+
+    internal sealed record TrustedNewsServerIdentity(string ServerKey, string DisplayName);
+
+    internal sealed record TrustedNewsAdminIdentity(string Email, GameAdministrationAccessInfo Access);
+
+    internal static async Task<TrustedNewsServerIdentity?> TryResolveTrustedNewsServerIdentityAsync(
+        MasterDbContext db,
+        MasterServerOptions options,
+        MasterServerServiceInput input,
+        CancellationToken cancellationToken = default)
+    {
+        var expectedRegistrationKey = options.RegistrationKey.Trim();
+        var suppliedRegistrationKey = input.RegistrationKey?.Trim();
+        if (string.IsNullOrWhiteSpace(expectedRegistrationKey)
+            || !string.Equals(expectedRegistrationKey, suppliedRegistrationKey, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var serverKey = input.ServerKey?.Trim();
+        if (string.IsNullOrWhiteSpace(serverKey))
+        {
+            return null;
+        }
+
+        var now = DateTime.UtcNow;
+        var serverKeyHash = ShardKeyProtector.ComputeHash(serverKey);
+        var server = await db.GameServers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                candidate => (candidate.ServerKey == serverKey || candidate.ServerKeyHash == serverKeyHash)
+                    && candidate.IsActive
+                    && candidate.ExpiresAtUtc > now,
+                cancellationToken);
+
+        return server is null
+            ? null
+            : new TrustedNewsServerIdentity(server.ServerKey, server.DisplayName);
+    }
+
+    internal static async Task<TrustedNewsAdminIdentity?> TryResolvePrivilegedNewsAdminIdentityAsync(
+        MasterDbContext db,
+        GameAdministrationOptions options,
+        ClaimsPrincipal principal,
+        CancellationToken cancellationToken = default)
+    {
+        if (principal.Identity?.IsAuthenticated != true)
+        {
+            return null;
+        }
+
+        string callerEmail;
+        try
+        {
+            callerEmail = GetEmailFromClaims(principal);
+        }
+        catch (GraphQLException)
+        {
+            return null;
+        }
+
+        var access = await BuildGameAdministrationAccessAsync(db, options, callerEmail);
+        if (!access.CanAccessEveryGameDashboard)
+        {
+            return null;
+        }
+
+        return new TrustedNewsAdminIdentity(callerEmail, access);
     }
 
     internal static GameNewsEntryInfo ToGameNewsEntryInfo(

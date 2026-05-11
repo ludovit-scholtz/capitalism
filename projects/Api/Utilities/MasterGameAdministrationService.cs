@@ -215,7 +215,6 @@ public sealed class MasterGameAdministrationService(
                 {
                     playerEmail,
                     includeDrafts,
-                    requesterEmail,
                     limit = 100,
                 })
             },
@@ -316,7 +315,6 @@ public sealed class MasterGameAdministrationService(
                 input = BuildServiceInput(new
                 {
                     entryId,
-                    requesterEmail,
                     entryType,
                     status,
                     localizations,

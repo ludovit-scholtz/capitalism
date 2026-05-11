@@ -43,6 +43,13 @@ public sealed class ApiKeyScopeMiddleware(RequestDelegate next)
             ["sellShares"] = new(ApiKeyScopes.TradingOnly, true, ResolveTradingAccountCompanyIdsAsync),
             ["placeLimitOrder"] = new(ApiKeyScopes.TradingOnly, true, ResolveActiveTradingCompanyIdsAsync),
             ["cancelLimitOrder"] = new(ApiKeyScopes.TradingOnly, true, ResolveLimitOrderOwnerCompanyIdsAsync),
+            ["createGoldAmmPool"] = new(ApiKeyScopes.TradingOnly, false),
+            ["addGoldAmmLiquidity"] = new(ApiKeyScopes.TradingOnly, false),
+            ["removeGoldAmmLiquidity"] = new(ApiKeyScopes.TradingOnly, false),
+            ["executeGoldAmmSwap"] = new(ApiKeyScopes.TradingOnly, false),
+            ["proposeDividend"] = new(ApiKeyScopes.TradingOnly, true, ResolveActiveTradingCompanyIdsAsync),
+            ["voteDividend"] = new(ApiKeyScopes.TradingOnly, true, ResolveActiveTradingCompanyIdsAsync),
+            ["voteDividendProposal"] = new(ApiKeyScopes.TradingOnly, true, ResolveActiveTradingCompanyIdsAsync),
 
             // Bot-only automation / company management operations.
             ["createCompany"] = new(ApiKeyScopes.BotOnly, false),

@@ -12,14 +12,39 @@ public sealed partial class Mutation
 {
     public async Task<GameNewsEntryInfo> UpsertGameNewsEntry(
         UpsertGameNewsEntryInput input,
+        ClaimsPrincipal claimsPrincipal,
         [Service] MasterDbContext db,
         [Service] IOptions<MasterServerOptions> masterServerOptions,
         [Service] IOptions<GameAdministrationOptions> gameAdministrationOptions)
     {
-        Query.EnsureServiceAccess(input, masterServerOptions, false, false);
+        if (!string.IsNullOrWhiteSpace(input.RequesterEmail))
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Requester email is derived from trusted caller identity and cannot be supplied.")
+                    .SetCode("REQUESTER_EMAIL_NOT_ALLOWED")
+                    .Build());
+        }
 
-        var requesterEmail = Query.NormalizeEmail(input.RequesterEmail, "INVALID_REQUESTER_EMAIL");
-        var requesterAccess = await Query.BuildGameAdministrationAccessAsync(db, gameAdministrationOptions.Value, requesterEmail);
+        var trustedServer = await Query.TryResolveTrustedNewsServerIdentityAsync(db, masterServerOptions.Value, input);
+        var trustedAdmin = await Query.TryResolvePrivilegedNewsAdminIdentityAsync(db, gameAdministrationOptions.Value, claimsPrincipal);
+        if (trustedServer is null && trustedAdmin is null)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("A trusted game-server credential or authenticated global admin identity is required.")
+                    .SetCode("NEWS_TRUST_BOUNDARY_FORBIDDEN")
+                    .Build());
+        }
+
+        var requesterEmail = trustedAdmin?.Email ?? $"server:{trustedServer!.ServerKey}";
+        var requesterAccess = trustedAdmin?.Access ?? new GameAdministrationAccessInfo
+        {
+            Email = requesterEmail,
+            IsRootAdministrator = false,
+            HasGlobalAdminRole = false,
+            CanAccessEveryGameDashboard = false,
+        };
         var entryType = input.EntryType.Trim().ToUpperInvariant();
         var status = input.Status.Trim().ToUpperInvariant();
 
@@ -50,9 +75,11 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        var requestedTargetServerKey = string.IsNullOrWhiteSpace(input.TargetServerKey)
-            ? null
-            : input.TargetServerKey.Trim();
+        var requestedTargetServerKey = trustedServer is not null && trustedAdmin is null
+            ? trustedServer.ServerKey
+            : string.IsNullOrWhiteSpace(input.TargetServerKey)
+                ? null
+                : input.TargetServerKey.Trim();
         if (!requesterAccess.CanAccessEveryGameDashboard && requestedTargetServerKey is null)
         {
             requestedTargetServerKey = input.ServerKey;

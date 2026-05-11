@@ -51,6 +51,34 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
         return doc.RootElement.Clone();
     }
 
+    private async Task RegisterDefaultGameServerAsync()
+    {
+        _ = await GraphQlAsync("""
+            mutation RegisterServer($input: RegisterGameServerInput!) {
+              registerGameServer(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey = "capitalism-local",
+                    displayName = "Capitalism Local",
+                    description = "Test shard",
+                    region = "EU",
+                    environment = "testing",
+                    backendUrl = "https://game.example.com",
+                    graphqlUrl = "https://game.example.com/graphql",
+                    frontendUrl = "https://game.example.com/app",
+                    version = "1.0.0-test",
+                    playerCount = 1,
+                    companyCount = 1,
+                    currentTick = 1,
+                }
+            });
+    }
+
     private async Task<(string Token, JsonElement Player)> RegisterAndGetTokenAsync(
         string email = "test@example.com",
         string displayName = "Test Player",
@@ -1450,8 +1478,10 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
         }
 
         [Fact]
-        public async Task GameNewsFeed_HidesDraftsFromPublicButIncludesThemForAdminView()
-        {
+    public async Task GameNewsFeed_HidesDraftsFromPublicButIncludesThemForAdminView()
+    {
+            await RegisterDefaultGameServerAsync();
+
             await GraphQlAsync("""
                 mutation UpsertDraft($input: UpsertGameNewsEntryInput!) {
                   upsertGameNewsEntry(input: $input) { id }
@@ -1463,7 +1493,6 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
                     {
                         registrationKey = "test-registration-key",
                         serverKey = "capitalism-local",
-                        requesterEmail = "admin@events.local",
                         entryType = "NEWS",
                         status = "DRAFT",
                         localizations = new[]
@@ -1490,7 +1519,6 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
                                             {
                                                 registrationKey = "test-registration-key",
                                                 serverKey = "capitalism-local",
-                                                requesterEmail = "admin@events.local",
                                                 entryType = "CHANGELOG",
                                                 status = "PUBLISHED",
                                                 localizations = new[]
@@ -1533,6 +1561,29 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
                                     Assert.Contains(publicItems, item => item.GetProperty("status").GetString() == "PUBLISHED");
                                     Assert.True(publicFeed.GetProperty("data").GetProperty("gameNewsFeed").GetProperty("unreadCount").GetInt32() >= 1);
 
+                                    var untrustedDraftFeed = await GraphQlAsync("""
+                                        query Feed($input: GetGameNewsFeedInput!) {
+                                          gameNewsFeed(input: $input) {
+                                            items { id status entryType }
+                                          }
+                                        }
+                                        """,
+                                        new
+                                        {
+                                            input = new
+                                            {
+                                                registrationKey = "invalid-registration-key",
+                                                serverKey = "unknown-shard",
+                                                includeDrafts = true,
+                                                limit = 50,
+                                            }
+                                        });
+
+                                    Assert.False(untrustedDraftFeed.TryGetProperty("errors", out _));
+                                    var untrustedItems = untrustedDraftFeed.GetProperty("data").GetProperty("gameNewsFeed").GetProperty("items").EnumerateArray().ToList();
+                                    Assert.DoesNotContain(untrustedItems, item => item.GetProperty("status").GetString() == "DRAFT");
+                                    Assert.Contains(untrustedItems, item => item.GetProperty("status").GetString() == "PUBLISHED");
+
                                     var adminFeed = await GraphQlAsync("""
                                         query Feed($input: GetGameNewsFeedInput!) {
                                           gameNewsFeed(input: $input) {
@@ -1548,7 +1599,6 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
                                                 serverKey = "capitalism-local",
                                                 includeDrafts = true,
                                                 limit = 50,
-                                                requesterEmail = "admin@events.local",
                                             }
                                         });
 
@@ -1559,8 +1609,10 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
                                 }
 
                                 [Fact]
-                                public async Task MarkGameNewsRead_ClearsUnreadCountForPlayerAndServer()
-                                {
+    public async Task MarkGameNewsRead_ClearsUnreadCountForPlayerAndServer()
+    {
+                                    await RegisterDefaultGameServerAsync();
+
                                     var createResult = await GraphQlAsync("""
                                         mutation Upsert($input: UpsertGameNewsEntryInput!) {
                                           upsertGameNewsEntry(input: $input) {
@@ -1575,7 +1627,6 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
                                             {
                                                 registrationKey = "test-registration-key",
                                                 serverKey = "capitalism-local",
-                                                requesterEmail = "admin@events.local",
                                                 entryType = "NEWS",
                                                 status = "PUBLISHED",
                                                 localizations = new[]
@@ -1673,6 +1724,8 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
                                 [Fact]
                                 public async Task MarkAllGameNewsRead_ClearsAllUnreadCountForPlayerAndServer()
                                 {
+                                    await RegisterDefaultGameServerAsync();
+
                                     async Task<string> CreatePublishedNewsAsync(string title)
                                     {
                                         var result = await GraphQlAsync(
@@ -1689,7 +1742,6 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
                                                 {
                                                     registrationKey = "test-registration-key",
                                                     serverKey = "capitalism-local",
-                                                    requesterEmail = "admin@events.local",
                                                     entryType = "NEWS",
                                                     status = "PUBLISHED",
                                                     localizations = new[]
@@ -1912,6 +1964,82 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
         Assert.Equal("ACTIVE", sub.GetProperty("status").GetString());
         Assert.True(sub.GetProperty("isActive").GetBoolean());
         Assert.True(sub.GetProperty("daysRemaining").GetInt32() > 150);
+    }
+
+    [Fact]
+    public async Task UpsertGameNewsEntry_RequesterEmailSupplied_ReturnsRequesterEmailNotAllowed()
+    {
+        var result = await GraphQlAsync("""
+            mutation Upsert($input: UpsertGameNewsEntryInput!) {
+              upsertGameNewsEntry(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey = "capitalism-local",
+                    requesterEmail = "spoofed@example.com",
+                    entryType = "NEWS",
+                    status = "DRAFT",
+                    localizations = new[]
+                    {
+                        new
+                        {
+                            locale = "en",
+                            title = "Draft",
+                            summary = "Summary",
+                            htmlContent = "<p>Body</p>",
+                        }
+                    }
+                }
+            });
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Contains("REQUESTER_EMAIL_NOT_ALLOWED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task UpsertGameNewsEntry_ServiceCaller_DerivesAuthorFromServerIdentity()
+    {
+        await RegisterDefaultGameServerAsync();
+
+        var result = await GraphQlAsync("""
+            mutation Upsert($input: UpsertGameNewsEntryInput!) {
+              upsertGameNewsEntry(input: $input) {
+                createdByEmail
+                updatedByEmail
+                targetServerKey
+              }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey = "capitalism-local",
+                    entryType = "NEWS",
+                    status = "DRAFT",
+                    localizations = new[]
+                    {
+                        new
+                        {
+                            locale = "en",
+                            title = "Shard notice",
+                            summary = "Summary",
+                            htmlContent = "<p>Body</p>",
+                        }
+                    }
+                }
+            });
+
+        Assert.False(result.TryGetProperty("errors", out _));
+        var upserted = result.GetProperty("data").GetProperty("upsertGameNewsEntry");
+        Assert.Equal("server:capitalism-local", upserted.GetProperty("createdByEmail").GetString());
+        Assert.Equal("server:capitalism-local", upserted.GetProperty("updatedByEmail").GetString());
+        Assert.Equal("capitalism-local", upserted.GetProperty("targetServerKey").GetString());
     }
 
     #endregion

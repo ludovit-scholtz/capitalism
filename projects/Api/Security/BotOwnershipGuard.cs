@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Api.Data;
+using Api.Utilities;
 using HotChocolate;
 using Microsoft.EntityFrameworkCore;
 
@@ -60,6 +61,35 @@ public sealed class BotOwnershipGuard(AppDbContext db)
             case "setBuildingForSale":
             case "destroyBuilding":
                 await EnsureBuildingOwnedAsync(playerId, GetGuidPath(variables, "input", "buildingId"), cancellationToken);
+                break;
+
+            case "createGoldAmmPool":
+            case "executeGoldAmmSwap":
+                break;
+
+            case "addGoldAmmLiquidity":
+                await EnsureGoldAmmPoolOwnedAsync(playerId, GetGuidPath(variables, "input", "poolId"), cancellationToken);
+                break;
+
+            case "removeGoldAmmLiquidity":
+                await EnsureGoldAmmPositionOwnedAsync(playerId, GetGuidPath(variables, "input", "positionId"), cancellationToken);
+                break;
+
+            case "placeLimitOrder":
+                await EnsureLimitOrderPlacementOwnershipAsync(playerId, GetStringPath(variables, "input", "stockSymbol"), cancellationToken);
+                break;
+
+            case "cancelLimitOrder":
+                await EnsureLimitOrderOwnedAsync(playerId, GetGuidPath(variables, "orderId"), cancellationToken);
+                break;
+
+            case "proposeDividend":
+                await EnsureDividendCompanyOwnershipAsync(playerId, GetStringPath(variables, "input", "stockSymbol"), cancellationToken);
+                break;
+
+            case "voteDividend":
+            case "voteDividendProposal":
+                await EnsureDividendProposalOwnershipAsync(playerId, GetGuidPath(variables, "input", "proposalId"), cancellationToken);
                 break;
 
             case "makeOfferOnBuilding":
@@ -222,6 +252,180 @@ public sealed class BotOwnershipGuard(AppDbContext db)
         }
     }
 
+    private async Task EnsureGoldAmmPoolOwnedAsync(Guid playerId, Guid? poolId, CancellationToken cancellationToken)
+    {
+        if (!poolId.HasValue)
+        {
+            throw CreateNotOwnedOrNotFoundException(AuthorizationReasonNotFound, null);
+        }
+
+        var poolExists = await db.GoldAmmPools
+            .AsNoTracking()
+            .AnyAsync(pool => pool.Id == poolId.Value, cancellationToken);
+        if (!poolExists)
+        {
+            throw CreateNotOwnedOrNotFoundException(AuthorizationReasonNotFound, poolId);
+        }
+
+        var isOwned = await db.GoldAmmPositions
+            .AsNoTracking()
+            .AnyAsync(position => position.PoolId == poolId.Value && position.PlayerId == playerId, cancellationToken);
+        if (!isOwned)
+        {
+            throw CreateNotOwnedOrNotFoundException(AuthorizationReasonNotOwned, poolId);
+        }
+    }
+
+    private async Task EnsureGoldAmmPositionOwnedAsync(Guid playerId, Guid? positionId, CancellationToken cancellationToken)
+    {
+        if (!positionId.HasValue)
+        {
+            throw CreateNotOwnedOrNotFoundException(AuthorizationReasonNotFound, null);
+        }
+
+        var ownerId = await db.GoldAmmPositions
+            .AsNoTracking()
+            .Where(position => position.Id == positionId.Value)
+            .Select(position => (Guid?)position.PlayerId)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (ownerId != playerId)
+        {
+            throw CreateNotOwnedOrNotFoundException(
+                ownerId is null ? AuthorizationReasonNotFound : AuthorizationReasonNotOwned,
+                positionId);
+        }
+    }
+
+    private async Task EnsureLimitOrderPlacementOwnershipAsync(Guid playerId, string? stockSymbol, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(stockSymbol) || !StockSymbolCodec.TryParseCompanyId(stockSymbol, out var companyId))
+        {
+            throw CreateNotOwnedOrNotFoundException(AuthorizationReasonNotFound, null);
+        }
+
+        var hasOwnedUsdSettlementAccount = await db.BankAccounts
+            .AsNoTracking()
+            .AnyAsync(account =>
+                    account.CurrencyCode == "USD"
+                    && account.ClosedAtUtc == null
+                    && (account.PlayerId == playerId
+                        || (account.CompanyId.HasValue && account.Company != null && account.Company.PlayerId == playerId)),
+                cancellationToken);
+        if (!hasOwnedUsdSettlementAccount)
+        {
+            throw CreateNotOwnedOrNotFoundException(AuthorizationReasonNotFound, null);
+        }
+
+        var companyExists = await db.Companies
+            .AsNoTracking()
+            .AnyAsync(company => company.Id == companyId, cancellationToken);
+        if (!companyExists)
+        {
+            throw CreateNotOwnedOrNotFoundException(AuthorizationReasonNotFound, companyId);
+        }
+    }
+
+    private async Task EnsureLimitOrderOwnedAsync(Guid playerId, Guid? orderId, CancellationToken cancellationToken)
+    {
+        if (!orderId.HasValue)
+        {
+            throw CreateNotOwnedOrNotFoundException(AuthorizationReasonNotFound, null);
+        }
+
+        var ownershipState = await db.LimitOrders
+            .AsNoTracking()
+            .Where(order => order.Id == orderId.Value)
+            .Select(order => new
+            {
+                order.OwnerPlayerId,
+                OwnerCompanyPlayerId = order.OwnerCompany != null ? (Guid?)order.OwnerCompany.PlayerId : null,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (ownershipState is null)
+        {
+            throw CreateNotOwnedOrNotFoundException(AuthorizationReasonNotFound, orderId);
+        }
+
+        var isOwned = ownershipState.OwnerPlayerId == playerId
+            || ownershipState.OwnerCompanyPlayerId == playerId;
+        if (!isOwned)
+        {
+            throw CreateNotOwnedOrNotFoundException(AuthorizationReasonNotOwned, orderId);
+        }
+    }
+
+    private async Task EnsureDividendCompanyOwnershipAsync(Guid playerId, string? stockSymbol, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(stockSymbol) || !StockSymbolCodec.TryParseCompanyId(stockSymbol, out var companyId))
+        {
+            throw CreateNotOwnedOrNotFoundException(AuthorizationReasonNotFound, null);
+        }
+
+        await EnsureDividendCompanyStakeOwnedAsync(playerId, companyId, cancellationToken);
+    }
+
+    private async Task EnsureDividendProposalOwnershipAsync(Guid playerId, Guid? proposalId, CancellationToken cancellationToken)
+    {
+        if (!proposalId.HasValue)
+        {
+            throw CreateNotOwnedOrNotFoundException(AuthorizationReasonNotFound, null);
+        }
+
+        var proposalCompanyId = await db.DividendProposals
+            .AsNoTracking()
+            .Where(proposal => proposal.Id == proposalId.Value)
+            .Select(proposal => (Guid?)proposal.CompanyId)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (!proposalCompanyId.HasValue)
+        {
+            throw CreateNotOwnedOrNotFoundException(AuthorizationReasonNotFound, proposalId);
+        }
+
+        await EnsureDividendCompanyStakeOwnedAsync(playerId, proposalCompanyId.Value, cancellationToken, proposalId);
+    }
+
+    private async Task EnsureDividendCompanyStakeOwnedAsync(
+        Guid playerId,
+        Guid companyId,
+        CancellationToken cancellationToken,
+        Guid? attemptedObjectId = null)
+    {
+        var ownerId = await db.Companies
+            .AsNoTracking()
+            .Where(company => company.Id == companyId)
+            .Select(company => (Guid?)company.PlayerId)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (!ownerId.HasValue)
+        {
+            throw CreateNotOwnedOrNotFoundException(AuthorizationReasonNotFound, attemptedObjectId ?? companyId);
+        }
+
+        if (ownerId == playerId)
+        {
+            return;
+        }
+
+        var controlledCompanyIds = await db.Companies
+            .AsNoTracking()
+            .Where(company => company.PlayerId == playerId)
+            .Select(company => company.Id)
+            .ToListAsync(cancellationToken);
+
+        var hasShares = await db.Shareholdings
+            .AsNoTracking()
+            .AnyAsync(holding =>
+                    holding.CompanyId == companyId
+                    && holding.ShareCount > 0m
+                    && (holding.OwnerPlayerId == playerId
+                        || (holding.OwnerCompanyId.HasValue && controlledCompanyIds.Contains(holding.OwnerCompanyId.Value))),
+                cancellationToken);
+
+        if (!hasShares)
+        {
+            throw CreateNotOwnedOrNotFoundException(AuthorizationReasonNotOwned, attemptedObjectId ?? companyId);
+        }
+    }
+
     private static GraphQLException CreateNotOwnedOrNotFoundException(string reason, Guid? attemptedObjectId)
         => new(
             ErrorBuilder.New()
@@ -244,6 +448,22 @@ public sealed class BotOwnershipGuard(AppDbContext db)
 
         return element.ValueKind == JsonValueKind.String && Guid.TryParse(element.GetString(), out var value)
             ? value
+            : null;
+    }
+
+    private static string? GetStringPath(JsonElement root, params string[] path)
+    {
+        var element = root;
+        foreach (var segment in path)
+        {
+            if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty(segment, out element))
+            {
+                return null;
+            }
+        }
+
+        return element.ValueKind == JsonValueKind.String
+            ? element.GetString()
             : null;
     }
 }
