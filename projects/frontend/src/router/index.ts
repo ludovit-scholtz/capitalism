@@ -40,7 +40,12 @@ const router = createRouter({
     { path: '/banking', name: 'loan-marketplace', alias: '/loans', component: () => import('@/views/LoanMarketplaceView.vue') },
     { path: '/bank/:buildingId', name: 'bank-management', component: () => import('@/views/BankManagementView.vue') },
     { path: '/bank/:buildingId/request-loan', name: 'bank-loan-request', component: () => import('@/views/BankLoanRequestView.vue') },
-    { path: '/personal-ledger', name: 'personal-ledger', component: () => import('@/views/PersonalLedgerView.vue') },
+    {
+      path: '/personal-ledger',
+      name: 'personal-ledger',
+      alias: '/portfolio',
+      component: () => import('@/views/PersonalLedgerView.vue'),
+    },
     {
       path: '/market-intelligence',
       name: 'market-intelligence',

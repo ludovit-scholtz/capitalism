@@ -2953,6 +2953,20 @@ test.describe('Stock exchange — tax holdback', () => {
 })
 
 test.describe('Personal Ledger view', () => {
+  test('portfolio route alias loads personal ledger view', async ({ page }) => {
+    const player = makePlayer({ companies: [] })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/portfolio')
+
+    await expect(page).toHaveURL('/portfolio')
+    await expect(page.getByRole('heading', { name: 'Personal Ledger' })).toBeVisible()
+  })
+
   test('renders wealth breakdown cards', async ({ page }) => {
     const player = makePlayer({
       personalCash: 100_000,
