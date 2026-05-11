@@ -8878,7 +8878,31 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       return routeJson({ upsertGameNewsEntry: buildGameNewsEntry(nextEntry) })
     }
 
-    // Helper: true if the query is a standalone `me` query (not a more-specific query whose field names happen to include "me" as a substring).
+    if (query.includes('endShardManually')) {
+      const accessFailure = getAdminAccessFailure(false)
+      if (accessFailure) {
+        return routeJsonError(accessFailure.message, accessFailure.code)
+      }
+
+      const input = body.variables?.input
+      if (input?.reason && String(input.reason).length > 500) {
+        return routeJsonError('Reason must not exceed 500 characters.', 'REASON_TOO_LONG')
+      }
+
+      // Mark the game as ended and pick a mock winner
+      state.endgameStatus = {
+        ...state.endgameStatus,
+        gameEnded: true,
+        winnerPlayerId: state.currentUserId,
+        winnerDisplayName: 'Mock Winner',
+        winnerCompanyName: 'Winner Corp',
+        gameEndedAtUtc: new Date().toISOString(),
+      }
+      return routeJson({ endShardManually: { ...state.endgameStatus } })
+    }
+
+    // Helper: true if the query is a standalone `me` query
+    // (not a more-specific query whose field names happen to include "me" as a substring).
     // NOTE: Many field names end in "Name" (e.g. bankBuildingName, lenderCompanyName, cityName) which contain "me" as a substring.
     // Also "payment" contains "me" (pay-me-nt). Always add exclusions here for any new query/mutation with such fields.
     const isStandaloneMeQuery = (q: string) =>
@@ -8932,7 +8956,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       !q.includes('transferFunds') &&
       // getMineDepletionForecast has estimatedGameDaysRemaining field which contains 'me' via 'Game'
       !q.includes('getMineDepletionForecast') &&
-      !q.includes('getMineExtractionIntelligence')
+      !q.includes('getMineExtractionIntelligence') &&
+      // endgameStatus contains 'me' as substring (endga**me**Status)
+      !q.includes('endgameStatus')
 
     if (isStandaloneMeQuery(query)) {
       const player = resolveCurrentPlayer()

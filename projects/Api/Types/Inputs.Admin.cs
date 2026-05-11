@@ -92,3 +92,11 @@ public sealed class AdminSetPlayerGoldBalanceInput
     [Required]
     public string Note { get; set; } = string.Empty;
 }
+
+/// <summary>Input for manually ending a game shard (admin override).</summary>
+public sealed class EndShardManuallyInput
+{
+    /// <summary>Optional reason for the manual end (shown in moderation logs).</summary>
+    [MaxLength(500)]
+    public string? Reason { get; set; }
+}

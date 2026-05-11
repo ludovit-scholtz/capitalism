@@ -77,13 +77,16 @@ public sealed class ApiKeyAuthMiddleware(RequestDelegate next)
             apiKey.CompanyIds ?? []);
 
         // Fire-and-forget usage tracking (best effort, non-blocking).
+        // Capture IServiceScopeFactory synchronously before dispatching the background task.
+        // context.RequestServices may become null after the request completes (TestHost clean-up
+        // sets IServiceProvidersFeature to null), so we must resolve what we need while the
+        // HttpContext is still fully initialised.
+        var scopeFactory = context.RequestServices.GetRequiredService<IServiceScopeFactory>();
         _ = Task.Run(async () =>
         {
             try
             {
-                await using var scope = context.RequestServices
-                    .GetRequiredService<IServiceScopeFactory>()
-                    .CreateAsyncScope();
+                await using var scope = scopeFactory.CreateAsyncScope();
                 var trackDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 await trackDb.PlayerApiKeys
                     .Where(k => k.Id == apiKey.Id)

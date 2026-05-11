@@ -1,10 +1,6 @@
 name: api-ci-cd
 
 on:
-  pull_request:
-    paths:
-      - 'projects/Api/**'
-      - '.github/workflows/api-ci-cd.yml'
   push:
     branches:
       - main
