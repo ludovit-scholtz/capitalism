@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-05-11T07:15:01.835Z",
+  "generatedAt": "2026-05-11T09:10:42.240Z",
   "totalFindings": 12,
-  "gateStatus": "fail",
-  "failingCount": 7,
+  "gateStatus": "pass",
+  "failingCount": 0,
   "findings": [
     {
       "slug": "2026-W19-security-audit/unauthenticated-loan-offer-intelligence-leak",
@@ -45,7 +45,9 @@
       "title": "Player API keys still have full-account scope",
       "severity": "High",
       "status": "Open",
-      "issues": [],
+      "issues": [
+        391
+      ],
       "owner": "@ludovit-scholtz"
     },
     {
@@ -56,7 +58,9 @@
       "title": "FX execution fairness depends on stale-quote handling",
       "severity": "High",
       "status": "Open",
-      "issues": [],
+      "issues": [
+        391
+      ],
       "owner": "@ludovit-scholtz"
     },
     {
@@ -67,7 +71,9 @@
       "title": "Building secondary-market race conditions need continuous review",
       "severity": "High",
       "status": "In-Progress",
-      "issues": [],
+      "issues": [
+        389
+      ],
       "owner": "@ludovit-scholtz"
     },
     {
@@ -78,7 +84,9 @@
       "title": "Loan collateral and missed-payment foreclosure remain exploit-sensitive",
       "severity": "High",
       "status": "In-Progress",
-      "issues": [],
+      "issues": [
+        379
+      ],
       "owner": "@ludovit-scholtz"
     },
     {
@@ -89,7 +97,9 @@
       "title": "Master-vs-game token boundary confusion would be privilege-critical",
       "severity": "Critical",
       "status": "Open",
-      "issues": [],
+      "issues": [
+        313
+      ],
       "owner": "@ludovit-scholtz"
     },
     {
@@ -100,7 +110,9 @@
       "title": "Bot automation can still overreach if company boundaries drift",
       "severity": "High",
       "status": "Open",
-      "issues": [],
+      "issues": [
+        389
+      ],
       "owner": "@ludovit-scholtz"
     },
     {
@@ -122,7 +134,9 @@
       "title": "Frontend trust boundaries must stay non-authoritative",
       "severity": "High",
       "status": "Open",
-      "issues": [],
+      "issues": [
+        391
+      ],
       "owner": "@ludovit-scholtz"
     },
     {
