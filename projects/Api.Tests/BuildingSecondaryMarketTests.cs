@@ -1719,12 +1719,13 @@ public sealed class BuildingSecondaryMarketTests
                             ? code.GetString()
                             : null)
                 : [];
-
-        var successCount = results.Count(r =>
-            r.TryGetProperty("data", out var data)
+        static bool IsAcceptSuccess(JsonElement response) =>
+            response.TryGetProperty("data", out var data)
             && data.ValueKind == JsonValueKind.Object
             && data.TryGetProperty("acceptBuildingOffer", out var accepted)
-            && accepted.ValueKind == JsonValueKind.Object);
+            && accepted.ValueKind == JsonValueKind.Object;
+
+        var successCount = results.Count(IsAcceptSuccess);
         var conflictLikeCodes = new HashSet<string>(StringComparer.Ordinal)
         {
             "OFFER_VERSION_CONFLICT",
@@ -1734,7 +1735,29 @@ public sealed class BuildingSecondaryMarketTests
         };
         var conflictCount = results.Count(r => GetCodes(r).Any(code => code is not null && conflictLikeCodes.Contains(code)));
 
-        Assert.InRange(successCount, 0, 1);
+        if (successCount == 0)
+        {
+            await using var retryScope = factory.Services.CreateAsyncScope();
+            var retryDb = retryScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var latestOffer = await retryDb.BuildingSaleOffers
+                .AsNoTracking()
+                .Where(o => o.Id == offerId)
+                .Select(o => new { o.Status, o.OfferVersion })
+                .SingleAsync();
+
+            if (latestOffer.Status == BuildingSaleOfferStatus.Pending)
+            {
+                var retryResponse = await ExecAsync(client, acceptMutation, new { input = new { offerId, offerVersion = latestOffer.OfferVersion } }, sellerToken);
+                Assert.True(IsAcceptSuccess(retryResponse), "Retry accept should succeed when offer remains pending.");
+                successCount = 1;
+            }
+            else if (latestOffer.Status == BuildingSaleOfferStatus.Accepted)
+            {
+                successCount = 1;
+            }
+        }
+
+        Assert.Equal(1, successCount);
         Assert.InRange(conflictCount, 1, 2);
 
         await using var scope = factory.Services.CreateAsyncScope();

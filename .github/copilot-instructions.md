@@ -1592,5 +1592,5 @@ Root-cause of recurring CI failure (May 2026, PR #379 follow-up):
 **Rules to prevent recurrence:**
 1. **For concurrent mutation tests, primary assertions must target persisted invariants** (final owner, sale flag, accepted offer status, audit log), not a single response-code pair.
 2. **Treat loser responses as an allowed set of conflict-like errors when multiple commit-time guards can race.** Do not overfit to one error code.
-3. **If response-level success count is timing-sensitive, allow `0..1` success payloads and assert the database ended in exactly one committed transfer.**
+3. **If response-level success count is timing-sensitive, add a deterministic follow-up accept attempt (with latest `offerVersion`) when the first concurrent pair returns no success payload, then enforce exactly one success and exactly one committed transfer in persisted state.**
 4. **Always include `BUILDING_NOT_FOUND` in conflict-like loser code sets for post-transfer ownership revalidation paths.**
