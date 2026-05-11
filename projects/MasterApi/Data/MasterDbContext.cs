@@ -190,12 +190,15 @@ public sealed class MasterDbContext(DbContextOptions<MasterDbContext> options) :
         rankingEvent.HasKey(entry => entry.Id);
         rankingEvent.HasIndex(entry => new { entry.EventType, entry.Status, entry.CreatedAtUtc });
         rankingEvent.HasIndex(entry => entry.ExternalEventId).IsUnique();
+        rankingEvent.HasIndex(entry => entry.ProofReference).IsUnique();
+        rankingEvent.HasIndex(entry => new { entry.PlayerEmail, entry.EventType, entry.ServerKey, entry.IdempotencyKey });
         rankingEvent.Property(entry => entry.PlayerEmail).HasMaxLength(200);
         rankingEvent.Property(entry => entry.EventType).HasMaxLength(120);
         rankingEvent.Property(entry => entry.ServerKey).HasMaxLength(120);
         rankingEvent.Property(entry => entry.ServerKeyHash).HasMaxLength(128);
         rankingEvent.Property(entry => entry.ExternalEventId).HasMaxLength(220);
         rankingEvent.Property(entry => entry.UniqueScopeKey).HasMaxLength(220);
+        rankingEvent.Property(entry => entry.IdempotencyKey).HasMaxLength(220);
         rankingEvent.Property(entry => entry.TelemetryNonce).HasMaxLength(220);
         rankingEvent.Property(entry => entry.PayloadHash).HasMaxLength(128);
         rankingEvent.Property(entry => entry.TelemetrySignatureHash).HasMaxLength(128);

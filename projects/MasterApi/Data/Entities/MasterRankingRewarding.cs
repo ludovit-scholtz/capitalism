@@ -20,6 +20,8 @@ public sealed class MasterRankingEvent
 
     public string? UniqueScopeKey { get; set; }
 
+    public string? IdempotencyKey { get; set; }
+
     public string? TelemetryNonce { get; set; }
 
     public string? PayloadHash { get; set; }

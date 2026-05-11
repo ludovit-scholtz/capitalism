@@ -54,4 +54,7 @@ public static class RankingTelemetryAuditReason
     public const string UnknownShardKey = "UNKNOWN_SHARD_KEY";
     public const string StaleShardKey = "STALE_SHARD_KEY";
     public const string DuplicateEventSignature = "DUPLICATE_EVENT_SIGNATURE";
+    public const string BurstSubmissionPattern = "BURST_SUBMISSION_PATTERN";
+    public const string NonMonotonicNetWorth = "NON_MONOTONIC_NET_WORTH";
+    public const string MismatchedShardKey = "MISMATCHED_SHARD_KEY";
 }

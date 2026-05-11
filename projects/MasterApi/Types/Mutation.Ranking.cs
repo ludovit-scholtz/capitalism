@@ -32,6 +32,28 @@ public sealed partial class Mutation
 
         var playerEmail = Query.NormalizeEmail(input.PlayerEmail, "INVALID_PLAYER_EMAIL");
         var occurredAtUtc = input.OccurredAtUtc == default ? DateTime.UtcNow : input.OccurredAtUtc;
+        var existingIdempotentEvent = await rankingService.FindIdempotentEventAsync(
+            eventType,
+            playerEmail,
+            input.ServerKey,
+            input.IdempotencyKey,
+            CancellationToken.None);
+        if (existingIdempotentEvent is not null)
+        {
+            return new RankingEventModerationItem
+            {
+                Id = existingIdempotentEvent.Id,
+                EventType = existingIdempotentEvent.EventType,
+                PlayerEmail = existingIdempotentEvent.PlayerEmail,
+                ServerKey = existingIdempotentEvent.ServerKey,
+                ProofReference = existingIdempotentEvent.ProofReference,
+                PayloadJson = existingIdempotentEvent.PayloadJson,
+                Status = existingIdempotentEvent.Status,
+                OccurredAtUtc = existingIdempotentEvent.OccurredAtUtc,
+                CreatedAtUtc = existingIdempotentEvent.CreatedAtUtc,
+            };
+        }
+
         var telemetryValidation = await telemetryValidator.ValidateAndTrackAsync(
             input.ServerKey,
             eventType,
@@ -39,6 +61,7 @@ public sealed partial class Mutation
             input.ExternalEventId,
             input.UniqueScopeKey,
             input.PayloadJson,
+            occurredAtUtc,
             CancellationToken.None);
 
         var rankingEvent = await rankingService.IngestEventAsync(
@@ -47,6 +70,7 @@ public sealed partial class Mutation
             input.ServerKey,
             input.ExternalEventId,
             input.UniqueScopeKey,
+            input.IdempotencyKey,
             input.ProofReference,
             input.PayloadJson,
             occurredAtUtc,
@@ -219,6 +243,7 @@ public sealed partial class Mutation
         string bountyCode,
         string proofReference,
         string? uniqueScopeKey,
+        string? idempotencyKey,
         ClaimsPrincipal claimsPrincipal,
         [Service] MasterDbContext db,
         [Service] MasterRankingService rankingService)
@@ -243,12 +268,35 @@ public sealed partial class Mutation
                     .Build());
         }
 
+        var existingIdempotentEvent = await rankingService.FindIdempotentEventAsync(
+            definition.SourceEventType,
+            player.Email,
+            null,
+            idempotencyKey,
+            CancellationToken.None);
+        if (existingIdempotentEvent is not null)
+        {
+            return new RankingEventModerationItem
+            {
+                Id = existingIdempotentEvent.Id,
+                EventType = existingIdempotentEvent.EventType,
+                PlayerEmail = existingIdempotentEvent.PlayerEmail,
+                ServerKey = existingIdempotentEvent.ServerKey,
+                ProofReference = null,
+                PayloadJson = "{}",
+                Status = existingIdempotentEvent.Status,
+                OccurredAtUtc = existingIdempotentEvent.OccurredAtUtc,
+                CreatedAtUtc = existingIdempotentEvent.CreatedAtUtc,
+            };
+        }
+
         var rankingEvent = await rankingService.IngestEventAsync(
             definition.SourceEventType,
             player.Email,
             null,
             null,
             uniqueScopeKey,
+            idempotencyKey,
             proofReference,
             JsonSerializer.Serialize(new { bountyCode = normalizedBountyCode }),
             DateTime.UtcNow,
@@ -300,12 +348,43 @@ public sealed partial class Mutation
                     .SetCode("RANKING_EVENT_NOT_FOUND")
                     .Build());
 
+        var now = DateTime.UtcNow;
         rankingEvent.Status = input.Approve ? RankingEventStatus.Approved : RankingEventStatus.Rejected;
         rankingEvent.ModeratedByEmail = callerEmail;
-        rankingEvent.ModeratedAtUtc = DateTime.UtcNow;
+        rankingEvent.ModeratedAtUtc = now;
         rankingEvent.ModerationReason = string.IsNullOrWhiteSpace(input.Reason)
             ? (input.Approve ? "Approved by administrator." : "Rejected by administrator.")
             : input.Reason.Trim();
+        if (input.Approve)
+        {
+            rankingEvent.IsQuarantined = false;
+            rankingEvent.QuarantineClearedByEmail = callerEmail;
+            rankingEvent.QuarantineClearedAtUtc = now;
+            rankingEvent.QuarantineClearJustification = rankingEvent.ModerationReason;
+            rankingEvent.QuarantineReason = null;
+        }
+        else
+        {
+            rankingEvent.IsQuarantined = true;
+            rankingEvent.QuarantinedByEmail = callerEmail;
+            rankingEvent.QuarantinedAtUtc = now;
+            rankingEvent.QuarantineReason = rankingEvent.ModerationReason;
+        }
+
+        if (rankingEvent.TelemetryBatchId.HasValue)
+        {
+            var auditRows = await db.RankingTelemetryAuditLogs
+                .Where(item => item.BatchId == rankingEvent.TelemetryBatchId.Value)
+                .ToListAsync();
+            foreach (var audit in auditRows)
+            {
+                audit.IsQuarantined = !input.Approve;
+                audit.QuarantineUpdatedAtUtc = now;
+                audit.QuarantineUpdatedByEmail = callerEmail;
+                audit.QuarantineReason = input.Approve ? null : rankingEvent.ModerationReason;
+                audit.ClearJustification = input.Approve ? rankingEvent.ModerationReason : null;
+            }
+        }
 
         await db.SaveChangesAsync();
 

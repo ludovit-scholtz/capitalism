@@ -811,11 +811,12 @@ const QUARANTINED_TELEMETRY_BATCHES_QUERY = `
 `
 
 const SUBMIT_RANKING_PROOF_EVENT_MUTATION = `
-  mutation SubmitRankingProofEvent($bountyCode: String!, $proofReference: String!, $uniqueScopeKey: String) {
+  mutation SubmitRankingProofEvent($bountyCode: String!, $proofReference: String!, $uniqueScopeKey: String, $idempotencyKey: String) {
     submitRankingProofEvent(
       bountyCode: $bountyCode
       proofReference: $proofReference
       uniqueScopeKey: $uniqueScopeKey
+      idempotencyKey: $idempotencyKey
     ) {
       id
       eventType
@@ -998,10 +999,16 @@ export async function submitRankingProofEvent(
   bountyCode: string,
   proofReference: string,
   uniqueScopeKey?: string,
+  idempotencyKey?: string,
 ): Promise<RankingEventModerationItem> {
   const data = await gqlRequest<{ submitRankingProofEvent: RankingEventModerationItem }>(
     SUBMIT_RANKING_PROOF_EVENT_MUTATION,
-    { bountyCode, proofReference, uniqueScopeKey: uniqueScopeKey ?? null },
+    {
+      bountyCode,
+      proofReference,
+      uniqueScopeKey: uniqueScopeKey ?? null,
+      idempotencyKey: idempotencyKey ?? null,
+    },
     token,
   )
   return data.submitRankingProofEvent
