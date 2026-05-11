@@ -32,5 +32,5 @@ Create a fun game in the style of Capitalism II, where players experience realis
 ### Security Operations & Audit Cadence
 
 - [x] (100%) Create a weekly security action board that mirrors `/audits/*.md` findings, tracks owner plus due tick, and blocks release sign-off when any High or Critical finding from the latest audit has no linked implementation issue.
-- [ ] Add an automated GraphQL surface inventory report in CI that flags newly added finance, shareholder, ranking, lending, and admin queries or mutations missing explicit auth and ownership tests.
+- [x] (100%) Add an automated GraphQL surface inventory report in CI that flags newly added finance, shareholder, ranking, lending, and admin queries or mutations missing explicit auth and ownership tests.
 - [ ] Add a frontend dependency-audit release gate that runs `npm audit --omit=dev` for both frontends, tracks reachable rich-content sinks such as `dompurify` plus `v-html`, and blocks release validation while known high-severity production advisories remain unresolved.
