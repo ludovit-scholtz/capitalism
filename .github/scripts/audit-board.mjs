@@ -85,7 +85,13 @@ export function loadOwners(filePath) {
 // Markdown parsing
 // ---------------------------------------------------------------------------
 
-/** Converts a heading text to a GitHub-style anchor slug */
+/**
+ * Converts a heading text to a GitHub-style anchor slug.
+ *
+ * IMPORTANT: This algorithm must match GitHub's heading anchor generation exactly,
+ * because the output is used to build deep-link URLs into audit files on GitHub.
+ * It must also stay synchronized with the `auditUrl()` helper in SecurityBoardView.vue.
+ */
 export function slugify(text) {
   return text
     .toLowerCase()
@@ -178,8 +184,8 @@ export function parseAuditFile(filePath, owners = {}) {
     // Extract status
     const statusMatch = section.match(/\*\*Status:\*\*\s*(.+)/i)
     const rawStatus = statusMatch ? statusMatch[1].trim() : 'Unknown'
-    // Strip trailing issue annotation from status line
-    const status = rawStatus.replace(/<!--.*?-->/g, '').trim()
+    // Strip trailing issue annotation from status line (use [\s\S] to handle multi-line comments)
+    const status = rawStatus.replace(/<!--[\s\S]*?-->/g, '').trim()
 
     // Extract linked issues from the section
     const issues = extractIssueRefs(section)

@@ -80,8 +80,9 @@ async function fetchBoard() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = (await res.json()) as SecurityBoardReport
     report.value = data
-  } catch {
+  } catch (err) {
     // Fallback: render empty state with a helpful message
+    console.error('[SecurityBoardView] Failed to load report:', err)
     report.value = { generatedAt: '', totalFindings: 0, gateStatus: 'pass', failingCount: 0, findings: [] }
     error.value = t('securityBoard.loadError')
   } finally {
