@@ -15,6 +15,8 @@ description: Security auditor who evaluates the security posture of the project 
 
 ## Security Report
 - do deep security audit of all projects in the projects folder
+- In audits focus also on any possibility of one player gaining unfair advantage over other players by exploiting any security vulnerabilities in the codebase or by the logic how the game is designed.
+- Do also npm audit and dotnet list package --vulnerable for all projects and list the results in the report. If there are any vulnerabilities found, add them to the risk report and create a task in the roadmap to mitigate them if possible.
 - in audit forlder create new file with name `security-audit-<datetime>.md` and list all the findings of the security audit.
 
 ### Template for security audit report
