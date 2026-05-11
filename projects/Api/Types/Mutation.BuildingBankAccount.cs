@@ -45,8 +45,8 @@ public sealed partial class Mutation
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("Building not found or you do not own it.")
-                    .SetCode("BUILDING_NOT_FOUND")
+                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
+                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
                     .Build());
         }
 
@@ -74,7 +74,7 @@ public sealed partial class Mutation
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage($"Insufficient company funds. Source account {sourceAccount.AccountNumber} has {sourceAccount.Balance:F2} {cityCurrencyCode} available.")
+                    .SetMessage("Insufficient company funds in the source account.")
                     .SetCode("INSUFFICIENT_COMPANY_CASH")
                     .Build());
         }
@@ -153,8 +153,8 @@ public sealed partial class Mutation
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("Building not found or you do not own it.")
-                    .SetCode("BUILDING_NOT_FOUND")
+                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
+                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
                     .Build());
         }
 

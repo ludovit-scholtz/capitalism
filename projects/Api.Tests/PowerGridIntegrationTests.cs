@@ -2233,10 +2233,10 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
     }
 
     /// <summary>
-    /// setPlantDispatch must enforce ownership checks and hide foreign plants behind BUILDING_NOT_FOUND.
+    /// setPlantDispatch must enforce ownership checks and return NOT_FOUND_OR_NOT_OWNED for foreign plants.
     /// </summary>
     [Fact]
-    public async Task SetPlantDispatch_ForeignPlant_ReturnsBuildingNotFound()
+    public async Task SetPlantDispatch_ForeignPlant_ReturnsNotFoundOrNotOwned()
     {
         _ = await RegisterAndGetTokenAsync($"dispatch_owner_{Guid.NewGuid():N}"[..28] + "@t.com", "DispatchOwner");
         var foreignToken = await RegisterAndGetTokenAsync($"dispatch_foreign_{Guid.NewGuid():N}"[..28] + "@t.com", "DispatchForeign");
@@ -2277,7 +2277,7 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
             foreignToken);
 
         var errorCode = result.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString();
-        Assert.Equal("BUILDING_NOT_FOUND", errorCode);
+        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", errorCode);
 
         await db.Entry(plant).ReloadAsync();
         Assert.Equal(100, plant.DispatchTargetPercent);

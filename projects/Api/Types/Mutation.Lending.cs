@@ -426,16 +426,16 @@ public sealed partial class Mutation
             .FirstOrDefaultAsync(l => l.Id == input.LoanId)
             ?? throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("Loan not found.")
-                    .SetCode("LOAN_NOT_FOUND")
+                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
+                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
                     .Build());
 
         if (loan.BorrowerCompany.PlayerId != userId)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("You do not own this loan.")
-                    .SetCode("LOAN_NOT_FOUND")
+                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
+                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
                     .Build());
         }
 

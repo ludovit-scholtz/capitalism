@@ -34,8 +34,8 @@ public sealed partial class Mutation
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("Building not found or not listed for sale.")
-                    .SetCode("BUILDING_NOT_FOR_SALE")
+                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
+                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
                     .Build());
         }
 
@@ -203,8 +203,8 @@ public sealed partial class Mutation
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("You don't own this building.")
-                    .SetCode("BUILDING_NOT_FOUND")
+                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
+                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
                     .Build());
         }
 
@@ -250,8 +250,7 @@ public sealed partial class Mutation
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage(
-                        $"Buyer has insufficient funds. Available: {buyerBalance.ToString("F2", CultureInfo.InvariantCulture)} {currencyCode}.")
+                    .SetMessage("Buyer does not have sufficient funds to complete this purchase.")
                     .SetCode("INSUFFICIENT_FUNDS")
                     .Build());
         }
@@ -653,8 +652,8 @@ public sealed partial class Mutation
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("You don't own this building.")
-                    .SetCode("BUILDING_NOT_FOUND")
+                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
+                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
                     .Build());
         }
 
