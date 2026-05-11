@@ -10,7 +10,7 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 ### Security Follow-Ups
 
-- [ ] Finish `NOT_FOUND_OR_NOT_OWNED` plus balance-redaction normalization across building-market, exchange, and bank-transfer mutations so authenticated probes cannot infer foreign object existence, listing state, company linkage, or exact available funds.
+- [x] (100%) Finished `NOT_FOUND_OR_NOT_OWNED` plus balance-redaction normalization across building-market, exchange, and bank-transfer mutations so authenticated probes cannot infer foreign object existence, listing state, company linkage, or exact available funds.
 - [ ] Add password-auth abuse controls across `projects/Api` and `projects/MasterApi`: account-aware login throttling or temporary lockout, endpoint rate limiting, duplicate-email response normalization, and monitoring for repeated failed attempts.
 - [ ] Add GraphQL query depth and complexity limits to both `Api` and `MasterApi` `Program.cs` using HotChocolate cost-analysis to prevent resource-exhaustion via deeply joined or large-field queries.
 - [ ] Rate-limit the `SendChatMessage` mutation per authenticated user (e.g., 20 messages/minute) and enforce a maximum message length (e.g., 500 characters) to prevent chat spam and database bloat.

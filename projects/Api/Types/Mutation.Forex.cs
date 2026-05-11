@@ -101,7 +101,9 @@ public sealed partial class Mutation
             {
                 // ── Bank-account path (source) ─────────────────────────────
                 var fromAccount = await GetAccountInActiveContextAsync(db, input.FromBankAccountId.Value, player)
-                    ?? throw new GraphQLException(new Error("Source bank account not found in the active account context.", "ACCOUNT_NOT_FOUND"));
+                    ?? throw new GraphQLException(new Error(
+                        ObjectAuthorizationService.FriendlyMessage,
+                        ObjectAuthorizationService.NotFoundOrNotOwnedCode));
 
                 if (!string.Equals(fromAccount.CurrencyCode, fromCode, StringComparison.OrdinalIgnoreCase))
                     throw new GraphQLException(new Error(
@@ -109,11 +111,7 @@ public sealed partial class Mutation
                         "CURRENCY_MISMATCH"));
 
                 if (fromAccount.Balance < input.Amount)
-                    throw new GraphQLException(new Error(
-                        string.Format(
-                            "Insufficient balance. Account has {0:F2} {1} but tried to swap {2:F2} {1}.",
-                            fromAccount.Balance, fromCode, input.Amount),
-                        "INSUFFICIENT_FUNDS"));
+                    throw new GraphQLException(new Error("Insufficient funds.", "INSUFFICIENT_FUNDS"));
 
                 fromAccount.Balance -= input.Amount;
                 fromCompanyAccount = fromAccount.CompanyId.HasValue ? fromAccount : null;
@@ -131,11 +129,7 @@ public sealed partial class Mutation
                 var currentBalance = await Query.GetPersonalBalanceAsync(db, playerId, fromCode);
 
                 if (currentBalance < input.Amount)
-                    throw new GraphQLException(new Error(
-                        string.Format(
-                            "Insufficient balance. You have {0:F2} {1} but tried to swap {2:F2} {1}.",
-                            currentBalance, fromCode, input.Amount),
-                        "INSUFFICIENT_FUNDS"));
+                    throw new GraphQLException(new Error("Insufficient funds.", "INSUFFICIENT_FUNDS"));
 
                 if (fromCode == PersonalBankAccountService.SettlementCurrencyCode)
                 {
@@ -154,7 +148,9 @@ public sealed partial class Mutation
             {
                 // ── Bank-account path (destination) ───────────────────────
                 var toAccount = await GetAccountInActiveContextAsync(db, input.ToBankAccountId.Value, player)
-                    ?? throw new GraphQLException(new Error("Destination bank account not found in the active account context.", "ACCOUNT_NOT_FOUND"));
+                    ?? throw new GraphQLException(new Error(
+                        ObjectAuthorizationService.FriendlyMessage,
+                        ObjectAuthorizationService.NotFoundOrNotOwnedCode));
 
                 if (!string.Equals(toAccount.CurrencyCode, toCode, StringComparison.OrdinalIgnoreCase))
                     throw new GraphQLException(new Error(

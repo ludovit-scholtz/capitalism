@@ -726,6 +726,7 @@ public sealed class GlobalCitiesAndFxRatesTests
 
         var errors = result.GetProperty("errors");
         Assert.Equal(JsonValueKind.Array, errors.ValueKind);
+        Assert.DoesNotContain("5.00", errors[0].GetProperty("message").GetString());
         var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
         Assert.Equal("INSUFFICIENT_FUNDS", code);
     }
@@ -996,6 +997,7 @@ public sealed class GlobalCitiesAndFxRatesTests
 
         var errors = result.GetProperty("errors");
         Assert.Equal(JsonValueKind.Array, errors.ValueKind);
+        Assert.DoesNotContain("50.00", errors[0].GetProperty("message").GetString());
         var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
         Assert.Equal("INSUFFICIENT_FUNDS", code);
 
@@ -1326,7 +1328,7 @@ public sealed class GlobalCitiesAndFxRatesTests
         var errors = result.GetProperty("errors");
         Assert.Equal(JsonValueKind.Array, errors.ValueKind);
         var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
-        Assert.Equal("ACCOUNT_NOT_FOUND", code);
+        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", code);
     }
 
     [Fact]
@@ -1366,7 +1368,7 @@ public sealed class GlobalCitiesAndFxRatesTests
     }
 
     [Fact]
-    public async Task ExecuteForexSwap_PersonContext_WithCompanyBankAccountId_ReturnsAccountNotFound()
+    public async Task ExecuteForexSwap_PersonContext_WithCompanyBankAccountId_ReturnsNotFoundOrNotOwned()
     {
         await using var factory = new ApiWebApplicationFactory();
         var client = factory.CreateClient();
@@ -1412,7 +1414,7 @@ public sealed class GlobalCitiesAndFxRatesTests
         var errors = result.GetProperty("errors");
         Assert.Equal(JsonValueKind.Array, errors.ValueKind);
         var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
-        Assert.Equal("ACCOUNT_NOT_FOUND", code);
+        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", code);
     }
 
     [Fact]
@@ -1452,6 +1454,44 @@ public sealed class GlobalCitiesAndFxRatesTests
         Assert.Equal(200m, quote.GetProperty("fromAmount").GetDecimal());
         Assert.Equal(2500m, quote.GetProperty("availableFromBalance").GetDecimal());
         Assert.True(quote.GetProperty("toAmount").GetDecimal() > 0);
+    }
+
+    [Fact]
+    public async Task GetForexQuote_ForeignBankAccount_ReturnsNotFoundOrNotOwned()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var ownerToken = await RegisterAndLoginAsync(client, $"ba-quote-owner-{Guid.NewGuid():N}@example.com");
+        var probeToken = await RegisterAndLoginAsync(client, $"ba-quote-probe-{Guid.NewGuid():N}@example.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var ownerResult = await ExecuteGraphQlAsync(client, "{ me { id } }", token: ownerToken);
+        var ownerId = Guid.Parse(ownerResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        var ownerCompany = new Company { Id = Guid.NewGuid(), PlayerId = ownerId, Name = "Quote Owner Co", Cash = 0m, FoundedAtUtc = DateTime.UtcNow, FoundedAtTick = 1 };
+        db.Companies.Add(ownerCompany);
+        var foreignAccount = new BankAccount { Id = Guid.NewGuid(), CompanyId = ownerCompany.Id, AccountNumber = "8899999988889999", CurrencyCode = "EUR", Balance = 2500m };
+        db.BankAccounts.Add(foreignAccount);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(client,
+            """
+            query ForexQuote($input: GetForexQuoteInput!) {
+                forexQuote(input: $input) {
+                    availableFromBalance
+                }
+            }
+            """,
+            new { input = new { fromCurrencyCode = "EUR", toCurrencyCode = "CZK", amount = 200m, fromBankAccountId = foreignAccount.Id } },
+            probeToken);
+
+        var errors = result.GetProperty("errors");
+        Assert.Equal(JsonValueKind.Array, errors.ValueKind);
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", code);
     }
 
     // ── Quote nonce lifecycle & slippage guard ────────────────────────────────

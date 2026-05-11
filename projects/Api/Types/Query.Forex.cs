@@ -53,7 +53,9 @@ public sealed partial class Query
         {
             var account = await GetOwnedBankAccountAsync(db, input.FromBankAccountId.Value, player);
             if (account is null)
-                throw new GraphQLException(new Error("Source bank account not found in the active account context.", "ACCOUNT_NOT_FOUND"));
+                throw new GraphQLException(new Error(
+                    ObjectAuthorizationService.FriendlyMessage,
+                    ObjectAuthorizationService.NotFoundOrNotOwnedCode));
             if (!string.Equals(account.CurrencyCode, fromCode, StringComparison.OrdinalIgnoreCase))
                 throw new GraphQLException(new Error(
                     $"Source bank account currency ({account.CurrencyCode}) does not match the requested from-currency ({fromCode}).",
@@ -77,7 +79,9 @@ public sealed partial class Query
         {
             var toAccount = await GetOwnedBankAccountAsync(db, input.ToBankAccountId.Value, player);
             if (toAccount is null)
-                throw new GraphQLException(new Error("Destination bank account not found in the active account context.", "ACCOUNT_NOT_FOUND"));
+                throw new GraphQLException(new Error(
+                    ObjectAuthorizationService.FriendlyMessage,
+                    ObjectAuthorizationService.NotFoundOrNotOwnedCode));
             if (!string.Equals(toAccount.CurrencyCode, toCode, StringComparison.OrdinalIgnoreCase))
                 throw new GraphQLException(new Error(
                     $"Destination bank account currency ({toAccount.CurrencyCode}) does not match the requested to-currency ({toCode}).",

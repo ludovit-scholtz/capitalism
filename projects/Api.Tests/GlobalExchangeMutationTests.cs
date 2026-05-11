@@ -262,7 +262,7 @@ public sealed class GlobalExchangeMutationTests
         var result = await ExecuteGraphQlAsync(client,
             """
             mutation BuyFromExchange($input: BuyFromExchangeInput!) {
-                buyFromExchange(input: $input) { success errorCode }
+                buyFromExchange(input: $input) { success errorCode errorMessage }
             }
             """,
             new
@@ -281,6 +281,8 @@ public sealed class GlobalExchangeMutationTests
         var payload = result.GetProperty("data").GetProperty("buyFromExchange");
         Assert.False(payload.GetProperty("success").GetBoolean());
         Assert.Equal("INSUFFICIENT_FUNDS", payload.GetProperty("errorCode").GetString());
+        Assert.DoesNotContain("0.01", payload.GetProperty("errorMessage").GetString());
+        Assert.DoesNotContain("Required:", payload.GetProperty("errorMessage").GetString());
     }
 
     [Fact]
@@ -378,7 +380,58 @@ public sealed class GlobalExchangeMutationTests
 
         var payload = result.GetProperty("data").GetProperty("buyFromExchange");
         Assert.False(payload.GetProperty("success").GetBoolean());
-        Assert.Equal("BANK_ACCOUNT_MISMATCH", payload.GetProperty("errorCode").GetString());
+        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", payload.GetProperty("errorCode").GetString());
+    }
+
+    [Fact]
+    public async Task BuyFromExchange_ForeignBuildingUnit_ReturnsNotFoundOrNotOwned()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var ownerEmail = $"buy-foreign-owner-{Guid.NewGuid():N}@test.com";
+        var probeEmail = $"buy-foreign-probe-{Guid.NewGuid():N}@test.com";
+        var ownerToken = await RegisterAndGetTokenAsync(client, ownerEmail);
+        var probeToken = await RegisterAndGetTokenAsync(client, probeEmail);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var ownerId = await GetPlayerIdAsync(db, ownerEmail);
+        var probeId = await GetPlayerIdAsync(db, probeEmail);
+
+        var bratislava = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+        var wood = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
+
+        var ownerCompany = SeedCompany(db, ownerId, "Owner Company");
+        var ownerBuilding = SeedBuilding(db, ownerCompany.Id, bratislava.Id);
+        var foreignUnit = SeedBuildingUnit(db, ownerBuilding.Id, "STORAGE");
+
+        var probeCompany = SeedCompany(db, probeId, "Probe Company");
+        var probeAccount = SeedCompanyBankAccount(db, probeCompany.Id, "EUR", 50_000m);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(client,
+            """
+            mutation BuyFromExchange($input: BuyFromExchangeInput!) {
+                buyFromExchange(input: $input) { success errorCode errorMessage }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    sourceCityId = bratislava.Id,
+                    resourceTypeId = wood.Id,
+                    quantity = 5m,
+                    targetBuildingUnitId = foreignUnit.Id,
+                    bankAccountId = probeAccount.Id,
+                }
+            },
+            probeToken);
+
+        var payload = result.GetProperty("data").GetProperty("buyFromExchange");
+        Assert.False(payload.GetProperty("success").GetBoolean());
+        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", payload.GetProperty("errorCode").GetString());
     }
 
     // ── SellToExchange tests ───────────────────────────────────────────────────
@@ -576,5 +629,64 @@ public sealed class GlobalExchangeMutationTests
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
         var inventory = await verifyDb.Inventories.FindAsync(inventoryId);
         Assert.Null(inventory); // row must be deleted
+    }
+
+    [Fact]
+    public async Task SellToExchange_ForeignBuildingUnit_ReturnsNotFoundOrNotOwned()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var ownerEmail = $"sell-foreign-owner-{Guid.NewGuid():N}@test.com";
+        var probeEmail = $"sell-foreign-probe-{Guid.NewGuid():N}@test.com";
+        var ownerToken = await RegisterAndGetTokenAsync(client, ownerEmail);
+        var probeToken = await RegisterAndGetTokenAsync(client, probeEmail);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var ownerId = await GetPlayerIdAsync(db, ownerEmail);
+        var probeId = await GetPlayerIdAsync(db, probeEmail);
+
+        var bratislava = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+        var wood = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
+
+        var ownerCompany = SeedCompany(db, ownerId, "Owner Sell Company");
+        var ownerBuilding = SeedBuilding(db, ownerCompany.Id, bratislava.Id);
+        var foreignUnit = SeedBuildingUnit(db, ownerBuilding.Id, "STORAGE");
+        db.Inventories.Add(new Inventory
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = ownerBuilding.Id,
+            BuildingUnitId = foreignUnit.Id,
+            ResourceTypeId = wood.Id,
+            Quantity = 10m,
+            Quality = 0.7m,
+        });
+
+        var probeCompany = SeedCompany(db, probeId, "Probe Sell Company");
+        var probeAccount = SeedCompanyBankAccount(db, probeCompany.Id, "EUR", 0m);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(client,
+            """
+            mutation SellToExchange($input: SellToExchangeInput!) {
+                sellToExchange(input: $input) { success errorCode errorMessage }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    sourceBuildingUnitId = foreignUnit.Id,
+                    resourceTypeId = wood.Id,
+                    quantity = 5m,
+                    bankAccountId = probeAccount.Id,
+                }
+            },
+            probeToken);
+
+        var payload = result.GetProperty("data").GetProperty("sellToExchange");
+        Assert.False(payload.GetProperty("success").GetBoolean());
+        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", payload.GetProperty("errorCode").GetString());
     }
 }
