@@ -45,4 +45,5 @@ Create a fun game in the style of Capitalism II, where players experience realis
 ### Security Follow-Ups
 
 - [ ] Finish `NOT_FOUND_OR_NOT_OWNED` plus balance-redaction normalization across building-market, exchange, and bank-transfer mutations so authenticated probes cannot infer foreign object existence, listing state, company linkage, or exact available funds.
-- [ ] Upgrade `postcss` in `projects/master-frontend` to `>= 8.5.10` and keep both frontends on a zero known production dependency advisory baseline in CI.
+- [ ] Add password-auth abuse controls across `projects/Api` and `projects/MasterApi`: account-aware login throttling or temporary lockout, endpoint rate limiting, duplicate-email response normalization, and monitoring for repeated failed attempts.
+- [ ] Remove or upgrade vulnerable `@vercel/node` tooling in `projects/frontend` so full `npm audit` is clean, and keep both frontends on a zero known production dependency advisory baseline in CI.
