@@ -270,6 +270,7 @@ test.describe('Onboarding IPO – personal account name generator', () => {
 
     const personalNameInput = page.locator('#onboarding-personal-account-name')
     await expect(personalNameInput).toBeVisible()
+    await expect(personalNameInput).toHaveValue('Alias Onboarding Captain')
     const generated = await personalNameInput.inputValue()
     expect(generated.trim().split(' ')).toHaveLength(3)
 

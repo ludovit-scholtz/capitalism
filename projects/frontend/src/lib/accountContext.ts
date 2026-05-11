@@ -66,6 +66,6 @@ export function buildAccountOptions<TCompany extends CompanyAccountSnapshot>(pla
   ]
 }
 
-function resolvePlayerAccountName(player: PlayerAccountSnapshot): string | null {
+export function resolvePlayerAccountName(player: PlayerAccountSnapshot): string | null {
   return player?.personalAccountName ?? player?.displayName ?? null
 }
