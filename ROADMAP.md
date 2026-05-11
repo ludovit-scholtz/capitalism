@@ -27,7 +27,7 @@ Create a fun game in the style of Capitalism II, where players experience realis
 - [x] (100%) Keep frontend trust non-authoritative by validating economy-sensitive stock trade ownership overrides server-side, rejecting tampered account-type/company payloads with `INVALID_CLIENT_OVERRIDE`, and adding backend plus Playwright regressions proving friendly client-error handling.
 - [x] (100%) Standardize object-authorization failure responses to "not found or not owned" semantics to reduce resource enumeration risk while preserving internal audit visibility through structured security logs.
 - [x] (100%) Close the MasterApi news-service trust-boundary gap by requiring validated game-server credentials or authenticated root/global admin claims for `gameNewsFeed(includeDrafts: true)` and `upsertGameNewsEntry`, rejecting caller-supplied email spoofing, and covering anonymous draft read/write rejection with regression tests.
-- [ ] Finish the error-surface hardening pass across building, banking, lending, and stock mutations so unauthorized probes no longer distinguish foreign-object existence, listing state, or precise available-balance details.
+- [x] (100%) Finish the error-surface hardening pass across building, banking, lending, and stock mutations so unauthorized probes no longer distinguish foreign-object existence, listing state, or precise available-balance details.
 
 ### Security Operations & Audit Cadence
 

@@ -62,8 +62,8 @@ public sealed partial class Mutation
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("Source bank account not found or you do not own it.")
-                    .SetCode("FROM_ACCOUNT_NOT_FOUND")
+                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
+                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
                     .Build());
         }
 
@@ -78,8 +78,8 @@ public sealed partial class Mutation
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("Destination bank account not found or you do not own it.")
-                    .SetCode("TO_ACCOUNT_NOT_FOUND")
+                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
+                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
                     .Build());
         }
 
