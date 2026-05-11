@@ -65,7 +65,7 @@ public sealed partial class Query
             {
                 Id = message.Id,
                 PlayerId = message.PlayerId,
-                PlayerDisplayName = message.Player.DisplayName,
+                PlayerDisplayName = PublicPlayerDisplayName.Resolve(message.Player),
                 Message = message.Message,
                 SentAtUtc = message.SentAtUtc,
                 IsOwnMessage = message.PlayerId == userId

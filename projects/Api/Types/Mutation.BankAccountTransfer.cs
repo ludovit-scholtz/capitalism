@@ -1,6 +1,7 @@
 using Api.Data;
 using Api.Data.Entities;
 using Api.Security;
+using Api.Utilities;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
 
@@ -188,7 +189,7 @@ public sealed partial class Mutation
                 CompanyId = fromAccount.CompanyId,
                 CompanyName = fromAccount.Company?.Name,
                 OwnerType = fromAccount.CompanyId.HasValue ? "COMPANY" : "PERSON",
-                OwnerDisplayName = fromAccount.Company?.Name ?? fromAccount.Player?.DisplayName ?? string.Empty,
+                OwnerDisplayName = fromAccount.Company?.Name ?? PublicPlayerDisplayName.Resolve(fromAccount.Player),
             },
             ToAccount = new PlayerBankAccountSummary
             {
@@ -199,7 +200,7 @@ public sealed partial class Mutation
                 CompanyId = toAccount.CompanyId,
                 CompanyName = toAccount.Company?.Name,
                 OwnerType = toAccount.CompanyId.HasValue ? "COMPANY" : "PERSON",
-                OwnerDisplayName = toAccount.Company?.Name ?? toAccount.Player?.DisplayName ?? string.Empty,
+                OwnerDisplayName = toAccount.Company?.Name ?? PublicPlayerDisplayName.Resolve(toAccount.Player),
             },
         };
     }

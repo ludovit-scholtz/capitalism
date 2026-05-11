@@ -163,7 +163,7 @@ public sealed partial class Query
         var result = new PersonAccountResult
         {
             PlayerId = player.Id,
-            DisplayName = player.DisplayName,
+            DisplayName = PublicPlayerDisplayName.Resolve(player),
             PersonalCash = grossPersonalCashUsd,
             TaxReserve = player.PersonalTaxReserve,
             AvailableCash = grossPersonalCashUsd - player.PersonalTaxReserve,

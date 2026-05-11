@@ -1,6 +1,9 @@
 import type { AccountContextType, Company, Player } from '@/types'
 
-type PlayerAccountSnapshot = Pick<Player, 'displayName' | 'activeAccountType' | 'activeCompanyId'> | null | undefined
+type PlayerAccountSnapshot =
+  | Pick<Player, 'displayName' | 'personalAccountName' | 'activeAccountType' | 'activeCompanyId'>
+  | null
+  | undefined
 type CompanyAccountSnapshot = Pick<Company, 'id' | 'name' | 'cash'>
 
 export interface AccountOption<TCompany extends CompanyAccountSnapshot = CompanyAccountSnapshot> {
@@ -31,7 +34,7 @@ export function getActiveAccountName<TCompany extends CompanyAccountSnapshot>(pl
     return activeCompany.name
   }
 
-  return player?.displayName ?? null
+  return resolvePlayerAccountName(player)
 }
 
 export function getActiveAccountOption<TCompany extends CompanyAccountSnapshot>(player: PlayerAccountSnapshot, companies: readonly TCompany[]): AccountOption<TCompany> | null {
@@ -46,7 +49,7 @@ export function buildAccountOptions<TCompany extends CompanyAccountSnapshot>(pla
       key: 'person',
       accountType: 'PERSON',
       companyId: null,
-      name: player?.displayName ?? '',
+      name: resolvePlayerAccountName(player) ?? '',
       cash: null,
       company: null,
       isActive: !isCompanyAccountActive,
@@ -61,4 +64,8 @@ export function buildAccountOptions<TCompany extends CompanyAccountSnapshot>(pla
       isActive: isCompanyAccountActive && player?.activeCompanyId === company.id,
     })),
   ]
+}
+
+function resolvePlayerAccountName(player: PlayerAccountSnapshot): string | null {
+  return player?.personalAccountName ?? player?.displayName ?? null
 }

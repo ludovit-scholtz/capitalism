@@ -1600,6 +1600,117 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task LegacySensitiveDisplayName_PublicIdentitySurfaces_UseSanitizedAlias()
+    {
+        var email = $"legacy-surface-{Guid.NewGuid():N}@example.com";
+        var token = CreateSharedToken(Guid.NewGuid().ToString(), email, "OIDC Subject User");
+
+        var meResult = await ExecuteGraphQlAsync("{ me { id } }", token: token);
+        var playerId = Guid.Parse(meResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(candidate => candidate.Id == playerId);
+            player.DisplayName = email;
+            await db.SaveChangesAsync();
+        }
+
+        await ExecuteGraphQlAsync(
+            """
+            mutation CreateCompany($input: CreateCompanyInput!) {
+              createCompany(input: $input) { id }
+            }
+            """,
+            new { input = new { name = "Alias Holdings" } },
+            token);
+
+        var expectedAlias = PlayerDisplayNameProvisioning.ResolveDisplayName(email, email, playerId.ToString());
+        var result = await ExecuteGraphQlAsync(
+            """
+            {
+              me { displayName personalAccountName }
+              myBankAccounts { ownerType ownerDisplayName }
+              myCompanies { id player { displayName personalAccountName } }
+            }
+            """,
+            token: token);
+
+        Assert.False(result.TryGetProperty("errors", out _));
+
+        var me = result.GetProperty("data").GetProperty("me");
+        Assert.Equal(expectedAlias, me.GetProperty("displayName").GetString());
+        Assert.Equal(expectedAlias, me.GetProperty("personalAccountName").GetString());
+
+        var personalAccountOwners = result.GetProperty("data").GetProperty("myBankAccounts")
+            .EnumerateArray()
+            .Where(account => account.GetProperty("ownerType").GetString() == "PERSON")
+            .Select(account => account.GetProperty("ownerDisplayName").GetString())
+            .ToList();
+        Assert.NotEmpty(personalAccountOwners);
+        Assert.All(personalAccountOwners, owner => Assert.Equal(expectedAlias, owner));
+
+        var companyPlayer = result.GetProperty("data").GetProperty("myCompanies")
+            .EnumerateArray()
+            .First()
+            .GetProperty("player");
+        Assert.Equal(expectedAlias, companyPlayer.GetProperty("displayName").GetString());
+        Assert.Equal(expectedAlias, companyPlayer.GetProperty("personalAccountName").GetString());
+    }
+
+    [Fact]
+    public async Task LegacySensitiveDisplayName_ChatUsesSanitizedAlias()
+    {
+        var email = $"legacy-chat-{Guid.NewGuid():N}@example.com";
+        var token = CreateSharedToken(Guid.NewGuid().ToString(), email, "OIDC Subject User");
+
+        var meResult = await ExecuteGraphQlAsync("{ me { id } }", token: token);
+        var playerId = Guid.Parse(meResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(candidate => candidate.Id == playerId);
+            player.DisplayName = email;
+            await db.SaveChangesAsync();
+        }
+
+        var expectedAlias = PlayerDisplayNameProvisioning.ResolveDisplayName(email, email, playerId.ToString());
+        var sendResult = await ExecuteGraphQlAsync(
+            """
+            mutation SendChatMessage($input: SendChatMessageInput!) {
+              sendChatMessage(input: $input) {
+                playerDisplayName
+                message
+              }
+            }
+            """,
+            new { input = new { message = "Alias only please" } },
+            token);
+
+        Assert.Equal(
+            expectedAlias,
+            sendResult.GetProperty("data").GetProperty("sendChatMessage").GetProperty("playerDisplayName").GetString());
+
+        var chatResult = await ExecuteGraphQlAsync(
+            """
+            {
+              chatMessages(limit: 10) {
+                playerDisplayName
+                message
+              }
+            }
+            """,
+            token: token);
+
+        Assert.Contains(
+            chatResult.GetProperty("data").GetProperty("chatMessages").EnumerateArray(),
+            message =>
+                message.GetProperty("playerDisplayName").GetString() == expectedAlias
+                && message.GetProperty("message").GetString() == "Alias only please");
+    }
+
+    [Fact]
     public void IsImpersonating_FalseWhenEffectiveAndActorIdsMatch()
     {
         var playerId = Guid.NewGuid();

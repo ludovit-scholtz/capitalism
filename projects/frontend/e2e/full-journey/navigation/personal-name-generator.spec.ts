@@ -143,6 +143,31 @@ test.describe('Player profile – display name editing', () => {
   })
 })
 
+test.describe('Personal account name surfaces', () => {
+  test('account context switcher prefers personalAccountName over JWT-style displayName', async ({
+    page,
+  }) => {
+    const player = makePlayer({
+      id: 'player-personal-alias-ui',
+      email: 'alias-ui@example.com',
+      displayName: 'OIDC Subject User',
+      personalAccountName: 'Maximus Decimus Aurelius',
+      onboardingCompletedAtUtc: '2024-01-01T00:00:00Z',
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await authenticate(page, `token-${player.id}`)
+
+    await page.goto('/dashboard')
+
+    const trigger = page.locator('.ctx-trigger')
+    await expect(trigger).toBeVisible()
+    await expect(trigger.locator('.ctx-account-name')).toContainText('Maximus Decimus Aurelius')
+    await expect(trigger.locator('.ctx-account-name')).not.toContainText('OIDC Subject User')
+  })
+})
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Rankings — display name shown (ROADMAP: "In ranking show the personal account name")
 // ─────────────────────────────────────────────────────────────────────────────
@@ -230,7 +255,7 @@ test.describe('Onboarding IPO – personal account name generator', () => {
     const player = makePlayer({
       id: 'player-onboarding-personal-alias',
       email: 'alias-onboarding@example.com',
-      displayName: 'alias-onboarding@example.com',
+      displayName: 'Alias Onboarding Captain',
       onboardingCompletedAtUtc: null,
     })
     const state = setupMockApi(page, { players: [player] })

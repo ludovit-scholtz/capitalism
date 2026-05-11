@@ -55,6 +55,7 @@ function normalizeRedirectPath(redirectPath: string | null | undefined) {
 const PLAYER_SELECTION = `
   id
   displayName
+  personalAccountName
   email
   role
   createdAtUtc

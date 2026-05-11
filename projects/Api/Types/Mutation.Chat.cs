@@ -1,6 +1,7 @@
 using Api.Data;
 using Api.Data.Entities;
 using Api.Security;
+using Api.Utilities;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
 
@@ -70,7 +71,7 @@ public sealed partial class Mutation
         {
             Id = chatMessage.Id,
             PlayerId = player.Id,
-            PlayerDisplayName = player.DisplayName,
+            PlayerDisplayName = PublicPlayerDisplayName.Resolve(player),
             Message = chatMessage.Message,
             SentAtUtc = chatMessage.SentAtUtc,
             IsOwnMessage = true
