@@ -72,7 +72,10 @@ export interface MockApiKeyAuditLog {
   scopeUsed: string
   wasAllowed: boolean
   denialCode: string | null
+  denialReason: string | null
+  attemptedObjectId: string | null
   ipAddress: string | null
+  sessionContext: string | null
   occurredAtUtc: string
 }
 
@@ -366,7 +369,10 @@ export function makeApiKeyAuditLog(overrides: Partial<MockApiKeyAuditLog> = {}):
     scopeUsed: 'read-only',
     wasAllowed: true,
     denialCode: null,
+    denialReason: null,
+    attemptedObjectId: null,
     ipAddress: '127.0.0.1',
+    sessionContext: 'mock-session',
     occurredAtUtc: new Date().toISOString(),
     ...overrides,
   }

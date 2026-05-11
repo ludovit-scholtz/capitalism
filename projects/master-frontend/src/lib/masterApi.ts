@@ -1149,7 +1149,10 @@ export interface ApiKeyAuditLogInfo {
   scopeUsed: string
   wasAllowed: boolean
   denialCode: string | null
+  denialReason: string | null
+  attemptedObjectId: string | null
   ipAddress: string | null
+  sessionContext: string | null
   occurredAtUtc: string
 }
 
@@ -1203,7 +1206,10 @@ const MY_API_KEY_AUDIT_LOG_QUERY = `
       scopeUsed
       wasAllowed
       denialCode
+      denialReason
+      attemptedObjectId
       ipAddress
+      sessionContext
       occurredAtUtc
     }
   }
@@ -1243,7 +1249,10 @@ const ADMIN_API_KEY_AUDIT_LOG_QUERY = `
       scopeUsed
       wasAllowed
       denialCode
+      denialReason
+      attemptedObjectId
       ipAddress
+      sessionContext
       occurredAtUtc
     }
   }

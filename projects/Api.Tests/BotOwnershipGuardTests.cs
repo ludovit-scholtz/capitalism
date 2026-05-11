@@ -68,7 +68,7 @@ public sealed class BotOwnershipGuardTests
 
         var guard = new BotOwnershipGuard(db);
         var ex = await Assert.ThrowsAsync<GraphQLException>(() => guard.EnsureCompanyOwnedAsync(ownerPlayerId, companyId, CancellationToken.None));
-        Assert.Equal(BotOwnershipGuard.NotOwnedOrNotFoundCode, ex.Errors.Single().Code);
+        Assert.Equal(BotOwnershipGuard.NotFoundOrNotOwnedCode, ex.Errors.Single().Code);
     }
 
     [Fact]
@@ -87,7 +87,7 @@ public sealed class BotOwnershipGuardTests
 
         var guard = new BotOwnershipGuard(db);
         var ex = await Assert.ThrowsAsync<GraphQLException>(() => guard.EnsureCompanyOwnedAsync(playerId, null, CancellationToken.None));
-        Assert.Equal(BotOwnershipGuard.NotOwnedOrNotFoundCode, ex.Errors.Single().Code);
+        Assert.Equal(BotOwnershipGuard.NotFoundOrNotOwnedCode, ex.Errors.Single().Code);
     }
 
     [Fact]
@@ -133,7 +133,7 @@ public sealed class BotOwnershipGuardTests
 
         var guard = new BotOwnershipGuard(db);
         var ex = await Assert.ThrowsAsync<GraphQLException>(() => guard.EnsureMutationOwnershipAsync("executeForexSwap", document.RootElement, ownerPlayerId, CancellationToken.None));
-        Assert.Equal(BotOwnershipGuard.NotOwnedOrNotFoundCode, ex.Errors.Single().Code);
+        Assert.Equal(BotOwnershipGuard.NotFoundOrNotOwnedCode, ex.Errors.Single().Code);
     }
 
     private static AppDbContext CreateDb(string name)

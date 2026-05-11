@@ -42,7 +42,10 @@ public sealed partial class AppDbContext
             e.Property(log => log.OperationType).HasMaxLength(16);
             e.Property(log => log.ScopeUsed).HasMaxLength(40);
             e.Property(log => log.DenialCode).HasMaxLength(80);
+            e.Property(log => log.DenialReason).HasMaxLength(40);
+            e.Property(log => log.AttemptedObjectId).HasMaxLength(64);
             e.Property(log => log.IpAddress).HasMaxLength(64);
+            e.Property(log => log.SessionContext).HasMaxLength(128);
             e.HasIndex(log => new { log.PlayerApiKeyId, log.OccurredAtUtc });
             e.HasIndex(log => new { log.PlayerId, log.OccurredAtUtc });
             e.HasOne(log => log.PlayerApiKey)

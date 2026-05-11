@@ -30,7 +30,9 @@ public sealed class ApiKeyScopeMiddleware(RequestDelegate next)
         string OperationName,
         string OperationType,
         string ScopeUsed,
-        string? DenialCode);
+        string? DenialCode,
+        string? DenialReason = null,
+        string? AttemptedObjectId = null);
 
     private static readonly IReadOnlyDictionary<string, MutationRule> MutationRules =
         new Dictionary<string, MutationRule>(StringComparer.Ordinal)
@@ -298,14 +300,18 @@ public sealed class ApiKeyScopeMiddleware(RequestDelegate next)
             {
                 await ownershipGuard.EnsureMutationOwnershipAsync(rootField, variables, apiKeyContext.PlayerId, cancellationToken);
             }
-            catch (GraphQLException ex) when (TryGetErrorCode(ex) == BotOwnershipGuard.NotOwnedOrNotFoundCode)
+            catch (GraphQLException ex) when (TryGetErrorCode(ex) == BotOwnershipGuard.NotFoundOrNotOwnedCode)
             {
+                var denialReason = TryGetErrorExtension(ex, "authorizationReason");
+                var attemptedObjectId = TryGetErrorExtension(ex, "attemptedObjectId");
                 decisions.Add(new ScopeDecision(
                     false,
                     rootField,
                     "mutation",
                     scopeUsed,
-                    BotOwnershipGuard.NotOwnedOrNotFoundCode));
+                    BotOwnershipGuard.NotFoundOrNotOwnedCode,
+                    denialReason,
+                    attemptedObjectId));
                 continue;
             }
 
@@ -387,7 +393,10 @@ public sealed class ApiKeyScopeMiddleware(RequestDelegate next)
                 ScopeUsed = decision.ScopeUsed,
                 WasAllowed = decision.IsAllowed,
                 DenialCode = decision.DenialCode,
+                DenialReason = decision.DenialReason,
+                AttemptedObjectId = decision.AttemptedObjectId,
                 IpAddress = ipAddress,
+                SessionContext = context.TraceIdentifier,
                 OccurredAtUtc = DateTime.UtcNow,
             });
         }
@@ -418,6 +427,22 @@ public sealed class ApiKeyScopeMiddleware(RequestDelegate next)
 
     private static string? TryGetErrorCode(GraphQLException ex)
         => ex.Errors.FirstOrDefault()?.Code;
+
+    private static string? TryGetErrorExtension(GraphQLException ex, string key)
+    {
+        var error = ex.Errors.FirstOrDefault();
+        if (error?.Extensions is null)
+        {
+            return null;
+        }
+
+        if (!error.Extensions.TryGetValue(key, out var value) || value is null)
+        {
+            return null;
+        }
+
+        return value.ToString();
+    }
 
     private static ValueTask<IReadOnlyCollection<Guid>> ResolveDirectCompanyIdsAsync(
         JsonElement variables,
