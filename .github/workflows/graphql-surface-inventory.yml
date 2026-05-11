@@ -1,0 +1,56 @@
+name: graphql-surface-inventory
+
+on:
+  pull_request:
+    paths:
+      - 'projects/Api/**'
+      - 'projects/Api.Tests/**'
+      - 'tools/GraphQLSurfaceInventory/**'
+      - '.github/workflows/graphql-surface-inventory.yml'
+      - 'audits/graphql-surface-inventory.json'
+  push:
+    branches:
+      - main
+    paths:
+      - 'projects/Api/**'
+      - 'projects/Api.Tests/**'
+      - 'tools/GraphQLSurfaceInventory/**'
+      - '.github/workflows/graphql-surface-inventory.yml'
+      - 'audits/graphql-surface-inventory.json'
+
+permissions:
+  contents: read
+
+jobs:
+  graphql-surface-inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.x
+
+      - name: Test GraphQL surface inventory tool
+        run: dotnet test tools/GraphQLSurfaceInventory.Tests/GraphQLSurfaceInventory.Tests.csproj --configuration Release
+
+      - name: Run GraphQL surface inventory gate
+        run: |
+          dotnet run --project tools/GraphQLSurfaceInventory/GraphQLSurfaceInventory.csproj -- \
+            --api-types-dir "${{ github.workspace }}/projects/Api/Types" \
+            --api-tests-dir "${{ github.workspace }}/projects/Api.Tests" \
+            --baseline "${{ github.workspace }}/audits/graphql-surface-inventory.json" \
+            --output "${{ runner.temp }}/graphql-surface-inventory.json" \
+            --report "${{ runner.temp }}/graphql-surface-report.md" \
+            --gate
+
+      - name: Upload GraphQL surface report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphql-surface-report
+          path: |
+            ${{ runner.temp }}/graphql-surface-report.md
+            ${{ runner.temp }}/graphql-surface-inventory.json
