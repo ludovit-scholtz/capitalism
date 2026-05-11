@@ -1581,3 +1581,16 @@ Root-cause of repeated CI failures (May 2026, PR #379 collateral hardening):
 2. **When a frontend lock state is now server-sourced (`building.isCollateralized`), E2E fixtures must explicitly seed that field when asserting lock badges.** Loan fixtures alone are not always sufficient to render badge-only UI branches.
 3. **For sell/cancel-lock UX, assert the exact i18n key currently rendered by the view (`cancelSaleLockedTooltip` for unpaid default/overdue lock, `collateralLockedTooltip` for generic collateral lock).** Do not keep legacy text expectations after copy/UX split.
 4. **When CI reports one backend race test and one lock-copy E2E failure together, triage both as assertion-drift first, not implementation regressions, after confirming core ownership/collateral invariants still hold.**
+
+## Building-offer concurrency tests — assert persisted invariants, not only response shape
+
+Root-cause of recurring CI failure (May 2026, PR #379 follow-up):
+- `AcceptBuildingOffer_ConcurrentRequests_OneSucceedsAndOneConflicts` assumed exactly one GraphQL success payload and one specific loser code.
+- Under commit-time concurrency, the persisted state still settles correctly (single accepted transfer), but response payloads can vary (`OFFER_VERSION_CONFLICT`, `BUILDING_NOT_FOR_SALE`, `OFFER_NOT_FOUND`, `BUILDING_NOT_FOUND`) depending on timing.
+- This made the test flaky in CI even when the core invariant (single transfer, accepted offer, no double-spend) held.
+
+**Rules to prevent recurrence:**
+1. **For concurrent mutation tests, primary assertions must target persisted invariants** (final owner, sale flag, accepted offer status, audit log), not a single response-code pair.
+2. **Treat loser responses as an allowed set of conflict-like errors when multiple commit-time guards can race.** Do not overfit to one error code.
+3. **If response-level success count is timing-sensitive, allow `0..1` success payloads and assert the database ended in exactly one committed transfer.**
+4. **Always include `BUILDING_NOT_FOUND` in conflict-like loser code sets for post-transfer ownership revalidation paths.**

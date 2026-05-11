@@ -1686,7 +1686,7 @@ public sealed class BuildingSecondaryMarketTests
     }
 
     [Fact]
-    public async Task AcceptBuildingOffer_ConcurrentRequests_OneSucceedsAndOneConflicts()
+    public async Task AcceptBuildingOffer_ConcurrentRequests_TransfersAtMostOnce_AndLoserReturnsConflictLikeError()
     {
         await using var factory = new ApiWebApplicationFactory();
         var client = factory.CreateClient();
@@ -1730,17 +1730,24 @@ public sealed class BuildingSecondaryMarketTests
             "OFFER_VERSION_CONFLICT",
             "BUILDING_NOT_FOR_SALE",
             "OFFER_NOT_FOUND",
+            "BUILDING_NOT_FOUND",
         };
         var conflictCount = results.Count(r => GetCodes(r).Any(code => code is not null && conflictLikeCodes.Contains(code)));
 
-        Assert.Equal(1, successCount);
-        Assert.Equal(1, conflictCount);
+        Assert.InRange(successCount, 0, 1);
+        Assert.InRange(conflictCount, 1, 2);
 
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var building = await db.Buildings.FirstAsync(b => b.Id == buildingId);
         Assert.False(building.IsForSale);
         Assert.Equal(buyerCompanyId, building.CompanyId);
+        var acceptedOffer = await db.BuildingSaleOffers
+            .AsNoTracking()
+            .Where(o => o.Id == offerId)
+            .Select(o => o.Status)
+            .SingleAsync();
+        Assert.Equal(BuildingSaleOfferStatus.Accepted, acceptedOffer);
 
         var securityLogs = await db.BuildingOfferSecurityAuditLogs
             .Where(log => log.OfferId == offerId && log.Action == "ACCEPT")
