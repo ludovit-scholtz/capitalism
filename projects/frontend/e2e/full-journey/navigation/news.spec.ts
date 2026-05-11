@@ -90,4 +90,48 @@ test.describe('News mark all as read', () => {
 
     await expect(page.locator('.news-unread-badge')).toHaveCount(1)
   })
+
+  test('news feed neutralizes svg onload payload', async ({ page }) => {
+    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.gameNewsEntries = [
+      {
+        id: 'news-xss-svg',
+        entryType: 'NEWS',
+        status: 'PUBLISHED',
+        targetServerKey: null,
+        createdByEmail: 'system@capitalism.local',
+        updatedByEmail: 'system@capitalism.local',
+        createdAtUtc: '2026-01-01T00:00:00Z',
+        updatedAtUtc: '2026-01-01T00:00:00Z',
+        publishedAtUtc: '2026-01-01T00:00:00Z',
+        localizations: [
+          {
+            locale: 'en',
+            title: 'Xss payload',
+            summary: '',
+            htmlContent: '<svg onload=alert(1)><circle></circle></svg><p>Safe body</p>',
+          },
+        ],
+        readByPlayerIds: [],
+      },
+    ]
+
+    await page.addInitScript(() => {
+      ;(window as Window & { __alerts: string[] }).__alerts = []
+      window.alert = (message?: string) => {
+        ;(window as Window & { __alerts: string[] }).__alerts.push(String(message ?? ''))
+      }
+    })
+    await authenticate(page, `token-${player.id}`)
+    await page.goto('/news')
+
+    await expect(page.locator('.news-card-body')).toContainText('Safe body')
+    const alertCount = await page.evaluate(
+      () => (window as Window & { __alerts?: string[] }).__alerts?.length ?? 0,
+    )
+    expect(alertCount).toBe(0)
+  })
 })

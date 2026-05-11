@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Capitalism.Shared.Security;
 using Api.Data;
 using Api.Data.Entities;
 using Api.Engine;
@@ -185,12 +186,22 @@ public sealed partial class Mutation
         [Service] IMasterGameAdministrationService masterGameAdministrationService)
     {
         var accessContext = await gameAdminAuthorizationService.RequireAdminDashboardAccessAsync(db, httpContextAccessor.HttpContext!.User, httpContextAccessor.HttpContext.RequestAborted);
+        var sanitizedLocalizations = input.Localizations
+            .Select(localization => new GameNewsLocalizationInput
+            {
+                Locale = localization.Locale,
+                Title = localization.Title,
+                Summary = localization.Summary,
+                HtmlContent = AllowlistHtmlSanitizer.Sanitize(localization.HtmlContent),
+            })
+            .ToList();
+
         return await masterGameAdministrationService.UpsertGameNewsEntryAsync(
             accessContext.ActorPlayer.Email,
             input.EntryId,
             input.EntryType,
             input.Status,
-            input.Localizations,
+            sanitizedLocalizations,
             httpContextAccessor.HttpContext.RequestAborted);
     }
 

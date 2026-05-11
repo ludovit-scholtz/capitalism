@@ -1,0 +1,36 @@
+{
+  "payloads": [
+    {
+      "id": "script-tag",
+      "payload": "<script>alert(1)</script>"
+    },
+    {
+      "id": "svg-onload",
+      "payload": "<svg onload=alert(1)>"
+    },
+    {
+      "id": "javascript-href",
+      "payload": "<a href=\"javascript:alert(1)\">x</a>"
+    },
+    {
+      "id": "obfuscated-javascript-protocol",
+      "payload": "<a href=\"&#106;avascript:alert(1)\">x</a>"
+    },
+    {
+      "id": "image-onerror",
+      "payload": "<img src=x onerror=alert(1)>"
+    },
+    {
+      "id": "nested-malformed-script",
+      "payload": "<scr<script>ipt>alert(1)</scr<script>ipt>"
+    },
+    {
+      "id": "css-expression",
+      "payload": "<div style=\"expression(alert(1))\">x</div>"
+    },
+    {
+      "id": "svg-noscript-mutation-xss",
+      "payload": "<noscript><p title=\"</noscript><img src=x onerror=alert(1)>\">"
+    }
+  ]
+}

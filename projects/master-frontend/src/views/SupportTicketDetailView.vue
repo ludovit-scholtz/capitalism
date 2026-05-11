@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import ViewJumbotron from '@/components/layout/ViewJumbotron.vue'
 import ViewSubnav from '@/components/layout/ViewSubnav.vue'
 import TicketMarkdownEditor from '@/components/support/TicketMarkdownEditor.vue'
+import { sanitizeRichHtml } from '@/lib/htmlSanitizer'
 import {
   fetchMySupportTickets,
   updateSupportTicketContent,
@@ -63,6 +64,10 @@ function typeLabel(type: string): string {
     : type === 'BUG'
       ? t('common.bug')
       : t('common.other')
+}
+
+function sanitizePreviewHtml(html: string): string {
+  return sanitizeRichHtml(html)
 }
 
 async function loadTicket() {
@@ -191,7 +196,7 @@ onMounted(async () => {
             <div
               v-if="ticket.sanitizedPreviewHtml"
               class="preview-html mt-3"
-              v-html="ticket.sanitizedPreviewHtml"
+              v-html="sanitizePreviewHtml(ticket.sanitizedPreviewHtml)"
             ></div>
             <p v-else class="state-message mt-2">{{ t('support.previewHidden') }}</p>
           </section>

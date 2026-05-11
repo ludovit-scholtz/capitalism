@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import DOMPurify from 'dompurify'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import { sanitizeRichHtml } from '@/lib/htmlSanitizer'
 import { pickGamesLocalization } from '@/lib/news'
 import { useAuthStore } from '@/stores/auth'
 import { usesStore } from '@/stores/news'
@@ -86,7 +86,7 @@ function formatDate(value: string | null) {
 }
 
 function sanitizeHtml(html: string) {
-  return DOMPurify.sanitize(html)
+  return sanitizeRichHtml(html)
 }
 
 /** Returns the plain text of an HTML string by stripping all tags. */

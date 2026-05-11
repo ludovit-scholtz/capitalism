@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Capitalism.Shared.Security;
 using MasterApi.Configuration;
 using MasterApi.Data;
 using MasterApi.Data.Entities;
@@ -142,7 +143,7 @@ public sealed partial class Mutation
                 Locale = NormalizeLocale(localization.Locale),
                 Title = localization.Title.Trim(),
                 Summary = localization.Summary.Trim(),
-                HtmlContent = localization.HtmlContent.Trim(),
+                HtmlContent = AllowlistHtmlSanitizer.Sanitize(localization.HtmlContent.Trim()),
             })
             .GroupBy(localization => localization.Locale)
             .Select(group => group.Last())

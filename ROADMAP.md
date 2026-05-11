@@ -57,7 +57,7 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 ### Security Follow-Ups
 
-- [ ] Replace the regex-based support markdown sanitizer with an allowlist HTML sanitizer, and add stored-XSS regression payloads that cover SVG, attribute, protocol, and malformed-markup bypass attempts before any `v-html` support preview is rendered.
+- [x] (100%) Replace the regex-based support markdown sanitizer with an allowlist HTML sanitizer, and add stored-XSS regression payloads that cover SVG, attribute, protocol, and malformed-markup bypass attempts before any `v-html` support preview is rendered.
 - [ ] Finish `NOT_FOUND_OR_NOT_OWNED` plus balance-redaction normalization across building-market, exchange, and bank-transfer mutations so authenticated probes cannot infer foreign object existence, listing state, company linkage, or exact available funds.
 - [ ] Add dedicated MasterApi security regression tests for `gameNewsFeed(includeDrafts)` and `upsertGameNewsEntry`, covering anonymous draft reads, invalid registration keys, inactive server keys, spoofed requester identity, trusted server success, and privileged admin success.
 - [x] (100%) Remove the committed NPC bot shared default password, require an environment-provided secret or API-key mode outside local development, and fail startup when the placeholder credential is still configured.

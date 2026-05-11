@@ -22,6 +22,18 @@ public sealed class SupportTicketIntegrationTests : IClassFixture<MasterApiWebAp
         _client = factory.CreateClient();
     }
 
+    public static IEnumerable<object[]> DangerousMarkdownPayloads()
+    {
+        yield return ["<script>alert(1)</script>"];
+        yield return ["<svg onload=alert(1)>"];
+        yield return ["<a href=\"javascript:alert(1)\">x</a>"];
+        yield return ["<img src=x onerror=alert(1)>"];
+        yield return ["<div style=\"expression(alert(1))\">x</div>"];
+        yield return ["<noscript><p title=\"</noscript><img src=x onerror=alert(1)>\">"];
+        yield return ["<a href=\"&#106;avascript:alert(1)\">x</a>"];
+        yield return ["<scr<script>ipt>alert(1)</scr<script>ipt>"];
+    }
+
     private static string CreateRootAdminToken()
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SharedJwtSigningKey));
@@ -312,6 +324,108 @@ public sealed class SupportTicketIntegrationTests : IClassFixture<MasterApiWebAp
         Assert.NotNull(previewHtml);
         Assert.DoesNotContain("<script", previewHtml!, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("http://example.com/a.png", approved.GetProperty("extractedImages")[0].GetString());
+    }
+
+    [Theory]
+    [MemberData(nameof(DangerousMarkdownPayloads))]
+    public async Task SupportTicketPreview_StripsDangerousPayloads(string payload)
+    {
+        var (ownerToken, _, _) = await RegisterAsync($"support-xss-{Guid.NewGuid():N}@example.com");
+        var adminToken = CreateRootAdminToken();
+
+        var createResult = await GraphQlAsync(_client, """
+            mutation Create($input: CreateSupportTicketInput!) {
+              createSupportTicket(input: $input) {
+                id
+              }
+            }
+            """, new
+        {
+            input = new
+            {
+                ticketType = "BUG",
+                title = "Xss payload check",
+                markdownSource = $"{payload} Safe markdown tail to satisfy minimum length 1234567890.",
+            }
+        }, ownerToken);
+        var ticketId = createResult.GetProperty("data").GetProperty("createSupportTicket").GetProperty("id").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(ticketId));
+
+        var approvedResult = await GraphQlAsync(_client, """
+            mutation Moderate($input: ModerateSupportTicketInput!) {
+              moderateSupportTicket(input: $input) {
+                sanitizedPreviewHtml
+              }
+            }
+            """, new
+        {
+            input = new
+            {
+                ticketId,
+                approve = true,
+                note = "approved",
+            }
+        }, adminToken);
+
+        var previewHtml = approvedResult.GetProperty("data")
+            .GetProperty("moderateSupportTicket")
+            .GetProperty("sanitizedPreviewHtml")
+            .GetString() ?? string.Empty;
+
+        Assert.DoesNotContain("<script", previewHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<svg", previewHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("onerror=", previewHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("onload=", previewHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("javascript:", previewHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("expression(", previewHtml, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SupportTicketPreview_PreservesSafeMarkdownFormatting()
+    {
+        var (ownerToken, _, _) = await RegisterAsync($"support-safe-{Guid.NewGuid():N}@example.com");
+        var adminToken = CreateRootAdminToken();
+
+        var createResult = await GraphQlAsync(_client, """
+            mutation Create($input: CreateSupportTicketInput!) {
+              createSupportTicket(input: $input) {
+                id
+              }
+            }
+            """, new
+        {
+            input = new
+            {
+                ticketType = "SUGGESTION",
+                title = "Safe markdown rendering",
+                markdownSource = "**Bold** _Italic_ [Safe](https://example.com) - list item content long enough.",
+            }
+        }, ownerToken);
+        var ticketId = createResult.GetProperty("data").GetProperty("createSupportTicket").GetProperty("id").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(ticketId));
+
+        var approvedResult = await GraphQlAsync(_client, """
+            mutation Moderate($input: ModerateSupportTicketInput!) {
+              moderateSupportTicket(input: $input) {
+                sanitizedPreviewHtml
+              }
+            }
+            """, new
+        {
+            input = new
+            {
+                ticketId,
+                approve = true,
+            }
+        }, adminToken);
+
+        var previewHtml = approvedResult.GetProperty("data")
+            .GetProperty("moderateSupportTicket")
+            .GetProperty("sanitizedPreviewHtml")
+            .GetString() ?? string.Empty;
+        Assert.Contains("<strong>Bold</strong>", previewHtml);
+        Assert.Contains("<em>Italic</em>", previewHtml);
+        Assert.Contains("href=\"https://example.com\"", previewHtml, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
