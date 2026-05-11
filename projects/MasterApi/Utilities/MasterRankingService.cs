@@ -4,6 +4,7 @@ using HotChocolate;
 using MasterApi.Data;
 using MasterApi.Data.Entities;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace MasterApi.Utilities;
 
@@ -306,7 +307,19 @@ public sealed class MasterRankingService(MasterDbContext db, ILogger<MasterRanki
         };
 
         db.MasterRankingEvents.Add(rankingEvent);
-        await db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsProofReferenceUniqueConstraintViolation(ex))
+        {
+            logger.LogWarning(
+                ex,
+                "Ranking proof reference duplicate detected during persistence. proofReference={ProofReference}",
+                normalizedProofReference);
+            throw BuildProofReferenceConflictError();
+        }
+
         return rankingEvent;
     }
 
@@ -576,5 +589,16 @@ public sealed class MasterRankingService(MasterDbContext db, ILogger<MasterRanki
                 .SetCode("PROOF_REFERENCE_CONFLICT")
                 .SetExtension("httpStatus", 409)
                 .Build());
+    }
+
+    private static bool IsProofReferenceUniqueConstraintViolation(DbUpdateException ex)
+    {
+        if (ex.InnerException is not PostgresException postgres)
+        {
+            return false;
+        }
+
+        return postgres.SqlState == PostgresErrorCodes.UniqueViolation
+            && string.Equals(postgres.ConstraintName, "IX_MasterRankingEvents_ProofReference", StringComparison.Ordinal);
     }
 }

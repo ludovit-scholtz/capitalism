@@ -28,6 +28,7 @@ public sealed class RankingTelemetryValidator(MasterDbContext db)
 {
     private static readonly TimeSpan SignatureTtl = TimeSpan.FromHours(24);
     private const int BurstThresholdPerMinute = 8;
+    private const decimal NetWorthRegressionToleranceUsd = 0.01m;
 
     public async Task<RankingTelemetryValidationResult> ValidateAndTrackAsync(
         string serverKey,
@@ -218,7 +219,7 @@ public sealed class RankingTelemetryValidator(MasterDbContext db)
                 continue;
             }
 
-            if (currentNetWorthUsd + 0.01m < priorNetWorthUsd)
+            if (currentNetWorthUsd + NetWorthRegressionToleranceUsd < priorNetWorthUsd)
             {
                 return RankingTelemetryAuditReason.NonMonotonicNetWorth;
             }
