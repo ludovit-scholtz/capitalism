@@ -50,6 +50,6 @@ Create a fun game in the style of Capitalism II, where players experience realis
 - [x] (100%) Lock icon in `AppHeader` navbar with tooltip when shard has ended.
 - [x] (100%) Admin "End Shard" control in `AdminDashboardContent` with confirmation dialog and reason field.
 - [x] (100%) i18n keys for all endgame UI in en, sk, and de locales.
-- [x] (100%) 9 backend integration tests covering win detection, mutation guard, benchmark admin, and manual shard end.
+- [x] (100%) 14 backend integration tests covering win detection, mutation guard, benchmark admin, manual shard end, unauthenticated access, validation errors, multi-currency leader selection, and post-end mutation blocking.
 - [x] (100%) 11 frontend unit tests for `useEndgameStore` covering polling, milestone logic, and progress computation.
-- [x] (100%) E2E Playwright tests in `finance/endgame.spec.ts`.
+- [x] (100%) 8 E2E Playwright tests in `finance/endgame.spec.ts`: billionaire panel, ARIA progress bar, winner overlay/read-only banner, admin End Shard visibility, End Shard full confirmation flow, End Shard cancel flow, non-admin access denial, and navbar lock icon.

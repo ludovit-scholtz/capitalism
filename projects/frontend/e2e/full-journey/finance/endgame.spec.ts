@@ -90,6 +90,81 @@ test.describe('Endgame UI', () => {
     await expect(page.getByRole('button', { name: 'End Shard' })).toBeVisible()
   })
 
+  test('admin End Shard confirmation flow: enter reason, confirm, see success', async ({ page }) => {
+    const admin = makeAdminPlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const state = setupMockApi(page, { players: [admin] })
+    state.currentUserId = admin.id
+    state.currentToken = `token-${admin.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${admin.id}`)
+    await page.goto('/admin')
+
+    await expect(page.getByRole('button', { name: 'End Shard' })).toBeVisible()
+
+    // Enter a reason and click the End Shard button to open confirmation
+    await page.getByLabel('Reason (optional)').fill('Season finale — ending the shard.')
+    await page.getByRole('button', { name: 'End Shard' }).click()
+
+    // Confirmation dialog should appear
+    await expect(
+      page.getByText('Are you sure you want to end this shard manually? This cannot be undone.'),
+    ).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Confirm' })).toBeVisible()
+
+    // Confirm the action
+    await page.getByRole('button', { name: 'Confirm' }).click()
+
+    // Success message should appear
+    await expect(page.getByText('The game shard has been ended.')).toBeVisible()
+  })
+
+  test('admin End Shard cancel flow: confirmation dialog can be dismissed', async ({ page }) => {
+    const admin = makeAdminPlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const state = setupMockApi(page, { players: [admin] })
+    state.currentUserId = admin.id
+    state.currentToken = `token-${admin.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${admin.id}`)
+    await page.goto('/admin')
+
+    await expect(page.getByRole('button', { name: 'End Shard' })).toBeVisible()
+    await page.getByRole('button', { name: 'End Shard' }).click()
+
+    // Confirmation dialog is visible
+    await expect(
+      page.getByText('Are you sure you want to end this shard manually? This cannot be undone.'),
+    ).toBeVisible()
+
+    // Cancel — confirmation dialog should close, form re-appears
+    await page.getByRole('button', { name: 'Cancel' }).click()
+    await expect(page.getByRole('button', { name: 'End Shard' })).toBeVisible()
+    await expect(
+      page.getByText('Are you sure you want to end this shard manually? This cannot be undone.'),
+    ).toBeHidden()
+  })
+
+  test('non-admin player cannot access the End Shard section', async ({ page }) => {
+    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/admin')
+
+    // Non-admin should be redirected or see access denied
+    await expect(page.getByRole('button', { name: 'End Shard' })).toBeHidden()
+  })
+
   test('navbar shows lock icon when game has ended', async ({ page }) => {
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',

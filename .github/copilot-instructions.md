@@ -518,6 +518,21 @@ Root-cause of a quality failure (May 2026, PR #345 / Power Plants & Energy Syste
 4. **Before replying to “fix build and tests,” run the real local pipelines from a clean dependency state** (`npm ci`, then `npm run lint`, `npm run test:unit`, `npm run build`, plus the relevant Playwright specs and backend Release tests). Do not assume prior-session installs still exist.
 5. **For infrastructure/economy features with visible dashboards or planning panels, always include a fresh screenshot of the shipped UI in the reply.** Backend-only proof is not enough when the product requirement is partly visual.
 
+
+## Admin feature routing — End Shard in orphaned component
+
+Root-cause of a quality failure (May 2026, PR #405 / Endgame Win Condition):
+- The "End Shard" admin section was added to `AdminDashboardContent.vue` — but the `/admin` route had been migrated to redirect to `OperationsOverviewView.vue`.
+- `AdminDashboardContent.vue` was never rendered by any active route, so the feature was completely inaccessible at runtime.
+- The E2E test for the End Shard button correctly failed in the previous session, exposing the routing mismatch.
+- Additionally, the full End Shard flow (enter reason → click confirm → see success) was only covered by a button-visibility assertion, not by a full interaction test. Confirmation dialog, cancel, and non-admin access denial tests were all missing.
+
+**Rules to prevent recurrence:**
+1. **Before adding an admin feature to a component, verify which Vue component is actually served at the target route.** Check `src/router/index.ts` for the exact component mount, not just the directory for admin-related files.
+2. **For any admin section with a destructive action (End Shard, Reset Player, Purge Data), add E2E coverage for the full lifecycle:** (a) button visible for admin; (b) confirmation dialog appears; (c) cancel dismisses dialog without action; (d) confirm triggers success; (e) non-admin user cannot see the button.
+3. **When an admin component gets orphaned by router changes, audit it for features** (grep for router.ts references to that component) and either delete the orphan or move its features to the active component before committing.
+4. **The minimum E2E test surface for an admin destructive mutation is 4 tests:** admin visibility, confirmation flow (full success), cancel flow, and non-admin access denial. A single button-visibility test is insufficient.
+
 ## Onboarding product-proof quality — green CI is not enough
 
 Root-cause of a quality failure (March 2026, PR #51 onboarding follow-up):
