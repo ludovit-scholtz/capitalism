@@ -7,6 +7,9 @@ public sealed class ObjectAuthorizationService(
     ILogger<ObjectAuthorizationService> logger,
     IHttpContextAccessor httpContextAccessor)
 {
+    private readonly ILogger<ObjectAuthorizationService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor ?? throw new ArgumentNullException(nameof(httpContextAccessor));
+
     public const string NotFoundOrNotOwnedCode = "NOT_FOUND_OR_NOT_OWNED";
     public const string NotFoundReason = "not_found";
     public const string NotOwnedReason = "not_owned";
@@ -49,8 +52,8 @@ public sealed class ObjectAuthorizationService(
         Guid requestedObjectId,
         string actualFailureReason)
     {
-        var apiKeyContext = httpContextAccessor.HttpContext?.Items[ApiKeyRequestContext.HttpContextItemKey] as ApiKeyRequestContext;
-        logger.LogWarning(
+        var apiKeyContext = _httpContextAccessor.HttpContext?.Items[ApiKeyRequestContext.HttpContextItemKey] as ApiKeyRequestContext;
+        _logger.LogWarning(
             "Object authorization denied {@SecurityAuditEvent}",
             new
             {
