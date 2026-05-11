@@ -131,9 +131,13 @@ public sealed partial class Query
                 Limit = 20,
             };
         }
-        var trustedServer = await TryResolveTrustedNewsServerIdentityAsync(db, masterServerOptions.Value, input);
-        var trustedAdmin = await TryResolvePrivilegedNewsAdminIdentityAsync(db, gameAdministrationOptions.Value, claimsPrincipal);
-        var includeDrafts = input.IncludeDrafts && (trustedServer is not null || trustedAdmin is not null);
+        var includeDrafts = false;
+        if (input.IncludeDrafts)
+        {
+            var trustedServer = await TryResolveTrustedNewsServerIdentityAsync(db, masterServerOptions.Value, input);
+            var trustedAdmin = await TryResolvePrivilegedNewsAdminIdentityAsync(db, gameAdministrationOptions.Value, claimsPrincipal);
+            includeDrafts = trustedServer is not null || trustedAdmin is not null;
+        }
 
         var playerEmail = string.IsNullOrWhiteSpace(input.PlayerEmail)
             ? null

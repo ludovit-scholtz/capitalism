@@ -84,7 +84,7 @@ public sealed class BotOwnershipGuard(AppDbContext db)
                 break;
 
             case "proposeDividend":
-                await EnsureDividendCompanyOwnershipAsync(playerId, GetStringPath(variables, "input", "stockSymbol"), cancellationToken);
+                await EnsureDividendProposalAuthorizationAsync(playerId, GetStringPath(variables, "input", "stockSymbol"), cancellationToken);
                 break;
 
             case "voteDividend":
@@ -354,7 +354,7 @@ public sealed class BotOwnershipGuard(AppDbContext db)
         }
     }
 
-    private async Task EnsureDividendCompanyOwnershipAsync(Guid playerId, string? stockSymbol, CancellationToken cancellationToken)
+    private async Task EnsureDividendProposalAuthorizationAsync(Guid playerId, string? stockSymbol, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(stockSymbol) || !StockSymbolCodec.TryParseCompanyId(stockSymbol, out var companyId))
         {
