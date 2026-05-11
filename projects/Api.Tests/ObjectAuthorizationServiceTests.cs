@@ -64,13 +64,18 @@ public sealed class ObjectAuthorizationServiceTests
 
     private static T GetProperty<T>(object source, string propertyName)
     {
-        var value = source.GetType().GetProperty(propertyName)!.GetValue(source)!;
+        var property = source.GetType().GetProperty(propertyName)
+            ?? throw new ArgumentException($"Property '{propertyName}' not found on {source.GetType().Name}.", nameof(propertyName));
+        var value = property.GetValue(source)
+            ?? throw new ArgumentException($"Property '{propertyName}' value is null.", nameof(propertyName));
         return (T)value;
     }
 
     private static Guid? GetNullableGuidProperty(object source, string propertyName)
     {
-        var value = source.GetType().GetProperty(propertyName)!.GetValue(source);
+        var property = source.GetType().GetProperty(propertyName)
+            ?? throw new ArgumentException($"Property '{propertyName}' not found on {source.GetType().Name}.", nameof(propertyName));
+        var value = property.GetValue(source);
         if (value is null)
         {
             return null;
