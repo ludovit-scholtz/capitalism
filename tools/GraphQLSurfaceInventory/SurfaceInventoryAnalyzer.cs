@@ -4,6 +4,11 @@ namespace GraphQLSurfaceInventory;
 
 internal static partial class SurfaceInventoryAnalyzer
 {
+    // attrs: zero or more attribute lines above the resolver
+    // static: marks helper methods we exclude from GraphQL operation inventory
+    // name: public method name that becomes GraphQL field name (or maps via [GraphQLName])
+    private const string ResolverMethodPattern = "(?ms)(?<attrs>(?:\\s*\\[[^\\]]+\\]\\s*)*)\\s*public\\s+(?<static>static\\s+)?(?:(?:async)\\s+)?(?:[A-Za-z0-9_<>,.\\?\\[\\]\\s]+?)\\s+(?<name>[A-Z][A-Za-z0-9_]*)\\s*\\(";
+
     private static readonly string[] NegativeKeywords =
     [
         "Unauthenticated",
@@ -233,6 +238,11 @@ internal static partial class SurfaceInventoryAnalyzer
             return value;
         }
 
+        if (value.Length == 1)
+        {
+            return value.ToLowerInvariant();
+        }
+
         return string.Concat(char.ToLowerInvariant(value[0]), value[1..]);
     }
 
@@ -248,7 +258,12 @@ internal static partial class SurfaceInventoryAnalyzer
             return string.Concat(
                 value
                     .Split('-', StringSplitOptions.RemoveEmptyEntries)
-                    .Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
+                    .Select(part => part.Length == 1 ? part.ToUpperInvariant() : char.ToUpperInvariant(part[0]) + part[1..]));
+        }
+
+        if (value.Length == 1)
+        {
+            return value.ToUpperInvariant();
         }
 
         return char.ToUpperInvariant(value[0]) + value[1..];

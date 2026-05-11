@@ -13,8 +13,14 @@ internal static class InventoryIo
 
     public static InventorySnapshot LoadBaseline(string baselinePath)
     {
-        if (string.IsNullOrWhiteSpace(baselinePath) || !File.Exists(baselinePath))
+        if (string.IsNullOrWhiteSpace(baselinePath))
         {
+            return new InventorySnapshot(DateTime.UtcNow.ToString("O"), []);
+        }
+
+        if (!File.Exists(baselinePath))
+        {
+            Console.Error.WriteLine($"Warning: baseline file not found at {baselinePath}. Treating baseline as empty.");
             return new InventorySnapshot(DateTime.UtcNow.ToString("O"), []);
         }
 
@@ -30,7 +36,11 @@ internal static class InventoryIo
             return;
         }
 
-        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+        var outputDirectory = Path.GetDirectoryName(Path.GetFullPath(outputPath));
+        if (!string.IsNullOrWhiteSpace(outputDirectory))
+        {
+            Directory.CreateDirectory(outputDirectory);
+        }
         File.WriteAllText(outputPath, JsonSerializer.Serialize(snapshot, JsonOptions) + Environment.NewLine);
     }
 
@@ -44,7 +54,11 @@ internal static class InventoryIo
             return;
         }
 
-        Directory.CreateDirectory(Path.GetDirectoryName(reportPath)!);
+        var reportDirectory = Path.GetDirectoryName(Path.GetFullPath(reportPath));
+        if (!string.IsNullOrWhiteSpace(reportDirectory))
+        {
+            Directory.CreateDirectory(reportDirectory);
+        }
 
         var sensitive = snapshot.Operations
             .Where(op => op.IsSensitive)

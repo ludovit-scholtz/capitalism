@@ -1,76 +1,14 @@
 # GraphQL Surface Inventory Report
 
-> Generated at `2026-05-11T12:54:59.2956695Z`
+> Generated at `2026-05-11T13:10:00.4997175Z`
 
 - Total operations: **213**
 - Sensitive operations: **95**
-- Newly added sensitive operations missing required coverage: **61**
+- Newly added sensitive operations missing required coverage: **0**
 
 ## Gate status
 
-❌ Missing coverage detected for newly added sensitive operations:
-
-- `mutation adminSetPlayerGoldBalance` (admin) — missing both auth-negative and owner-success tests
-- `mutation assignGlobalGameAdminRole` (admin) — missing both auth-negative and owner-success tests
-- `mutation createCompanyBankAccount` (finance) — missing unauthenticated/wrong-owner test
-- `mutation createPersonalBankAccount` (finance) — missing unauthenticated/wrong-owner test
-- `mutation markAllGameNewsRead` (admin) — missing unauthenticated/wrong-owner test
-- `mutation markGameNewsRead` (admin) — missing unauthenticated/wrong-owner test
-- `mutation placeLimitOrder` (shareholder) — missing unauthenticated/wrong-owner test
-- `mutation proposeDividend` (shareholder) — missing owner-success test
-- `mutation removeGlobalGameAdminRole` (admin) — missing both auth-negative and owner-success tests
-- `mutation repayLoanDebt` (lending) — missing owner-success test
-- `mutation setBankAccountAlertThreshold` (finance) — missing unauthenticated/wrong-owner test
-- `mutation setLocalGameAdminRole` (admin) — missing both auth-negative and owner-success tests
-- `mutation setPlayerInvisibleInChat` (admin) — missing unauthenticated/wrong-owner test
-- `mutation startAdminImpersonation` (admin) — missing both auth-negative and owner-success tests
-- `mutation stopAdminImpersonation` (admin) — missing both auth-negative and owner-success tests
-- `mutation switchAccountContext` (finance) — missing unauthenticated/wrong-owner test
-- `mutation topUpDeposit` (finance) — missing unauthenticated/wrong-owner test
-- `mutation updateRealWorldBillionaire` (admin) — missing unauthenticated/wrong-owner test
-- `mutation upsertGameNewsEntry` (admin) — missing unauthenticated/wrong-owner test
-- `query additionalCompanyPrerequisites` (ranking) — missing unauthenticated/wrong-owner test
-- `query adminApiKeyAuditLog` (admin) — missing both auth-negative and owner-success tests
-- `query adminApiKeys` (admin) — missing both auth-negative and owner-success tests
-- `query adminProductAnalytics` (admin) — missing unauthenticated/wrong-owner test
-- `query allBanks` (finance) — missing unauthenticated/wrong-owner test
-- `query bankDepositRateHistory` (finance) — missing both auth-negative and owner-success tests
-- `query bankDeposits` (finance) — missing both auth-negative and owner-success tests
-- `query bankLoans` (lending) — missing unauthenticated/wrong-owner test
-- `query cityLots` (finance) — missing unauthenticated/wrong-owner test
-- `query companyBankAccounts` (finance) — missing unauthenticated/wrong-owner test
-- `query companyCityFinancialBreakdown` (finance) — missing unauthenticated/wrong-owner test
-- `query companyRankings` (ranking) — missing unauthenticated/wrong-owner test
-- `query companyShareholders` (shareholder) — missing unauthenticated/wrong-owner test
-- `query dividendProposals` (shareholder) — missing both auth-negative and owner-success tests
-- `query eurFxRates` (finance) — missing unauthenticated/wrong-owner test
-- `query forexQuote` (finance) — missing unauthenticated/wrong-owner test
-- `query forexTradeHistory` (finance) — missing unauthenticated/wrong-owner test
-- `query fxRateHistory` (finance) — missing unauthenticated/wrong-owner test
-- `query gameAdminSession` (admin) — missing both auth-negative and owner-success tests
-- `query gameState` (ranking) — missing unauthenticated/wrong-owner test
-- `query getCities` (finance) — missing unauthenticated/wrong-owner test
-- `query globalExchangeOffers` (finance) — missing unauthenticated/wrong-owner test
-- `query globalExchangeProductListings` (finance) — missing unauthenticated/wrong-owner test
-- `query loanOffers` (lending) — missing unauthenticated/wrong-owner test
-- `query myBankAccounts` (finance) — missing unauthenticated/wrong-owner test
-- `query myCollateralBuildings` (lending) — missing unauthenticated/wrong-owner test
-- `query myDeposits` (finance) — missing both auth-negative and owner-success tests
-- `query myDividendVotes` (shareholder) — missing both auth-negative and owner-success tests
-- `query myLoanOffers` (lending) — missing both auth-negative and owner-success tests
-- `query myLoans` (lending) — missing unauthenticated/wrong-owner test
-- `query myOpenDividendProposalCount` (shareholder) — missing both auth-negative and owner-success tests
-- `query myOpenOrders` (shareholder) — missing unauthenticated/wrong-owner test
-- `query operationsStatistics` (admin) — missing unauthenticated/wrong-owner test
-- `query orderBook` (shareholder) — missing both auth-negative and owner-success tests
-- `query playerCurrencyBalances` (finance) — missing unauthenticated/wrong-owner test
-- `query playerRankHistory` (ranking) — missing unauthenticated/wrong-owner test
-- `query rankHistory` (ranking) — missing unauthenticated/wrong-owner test
-- `query rankings` (ranking) — missing unauthenticated/wrong-owner test
-- `query starterIndustries` (ranking) — missing unauthenticated/wrong-owner test
-- `query stockExchangePriceHistory` (shareholder) — missing unauthenticated/wrong-owner test
-- `query stockTradeHistory` (shareholder) — missing unauthenticated/wrong-owner test
-- `query unitUpgradeInfo` (lending) — missing unauthenticated/wrong-owner test
+✅ No newly added sensitive operations are missing auth/ownership coverage.
 
 ## Sensitive operation inventory
 
