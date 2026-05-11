@@ -28,6 +28,7 @@ public sealed partial class Mutation
         BuySharesInput input,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization,
         [Service] ILogger<Mutation> logger,
         [Service] IMasterRankingTelemetryService rankingTelemetry,
         [Service] IOptions<MasterServerRegistrationOptions> masterOptions)
@@ -91,7 +92,9 @@ public sealed partial class Mutation
             player,
             account,
             input.BankAccountId,
-            "USD");
+            "USD",
+            objectAuthorization,
+            httpContextAccessor.HttpContext!.RequestAborted);
         decimal? personalCashAfterTrade = null;
         decimal? companyCashAfterTrade = null;
 
@@ -218,6 +221,7 @@ public sealed partial class Mutation
         SellSharesInput input,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization,
         [Service] ILogger<Mutation> logger,
         [Service] IMasterRankingTelemetryService rankingTelemetry,
         [Service] IOptions<MasterServerRegistrationOptions> masterOptions)
@@ -285,7 +289,9 @@ public sealed partial class Mutation
             player,
             account,
             input.BankAccountId,
-            "USD");
+            "USD",
+            objectAuthorization,
+            httpContextAccessor.HttpContext!.RequestAborted);
         decimal? personalCashAfterTrade = null;
         decimal? companyCashAfterTrade = null;
 

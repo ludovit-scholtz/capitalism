@@ -113,7 +113,8 @@ public sealed partial class Mutation
     public async Task<LimitOrderResult> CancelLimitOrder(
         Guid orderId,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
         var player = await db.Players
@@ -121,21 +122,22 @@ public sealed partial class Mutation
             .FirstOrDefaultAsync(candidate => candidate.Id == userId)
             ?? throw new GraphQLException(ErrorBuilder.New().SetMessage("Player not found.").SetCode("PLAYER_NOT_FOUND").Build());
 
-        var order = await db.LimitOrders
-            .Include(candidate => candidate.Company)
-            .FirstOrDefaultAsync(candidate => candidate.Id == orderId)
-            ?? throw new GraphQLException(ErrorBuilder.New().SetMessage("Order not found.").SetCode("ORDER_NOT_FOUND").Build());
+        var companyIds = player.Companies.Select(company => company.Id).ToHashSet();
+        var order = await objectAuthorization.RequireOwnedAsync(
+            actorUserId: player.Id,
+            requestedObjectType: "limit_order",
+            requestedObjectId: orderId,
+            loadEntityAsync: token => db.LimitOrders
+                .Include(candidate => candidate.Company)
+                .FirstOrDefaultAsync(candidate => candidate.Id == orderId, token),
+            isOwnedByActor: candidate =>
+                candidate.OwnerPlayerId == player.Id
+                || (candidate.OwnerCompanyId.HasValue && companyIds.Contains(candidate.OwnerCompanyId.Value)),
+            cancellationToken: httpContextAccessor.HttpContext!.RequestAborted);
 
         if (order.Status is LimitOrderStatus.Filled or LimitOrderStatus.Cancelled)
         {
             throw new GraphQLException(ErrorBuilder.New().SetMessage("Filled or cancelled orders cannot be cancelled again.").SetCode("ORDER_NOT_CANCELLABLE").Build());
-        }
-
-        var companyIds = player.Companies.Select(company => company.Id).ToHashSet();
-        var isOwner = order.OwnerPlayerId == player.Id || (order.OwnerCompanyId.HasValue && companyIds.Contains(order.OwnerCompanyId.Value));
-        if (!isOwner)
-        {
-            throw new GraphQLException(ErrorBuilder.New().SetMessage("You can cancel only your own limit orders.").SetCode("ORDER_NOT_OWNED").Build());
         }
 
         var settlementAccount = await db.BankAccounts.FirstOrDefaultAsync(candidate => candidate.Id == order.SettlementBankAccountId)
