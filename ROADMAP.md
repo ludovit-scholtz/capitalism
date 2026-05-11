@@ -59,6 +59,10 @@ Create a fun game in the style of Capitalism II, where players experience realis
 - [x] (100%) 11 frontend unit tests for `useEndgameStore` covering polling, milestone logic, and progress computation.
 - [x] (100%) 8 E2E Playwright tests in `finance/endgame.spec.ts`: billionaire panel, ARIA progress bar, winner overlay/read-only banner, admin End Shard visibility, End Shard full confirmation flow, End Shard cancel flow, non-admin access denial, and navbar lock icon.
 
+### Capital Markets & Shareholder Governance
+
+- [x] (100%) Deliver company-share ownership, shareholder registry visibility, stock buy/sell ownership updates, dividend vote governance, and dividend payout settlement with weighted shareholder voting and portfolio/net-worth tracking.
+
 ### Security Follow-Ups
 
 - [x] (100%) Replace the regex-based support markdown sanitizer with an allowlist HTML sanitizer, and add stored-XSS regression payloads that cover SVG, attribute, protocol, and malformed-markup bypass attempts before any `v-html` support preview is rendered.
