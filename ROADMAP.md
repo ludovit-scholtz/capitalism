@@ -7,6 +7,7 @@ Create a fun game in the style of Capitalism II, where players experience realis
 ### Onboarding
 
 - [x] (100%) The generated user name - the personal account name is not stored properly. Make sure to store it in the master server if the server does not already contain this information.
+- [ ] (0%) Generated user personal account name is not used in the game ranking. Make sure to use it in the ranking in the game server. Do not use the jwt name anywhere.
 - [x] (100%) Generated user personal account name is not used in the ranking. Make sure to use it in the ranking.
 - [x] (100%) Do not show the jwt user name anywhere to other players. The user name is generated from the user's algorand address, so for the privacy purposes it is not good to use it
 
@@ -53,3 +54,11 @@ Create a fun game in the style of Capitalism II, where players experience realis
 - [x] (100%) 14 backend integration tests covering win detection, mutation guard, benchmark admin, manual shard end, unauthenticated access, validation errors, multi-currency leader selection, and post-end mutation blocking.
 - [x] (100%) 11 frontend unit tests for `useEndgameStore` covering polling, milestone logic, and progress computation.
 - [x] (100%) 8 E2E Playwright tests in `finance/endgame.spec.ts`: billionaire panel, ARIA progress bar, winner overlay/read-only banner, admin End Shard visibility, End Shard full confirmation flow, End Shard cancel flow, non-admin access denial, and navbar lock icon.
+
+### Security Follow-Ups
+
+- [ ] Replace the regex-based support markdown sanitizer with an allowlist HTML sanitizer, and add stored-XSS regression payloads that cover SVG, attribute, protocol, and malformed-markup bypass attempts before any `v-html` support preview is rendered.
+- [ ] Finish `NOT_FOUND_OR_NOT_OWNED` plus balance-redaction normalization across building-market, exchange, and bank-transfer mutations so authenticated probes cannot infer foreign object existence, listing state, company linkage, or exact available funds.
+- [ ] Add dedicated MasterApi security regression tests for `gameNewsFeed(includeDrafts)` and `upsertGameNewsEntry`, covering anonymous draft reads, invalid registration keys, inactive server keys, spoofed requester identity, trusted server success, and privileged admin success.
+- [ ] Remove the committed NPC bot shared default password, require an environment-provided secret or API-key mode outside local development, and fail startup when the placeholder credential is still configured.
+- [ ] Upgrade `postcss` in `projects/master-frontend` to `>= 8.5.10` and keep both frontends on a zero known production dependency advisory baseline in CI.
