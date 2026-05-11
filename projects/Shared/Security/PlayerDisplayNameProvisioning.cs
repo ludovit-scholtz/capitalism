@@ -84,6 +84,31 @@ public static partial class PlayerDisplayNameProvisioning
             return true;
         }
 
+        // Algorand NFD (Non-Fungible Domain) names end with ".algo"
+        if (candidate.EndsWith(".algo", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        // Algorand NFD names can also end with ".algorand"
+        if (candidate.EndsWith(".algorand", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        // Algorand-style base32 strings of typical account/asset ID length that consist entirely
+        // of uppercase base32 characters are likely wallet or key identifiers.
+        // Range 44–70 covers:
+        //   • Algorand account addresses (exactly 58 chars, base32 of 36-byte checksum pubkey)
+        //   • Algorand multisig addresses (also 58 chars)
+        //   • Algorand transaction IDs and asset IDs (32-byte base32 = 52 chars)
+        //   • Algorand application IDs encoded as base32 keys (44+ chars)
+        // The upper bound of 70 provides a margin for future identifier types.
+        if (candidate.Length is >= 44 and <= 70 && AlgorandAddressRegex().IsMatch(candidate))
+        {
+            return true;
+        }
+
         return false;
     }
 

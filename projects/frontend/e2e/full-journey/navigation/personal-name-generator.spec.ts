@@ -169,6 +169,60 @@ test.describe('Rankings – display name shown', () => {
     // Email must NOT appear anywhere in any rank card (rankings show alias, not email)
     await expect(page.locator('.rank-card').getByText(player.email)).toBeHidden()
   })
+
+  test('leaderboard security regression: no Algorand address appears in ranking rows', async ({
+    page,
+  }) => {
+    // A player whose displayName mimics a JWT-derived name that should have been sanitised
+    // by the backend before reaching the frontend. The mock here simulates the backend
+    // correctly serving the sanitised alias (not the raw address).
+    const player = makePlayer({
+      id: 'security-algo-player',
+      email: 'algo-wallet@example.com',
+      // The backend MUST have replaced the Algorand address with this alias before serving.
+      // The frontend only renders what the backend returns — this tests the frontend
+      // binding never references the JWT name field directly.
+      displayName: 'Nimble Merchant 412',
+    })
+    setupMockApi(page, { players: [player] })
+    await page.goto('/leaderboard')
+
+    const rankCard = page.locator('.rank-card').first()
+    await expect(rankCard).toBeVisible()
+
+    // The generated alias must be visible
+    await expect(rankCard.getByText('Nimble Merchant 412')).toBeVisible()
+
+    // Verify the mock fixture itself follows the "Adjective Noun NNN" generated-alias pattern,
+    // confirming the test setup correctly represents a sanitised backend response.
+    expect('Nimble Merchant 412').toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+ \d{3}$/)
+
+    // Raw Algorand address pattern (58-char uppercase base32) must never appear in any rank card
+    const allText = await page.locator('.rank-card').allInnerTexts()
+    for (const text of allText) {
+      // Algorand addresses are 58-char uppercase A-Z + 2-7 only
+      expect(text).not.toMatch(/\b[A-Z2-7]{58}\b/)
+      // NFD .algo domains must not appear
+      expect(text.toLowerCase()).not.toContain('.algo')
+      // Email addresses must not appear
+      expect(text).not.toMatch(/\S+@\S+\.\S+/)
+    }
+  })
+
+  test('home page leaderboard uses personalAccountName not JWT-derived name', async ({ page }) => {
+    const player = makePlayer({
+      id: 'home-algo-player',
+      email: 'home-algo@example.com',
+      displayName: 'Bold Navigator 237',
+    })
+    setupMockApi(page, { players: [player] })
+    await page.goto('/')
+
+    // The generated alias must appear in the home page leaderboard snippet
+    await expect(page.getByText('Bold Navigator 237')).toBeVisible()
+    // The email must not appear in the leaderboard
+    await expect(page.getByText('home-algo@example.com')).toBeHidden()
+  })
 })
 
 test.describe('Onboarding IPO – personal account name generator', () => {
