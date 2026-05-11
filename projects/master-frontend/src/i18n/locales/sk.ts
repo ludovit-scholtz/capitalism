@@ -2,6 +2,7 @@ export default {
   common: {
     backToPortal: 'Späť na portál',
     allRightsReserved: '© {year} Kapitalizmus HQ. Všetky práva vyhradené.',
+    securityLink: 'Bezpečnosť',
     loading: 'Načítavam...',
     refresh: 'Obnoviť',
     apply: 'Použiť',
@@ -424,6 +425,11 @@ export default {
     goldCopy: 'Upravuj zostatky tokenizovaného zlata s kompletnou auditnou stopou.',
     securityBoardCopy:
       'Sleduj otvorené High/Critical audítorské zistenia, zodpovedných a prepojené implementačné issues.',
+    depAuditTitle: 'Audit závislostí frontendu',
+    depAuditCopy:
+      'Zobraz stav npm audit pre oba frontendy. Zelená znamená žiadne high/critical produkčné advisories.',
+    depAuditClean: '✅ Brána aktívna — audit baseline je čistý',
+    depAuditViewRuns: 'Zobraziť CI behy',
   },
   rankingHistory: {
     title: 'História odmien',

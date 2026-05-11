@@ -1,0 +1,61 @@
+{
+  "generatedAt": "2026-05-11T13:28:11.356Z",
+  "scannedDirectories": [
+    "/home/runner/work/capitalism/capitalism/projects/frontend/src",
+    "/home/runner/work/capitalism/capitalism/projects/master-frontend/src"
+  ],
+  "totalSinks": 7,
+  "sanitizedSinks": 1,
+  "unsanitizedSinks": 6,
+  "sinks": [
+    {
+      "filePath": "projects/frontend/src/components/admin/RichTextEditor.vue",
+      "lineNumber": 18,
+      "sinkType": "innerHTML",
+      "sanitized": false,
+      "sanitizationNote": "No DOMPurify sanitization detected"
+    },
+    {
+      "filePath": "projects/frontend/src/components/admin/RichTextEditor.vue",
+      "lineNumber": 22,
+      "sinkType": "innerHTML",
+      "sanitized": false,
+      "sanitizationNote": "No DOMPurify sanitization detected"
+    },
+    {
+      "filePath": "projects/frontend/src/components/common/CountryFlag.vue",
+      "lineNumber": 46,
+      "sinkType": "v-html",
+      "sanitized": false,
+      "sanitizationNote": "No DOMPurify sanitization detected"
+    },
+    {
+      "filePath": "projects/frontend/src/views/NewsView.vue",
+      "lineNumber": 339,
+      "sinkType": "v-html",
+      "sanitized": true,
+      "sanitizationNote": "DOMPurify.sanitize() found in same file"
+    },
+    {
+      "filePath": "projects/master-frontend/src/components/common/CountryFlag.vue",
+      "lineNumber": 45,
+      "sinkType": "v-html",
+      "sanitized": false,
+      "sanitizationNote": "No DOMPurify sanitization detected"
+    },
+    {
+      "filePath": "projects/master-frontend/src/views/SupportAdminView.vue",
+      "lineNumber": 315,
+      "sinkType": "v-html",
+      "sanitized": false,
+      "sanitizationNote": "No DOMPurify sanitization detected"
+    },
+    {
+      "filePath": "projects/master-frontend/src/views/SupportTicketDetailView.vue",
+      "lineNumber": 194,
+      "sinkType": "v-html",
+      "sanitized": false,
+      "sanitizationNote": "No DOMPurify sanitization detected"
+    }
+  ]
+}

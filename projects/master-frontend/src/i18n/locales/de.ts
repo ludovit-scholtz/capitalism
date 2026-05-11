@@ -2,6 +2,7 @@ export default {
   common: {
     backToPortal: 'Zurück zum Portal',
     allRightsReserved: '© {year} Kapitalismus HQ. Alle Rechte vorbehalten.',
+    securityLink: 'Sicherheit',
     loading: 'Lade...',
     refresh: 'Aktualisieren',
     apply: 'Anwenden',
@@ -431,6 +432,11 @@ export default {
     goldCopy: 'Passe tokenisierte Goldguthaben mit vollständiger Audit-Spur an.',
     securityBoardCopy:
       'Verfolge offene High/Critical Audit-Befunde, Verantwortliche und verknüpfte Implementierungs-Issues.',
+    depAuditTitle: 'Frontend-Abhängigkeitsaudit',
+    depAuditCopy:
+      'Zeige den aktuellen npm-Audit-Status für beide Frontends. Grün bedeutet keine high/critical Produktionsadvisories.',
+    depAuditClean: '✅ Gate aktiv — Audit-Baseline ist sauber',
+    depAuditViewRuns: 'CI-Läufe anzeigen',
   },
   rankingHistory: {
     title: 'Belohnungsverlauf',

@@ -13,6 +13,7 @@ export default {
     submit: 'Absenden',
     close: 'Schlie\u00dfen',
     allRightsReserved: '\u00a9 {year} Kapitalismus sro. Alle Rechte vorbehalten.',
+    securityLink: 'Sicherheit',
     confirm: 'Best\u00e4tigen',
     level: 'Stufe',
     notAvailable: 'N/V',

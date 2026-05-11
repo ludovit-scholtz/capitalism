@@ -2,6 +2,7 @@ export default {
   common: {
     backToPortal: 'Back to portal',
     allRightsReserved: '© {year} Capitalism HQ. All rights reserved.',
+    securityLink: 'Security',
     loading: 'Loading...',
     refresh: 'Refresh',
     apply: 'Apply',
@@ -427,6 +428,11 @@ export default {
     goldCopy: 'Adjust tokenized gold balances with a complete audit trail.',
     securityBoardCopy:
       'Track open High/Critical audit findings, owner assignments, and linked implementation issues.',
+    depAuditTitle: 'Frontend Dependency Audit',
+    depAuditCopy:
+      'View the latest npm audit gate status for both frontends. Green means no high/critical production advisories.',
+    depAuditClean: '✅ Gate active — audit baseline is clean',
+    depAuditViewRuns: 'View CI runs',
   },
   rankingHistory: {
     title: 'Bounty History',

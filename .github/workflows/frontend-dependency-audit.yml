@@ -1,0 +1,369 @@
+name: frontend-dependency-audit
+
+on:
+  pull_request:
+    paths:
+      - 'projects/frontend/**'
+      - 'projects/master-frontend/**'
+      - 'tools/frontend-sink-tracker/**'
+      - 'audits/frontend-sink-inventory.json'
+      - '.github/workflows/frontend-dependency-audit.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'projects/frontend/**'
+      - 'projects/master-frontend/**'
+      - 'tools/frontend-sink-tracker/**'
+      - 'audits/frontend-sink-inventory.json'
+      - '.github/workflows/frontend-dependency-audit.yml'
+  schedule:
+    # Weekly on Monday at 07:00 UTC
+    - cron: '0 7 * * 1'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────────
+  # Job 1: npm audit production dependency gate
+  # ──────────────────────────────────────────────────────────────────────────
+  audit-game-frontend:
+    name: npm audit — game frontend
+    runs-on: ubuntu-latest
+    outputs:
+      advisory_count: ${{ steps.audit.outputs.advisory_count }}
+      report_fragment: ${{ steps.audit.outputs.report_fragment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: projects/frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: projects/frontend
+        run: npm ci
+
+      - name: Run npm audit (production only)
+        id: audit
+        working-directory: projects/frontend
+        shell: bash
+        run: |
+          set +e
+          AUDIT_JSON=$(npm audit --omit=dev --json 2>/dev/null)
+          EXIT_CODE=$?
+
+          # Parse advisory count
+          ADVISORY_COUNT=$(echo "$AUDIT_JSON" | node -e "
+            const chunks = [];
+            process.stdin.on('data', c => chunks.push(c));
+            process.stdin.on('end', () => {
+              try {
+                const data = JSON.parse(chunks.join(''));
+                const vulns = data.vulnerabilities ?? {};
+                const hc = Object.values(vulns).filter(v => ['high','critical'].includes(v.severity));
+                process.stdout.write(String(hc.length));
+              } catch { process.stdout.write('0'); }
+            });
+          ")
+
+          echo "advisory_count=$ADVISORY_COUNT" >> "$GITHUB_OUTPUT"
+
+          # Build report fragment
+          if [ "$ADVISORY_COUNT" -gt 0 ]; then
+            FRAGMENT=$(echo "$AUDIT_JSON" | node -e "
+              const chunks = [];
+              process.stdin.on('data', c => chunks.push(c));
+              process.stdin.on('end', () => {
+                try {
+                  const data = JSON.parse(chunks.join(''));
+                  const vulns = data.vulnerabilities ?? {};
+                  let md = '### 🎮 Game Frontend Advisories\n\n';
+                  md += '| Package | Severity | Direct | Fix Available |\n';
+                  md += '|---------|----------|--------|---------------|\n';
+                  for (const [name, v] of Object.entries(vulns)) {
+                    if (['high','critical'].includes(v.severity)) {
+                      const fix = v.fixAvailable === true ? '✅ Yes' : v.fixAvailable ? \`⚠️ \${v.fixAvailable.name}@\${v.fixAvailable.version}\` : '❌ No';
+                      md += \`| \${name} | \${v.severity.toUpperCase()} | \${v.isDirect ? 'Yes' : 'No'} | \${fix} |\n\`;
+                    }
+                  }
+                  process.stdout.write(JSON.stringify(md));
+                } catch { process.stdout.write('""'); }
+              });
+            " | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')))" 2>/dev/null || echo "")
+            echo "report_fragment<<EOF" >> "$GITHUB_OUTPUT"
+            echo "$FRAGMENT" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+          else
+            echo "report_fragment=### 🎮 Game Frontend\n\n✅ No high/critical production advisories found." >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "Game frontend advisory count (high/critical): $ADVISORY_COUNT"
+          if [ "$ADVISORY_COUNT" -gt 0 ]; then
+            echo "::error::Game frontend has $ADVISORY_COUNT high/critical production advisory(ies). Run 'npm audit --omit=dev' in projects/frontend to see details."
+            exit 1
+          fi
+
+  audit-master-frontend:
+    name: npm audit — master frontend
+    runs-on: ubuntu-latest
+    outputs:
+      advisory_count: ${{ steps.audit.outputs.advisory_count }}
+      report_fragment: ${{ steps.audit.outputs.report_fragment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: projects/master-frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: projects/master-frontend
+        run: npm ci
+
+      - name: Run npm audit (production only)
+        id: audit
+        working-directory: projects/master-frontend
+        shell: bash
+        run: |
+          set +e
+          AUDIT_JSON=$(npm audit --omit=dev --json 2>/dev/null)
+          EXIT_CODE=$?
+
+          ADVISORY_COUNT=$(echo "$AUDIT_JSON" | node -e "
+            const chunks = [];
+            process.stdin.on('data', c => chunks.push(c));
+            process.stdin.on('end', () => {
+              try {
+                const data = JSON.parse(chunks.join(''));
+                const vulns = data.vulnerabilities ?? {};
+                const hc = Object.values(vulns).filter(v => ['high','critical'].includes(v.severity));
+                process.stdout.write(String(hc.length));
+              } catch { process.stdout.write('0'); }
+            });
+          ")
+
+          echo "advisory_count=$ADVISORY_COUNT" >> "$GITHUB_OUTPUT"
+
+          if [ "$ADVISORY_COUNT" -gt 0 ]; then
+            FRAGMENT=$(echo "$AUDIT_JSON" | node -e "
+              const chunks = [];
+              process.stdin.on('data', c => chunks.push(c));
+              process.stdin.on('end', () => {
+                try {
+                  const data = JSON.parse(chunks.join(''));
+                  const vulns = data.vulnerabilities ?? {};
+                  let md = '### 🖥️ Master Frontend Advisories\n\n';
+                  md += '| Package | Severity | Direct | Fix Available |\n';
+                  md += '|---------|----------|--------|---------------|\n';
+                  for (const [name, v] of Object.entries(vulns)) {
+                    if (['high','critical'].includes(v.severity)) {
+                      const fix = v.fixAvailable === true ? '✅ Yes' : v.fixAvailable ? \`⚠️ \${v.fixAvailable.name}@\${v.fixAvailable.version}\` : '❌ No';
+                      md += \`| \${name} | \${v.severity.toUpperCase()} | \${v.isDirect ? 'Yes' : 'No'} | \${fix} |\n\`;
+                    }
+                  }
+                  process.stdout.write(JSON.stringify(md));
+                } catch { process.stdout.write('""'); }
+              });
+            " | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')))" 2>/dev/null || echo "")
+            echo "report_fragment<<EOF" >> "$GITHUB_OUTPUT"
+            echo "$FRAGMENT" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+          else
+            echo "report_fragment=### 🖥️ Master Frontend\n\n✅ No high/critical production advisories found." >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "Master frontend advisory count (high/critical): $ADVISORY_COUNT"
+          if [ "$ADVISORY_COUNT" -gt 0 ]; then
+            echo "::error::Master frontend has $ADVISORY_COUNT high/critical production advisory(ies). Run 'npm audit --omit=dev' in projects/master-frontend to see details."
+            exit 1
+          fi
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Job 2: Sink tracker tests + inventory
+  # ──────────────────────────────────────────────────────────────────────────
+  sink-tracker:
+    name: Rich-content sink tracker
+    runs-on: ubuntu-latest
+    outputs:
+      unsanitized_count: ${{ steps.track.outputs.unsanitized_count }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Run sink tracker tests
+        run: node --test tools/frontend-sink-tracker/__tests__/sink-tracker.test.mjs
+
+      - name: Run sink tracker and generate inventory
+        id: track
+        run: |
+          node tools/frontend-sink-tracker/index.mjs \
+            --dirs projects/frontend/src \
+            --dirs projects/master-frontend/src \
+            --output "${{ runner.temp }}/frontend-sink-inventory.json" \
+            --base-dir "${{ github.workspace }}"
+
+          UNSANITIZED=$(node -e "
+            const { readFileSync } = require('fs');
+            const inv = JSON.parse(readFileSync('${{ runner.temp }}/frontend-sink-inventory.json', 'utf8'));
+            process.stdout.write(String(inv.unsanitizedSinks));
+          ")
+          echo "unsanitized_count=$UNSANITIZED" >> "$GITHUB_OUTPUT"
+
+      - name: Upload sink inventory artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-sink-inventory
+          path: ${{ runner.temp }}/frontend-sink-inventory.json
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Job 3: Assemble Markdown report artifact
+  # ──────────────────────────────────────────────────────────────────────────
+  report:
+    name: Generate dependency audit report
+    runs-on: ubuntu-latest
+    needs: [audit-game-frontend, audit-master-frontend, sink-tracker]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: projects/frontend/package-lock.json
+
+      - name: Install game frontend dependencies
+        working-directory: projects/frontend
+        run: npm ci
+
+      - name: Install master frontend dependencies
+        working-directory: projects/master-frontend
+        run: npm ci
+
+      - name: Generate full Markdown report
+        shell: bash
+        run: |
+          GAME_ADVISORIES="${{ needs.audit-game-frontend.outputs.advisory_count }}"
+          MASTER_ADVISORIES="${{ needs.audit-master-frontend.outputs.advisory_count }}"
+          UNSANITIZED="${{ needs.sink-tracker.outputs.unsanitized_count }}"
+          RUN_DATE=$(date -u '+%Y-%m-%d %H:%M UTC')
+          OVERALL_STATUS="✅ CLEAN"
+          if [ "${GAME_ADVISORIES:-0}" -gt 0 ] || [ "${MASTER_ADVISORIES:-0}" -gt 0 ]; then
+            OVERALL_STATUS="❌ ADVISORIES FOUND"
+          fi
+
+          cat > "${{ runner.temp }}/frontend-dependency-report.md" <<MDEOF
+          # Frontend Dependency Audit Report
+
+          **Generated:** ${RUN_DATE}
+          **Workflow run:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          **Overall status:** ${OVERALL_STATUS}
+
+          ---
+
+          ## Production Advisory Summary
+
+          | Frontend | High/Critical Advisories | Status |
+          |----------|--------------------------|--------|
+          | 🎮 Game frontend (\`projects/frontend\`) | ${GAME_ADVISORIES:-0} | $([ "${GAME_ADVISORIES:-0}" -eq 0 ] && echo "✅ Clean" || echo "❌ Blocked") |
+          | 🖥️ Master frontend (\`projects/master-frontend\`) | ${MASTER_ADVISORIES:-0} | $([ "${MASTER_ADVISORIES:-0}" -eq 0 ] && echo "✅ Clean" || echo "❌ Blocked") |
+
+          ## Game Frontend — Full Audit (\`--omit=dev\`)
+
+          \`\`\`
+          $(cd projects/frontend && npm audit --omit=dev 2>&1 || true)
+          \`\`\`
+
+          ## Master Frontend — Full Audit (\`--omit=dev\`)
+
+          \`\`\`
+          $(cd projects/master-frontend && npm audit --omit=dev 2>&1 || true)
+          \`\`\`
+
+          ---
+
+          ## Rich-Content Sink Inventory
+
+          **Unsanitized sinks (no DOMPurify):** ${UNSANITIZED:-0}
+
+          Sink details are in the \`frontend-sink-inventory\` artifact attached to this run.
+
+          **Sink types tracked:** \`v-html\`, \`innerHTML\`, \`document.write\`
+          **Sanitization check:** DOMPurify.sanitize() called in same component file
+
+          ---
+
+          ## Remediation Guide
+
+          - Run \`npm audit fix --omit=dev\` in the affected frontend directory to auto-fix no-breaking-change advisories.
+          - For breaking-change fixes, evaluate the upgrade manually and test the build.
+          - For unsanitized sinks, wrap the value with \`DOMPurify.sanitize(value)\` before passing to \`v-html\` or \`innerHTML\`.
+          - See [npm audit documentation](https://docs.npmjs.com/cli/v10/commands/npm-audit) for details.
+          MDEOF
+
+          echo "Report generated."
+          cat "${{ runner.temp }}/frontend-dependency-report.md"
+
+      - name: Upload dependency report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dependency-report
+          path: ${{ runner.temp }}/frontend-dependency-report.md
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Job 4: Open a GitHub Issue on scheduled runs when advisories are found
+  # ──────────────────────────────────────────────────────────────────────────
+  notify-on-schedule:
+    name: Open advisory issue (scheduled only)
+    runs-on: ubuntu-latest
+    needs: [audit-game-frontend, audit-master-frontend]
+    if: |
+      github.event_name == 'schedule' &&
+      (needs.audit-game-frontend.outputs.advisory_count > 0 ||
+       needs.audit-master-frontend.outputs.advisory_count > 0)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create advisory issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const gameCnt = ${{ needs.audit-game-frontend.outputs.advisory_count || 0 }};
+            const masterCnt = ${{ needs.audit-master-frontend.outputs.advisory_count || 0 }};
+            const total = gameCnt + masterCnt;
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[Security] ${total} high/critical frontend production advisory(ies) detected`,
+              body: [
+                '## Weekly frontend dependency audit alert',
+                '',
+                `A scheduled audit run found **${total}** high/critical production advisory(ies).`,
+                '',
+                `| Frontend | Advisories |`,
+                `|----------|-----------|`,
+                `| 🎮 Game frontend | ${gameCnt} |`,
+                `| 🖥️ Master frontend | ${masterCnt} |`,
+                '',
+                `**Workflow run:** ${runUrl}`,
+                '',
+                'Please resolve these advisories before the next release.',
+                'Run `npm audit --omit=dev` in the affected directory and upgrade or override affected packages.',
+              ].join('\n'),
+              labels: ['security', 'dependencies'],
+            });
