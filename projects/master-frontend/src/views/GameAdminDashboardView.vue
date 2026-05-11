@@ -62,6 +62,19 @@ const navItems = computed(() => [
         <h2>{{ t('securityBoard.title') }}</h2>
         <p>{{ t('gameAdmin.securityBoardCopy') }}</p>
       </RouterLink>
+
+      <!-- Frontend Dependency Audit badge -->
+      <a
+        class="admin-card dep-audit-card"
+        href="https://github.com/ludovit-scholtz/capitalism/actions/workflows/frontend-dependency-audit.yml"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <h2>{{ t('gameAdmin.depAuditTitle') }}</h2>
+        <p>{{ t('gameAdmin.depAuditCopy') }}</p>
+        <span class="dep-audit-badge">{{ t('gameAdmin.depAuditClean') }}</span>
+        <span class="dep-audit-link">{{ t('gameAdmin.depAuditViewRuns') }} →</span>
+      </a>
     </section>
   </main>
 </template>
@@ -89,5 +102,20 @@ const navItems = computed(() => [
   margin-top: 0.5rem;
   font-size: 0.9rem;
   color: var(--color-text-secondary);
+}
+
+.dep-audit-badge {
+  display: inline-block;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--color-success, #22c55e);
+  font-weight: 600;
+}
+
+.dep-audit-link {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--color-primary, #60a5fa);
 }
 </style>

@@ -13,6 +13,7 @@ export default {
     submit: 'Submit',
     close: 'Close',
     allRightsReserved: '\u00a9 {year} Capitalism sro. All rights reserved.',
+    securityLink: 'Security',
     confirm: 'Confirm',
     level: 'Level',
     notAvailable: 'N/A',
