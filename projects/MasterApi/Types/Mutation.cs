@@ -5,6 +5,7 @@ using MasterApi.Configuration;
 using MasterApi.Data;
 using MasterApi.Data.Entities;
 using MasterApi.Security;
+using Capitalism.Shared.Security;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -45,6 +46,7 @@ public sealed partial class Mutation
             new Claim(ClaimTypes.NameIdentifier, player.Id.ToString()),
             new Claim(ClaimTypes.Email, player.Email),
             new Claim(ClaimTypes.Name, player.DisplayName),
+            new Claim(TokenBoundaryClaims.TokenTypeClaimType, TokenBoundaryClaims.TokenTypeMaster),
         };
 
         var token = new JwtSecurityToken(

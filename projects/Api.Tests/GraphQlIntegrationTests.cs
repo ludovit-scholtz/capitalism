@@ -10,6 +10,7 @@ using Api.Security;
 using Api.Types;
 using Api.Tests.Infrastructure;
 using Api.Utilities;
+using Capitalism.Shared.Security;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -93,6 +94,11 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             new(ClaimTypes.Email, email),
             new(ClaimTypes.Name, displayName),
         };
+        if (!extraClaims.Any(claim => claim.Type == TokenBoundaryClaims.TokenTypeClaimType))
+        {
+            claims.Add(new Claim(TokenBoundaryClaims.TokenTypeClaimType, TokenBoundaryClaims.TokenTypeMaster));
+        }
+
         claims.AddRange(extraClaims);
 
         var token = new JwtSecurityToken(
@@ -1605,6 +1611,138 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         }, "test"));
 
         Assert.False(principal.IsImpersonating());
+    }
+
+    [Fact]
+    public async Task Me_ImpersonationWithoutExplicitGrant_IsRejected()
+    {
+        var actorId = Guid.NewGuid();
+        var token = CreateSharedToken(
+            actorId.ToString(),
+            $"impersonation-missing-grant-{Guid.NewGuid():N}@example.com",
+            "Impersonation Missing Grant",
+            new Claim(TokenBoundaryClaims.TokenTypeClaimType, TokenBoundaryClaims.TokenTypeGame),
+            new Claim(ClaimsPrincipalExtensions.EffectivePlayerIdClaimType, Guid.NewGuid().ToString()),
+            new Claim(ClaimsPrincipalExtensions.EffectivePlayerEmailClaimType, "target@example.com"),
+            new Claim(ClaimsPrincipalExtensions.EffectivePlayerNameClaimType, "Target Player"));
+
+        var result = await ExecuteGraphQlAsync("{ me { id email } }", token: token);
+        Assert.True(result.TryGetProperty("errors", out _));
+    }
+
+    [Fact]
+    public async Task Me_ImpersonationWithExplicitGrant_ResolvesEffectivePlayer()
+    {
+        var actorEmail = $"impersonation-actor-{Guid.NewGuid():N}@example.com";
+        var targetEmail = $"impersonation-target-{Guid.NewGuid():N}@example.com";
+        await RegisterAndGetTokenAsync(actorEmail, "Actor User");
+        await RegisterAndGetTokenAsync(targetEmail, "Target User");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var actor = await db.Players.SingleAsync(player => player.Email == actorEmail);
+        var target = await db.Players.SingleAsync(player => player.Email == targetEmail);
+
+        var token = CreateSharedToken(
+            actor.Id.ToString(),
+            actorEmail,
+            actor.DisplayName,
+            new Claim(TokenBoundaryClaims.TokenTypeClaimType, TokenBoundaryClaims.TokenTypeGame),
+            new Claim(ClaimsPrincipalExtensions.EffectivePlayerIdClaimType, target.Id.ToString()),
+            new Claim(ClaimsPrincipalExtensions.EffectivePlayerEmailClaimType, target.Email),
+            new Claim(ClaimsPrincipalExtensions.EffectivePlayerNameClaimType, target.DisplayName),
+            new Claim(TokenBoundaryClaims.ImpersonationGrantClaimType, bool.TrueString));
+
+        var result = await ExecuteGraphQlAsync("{ me { id email displayName } }", token: token);
+        Assert.False(result.TryGetProperty("errors", out _));
+        var me = result.GetProperty("data").GetProperty("me");
+        Assert.Equal(target.Id.ToString(), me.GetProperty("id").GetString());
+        Assert.Equal(target.Email, me.GetProperty("email").GetString());
+    }
+
+    [Fact]
+    public async Task GameAdminDashboard_MasterTokenWithAdminRole_IsRestrictedToPlayerScope()
+    {
+        var email = $"master-scope-{Guid.NewGuid():N}@example.com";
+        await RegisterAndGetTokenAsync(email, "Master Scope User");
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(candidate => candidate.Email == email);
+            player.Role = PlayerRole.Admin;
+            await db.SaveChangesAsync();
+        }
+
+        var masterToken = CreateSharedToken(
+            Guid.NewGuid().ToString(),
+            email,
+            "Master Scope User",
+            new Claim(TokenBoundaryClaims.TokenTypeClaimType, TokenBoundaryClaims.TokenTypeMaster),
+            new Claim(ClaimTypes.Role, PlayerRole.Admin));
+
+        var meResult = await ExecuteGraphQlAsync("{ me { email role } }", token: masterToken);
+        Assert.False(meResult.TryGetProperty("errors", out _));
+        Assert.Equal("PLAYER", meResult.GetProperty("data").GetProperty("me").GetProperty("role").GetString());
+
+        var dashboardResult = await ExecuteGraphQlAsync(
+            """
+            query {
+              gameAdminDashboard {
+                moneySupply
+              }
+            }
+            """,
+            token: masterToken);
+
+        Assert.True(dashboardResult.TryGetProperty("errors", out _));
+    }
+
+    [Fact]
+    public async Task SetPlayerInvisibleInChat_MasterTokenWithAdminRole_IsRestrictedToPlayerScope()
+    {
+        var email = $"master-admin-mutation-{Guid.NewGuid():N}@example.com";
+        await RegisterAndGetTokenAsync(email, "Master Mutation Scope User");
+
+        Guid playerId;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(candidate => candidate.Email == email);
+            player.Role = PlayerRole.Admin;
+            playerId = player.Id;
+            await db.SaveChangesAsync();
+        }
+
+        var masterToken = CreateSharedToken(
+            Guid.NewGuid().ToString(),
+            email,
+            "Master Mutation Scope User",
+            new Claim(TokenBoundaryClaims.TokenTypeClaimType, TokenBoundaryClaims.TokenTypeMaster),
+            new Claim(ClaimTypes.Role, PlayerRole.Admin));
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation SetInvisible($input: SetPlayerInvisibleInChatInput!) {
+              setPlayerInvisibleInChat(input: $input) {
+                id
+              }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    playerId,
+                    isInvisibleInChat = true,
+                }
+            },
+            masterToken);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Contains(
+            errors.EnumerateArray(),
+            error => error.GetProperty("extensions").GetProperty("code").GetString() == "ADMIN_ACCESS_REQUIRED");
     }
 
     #endregion

@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using Capitalism.Shared.Security;
 using MasterApi.Data;
 using MasterApi.Data.Entities;
 using MasterApi.Tests.Infrastructure;
@@ -1695,6 +1696,7 @@ public sealed class RankingIntegrationTests
                 new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
                 new Claim(ClaimTypes.Email, "root@example.com"),
                 new Claim(ClaimTypes.Name, "Root Admin"),
+                new Claim(TokenBoundaryClaims.TokenTypeClaimType, TokenBoundaryClaims.TokenTypeMaster),
             ],
             expires: DateTime.UtcNow.AddMinutes(30),
             signingCredentials: credentials);

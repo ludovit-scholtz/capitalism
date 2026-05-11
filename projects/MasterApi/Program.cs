@@ -8,6 +8,7 @@ using MasterApi.Data;
 using MasterApi.Data.Entities;
 using MasterApi.Security;
 using MasterApi.Utilities;
+using Capitalism.Shared.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -156,6 +157,8 @@ public class Program
                         {
                             var synchronizer = context.HttpContext.RequestServices.GetRequiredService<AuthenticatedMasterPlayerClaimsSyncService>();
                             await synchronizer.SyncAsync(context.Principal, identity, context.HttpContext.RequestAborted);
+
+                            StampMasterPrivilegeEligibility(identity, context.Principal, jwtOptions.Issuer);
                         }
                     }
                 };
@@ -205,6 +208,8 @@ public class Program
 
                         var synchronizer = context.HttpContext.RequestServices.GetRequiredService<AuthenticatedMasterPlayerClaimsSyncService>();
                         await synchronizer.SyncAsync(context.Principal, identity, context.HttpContext.RequestAborted);
+
+                        StampMasterPrivilegeEligibility(identity, context.Principal, jwtOptions.Issuer);
                     }
                 };
             });
@@ -253,5 +258,18 @@ public class Program
         }
 
         await app.RunAsync();
+
+        static void StampMasterPrivilegeEligibility(ClaimsIdentity identity, ClaimsPrincipal principal, string expectedIssuer)
+        {
+            foreach (var claim in identity.FindAll(TokenBoundaryClaims.MasterPrivilegeEligibleClaimType).ToList())
+            {
+                identity.RemoveClaim(claim);
+            }
+
+            if (TokenBoundaryClaims.IsMasterPrivilegeEligible(principal, expectedIssuer))
+            {
+                identity.AddClaim(new Claim(TokenBoundaryClaims.MasterPrivilegeEligibleClaimType, bool.TrueString));
+            }
+        }
     }
 }
