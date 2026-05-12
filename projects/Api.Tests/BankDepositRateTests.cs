@@ -1,6 +1,7 @@
 using Api.Data;
 using Api.Data.Entities;
 using Api.Engine;
+using Api.Security;
 using Api.Tests.Infrastructure;
 using Api.Types;
 using Microsoft.EntityFrameworkCore;
@@ -255,10 +256,10 @@ public sealed class BankDepositRateTests
     // ── Owner-only enforcement ─────────────────────────────────────────────────
 
     /// <summary>
-    /// Non-owner cannot call UpdateBankDepositRate — must return BANK_NOT_FOUND error.
+    /// Non-owner cannot call UpdateBankDepositRate — must return NOT_FOUND_OR_NOT_OWNED.
     /// </summary>
     [Fact]
-    public async Task UpdateBankDepositRate_NonOwner_ReturnsBankNotFoundError()
+    public async Task UpdateBankDepositRate_NonOwner_ReturnsNotFoundOrNotOwnedError()
     {
         await using var factory = new ApiWebApplicationFactory();
         var client = factory.CreateClient();
@@ -294,7 +295,7 @@ public sealed class BankDepositRateTests
         var errors = result.GetProperty("errors");
         Assert.True(errors.GetArrayLength() > 0, "Expected an error when non-owner calls updateBankDepositRate.");
         var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
-        Assert.Equal("BANK_NOT_FOUND", code);
+        Assert.Equal(ObjectAuthorizationService.NotFoundOrNotOwnedCode, code);
     }
 
     // ── Scheduling (24-tick delay) ──────────────────────────────────────────────
@@ -630,6 +631,60 @@ public sealed class BankDepositRateTests
         var entry = history[0];
         Assert.Equal(5.5m, entry.GetProperty("newRatePercent").GetDecimal());
         Assert.False(entry.GetProperty("isApplied").GetBoolean(), "Rate not yet applied.");
+    }
+
+    /// <summary>
+    /// Non-owners cannot read another bank's deposit-rate history.
+    /// The query must return the same opaque NOT_FOUND_OR_NOT_OWNED code used elsewhere.
+    /// </summary>
+    [Fact]
+    public async Task BankDepositRateHistory_NonOwner_ReturnsNotFoundOrNotOwnedError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var ownerToken = await RegisterAsync(client, "ratehistory-owner@test.com", "Rate History Owner");
+        var otherToken = await RegisterAsync(client, "ratehistory-other@test.com", "Rate History Other");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var ownerPlayer = await db.Players.FirstAsync(p => p.Email == "ratehistory-owner@test.com");
+        var city = await db.Cities.FirstDeterministicAsync();
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = ownerPlayer.Id, Name = "History Guard Co", Cash = 50_000_000m };
+        db.Companies.Add(company);
+        var bank = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.Bank, Name = "History Guard Bank", Level = 1,
+            BaseCapitalDeposited = true, DepositInterestRatePercent = 3m,
+        };
+        db.Buildings.Add(bank);
+        await db.SaveChangesAsync();
+
+        await ExecuteAsync(client,
+            """
+            mutation UBDR($input: UpdateBankDepositRateInput!) {
+              updateBankDepositRate(input: $input) { pendingDepositInterestRatePercent }
+            }
+            """,
+            new { input = new { bankBuildingId = bank.Id.ToString(), newRatePercent = 4m } },
+            token: ownerToken);
+
+        var result = await ExecuteAsync(client,
+            """
+            query HIST($id: UUID!) {
+              bankDepositRateHistory(bankBuildingId: $id) {
+                id
+              }
+            }
+            """,
+            new { id = bank.Id.ToString() },
+            token: otherToken);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0, "Expected an error when non-owner queries bank deposit rate history.");
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal(ObjectAuthorizationService.NotFoundOrNotOwnedCode, code);
     }
 
     // ── Bank activation guard ─────────────────────────────────────────────────
