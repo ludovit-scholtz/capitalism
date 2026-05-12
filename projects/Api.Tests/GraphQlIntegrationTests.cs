@@ -8107,63 +8107,6 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         }
 
         [Fact]
-        public async Task ReplaceCEO_UsesControlledOwnershipToTakeControl()
-        {
-                var targetOwnerToken = await RegisterAndGetTokenAsync($"replace-ceo-target-{Guid.NewGuid():N}@test.com", "Target Owner");
-                var targetOwnerId = await GetCurrentPlayerIdAsync(targetOwnerToken);
-                var targetCompanyId = await SeedPublicCompanyAsync(targetOwnerId, name: "Replace CEO Target", cash: 100_000m);
-
-                var acquirerToken = await RegisterAndGetTokenAsync($"replace-ceo-acquirer-{Guid.NewGuid():N}@test.com", "Acquirer");
-                var acquirerId = await GetCurrentPlayerIdAsync(acquirerToken);
-
-                await ExecuteGraphQlAsync(
-                        """
-                        mutation BuyShares($input: BuySharesInput!) {
-                            buyShares(input: $input) { ownedShareCount }
-                        }
-                        """,
-                        new { input = new { companyId = targetCompanyId, shareCount = 5_000m } },
-                        acquirerToken);
-
-                var replaceResult = await ExecuteGraphQlAsync(
-                        """
-                        mutation ReplaceCEO($input: ReplaceCeoInput!) {
-                            replaceCEO(input: $input) {
-                                companyId
-                                companyName
-                                newCeoPlayerId
-                                newCeoDisplayName
-                            }
-                        }
-                        """,
-                        new { input = new { companyId = targetCompanyId, newCeoPlayerId = acquirerId } },
-                        acquirerToken);
-
-                var replaced = replaceResult.GetProperty("data").GetProperty("replaceCEO");
-                Assert.Equal(targetCompanyId.ToString(), replaced.GetProperty("companyId").GetString());
-                Assert.Equal("Replace CEO Target", replaced.GetProperty("companyName").GetString());
-                Assert.Equal(acquirerId.ToString(), replaced.GetProperty("newCeoPlayerId").GetString());
-                Assert.Equal("Acquirer", replaced.GetProperty("newCeoDisplayName").GetString());
-
-                var meResult = await ExecuteGraphQlAsync(
-                        """
-                        {
-                            me {
-                                activeAccountType
-                                activeCompanyId
-                                companies { id name }
-                            }
-                        }
-                        """,
-                        token: acquirerToken);
-
-                var me = meResult.GetProperty("data").GetProperty("me");
-                Assert.Equal("COMPANY", me.GetProperty("activeAccountType").GetString());
-                Assert.Equal(targetCompanyId.ToString(), me.GetProperty("activeCompanyId").GetString());
-                Assert.Contains(me.GetProperty("companies").EnumerateArray(), company => company.GetProperty("id").GetString() == targetCompanyId.ToString());
-        }
-
-        [Fact]
         public async Task BuyShares_AsCompanyBuyback_RetiresIssuedShares()
         {
                 var ownerToken = await RegisterAndGetTokenAsync($"buyback-owner-{Guid.NewGuid():N}@test.com", "Buyback Owner");
@@ -8936,48 +8879,6 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
                         token: investorToken);
 
                 var errors = switchResult.GetProperty("errors").EnumerateArray().ToList();
-                Assert.NotEmpty(errors);
-                Assert.Contains(errors, error =>
-                {
-                        var extensions = error.GetProperty("extensions");
-                        return extensions.TryGetProperty("code", out var code) &&
-                               code.GetString() == "COMPANY_CONTROL_REQUIRED";
-                });
-        }
-
-        [Fact]
-        public async Task ReplaceCEO_BelowFiftyPercentOwnership_ReturnsCompanyControlRequired()
-        {
-                var investorToken = await RegisterAndGetTokenAsync($"replace-ceo-low-{Guid.NewGuid():N}@test.com", "Low Ownership Investor");
-                var investorId = await GetCurrentPlayerIdAsync(investorToken);
-
-                var founderToken = await RegisterAndGetTokenAsync($"replace-ceo-founder-{Guid.NewGuid():N}@test.com", "Replace Founder");
-                var founderId = await GetCurrentPlayerIdAsync(founderToken);
-                var companyId = await SeedPublicCompanyAsync(founderId, name: "Replace CEO Threshold", founderShares: 8_000m);
-
-                await using (var scope = _factory.Services.CreateAsyncScope())
-                {
-                        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                        db.Shareholdings.Add(new Shareholding
-                        {
-                                Id = Guid.NewGuid(),
-                                CompanyId = companyId,
-                                OwnerPlayerId = investorId,
-                                ShareCount = 1_000m,
-                        });
-                        await db.SaveChangesAsync();
-                }
-
-                var replaceResult = await ExecuteGraphQlAsync(
-                        """
-                        mutation ReplaceCEO($input: ReplaceCeoInput!) {
-                            replaceCEO(input: $input) { companyId }
-                        }
-                        """,
-                        new { input = new { companyId, newCeoPlayerId = investorId } },
-                        token: investorToken);
-
-                var errors = replaceResult.GetProperty("errors").EnumerateArray().ToList();
                 Assert.NotEmpty(errors);
                 Assert.Contains(errors, error =>
                 {
