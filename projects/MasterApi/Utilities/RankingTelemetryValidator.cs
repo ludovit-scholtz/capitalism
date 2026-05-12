@@ -31,6 +31,25 @@ public sealed class RankingTelemetryValidator(MasterDbContext db)
     private const int BurstThresholdPerMinute = 8;
     private const decimal NetWorthRegressionToleranceUsd = 0.01m;
 
+    internal static string NormalizePayload(string? payloadJson)
+    {
+        return string.IsNullOrWhiteSpace(payloadJson) ? "{}" : payloadJson;
+    }
+
+    internal static string ComputeSignatureHash(
+        string serverKey,
+        string? externalEventId,
+        string? uniqueScopeKey,
+        string payloadJson)
+    {
+        var normalizedServerKey = serverKey.Trim();
+        var serverKeyHash = ShardKeyProtector.ComputeHash(normalizedServerKey);
+        var normalizedPayload = NormalizePayload(payloadJson);
+        var payloadHash = ShardKeyProtector.ComputeHash(normalizedPayload);
+        var nonce = ResolveNonce(externalEventId, uniqueScopeKey);
+        return ShardKeyProtector.ComputeHash($"{serverKeyHash}|{nonce}|{payloadHash}");
+    }
+
     public async Task<RankingTelemetryValidationResult> ValidateAndTrackAsync(
         string serverKey,
         string eventType,
@@ -44,10 +63,10 @@ public sealed class RankingTelemetryValidator(MasterDbContext db)
         var normalizedServerKey = serverKey.Trim();
         var serverKeyHash = ShardKeyProtector.ComputeHash(normalizedServerKey);
         var maskedServerKey = ShardKeyProtector.Mask(normalizedServerKey);
-        var normalizedPayload = string.IsNullOrWhiteSpace(payloadJson) ? "{}" : payloadJson;
+        var normalizedPayload = NormalizePayload(payloadJson);
         var payloadHash = ShardKeyProtector.ComputeHash(normalizedPayload);
         var nonce = ResolveNonce(externalEventId, uniqueScopeKey);
-        var signatureHash = ShardKeyProtector.ComputeHash($"{serverKeyHash}|{nonce}|{payloadHash}");
+        var signatureHash = ComputeSignatureHash(normalizedServerKey, externalEventId, uniqueScopeKey, normalizedPayload);
         var now = DateTime.UtcNow;
         var batchId = Guid.NewGuid();
 
@@ -322,7 +341,7 @@ public sealed class RankingTelemetryValidator(MasterDbContext db)
         }
     }
 
-    private static string ResolveNonce(string? externalEventId, string? uniqueScopeKey)
+    internal static string ResolveNonce(string? externalEventId, string? uniqueScopeKey)
     {
         if (!string.IsNullOrWhiteSpace(externalEventId))
         {

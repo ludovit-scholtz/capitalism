@@ -7,6 +7,7 @@ using Capitalism.Shared.Security;
 using MasterApi.Data;
 using MasterApi.Data.Entities;
 using MasterApi.Tests.Infrastructure;
+using MasterApi.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
@@ -327,6 +328,87 @@ public sealed class RankingIntegrationTests
             .ToListAsync();
         Assert.Single(events);
     }
+
+      [Fact]
+      public async Task IngestRankingEvent_WithIdempotencyKey_ReusesExistingTelemetrySignatureEvent()
+      {
+        await using var factory = new MasterApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var userEmail = $"rank-replay-{Guid.NewGuid():N}@example.com";
+        var externalEventId = $"replay-{Guid.NewGuid():N}";
+        var payloadJson = "{\"netWorthUsd\":1234}";
+        var occurredAtUtc = DateTime.UtcNow.AddMinutes(-2);
+        var signatureHash = RankingTelemetryValidator.ComputeSignatureHash(
+          "capitalism-eu-1",
+          externalEventId,
+          uniqueScopeKey: null,
+          payloadJson);
+        var payloadHash = ShardKeyProtector.ComputeHash(payloadJson);
+        var existingEventId = Guid.NewGuid();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+          var db = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
+          db.RankingTelemetryEventSignatures.Add(new RankingTelemetryEventSignature
+          {
+            Id = Guid.NewGuid(),
+            SignatureHash = signatureHash,
+            CreatedAtUtc = occurredAtUtc,
+            ExpiresAtUtc = occurredAtUtc.AddHours(24),
+          });
+          db.MasterRankingEvents.Add(new MasterRankingEvent
+          {
+            Id = existingEventId,
+            PlayerEmail = userEmail,
+            EventType = MasterRankingBountyCodes.FxTrader,
+            ServerKey = "capitalism-eu-1",
+            ServerKeyHash = ShardKeyProtector.ComputeHash("capitalism-eu-1"),
+            ExternalEventId = externalEventId,
+            UniqueScopeKey = null,
+            IdempotencyKey = null,
+            TelemetryNonce = externalEventId,
+            PayloadHash = payloadHash,
+            TelemetrySignatureHash = signatureHash,
+            PayloadJson = payloadJson,
+            Status = RankingEventStatus.Pending,
+            OccurredAtUtc = occurredAtUtc,
+            CreatedAtUtc = occurredAtUtc,
+          });
+          await db.SaveChangesAsync();
+        }
+
+        var result = await GraphQlAsync(
+          client,
+          """
+          mutation Ingest($input: IngestRankingEventInput!) {
+            ingestRankingEvent(input: $input) { id status createdAtUtc }
+          }
+          """,
+          new
+          {
+            input = new
+            {
+              registrationKey = "test-registration-key",
+              serverKey = "capitalism-eu-1",
+              eventType = MasterRankingBountyCodes.FxTrader,
+              playerEmail = userEmail,
+              occurredAtUtc = DateTime.UtcNow,
+              externalEventId,
+              idempotencyKey = $"idem-{Guid.NewGuid():N}",
+              payloadJson,
+            }
+          });
+
+        Assert.False(result.TryGetProperty("errors", out _));
+        var eventPayload = result.GetProperty("data").GetProperty("ingestRankingEvent");
+        Assert.Equal(existingEventId.ToString(), eventPayload.GetProperty("id").GetString());
+        Assert.Equal(RankingEventStatus.Pending, eventPayload.GetProperty("status").GetString());
+
+        using var verifyScope = factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<MasterDbContext>();
+        Assert.Single(verifyDb.MasterRankingEvents.Where(item => item.PlayerEmail == userEmail));
+      }
 
     [Fact]
     public async Task SubmitRankingProofEvent_DuplicateProofReference_ReturnsConflict()

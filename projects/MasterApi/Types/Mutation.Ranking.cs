@@ -33,26 +33,18 @@ public sealed partial class Mutation
 
         var playerEmail = Query.NormalizeEmail(input.PlayerEmail, "INVALID_PLAYER_EMAIL");
         var occurredAtUtc = input.OccurredAtUtc == default ? DateTime.UtcNow : input.OccurredAtUtc;
-        var existingIdempotentEvent = await rankingService.FindIdempotentEventAsync(
+        var replayedEvent = await rankingService.FindReplayEventAsync(
             eventType,
             playerEmail,
             input.ServerKey,
+            input.ExternalEventId,
+            input.UniqueScopeKey,
             input.IdempotencyKey,
+            input.PayloadJson,
             CancellationToken.None);
-        if (existingIdempotentEvent is not null)
+        if (replayedEvent is not null)
         {
-            return new RankingEventModerationItem
-            {
-                Id = existingIdempotentEvent.Id,
-                EventType = existingIdempotentEvent.EventType,
-                PlayerEmail = existingIdempotentEvent.PlayerEmail,
-                ServerKey = existingIdempotentEvent.ServerKey,
-                ProofReference = existingIdempotentEvent.ProofReference,
-                PayloadJson = existingIdempotentEvent.PayloadJson,
-                Status = existingIdempotentEvent.Status,
-                OccurredAtUtc = existingIdempotentEvent.OccurredAtUtc,
-                CreatedAtUtc = existingIdempotentEvent.CreatedAtUtc,
-            };
+            return ToModerationItem(replayedEvent);
         }
 
         await using IDbContextTransaction? tx = db.Database.IsRelational()
@@ -89,25 +81,33 @@ public sealed partial class Mutation
                 await tx.CommitAsync();
             }
 
-            return new RankingEventModerationItem
-            {
-                Id = rankingEvent.Id,
-                EventType = rankingEvent.EventType,
-                PlayerEmail = rankingEvent.PlayerEmail,
-                ServerKey = rankingEvent.ServerKey,
-                ProofReference = rankingEvent.ProofReference,
-                PayloadJson = rankingEvent.PayloadJson,
-                Status = rankingEvent.Status,
-                OccurredAtUtc = rankingEvent.OccurredAtUtc,
-                CreatedAtUtc = rankingEvent.CreatedAtUtc,
-            };
+            return ToModerationItem(rankingEvent);
         }
         catch (GraphQLException ex) when (RankingTelemetryValidator.IsDuplicateSignatureError(ex))
         {
             if (tx is not null)
             {
                 await tx.RollbackAsync();
-                db.ChangeTracker.Clear();
+            }
+
+            db.ChangeTracker.Clear();
+
+            replayedEvent = await rankingService.FindReplayEventAsync(
+                eventType,
+                playerEmail,
+                input.ServerKey,
+                input.ExternalEventId,
+                input.UniqueScopeKey,
+                input.IdempotencyKey,
+                input.PayloadJson,
+                CancellationToken.None);
+            if (replayedEvent is not null)
+            {
+                return ToModerationItem(replayedEvent);
+            }
+
+            if (tx is not null)
+            {
                 await telemetryValidator.RecordDuplicateSignatureAuditAsync(
                     input.ServerKey,
                     eventType,
@@ -138,6 +138,22 @@ public sealed partial class Mutation
 
             throw;
         }
+    }
+
+    private static RankingEventModerationItem ToModerationItem(MasterRankingEvent rankingEvent)
+    {
+        return new RankingEventModerationItem
+        {
+            Id = rankingEvent.Id,
+            EventType = rankingEvent.EventType,
+            PlayerEmail = rankingEvent.PlayerEmail,
+            ServerKey = rankingEvent.ServerKey,
+            ProofReference = rankingEvent.ProofReference,
+            PayloadJson = rankingEvent.PayloadJson,
+            Status = rankingEvent.Status,
+            OccurredAtUtc = rankingEvent.OccurredAtUtc,
+            CreatedAtUtc = rankingEvent.CreatedAtUtc,
+        };
     }
 
     [HotChocolate.Authorization.Authorize]

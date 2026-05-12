@@ -351,6 +351,58 @@ public sealed class MasterRankingService(MasterDbContext db, ILogger<MasterRanki
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    public async Task<MasterRankingEvent?> FindReplayEventAsync(
+        string eventType,
+        string playerEmail,
+        string? serverKey,
+        string? externalEventId,
+        string? uniqueScopeKey,
+        string? idempotencyKey,
+        string payloadJson,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedIdempotencyKey = NormalizeIdempotencyKey(idempotencyKey);
+        if (normalizedIdempotencyKey is null)
+        {
+            return null;
+        }
+
+        var idempotentEvent = await FindIdempotentEventAsync(
+            eventType,
+            playerEmail,
+            serverKey,
+            normalizedIdempotencyKey,
+            cancellationToken);
+        if (idempotentEvent is not null)
+        {
+            return idempotentEvent;
+        }
+
+        if (string.IsNullOrWhiteSpace(serverKey))
+        {
+            return null;
+        }
+
+        var normalizedEmail = playerEmail.Trim().ToLowerInvariant();
+        var normalizedEventType = eventType.Trim().ToUpperInvariant();
+        var normalizedServerKey = serverKey.Trim();
+        var signatureHash = RankingTelemetryValidator.ComputeSignatureHash(
+            normalizedServerKey,
+            externalEventId,
+            uniqueScopeKey,
+            payloadJson);
+
+        return await db.MasterRankingEvents
+            .AsNoTracking()
+            .Where(entry =>
+                entry.PlayerEmail == normalizedEmail
+                && entry.EventType == normalizedEventType
+                && entry.ServerKey == normalizedServerKey
+                && entry.TelemetrySignatureHash == signatureHash)
+            .OrderBy(entry => entry.CreatedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task RebuildSnapshotsFromRewardsAsync(CancellationToken cancellationToken = default)
     {
         var rewardTotalsByPlayer = await db.MasterRankingRewardRecords
