@@ -37,6 +37,7 @@ const displayNameSuccess = ref(false)
 
 const playerId = computed(() => route.params.id as string)
 const isOwnProfile = computed(() => auth.player?.id === playerId.value)
+const passwordAuthEnabled = import.meta.env.VITE_AUTH_PASSWORD_ENABLED === 'true'
 
 // ── Queries ────────────────────────────────────────────────────────────────────
 
@@ -250,6 +251,13 @@ onUnmounted(() => {
 
           <!-- Display name editing (own profile only) -->
           <div v-if="isOwnProfile" class="max-w-[480px] mx-auto mb-3">
+            <p
+              v-if="!passwordAuthEnabled"
+              class="mb-3 rounded-md border border-brand/25 bg-brand/10 px-3 py-2 text-xs text-body"
+              role="status"
+            >
+              {{ t('auth.oidcOnlyBanner') }}
+            </p>
             <div v-if="!editingDisplayName" class="flex items-center justify-center gap-2">
               <button
                 class="edit-display-name-btn text-xs text-brand hover:underline"

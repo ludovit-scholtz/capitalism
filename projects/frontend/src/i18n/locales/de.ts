@@ -268,6 +268,29 @@ export default {
     loginThrottledMessage:
       'Zu viele fehlgeschlagene Anmeldeversuche. Bitte warten Sie 15 Minuten und versuchen Sie es erneut.',
     loginWithBiatec: 'Mit Google anmelden',
+    forgotPasswordLink: 'Passwort vergessen?',
+    forgotPasswordTitle: 'Passwort vergessen',
+    forgotPasswordDescription:
+      'Geben Sie die E-Mail Ihres Kontos ein. Falls das Konto existiert, senden wir einen einmaligen Link zum Zurücksetzen.',
+    forgotPasswordSubmit: 'Link zum Zurücksetzen senden',
+    forgotPasswordGenericError: 'Das Zurücksetzen konnte gerade nicht verarbeitet werden. Bitte versuchen Sie es später erneut.',
+    resetPasswordTitle: 'Passwort zurücksetzen',
+    resetPasswordDescription:
+      'Legen Sie ein neues Passwort für Ihr Konto fest. Dieser Link kann nur einmal verwendet werden.',
+    resetNewPassword: 'Neues Passwort',
+    resetConfirmPassword: 'Neues Passwort bestätigen',
+    resetPasswordSubmit: 'Passwort zurücksetzen',
+    resetPasswordMismatch: 'Die Passwörter stimmen nicht überein.',
+    resetPasswordGenericError:
+      'Das Passwort konnte derzeit nicht zurückgesetzt werden. Bitte versuchen Sie es später erneut.',
+    resetTokenMissing:
+      'Der Reset-Token fehlt. Öffnen Sie den Zurücksetzen-Link aus der E-Mail erneut.',
+    passwordStrengthLabel: 'Passwortstärke',
+    passwordStrengthWeak: 'Schwach',
+    passwordStrengthMedium: 'Mittel',
+    passwordStrengthStrong: 'Stark',
+    oidcOnlyBanner:
+      'Dieser Server verwendet Single Sign-On. Wenn Sie keinen Zugriff auf Ihr Konto haben, authentifizieren Sie sich erneut über den Identitätsanbieter oder kontaktieren Sie den Support.',
     oidcRetryDriveAccessHint:
       'Für die Einrichtung der Biatec-Wallet muss das Erstellen von Dateien in Google Drive erlaubt sein. Starten Sie die Google-Anmeldung erneut und erlauben Sie den Drive-Zugriff, damit die Anmeldung abgeschlossen werden kann.',
     oidcCallbackTitle: 'Anmeldung wird abgeschlossen',

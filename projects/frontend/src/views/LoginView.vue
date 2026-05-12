@@ -93,6 +93,9 @@ onMounted(() => {
         <template v-if="!passwordAuthEnabled && !requiresConsentRetry">
           <div class="flex flex-col items-center gap-4 py-4 text-center">
             <div class="h-8 w-8 animate-spin rounded-full border-4 border-brand border-t-transparent" aria-hidden="true" />
+            <p class="rounded-md border border-brand/25 bg-brand/10 px-3 py-2 text-sm text-body">
+              {{ t('auth.oidcOnlyBanner') }}
+            </p>
             <p class="text-body">{{ t('auth.redirectingToSignIn') }}</p>
           </div>
         </template>
@@ -184,6 +187,9 @@ onMounted(() => {
               <div class="flex flex-col gap-1.5">
                 <label for="password" class="text-sm font-medium text-muted">{{ t('auth.password') }}</label>
                 <input id="password" v-model="password" type="password" required minlength="8" autocomplete="current-password" class="form-input" />
+                <RouterLink to="/forgot-password" class="text-xs text-brand underline">
+                  {{ t('auth.forgotPasswordLink') }}
+                </RouterLink>
               </div>
 
               <button type="submit" class="btn btn-primary w-full justify-center" :disabled="auth.loading">
@@ -217,4 +223,3 @@ onMounted(() => {
     </section>
   </main>
 </template>
-

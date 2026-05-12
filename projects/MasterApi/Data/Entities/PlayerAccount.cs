@@ -34,6 +34,8 @@ public sealed class PlayerAccount
 
     public ICollection<GoldTokenTransaction> GoldTokenTransactions { get; set; } = [];
 
+    public ICollection<PasswordResetToken> PasswordResetTokens { get; set; } = [];
+
     public ICollection<MasterRankingRewardRecord> RankingRewardRecords { get; set; } = [];
 
     public ICollection<MasterRankingEvent> RankingEvents { get; set; } = [];

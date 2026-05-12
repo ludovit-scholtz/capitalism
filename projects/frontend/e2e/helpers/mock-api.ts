@@ -1284,6 +1284,8 @@ export type MockState = {
       positionChange: number | null
     }>
   >
+  /** Raw reset token => player email mapping for forgot/reset password endpoint mocks. */
+  passwordResetTokens: Record<string, string>
   /** Mine extraction records returned by getMineExtractionHistory query. */
   mineExtractionRecords?: Array<{
     tick: number
@@ -3106,6 +3108,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     ],
     playerBadges: {},
     playerRankSnapshots: {},
+    passwordResetTokens: {},
     ...initial,
   }
 
@@ -3264,6 +3267,76 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
   }
 
   mockStateByPage.set(page, state)
+
+  page.route('**/auth/forgot-password', async (route) => {
+    if (route.request().method() !== 'POST') {
+      return route.fallback()
+    }
+
+    const payload = route.request().postDataJSON() as { email?: string } | null
+    const normalizedEmail = payload?.email?.trim().toLowerCase() ?? ''
+    const matchingPlayer = state.players.find((player) => player.email.toLowerCase() === normalizedEmail)
+    if (matchingPlayer) {
+      const token = `reset-${matchingPlayer.id}`
+      state.passwordResetTokens[token] = matchingPlayer.email
+    }
+
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ message: 'If an account exists, a reset link has been sent.' }),
+    })
+  })
+
+  page.route('**/auth/reset-password', async (route) => {
+    if (route.request().method() !== 'POST') {
+      return route.fallback()
+    }
+
+    const payload = route.request().postDataJSON() as { token?: string; newPassword?: string } | null
+    const token = payload?.token?.trim() ?? ''
+    const newPassword = payload?.newPassword?.trim() ?? ''
+    if (!token || !newPassword || newPassword.length < 8) {
+      return route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: 'Password must be at least 8 characters.', code: 'PASSWORD_TOO_SHORT' }),
+      })
+    }
+
+    const targetEmail = state.passwordResetTokens[token]
+    if (!targetEmail) {
+      return route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          message: 'This reset link is invalid or expired. Please request a new one.',
+          code: 'RESET_TOKEN_INVALID_OR_EXPIRED',
+        }),
+      })
+    }
+
+    const targetPlayer = state.players.find((player) => player.email.toLowerCase() === targetEmail.toLowerCase())
+    if (!targetPlayer) {
+      return route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          message: 'This reset link is invalid or expired. Please request a new one.',
+          code: 'RESET_TOKEN_INVALID_OR_EXPIRED',
+        }),
+      })
+    }
+
+    targetPlayer.password = newPassword
+    delete state.passwordResetTokens[token]
+
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ message: 'Password has been reset successfully.' }),
+    })
+  })
 
   page.route('**/graphql', async (route) => {
     const routeJson = (data: unknown) =>

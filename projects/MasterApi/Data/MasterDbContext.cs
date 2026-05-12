@@ -9,6 +9,8 @@ public sealed class MasterDbContext(DbContextOptions<MasterDbContext> options) :
 
     public DbSet<PlayerAccount> PlayerAccounts => Set<PlayerAccount>();
 
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+
     public DbSet<ProSubscription> ProSubscriptions => Set<ProSubscription>();
 
     public DbSet<GlobalGameAdminGrant> GlobalGameAdminGrants => Set<GlobalGameAdminGrant>();
@@ -68,6 +70,16 @@ public sealed class MasterDbContext(DbContextOptions<MasterDbContext> options) :
         player.Property(p => p.Email).HasMaxLength(200);
         player.Property(p => p.DisplayName).HasMaxLength(120);
         player.Property(p => p.PasswordHash).HasMaxLength(512);
+        player.HasMany(p => p.PasswordResetTokens)
+            .WithOne(token => token.PlayerAccount)
+            .HasForeignKey(token => token.PlayerAccountId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        var passwordResetToken = modelBuilder.Entity<PasswordResetToken>();
+        passwordResetToken.HasKey(token => token.Id);
+        passwordResetToken.HasIndex(token => token.TokenHash).IsUnique();
+        passwordResetToken.HasIndex(token => new { token.PlayerAccountId, token.ExpiresAtUtc });
+        passwordResetToken.Property(token => token.TokenHash).HasMaxLength(128);
 
         var sub = modelBuilder.Entity<ProSubscription>();
         sub.HasKey(s => s.Id);
