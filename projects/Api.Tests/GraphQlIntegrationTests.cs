@@ -28,7 +28,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     private const decimal DefaultStarterCompanyCash = 600_000m;
     private const string SharedJwtIssuer = "Capitalism";
     private const string SharedJwtAudience = "Capitalism";
-    private const string SharedJwtSigningKey = "TestingOnlyStrongSigningKey0123456789ABCDEF!";
+    private const string SharedJwtSigningKey = "ChangeThisSigningKeyBeforeProduction123!";
 
     private readonly HttpClient _client;
     private readonly ApiWebApplicationFactory _factory;

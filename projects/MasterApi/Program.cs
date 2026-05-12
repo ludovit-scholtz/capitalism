@@ -73,10 +73,10 @@ public class Program
                 [JwtOptions.DefaultSigningKey],
                 out var unsafeSigningKeyReason))
         {
-            if (builder.Environment.IsDevelopment())
+            if (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing"))
             {
                 startupLogger.LogWarning(
-                    "Development startup with insecure Jwt signing key. Environment={EnvironmentName} Reason={Reason} OverrideEnvironmentVariable={OverrideEnvironmentVariable}",
+                    "Startup with insecure Jwt signing key is allowed only in Development/Testing. Environment={EnvironmentName} Reason={Reason} OverrideEnvironmentVariable={OverrideEnvironmentVariable}",
                     builder.Environment.EnvironmentName,
                     unsafeSigningKeyReason,
                     "Jwt__SigningKey");

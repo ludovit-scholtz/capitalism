@@ -65,9 +65,9 @@ public sealed class JwtSigningKeyStartupGuardTests
 public sealed class ApiJwtSigningKeyStartupGuardHostTests
 {
     [Fact]
-    public void Startup_Testing_WithPlaceholderSigningKey_ThrowsInvalidOperation()
+    public void Startup_Production_WithPlaceholderSigningKey_ThrowsInvalidOperation()
     {
-        using var factory = new ApiJwtSigningKeyGuardFactory("Testing", JwtOptions.DefaultSigningKey);
+        using var factory = new ApiJwtSigningKeyGuardFactory("Production", JwtOptions.DefaultSigningKey);
 
         var ex = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
         Assert.Contains("Jwt:SigningKey is set to a placeholder or insecure value", ex.Message, StringComparison.OrdinalIgnoreCase);
@@ -75,12 +75,11 @@ public sealed class ApiJwtSigningKeyStartupGuardHostTests
     }
 
     [Fact]
-    public void Startup_Testing_WithStrongSigningKey_DoesNotThrow()
+    public void Startup_Production_WithTooShortSigningKey_ThrowsInvalidOperation()
     {
-        using var factory = new ApiJwtSigningKeyGuardFactory("Testing", "HostStrongSigningKey0123456789ABCDEFGHI!");
-        using var client = factory.CreateClient();
-
-        Assert.NotNull(client);
+        using var factory = new ApiJwtSigningKeyGuardFactory("Production", "too-short");
+        var ex = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+        Assert.Contains("Jwt:SigningKey is set to a placeholder or insecure value", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
 }

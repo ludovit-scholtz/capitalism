@@ -17,7 +17,7 @@ public sealed class RankingIntegrationTests
 {
     private const string SharedJwtIssuer = "Capitalism";
     private const string SharedJwtAudience = "Capitalism";
-    private const string SharedJwtSigningKey = "TestingOnlyStrongSigningKey0123456789ABCDEF!";
+    private const string SharedJwtSigningKey = "ChangeThisSigningKeyBeforeProduction123!";
 
     [Fact]
     public async Task IngestRankingEvent_RequiresServerKey()

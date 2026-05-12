@@ -30,7 +30,6 @@ public sealed class MasterApiWebApplicationFactory : WebApplicationFactory<Progr
                 ["ConnectionStrings:MasterCatalog"] = _databaseName,
                 ["MasterServer:RegistrationKey"] = "test-registration-key",
                 ["MasterServer:ActiveThresholdSeconds"] = "90",
-                ["Jwt:SigningKey"] = "TestingOnlyStrongSigningKey0123456789ABCDEF!",
                 ["GameAdministration:RootAdministratorEmails:0"] = "root@example.com",
                 // Enable password auth in tests so all existing auth tests continue to pass.
                 ["Auth:PasswordAuthEnabled"] = "true",

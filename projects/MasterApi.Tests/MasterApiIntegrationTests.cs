@@ -20,7 +20,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
 {
     private const string SharedJwtIssuer = "Capitalism";
     private const string SharedJwtAudience = "Capitalism";
-    private const string SharedJwtSigningKey = "TestingOnlyStrongSigningKey0123456789ABCDEF!";
+    private const string SharedJwtSigningKey = "ChangeThisSigningKeyBeforeProduction123!";
 
     private readonly HttpClient _client;
     private readonly MasterApiWebApplicationFactory _factory;

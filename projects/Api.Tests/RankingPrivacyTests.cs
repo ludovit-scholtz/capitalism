@@ -25,7 +25,7 @@ public sealed class RankingPrivacyTests
     // These must match appsettings.json so the game API validates the test tokens.
     private const string JwtIssuer = "Capitalism";
     private const string JwtAudience = "Capitalism";
-    private const string JwtSigningKey = "TestingOnlyStrongSigningKey0123456789ABCDEF!";
+    private const string JwtSigningKey = "ChangeThisSigningKeyBeforeProduction123!";
 
     private static string CreateMasterToken(string userId, string email, string jwtName, params Claim[] extra)
     {

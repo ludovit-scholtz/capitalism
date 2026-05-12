@@ -28,7 +28,6 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>
                 ["SeedData:AdminPassword"] = "ChangeMe123!",
                 ["GameEngine:Enabled"] = "false",
                 ["MasterServer:RegistrationEnabled"] = "false",
-                ["Jwt:SigningKey"] = "TestingOnlyStrongSigningKey0123456789ABCDEF!",
                 // Enable password auth in tests so all existing auth tests continue to pass.
                 ["Auth:PasswordAuthEnabled"] = "true"
             });

@@ -22,7 +22,7 @@ public sealed class SupplyChainTests : IClassFixture<ApiWebApplicationFactory>
 
     private const string SharedJwtIssuer = "Capitalism";
     private const string SharedJwtAudience = "Capitalism";
-    private const string SharedJwtSigningKey = "TestingOnlyStrongSigningKey0123456789ABCDEF!";
+    private const string SharedJwtSigningKey = "ChangeThisSigningKeyBeforeProduction123!";
 
     public SupplyChainTests(ApiWebApplicationFactory factory)
     {
