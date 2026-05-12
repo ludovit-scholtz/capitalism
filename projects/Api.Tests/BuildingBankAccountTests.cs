@@ -199,6 +199,125 @@ public sealed class BuildingBankAccountTests
         Assert.DoesNotContain(closedAccount.Id.ToString(), accountIds);
     }
 
+    [Fact]
+    public async Task BuildingBankAccount_ForeignBuilding_ReturnsNull()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var ownerToken = await RegisterAndGetTokenAsync(client, $"bba-foreign-owner-{Guid.NewGuid():N}@test.com");
+        var probeToken = await RegisterAndGetTokenAsync(client, $"bba-foreign-probe-{Guid.NewGuid():N}@test.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var ownerId = await GetCurrentPlayerIdAsync(client, ownerToken);
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = ownerId,
+            Name = "Foreign Building Owner Co",
+            Cash = 0m,
+            FoundedAtUtc = DateTime.UtcNow,
+            FoundedAtTick = 1,
+        };
+        db.Companies.Add(company);
+
+        var account = new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = "EUR",
+            Balance = 1234m,
+            CreatedAtUtc = DateTime.UtcNow,
+            IsGovernmentAccount = false,
+        };
+        db.BankAccounts.Add(account);
+
+        var building = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.Factory,
+            Name = "Foreign Hidden Factory",
+            Latitude = city.Latitude,
+            Longitude = city.Longitude,
+            PowerConsumption = 10,
+            BankAccountId = account.Id,
+            BuiltAtUtc = DateTime.UtcNow,
+        };
+        db.Buildings.Add(building);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            query BuildingBankAccount($buildingId: UUID!) {
+                buildingBankAccount(buildingId: $buildingId) {
+                    hasBankAccount
+                    balance
+                }
+            }
+            """,
+            new { buildingId = building.Id },
+            probeToken);
+
+        Assert.Equal(JsonValueKind.Null, result.GetProperty("data").GetProperty("buildingBankAccount").ValueKind);
+    }
+
+    [Fact]
+    public async Task CompanyBankAccounts_ForeignCompany_ReturnsEmptyList()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var ownerToken = await RegisterAndGetTokenAsync(client, $"bba-company-owner-{Guid.NewGuid():N}@test.com");
+        var probeToken = await RegisterAndGetTokenAsync(client, $"bba-company-probe-{Guid.NewGuid():N}@test.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var ownerId = await GetCurrentPlayerIdAsync(client, ownerToken);
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = ownerId,
+            Name = "Foreign Accounts Co",
+            Cash = 0m,
+            FoundedAtUtc = DateTime.UtcNow,
+            FoundedAtTick = 1,
+        };
+        db.Companies.Add(company);
+        db.BankAccounts.Add(new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = "EUR",
+            Balance = 9876m,
+            CreatedAtUtc = DateTime.UtcNow,
+            IsGovernmentAccount = false,
+        });
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            query CompanyBankAccounts($companyId: UUID!) {
+              companyBankAccounts(companyId: $companyId) {
+                id
+                balance
+              }
+            }
+            """,
+            new { companyId = company.Id },
+            probeToken);
+
+        Assert.Empty(result.GetProperty("data").GetProperty("companyBankAccounts").EnumerateArray().ToList());
+    }
+
     // ── fundBuildingBankAccount mutation ──────────────────────────────────────
 
     [Fact]

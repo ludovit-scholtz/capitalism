@@ -337,6 +337,138 @@ public sealed class ErrorSurfaceHardeningTests : IAsyncLifetime
         AssertNoBalanceInErrors(result, "AcceptBuildingOffer buyer balance must not leak");
     }
 
+    [Fact]
+    public async Task AcceptBuildingOffer_ForeignAndMissingOffer_ReturnSameNotFoundOrNotOwned()
+    {
+        var sellerToken = await RegisterAndGetTokenAsync($"noo-accept-seller-{Guid.NewGuid():N}@t.com");
+        var buyerToken = await RegisterAndGetTokenAsync($"noo-accept-buyer-{Guid.NewGuid():N}@t.com");
+        var probeToken = await RegisterAndGetTokenAsync($"noo-accept-probe-{Guid.NewGuid():N}@t.com");
+        var sellerId = await GetPlayerIdAsync(sellerToken);
+        var buyerId = await GetPlayerIdAsync(buyerToken);
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+
+        var sellerCompany = new Company { Id = Guid.NewGuid(), Name = "Accept Seller Co", Cash = 0m, PlayerId = sellerId, FoundedAtUtc = DateTime.UtcNow };
+        var buyerCompany = new Company { Id = Guid.NewGuid(), Name = "Accept Buyer Co", Cash = 0m, PlayerId = buyerId, FoundedAtUtc = DateTime.UtcNow };
+        db.Companies.AddRange(sellerCompany, buyerCompany);
+
+        var building = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = sellerCompany.Id,
+            Type = BuildingType.Factory,
+            Name = "Accept Market Factory",
+            Latitude = city.Latitude,
+            Longitude = city.Longitude,
+            Level = 1,
+            BuiltAtUtc = DateTime.UtcNow,
+            IsForSale = true,
+            AskingPrice = 50_000m,
+        };
+        db.Buildings.Add(building);
+
+        db.BankAccounts.Add(new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = (1_000_000_000_000_020L + (DateTime.UtcNow.Ticks % 1_000_000_000_000_000L)).ToString("D16"),
+            CurrencyCode = city.CurrencyCode,
+            Balance = 100_000m,
+            CompanyId = buyerCompany.Id,
+            CreatedAtUtc = DateTime.UtcNow,
+        });
+
+        var offer = new BuildingSaleOffer
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = building.Id,
+            BuyerCompanyId = buyerCompany.Id,
+            BuyerPlayerId = buyerId,
+            OfferedPrice = 50_000m,
+            Status = BuildingSaleOfferStatus.Pending,
+            OfferVersion = Guid.NewGuid(),
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.BuildingSaleOffers.Add(offer);
+        await db.SaveChangesAsync();
+
+        var resultExisting = await ExecuteGraphQlAsync(
+            "mutation A($i: AcceptBuildingOfferInput!) { acceptBuildingOffer(input: $i) { offer { id } } }",
+            new { i = new { offerId = offer.Id, offerVersion = offer.OfferVersion } },
+            probeToken);
+        AssertOpaque(resultExisting, "AcceptBuildingOffer foreign offer");
+
+        var resultMissing = await ExecuteGraphQlAsync(
+            "mutation A($i: AcceptBuildingOfferInput!) { acceptBuildingOffer(input: $i) { offer { id } } }",
+            new { i = new { offerId = Guid.NewGuid(), offerVersion = Guid.NewGuid() } },
+            probeToken);
+        AssertOpaque(resultMissing, "AcceptBuildingOffer missing offer");
+
+        Assert.Equal(GetErrorCode(resultExisting), GetErrorCode(resultMissing));
+    }
+
+    [Fact]
+    public async Task CancelBuildingOffer_ForeignAndMissingOffer_ReturnSameNotFoundOrNotOwned()
+    {
+        var sellerToken = await RegisterAndGetTokenAsync($"noo-cancel-seller-{Guid.NewGuid():N}@t.com");
+        var buyerToken = await RegisterAndGetTokenAsync($"noo-cancel-buyer-{Guid.NewGuid():N}@t.com");
+        var probeToken = await RegisterAndGetTokenAsync($"noo-cancel-probe-{Guid.NewGuid():N}@t.com");
+        var sellerId = await GetPlayerIdAsync(sellerToken);
+        var buyerId = await GetPlayerIdAsync(buyerToken);
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+
+        var sellerCompany = new Company { Id = Guid.NewGuid(), Name = "Cancel Seller Co", Cash = 0m, PlayerId = sellerId, FoundedAtUtc = DateTime.UtcNow };
+        var buyerCompany = new Company { Id = Guid.NewGuid(), Name = "Cancel Buyer Co", Cash = 0m, PlayerId = buyerId, FoundedAtUtc = DateTime.UtcNow };
+        db.Companies.AddRange(sellerCompany, buyerCompany);
+
+        var building = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = sellerCompany.Id,
+            Type = BuildingType.Factory,
+            Name = "Cancel Market Factory",
+            Latitude = city.Latitude,
+            Longitude = city.Longitude,
+            Level = 1,
+            BuiltAtUtc = DateTime.UtcNow,
+            IsForSale = true,
+            AskingPrice = 40_000m,
+        };
+        db.Buildings.Add(building);
+
+        var offer = new BuildingSaleOffer
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = building.Id,
+            BuyerCompanyId = buyerCompany.Id,
+            BuyerPlayerId = buyerId,
+            OfferedPrice = 40_000m,
+            Status = BuildingSaleOfferStatus.Pending,
+            OfferVersion = Guid.NewGuid(),
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.BuildingSaleOffers.Add(offer);
+        await db.SaveChangesAsync();
+
+        var resultExisting = await ExecuteGraphQlAsync(
+            "mutation C($i: CancelBuildingOfferInput!) { cancelBuildingOffer(input: $i) { id } }",
+            new { i = new { offerId = offer.Id, offerVersion = offer.OfferVersion } },
+            probeToken);
+        AssertOpaque(resultExisting, "CancelBuildingOffer foreign offer");
+
+        var resultMissing = await ExecuteGraphQlAsync(
+            "mutation C($i: CancelBuildingOfferInput!) { cancelBuildingOffer(input: $i) { id } }",
+            new { i = new { offerId = Guid.NewGuid(), offerVersion = Guid.NewGuid() } },
+            probeToken);
+        AssertOpaque(resultMissing, "CancelBuildingOffer missing offer");
+
+        Assert.Equal(GetErrorCode(resultExisting), GetErrorCode(resultMissing));
+    }
+
     // ──────────────────────────────────────────────────────────────────────────────────────────
     // Banking mutations — non-owner bank account probe tests
     // ──────────────────────────────────────────────────────────────────────────────────────────

@@ -60,14 +60,11 @@ public sealed partial class Mutation
                 .ThenInclude(b => b.Company)
             .FirstOrDefaultAsync(u => u.Id == input.TargetBuildingUnitId);
 
-        if (targetUnit is null)
+        if (targetUnit is null || targetUnit.Building.Company.PlayerId != userId)
         {
-            return BuyFromExchangeResult.Fail("Target building unit not found.", "UNIT_NOT_FOUND");
-        }
-
-        if (targetUnit.Building.Company.PlayerId != userId)
-        {
-            return BuyFromExchangeResult.Fail("You do not own this building.", "ACCESS_DENIED");
+            return BuyFromExchangeResult.Fail(
+                ObjectAuthorizationService.FriendlyMessage,
+                ObjectAuthorizationService.NotFoundOrNotOwnedCode);
         }
 
         // Only STORAGE and PURCHASE units can receive resource deliveries
@@ -98,14 +95,11 @@ public sealed partial class Mutation
         var bankAccount = await db.BankAccounts
             .FirstOrDefaultAsync(a => a.Id == input.BankAccountId && a.ClosedAtUtc == null);
 
-        if (bankAccount is null)
+        if (bankAccount is null || bankAccount.CompanyId != targetUnit.Building.CompanyId)
         {
-            return BuyFromExchangeResult.Fail("Bank account not found.", "BANK_ACCOUNT_NOT_FOUND");
-        }
-
-        if (bankAccount.CompanyId != targetUnit.Building.CompanyId)
-        {
-            return BuyFromExchangeResult.Fail("Bank account does not belong to this company.", "BANK_ACCOUNT_MISMATCH");
+            return BuyFromExchangeResult.Fail(
+                ObjectAuthorizationService.FriendlyMessage,
+                ObjectAuthorizationService.NotFoundOrNotOwnedCode);
         }
 
         // ── Compute prices in bank account currency ───────────────────────────────
@@ -134,9 +128,7 @@ public sealed partial class Mutation
         // ── Check sufficient balance ──────────────────────────────────────────────
         if (bankAccount.Balance < totalCost)
         {
-            return BuyFromExchangeResult.Fail(
-                $"Insufficient funds. Required: {totalCost:F2} {bankCurrency}, available: {bankAccount.Balance:F2} {bankCurrency}.",
-                "INSUFFICIENT_FUNDS");
+            return BuyFromExchangeResult.Fail("Insufficient funds.", "INSUFFICIENT_FUNDS");
         }
 
         // ── Compute quality for this purchase ─────────────────────────────────────
@@ -259,14 +251,11 @@ public sealed partial class Mutation
                 .ThenInclude(b => b.Company)
             .FirstOrDefaultAsync(u => u.Id == input.SourceBuildingUnitId);
 
-        if (sourceUnit is null)
+        if (sourceUnit is null || sourceUnit.Building.Company.PlayerId != userId)
         {
-            return SellToExchangeResult.Fail("Source building unit not found.", "UNIT_NOT_FOUND");
-        }
-
-        if (sourceUnit.Building.Company.PlayerId != userId)
-        {
-            return SellToExchangeResult.Fail("You do not own this building.", "ACCESS_DENIED");
+            return SellToExchangeResult.Fail(
+                ObjectAuthorizationService.FriendlyMessage,
+                ObjectAuthorizationService.NotFoundOrNotOwnedCode);
         }
 
         // ── Check inventory ───────────────────────────────────────────────────────
@@ -290,14 +279,11 @@ public sealed partial class Mutation
         var bankAccount = await db.BankAccounts
             .FirstOrDefaultAsync(a => a.Id == input.BankAccountId && a.ClosedAtUtc == null);
 
-        if (bankAccount is null)
+        if (bankAccount is null || bankAccount.CompanyId != sourceUnit.Building.CompanyId)
         {
-            return SellToExchangeResult.Fail("Bank account not found.", "BANK_ACCOUNT_NOT_FOUND");
-        }
-
-        if (bankAccount.CompanyId != sourceUnit.Building.CompanyId)
-        {
-            return SellToExchangeResult.Fail("Bank account does not belong to this company.", "BANK_ACCOUNT_MISMATCH");
+            return SellToExchangeResult.Fail(
+                ObjectAuthorizationService.FriendlyMessage,
+                ObjectAuthorizationService.NotFoundOrNotOwnedCode);
         }
 
         // ── Compute prices in bank account currency ───────────────────────────────

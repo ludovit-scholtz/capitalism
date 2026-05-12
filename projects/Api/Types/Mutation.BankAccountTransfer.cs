@@ -123,8 +123,7 @@ public sealed partial class Mutation
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage(
-                        $"Insufficient funds. Available: {fromAccount.Balance:F2} {fromAccount.CurrencyCode}.")
+                    .SetMessage("Insufficient funds.")
                     .SetCode("INSUFFICIENT_FUNDS")
                     .Build());
         }

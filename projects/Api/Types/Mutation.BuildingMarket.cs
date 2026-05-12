@@ -76,8 +76,7 @@ public sealed partial class Mutation
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage(
-                        $"Insufficient funds. Available: {availableBalance.ToString("F2", CultureInfo.InvariantCulture)} {currencyCode}.")
+                    .SetMessage("Insufficient funds.")
                     .SetCode("INSUFFICIENT_FUNDS")
                     .Build());
         }
@@ -165,8 +164,8 @@ public sealed partial class Mutation
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("Offer not found or no longer pending.")
-                    .SetCode("OFFER_NOT_FOUND")
+                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
+                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
                     .Build());
         }
 
@@ -617,8 +616,8 @@ public sealed partial class Mutation
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("Offer not found or no longer pending.")
-                    .SetCode("OFFER_NOT_FOUND")
+                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
+                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
                     .Build());
         }
 
