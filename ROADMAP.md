@@ -4,6 +4,17 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 ## Active issues to work on
 
+### Buildings & Land Map System (Core Gameplay Loop)
+
+- [x] (100%) Buildings & Land Map System is fully live: players can browse available land parcels on a real-world GPS map (Leaflet.js, OpenStreetMap tiles), purchase lots, construct all 10 building types (Mine, Factory, SalesShop, ResearchDevelopment, Apartment, Commercial, MediaHouse, Bank, Exchange, PowerPlant), and manage their property portfolio via the "My Properties" sidebar.
+  - Real-world GPS coordinates per city with population-index-weighted lot pricing.
+  - Auto-generation guard (`EnsureMinimumAvailableLotsAsync`) ensures ≥10 available lots per resource type per city at all times — triggered on each `cityLots` query.
+  - Mine lots are constrained to resource-deposit plots; a purchased mine lot auto-creates a replacement mine lot so the minimum availability guarantee holds.
+  - `purchaseLot` mutation deducts from the company's local-currency bank account, supports all three seeded cities (Bratislava EUR, Prague CZK, Vienna EUR), and returns structured errors: `INSUFFICIENT_FUNDS`, `LAND_NOT_AVAILABLE`, `INVALID_BUILDING_TYPE_FOR_LAND`, `MINE_REQUIRES_RESOURCE_DEPOSIT`, `BUILDING_ALREADY_ON_LOT`.
+  - `setBuildingForSale` / `makeOfferOnBuilding` / `acceptBuildingOffer` mutations enable a player-to-player building secondary market with optimistic-concurrency conflict detection.
+  - Game-engine tick consumes `rawMaterialQuantity` on each mine extraction tick with a diminishing-return factor; `getMineExtractionHistory` and `getMineDepletionForecast` queries give players forward visibility on remaining deposits.
+  - `/city/:id` city-map frontend route with colour-coded lot markers (green = available, blue = yours, grey = other owner), lot detail panel, purchase confirmation, and strategic recommendation labels driven by `populationIndex` and resource data.
+
 ### Onboarding
 
 - [x] (100%) Personal account name is generated in the onboarding process before user signs in. The game server now resolves public player labels from the stored player profile across rankings, chat, account ownership labels, and player GraphQL surfaces instead of exposing JWT auth names.
