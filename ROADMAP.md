@@ -17,7 +17,7 @@ Create a fun game in the style of Capitalism II, where players experience realis
 - [x] (100%) HotChocolate Nitro IDE and schema introspection are now gated to `IsDevelopment()` only in both APIs, with non-development introspection requests returning `FORBIDDEN`.
 - [x] (100%) Added startup guard in both APIs that throws `InvalidOperationException` when `Jwt:SigningKey` is placeholder/insecure (null, whitespace, short, or known placeholder) outside Development and logs a critical startup-block event with `Jwt__SigningKey` override guidance.
 - [x] Restrict CORS open fallback (`AllowAnyOrigin()`) to `IsDevelopment()` only; non-Development deployments with an empty `Cors:AllowedOrigins` list should reject all cross-origin requests with a warning log. (100%)
-- [ ] Add `Strict-Transport-Security` header to `projects/frontend/nginx.conf` with `max-age=31536000; includeSubDomains`.
-- [ ] Remove `unsafe-inline` from `script-src` in `projects/frontend/nginx.conf` CSP header; verify production Vite bundle works without it and implement nonce-based CSP if inline scripts are required.
+- [x] (100%) Add `Strict-Transport-Security` header to `projects/frontend/nginx.conf` with `max-age=31536000; includeSubDomains`.
+- [x] (100%) Remove `unsafe-inline` from `script-src` in `projects/frontend/nginx.conf` CSP header; verify production Vite bundle works without it and implement nonce-based CSP if inline scripts are required.
 - [ ] Implement a time-limited email-based password reset flow (or document OIDC re-linkage as the only recovery path) to prevent permanent player lock-out on credential loss.
 - [ ] Move `RootAdministratorEmails` and database credentials out of committed `appsettings.json` into environment-variable configuration or a secrets manager.

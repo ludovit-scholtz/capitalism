@@ -16,6 +16,7 @@
     "test:e2e:archive": "playwright test e2e/archive",
     "test:e2e:docs": "playwright test e2e/docs",
     "test:e2e:video": "set VIDEO_RECORDING=true && playwright test --config playwright-video.config.ts",
+    "test:security-headers": "node scripts/verify-security-headers.mjs",
     "test:screenshots": "playwright test --ignore-snapshots e2e/docs/encyclopedia/encyclopedia-screenshots.spec.ts e2e/docs/help/forex-help-screenshots.spec.ts e2e/docs/help/onboarding-help-screenshots.spec.ts e2e/docs/help/sales-shop-help-screenshots.spec.ts e2e/docs/help/stock-exchange-help-screenshots.spec.ts",
     "i18n:missing": "node scripts/find-missing-translation-keys.mjs",
     "i18n:template-missing": "node scripts/find-missing-template-translation-keys.mjs",
