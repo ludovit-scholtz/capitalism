@@ -38,7 +38,7 @@ const router = createRouter({
       component: () => import('@/views/ManufacturingEncyclopediaView.vue'),
     },
     { path: '/exchange', name: 'exchange', component: () => import('@/views/GlobalExchangeView.vue') },
-    { path: '/stocks', name: 'stocks', component: () => import('@/views/StockExchangeView.vue') },
+    { path: '/stocks', name: 'stocks', alias: '/stock-exchange', component: () => import('@/views/StockExchangeView.vue') },
     { path: '/forex', name: 'forex', component: () => import('@/views/ForexExchangeView.vue') },
     { path: '/encyclopedia/resources/:slug', name: 'encyclopedia-detail', component: () => import('@/views/ResourceDetailView.vue') },
     { path: '/buy-building/:companyId', name: 'buy-building', component: () => import('@/views/BuyBuildingView.vue') },

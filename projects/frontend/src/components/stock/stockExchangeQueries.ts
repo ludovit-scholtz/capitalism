@@ -226,6 +226,17 @@ export const MERGE_MUTATION = `
   }
 `
 
+export const REPLACE_CEO_MUTATION = `
+  mutation ReplaceCEO($input: ReplaceCeoInput!) {
+    replaceCEO(input: $input) {
+      companyId
+      companyName
+      newCeoPlayerId
+      newCeoDisplayName
+    }
+  }
+`
+
 export const COMPANY_SHAREHOLDERS_QUERY = `
   query CompanyShareholders($companyId: UUID!) {
     companyShareholders(companyId: $companyId) {

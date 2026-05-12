@@ -988,6 +988,37 @@ public sealed class ApiKeyAuthTests : IClassFixture<ApiWebApplicationFactory>
     }
 
     [Fact]
+    public async Task TradingOnlyApiKey_ReplaceCeo_ForeignCompany_ReturnsNotOwnedOrNotFound()
+    {
+        const string ownerEmail = "ak-replace-ceo-owner@test.com";
+        var token = await RegisterAndLoginAsync(ownerEmail, "ReplaceCeoOwner");
+        var ownerPlayerId = await GetPlayerIdByEmailAsync(ownerEmail);
+        var foreignPlayerId = await SeedPlayerAsync("ak-replace-ceo-foreign@test.com", "ReplaceCeoForeign");
+        var foreignCompanyId = await SeedCompanyAsync(foreignPlayerId, "Foreign Control Co");
+        var (plaintext, _) = await GenerateApiKeyAsync(token, "Trading Key", [ApiKeyScopes.TradingOnly]);
+
+        var (response, body) = await SendWithStatusAsync(
+            _client,
+            @"mutation ReplaceCEO($input: ReplaceCeoInput!) {
+                replaceCEO(input: $input) { companyId }
+            }",
+            new
+            {
+                input = new
+                {
+                    companyId = foreignCompanyId,
+                    newCeoPlayerId = ownerPlayerId,
+                }
+            },
+            apiKey: plaintext);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(
+            BotOwnershipGuard.NotFoundOrNotOwnedCode,
+            body.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
     public async Task TradingOnlyApiKey_AddGoldAmmLiquidity_ForeignPool_ReturnsNotOwnedOrNotFound()
     {
         const string ownerEmail = "ak-gold-amm-owner@test.com";

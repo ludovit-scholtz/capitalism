@@ -13,6 +13,16 @@ public sealed class MergeCompanyInput
     public Guid DestinationCompanyId { get; set; }
 }
 
+/// <summary>Input for taking control of a company once the player owns at least 50% of its shares.</summary>
+public sealed class ReplaceCeoInput
+{
+    /// <summary>The company whose CEO/control should be transferred.</summary>
+    public Guid CompanyId { get; set; }
+
+    /// <summary>The player who becomes the new CEO. Currently this must be the authenticated player.</summary>
+    public Guid NewCeoPlayerId { get; set; }
+}
+
 /// <summary>Input for launching an additional company via the IPO path.</summary>
 public sealed class StartAdditionalCompanyInput
 {

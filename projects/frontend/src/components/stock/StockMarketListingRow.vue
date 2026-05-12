@@ -34,7 +34,7 @@
       <button class="btn btn-primary btn-sm" :class="{ 'btn-active': expanded }" @click="emit('toggle-trade-panel')">
         {{ expanded ? t('stockExchange.closeTrade') : t('stockExchange.openTrade') }}
       </button>
-      <button v-if="listing.canClaimControl && !isControlledCompany" class="btn btn-ghost btn-sm" :disabled="actionLoadingKey === `switch-${listing.companyId}`" @click="emit('switch-to-company')">
+      <button v-if="listing.canClaimControl && !isControlledCompany" class="btn btn-ghost btn-sm" @click="emit('open-takeover')">
         {{ t('stockExchange.claimControl') }}
       </button>
       <button v-if="listing.canMerge" class="btn btn-warning btn-sm" @click="emit('open-merge')">{{ t('stockExchange.mergeCompany') }}</button>
@@ -397,7 +397,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'toggle-trade-panel'): void
-  (e: 'switch-to-company'): void
+  (e: 'open-takeover'): void
   (e: 'open-merge'): void
   (e: 'update:settlement-bank-account-id', value: string): void
   (e: 'update-quantity', value: number): void

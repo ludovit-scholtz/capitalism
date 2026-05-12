@@ -7,7 +7,7 @@ import { useGameStateStore } from '@/stores/gameState'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { getActiveAccountOption } from '@/lib/accountContext'
 import { deepEqual } from '@/lib/utils'
-import type { CompanyOwnership, DividendProposal, DividendVoteResult, MergeCompanyResult, OpenLimitOrder, PlayerBankAccountSummary, PersonAccount, ShareTradeResult, StockExchangeListing, StockExchangePriceHistoryPoint, StockOrderBook, StockTradeExecution } from '@/types'
+import type { CompanyOwnership, DividendProposal, DividendVoteResult, MergeCompanyResult, OpenLimitOrder, PlayerBankAccountSummary, PersonAccount, ReplaceCeoResult, ShareTradeResult, StockExchangeListing, StockExchangePriceHistoryPoint, StockOrderBook, StockTradeExecution } from '@/types'
 import {
   PERSON_ACCOUNT_QUERY,
   LISTINGS_QUERY,
@@ -16,6 +16,7 @@ import {
   SELL_MUTATION,
   PRICE_HISTORY_QUERY,
   MERGE_MUTATION,
+  REPLACE_CEO_MUTATION,
   COMPANY_SHAREHOLDERS_QUERY,
   OPEN_ORDERS_QUERY,
   ORDER_BOOK_QUERY,
@@ -79,6 +80,14 @@ export function useStockExchange() {
   const mergeLoading = ref(false)
   const mergeError = ref<string | null>(null)
   const mergeSuccess = ref<MergeCompanyResult | null>(null)
+  const takeoverDialogCompanyId = ref<string | null>(null)
+  const takeoverDialogOpen = computed({
+    get: () => takeoverDialogCompanyId.value !== null,
+    set: (val: boolean) => { if (!val) closeTakeoverDialog() },
+  })
+  const takeoverLoading = ref(false)
+  const takeoverError = ref<string | null>(null)
+  const takeoverSuccess = ref<ReplaceCeoResult | null>(null)
   const filterText = ref('')
   const selectedCityFilter = ref('ALL')
   const selectedIndustryFilter = ref('ALL')
@@ -119,6 +128,8 @@ export function useStockExchange() {
 
   const availableCityFilters = computed(() => ['ALL', ...new Set(listings.value.map((listing) => listing.primaryCityName).filter((city) => city)).values()])
   const availableIndustryFilters = computed(() => ['ALL', ...new Set(listings.value.map((listing) => listing.primaryIndustry).filter((industry) => industry)).values()])
+  const takeoverTargetCompanyName = computed(() =>
+    listings.value.find((listing) => listing.companyId === takeoverDialogCompanyId.value)?.companyName ?? '')
   const stockSymbolForListing = (listing: StockExchangeListing): string =>
     listing.stockSymbol?.trim().length
       ? listing.stockSymbol
@@ -366,19 +377,37 @@ export function useStockExchange() {
     }
   }
 
-  async function switchToCompanyAccount(companyId: string) {
-    actionLoadingKey.value = `switch-${companyId}`
-    errorByCompany.value[companyId] = null
-    successByCompany.value[companyId] = null
-    const companyName = auth.player?.companies.find((company) => company.id === companyId)?.name ?? listings.value.find((listing) => listing.companyId === companyId)?.companyName ?? t('stockExchange.companyAccount')
+  function openTakeoverDialog(companyId: string) {
+    takeoverDialogCompanyId.value = companyId
+    takeoverError.value = null
+    takeoverSuccess.value = null
+  }
+
+  function closeTakeoverDialog() {
+    takeoverDialogCompanyId.value = null
+    takeoverError.value = null
+    takeoverSuccess.value = null
+  }
+
+  async function executeTakeover() {
+    const companyId = takeoverDialogCompanyId.value
+    const newCeoPlayerId = auth.player?.id
+    if (!companyId || !newCeoPlayerId) return
+
+    takeoverLoading.value = true
+    takeoverError.value = null
     try {
-      await auth.switchAccountContext('COMPANY', companyId)
-      await loadData(true)
-      successByCompany.value[companyId] = t('stockExchange.switchSuccess', { account: companyName })
+      const data = await gqlRequest<{ replaceCEO: ReplaceCeoResult }>(REPLACE_CEO_MUTATION, {
+        input: { companyId, newCeoPlayerId },
+      })
+      takeoverSuccess.value = data.replaceCEO
+      await Promise.all([loadData(true), auth.fetchMe()])
       expandedCompany.value = companyId
     } catch (reason: unknown) {
-      errorByCompany.value[companyId] = reason instanceof Error ? reason.message : t('stockExchange.actionFailed')
-    } finally { actionLoadingKey.value = null }
+      takeoverError.value = reason instanceof Error ? reason.message : t('stockExchange.actionFailed')
+    } finally {
+      takeoverLoading.value = false
+    }
   }
 
   async function executeTrade(kind: 'buy' | 'sell', companyId: string) {
@@ -542,6 +571,11 @@ export function useStockExchange() {
     mergeLoading,
     mergeError,
     mergeSuccess,
+    takeoverDialogOpen,
+    takeoverLoading,
+    takeoverError,
+    takeoverSuccess,
+    takeoverTargetCompanyName,
     filterText,
     selectedCityFilter,
     selectedIndustryFilter,
@@ -571,7 +605,9 @@ export function useStockExchange() {
     loadOrderBookAndTrades,
     placeLimitOrder,
     cancelLimitOrder,
-    switchToCompanyAccount,
+    openTakeoverDialog,
+    closeTakeoverDialog,
+    executeTakeover,
     executeTrade,
     proposeDividend,
     voteDividendProposal,

@@ -181,6 +181,14 @@ public sealed class MergeCompanyResult
     public int BuildingsTransferred { get; set; }
 }
 
+public sealed class ReplaceCeoResult
+{
+    public Guid CompanyId { get; set; }
+    public string CompanyName { get; set; } = string.Empty;
+    public Guid NewCeoPlayerId { get; set; }
+    public string NewCeoDisplayName { get; set; } = string.Empty;
+}
+
 /// <summary>A single shareholder row for a company's ownership breakdown.</summary>
 public sealed class CompanyShareholderResult
 {
