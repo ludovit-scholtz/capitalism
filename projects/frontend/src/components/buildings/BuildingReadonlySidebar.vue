@@ -109,6 +109,16 @@ const selectedMiningRate = computed<number | null>(() => {
   return getMiningRateForLevel(unit.level)
 })
 
+/** Price recommendation state relative to the city market clearing price. */
+const priceRecState = computed<'noData' | 'competitive' | 'slightlyAbove' | 'overpriced'>(() => {
+  const marketPrice = publicSalesAnalytics.value?.cityMarketClearingPrice
+  if (marketPrice == null) return 'noData'
+  const playerPrice = currentPublicSalesMinPrice.value
+  if (playerPrice <= 0 || playerPrice <= marketPrice) return 'competitive'
+  if (playerPrice <= marketPrice * 1.3) return 'slightlyAbove'
+  return 'overpriced'
+})
+
 function operationalStatusCardClass(status: string): string {
   const normalizedStatus = status.toLowerCase()
 
@@ -335,37 +345,32 @@ function buildCompetitionPieGradient(entries: CompetitionLegendEntry[]): string 
               <div
                 v-if="publicSalesAnalytics"
                 class="price-recommendation-badge mt-3 flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs"
-                :class="
-                  publicSalesAnalytics.cityMarketClearingPrice == null
-                    ? 'border-divider bg-surface text-muted'
-                    : currentPublicSalesMinPrice <= 0 || currentPublicSalesMinPrice <= publicSalesAnalytics.cityMarketClearingPrice
-                      ? 'border-emerald-400/50 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300'
-                      : currentPublicSalesMinPrice <= publicSalesAnalytics.cityMarketClearingPrice * 1.3
-                        ? 'border-amber-400/50 bg-amber-500/10 text-amber-700 dark:text-amber-300'
-                        : 'border-red-400/50 bg-red-500/10 text-red-700 dark:text-red-300'
-                "
+                :class="{
+                  'border-divider bg-surface text-muted': priceRecState === 'noData',
+                  'border-emerald-400/50 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300': priceRecState === 'competitive',
+                  'border-amber-400/50 bg-amber-500/10 text-amber-700 dark:text-amber-300': priceRecState === 'slightlyAbove',
+                  'border-red-400/50 bg-red-500/10 text-red-700 dark:text-red-300': priceRecState === 'overpriced',
+                }"
                 :title="t('buildingDetail.marketIntelligence.priceRecommendation.tooltip')"
               >
                 <span class="font-semibold uppercase tracking-wide">{{ t('buildingDetail.marketIntelligence.priceRecommendation.title') }}</span>
-                <span v-if="publicSalesAnalytics.cityMarketClearingPrice == null" class="text-muted">
+                <span v-if="priceRecState === 'noData'" class="text-muted">
                   {{ t('buildingDetail.marketIntelligence.priceRecommendation.noData') }}
                 </span>
                 <span v-else class="flex items-center gap-1.5">
-                  <strong>{{ formatCurrency(publicSalesAnalytics.cityMarketClearingPrice) }}</strong>
+                  <strong>{{ formatCurrency(publicSalesAnalytics.cityMarketClearingPrice!) }}</strong>
                   <span
                     class="price-rec-label rounded-full border px-1.5 py-0.5 text-[0.6rem] font-bold uppercase"
-                    :class="
-                      currentPublicSalesMinPrice <= 0 || currentPublicSalesMinPrice <= publicSalesAnalytics.cityMarketClearingPrice
-                        ? 'border-emerald-400/50 bg-emerald-500/15'
-                        : currentPublicSalesMinPrice <= publicSalesAnalytics.cityMarketClearingPrice * 1.3
-                          ? 'border-amber-400/50 bg-amber-500/15'
-                          : 'border-red-400/50 bg-red-500/15'
-                    "
+                    :class="{
+                      'border-emerald-400/50 bg-emerald-500/15': priceRecState === 'competitive',
+                      'border-amber-400/50 bg-amber-500/15': priceRecState === 'slightlyAbove',
+                      'border-red-400/50 bg-red-500/15': priceRecState === 'overpriced',
+                    }"
                   >
                     {{
-                      currentPublicSalesMinPrice <= 0 || currentPublicSalesMinPrice <= publicSalesAnalytics.cityMarketClearingPrice
+                      priceRecState === 'competitive'
                         ? t('buildingDetail.marketIntelligence.priceRecommendation.competitive')
-                        : currentPublicSalesMinPrice <= publicSalesAnalytics.cityMarketClearingPrice * 1.3
+                        : priceRecState === 'slightlyAbove'
                           ? t('buildingDetail.marketIntelligence.priceRecommendation.slightlyAbove')
                           : t('buildingDetail.marketIntelligence.priceRecommendation.overpriced')
                     }}
