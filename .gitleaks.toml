@@ -1,0 +1,7 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Allow documented placeholder signing-key examples in .env.example"
+paths = ['''^\.env\.example$''']
+regexes = ['''Jwt__SigningKey=(set-via-secrets-manager|REPLACE_WITH_32PLUS_CHAR_SECRET)''']

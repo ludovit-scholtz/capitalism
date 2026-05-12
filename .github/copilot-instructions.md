@@ -1639,7 +1639,7 @@ Root-cause of a quality failure (May 2026, PR #437 follow-up):
 1. **Any workflow using `gitleaks/gitleaks-action` on pull_request MUST set `env: GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}` on the action step.** Do not assume implicit token propagation.
 2. **When adding a new CI workflow, inspect the first run logs immediately and fix action-specific required inputs before declaring the PR ready.**
 3. **For gitleaks PR scans, checkout must use full history (`actions/checkout` with `fetch-depth: 0`) so the base/head commit range exists.** Shallow checkout can fail with `fatal: ambiguous argument '<base>^..<head>'`.
-4. **When scanning PRs with gitleaks action, prefer `with: args: --no-git` for repository-level CI** unless history scanning is explicitly required. This avoids false-positive failures from safe placeholders that existed in earlier commits of the same PR.
-5. **Use low-entropy human-readable placeholders in `.env.example`** (for example `set-via-secrets-manager`) to avoid generic-api-key detectors flagging documentation examples as leaks.
+4. **Keep gitleaks history scan enabled for PRs, but add a narrow `.gitleaks.toml` allowlist for known safe placeholders** (for example `Jwt__SigningKey` examples in `.env.example`). Do not disable git-history scanning as a general workaround.
+5. **Use low-entropy human-readable placeholders in `.env.example`** (for example `set-via-secrets-manager`) to reduce generic-api-key false positives.
 6. **When a reviewer says \"Fix build and fix tests\", always separate failing category by workflow logs first** (code tests vs workflow wiring) and fix all in-PR failures, including newly added workflow configuration errors.
 7. **For security configuration hardening PRs, include unit coverage for new guard helpers** (for example connection-string and root-admin placeholder detection), not only host-startup tests.
