@@ -8,6 +8,10 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 - [x] (100%) Personal account name is generated in the onboarding process before user signs in. The game server now resolves public player labels from the stored player profile across rankings, chat, account ownership labels, and player GraphQL surfaces instead of exposing JWT auth names.
 
+### Economy & Markets
+
+- [x] (100%) FX Exchange with Gold Token AMM and liquidity pools is live: players can quote/execute currency swaps, create/add/remove Gold AMM liquidity positions, receive proportional 1% swap-fee accrual, and use the Forex UI route for trading and pool management.
+
 ### Security Follow-Ups
 
 - [x] (100%) Finished `NOT_FOUND_OR_NOT_OWNED` plus balance-redaction normalization across building-market, exchange, and bank-transfer mutations so authenticated probes cannot infer foreign object existence, listing state, company linkage, or exact available funds.
