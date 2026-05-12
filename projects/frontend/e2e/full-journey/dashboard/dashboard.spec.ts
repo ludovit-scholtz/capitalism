@@ -1457,9 +1457,7 @@ test.describe('Dashboard — starter operations (supply chain, financials, guida
     await expect(page.locator('.supply-chain-panel').first()).toBeVisible()
   })
 
-  test('guidance uses backend netIncome (after tax) not frontend-derived profit — shows unprofitable when tax makes netIncome negative', async ({
-    page,
-  }) => {
+  test('guidance uses backend netIncome (after tax) not frontend-derived profit — shows unprofitable when tax makes netIncome negative', async ({ page }) => {
     // Scenario: revenue=5000, operating costs=3000 → pre-tax "profit" would be +2000
     // But totalTaxPaid=2500 → netIncome = -500 (loss after tax)
     // The dashboard MUST show "Review your pricing", NOT "Business is profitable"
@@ -1516,9 +1514,7 @@ test.describe('Dashboard — starter operations (supply chain, financials, guida
     await expect(page.locator('.financial-summary-card')).toContainText('-€500')
   })
 
-  test('guidance shows profitable when netIncome is positive even if pre-tax margins are thin', async ({
-    page,
-  }) => {
+  test('guidance shows profitable when netIncome is positive even if pre-tax margins are thin', async ({ page }) => {
     // Scenario: revenue=1000, costs=900, tax=0 → netIncome=100 (positive)
     // Guidance MUST show "Business is profitable" (netIncome > 0)
     const { factory, shop } = makeStarterCompanyWithBuildings()
@@ -1626,9 +1622,7 @@ test.describe('Dashboard — starter operations (supply chain, financials, guida
     await expect(page.locator('.financial-summary-card')).toContainText('3,000')
   })
 
-  test('financial summary shows skeleton loading state, not NaN, before data arrives', async ({
-    page,
-  }) => {
+  test('financial summary shows skeleton loading state, not NaN, before data arrives', async ({ page }) => {
     // Verifies the loading state shows skeleton placeholders (not broken text)
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
@@ -1742,9 +1736,7 @@ test.describe('Dashboard — unit operational status in supply chain', () => {
 })
 
 test.describe('Dashboard — post-onboarding routing', () => {
-  test('authenticated player with completed onboarding and starter buildings sees dashboard with supply chain', async ({
-    page,
-  }) => {
+  test('authenticated player with completed onboarding and starter buildings sees dashboard with supply chain', async ({ page }) => {
     const factory: MockBuilding = {
       id: 'building-post-onb-factory',
       companyId: 'comp-post-onb',
@@ -1931,9 +1923,7 @@ test.describe('Dashboard — post-onboarding routing', () => {
     await expect(shopChain).toContainText('Public Sales')
   })
 
-  test('dashboard shows correct financial data for Food Processing starter company', async ({
-    page,
-  }) => {
+  test('dashboard shows correct financial data for Food Processing starter company', async ({ page }) => {
     const factory: MockBuilding = {
       id: 'building-food-dashboard',
       companyId: 'comp-food-dashboard',
@@ -2143,9 +2133,7 @@ test.describe('Dashboard — post-onboarding routing', () => {
 })
 
 test.describe('Dashboard tick-refresh stability', () => {
-  test('background tick refresh does not show a loading spinner or reset the dashboard view', async ({
-    page,
-  }) => {
+  test('background tick refresh does not show a loading spinner or reset the dashboard view', async ({ page }) => {
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
       companies: [
@@ -2740,7 +2728,10 @@ test.describe('Dashboard — personal account panel', () => {
 
     // Switch to Ledger tab first
     await page.getByRole('tab', { name: 'Ledger' }).click()
-    await page.locator('.person-account-ledger-link').getByRole('link', { name: /personal ledger/i }).click()
+    await page
+      .locator('.person-account-ledger-link')
+      .getByRole('link', { name: /personal ledger/i })
+      .click()
     await expect(page).toHaveURL('/personal-ledger')
     await expect(page.getByRole('heading', { name: 'Personal Ledger' })).toBeVisible()
   })

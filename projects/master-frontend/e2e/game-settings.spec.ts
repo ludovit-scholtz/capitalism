@@ -9,7 +9,9 @@ test.describe('Game settings', () => {
     await expect(page).toHaveURL('/login')
   })
 
-  test('authenticated player can rename personal account name from the menu and see it in the master ranking', async ({ page }) => {
+  test('authenticated player can rename personal account name from the menu and see it in the master ranking', async ({
+    page,
+  }) => {
     const player = makePlayer({
       displayName: 'Old Alias',
       personalAccountName: 'Old Alias',
@@ -39,6 +41,8 @@ test.describe('Game settings', () => {
     await expect(page.getByRole('status')).toContainText('Personal account name updated.')
 
     await page.goto('/ranking')
-    await expect(page.locator('table[aria-label="Master ranking leaderboard table"]')).toContainText('Nova Alias')
+    await expect(
+      page.locator('table[aria-label="Master ranking leaderboard table"]'),
+    ).toContainText('Nova Alias')
   })
 })

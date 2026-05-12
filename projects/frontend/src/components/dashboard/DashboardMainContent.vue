@@ -148,9 +148,7 @@ function powerBalanceClass(status: string): string {
 function miningEfficiencyPercent(building: Company['buildings'][number]): number | null {
   if (building.lotOriginalMaterialQuantity == null || building.lotOriginalMaterialQuantity <= 0) return null
   if (building.lotMaterialQuantity == null) return null
-  return Math.round(
-    computeMiningEfficiencyFactor(building.lotMaterialQuantity, building.lotOriginalMaterialQuantity) * 100,
-  )
+  return Math.round(computeMiningEfficiencyFactor(building.lotMaterialQuantity, building.lotOriginalMaterialQuantity) * 100)
 }
 
 function formatCurrency(value: number, currencyCode = 'EUR'): string {
@@ -276,12 +274,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <EconomyCycleWidget
-    :economic-cycle="economicCycle"
-    :active-market-events="activeMarketEvents"
-    :economic-history="economicHistory"
-    class="mb-6"
-  />
+  <EconomyCycleWidget :economic-cycle="economicCycle" :active-market-events="activeMarketEvents" :economic-history="economicHistory" class="mb-6" />
 
   <!-- Person account mode (no company selected) -->
   <section v-if="isPersonAccount" class="person-account-panel mt-6 p-6 border border-divider rounded-xl bg-card">
@@ -342,10 +335,7 @@ onMounted(() => {
         </div>
 
         <!-- Prerequisites checklist shown when NOT all met -->
-        <ul
-          v-if="!additionalCompanyPrerequisites.allRequirementsMet"
-          class="nc-prereq-list mt-4 flex flex-col gap-1.5 text-sm list-none p-0 m-0"
-        >
+        <ul v-if="!additionalCompanyPrerequisites.allRequirementsMet" class="nc-prereq-list mt-4 flex flex-col gap-1.5 text-sm list-none p-0 m-0">
           <li :class="additionalCompanyPrerequisites.companyAgeRequirementMet ? 'text-good' : 'text-muted'">
             {{
               additionalCompanyPrerequisites.companyAgeRequirementMet
@@ -357,7 +347,11 @@ onMounted(() => {
             {{ additionalCompanyPrerequisites.profitabilityRequirementMet ? t('dashboard.prereqProfitabilityMet') : t('dashboard.prereqProfitabilityNotMet') }}
           </li>
           <li :class="additionalCompanyPrerequisites.balanceRequirementMet ? 'text-good' : 'text-muted'">
-            {{ additionalCompanyPrerequisites.balanceRequirementMet ? t('dashboard.prereqBalanceMet') : t('dashboard.prereqBalanceNotMet', { required: '200,000', current: Math.floor(additionalCompanyPrerequisites.personalBalanceUsd).toLocaleString() }) }}
+            {{
+              additionalCompanyPrerequisites.balanceRequirementMet
+                ? t('dashboard.prereqBalanceMet')
+                : t('dashboard.prereqBalanceNotMet', { required: '200,000', current: Math.floor(additionalCompanyPrerequisites.personalBalanceUsd).toLocaleString() })
+            }}
           </li>
           <li :class="additionalCompanyPrerequisites.underMaxCap ? 'text-good' : 'text-bad'">
             {{ additionalCompanyPrerequisites.underMaxCap ? t('dashboard.prereqMaxCapMet') : t('dashboard.prereqMaxCapNotMet') }}
@@ -528,7 +522,7 @@ onMounted(() => {
                         ? 'bg-red-500/20 text-red-700 dark:text-red-400 border-red-400/30'
                         : 'bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-400/30'
                   "
-                  :title="t('mining.dashboardBadgeTooltip', { percent: Math.round((building.lotMaterialQuantity ?? 0) / (building.lotOriginalMaterialQuantity ?? 1) * 100) })"
+                  :title="t('mining.dashboardBadgeTooltip', { percent: Math.round(((building.lotMaterialQuantity ?? 0) / (building.lotOriginalMaterialQuantity ?? 1)) * 100) })"
                   :aria-label="t('mining.depletionRisk')"
                 >
                   {{
@@ -643,11 +637,5 @@ onMounted(() => {
   </div>
 
   <!-- Launch New Company Modal -->
-  <NewCompanyModal
-    :open="showNewCompanyModal"
-    :cities="dashboardCities"
-    :prerequisites="additionalCompanyPrerequisites"
-    @close="showNewCompanyModal = false"
-    @launched="onNewCompanyLaunched"
-  />
+  <NewCompanyModal :open="showNewCompanyModal" :cities="dashboardCities" :prerequisites="additionalCompanyPrerequisites" @close="showNewCompanyModal = false" @launched="onNewCompanyLaunched" />
 </template>

@@ -180,8 +180,7 @@ export default {
     globalAdminFailed: 'Die globale Administratorrolle konnte nicht aktualisiert werden.',
     globalAdminRemoved: 'Globale Administratorrolle entfernt.',
     billionaireTitle: 'Benchmark realer Milliardäre',
-    billionaireBody:
-      'Aktualisieren Sie die Top-10-Rangliste realer Milliardäre, die für Rennen an die Spitze und die Shard-Siegbedingung genutzt wird.',
+    billionaireBody: 'Aktualisieren Sie die Top-10-Rangliste realer Milliardäre, die für Rennen an die Spitze und die Shard-Siegbedingung genutzt wird.',
     billionaireSaved: 'Benchmark aktualisiert.',
     billionaireSaveFailed: 'Benchmark konnte nicht aktualisiert werden.',
     stopImpersonation: 'Imitation beenden',
@@ -265,26 +264,21 @@ export default {
     loginFailed: 'Anmeldung fehlgeschlagen. Bitte überprüfen Sie Ihre Zugangsdaten und versuchen Sie es erneut.',
     loginRequired: 'Bitte melden Sie sich an, um fortzufahren.',
     loginThrottledTitle: 'Zu viele fehlgeschlagene Versuche',
-    loginThrottledMessage:
-      'Zu viele fehlgeschlagene Anmeldeversuche. Bitte warten Sie 15 Minuten und versuchen Sie es erneut.',
+    loginThrottledMessage: 'Zu viele fehlgeschlagene Anmeldeversuche. Bitte warten Sie 15 Minuten und versuchen Sie es erneut.',
     loginWithBiatec: 'Mit Google anmelden',
     forgotPasswordLink: 'Passwort vergessen?',
     forgotPasswordTitle: 'Passwort vergessen',
-    forgotPasswordDescription:
-      'Geben Sie die E-Mail Ihres Kontos ein. Falls das Konto existiert, senden wir einen einmaligen Link zum Zurücksetzen.',
+    forgotPasswordDescription: 'Geben Sie die E-Mail Ihres Kontos ein. Falls das Konto existiert, senden wir einen einmaligen Link zum Zurücksetzen.',
     forgotPasswordSubmit: 'Link zum Zurücksetzen senden',
     forgotPasswordGenericError: 'Das Zurücksetzen konnte gerade nicht verarbeitet werden. Bitte versuchen Sie es später erneut.',
     resetPasswordTitle: 'Passwort zurücksetzen',
-    resetPasswordDescription:
-      'Legen Sie ein neues Passwort für Ihr Konto fest. Dieser Link kann nur einmal verwendet werden.',
+    resetPasswordDescription: 'Legen Sie ein neues Passwort für Ihr Konto fest. Dieser Link kann nur einmal verwendet werden.',
     resetNewPassword: 'Neues Passwort',
     resetConfirmPassword: 'Neues Passwort bestätigen',
     resetPasswordSubmit: 'Passwort zurücksetzen',
     resetPasswordMismatch: 'Die Passwörter stimmen nicht überein.',
-    resetPasswordGenericError:
-      'Das Passwort konnte derzeit nicht zurückgesetzt werden. Bitte versuchen Sie es später erneut.',
-    resetTokenMissing:
-      'Der Reset-Token fehlt. Öffnen Sie den Zurücksetzen-Link aus der E-Mail erneut.',
+    resetPasswordGenericError: 'Das Passwort konnte derzeit nicht zurückgesetzt werden. Bitte versuchen Sie es später erneut.',
+    resetTokenMissing: 'Der Reset-Token fehlt. Öffnen Sie den Zurücksetzen-Link aus der E-Mail erneut.',
     passwordStrengthLabel: 'Passwortstärke',
     passwordStrengthWeak: 'Schwach',
     passwordStrengthMedium: 'Mittel',
@@ -308,8 +302,7 @@ export default {
     subtitle: 'Wählen Sie Ihre Branche, sichern Sie sich Ihre ersten Stadtgrundstücke und starten Sie Ihr erstes Produkt.',
     referralBannerTitle: 'Empfehlungscode aktiv: {code}',
     referralBannerBody: 'Sie erhalten 10% Rabatt auf berechtigte In-Game-Käufe.',
-    referralBannerTooltip:
-      'Der Empfehlungsrabatt wird serverseitig auf berechtigte Käufe während des Onboardings und nach der Kontoerstellung angewendet.',
+    referralBannerTooltip: 'Der Empfehlungsrabatt wird serverseitig auf berechtigte Käufe während des Onboardings und nach der Kontoerstellung angewendet.',
     step1Title: 'Stadt wählen',
     step1Desc: 'Wählen Sie die Stadt, in der Ihr erstes Unternehmen arbeiten wird. Diese Stadt wird zugleich im oberen Kontextumschalter aktiv gesetzt.',
     step2Title: 'Branche wählen',
@@ -695,8 +688,7 @@ export default {
     viewMasterRanking: 'Globale Master-Rangliste anzeigen',
     raceBenchmarkTitle: 'Rennen an die Spitze — Realwelt-Benchmark',
     realWorldBenchmarkTitle: 'Realwelt-Benchmark',
-    realWorldBenchmarkBody:
-      'Die reichsten realen Milliardäre werden hier als Motivations-Benchmark für diesen Shard angezeigt.',
+    realWorldBenchmarkBody: 'Die reichsten realen Milliardäre werden hier als Motivations-Benchmark für diesen Shard angezeigt.',
     realWorldTarget: 'Shard-Siegziel (#1-Benchmark): {amount}',
     shardLeaderProgress: 'Fortschritt des Shard-Leaders: {name}',
     shardLeaderProgressValue: '{percent} des #1-Ziels',
@@ -1593,23 +1585,21 @@ export default {
     collateralBlockedByLoans: 'Blockiert durch {count} aktiven Kredit(e), der dieses Gebäude als Sicherheit nutzt. Begleichen Sie diese Kredite zuerst.',
     collateralLockedBadge: 'Sicherheit gesperrt',
     collateralLockedTooltip: 'Gebäude ist als Kreditsicherheit verpfändet.',
-    collateralLockedToast:
-      'Dieses Gebäude ist derzeit als Kreditsicherheit gesperrt und kann nicht verkauft oder zerstört werden.',
-    collateralOwnershipConflictToast:
-      'Der Eigentümer dieses Gebäudes hat sich geändert, bevor Ihre Kreditaktion abgeschlossen wurde — bitte neu laden und erneut versuchen.',
+    collateralLockedToast: 'Dieses Gebäude ist derzeit als Kreditsicherheit gesperrt und kann nicht verkauft oder zerstört werden.',
+    collateralOwnershipConflictToast: 'Der Eigentümer dieses Gebäudes hat sich geändert, bevor Ihre Kreditaktion abgeschlossen wurde — bitte neu laden und erneut versuchen.',
     destroyedBadge: 'Zerstört',
     destroyedHint: 'Dieses Gebäude wurde nach einem Kreditausfall zwangsvollstreckt und zerstört.',
     loanDefaultBadge: '⚠️ Kreditausfall',
     loanDefaultHint: 'Dieses Gebäude hat einen ausgefallenen Kredit. Es wird automatisch zum Verkauf angeboten und bei Nichtzahlung zerstört.',
     loanDefaultTitle: '⚠️ Kreditausfall',
-    loanDefaultBody: 'Dieses Gebäude hat einen überfälligen gesicherten Kredit. Es wurde automatisch zum Verkauf angeboten. Verkaufen Sie das Gebäude oder zahlen Sie den Kredit zurück, um eine Zerstörung zu vermeiden.',
+    loanDefaultBody:
+      'Dieses Gebäude hat einen überfälligen gesicherten Kredit. Es wurde automatisch zum Verkauf angeboten. Verkaufen Sie das Gebäude oder zahlen Sie den Kredit zurück, um eine Zerstörung zu vermeiden.',
     loanDefaultDestruction: 'Zerstörung in {ticks} Ticks, wenn nicht gekauft.',
     backToBuilding: 'Zurück zum Gebäude',
     sellRedirecting: 'Weiterleitung zurück zu Ihrem Gebäude…',
     listingSuccess: 'Gebäude erfolgreich zum Verkauf inseriert!',
     cancelListingSuccess: 'Inserat entfernt. Ihr Gebäude steht nicht mehr zum Verkauf.',
-    cancelSaleLockedTooltip:
-      'Der Verkauf kann nicht storniert werden — dieses Gebäude ist Sicherheit für einen unbezahlten Kredit.',
+    cancelSaleLockedTooltip: 'Der Verkauf kann nicht storniert werden — dieses Gebäude ist Sicherheit für einen unbezahlten Kredit.',
     setAskingPrice: 'Verkaufspreis festlegen',
     updateAskingPrice: 'Verkaufspreis aktualisieren',
     updateListing: 'Inserat aktualisieren',
@@ -1624,8 +1614,7 @@ export default {
     destroyConfirmBody: 'Sind Sie sicher? Dies kann nicht rückgängig gemacht werden. Sie erhalten {amount}.',
     destroyConfirmAction: 'Gebäude zerstören',
     destroySuccessWithAmount: 'Gebäude zerstört. {amount} wurde Ihrem Konto gutgeschrieben.',
-    destroyBlockedByUnpaidLoan:
-      'Dieses Gebäude kann nicht zerstört werden, solange es als Sicherheit für einen unbezahlten Kredit dient.',
+    destroyBlockedByUnpaidLoan: 'Dieses Gebäude kann nicht zerstört werden, solange es als Sicherheit für einen unbezahlten Kredit dient.',
     destroyFailed: 'Gebäudezerstörung fehlgeschlagen. Bitte erneut versuchen.',
     editTabConfig: 'Konfiguration',
     editTabPerformance: 'Leistung',
@@ -3698,8 +3687,7 @@ export default {
     rejectOffer: 'Ablehnen',
     offerAccepted: 'Angebot angenommen. Gebäude an Käufer übertragen.',
     offerRejected: 'Angebot abgelehnt.',
-    offerConflictRefreshing:
-      'Angebot bereits vergeben — Markt wird aktualisiert…',
+    offerConflictRefreshing: 'Angebot bereits vergeben — Markt wird aktualisiert…',
     processingOffer: 'Wird verarbeitet…',
     offerStatus: {
       PENDING: 'Ausstehend',

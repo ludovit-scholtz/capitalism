@@ -42,7 +42,9 @@ watch(
 
 const trimmedDraftName = computed(() => draftName.value.trim())
 const canSave = computed(
-  () => trimmedDraftName.value.length > 0 && trimmedDraftName.value !== currentPersonalAccountName.value,
+  () =>
+    trimmedDraftName.value.length > 0 &&
+    trimmedDraftName.value !== currentPersonalAccountName.value,
 )
 
 onMounted(async () => {
@@ -98,7 +100,9 @@ async function savePersonalAccountNameSetting() {
         <div class="flex flex-col gap-2">
           <h2 class="text-xl font-semibold text-body">{{ t('gameSettings.cardTitle') }}</h2>
           <p class="text-sm text-muted">{{ t('gameSettings.cardBody') }}</p>
-          <p class="rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-300">
+          <p
+            class="rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-300"
+          >
             {{ t('gameSettings.warning') }}
           </p>
         </div>
@@ -120,10 +124,18 @@ async function savePersonalAccountNameSetting() {
           </button>
         </form>
 
-        <p v-if="successMessage" class="mt-4 rounded-xl bg-green-500/10 px-4 py-3 text-sm text-green-300" role="status">
+        <p
+          v-if="successMessage"
+          class="mt-4 rounded-xl bg-green-500/10 px-4 py-3 text-sm text-green-300"
+          role="status"
+        >
           {{ successMessage }}
         </p>
-        <p v-if="errorMessage" class="mt-4 rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300" role="alert">
+        <p
+          v-if="errorMessage"
+          class="mt-4 rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300"
+          role="alert"
+        >
           {{ errorMessage }}
         </p>
 
@@ -133,7 +145,9 @@ async function savePersonalAccountNameSetting() {
             <p class="mt-1 text-sm text-muted">{{ t('gameSettings.usageBodyShard') }}</p>
           </article>
           <article class="rounded-xl border border-divider bg-page px-4 py-4">
-            <h3 class="text-sm font-semibold text-body">{{ t('gameSettings.usageTitleMaster') }}</h3>
+            <h3 class="text-sm font-semibold text-body">
+              {{ t('gameSettings.usageTitleMaster') }}
+            </h3>
             <p class="mt-1 text-sm text-muted">{{ t('gameSettings.usageBodyMaster') }}</p>
           </article>
         </div>

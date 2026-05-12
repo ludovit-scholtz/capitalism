@@ -190,19 +190,24 @@ export default {
   gameSettings: {
     kicker: 'Serverübergreifende Identität',
     title: 'Spieleinstellungen',
-    subtitle: 'Verwalten Sie den Namen des persönlichen Kontos, der auf allen Capitalism-Spielservern und in den Ranglisten erscheint.',
+    subtitle:
+      'Verwalten Sie den Namen des persönlichen Kontos, der auf allen Capitalism-Spielservern und in den Ranglisten erscheint.',
     cardTitle: 'Name des persönlichen Kontos',
-    cardBody: 'Dieser serverübergreifende Alias wird auf dem Master-Server gespeichert und von jedem laufenden Spiel-Shard wiederverwendet.',
-    warning: 'Verwenden Sie nicht Ihre echte rechtliche Identität. Wählen Sie einen fiktiven Alias für öffentliche Ranglisten und Spieleroberflächen.',
+    cardBody:
+      'Dieser serverübergreifende Alias wird auf dem Master-Server gespeichert und von jedem laufenden Spiel-Shard wiederverwendet.',
+    warning:
+      'Verwenden Sie nicht Ihre echte rechtliche Identität. Wählen Sie einen fiktiven Alias für öffentliche Ranglisten und Spieleroberflächen.',
     nameLabel: 'Name des persönlichen Kontos',
     namePlaceholder: 'Geben Sie den Namen Ihres persönlichen Kontos ein',
     save: 'Änderungen speichern',
     saved: 'Der Name des persönlichen Kontos wurde aktualisiert.',
     saveError: 'Der Name des persönlichen Kontos konnte nicht aktualisiert werden.',
     usageTitleShard: 'Nutzung im Shard',
-    usageBodyShard: 'Ihr aktualisierter Alias wird an laufende Spiel-Shards übertragen und in den Shard-Ranglisten sowie an persönlichen Kontobezeichnungen angezeigt.',
+    usageBodyShard:
+      'Ihr aktualisierter Alias wird an laufende Spiel-Shards übertragen und in den Shard-Ranglisten sowie an persönlichen Kontobezeichnungen angezeigt.',
     usageTitleMaster: 'Nutzung im Master',
-    usageBodyMaster: 'Derselbe Name wird in der Master-Rangliste, Ihrem Master-Profil und den gemeinsamen serverübergreifenden Kontoflächen verwendet.',
+    usageBodyMaster:
+      'Derselbe Name wird in der Master-Rangliste, Ihrem Master-Profil und den gemeinsamen serverübergreifenden Kontoflächen verwendet.',
   },
   goldAdmin: {
     kicker: 'Master-Administration',
@@ -310,10 +315,12 @@ export default {
     referralCode: 'Empfehlungscode',
     registeredUsers: 'Registrierte Nutzer',
     shareLinksTitle: 'Teilbare Empfehlungslinks',
-    shareLinksSubtitle: 'Kopieren Sie einen Link und teilen Sie ihn mit Freunden. Neue Spieler, die sich über Ihren Link registrieren, erhalten 10% Rabatt auf In-Game-Käufe.',
+    shareLinksSubtitle:
+      'Kopieren Sie einen Link und teilen Sie ihn mit Freunden. Neue Spieler, die sich über Ihren Link registrieren, erhalten 10% Rabatt auf In-Game-Käufe.',
     copyLink: 'Link kopieren',
     linkCopied: 'Kopiert!',
-    serverLoadFailed: 'Spielserver konnten nicht geladen werden. Teilbare Links sind vorübergehend nicht verfügbar.',
+    serverLoadFailed:
+      'Spielserver konnten nicht geladen werden. Teilbare Links sind vorübergehend nicht verfügbar.',
   },
   support: {
     title: 'Support-Tickets',
@@ -579,14 +586,16 @@ export default {
   },
   apiKeys: {
     title: 'API-Schlüssel',
-    subtitle: 'Verwalten Sie persönliche API-Schlüssel mit granularen Bereichen für den programmatischen Zugriff auf Ihre Spielunternehmen.',
+    subtitle:
+      'Verwalten Sie persönliche API-Schlüssel mit granularen Bereichen für den programmatischen Zugriff auf Ihre Spielunternehmen.',
     generateButton: 'Neuen Schlüssel generieren',
     generateModalTitle: 'Neuer API-Schlüssel',
     generateModalNameLabel: 'Schlüsselname',
     generateModalNamePlaceholder: 'z.B. Mein Handelsbot',
     generateModalSubmit: 'Generieren',
     generatedSuccessTitle: 'Schlüssel generiert!',
-    generatedSuccessWarning: 'Kopieren Sie diesen Schlüssel jetzt — er wird nicht erneut angezeigt.',
+    generatedSuccessWarning:
+      'Kopieren Sie diesen Schlüssel jetzt — er wird nicht erneut angezeigt.',
     copyButton: 'Kopieren',
     copiedButton: 'Kopiert!',
     closeModal: 'Schließen',
@@ -605,7 +614,8 @@ export default {
     statusActive: 'Aktiv',
     statusRevoked: 'Widerrufen',
     revokeButton: 'Widerrufen',
-    revokeConfirm: 'Sind Sie sicher, dass Sie diesen Schlüssel widerrufen möchten? Dies kann nicht rückgängig gemacht werden.',
+    revokeConfirm:
+      'Sind Sie sicher, dass Sie diesen Schlüssel widerrufen möchten? Dies kann nicht rückgängig gemacht werden.',
     revokeAllButton: 'Alle für Spieler widerrufen',
     revokeAllConfirm: 'Alle aktiven Schlüssel dieses Spielers widerrufen?',
     revokeAllSuccess: '{count} API-Schlüssel widerrufen.',
@@ -613,7 +623,8 @@ export default {
     loadError: 'API-Schlüssel konnten nicht geladen werden.',
     adminLoadError: 'Admin-Daten zu API-Schlüsseln konnten nicht geladen werden.',
     never: 'Nie',
-    authInstructions: 'Verwenden Sie Ihren API-Schlüssel in Anfragen mit dem Header: Authorization: ApiKey <Ihr-Schlüssel>',
+    authInstructions:
+      'Verwenden Sie Ihren API-Schlüssel in Anfragen mit dem Header: Authorization: ApiKey <Ihr-Schlüssel>',
     auditTitle: 'Aktuelle API-Schlüssel-Auditspur',
     auditOperation: 'Operation',
     auditScope: 'Verwendeter Bereich',
@@ -629,9 +640,11 @@ export default {
     ipUnavailable: 'Nicht verfügbar',
     companyScopeAllCompanies: 'Alle eigenen Unternehmen',
     companyScopeTitle: 'Erlaubte Unternehmen',
-    companyScopeHelp: 'Company-bound-Schlüssel dürfen nur für die ausgewählten Unternehmen handeln.',
+    companyScopeHelp:
+      'Company-bound-Schlüssel dürfen nur für die ausgewählten Unternehmen handeln.',
     adminTitle: 'Admin-Review und Notfall-Widerruf',
-    adminSubtitle: 'Filtern Sie Spielerschlüssel, prüfen Sie Audit-Einträge und widerrufen Sie kompromittierte Schlüssel.',
+    adminSubtitle:
+      'Filtern Sie Spielerschlüssel, prüfen Sie Audit-Einträge und widerrufen Sie kompromittierte Schlüssel.',
     adminFilterLabel: 'Nach Spieler-E-Mail filtern',
     adminPlayer: 'Spieler',
     adminRevokeButton: 'Widerruf erzwingen',
@@ -644,10 +657,14 @@ export default {
       companyBound: 'Unternehmensgebunden',
     },
     scopeDescriptions: {
-      readOnly: 'Erlaubt nur Query-Operationen. Jede Mutation wird mit einer strukturierten 403-Antwort abgelehnt.',
-      botOnly: 'Erlaubt Automatisierungsabläufe wie Unternehmensverwaltung und Produktionskonfiguration, blockiert aber Forex-, Aktien- und direkte Gebäude-Kauf-Mutationen.',
-      tradingOnly: 'Erlaubt nur Forex- und Aktienhandels-Mutationen. Admin-, Kredit- und Gebäudeoperationen bleiben blockiert.',
-      companyBound: 'Fügt eine deny-by-default-Unternehmensgrenze hinzu. Der Schlüssel darf nur für die ausgewählten Unternehmens-IDs handeln.',
+      readOnly:
+        'Erlaubt nur Query-Operationen. Jede Mutation wird mit einer strukturierten 403-Antwort abgelehnt.',
+      botOnly:
+        'Erlaubt Automatisierungsabläufe wie Unternehmensverwaltung und Produktionskonfiguration, blockiert aber Forex-, Aktien- und direkte Gebäude-Kauf-Mutationen.',
+      tradingOnly:
+        'Erlaubt nur Forex- und Aktienhandels-Mutationen. Admin-, Kredit- und Gebäudeoperationen bleiben blockiert.',
+      companyBound:
+        'Fügt eine deny-by-default-Unternehmensgrenze hinzu. Der Schlüssel darf nur für die ausgewählten Unternehmens-IDs handeln.',
     },
   },
   securityBoard: {

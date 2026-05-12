@@ -359,7 +359,9 @@ export function makeApiKey(overrides: Partial<MockApiKey> = {}): MockApiKey {
   }
 }
 
-export function makeApiKeyAuditLog(overrides: Partial<MockApiKeyAuditLog> = {}): MockApiKeyAuditLog {
+export function makeApiKeyAuditLog(
+  overrides: Partial<MockApiKeyAuditLog> = {},
+): MockApiKeyAuditLog {
   return {
     id: `api-audit-${Math.random().toString(36).slice(2)}`,
     keyId: overrides.keyId ?? 'api-key-001',
@@ -1147,7 +1149,12 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: 'Telemetry batch not found.', extensions: { code: 'TELEMETRY_BATCH_NOT_FOUND' } }],
+            errors: [
+              {
+                message: 'Telemetry batch not found.',
+                extensions: { code: 'TELEMETRY_BATCH_NOT_FOUND' },
+              },
+            ],
           }),
         })
         return
@@ -1172,7 +1179,12 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: 'Telemetry batch not found.', extensions: { code: 'TELEMETRY_BATCH_NOT_FOUND' } }],
+            errors: [
+              {
+                message: 'Telemetry batch not found.',
+                extensions: { code: 'TELEMETRY_BATCH_NOT_FOUND' },
+              },
+            ],
           }),
         })
         return
@@ -1367,7 +1379,8 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
       const duplicate = state.rankingLeaderboard.some(
         (entry) =>
           entry.playerId !== state.currentPlayer?.id &&
-          (entry.personalAccountName ?? entry.displayName).toLowerCase() === personalAccountName.toLowerCase(),
+          (entry.personalAccountName ?? entry.displayName).toLowerCase() ===
+            personalAccountName.toLowerCase(),
       )
       if (duplicate) {
         await route.fulfill({
@@ -1553,7 +1566,9 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
 
         const allowed = matchedKey.scopes.includes('trading-only')
         const usedScope =
-          matchedKey.scopes.find((scope) => scope !== 'company-bound') ?? matchedKey.scopes[0] ?? 'none'
+          matchedKey.scopes.find((scope) => scope !== 'company-bound') ??
+          matchedKey.scopes[0] ??
+          'none'
         state.apiKeyAuditLogs = [
           makeApiKeyAuditLog({
             keyId: matchedKey.id,
@@ -1645,7 +1660,9 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
     }
 
     if (query.includes('adminApiKeyAuditLog')) {
-      const vars = body.variables as { playerEmail?: string | null; keyId?: string | null } | undefined
+      const vars = body.variables as
+        | { playerEmail?: string | null; keyId?: string | null }
+        | undefined
       const filter = vars?.playerEmail?.toLowerCase()
       const items = state.apiKeyAuditLogs.filter(
         (entry) =>

@@ -11,9 +11,7 @@ const emit = defineEmits<{
 const auth = useAuthStore()
 const { t } = useI18n()
 
-const currentPersonalAccountName = computed(
-  () => auth.player?.personalAccountName ?? auth.player?.displayName ?? '',
-)
+const currentPersonalAccountName = computed(() => auth.player?.personalAccountName ?? auth.player?.displayName ?? '')
 const draftName = ref('')
 const saving = ref(false)
 const errorMessage = ref<string | null>(null)
@@ -28,9 +26,7 @@ watch(
 )
 
 const trimmedDraftName = computed(() => draftName.value.trim())
-const canSave = computed(
-  () => trimmedDraftName.value.length > 0 && trimmedDraftName.value !== currentPersonalAccountName.value,
-)
+const canSave = computed(() => trimmedDraftName.value.length > 0 && trimmedDraftName.value !== currentPersonalAccountName.value)
 
 async function savePersonalAccountName() {
   if (!canSave.value) {
@@ -107,18 +103,10 @@ async function savePersonalAccountName() {
       </div>
     </form>
 
-    <p
-      v-if="successMessage"
-      class="m-0 rounded-lg bg-[rgba(34,197,94,0.12)] px-3 py-3 text-sm text-good"
-      role="status"
-    >
+    <p v-if="successMessage" class="m-0 rounded-lg bg-[rgba(34,197,94,0.12)] px-3 py-3 text-sm text-good" role="status">
       {{ successMessage }}
     </p>
-    <p
-      v-if="errorMessage"
-      class="m-0 rounded-lg bg-[rgba(248,113,113,0.12)] px-3 py-3 text-sm text-bad"
-      role="alert"
-    >
+    <p v-if="errorMessage" class="m-0 rounded-lg bg-[rgba(248,113,113,0.12)] px-3 py-3 text-sm text-bad" role="alert">
       {{ errorMessage }}
     </p>
   </div>
