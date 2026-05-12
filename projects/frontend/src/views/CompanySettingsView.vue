@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
 import { getOverheadStatus } from '@/lib/companyOverhead'
@@ -266,6 +266,9 @@ onMounted(loadSettings)
           <p class="text-sm text-muted">{{ t('companySettings.eyebrow') }}</p>
           <h1>{{ settings?.companyName ?? t('companySettings.title') }}</h1>
         </div>
+        <RouterLink :to="`/ledger/${companyId}`" class="btn btn-ghost self-start ml-auto">
+          📒 {{ t('dashboard.viewLedger') }}
+        </RouterLink>
       </div>
 
       <!-- Loading state -->

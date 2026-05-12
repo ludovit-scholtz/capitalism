@@ -581,6 +581,22 @@ function sparklineHeight(summary: CompanyCityFinancialSummary, revenue: number):
         </table>
       </div>
     </div>
+
+    <!-- Race to the Top panel -->
+    <div class="race-panel">
+      <div class="race-panel-inner">
+        <div class="race-panel-text">
+          <span class="race-panel-icon">🏆</span>
+          <div>
+            <strong class="race-panel-title">{{ $t('endgame.raceTitle') }}</strong>
+            <p class="race-panel-subtitle">{{ $t('endgame.raceSubtitle') }}</p>
+          </div>
+        </div>
+        <RouterLink to="/personal-ledger" class="btn btn-secondary btn-sm race-panel-link">
+          {{ $t('ledger.viewPersonalLedger') }}
+        </RouterLink>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -905,5 +921,42 @@ function sparklineHeight(summary: CompanyCityFinancialSummary, revenue: number):
   width: 8px;
   border-radius: 3px 3px 0 0;
   background: color-mix(in srgb, var(--color-primary) 75%, transparent);
+}
+.race-panel {
+  background: color-mix(in srgb, var(--color-accent, #f59e0b) 10%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-accent, #f59e0b) 30%, transparent);
+  border-radius: 0.75rem;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+}
+.race-panel-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.race-panel-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+.race-panel-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+.race-panel-title {
+  display: block;
+  font-size: 0.9375rem;
+  color: var(--color-text);
+}
+.race-panel-subtitle {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  margin: 0.2rem 0 0;
+}
+.race-panel-link {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 </style>
