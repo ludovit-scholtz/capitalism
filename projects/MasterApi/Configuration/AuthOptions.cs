@@ -13,4 +13,22 @@ public sealed class AuthOptions
     /// traditional email/password authentication alongside OIDC.
     /// </summary>
     public bool PasswordAuthEnabled { get; init; } = false;
+
+    /// <summary>
+    /// Number of consecutive failed login attempts before the account is temporarily locked out.
+    /// Default is 5.
+    /// </summary>
+    public int MaxFailedLoginAttempts { get; init; } = 5;
+
+    /// <summary>
+    /// How long (in minutes) a locked-out account must wait before it can attempt login again.
+    /// Default is 15 minutes.
+    /// </summary>
+    public int LockoutWindowMinutes { get; init; } = 15;
+
+    /// <summary>
+    /// Maximum number of login/register requests per IP address per minute before HTTP 429 is returned.
+    /// Applies in non-Development environments only. Default is 10.
+    /// </summary>
+    public int RateLimitRequestsPerMinute { get; init; } = 10;
 }

@@ -33,7 +33,8 @@ public sealed partial class Mutation
         [Service] IOptions<JwtOptions> jwtOptions,
         [Service] IOptions<AuthOptions> authOptions,
         [Service] IMasterRankingTelemetryService rankingTelemetry,
-        [Service] IOptions<MasterServerRegistrationOptions> masterOptions)
+        [Service] IOptions<MasterServerRegistrationOptions> masterOptions,
+        [Service] ILoginThrottleService throttle)
     {
         if (!authOptions.Value.PasswordAuthEnabled)
         {
@@ -48,9 +49,10 @@ public sealed partial class Mutation
 
         if (await db.Players.AnyAsync(p => p.Email.ToLower() == normalizedEmail))
         {
+            // Return a neutral message so callers cannot enumerate registered email addresses.
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("A player with this email already exists.")
+                    .SetMessage("An account with that email may already exist. Please check your inbox or try signing in.")
                     .SetCode("DUPLICATE_EMAIL")
                     .Build());
         }
@@ -90,7 +92,8 @@ public sealed partial class Mutation
         [Service] IOptions<JwtOptions> jwtOptions,
         [Service] IOptions<AuthOptions> authOptions,
         [Service] IMasterRankingTelemetryService rankingTelemetry,
-        [Service] IOptions<MasterServerRegistrationOptions> masterOptions)
+        [Service] IOptions<MasterServerRegistrationOptions> masterOptions,
+        [Service] ILoginThrottleService throttle)
     {
         if (!authOptions.Value.PasswordAuthEnabled)
         {
@@ -102,9 +105,22 @@ public sealed partial class Mutation
         }
 
         var normalizedEmail = input.Email.Trim().ToLowerInvariant();
+
+        // Check throttle BEFORE hitting the database to prevent oracle-style timing attacks.
+        if (throttle.IsThrottled(normalizedEmail))
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Too many failed login attempts. Please wait before trying again.")
+                    .SetCode("LOGIN_THROTTLED")
+                    .Build());
+        }
+
         var player = await db.Players.FirstOrDefaultAsync(p => p.Email.ToLower() == normalizedEmail);
         if (player is null)
         {
+            // Record failure even for unknown emails to prevent timing-based enumeration.
+            throttle.RecordFailure(normalizedEmail);
             throw new GraphQLException(
                 ErrorBuilder.New()
                     .SetMessage("Invalid email or password.")
@@ -117,12 +133,16 @@ public sealed partial class Mutation
 
         if (result == PasswordVerificationResult.Failed)
         {
+            throttle.RecordFailure(normalizedEmail);
             throw new GraphQLException(
                 ErrorBuilder.New()
                     .SetMessage("Invalid email or password.")
                     .SetCode("INVALID_CREDENTIALS")
                     .Build());
         }
+
+        // Successful login — clear the failure counter.
+        throttle.RecordSuccess(normalizedEmail);
 
         if (!string.Equals(player.Email, normalizedEmail, StringComparison.Ordinal))
         {

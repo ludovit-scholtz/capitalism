@@ -221,6 +221,8 @@ public class Program
         builder.Services.AddScoped<MasterRankingService>();
         builder.Services.AddScoped<RankingTelemetryValidator>();
         builder.Services.AddHostedService<MasterRankingSchedulerHostedService>();
+        builder.Services.AddMemoryCache();
+        builder.Services.AddSingleton<ILoginThrottleService, LoginThrottleService>();
 
         builder.Services
             .AddGraphQLServer()
@@ -238,6 +240,7 @@ public class Program
         var app = builder.Build();
 
         app.UseCors("frontend");
+        app.UseMiddleware<AuthRateLimitMiddleware>();
         app.UseAuthentication();
         app.UseAuthorization();
 

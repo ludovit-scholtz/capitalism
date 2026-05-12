@@ -262,6 +262,9 @@ export default {
     loginFailed: 'Login failed. Please check your credentials and try again.',
     loginToAccess: 'Log in to access',
     loginRequired: 'Please log in to continue.',
+    loginThrottledTitle: 'Too many failed attempts',
+    loginThrottledMessage:
+      'Too many failed login attempts. Please wait 15 minutes before trying again.',
     loginWithBiatec: 'Sign in with google',
     oidcRetryDriveAccessHint: 'Google Drive file creation access is required for the Biatec wallet setup. Start Google sign-in again and allow the Drive permission to finish authentication.',
     oidcCallbackTitle: 'Completing sign in',

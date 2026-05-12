@@ -261,6 +261,9 @@ export default {
     loginToAccess: 'Prihláste sa pre prístup',
     loginFailed: 'Prihl\u00e1senie zlyhalo. Skontrolujte prihlasovacie \u00fadaje a sk\u00faste znova.',
     loginRequired: 'Pred pokračovaním sa prihláste.',
+    loginThrottledTitle: 'Príliš veľa neúspešných pokusov',
+    loginThrottledMessage:
+      'Príliš veľa neúspešných pokusov o prihlásenie. Skúste to znova o 15 minút.',
     loginWithBiatec: 'Prihlásiť cez Google',
     oidcRetryDriveAccessHint:
       'Na nastavenie Biatec peňaženky je potrebné povoliť vytváranie súborov v Google Drive. Spustite prihlásenie cez Google znova a povoľte prístup k Drive, aby sa autentifikácia dokončila.',

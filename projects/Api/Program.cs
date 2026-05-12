@@ -247,6 +247,7 @@ public class Program
         builder.Services.AddScoped<GameAdminAuthorizationService>();
         builder.Services.AddScoped<IMasterRankingTelemetryService, MasterRankingTelemetryService>();
         builder.Services.AddMemoryCache();
+        builder.Services.AddSingleton<ILoginThrottleService, LoginThrottleService>();
 
         // ── Game tick engine ──
         builder.Services.AddScoped<TickProcessor>();
@@ -292,6 +293,7 @@ public class Program
         var app = builder.Build();
 
         app.UseCors("frontend");
+        app.UseMiddleware<AuthRateLimitMiddleware>();
         app.UseMiddleware<ApiKeyAuthMiddleware>();
         app.UseAuthentication();
         app.UseAuthorization();
