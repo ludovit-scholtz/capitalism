@@ -3422,6 +3422,48 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task CompanyAdministrationOverhead_Unauthenticated_ReturnsAuthorizationError()
+    {
+        var result = await ExecuteGraphQlAsync(
+            """
+            query CompanyAdministrationOverhead($companyId: UUID!) {
+              companyAdministrationOverhead(companyId: $companyId)
+            }
+            """,
+            new { companyId = Guid.NewGuid() },
+            token: null);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        var firstError = errors[0];
+        var message = firstError.GetProperty("message").GetString();
+        Assert.Contains("authorized", message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CompanyAdministrationOverhead_Owner_ReturnsRate()
+    {
+        var ownerToken = await RegisterAndGetTokenAsync("overhead-owner@test.com", "Overhead Owner");
+        var createResult = await ExecuteGraphQlAsync(
+            "mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }",
+            new { input = new { name = "Overhead Corp" } },
+            ownerToken);
+        var companyId = createResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString()!;
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query CompanyAdministrationOverhead($companyId: UUID!) {
+              companyAdministrationOverhead(companyId: $companyId)
+            }
+            """,
+            new { companyId },
+            ownerToken);
+
+        var overheadRate = result.GetProperty("data").GetProperty("companyAdministrationOverhead").GetDecimal();
+        Assert.True(overheadRate >= 0m);
+        Assert.True(overheadRate <= 0.5m);
+    }
+
+    [Fact]
     public async Task GetCompanySettings_ReturnsCurrencyCode()
     {
         // Companies created via onboarding inherit the city's currency.

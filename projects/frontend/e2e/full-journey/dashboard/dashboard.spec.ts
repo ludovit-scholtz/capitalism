@@ -547,6 +547,7 @@ test.describe('Dashboard — company settings', () => {
     await expect(page.getByRole('heading', { name: 'Settings Corp' })).toBeVisible()
 
     await page.getByLabel('Company Name').fill('Renamed Industries')
+    await page.getByRole('button', { name: 'Salaries' }).click()
     await page.getByLabel('Salary Multiplier Bratislava').fill('1.35')
     await page.getByRole('button', { name: 'Save' }).click()
 
@@ -579,10 +580,11 @@ test.describe('Dashboard — company settings', () => {
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/company/comp-overhead/settings')
+    await page.getByRole('button', { name: 'Administration' }).click()
 
     // Overhead section should be visible
-    await expect(page.getByText('Operating Overview')).toBeVisible()
-    await expect(page.getByText('Administration overhead', { exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Administration' })).toBeVisible()
+    await expect(page.locator('.overhead-value')).toBeVisible()
 
     // Overhead help text should explain the metric
     await expect(page.getByText(/Administration overhead increases/i)).toBeVisible()
@@ -610,6 +612,7 @@ test.describe('Dashboard — company settings', () => {
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/company/comp-salaries/settings')
+    await page.getByRole('button', { name: 'Salaries' }).click()
 
     // Salary table should show city, base salary, multiplier, and effective salary columns
     await expect(page.getByRole('columnheader', { name: 'City' })).toBeVisible()
@@ -663,6 +666,7 @@ test.describe('Dashboard — company settings', () => {
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/company/comp-high-overhead/settings')
+    await page.getByRole('button', { name: 'Administration' }).click()
 
     // Overhead value and badge should be visible
     await expect(page.locator('.overhead-value')).toBeVisible()
@@ -698,6 +702,7 @@ test.describe('Dashboard — company settings', () => {
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/company/comp-salary-hint/settings')
+    await page.getByRole('button', { name: 'Salaries' }).click()
 
     // Salary impact hint should appear below the salary table
     await expect(page.locator('.salary-impact-hint')).toBeVisible()
@@ -727,6 +732,7 @@ test.describe('Dashboard — company settings', () => {
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/company/comp-new/settings')
+    await page.getByRole('button', { name: 'Administration' }).click()
 
     // Low overhead badge should be visible and text should show 0.0%
     await expect(page.locator('.overhead-low')).toBeVisible()
