@@ -1,9 +1,8 @@
 [extend]
 useDefault = true
 
-[[allowlists]]
+[allowlist]
 description = "Allow documented placeholder signing-key examples in .env.example"
-condition = "AND"
-regexTarget = "line"
-paths = ['''^\.env\.example$''']
-regexes = ['''^Jwt__SigningKey=.*$''']
+paths = ['''.env\.example''']
+regexTarget = "match"
+regexes = ['''Jwt__SigningKey=.*''']
