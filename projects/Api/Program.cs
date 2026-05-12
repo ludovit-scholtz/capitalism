@@ -157,19 +157,7 @@ public class Program
         builder.Services.AddHttpClient("push");
         builder.Services.AddHttpClient("nbs-exchange-rate");
 
-        if (builder.Configuration["MasterServer:ApiUrl"]?.Contains("masterapi") == true)
-        {
-            // ignore ssl issues in local dev
-            builder.Services.AddHttpClient("master-server").ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
-            {
-                ServerCertificateCustomValidationCallback = (m, c, ch, e) => true
-            });
-
-        }
-        else
-        {
-            builder.Services.AddHttpClient("master-server");
-        }
+        MasterServerHttpClientRegistration.Add(builder.Services, builder.Environment);
 
         builder.Services.AddScoped<WebPush.IWebPushClient>(serviceProvider =>
             new WebPush.WebPushClient(
