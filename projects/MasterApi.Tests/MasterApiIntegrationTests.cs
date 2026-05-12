@@ -3964,7 +3964,7 @@ public sealed class JwtStartupGuardTests : IClassFixture<ProductionStartupGuardF
         // silently accepting forgeable tokens.
         var ex = Assert.Throws<InvalidOperationException>(() => _factory.CreateClient());
 
-        Assert.Contains("JWT SigningKey", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("default", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("placeholder or insecure value", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Jwt__SigningKey", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 }

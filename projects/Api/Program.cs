@@ -60,6 +60,40 @@ public class Program
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
+        using var startupLoggerFactory = LoggerFactory.Create(logging =>
+        {
+            logging.AddConfiguration(builder.Configuration.GetSection("Logging"));
+            logging.AddConsole();
+        });
+        var startupLogger = startupLoggerFactory.CreateLogger("JwtSigningKeyStartupGuard");
+
+        if (JwtSigningKeyStartupGuard.TryGetUnsafeReason(
+                jwtOptions.SigningKey,
+                [JwtOptions.DefaultSigningKey],
+                out var unsafeSigningKeyReason))
+        {
+            if (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing"))
+            {
+                startupLogger.LogWarning(
+                    "Startup with insecure Jwt signing key is allowed only in Development/Testing. Environment={EnvironmentName} Reason={Reason} OverrideEnvironmentVariable={OverrideEnvironmentVariable}",
+                    builder.Environment.EnvironmentName,
+                    unsafeSigningKeyReason,
+                    "Jwt__SigningKey");
+            }
+            else
+            {
+                startupLogger.LogCritical(
+                    "Blocking startup because Jwt signing key is insecure. Environment={EnvironmentName} Reason={Reason} OverrideEnvironmentVariable={OverrideEnvironmentVariable}",
+                    builder.Environment.EnvironmentName,
+                    unsafeSigningKeyReason,
+                    "Jwt__SigningKey");
+                throw new InvalidOperationException(
+                    "Jwt:SigningKey is set to a placeholder or insecure value. " +
+                    "Set a strong secret via environment variable 'Jwt__SigningKey' before starting outside Development. " +
+                    $"Validation reason: {unsafeSigningKeyReason}");
+            }
+        }
+
         builder.Services.AddCors(options =>
         {
             options.AddPolicy("frontend", policy =>
