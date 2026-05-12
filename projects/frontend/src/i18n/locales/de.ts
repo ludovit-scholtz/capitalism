@@ -261,6 +261,9 @@ export default {
     loginToAccess: 'Anmelden für Zugriff',
     loginFailed: 'Anmeldung fehlgeschlagen. Bitte überprüfen Sie Ihre Zugangsdaten und versuchen Sie es erneut.',
     loginRequired: 'Bitte melden Sie sich an, um fortzufahren.',
+    loginThrottledTitle: 'Zu viele fehlgeschlagene Versuche',
+    loginThrottledMessage:
+      'Zu viele fehlgeschlagene Anmeldeversuche. Bitte warten Sie 15 Minuten und versuchen Sie es erneut.',
     loginWithBiatec: 'Mit Google anmelden',
     oidcRetryDriveAccessHint:
       'Für die Einrichtung der Biatec-Wallet muss das Erstellen von Dateien in Google Drive erlaubt sein. Starten Sie die Google-Anmeldung erneut und erlauben Sie den Drive-Zugriff, damit die Anmeldung abgeschlossen werden kann.',

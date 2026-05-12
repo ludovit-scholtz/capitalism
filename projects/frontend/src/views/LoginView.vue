@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useReferralStore } from '@/stores/referral'
+import { GraphQLError } from '@/lib/graphql'
 import {
   generatePersonalAccountName,
   resetPersonalNameSession,
@@ -24,6 +25,7 @@ const email = ref('')
 const displayName = ref('')
 const password = ref('')
 const formError = ref<string | null>(null)
+const isThrottled = ref(false)
 const requiresConsentRetry = computed(() => route.query.oidc_retry === 'consent')
 const showsDriveAccessHint = computed(
   () => requiresConsentRetry.value && route.query.oidc_reason === 'drive_access',
@@ -47,6 +49,7 @@ function handleGenerateName() {
 
 async function handleSubmit() {
   formError.value = null
+  isThrottled.value = false
   try {
     if (isRegister.value) {
       await auth.register(email.value, displayName.value, password.value, referralStore.pendingCode)
@@ -56,7 +59,11 @@ async function handleSubmit() {
     }
     router.push('/')
   } catch (e: unknown) {
-    formError.value = e instanceof Error ? e.message : 'An error occurred'
+    if (e instanceof GraphQLError && e.code === 'LOGIN_THROTTLED') {
+      isThrottled.value = true
+    } else {
+      formError.value = e instanceof Error ? e.message : 'An error occurred'
+    }
   }
 }
 
@@ -125,6 +132,17 @@ onMounted(() => {
 
             <div v-if="formError" class="bg-bad/10 text-bad rounded-md px-3 py-3 text-sm" role="alert">
               {{ formError }}
+            </div>
+
+            <!-- Login throttle warning — visually distinct from generic errors -->
+            <div
+              v-if="isThrottled"
+              class="login-throttle-banner rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300"
+              role="alert"
+              aria-live="polite"
+            >
+              <p class="font-semibold">⚠ {{ t('auth.loginThrottledTitle') }}</p>
+              <p class="mt-1 text-amber-200/80">{{ t('auth.loginThrottledMessage') }}</p>
             </div>
 
             <!-- Password form fields (only shown when password auth is enabled) -->
