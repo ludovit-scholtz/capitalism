@@ -11,6 +11,7 @@ import SupplyChainPanel from '@/components/dashboard/SupplyChainPanel.vue'
 import FinancialSummaryCard from '@/components/dashboard/FinancialSummaryCard.vue'
 import StarterGuidance from '@/components/dashboard/StarterGuidance.vue'
 import DashboardChatPanel from '@/components/dashboard/DashboardChatPanel.vue'
+import DashboardPersonalSettingsPanel from '@/components/dashboard/DashboardPersonalSettingsPanel.vue'
 import DashboardTabNav from '@/components/dashboard/DashboardTabNav.vue'
 import EconomyCycleWidget from '@/components/dashboard/EconomyCycleWidget.vue'
 import BuildingHeaderFinancials from '@/components/buildings/BuildingHeaderFinancials.vue'
@@ -69,15 +70,16 @@ function setActiveTab(tab: 'overview' | 'buildings' | 'activity' | 'chat' | 'pro
 }
 
 const _savedPersonTab = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('person_account_tab') : null
-const personAccountTab = ref<'overview' | 'create-company' | 'ledger'>((_savedPersonTab as 'overview' | 'create-company' | 'ledger') || 'overview')
+const personAccountTab = ref<'overview' | 'create-company' | 'ledger' | 'settings'>((_savedPersonTab as 'overview' | 'create-company' | 'ledger' | 'settings') || 'overview')
 function setPersonAccountTab(tab: string) {
-  personAccountTab.value = tab as 'overview' | 'create-company' | 'ledger'
+  personAccountTab.value = tab as 'overview' | 'create-company' | 'ledger' | 'settings'
   if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('person_account_tab', tab)
 }
 const personAccountTabs = computed(() => [
   { key: 'overview', label: t('dashboard.personTabOverview') },
   { key: 'create-company', label: t('dashboard.personTabCreateCompany') },
   { key: 'ledger', label: t('dashboard.personTabLedger') },
+  { key: 'settings', label: t('dashboard.personTabSettings') },
 ])
 
 // ── Computed helpers ──────────────────────────────────────────────────────────
@@ -413,6 +415,11 @@ onMounted(() => {
       <div class="person-account-ledger-link mb-5">
         <RouterLink to="/personal-ledger" class="btn btn-primary inline-flex items-center gap-1.5"> 📒 {{ t('dashboard.viewPersonalLedger') }} </RouterLink>
       </div>
+    </div>
+
+    <!-- ── Settings tab ───────────────────────────────────────────────────── -->
+    <div v-show="personAccountTab === 'settings'" class="pt-5" role="tabpanel" :aria-label="t('dashboard.personTabSettings')">
+      <DashboardPersonalSettingsPanel @saved="emit('refresh-dashboard')" />
     </div>
   </section>
 

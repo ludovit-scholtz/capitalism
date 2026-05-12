@@ -2688,6 +2688,7 @@ test.describe('Dashboard — personal account panel', () => {
     await expect(page.getByRole('tab', { name: 'Overview' })).toBeVisible()
     await expect(page.getByRole('tab', { name: 'Create company' })).toBeVisible()
     await expect(page.getByRole('tab', { name: 'Ledger' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Settings' })).toBeVisible()
 
     // Overview tab is active by default
     await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
@@ -2791,18 +2792,57 @@ test.describe('Dashboard — personal account panel', () => {
     await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
     await expect(page.getByRole('tab', { name: 'Create company' })).toHaveAttribute('aria-selected', 'false')
     await expect(page.getByRole('tab', { name: 'Ledger' })).toHaveAttribute('aria-selected', 'false')
+    await expect(page.getByRole('tab', { name: 'Settings' })).toHaveAttribute('aria-selected', 'false')
 
     // Switch to Create company
     await page.getByRole('tab', { name: 'Create company' }).click()
     await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'false')
     await expect(page.getByRole('tab', { name: 'Create company' })).toHaveAttribute('aria-selected', 'true')
     await expect(page.getByRole('tab', { name: 'Ledger' })).toHaveAttribute('aria-selected', 'false')
+    await expect(page.getByRole('tab', { name: 'Settings' })).toHaveAttribute('aria-selected', 'false')
 
     // Switch to Ledger
     await page.getByRole('tab', { name: 'Ledger' }).click()
     await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'false')
     await expect(page.getByRole('tab', { name: 'Create company' })).toHaveAttribute('aria-selected', 'false')
     await expect(page.getByRole('tab', { name: 'Ledger' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('tab', { name: 'Settings' })).toHaveAttribute('aria-selected', 'false')
+
+    // Switch to Settings
+    await page.getByRole('tab', { name: 'Settings' }).click()
+    await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'false')
+    await expect(page.getByRole('tab', { name: 'Create company' })).toHaveAttribute('aria-selected', 'false')
+    await expect(page.getByRole('tab', { name: 'Ledger' })).toHaveAttribute('aria-selected', 'false')
+    await expect(page.getByRole('tab', { name: 'Settings' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  test('renames the personal account from the Settings tab and shows the alias on the shard leaderboard', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      displayName: 'Old Alias',
+      personalAccountName: 'Old Alias',
+      personalCash: 90_000,
+      companies: [],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    await page.getByRole('tab', { name: 'Settings' }).click()
+    await page.getByLabel('Personal account name').fill('Nova Alias')
+    await page.getByRole('button', { name: 'Save changes' }).click()
+
+    await expect(page.getByRole('status')).toContainText('Personal account name updated.')
+
+    await page.goto('/leaderboard')
+    await expect(page.locator('.rank-card').getByText('Nova Alias')).toBeVisible()
   })
 })
 

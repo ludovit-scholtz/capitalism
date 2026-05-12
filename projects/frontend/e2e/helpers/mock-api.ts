@@ -7092,8 +7092,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               companyId: company.id,
               companyName: company.name,
               playerId: player.id,
-              ownerDisplayName: player.displayName,
-              ownerPersonalAccountName: player.displayName,
+              ownerDisplayName: player.personalAccountName ?? player.displayName,
+              ownerPersonalAccountName: player.personalAccountName ?? player.displayName,
               currencyCode: 'EUR',
               cash: company.cash,
               buildingValue,
@@ -7225,6 +7225,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
       const player = state.players.find((p) => p.id === state.currentUserId)
       if (player) {
+        player.displayName = personalAccountName
         player.personalAccountName = personalAccountName
       }
 

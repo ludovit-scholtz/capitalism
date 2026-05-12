@@ -166,6 +166,14 @@ const CLAIM_STARTUP_PACK_MUTATION = `
   }
 `
 
+const UPDATE_PERSONAL_ACCOUNT_NAME_MUTATION = `
+  mutation UpdatePersonalAccountName($input: UpdatePersonalAccountNameInput!) {
+    updatePersonalAccountName(input: $input) {
+      personalAccountName
+    }
+  }
+`
+
 export async function fetchGameServers(): Promise<GameServerSummary[]> {
   const data = await gqlRequest<GameServersPayload>(GAME_SERVERS_QUERY)
   return data.gameServers
@@ -222,6 +230,27 @@ export async function claimStartupPack(token: string): Promise<SubscriptionInfo>
     token,
   )
   return data.claimStartupPack
+}
+
+export async function updatePersonalAccountName(
+  token: string,
+  personalAccountName: string,
+): Promise<string> {
+  const data = await gqlRequest<{
+    updatePersonalAccountName: {
+      personalAccountName: string
+    }
+  }>(
+    UPDATE_PERSONAL_ACCOUNT_NAME_MUTATION,
+    {
+      input: {
+        personalAccountName,
+      },
+    },
+    token,
+  )
+
+  return data.updatePersonalAccountName.personalAccountName
 }
 
 // ── Player gold account ────────────────────────────────────────────────────

@@ -1660,6 +1660,90 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
                 Assert.Equal(masterAlias, storedPlayer.DisplayName);
         }
 
+        [Fact]
+        public async Task SyncPersonalAccountNameFromMaster_ExistingShardPlayer_UpdatesMeAndRankings()
+        {
+                var email = $"master-sync-{Guid.NewGuid():N}@example.com";
+                var localToken = await RegisterAndGetTokenAsync(email, "Shard Local Name");
+                await ExecuteGraphQlAsync(
+                        "mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }",
+                        new { input = new { name = "Synced Alias Holdings" } },
+                        localToken);
+
+                const string syncedAlias = "Captain Ledger Fox";
+                var syncResult = await ExecuteGraphQlAsync(
+                        """
+                        mutation SyncPersonalAccountNameFromMaster($input: SyncPersonalAccountNameFromMasterInput!) {
+                            syncPersonalAccountNameFromMaster(input: $input) {
+                                playerId
+                                playerEmail
+                                personalAccountName
+                                playerFound
+                                wasUpdated
+                            }
+                        }
+                        """,
+                        new
+                        {
+                                input = new
+                                {
+                                        registrationKey = "local-master-registration-key",
+                                        serverKey = "capitalism-local",
+                                        playerEmail = email,
+                                        personalAccountName = syncedAlias,
+                                },
+                        });
+
+                Assert.False(syncResult.TryGetProperty("errors", out _));
+                var payload = syncResult.GetProperty("data").GetProperty("syncPersonalAccountNameFromMaster");
+                Assert.True(payload.GetProperty("playerFound").GetBoolean());
+                Assert.True(payload.GetProperty("wasUpdated").GetBoolean());
+                Assert.Equal(email, payload.GetProperty("playerEmail").GetString());
+                Assert.Equal(syncedAlias, payload.GetProperty("personalAccountName").GetString());
+
+                var result = await ExecuteGraphQlAsync(
+                        """
+                        {
+                            me {
+                                id
+                                displayName
+                                personalAccountName
+                            }
+                            rankings {
+                                playerId
+                                displayName
+                                personalAccountName
+                            }
+                            companyRankings {
+                                playerId
+                                companyName
+                                ownerDisplayName
+                                ownerPersonalAccountName
+                            }
+                        }
+                        """,
+                        token: localToken);
+
+                Assert.False(result.TryGetProperty("errors", out _));
+                var me = result.GetProperty("data").GetProperty("me");
+                var playerId = me.GetProperty("id").GetString();
+                Assert.Equal(syncedAlias, me.GetProperty("displayName").GetString());
+                Assert.Equal(syncedAlias, me.GetProperty("personalAccountName").GetString());
+
+                var playerRanking = result.GetProperty("data").GetProperty("rankings").EnumerateArray()
+                        .FirstOrDefault(entry => string.Equals(entry.GetProperty("playerId").GetString(), playerId, StringComparison.Ordinal));
+                Assert.True(playerRanking.ValueKind != JsonValueKind.Undefined, "Player must appear in the shard ranking leaderboard.");
+                Assert.Equal(syncedAlias, playerRanking.GetProperty("displayName").GetString());
+                Assert.Equal(syncedAlias, playerRanking.GetProperty("personalAccountName").GetString());
+
+                var companyRanking = result.GetProperty("data").GetProperty("companyRankings").EnumerateArray()
+                        .FirstOrDefault(entry => string.Equals(entry.GetProperty("playerId").GetString(), playerId, StringComparison.Ordinal));
+                Assert.True(companyRanking.ValueKind != JsonValueKind.Undefined, "Player company must appear in shard company rankings.");
+                Assert.Equal("Synced Alias Holdings", companyRanking.GetProperty("companyName").GetString());
+                Assert.Equal(syncedAlias, companyRanking.GetProperty("ownerDisplayName").GetString());
+                Assert.Equal(syncedAlias, companyRanking.GetProperty("ownerPersonalAccountName").GetString());
+        }
+
     [Fact]
     public async Task LegacySensitiveDisplayName_PublicIdentitySurfaces_UseSanitizedAlias()
     {
