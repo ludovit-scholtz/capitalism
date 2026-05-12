@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
@@ -49,6 +50,8 @@ public sealed class MasterRankingTelemetryService(
     IOptions<MasterServerRegistrationOptions> options,
     ILogger<MasterRankingTelemetryService> logger) : IMasterRankingTelemetryService
 {
+    private static readonly ConcurrentDictionary<string, Lazy<Task>> InFlightReports = new(StringComparer.Ordinal);
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = true,
@@ -76,6 +79,46 @@ public sealed class MasterRankingTelemetryService(
                 options.Value.ServerKey,
                 uniqueScopeKey,
                 externalEventId);
+            var reportTask = InFlightReports.GetOrAdd(
+                idempotencyKey,
+                _ => new Lazy<Task>(
+                    () => SendReportAsync(
+                        normalizedEventType,
+                        normalizedPlayerEmail,
+                        uniqueScopeKey,
+                        externalEventId,
+                        idempotencyKey,
+                        cancellationToken),
+                    LazyThreadSafetyMode.ExecutionAndPublication));
+            var sharedTask = reportTask.Value;
+
+            await sharedTask;
+
+            if (sharedTask.IsCompleted)
+            {
+                InFlightReports.TryRemove(new KeyValuePair<string, Lazy<Task>>(idempotencyKey, reportTask));
+            }
+        }
+        catch (Exception ex)
+        {
+            // Telemetry failures must never affect gameplay.
+            logger.LogWarning(ex,
+                "MasterRankingTelemetry: failed to report event {EventType} for player {Email}.",
+                eventType,
+                playerEmail);
+        }
+    }
+
+    private async Task SendReportAsync(
+        string normalizedEventType,
+        string normalizedPlayerEmail,
+        string? uniqueScopeKey,
+        string? externalEventId,
+        string idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
             var client = httpClientFactory.CreateClient("master-server");
             var body = new
             {
@@ -136,8 +179,8 @@ public sealed class MasterRankingTelemetryService(
             // Telemetry failures must never affect gameplay.
             logger.LogWarning(ex,
                 "MasterRankingTelemetry: failed to report event {EventType} for player {Email}.",
-                eventType,
-                playerEmail);
+                normalizedEventType,
+                normalizedPlayerEmail);
         }
     }
 

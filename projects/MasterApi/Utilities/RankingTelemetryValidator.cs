@@ -30,6 +30,7 @@ public sealed class RankingTelemetryValidator(MasterDbContext db)
     private static readonly TimeSpan SignatureTtl = TimeSpan.FromHours(24);
     private const int BurstThresholdPerMinute = 8;
     private const decimal NetWorthRegressionToleranceUsd = 0.01m;
+    private static readonly AsyncKeyedLock SignatureReservationLocks = new(StringComparer.Ordinal);
 
     internal static string NormalizePayload(string? payloadJson)
     {
@@ -86,6 +87,8 @@ public sealed class RankingTelemetryValidator(MasterDbContext db)
             await db.SaveChangesAsync(cancellationToken);
             throw BuildForbiddenError("Shard key is stale or revoked.", RankingTelemetryAuditReason.StaleShardKey);
         }
+
+        await using var signatureLock = await SignatureReservationLocks.AcquireAsync(signatureHash, cancellationToken);
 
         var expiredSignatures = await db.RankingTelemetryEventSignatures
             .Where(signature => signature.ExpiresAtUtc <= now)

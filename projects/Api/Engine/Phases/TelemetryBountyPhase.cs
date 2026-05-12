@@ -36,6 +36,7 @@ public sealed class TelemetryBountyPhase(
             .ToDictionary(kv => kv.Key, kv => kv.Value.PlayerId);
 
         var tasks = new List<Task>();
+        var queuedScopeKeys = new HashSet<string>(StringComparer.Ordinal);
         var pendingBadgesByPlayer = new Dictionary<Guid, HashSet<string>>();
 
         void QueueBounty(string bountyCode, Guid playerId, string? email)
@@ -45,10 +46,16 @@ public sealed class TelemetryBountyPhase(
                 return;
             }
 
+            var scopeKey = $"{bountyCode}:{email}:{today}:{serverKey}";
+            if (!queuedScopeKeys.Add(scopeKey))
+            {
+                return;
+            }
+
             tasks.Add(telemetry.ReportEventAsync(
                 bountyCode,
                 email,
-                uniqueScopeKey: $"{bountyCode}:{email}:{today}:{serverKey}"));
+                uniqueScopeKey: scopeKey));
 
             var badgeType = BadgeType.FromBountyCode(bountyCode);
             if (badgeType is null)

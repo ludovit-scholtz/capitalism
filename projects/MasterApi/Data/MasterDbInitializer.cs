@@ -2,6 +2,8 @@ using MasterApi.Data.Entities;
 using Capitalism.Shared.Ranking;
 using MasterApi.Utilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace MasterApi.Data;
 
@@ -16,6 +18,7 @@ public sealed class MasterDbInitializer(MasterDbContext db, ILogger<MasterDbInit
     {
         if (db.Database.IsRelational())
         {
+            await db.GetService<IHistoryRepository>().CreateIfNotExistsAsync(cancellationToken);
             await db.Database.MigrateAsync(cancellationToken);
         }
         else

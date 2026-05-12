@@ -12,6 +12,7 @@ public sealed class MasterRankingService(MasterDbContext db, ILogger<MasterRanki
 {
     private const decimal DailyDecayFactor = 0.99m;
     private const string ShadowPasswordHashPrefix = "__SHADOW__:";
+    private static readonly AsyncKeyedLock PlayerAccountProvisionLocks = new(StringComparer.OrdinalIgnoreCase);
 
     internal static bool IsShadowProvisionedPasswordHash(string? passwordHash)
     {
@@ -584,6 +585,18 @@ public sealed class MasterRankingService(MasterDbContext db, ILogger<MasterRanki
             return existingPlayerId.Value;
         }
 
+        await using var provisionLock = await PlayerAccountProvisionLocks.AcquireAsync(normalizedEmail, cancellationToken);
+
+        existingPlayerId = await db.PlayerAccounts
+            .AsNoTracking()
+            .Where(player => player.Email == normalizedEmail)
+            .Select(player => (Guid?)player.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (existingPlayerId.HasValue)
+        {
+            return existingPlayerId.Value;
+        }
+
         var now = DateTime.UtcNow;
         var fallbackDisplayName = PlayerDisplayNameProvisioning.ResolveDisplayName(
             claimedDisplayName: null,
@@ -606,7 +619,7 @@ public sealed class MasterRankingService(MasterDbContext db, ILogger<MasterRanki
             await db.SaveChangesAsync(cancellationToken);
             return shadowAccount.Id;
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (IsPlayerEmailUniqueConstraintViolation(ex))
         {
             db.Entry(shadowAccount).State = EntityState.Detached;
         }
@@ -652,5 +665,16 @@ public sealed class MasterRankingService(MasterDbContext db, ILogger<MasterRanki
 
         return postgres.SqlState == PostgresErrorCodes.UniqueViolation
             && string.Equals(postgres.ConstraintName, "IX_MasterRankingEvents_ProofReference", StringComparison.Ordinal);
+    }
+
+    private static bool IsPlayerEmailUniqueConstraintViolation(DbUpdateException ex)
+    {
+        if (ex.InnerException is not PostgresException postgres)
+        {
+            return false;
+        }
+
+        return postgres.SqlState == PostgresErrorCodes.UniqueViolation
+            && string.Equals(postgres.ConstraintName, "IX_PlayerAccounts_Email", StringComparison.Ordinal);
     }
 }

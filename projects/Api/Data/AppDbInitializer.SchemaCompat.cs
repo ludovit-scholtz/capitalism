@@ -3,6 +3,8 @@ using System.Text;
 using Api.Data.Entities;
 using Api.Utilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Api.Data;
 
@@ -166,6 +168,7 @@ public sealed partial class AppDbInitializer
     {
         if (dbContext.Database.IsRelational())
         {
+            await dbContext.GetService<IHistoryRepository>().CreateIfNotExistsAsync();
             await dbContext.Database.MigrateAsync();
             await RepairLegacyTextColumnsAsync();
             return;
