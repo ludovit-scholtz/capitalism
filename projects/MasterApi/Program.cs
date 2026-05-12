@@ -114,14 +114,10 @@ public class Program
             }
         }
 
-        var gameAdministrationOptions = builder.Configuration
-            .GetSection(GameAdministrationOptions.SectionName)
-            .Get<GameAdministrationOptions>()
-            ?? new GameAdministrationOptions();
-
         if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing")
             && RequiredSecretsStartupGuard.TryGetUnsafeRootAdministratorEmailsReason(
-                gameAdministrationOptions.RootAdministratorEmails,
+                (builder.Configuration.GetSection(GameAdministrationOptions.SectionName).Get<GameAdministrationOptions>()
+                    ?? new GameAdministrationOptions()).RootAdministratorEmails,
                 out var unsafeRootAdministratorReason))
         {
             startupLogger.LogCritical(
