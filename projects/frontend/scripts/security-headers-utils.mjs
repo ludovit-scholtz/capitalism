@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { JSDOM } from 'jsdom'
 
 export function extractAddHeaderValue(nginxConf, headerName) {
   const escapedHeaderName = headerName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -22,22 +23,10 @@ export function getCspDirective(csp, directiveName) {
 }
 
 export function extractInlineScriptsFromHtml(html) {
-  const inlineScripts = []
-  const scriptRegex = /<script([^>]*)>([\s\S]*?)<\/script>/gi
-
-  for (const match of html.matchAll(scriptRegex)) {
-    const attributes = match[1] ?? ''
-    if (/\ssrc\s*=/.test(attributes)) {
-      continue
-    }
-
-    const contents = match[2] ?? ''
-    if (contents.trim()) {
-      inlineScripts.push(contents)
-    }
-  }
-
-  return inlineScripts
+  const dom = new JSDOM(html)
+  return Array.from(dom.window.document.querySelectorAll('script'))
+    .filter((script) => !script.src && script.textContent?.trim())
+    .map((script) => script.textContent ?? '')
 }
 
 export function computeCspSha256(scriptContent) {

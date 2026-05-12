@@ -29,6 +29,10 @@ async function main() {
   }
 
   const scriptSrc = getCspDirective(csp, 'script-src')
+  if (scriptSrc.length === 0) {
+    throw new Error('script-src directive is missing from the Content-Security-Policy header.')
+  }
+
   if (scriptSrc.includes("'unsafe-inline'")) {
     throw new Error("script-src must not include 'unsafe-inline'.")
   }
@@ -43,7 +47,10 @@ async function main() {
   for (const inlineScript of inlineScripts) {
     const expectedHash = `'${computeCspSha256(inlineScript)}'`
     if (!scriptSrcHashes.has(expectedHash)) {
-      throw new Error(`Missing CSP hash ${expectedHash} for an inline script in dist/index.html.`)
+      const preview = inlineScript.replace(/\s+/g, ' ').trim().slice(0, 80)
+      throw new Error(
+        `Missing CSP hash ${expectedHash} for an inline script in dist/index.html. Script preview: ${JSON.stringify(preview)}`,
+      )
     }
   }
 
