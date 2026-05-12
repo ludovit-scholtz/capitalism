@@ -5,6 +5,7 @@ using MasterApi.Data;
 using MasterApi.Data.Entities;
 using MasterApi.Utilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Options;
 
 namespace MasterApi.Types;
@@ -54,41 +55,89 @@ public sealed partial class Mutation
             };
         }
 
-        var telemetryValidation = await telemetryValidator.ValidateAndTrackAsync(
-            input.ServerKey,
-            eventType,
-            playerEmail,
-            input.ExternalEventId,
-            input.UniqueScopeKey,
-            input.PayloadJson,
-            occurredAtUtc,
-            CancellationToken.None);
+        await using IDbContextTransaction? tx = db.Database.IsRelational()
+            ? await db.Database.BeginTransactionAsync()
+            : null;
 
-        var rankingEvent = await rankingService.IngestEventAsync(
-            eventType,
-            playerEmail,
-            input.ServerKey,
-            input.ExternalEventId,
-            input.UniqueScopeKey,
-            input.IdempotencyKey,
-            input.ProofReference,
-            input.PayloadJson,
-            occurredAtUtc,
-            telemetryValidation,
-            CancellationToken.None);
-
-        return new RankingEventModerationItem
+        try
         {
-            Id = rankingEvent.Id,
-            EventType = rankingEvent.EventType,
-            PlayerEmail = rankingEvent.PlayerEmail,
-            ServerKey = rankingEvent.ServerKey,
-            ProofReference = rankingEvent.ProofReference,
-            PayloadJson = rankingEvent.PayloadJson,
-            Status = rankingEvent.Status,
-            OccurredAtUtc = rankingEvent.OccurredAtUtc,
-            CreatedAtUtc = rankingEvent.CreatedAtUtc,
-        };
+            var telemetryValidation = await telemetryValidator.ValidateAndTrackAsync(
+                input.ServerKey,
+                eventType,
+                playerEmail,
+                input.ExternalEventId,
+                input.UniqueScopeKey,
+                input.PayloadJson,
+                occurredAtUtc,
+                CancellationToken.None);
+
+            var rankingEvent = await rankingService.IngestEventAsync(
+                eventType,
+                playerEmail,
+                input.ServerKey,
+                input.ExternalEventId,
+                input.UniqueScopeKey,
+                input.IdempotencyKey,
+                input.ProofReference,
+                input.PayloadJson,
+                occurredAtUtc,
+                telemetryValidation,
+                CancellationToken.None);
+
+            if (tx is not null)
+            {
+                await tx.CommitAsync();
+            }
+
+            return new RankingEventModerationItem
+            {
+                Id = rankingEvent.Id,
+                EventType = rankingEvent.EventType,
+                PlayerEmail = rankingEvent.PlayerEmail,
+                ServerKey = rankingEvent.ServerKey,
+                ProofReference = rankingEvent.ProofReference,
+                PayloadJson = rankingEvent.PayloadJson,
+                Status = rankingEvent.Status,
+                OccurredAtUtc = rankingEvent.OccurredAtUtc,
+                CreatedAtUtc = rankingEvent.CreatedAtUtc,
+            };
+        }
+        catch (GraphQLException ex) when (RankingTelemetryValidator.IsDuplicateSignatureError(ex))
+        {
+            if (tx is not null)
+            {
+                await tx.RollbackAsync();
+                db.ChangeTracker.Clear();
+                await telemetryValidator.RecordDuplicateSignatureAuditAsync(
+                    input.ServerKey,
+                    eventType,
+                    playerEmail,
+                    input.ExternalEventId,
+                    input.UniqueScopeKey,
+                    input.PayloadJson,
+                    CancellationToken.None);
+            }
+
+            throw;
+        }
+        catch (GraphQLException ex) when (RankingTelemetryValidator.IsShardValidationAuditOnlyError(ex))
+        {
+            if (tx is not null)
+            {
+                await tx.CommitAsync();
+            }
+
+            throw;
+        }
+        catch
+        {
+            if (tx is not null)
+            {
+                await tx.RollbackAsync();
+            }
+
+            throw;
+        }
     }
 
     [HotChocolate.Authorization.Authorize]

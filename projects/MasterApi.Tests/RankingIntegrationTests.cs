@@ -254,6 +254,8 @@ public sealed class RankingIntegrationTests
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
         Assert.True(db.RankingTelemetryAuditLogs.Any(item => item.ReasonCode == RankingTelemetryAuditReason.DuplicateEventSignature));
+        Assert.Single(db.MasterRankingEvents.Where(item => item.PlayerEmail == email));
+        Assert.Single(db.RankingTelemetryEventSignatures);
     }
 
     [Fact]
