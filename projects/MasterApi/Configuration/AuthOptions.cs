@@ -31,4 +31,60 @@ public sealed class AuthOptions
     /// Applies in non-Development environments only. Default is 10.
     /// </summary>
     public int RateLimitRequestsPerMinute { get; init; } = 10;
+
+    /// <summary>
+    /// Maximum number of forgot-password requests per normalized email during the reset window.
+    /// Default is 3.
+    /// </summary>
+    public int ForgotPasswordMaxRequests { get; init; } = 3;
+
+    /// <summary>
+    /// Duration of the forgot-password throttling window in minutes. Default is 15.
+    /// </summary>
+    public int ForgotPasswordWindowMinutes { get; init; } = 15;
+
+    /// <summary>
+    /// Password reset token lifetime in minutes. Default is 60.
+    /// </summary>
+    public int PasswordResetTokenLifetimeMinutes { get; init; } = 60;
+
+    /// <summary>
+    /// Frontend base URL used in password reset links.
+    /// </summary>
+    public string PasswordResetFrontendUrl { get; init; } = "http://localhost:5173";
+
+    /// <summary>
+    /// Sender address used for password reset emails.
+    /// </summary>
+    public string PasswordResetEmailFrom { get; init; } = "no-reply@capitalism.local";
+
+    /// <summary>
+    /// Optional sender display name for password reset emails.
+    /// </summary>
+    public string PasswordResetEmailFromName { get; init; } = "Capitalism";
+
+    /// <summary>
+    /// SMTP host for password reset email delivery. Leave empty to disable SMTP sending.
+    /// </summary>
+    public string PasswordResetSmtpHost { get; init; } = string.Empty;
+
+    /// <summary>
+    /// SMTP port for password reset email delivery.
+    /// </summary>
+    public int PasswordResetSmtpPort { get; init; } = 587;
+
+    /// <summary>
+    /// SMTP username for password reset email delivery.
+    /// </summary>
+    public string PasswordResetSmtpUsername { get; init; } = string.Empty;
+
+    /// <summary>
+    /// SMTP password for password reset email delivery.
+    /// </summary>
+    public string PasswordResetSmtpPassword { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Enables TLS when sending password reset emails through SMTP.
+    /// </summary>
+    public bool PasswordResetSmtpEnableSsl { get; init; } = true;
 }

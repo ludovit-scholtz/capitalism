@@ -65,3 +65,11 @@ npm run test:e2e -- --debug
 ```sh
 npm run lint
 ```
+
+## Authentication and account recovery
+
+- `VITE_AUTH_PASSWORD_ENABLED=true` enables native email/password forms (`/login`, `/forgot-password`, `/reset-password`).
+- When `VITE_AUTH_PASSWORD_ENABLED` is not `true`, the app runs in OIDC-only mode and shows recovery guidance banners on `/login` and player profile settings.
+- Password recovery API endpoints are served by Master API:
+  - `POST /auth/forgot-password`
+  - `POST /auth/reset-password`

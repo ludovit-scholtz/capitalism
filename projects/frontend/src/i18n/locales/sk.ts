@@ -268,6 +268,26 @@ export default {
     loginThrottledMessage:
       'Príliš veľa neúspešných pokusov o prihlásenie. Skúste to znova o 15 minút.',
     loginWithBiatec: 'Prihlásiť cez Google',
+    forgotPasswordLink: 'Zabudli ste heslo?',
+    forgotPasswordTitle: 'Zabudnuté heslo',
+    forgotPasswordDescription:
+      'Zadajte e-mail účtu a ak účet existuje, pošleme vám jednorazový odkaz na obnovu hesla.',
+    forgotPasswordSubmit: 'Poslať odkaz na obnovu',
+    forgotPasswordGenericError: 'Obnovu hesla sa teraz nepodarilo spracovať. Skúste to neskôr.',
+    resetPasswordTitle: 'Obnoviť heslo',
+    resetPasswordDescription: 'Nastavte si nové heslo. Tento odkaz je možné použiť iba raz.',
+    resetNewPassword: 'Nové heslo',
+    resetConfirmPassword: 'Potvrďte nové heslo',
+    resetPasswordSubmit: 'Obnoviť heslo',
+    resetPasswordMismatch: 'Heslá sa nezhodujú.',
+    resetPasswordGenericError: 'Heslo sa teraz nepodarilo obnoviť. Skúste to neskôr.',
+    resetTokenMissing: 'Chýba reset token. Otvorte znova odkaz z e-mailu.',
+    passwordStrengthLabel: 'Sila hesla',
+    passwordStrengthWeak: 'Slabé',
+    passwordStrengthMedium: 'Stredné',
+    passwordStrengthStrong: 'Silné',
+    oidcOnlyBanner:
+      'Tento server používa jednotné prihlásenie. Ak sa neviete dostať do účtu, znova sa prihláste cez poskytovateľa identity alebo kontaktujte podporu.',
     oidcRetryDriveAccessHint:
       'Na nastavenie Biatec peňaženky je potrebné povoliť vytváranie súborov v Google Drive. Spustite prihlásenie cez Google znova a povoľte prístup k Drive, aby sa autentifikácia dokončila.',
     oidcCallbackTitle: 'Dokončovanie prihlásenia',

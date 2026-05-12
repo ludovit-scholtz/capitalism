@@ -3,6 +3,7 @@ namespace MasterApi;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json.Serialization;
 using MasterApi.Configuration;
 using MasterApi.Data;
 using MasterApi.Data.Entities;
@@ -14,6 +15,7 @@ using HotChocolate.CostAnalysis;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 public class Program
@@ -255,9 +257,12 @@ public class Program
         builder.Services.AddScoped<IPasswordHasher<PlayerAccount>, PasswordHasher<PlayerAccount>>();
         builder.Services.AddScoped<MasterRankingService>();
         builder.Services.AddScoped<RankingTelemetryValidator>();
+        builder.Services.AddScoped<PasswordResetService>();
+        builder.Services.AddScoped<IPasswordResetEmailSender, PasswordResetEmailSender>();
         builder.Services.AddHostedService<MasterRankingSchedulerHostedService>();
         builder.Services.AddMemoryCache();
         builder.Services.AddSingleton<ILoginThrottleService, LoginThrottleService>();
+        builder.Services.AddSingleton<IPasswordResetThrottleService, PasswordResetThrottleService>();
 
         builder.Services
             .AddGraphQLServer()
@@ -327,6 +332,103 @@ public class Program
         }));
 
         app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
+        app.MapPost("/auth/forgot-password", async (
+            ForgotPasswordRequest request,
+            IOptions<AuthOptions> authOptions,
+            IPasswordResetThrottleService throttle,
+            PasswordResetService passwordResetService,
+            IPasswordResetEmailSender emailSender,
+            CancellationToken cancellationToken) =>
+        {
+            if (!authOptions.Value.PasswordAuthEnabled)
+            {
+                return Results.Json(new
+                {
+                    message = "Password reset is disabled on this server. Please use the identity provider sign-in flow.",
+                    code = "METHOD_NOT_ALLOWED",
+                }, statusCode: StatusCodes.Status405MethodNotAllowed);
+            }
+
+            var normalizedEmail = request.Email?.Trim().ToLowerInvariant() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(normalizedEmail))
+            {
+                return Results.BadRequest(new
+                {
+                    message = "Email is required.",
+                    code = "INVALID_EMAIL",
+                });
+            }
+
+            if (throttle.IsRateLimited(normalizedEmail))
+            {
+                return Results.Json(new
+                {
+                    message = "Too many reset requests. Please wait before trying again.",
+                    code = "RATE_LIMIT_EXCEEDED",
+                }, statusCode: StatusCodes.Status429TooManyRequests);
+            }
+
+            throttle.RecordRequest(normalizedEmail);
+            var issueResult = await passwordResetService.IssueResetTokenAsync(normalizedEmail, cancellationToken);
+
+            if (issueResult.AccountExists && issueResult.RawToken is not null && issueResult.RecipientEmail is not null)
+            {
+                var resetLink = PasswordResetService.BuildResetLink(authOptions.Value.PasswordResetFrontendUrl, issueResult.RawToken);
+                await emailSender.SendPasswordResetEmailAsync(
+                    issueResult.RecipientEmail,
+                    issueResult.RecipientDisplayName ?? "player",
+                    resetLink,
+                    cancellationToken);
+            }
+
+            return Results.Ok(new
+            {
+                message = "If an account exists, a reset link has been sent.",
+            });
+        });
+
+        app.MapPost("/auth/reset-password", async (
+            ResetPasswordRequest request,
+            IOptions<AuthOptions> authOptions,
+            PasswordResetService passwordResetService,
+            CancellationToken cancellationToken) =>
+        {
+            if (!authOptions.Value.PasswordAuthEnabled)
+            {
+                return Results.Json(new
+                {
+                    message = "Password reset is disabled on this server. Please use the identity provider sign-in flow.",
+                    code = "METHOD_NOT_ALLOWED",
+                }, statusCode: StatusCodes.Status405MethodNotAllowed);
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Token))
+            {
+                return Results.BadRequest(new
+                {
+                    message = "Reset token is required.",
+                    code = "RESET_TOKEN_REQUIRED",
+                });
+            }
+
+            try
+            {
+                await passwordResetService.ResetPasswordAsync(request.Token, request.NewPassword, cancellationToken);
+                return Results.Ok(new
+                {
+                    message = "Password has been reset successfully.",
+                });
+            }
+            catch (PasswordResetException exception)
+            {
+                return Results.Json(new
+                {
+                    message = exception.Message,
+                    code = exception.Code,
+                }, statusCode: exception.StatusCode);
+            }
+        });
+
         app.MapGraphQL().WithOptions(new GraphQLServerOptions
         {
             EnableSchemaRequests = builder.Environment.IsDevelopment(),
@@ -357,4 +459,11 @@ public class Program
             }
         }
     }
+
+    private sealed record ForgotPasswordRequest(
+        [property: JsonPropertyName("email")] string Email);
+
+    private sealed record ResetPasswordRequest(
+        [property: JsonPropertyName("token")] string Token,
+        [property: JsonPropertyName("newPassword")] string NewPassword);
 }
