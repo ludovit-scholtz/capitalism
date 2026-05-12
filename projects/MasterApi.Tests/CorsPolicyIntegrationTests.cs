@@ -1,0 +1,87 @@
+using System.Net;
+using MasterApi.Tests.Infrastructure;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
+
+namespace MasterApi.Tests;
+
+public sealed class CorsPolicyIntegrationTests
+{
+    [Fact]
+    public async Task NonDevelopment_EmptyAllowedOrigins_RejectsCrossOriginWith403()
+    {
+        using var factory = CreateFactory("Testing");
+        using var client = factory.CreateClient();
+        using var request = CreatePreflightRequest("https://evil.com");
+
+        using var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.False(response.Headers.Contains("Access-Control-Allow-Origin"));
+    }
+
+    [Fact]
+    public async Task NonDevelopment_ConfiguredOrigin_AllowsConfiguredAndRejectsOther()
+    {
+        using var factory = CreateFactory("Testing", "https://app.example.com");
+        using var client = factory.CreateClient();
+
+        using var allowedRequest = CreatePreflightRequest("https://app.example.com");
+        using var allowedResponse = await client.SendAsync(allowedRequest);
+
+        Assert.Equal(HttpStatusCode.NoContent, allowedResponse.StatusCode);
+        Assert.True(allowedResponse.Headers.TryGetValues("Access-Control-Allow-Origin", out var allowedValues));
+        Assert.Equal("https://app.example.com", allowedValues.Single());
+
+        using var blockedRequest = CreatePreflightRequest("https://evil.com");
+        using var blockedResponse = await client.SendAsync(blockedRequest);
+
+        Assert.Equal(HttpStatusCode.NoContent, blockedResponse.StatusCode);
+        Assert.False(blockedResponse.Headers.Contains("Access-Control-Allow-Origin"));
+    }
+
+    private static WebApplicationFactory<Program> CreateFactory(string environmentName, params string[] allowedOrigins)
+    {
+        return new MasterApiWebApplicationFactory().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment(environmentName);
+            builder.ConfigureAppConfiguration((_, configurationBuilder) =>
+            {
+                configurationBuilder.Sources.Clear();
+                configurationBuilder.AddInMemoryCollection(BuildConfiguration(allowedOrigins));
+            });
+        });
+    }
+
+    private static Dictionary<string, string?> BuildConfiguration(string[] allowedOrigins)
+    {
+        var values = new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:MasterCatalog"] = $"masterapi-cors-policy-tests-{Guid.NewGuid():N}",
+            ["MasterServer:RegistrationKey"] = "test-registration-key",
+            ["MasterServer:ActiveThresholdSeconds"] = "90",
+            ["GameAdministration:RootAdministratorEmails:0"] = "root@example.com",
+            ["Auth:PasswordAuthEnabled"] = "true",
+            ["Jwt:Issuer"] = "Capitalism",
+            ["Jwt:Audience"] = "Capitalism",
+            ["Jwt:SigningKey"] = "ChangeThisSigningKeyBeforeProduction123!",
+            ["Jwt:ExpiresMinutes"] = "120",
+        };
+
+        for (var i = 0; i < allowedOrigins.Length; i++)
+        {
+            values[$"Cors:AllowedOrigins:{i}"] = allowedOrigins[i];
+        }
+
+        return values;
+    }
+
+    private static HttpRequestMessage CreatePreflightRequest(string origin)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Options, "/graphql");
+        request.Headers.Add("Origin", origin);
+        request.Headers.Add("Access-Control-Request-Method", "POST");
+        return request;
+    }
+}

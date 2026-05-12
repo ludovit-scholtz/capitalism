@@ -98,11 +98,17 @@ public class Program
         {
             options.AddPolicy("frontend", policy =>
             {
-                var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+                var allowedOrigins = CorsPolicyHelper.ResolveAllowedOrigins(builder.Configuration);
+
+                if (CorsPolicyHelper.IsDevelopmentOpenPolicy(builder.Environment))
+                {
+                    policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+                    return;
+                }
 
                 if (allowedOrigins.Length == 0)
                 {
-                    policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+                    policy.SetIsOriginAllowed(static _ => false).AllowAnyHeader().AllowAnyMethod();
                     return;
                 }
 
@@ -352,6 +358,27 @@ public class Program
         builder.Services.AddHostedService<MarketReportPublisherHostedService>();
 
         var app = builder.Build();
+        var appCorsAllowedOrigins = CorsPolicyHelper.ResolveAllowedOrigins(app.Configuration);
+        var corsRejectAllCrossOrigin = CorsPolicyHelper.IsNonDevelopmentMisconfigured(app.Environment, appCorsAllowedOrigins);
+
+        if (corsRejectAllCrossOrigin)
+        {
+            startupLogger.LogWarning(
+                "{WarningMessage} Environment={EnvironmentName}",
+                CorsPolicyHelper.MisconfiguredWarningMessage,
+                app.Environment.EnvironmentName);
+
+            app.Use(async (context, next) =>
+            {
+                if (context.Request.Headers.ContainsKey("Origin"))
+                {
+                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    return;
+                }
+
+                await next();
+            });
+        }
 
         app.UseCors("frontend");
         app.UseMiddleware<AuthRateLimitMiddleware>();
