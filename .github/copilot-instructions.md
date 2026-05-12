@@ -1625,3 +1625,16 @@ Root-cause of recurring CI failure (May 2026, PR #379 follow-up):
 2. **Treat loser responses as an allowed set of conflict-like errors when multiple commit-time guards can race.** Do not overfit to one error code.
 3. **If response-level success count is timing-sensitive, add a deterministic follow-up accept attempt (with latest `offerVersion`) when the first concurrent pair returns no success payload, then enforce exactly one success and exactly one committed transfer in persisted state.**
 4. **Always include `BUILDING_NOT_FOUND` in conflict-like loser code sets for post-transfer ownership revalidation paths.**
+
+## Secret-scanning workflow CI failure — gitleaks PR scans require explicit token env
+
+Root-cause of a quality failure (May 2026, PR #437 follow-up):
+- A new `secret-scanning` workflow was added with `gitleaks/gitleaks-action@v2`, but the action was invoked without `GITHUB_TOKEN` in the step environment.
+- On pull_request events, gitleaks action now hard-fails with: `GITHUB_TOKEN is now required to scan pull requests`.
+- Result: build/test request from product owner failed despite code tests being green.
+
+**Rules to prevent recurrence:**
+1. **Any workflow using `gitleaks/gitleaks-action` on pull_request MUST set `env: GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}` on the action step.** Do not assume implicit token propagation.
+2. **When adding a new CI workflow, inspect the first run logs immediately and fix action-specific required inputs before declaring the PR ready.**
+3. **When a reviewer says \"Fix build and fix tests\", always separate failing category by workflow logs first** (code tests vs workflow wiring) and fix all in-PR failures, including newly added workflow configuration errors.
+4. **For security configuration hardening PRs, include unit coverage for new guard helpers** (for example connection-string and root-admin placeholder detection), not only host-startup tests.
