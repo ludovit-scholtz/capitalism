@@ -46,22 +46,20 @@ public sealed partial class Mutation
     public async Task<BankInfoSummary> SetBankRates(
         SetBankRatesInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
-        var bank = await db.Buildings
-            .Include(b => b.Company)
-            .FirstOrDefaultAsync(b => b.Id == input.BankBuildingId && b.Type == BuildingType.Bank);
-
-        if (bank is null || bank.Company.PlayerId != userId)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Bank building not found or you do not own it.")
-                    .SetCode("BANK_NOT_FOUND")
-                    .Build());
-        }
+        var bank = await objectAuthorization.RequireOwnedAsync(
+            userId,
+            "bank_building",
+            input.BankBuildingId,
+            async ct => await db.Buildings
+                .Include(b => b.Company)
+                .FirstOrDefaultAsync(b => b.Id == input.BankBuildingId && b.Type == BuildingType.Bank, ct),
+            bank => bank.Company?.PlayerId == userId,
+            httpContextAccessor.HttpContext.RequestAborted);
 
         if (input.DepositInterestRatePercent < 0m || input.DepositInterestRatePercent > 100m)
         {
@@ -101,24 +99,22 @@ public sealed partial class Mutation
     public async Task<BankInfoSummary> InitiateBaseDeposit(
         Guid bankBuildingId,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
-        var bank = await db.Buildings
-            .Include(b => b.Company)
-            .ThenInclude(c => c.Player)
-            .Include(b => b.City)
-            .FirstOrDefaultAsync(b => b.Id == bankBuildingId && b.Type == BuildingType.Bank);
-
-        if (bank is null || bank.Company.PlayerId != userId)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Bank building not found or you do not own it.")
-                    .SetCode("BANK_NOT_FOUND")
-                    .Build());
-        }
+        var bank = await objectAuthorization.RequireOwnedAsync(
+            userId,
+            "bank_building",
+            bankBuildingId,
+            async ct => await db.Buildings
+                .Include(b => b.Company)
+                .ThenInclude(c => c.Player)
+                .Include(b => b.City)
+                .FirstOrDefaultAsync(b => b.Id == bankBuildingId && b.Type == BuildingType.Bank, ct),
+            bank => bank.Company?.PlayerId == userId,
+            httpContextAccessor.HttpContext.RequestAborted);
 
         if (bank.BaseCapitalDeposited)
         {

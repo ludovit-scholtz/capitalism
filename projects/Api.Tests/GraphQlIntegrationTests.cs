@@ -33097,6 +33097,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         var errors = result.GetProperty("errors");
         Assert.True(errors.GetArrayLength() > 0, "Non-owner must not be able to set bank rates.");
+        Assert.Equal(ObjectAuthorizationService.NotFoundOrNotOwnedCode, errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
     [Fact]
@@ -33282,7 +33283,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         var errors = result.GetProperty("errors");
         Assert.True(errors.GetArrayLength() > 0);
-        Assert.Equal("BANK_NOT_FOUND", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal(ObjectAuthorizationService.NotFoundOrNotOwnedCode, errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
     [Fact]

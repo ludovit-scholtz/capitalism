@@ -1,6 +1,7 @@
 using Api.Data;
 using Api.Data.Entities;
 using Api.Engine;
+using Api.Security;
 using Api.Tests.Infrastructure;
 using Api.Types;
 using Microsoft.EntityFrameworkCore;
@@ -703,6 +704,53 @@ public sealed class BankingIntegrationTests
 
         var errors = result.GetProperty("errors");
         Assert.True(errors.GetArrayLength() > 0, "Expected an error when non-owner tries to set rates.");
+        Assert.Equal(ObjectAuthorizationService.NotFoundOrNotOwnedCode, errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    /// <summary>
+    /// Non-owners cannot inspect another bank's depositor list.
+    /// </summary>
+    [Fact]
+    public async Task BankDeposits_NonOwner_ReturnsNotFoundOrNotOwned()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var ownerToken = await RegisterAsync(client, "bankdeposits-owner@test.com", "Deposits Owner");
+        var otherToken = await RegisterAsync(client, "bankdeposits-other@test.com", "Deposits Other");
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.FirstDeterministicAsync();
+
+        var ownerUser = await db.Players.FirstAsync(p => p.Email == "bankdeposits-owner@test.com");
+        var ownerCompany = new Company { Id = Guid.NewGuid(), PlayerId = ownerUser.Id, Name = "Deposits Bank Co", Cash = 50_000_000m };
+        db.Companies.Add(ownerCompany);
+
+        var bank = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = ownerCompany.Id, CityId = city.Id,
+            Type = BuildingType.Bank, Name = "Deposits Test Bank", Level = 1,
+            DepositInterestRatePercent = 3m, LendingInterestRatePercent = 8m,
+            TotalDeposits = 10_000_000m, BaseCapitalDeposited = true,
+        };
+        db.Buildings.Add(bank);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteAsync(client,
+            """
+            query BANK_DEPOSITS($bankBuildingId: UUID!) {
+              bankDeposits(bankBuildingId: $bankBuildingId) {
+                id
+              }
+            }
+            """,
+            new { bankBuildingId = bank.Id.ToString() },
+            token: otherToken);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0, "Expected an error when non-owner queries bank deposits.");
+        Assert.Equal(ObjectAuthorizationService.NotFoundOrNotOwnedCode, errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
     // ── Self-interest exclusion tests ─────────────────────────────────────────
