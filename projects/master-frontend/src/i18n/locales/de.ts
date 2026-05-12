@@ -229,6 +229,10 @@ export default {
     loadBalancesError: 'Guthaben konnten nicht geladen werden.',
     loadTxError: 'Transaktionsverlauf konnte nicht geladen werden.',
     adjustFailed: 'Anpassung fehlgeschlagen.',
+    revokeSessions: 'Sitzungen widerrufen',
+    revokeSessionsConfirm: 'Alle aktiven Sitzungen dieses Spielers widerrufen?',
+    revokeSessionsSuccess: 'Spielersitzungen wurden widerrufen.',
+    revokeSessionsError: 'Spielersitzungen konnten nicht widerrufen werden.',
   },
   referralSetup: {
     title: 'Empfehlungscode einrichten',

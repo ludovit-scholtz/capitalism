@@ -3,6 +3,7 @@ namespace MasterApi;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using MasterApi.Configuration;
 using MasterApi.Data;
@@ -16,6 +17,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
 public class Program
@@ -230,7 +232,38 @@ public class Program
                             await synchronizer.SyncAsync(context.Principal, identity, context.HttpContext.RequestAborted);
 
                             StampMasterPrivilegeEligibility(identity, context.Principal, jwtOptions.Issuer);
+
+                            if (TryResolveJwtSecurityToken(context.SecurityToken, out var jwt))
+                            {
+                                var revocationService = context.HttpContext.RequestServices.GetRequiredService<IJwtSessionRevocationService>();
+                                var isValid = await revocationService.ValidateAndTrackAsync(
+                                    context.Principal,
+                                    jwt,
+                                    context.HttpContext,
+                                    context.HttpContext.RequestAborted);
+                                if (!isValid)
+                                {
+                                    context.HttpContext.Items["auth_error_code"] = "session_revoked";
+                                    context.Fail("session_revoked");
+                                }
+                            }
                         }
+                    },
+                    OnChallenge = async context =>
+                    {
+                        if (!string.Equals(context.HttpContext.Items["auth_error_code"] as string, "session_revoked", StringComparison.Ordinal))
+                        {
+                            return;
+                        }
+
+                        context.HandleResponse();
+                        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                        context.Response.ContentType = "application/json";
+                        await context.Response.WriteAsync(JsonSerializer.Serialize(new
+                        {
+                            error = "session_revoked",
+                            message = "Your session has been terminated. Please log in again."
+                        }));
                     }
                 };
             })
@@ -281,6 +314,38 @@ public class Program
                         await synchronizer.SyncAsync(context.Principal, identity, context.HttpContext.RequestAborted);
 
                         StampMasterPrivilegeEligibility(identity, context.Principal, jwtOptions.Issuer);
+
+                        if (TryResolveJwtSecurityToken(context.SecurityToken, out var jwt))
+                        {
+                            var revocationService = context.HttpContext.RequestServices.GetRequiredService<IJwtSessionRevocationService>();
+                            var isValid = await revocationService.ValidateAndTrackAsync(
+                                context.Principal,
+                                jwt,
+                                context.HttpContext,
+                                context.HttpContext.RequestAborted);
+                            if (!isValid)
+                            {
+                                context.HttpContext.Items["auth_error_code"] = "session_revoked";
+                                context.Fail("session_revoked");
+                            }
+                        }
+                    }
+                    ,
+                    OnChallenge = async context =>
+                    {
+                        if (!string.Equals(context.HttpContext.Items["auth_error_code"] as string, "session_revoked", StringComparison.Ordinal))
+                        {
+                            return;
+                        }
+
+                        context.HandleResponse();
+                        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                        context.Response.ContentType = "application/json";
+                        await context.Response.WriteAsync(JsonSerializer.Serialize(new
+                        {
+                            error = "session_revoked",
+                            message = "Your session has been terminated. Please log in again."
+                        }));
                     }
                 };
             });
@@ -297,6 +362,8 @@ public class Program
         builder.Services.AddMemoryCache();
         builder.Services.AddSingleton<ILoginThrottleService, LoginThrottleService>();
         builder.Services.AddSingleton<IPasswordResetThrottleService, PasswordResetThrottleService>();
+        builder.Services.AddScoped<IJwtSessionRevocationService, JwtSessionRevocationService>();
+        builder.Services.AddHostedService<JwtSessionCleanupHostedService>();
 
         builder.Services
             .AddGraphQLServer()
@@ -366,6 +433,81 @@ public class Program
         }));
 
         app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
+        app.MapGet("/auth/sessions", async (HttpContext httpContext, IJwtSessionRevocationService revocationService) =>
+        {
+            if (!Guid.TryParse(httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier), out var playerId))
+            {
+                return Results.Unauthorized();
+            }
+
+            var currentJti = httpContext.User.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Jti);
+            var sessions = await revocationService.GetActiveSessionsAsync(playerId, currentJti, httpContext.RequestAborted);
+            return Results.Ok(new { sessions });
+        }).RequireAuthorization();
+
+        app.MapPost("/auth/logout", async (HttpContext httpContext, IJwtSessionRevocationService revocationService) =>
+        {
+            if (!TryReadBearerJwt(httpContext, out var jwt))
+            {
+                return Results.Unauthorized();
+            }
+
+            await revocationService.RevokeCurrentAsync(httpContext.User, jwt, httpContext.RequestAborted);
+            return Results.NoContent();
+        }).RequireAuthorization();
+
+        app.MapPost("/auth/logout-all", async (HttpContext httpContext, IJwtSessionRevocationService revocationService) =>
+        {
+            if (!Guid.TryParse(httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier), out var playerId))
+            {
+                return Results.Unauthorized();
+            }
+
+            if (!TryReadBearerJwt(httpContext, out var jwt))
+            {
+                return Results.Unauthorized();
+            }
+
+            var currentJti = jwt.Claims.FirstOrDefault(claim => claim.Type == System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Jti)?.Value ?? jwt.Id;
+            if (string.IsNullOrWhiteSpace(currentJti))
+            {
+                return Results.Unauthorized();
+            }
+
+            await revocationService.RevokeOtherSessionsForPlayerAsync(playerId, currentJti, "PLAYER_LOGOUT_ALL", httpContext.RequestAborted);
+            return Results.NoContent();
+        }).RequireAuthorization();
+
+        app.MapPost("/admin/sessions/{playerId:guid}/revoke-all", async (
+            Guid playerId,
+            HttpContext httpContext,
+            MasterDbContext db,
+            IOptions<GameAdministrationOptions> gameAdministrationOptions,
+            IJwtSessionRevocationService revocationService) =>
+        {
+            var email = httpContext.User.FindFirstValue(ClaimTypes.Email)?.Trim().ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return Results.Unauthorized();
+            }
+
+            var rootEmails = gameAdministrationOptions.Value.RootAdministratorEmails
+                .Select(candidate => candidate?.Trim().ToLowerInvariant())
+                .Where(candidate => !string.IsNullOrWhiteSpace(candidate))
+                .Cast<string>()
+                .ToHashSet(StringComparer.Ordinal);
+            var hasGlobalAdminRole = await db.GlobalGameAdminGrants
+                .AsNoTracking()
+                .AnyAsync(grant => grant.Email == email, httpContext.RequestAborted);
+            if (!hasGlobalAdminRole && !rootEmails.Contains(email))
+            {
+                return Results.Forbid();
+            }
+
+            await revocationService.RevokeAllForPlayerAsync(playerId, "ADMIN_REVOKE_ALL", httpContext.RequestAborted);
+            return Results.NoContent();
+        }).RequireAuthorization();
+
         app.MapPost("/auth/forgot-password", async (
             ForgotPasswordRequest request,
             IOptions<AuthOptions> authOptions,
@@ -491,6 +633,50 @@ public class Program
             {
                 identity.AddClaim(new Claim(TokenBoundaryClaims.MasterPrivilegeEligibleClaimType, bool.TrueString));
             }
+        }
+
+        static bool TryReadBearerJwt(HttpContext httpContext, out JwtSecurityToken token)
+        {
+            token = null!;
+            var authorization = httpContext.Request.Headers.Authorization.ToString();
+            if (!authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var rawToken = authorization["Bearer ".Length..].Trim();
+            if (string.IsNullOrWhiteSpace(rawToken))
+            {
+                return false;
+            }
+
+            try
+            {
+                token = new JwtSecurityTokenHandler().ReadJwtToken(rawToken);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        static bool TryResolveJwtSecurityToken(SecurityToken? token, out JwtSecurityToken jwt)
+        {
+            jwt = null!;
+            if (token is JwtSecurityToken concreteJwt)
+            {
+                jwt = concreteJwt;
+                return true;
+            }
+
+            if (token is JsonWebToken jsonWebToken)
+            {
+                jwt = new JwtSecurityToken(jsonWebToken.EncodedToken);
+                return true;
+            }
+
+            return false;
         }
     }
 

@@ -10,6 +10,8 @@ public sealed class MasterDbContext(DbContextOptions<MasterDbContext> options) :
     public DbSet<PlayerAccount> PlayerAccounts => Set<PlayerAccount>();
 
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+    public DbSet<MasterPlayerSession> MasterPlayerSessions => Set<MasterPlayerSession>();
+    public DbSet<MasterRevokedToken> MasterRevokedTokens => Set<MasterRevokedToken>();
 
     public DbSet<ProSubscription> ProSubscriptions => Set<ProSubscription>();
 
@@ -70,10 +72,29 @@ public sealed class MasterDbContext(DbContextOptions<MasterDbContext> options) :
         player.Property(p => p.Email).HasMaxLength(200);
         player.Property(p => p.DisplayName).HasMaxLength(120);
         player.Property(p => p.PasswordHash).HasMaxLength(512);
+        player.HasMany(p => p.Sessions)
+            .WithOne(session => session.PlayerAccount)
+            .HasForeignKey(session => session.PlayerAccountId)
+            .OnDelete(DeleteBehavior.Cascade);
         player.HasMany(p => p.PasswordResetTokens)
             .WithOne(token => token.PlayerAccount)
             .HasForeignKey(token => token.PlayerAccountId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        var playerSession = modelBuilder.Entity<MasterPlayerSession>();
+        playerSession.HasKey(session => session.Jti);
+        playerSession.Property(session => session.Jti).HasMaxLength(64);
+        playerSession.Property(session => session.LastSeenIpAddress).HasMaxLength(64);
+        playerSession.Property(session => session.UserAgent).HasMaxLength(512);
+        playerSession.Property(session => session.RevokedReason).HasMaxLength(80);
+        playerSession.HasIndex(session => new { session.PlayerAccountId, session.LastSeenAtUtc });
+        playerSession.HasIndex(session => session.ExpiresAtUtc);
+
+        var revokedToken = modelBuilder.Entity<MasterRevokedToken>();
+        revokedToken.HasKey(token => token.Jti);
+        revokedToken.Property(token => token.Jti).HasMaxLength(64);
+        revokedToken.HasIndex(token => token.ExpiresAtUtc);
+        revokedToken.HasIndex(token => new { token.PlayerAccountId, token.RevokedAtUtc });
 
         var passwordResetToken = modelBuilder.Entity<PasswordResetToken>();
         passwordResetToken.HasKey(token => token.Id);

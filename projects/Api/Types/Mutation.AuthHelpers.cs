@@ -25,7 +25,8 @@ public sealed partial class Mutation
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(options.SigningKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-        var expires = DateTime.UtcNow.AddMinutes(options.ExpiresMinutes);
+        var issuedAtUtc = DateTime.UtcNow;
+        var expires = issuedAtUtc.AddMinutes(options.ExpiresMinutes);
 
         var claims = new List<Claim>
         {
@@ -34,6 +35,8 @@ public sealed partial class Mutation
             new Claim(ClaimTypes.Name, player.DisplayName),
             new Claim(ClaimTypes.Role, player.Role),
             new Claim(TokenBoundaryClaims.TokenTypeClaimType, TokenBoundaryClaims.TokenTypeGame),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
+            new Claim(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(issuedAtUtc).ToString(), ClaimValueTypes.Integer64),
         };
 
         if (impersonation is not null)
@@ -60,6 +63,7 @@ public sealed partial class Mutation
             issuer: options.Issuer,
             audience: options.Audience,
             claims: claims,
+            notBefore: issuedAtUtc,
             expires: expires,
             signingCredentials: credentials);
 
@@ -78,4 +82,40 @@ public sealed partial class Mutation
         string EffectiveAccountType,
         Guid? EffectiveCompanyId,
         string? EffectiveCompanyName);
+
+    private static async Task TrackIssuedSessionAsync(
+        AppDbContext db,
+        Guid playerId,
+        AuthenticatedSession session,
+        HttpContext? httpContext,
+        CancellationToken cancellationToken)
+    {
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(session.Token);
+        var jti = jwt.Claims.FirstOrDefault(claim => claim.Type == JwtRegisteredClaimNames.Jti)?.Value ?? jwt.Id;
+        if (string.IsNullOrWhiteSpace(jti))
+        {
+            return;
+        }
+
+        var current = await db.PlayerSessions.FirstOrDefaultAsync(candidate => candidate.Jti == jti, cancellationToken);
+        if (current is not null)
+        {
+            current.LastSeenAtUtc = DateTime.UtcNow;
+            current.ExpiresAtUtc = session.ExpiresAtUtc;
+            await db.SaveChangesAsync(cancellationToken);
+            return;
+        }
+
+        db.PlayerSessions.Add(new PlayerSession
+        {
+            Jti = jti,
+            PlayerId = playerId,
+            IssuedAtUtc = jwt.ValidFrom,
+            ExpiresAtUtc = session.ExpiresAtUtc,
+            LastSeenAtUtc = DateTime.UtcNow,
+            LastSeenIpAddress = httpContext?.Connection.RemoteIpAddress?.ToString(),
+            UserAgent = httpContext?.Request.Headers.UserAgent.ToString(),
+        });
+        await db.SaveChangesAsync(cancellationToken);
+    }
 }

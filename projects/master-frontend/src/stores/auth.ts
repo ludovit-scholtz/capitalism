@@ -33,6 +33,10 @@ const BIATEC_OIDC_ALLOWED_ISSUERS = (
   .map((entry) => entry.trim())
   .filter((entry) => entry.length > 0)
 const TOKEN_RENEW_BEFORE_MS = 60 * 1000
+const API_BASE_URL = (import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:44364/graphql').replace(
+  /\/graphql\/?$/,
+  '',
+)
 
 interface OidcStateRecord {
   state: string
@@ -517,10 +521,20 @@ export const useAuthStore = defineStore('masterAuth', () => {
   }
 
   function logout(options: LogoutOptions = {}) {
+    const currentToken = token.value
     const shouldFederatedLogout =
       options.federated === true && getStoredAuthProvider() === AUTH_PROVIDER_BIATEC
     const idTokenHint = token.value
     const federatedLogoutUrl = shouldFederatedLogout ? buildBiatecEndSessionUrl(idTokenHint) : null
+
+    if (currentToken) {
+      void fetch(`${API_BASE_URL}/auth/logout`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${currentToken}`,
+        },
+      }).catch(() => undefined)
+    }
 
     clearRenewalTimer()
     token.value = null

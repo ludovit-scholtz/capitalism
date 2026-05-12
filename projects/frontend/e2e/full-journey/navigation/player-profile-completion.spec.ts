@@ -239,3 +239,22 @@ test.describe('Player Profile – Tab Navigation', () => {
     await expect(page.locator('.profile-tab').filter({ hasText: /Rank History/i })).toHaveClass(/active/)
   })
 })
+
+test.describe('Player Profile – Session Security', () => {
+  test('own profile shows active sessions and allows logging out all devices', async ({ page }) => {
+    const player = makePlayer()
+    player.onboardingCompletedAtUtc = '2024-01-01T00:00:00Z'
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await authenticate(page, `token-${player.id}`)
+
+    await page.goto(`/player/${player.id}`)
+
+    await expect(page.getByRole('heading', { name: 'Session security' })).toBeVisible()
+    await expect(page.getByText('Current Browser')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Log out all devices' })).toBeVisible()
+    await page.getByRole('button', { name: 'Log out all devices' }).click()
+    await expect(page.getByText('All active sessions were revoked. Please re-login on other devices.')).toBeVisible()
+  })
+})
