@@ -3,9 +3,7 @@ useDefault = true
 
 [[allowlists]]
 description = "Allow documented placeholder signing-key examples in .env.example"
+condition = "AND"
+regexTarget = "line"
 paths = ['''^\.env\.example$''']
-regexes = ['''set-via-secrets-manager''', '''REPLACE_WITH_32PLUS_CHAR_SECRET''']
-
-[[allowlists]]
-description = "Allow historical false-positive placeholder in initial env-example commit"
-commits = ['''fe1e073856f80cdfff7e5675f51f1b1a3815d388''']
+regexes = ['''^Jwt__SigningKey=.*$''']
