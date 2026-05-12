@@ -4666,8 +4666,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Company not found or not authenticated.' }] }) })
       }
 
-      const policyDividendPercent = Number(input?.dividendPercent ?? Number.NaN)
-      if (Number.isFinite(policyDividendPercent)) {
+      if (input?.dividendPercent != null) {
+        const policyDividendPercent = Number(input.dividendPercent)
         if (company.playerId !== player.id) {
           return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ extensions: { code: 'NOT_CEO' }, message: 'Only the acting CEO can propose dividend changes.' }] }) })
         }

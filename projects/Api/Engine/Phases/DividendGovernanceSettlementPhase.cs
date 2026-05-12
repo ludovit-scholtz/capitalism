@@ -127,6 +127,7 @@ public sealed class DividendGovernanceSettlementPhase : ITickPhase
 
         proposal.Status = againstVotes > threshold
             ? DividendProposalStatus.Rejected
+            // "Cancelled" means vote window expired without majority approval or rejection.
             : DividendProposalStatus.Cancelled;
         await NotifyShareholdersAsync(
             context,

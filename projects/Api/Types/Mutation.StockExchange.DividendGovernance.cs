@@ -19,11 +19,15 @@ public sealed partial class Mutation
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
+        // New governance-policy contract:
+        // proposeDividend(companyId, dividendPercent) + voteDividend(companyId, vote)
         if (input.CompanyId.HasValue || input.DividendPercent.HasValue)
         {
             return await ProposeDividendPolicyAsync(input, db, httpContextAccessor);
         }
 
+        // Legacy per-share payout proposal contract used by stock-exchange flow:
+        // proposeDividend(stockSymbol, dividendPerShare)
         if (!input.DividendPerShare.HasValue || input.DividendPerShare.Value <= 0m)
         {
             throw new GraphQLException(
@@ -455,6 +459,8 @@ public sealed partial class Mutation
             .Sum(vote => vote.SharesVoted);
         var threshold = totalSharesIssued / 2m;
 
+        // Majority threshold is strictly >50% of total issued shares.
+        // Exactly 50% is not enough to resolve and remains pending until close tick.
         if (forVotes <= threshold && againstVotes <= threshold)
         {
             return;

@@ -109,7 +109,7 @@ async function loadSettings() {
     settings.value = data.companySettings
     companyName.value = data.companySettings.companyName
     dividendPayoutPercent.value = data.companySettings.dividendPayoutRatio * 100
-    dividendProposalPercent.value = data.companySettings.dividendPayoutRatio * 100
+    dividendProposalPercent.value = Number((data.companySettings.dividendPayoutRatio * 100).toFixed(2))
     salaryMultipliers.value = Object.fromEntries(data.companySettings.citySalarySettings.map((entry) => [entry.cityId, entry.salaryMultiplier]))
   } catch (reason: unknown) {
     error.value = reason instanceof Error ? reason.message : t('companySettings.loadFailed')
@@ -199,6 +199,14 @@ async function saveSettings() {
 
 function formatPercent(value: number): string {
   return `${(value * 100).toFixed(1)}%`
+}
+
+function formatRawPercent(value: number): string {
+  if (!Number.isFinite(value)) {
+    return '0.0'
+  }
+
+  return value.toFixed(1)
 }
 
 function formatShareCount(value: number): string {
@@ -448,7 +456,7 @@ onMounted(loadSettings)
           <div v-if="settings.pendingDividendProposal" class="rounded-xl border border-divider p-4 bg-card/40">
             <p class="text-sm mb-2">
               {{ t('companySettings.pendingProposal') }}:
-              <strong>{{ settings.pendingDividendProposal.dividendPercent.toFixed(1) }}%</strong>
+              <strong>{{ formatRawPercent(settings.pendingDividendProposal.dividendPercent) }}%</strong>
             </p>
             <p class="text-xs text-muted mb-2">
               {{ t('companySettings.votingClosesAtTick', { tick: settings.pendingDividendProposal.votingCloseTick }) }}
