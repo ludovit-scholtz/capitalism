@@ -1,0 +1,8 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allow documented placeholder signing-key examples in .env.example"
+paths = ['''.env\.example''']
+regexTarget = "match"
+regexes = ['''Jwt__SigningKey=.*''']

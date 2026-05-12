@@ -97,6 +97,40 @@ public class Program
             }
         }
 
+        if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing"))
+        {
+            var masterCatalogConnectionString = builder.Configuration.GetConnectionString("MasterCatalog");
+            if (RequiredSecretsStartupGuard.TryGetUnsafeConnectionStringReason(masterCatalogConnectionString, out var unsafeMasterConnectionReason))
+            {
+                startupLogger.LogCritical(
+                    "Blocking startup because ConnectionStrings:MasterCatalog is insecure. Environment={EnvironmentName} Reason={Reason} OverrideEnvironmentVariable={OverrideEnvironmentVariable}",
+                    builder.Environment.EnvironmentName,
+                    unsafeMasterConnectionReason,
+                    "ConnectionStrings__MasterCatalog");
+                throw new InvalidOperationException(
+                    "ConnectionStrings:MasterCatalog is missing or uses a placeholder value. " +
+                    "Set a real PostgreSQL connection string via environment variable 'ConnectionStrings__MasterCatalog' before starting outside Development. " +
+                    $"Validation reason: {unsafeMasterConnectionReason}");
+            }
+        }
+
+        if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing")
+            && RequiredSecretsStartupGuard.TryGetUnsafeRootAdministratorEmailsReason(
+                (builder.Configuration.GetSection(GameAdministrationOptions.SectionName).Get<GameAdministrationOptions>()
+                    ?? new GameAdministrationOptions()).RootAdministratorEmails,
+                out var unsafeRootAdministratorReason))
+        {
+            startupLogger.LogCritical(
+                "Blocking startup because GameAdministration:RootAdministratorEmails is insecure. Environment={EnvironmentName} Reason={Reason} OverrideEnvironmentVariablePattern={OverrideEnvironmentVariablePattern}",
+                builder.Environment.EnvironmentName,
+                unsafeRootAdministratorReason,
+                "GameAdministration__RootAdministratorEmails__0");
+            throw new InvalidOperationException(
+                "GameAdministration:RootAdministratorEmails is missing or uses placeholder values. " +
+                "Set root admin emails via environment variables like 'GameAdministration__RootAdministratorEmails__0' before starting outside Development. " +
+                $"Validation reason: {unsafeRootAdministratorReason}");
+        }
+
         builder.Services.AddCors(options =>
         {
             options.AddPolicy("frontend", policy =>

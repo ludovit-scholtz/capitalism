@@ -1638,3 +1638,33 @@ Root-cause of recurring CI failure (May 2026, PR #379 follow-up):
 2. **Treat loser responses as an allowed set of conflict-like errors when multiple commit-time guards can race.** Do not overfit to one error code.
 3. **If response-level success count is timing-sensitive, add a deterministic follow-up accept attempt (with latest `offerVersion`) when the first concurrent pair returns no success payload, then enforce exactly one success and exactly one committed transfer in persisted state.**
 4. **Always include `BUILDING_NOT_FOUND` in conflict-like loser code sets for post-transfer ownership revalidation paths.**
+
+## Secret-scanning workflow CI failure — gitleaks PR scans require explicit token env
+
+Root-cause of a quality failure (May 2026, PR #437 follow-up):
+- A new `secret-scanning` workflow was added with `gitleaks/gitleaks-action@v2`, but the action was invoked without `GITHUB_TOKEN` in the step environment.
+- On pull_request events, gitleaks action now hard-fails with: `GITHUB_TOKEN is now required to scan pull requests`.
+- After adding `GITHUB_TOKEN`, the workflow still failed because `actions/checkout` used the default shallow clone (`fetch-depth: 1`) and gitleaks PR commit-range scan could not resolve the base commit range.
+- After enabling full history, gitleaks still failed because a safe `.env.example` placeholder (`Jwt__SigningKey=...`) in an earlier commit was flagged in commit-range scan history, blocking the PR even though no real secret existed.
+- Result: build/test request from product owner failed despite code tests being green.
+
+**Rules to prevent recurrence:**
+1. **Any workflow using `gitleaks/gitleaks-action` on pull_request MUST set `env: GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}` on the action step.** Do not assume implicit token propagation.
+2. **When adding a new CI workflow, inspect the first run logs immediately and fix action-specific required inputs before declaring the PR ready.**
+3. **For gitleaks PR scans, checkout must use full history (`actions/checkout` with `fetch-depth: 0`) so the base/head commit range exists.** Shallow checkout can fail with `fatal: ambiguous argument '<base>^..<head>'`.
+4. **Keep gitleaks history scan enabled for PRs, but add a narrow `.gitleaks.toml` allowlist for known safe placeholders** (for example `Jwt__SigningKey` examples in `.env.example`). Do not disable git-history scanning as a general workaround.
+5. **Use low-entropy human-readable placeholders in `.env.example`** (for example `set-via-secrets-manager`) to reduce generic-api-key false positives.
+6. **When a reviewer says \"Fix build and fix tests\", always separate failing category by workflow logs first** (code tests vs workflow wiring) and fix all in-PR failures, including newly added workflow configuration errors.
+7. **For security configuration hardening PRs, include unit coverage for new guard helpers** (for example connection-string and root-admin placeholder detection), not only host-startup tests.
+
+## Merge-conflict completion quality — preserve both sides and remove duplicate roadmap drift
+
+Root-cause of a quality gap (May 2026, PR #437 follow-up):
+- The branch had unresolved `main` merge conflicts and could not be merged despite green checks on the previous head.
+- Conflict resolution in `ROADMAP.md` initially preserved both sides but left a duplicate checklist item (`Move RootAdministratorEmails...`) with conflicting completion states.
+- This made product-alignment proof ambiguous even though the implementation and tests were complete.
+
+**Rules to prevent recurrence:**
+1. **When product owner requests merge-conflict resolution, always unshallow/fetch `origin/main` first and merge/rebase immediately before claiming completion.**
+2. **After resolving conflicts, scan edited roadmap/checklist files for duplicate items with opposite states (`[x]` and `[ ]`) and keep only the canonical current state.**
+3. **For merge-fix sessions, re-check branch CI statuses on the new head SHA (not the previous head) before replying to review comments.**
