@@ -4,6 +4,18 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 ## Active issues to work on
 
+### Building Unit Grid Configuration System (Core Production Chain)
+
+- [x] (100%) Building Unit Grid Configuration System is fully live: players configure interactive 4×4 production-unit grids inside Mine, Factory, Sales Shop, and R&D buildings. The system is the core gameplay mechanic that turns map buildings into a living economic simulation.
+  - `storeBuildingConfiguration` mutation validates grid constraints (max 1 unit per cell, valid unit type per building type, link validity), deducts upgrade costs from company bank account, and applies layout atomically.
+  - `scheduleUnitUpgrade` mutation queues a unit-level upgrade with tick countdown and 90% cost refund on cancellation.
+  - `cancelPendingConfiguration` mutation discards a staged plan and unlocks the building for new changes.
+  - Mine buildings allow MINING, STORAGE, B2B_SALES; Factory adds PURCHASE, MANUFACTURING, BRANDING; Sales Shop allows PURCHASE, MARKETING, STORAGE, PUBLIC_SALES; R&D allows PRODUCT_QUALITY, BRAND_QUALITY.
+  - Tick engine phases execute unit processing: MiningPhase fills mining-unit inventory from deposit lots each tick respecting diminishing-return efficiency; ManufacturingPhase converts linked inputs to outputs; PublicSalesPhase and B2BSalesPhase settle sales and credit company bank accounts.
+  - `buildingDetail` query returns full unit grid with resource history sparklines (last 100 ticks per unit).
+  - Frontend `BuildingDetailView` renders the 4×4 interactive grid with unit-type icons, fill bars, level badges, link arrows, edit/staging mode, and desktop side-by-side layout.
+  - Integration tests: happy-path Mine/Factory/SalesShop configuration, invalid unit type rejection, unauthenticated access rejection, cancel pending plan, tick-engine mining inventory production, upgrade lifecycle.
+
 ### Buildings & Land Map System (Core Gameplay Loop)
 
 - [x] (100%) Buildings & Land Map System is fully live: players can browse available land parcels on a real-world GPS map (Leaflet.js, OpenStreetMap tiles), purchase lots, construct all 10 building types (Mine, Factory, SalesShop, ResearchDevelopment, Apartment, Commercial, MediaHouse, Bank, Exchange, PowerPlant), and manage their property portfolio via the "My Properties" sidebar.
