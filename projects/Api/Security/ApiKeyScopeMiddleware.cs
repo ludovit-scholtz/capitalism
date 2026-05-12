@@ -41,6 +41,7 @@ public sealed class ApiKeyScopeMiddleware(RequestDelegate next)
             ["executeForexSwap"] = new(ApiKeyScopes.TradingOnly, true, ResolveForexCompanyIdsAsync),
             ["buyShares"] = new(ApiKeyScopes.TradingOnly, true, ResolveTradingAccountCompanyIdsAsync),
             ["sellShares"] = new(ApiKeyScopes.TradingOnly, true, ResolveTradingAccountCompanyIdsAsync),
+            ["replaceCEO"] = new(ApiKeyScopes.TradingOnly, true, ResolveDirectCompanyIdsAsync),
             ["placeLimitOrder"] = new(ApiKeyScopes.TradingOnly, true, ResolveActiveTradingCompanyIdsAsync),
             ["cancelLimitOrder"] = new(ApiKeyScopes.TradingOnly, true, ResolveLimitOrderOwnerCompanyIdsAsync),
             ["createGoldAmmPool"] = new(ApiKeyScopes.TradingOnly, false),

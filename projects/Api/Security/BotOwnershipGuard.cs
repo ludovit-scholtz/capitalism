@@ -39,6 +39,10 @@ public sealed class BotOwnershipGuard(AppDbContext db)
                 await EnsureBankAccountOwnedIfPresentAsync(playerId, GetGuidPath(variables, "input", "bankAccountId"), cancellationToken);
                 break;
 
+            case "replaceCEO":
+                await EnsureCompanyOwnedAsync(playerId, GetGuidPath(variables, "input", "companyId"), cancellationToken);
+                break;
+
             case "acceptLoan":
                 var borrowerCompanyId = GetGuidPath(variables, "input", "borrowerCompanyId");
                 await EnsureCompanyOwnedAsync(playerId, borrowerCompanyId, cancellationToken);

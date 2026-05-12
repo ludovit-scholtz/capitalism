@@ -107,7 +107,7 @@ test.describe('Stock exchange', () => {
     state.currentToken = `token-${player.id}`
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
-    await page.goto('/stocks')
+    await page.goto('/stock-exchange')
 
     await expect(page.getByRole('heading', { name: 'Stock Exchange' })).toBeVisible()
 
@@ -907,7 +907,7 @@ test.describe('Stock exchange', () => {
     expect(errorBoundingBox).not.toBeNull()
   })
 
-  test('claim-control button appears when player combined ownership reaches 50%', async ({ page }) => {
+  test('claim-control confirmation dialog executes takeover when player combined ownership reaches 50%', async ({ page }) => {
     const player = makePlayer({
       personalCash: 200000,
       companies: [makeControlledCompany()],
@@ -945,7 +945,7 @@ test.describe('Stock exchange', () => {
     seedPersonalUsdSettlementAccount(state, player, 250_000)
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
-    await page.goto('/stocks')
+    await page.goto('/stock-exchange')
 
     const ctrlRow = page.locator('tr.listing-row', { hasText: 'Control Ready Inc' })
     await expect(ctrlRow).toBeVisible()
@@ -954,9 +954,12 @@ test.describe('Stock exchange', () => {
     const claimBtn = ctrlRow.getByRole('button', { name: 'Claim control' })
     await expect(claimBtn).toBeVisible()
 
-    // Click claim control and verify switch success message
+    // Click claim control and verify explicit takeover confirmation flow
     await claimBtn.click()
-    await expect(page.getByRole('status')).toContainText('Active account switched to Control Ready Inc.')
+    await expect(page.getByRole('heading', { name: 'Replace CEO' })).toBeVisible()
+    await expect(page.getByText('Take control of Control Ready Inc and switch your active account to the company immediately.')).toBeVisible()
+    await page.getByRole('button', { name: 'Confirm Takeover' }).click()
+    await expect(page.getByRole('status')).toContainText('You now control Control Ready Inc.')
   })
 
   test('buying up to 50% unlocks claim-control', async ({ page }) => {
@@ -996,7 +999,7 @@ test.describe('Stock exchange', () => {
     seedCompanyUsdSettlementAccount(state, player.companies[0]!, 500_000)
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
-    await page.goto('/stocks')
+    await page.goto('/stock-exchange')
 
     // Buy 100 more shares to cross 50%
     await openTradePanel(page, 'Target Industries')

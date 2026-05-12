@@ -3,11 +3,12 @@ import StockMarketListingRow from '@/components/stock/StockMarketListingRow.vue'
 import StockMergeDialog from '@/components/stock/StockMergeDialog.vue'
 import StockPersonPortfolio from '@/components/stock/StockPersonPortfolio.vue'
 import StockSummaryCards from '@/components/stock/StockSummaryCards.vue'
+import StockTakeoverDialog from '@/components/stock/StockTakeoverDialog.vue'
 import { useStockExchange } from '@/composables/useStockExchange'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
-const { currentTick, loading, error, personAccount, portfolioValue, recentDividendTotal, locale, filterText, selectedCityFilter, selectedIndustryFilter, availableCityFilters, availableIndustryFilters, filteredAndSortedListings, paginatedListings, totalPages, currentPage, toggleSort, sortIcon, isControlledCompany, actionLoadingKey, activeTradeAccountName, activeTradeAccountType, activeTradeAccountCash, activeSettlementAccounts, selectedSettlementBankAccountId, quantityByCompany, errorByCompany, successByCompany, expandedCompany, priceHistoryByCompany, priceHistoryLoadingByCompany, priceHistoryErrorByCompany, dividendProposalsByCompany, dividendProposalsLoadingByCompany, dividendProposalsErrorByCompany, dividendPerShareDraftByCompany, shareholdersByCompany, shareholdersLoadingByCompany, shareholdersErrorByCompany, mergeDialogOpen, mergeDestinationCompanyId, controlledCompanies, mergeLoading, mergeError, mergeSuccess, updateQuantity, estimatedBuyCost, estimatedSellProceeds, toggleTradePanel, switchToCompanyAccount, executeTrade, proposeDividend, voteDividendProposal, updateDividendPerShareDraft, openMergeDialog, closeMergeDialog, executeMerge, loadData, openOrders, selectedOrderBookSymbol, orderBook, tradeHistory, orderSide, orderPrice, orderQuantity, orderLoading, orderError, orderSuccess, selectedOrderListing, stockSymbolForListing, placeLimitOrder, cancelLimitOrder } = useStockExchange()
+const { currentTick, loading, error, personAccount, portfolioValue, recentDividendTotal, locale, filterText, selectedCityFilter, selectedIndustryFilter, availableCityFilters, availableIndustryFilters, filteredAndSortedListings, paginatedListings, totalPages, currentPage, toggleSort, sortIcon, isControlledCompany, actionLoadingKey, activeTradeAccountName, activeTradeAccountType, activeTradeAccountCash, activeSettlementAccounts, selectedSettlementBankAccountId, quantityByCompany, errorByCompany, successByCompany, expandedCompany, priceHistoryByCompany, priceHistoryLoadingByCompany, priceHistoryErrorByCompany, dividendProposalsByCompany, dividendProposalsLoadingByCompany, dividendProposalsErrorByCompany, dividendPerShareDraftByCompany, shareholdersByCompany, shareholdersLoadingByCompany, shareholdersErrorByCompany, mergeDialogOpen, mergeDestinationCompanyId, controlledCompanies, mergeLoading, mergeError, mergeSuccess, takeoverDialogOpen, takeoverLoading, takeoverError, takeoverSuccess, takeoverTargetCompanyName, updateQuantity, estimatedBuyCost, estimatedSellProceeds, toggleTradePanel, executeTrade, proposeDividend, voteDividendProposal, updateDividendPerShareDraft, openTakeoverDialog, closeTakeoverDialog, executeTakeover, openMergeDialog, closeMergeDialog, executeMerge, loadData, openOrders, selectedOrderBookSymbol, orderBook, tradeHistory, orderSide, orderPrice, orderQuantity, orderLoading, orderError, orderSuccess, selectedOrderListing, stockSymbolForListing, placeLimitOrder, cancelLimitOrder } = useStockExchange()
 
 function formatCityFilterLabel(city: string): string {
   return city === 'UNKNOWN' ? t('stockExchange.unknownCity') : city
@@ -144,7 +145,7 @@ function formatIndustryFilterLabel(industry: string): string {
                   :shareholders-loading="shareholdersLoadingByCompany[listing.companyId] ?? false"
                   :shareholders-error="shareholdersErrorByCompany[listing.companyId] ?? null"
                   @toggle-trade-panel="toggleTradePanel(listing.companyId)"
-                  @switch-to-company="switchToCompanyAccount(listing.companyId)"
+                  @open-takeover="openTakeoverDialog(listing.companyId)"
                   @open-merge="openMergeDialog(listing.companyId)"
                   @update:settlement-bank-account-id="selectedSettlementBankAccountId = $event"
                   @update-quantity="updateQuantity(listing.companyId, $event)"
@@ -289,6 +290,15 @@ function formatIndustryFilterLabel(industry: string): string {
     :locale="locale"
     @confirm="executeMerge"
     @close="closeMergeDialog"
+  />
+  <StockTakeoverDialog
+    v-model="takeoverDialogOpen"
+    :company-name="takeoverTargetCompanyName"
+    :takeover-loading="takeoverLoading"
+    :takeover-error="takeoverError"
+    :takeover-success="takeoverSuccess"
+    @confirm="executeTakeover"
+    @close="closeTakeoverDialog"
   />
 </template>
 

@@ -133,3 +133,10 @@ export interface MergeCompanyResult {
   cashTransferred: number
   buildingsTransferred: number
 }
+
+export interface ReplaceCeoResult {
+  companyId: string
+  companyName: string
+  newCeoPlayerId: string
+  newCeoDisplayName: string
+}

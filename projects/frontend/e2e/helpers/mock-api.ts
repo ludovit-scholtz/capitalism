@@ -4371,6 +4371,56 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    if (query.includes('ReplaceCEO')) {
+      const input = body.variables?.input
+      const player = state.players.find((candidate) => candidate.id === state.currentUserId)
+
+      if (!player) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Not authenticated' }] }) })
+      }
+
+      const targetCompany = state.players.flatMap((candidate) => candidate.companies).find((candidate) => candidate.id === input?.companyId)
+      if (!targetCompany) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Company not found.', extensions: { code: 'COMPANY_NOT_FOUND' } }] }) })
+      }
+
+      if (input?.newCeoPlayerId !== player.id) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'You can only appoint yourself as the new CEO when taking control.', extensions: { code: 'INVALID_NEW_CEO_PLAYER' } }] }),
+        })
+      }
+
+      const controlledRatio = getCombinedControlledOwnershipRatio(state, player.id, targetCompany)
+      if (targetCompany.playerId !== player.id && controlledRatio < 0.5) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'You need at least 50% combined ownership through your person account and controlled companies to take control of this company.', extensions: { code: 'COMPANY_CONTROL_REQUIRED' } }] }),
+        })
+      }
+
+      targetCompany.playerId = player.id
+      player.activeAccountType = 'COMPANY'
+      player.activeCompanyId = targetCompany.id
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            replaceCEO: {
+              companyId: targetCompany.id,
+              companyName: targetCompany.name,
+              newCeoPlayerId: player.id,
+              newCeoDisplayName: player.displayName,
+            },
+          },
+        }),
+      })
+    }
+
     if (query.includes('BuyShares')) {
       const input = body.variables?.input
       const player = state.players.find((candidate) => candidate.id === state.currentUserId)

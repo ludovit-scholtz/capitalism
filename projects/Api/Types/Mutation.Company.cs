@@ -329,34 +329,7 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        var companies = await db.Companies
-            .Include(company => company.BankAccounts)
-            .ToListAsync();
-        var targetCompany = companies.FirstOrDefault(company => company.Id == input.CompanyId.Value)
-            ?? throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Company not found.")
-                    .SetCode("COMPANY_NOT_FOUND")
-                    .Build());
-
-        if (targetCompany.PlayerId != userId)
-        {
-            var shareholdings = await db.Shareholdings
-                .Where(holding => holding.CompanyId == targetCompany.Id)
-                .ToListAsync();
-            var controlledOwnershipRatio = ComputeControlledOwnershipRatio(userId, targetCompany, companies, shareholdings);
-
-            if (controlledOwnershipRatio < 0.5m)
-            {
-                throw new GraphQLException(
-                    ErrorBuilder.New()
-                        .SetMessage("You need at least 50% combined ownership through your person account and controlled companies to switch into this company.")
-                        .SetCode("COMPANY_CONTROL_REQUIRED")
-                        .Build());
-            }
-
-            targetCompany.PlayerId = userId;
-        }
+        var targetCompany = await ClaimCompanyControlIfEligibleAsync(db, userId, input.CompanyId.Value);
 
         player.ActiveAccountType = AccountContextType.Company;
         player.ActiveCompanyId = targetCompany.Id;
