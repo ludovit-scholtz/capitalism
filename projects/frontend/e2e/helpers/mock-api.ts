@@ -1508,8 +1508,7 @@ function deriveMockPrimaryIndustry(state: MockState, company: MockCompany): stri
     }
   }
 
-  const topIndustry = [...industryUsage.entries()]
-    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0]
+  const topIndustry = [...industryUsage.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0]
 
   if (topIndustry) {
     return topIndustry
@@ -3181,21 +3180,10 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     personalCash: player.personalCash,
     totalCompanyCash: Number(player.companies.reduce((total, company) => total + company.cash, 0).toFixed(2)),
     totalCompanyEquity: Number(
-      (
-        player.companies.reduce((total, company) => total + company.cash, 0)
-        + player.companies.reduce((total, company) => total + company.buildings.length * MOCK_BUILDING_BASE_VALUE, 0)
-      ).toFixed(2),
+      (player.companies.reduce((total, company) => total + company.cash, 0) + player.companies.reduce((total, company) => total + company.buildings.length * MOCK_BUILDING_BASE_VALUE, 0)).toFixed(2),
     ),
     companyCount: player.companies.length,
-    cityNames: [
-      ...new Set(
-        player.companies.flatMap((company) =>
-          company.buildings
-            .map((building) => state.cities.find((city) => city.id === building.cityId)?.name ?? '')
-            .filter((name) => !!name),
-        ),
-      ),
-    ],
+    cityNames: [...new Set(player.companies.flatMap((company) => company.buildings.map((building) => state.cities.find((city) => city.id === building.cityId)?.name ?? '').filter((name) => !!name)))],
     companies: player.companies.map((company) => ({
       id: company.id,
       name: company.name,
@@ -3468,10 +3456,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         onboardingFactoryLotId: null,
         onboardingShopBuildingId: null,
         onboardingFirstSaleCompletedAtUtc: null,
-        appliedReferralCode:
-          typeof input?.referralCode === 'string' && /^[A-Za-z0-9]{4,20}$/.test(input.referralCode.trim())
-            ? input.referralCode.trim().toUpperCase()
-            : null,
+        appliedReferralCode: typeof input?.referralCode === 'string' && /^[A-Za-z0-9]{4,20}$/.test(input.referralCode.trim()) ? input.referralCode.trim().toUpperCase() : null,
         proSubscriptionEndsAtUtc: null,
         interestPayments: [],
         dividendPayments: [],
@@ -4587,9 +4572,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const input = body.variables?.input
       const player = state.players.find((candidate) => candidate.id === state.currentUserId)
       const stockSymbol = String(input?.stockSymbol ?? '')
-      const company = state.players
-        .flatMap((candidate) => candidate.companies)
-        .find((candidate) => stockSymbolForCompany(candidate.id) === stockSymbol)
+      const company = state.players.flatMap((candidate) => candidate.companies).find((candidate) => stockSymbolForCompany(candidate.id) === stockSymbol)
 
       if (!player || !company) {
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Company not found or not authenticated.' }] }) })
@@ -4668,10 +4651,12 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       }
 
       const sharesVoted = state.shareholdings
-        .filter((holding) =>
-          holding.companyId === proposal.companyId
-          && holding.shareCount > 0
-          && (voterAccountType === 'COMPANY' ? holding.ownerCompanyId === voterAccountId : holding.ownerPlayerId === voterAccountId))
+        .filter(
+          (holding) =>
+            holding.companyId === proposal.companyId &&
+            holding.shareCount > 0 &&
+            (voterAccountType === 'COMPANY' ? holding.ownerCompanyId === voterAccountId : holding.ownerPlayerId === voterAccountId),
+        )
         .reduce((sum, holding) => sum + holding.shareCount, 0)
       if (sharesVoted <= 0) {
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Only shareholders can vote.' }] }) })
@@ -4714,9 +4699,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       }
 
       const symbol = String(input?.stockSymbol ?? '')
-      const company = state.players
-        .flatMap((candidate) => candidate.companies)
-        .find((candidate) => stockSymbolForCompany(candidate.id) === symbol)
+      const company = state.players.flatMap((candidate) => candidate.companies).find((candidate) => stockSymbolForCompany(candidate.id) === symbol)
       if (!company) {
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Company not found.' }] }) })
       }
@@ -4750,7 +4733,15 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         }
       } else {
         const reservedShares = state.stockLimitOrders
-          .filter((order) => order.companyId === company.id && order.side === 'SELL' && order.status !== 'CANCELLED' && order.status !== 'FILLED' && order.ownerPlayerId === ownerPlayerId && order.ownerCompanyId === ownerCompanyId)
+          .filter(
+            (order) =>
+              order.companyId === company.id &&
+              order.side === 'SELL' &&
+              order.status !== 'CANCELLED' &&
+              order.status !== 'FILLED' &&
+              order.ownerPlayerId === ownerPlayerId &&
+              order.ownerCompanyId === ownerCompanyId,
+          )
           .reduce((sum, order) => sum + (order.quantity - order.filledQuantity), 0)
         const holding = getOrCreateShareholding(state, company.id, ownerPlayerId, ownerCompanyId)
         if ((holding.shareCount ?? 0) < quantity + reservedShares) {
@@ -5329,11 +5320,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
       if (input?.isForSale === false) {
         const isLockedByUnpaidCollateral = state.myLoans.some(
-          (loan) =>
-            loan.collateralBuildingId === building.id &&
-            (loan.status === 'OVERDUE' || loan.status === 'DEFAULTED') &&
-            (loan.missedPayments ?? 0) > 0 &&
-            (loan.remainingPrincipal ?? 0) > 0,
+          (loan) => loan.collateralBuildingId === building.id && (loan.status === 'OVERDUE' || loan.status === 'DEFAULTED') && (loan.missedPayments ?? 0) > 0 && (loan.remainingPrincipal ?? 0) > 0,
         )
 
         if (isLockedByUnpaidCollateral) {
@@ -5412,10 +5399,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       }
 
       const hasUnpaidCollateralLoan = state.myLoans.some(
-        (loan) =>
-          loan.collateralBuildingId === building.id &&
-          (loan.status === 'ACTIVE' || loan.status === 'OVERDUE' || loan.status === 'DEFAULTED') &&
-          (loan.remainingPrincipal ?? 0) > 0,
+        (loan) => loan.collateralBuildingId === building.id && (loan.status === 'ACTIVE' || loan.status === 'OVERDUE' || loan.status === 'DEFAULTED') && (loan.remainingPrincipal ?? 0) > 0,
       )
 
       if (hasUnpaidCollateralLoan) {
@@ -5436,8 +5420,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const city = state.cities.find((entry) => entry.id === building.cityId)
       const currencyCode = city?.currencyCode ?? 'EUR'
       const populationIndex = building.populationIndex ?? 0.5
-      const estimatedMarketValue =
-        Math.round(((75_000 * Math.pow(1.5, (building.level ?? 1) - 1) + (building.units?.length ?? 0) * 20_000) * (1 + populationIndex * 0.5)) / 1_000) * 1_000
+      const estimatedMarketValue = Math.round(((75_000 * Math.pow(1.5, (building.level ?? 1) - 1) + (building.units?.length ?? 0) * 20_000) * (1 + populationIndex * 0.5)) / 1_000) * 1_000
       const refundAmount = Math.round(estimatedMarketValue * 0.8 * 100) / 100
 
       company.buildings = company.buildings.filter((candidate) => candidate.id !== building.id)
@@ -6542,7 +6525,6 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
-
     if (query.includes('chatMessages')) {
       if (!state.currentUserId) {
         return route.fulfill({
@@ -6799,16 +6781,12 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
       const companyIds = new Set(
         state.shareholdings
-          .filter((holding) =>
-            holding.shareCount > 0
-            && (holding.ownerPlayerId === player.id
-              || (holding.ownerCompanyId && player.companies.some((company) => company.id === holding.ownerCompanyId))))
+          .filter((holding) => holding.shareCount > 0 && (holding.ownerPlayerId === player.id || (holding.ownerCompanyId && player.companies.some((company) => company.id === holding.ownerCompanyId))))
           .map((holding) => holding.companyId),
       )
-      const openCount = state.dividendProposals.filter((proposal) =>
-        companyIds.has(proposal.companyId)
-        && proposal.status === 'VOTING'
-        && proposal.votingCloseTick >= state.gameState.currentTick).length
+      const openCount = state.dividendProposals.filter(
+        (proposal) => companyIds.has(proposal.companyId) && proposal.status === 'VOTING' && proposal.votingCloseTick >= state.gameState.currentTick,
+      ).length
 
       return route.fulfill({
         status: 200,
@@ -6824,16 +6802,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         .filter((proposal) => proposal.stockSymbol === stockSymbol)
         .map((proposal) => {
           const proposalVotes = state.dividendVotes.filter((vote) => vote.proposalId === proposal.id)
-          const forVotes = proposalVotes
-            .filter((vote) => vote.voteChoice === 'FOR')
-            .reduce((sum, vote) => sum + vote.sharesVoted, 0)
-          const againstVotes = proposalVotes
-            .filter((vote) => vote.voteChoice === 'AGAINST')
-            .reduce((sum, vote) => sum + vote.sharesVoted, 0)
-          const myVote = player
-            ? proposalVotes.find((vote) =>
-                vote.voterAccountId === player.id || player.companies.some((company) => company.id === vote.voterAccountId))
-            : null
+          const forVotes = proposalVotes.filter((vote) => vote.voteChoice === 'FOR').reduce((sum, vote) => sum + vote.sharesVoted, 0)
+          const againstVotes = proposalVotes.filter((vote) => vote.voteChoice === 'AGAINST').reduce((sum, vote) => sum + vote.sharesVoted, 0)
+          const myVote = player ? proposalVotes.find((vote) => vote.voterAccountId === player.id || player.companies.some((company) => company.id === vote.voterAccountId)) : null
 
           return {
             ...proposal,
@@ -6906,8 +6877,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const player = state.players.find((candidate) => candidate.id === state.currentUserId)
       const playerCompanyIds = new Set((player?.companies ?? []).map((company) => company.id))
       const rows = state.stockLimitOrders
-        .filter((order) => (order.status === 'OPEN' || order.status === 'PARTIALLY_FILLED')
-          && (order.ownerPlayerId === player?.id || (order.ownerCompanyId && playerCompanyIds.has(order.ownerCompanyId))))
+        .filter(
+          (order) => (order.status === 'OPEN' || order.status === 'PARTIALLY_FILLED') && (order.ownerPlayerId === player?.id || (order.ownerCompanyId && playerCompanyIds.has(order.ownerCompanyId))),
+        )
         .map((order) => {
           const company = state.players.flatMap((candidate) => candidate.companies).find((candidate) => candidate.id === order.companyId)
           return {
@@ -6967,9 +6939,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     if (query.includes('stockTradeHistory')) {
       const symbol = String(body.variables?.stockSymbol ?? '')
       const limit = Number(body.variables?.limit ?? 20)
-      const rows = state.stockLimitOrderExecutions
-        .filter((execution) => execution.stockSymbol === symbol)
-        .slice(0, Math.max(1, limit))
+      const rows = state.stockLimitOrderExecutions.filter((execution) => execution.stockSymbol === symbol).slice(0, Math.max(1, limit))
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { stockTradeHistory: rows } }) })
     }
 
@@ -7242,11 +7212,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         })
       }
 
-      const duplicate = state.players.some(
-        (player) =>
-          player.id !== state.currentUserId
-          && (player.personalAccountName ?? player.displayName).toLowerCase() === personalAccountName.toLowerCase(),
-      )
+      const duplicate = state.players.some((player) => player.id !== state.currentUserId && (player.personalAccountName ?? player.displayName).toLowerCase() === personalAccountName.toLowerCase())
       if (duplicate) {
         return route.fulfill({
           status: 200,
@@ -7367,9 +7333,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
     if (query.includes('getActiveMarketEvents')) {
       const cityId = body.variables?.cityId ?? null
-      const events = cityId
-        ? (state.activeMarketEvents ?? []).filter((event) => event.affectedCityId == null || event.affectedCityId === cityId)
-        : (state.activeMarketEvents ?? [])
+      const events = cityId ? (state.activeMarketEvents ?? []).filter((event) => event.affectedCityId == null || event.affectedCityId === cityId) : (state.activeMarketEvents ?? [])
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -8350,10 +8314,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       }
 
       const unreadEntries = state.gameNewsEntries.filter(
-        (entry) =>
-          entry.status === 'PUBLISHED' &&
-          (entry.targetServerKey === null || entry.targetServerKey === state.serverKey) &&
-          !entry.readByPlayerIds.includes(state.currentUserId ?? ''),
+        (entry) => entry.status === 'PUBLISHED' && (entry.targetServerKey === null || entry.targetServerKey === state.serverKey) && !entry.readByPlayerIds.includes(state.currentUserId ?? ''),
       )
 
       if (unreadEntries.length > 0) {
@@ -9194,7 +9155,10 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             .flatMap((company) => company.buildings)
             .map((building) => [building.id, state.cities.find((city) => city.id === building.cityId)]),
         )
-        const grouped = new Map<string, { cityId: string; cityName: string; currencyCode: string; currencySymbol: string; revenue: number; costs: number; revenueTrend: Array<{ tick: number; revenue: number }> }>()
+        const grouped = new Map<
+          string,
+          { cityId: string; cityName: string; currencyCode: string; currencySymbol: string; revenue: number; costs: number; revenueTrend: Array<{ tick: number; revenue: number }> }
+        >()
         for (const buildingSummary of ledger.buildingSummaries ?? []) {
           const city = cityByBuildingId.get(buildingSummary.buildingId)
           if (!city) continue
@@ -10459,23 +10423,20 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         }))
 
       const forecast = state.mineDepletionForecast
-      const mockIntelligence = state.mineExtractionIntelligence !== undefined
-        ? state.mineExtractionIntelligence
-        : {
-        currentTick: (mockRecords[0]?.tick ?? 0) + 1,
-        burnRatePerTick: forecast?.averageExtractionRatePerTick ?? null,
-        burnRatePerDay:
-          forecast?.averageExtractionRatePerTick !== null &&
-          forecast?.averageExtractionRatePerTick !== undefined
-            ? forecast.averageExtractionRatePerTick * 24
-            : null,
-        expectedDepletionTick: forecast?.depletionTick ?? null,
-        qualityDecayInflectionTick: forecast?.critical20PctTick ?? null,
-        estimatedGameDaysRemaining: forecast?.estimatedGameDaysRemaining ?? null,
-        currentReserve: forecast?.currentReserve ?? null,
-        originalReserve: forecast?.originalReserve ?? null,
-        dailyExtraction,
-      }
+      const mockIntelligence =
+        state.mineExtractionIntelligence !== undefined
+          ? state.mineExtractionIntelligence
+          : {
+              currentTick: (mockRecords[0]?.tick ?? 0) + 1,
+              burnRatePerTick: forecast?.averageExtractionRatePerTick ?? null,
+              burnRatePerDay: forecast?.averageExtractionRatePerTick !== null && forecast?.averageExtractionRatePerTick !== undefined ? forecast.averageExtractionRatePerTick * 24 : null,
+              expectedDepletionTick: forecast?.depletionTick ?? null,
+              qualityDecayInflectionTick: forecast?.critical20PctTick ?? null,
+              estimatedGameDaysRemaining: forecast?.estimatedGameDaysRemaining ?? null,
+              currentReserve: forecast?.currentReserve ?? null,
+              originalReserve: forecast?.originalReserve ?? null,
+              dailyExtraction,
+            }
 
       return route.fulfill({
         status: 200,
