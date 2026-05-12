@@ -190,11 +190,9 @@ test.describe('Stock exchange', () => {
         { companyId: 'company-gov', ownerPlayerId: 'player-gov', ownerCompanyId: null, shareCount: 10000 },
       ],
     })
-    const currentPlayer = state.players.find((candidate) => candidate.id === player.id)
-    if (currentPlayer) {
-      currentPlayer.activeAccountType = 'PERSON'
-      currentPlayer.activeCompanyId = null
-    }
+    const currentPlayer = state.players.find((candidate) => candidate.id === player.id)!
+    currentPlayer.activeAccountType = 'PERSON'
+    currentPlayer.activeCompanyId = null
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
 

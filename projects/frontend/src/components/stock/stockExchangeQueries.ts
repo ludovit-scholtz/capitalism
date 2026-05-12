@@ -90,8 +90,8 @@ export const OPEN_ORDERS_QUERY = `
 `
 
 export const ORDER_BOOK_QUERY = `
-  query GetOrderBook($stockSymbol: String!) {
-    orderBook: getOrderBook(stockSymbol: $stockSymbol) {
+  query OrderBook($stockSymbol: String!) {
+    orderBook(stockSymbol: $stockSymbol) {
       stockSymbol
       bids {
         price

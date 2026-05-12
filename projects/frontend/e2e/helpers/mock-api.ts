@@ -6928,7 +6928,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { myOpenOrders: rows } }) })
     }
 
-    if (query.includes('getOrderBook')) {
+    if (query.includes('orderBook')) {
       const symbol = String(body.variables?.stockSymbol ?? '')
       const bids = state.stockLimitOrders
         .filter((order) => order.stockSymbol === symbol && order.side === 'BUY' && (order.status === 'OPEN' || order.status === 'PARTIALLY_FILLED'))
