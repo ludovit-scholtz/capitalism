@@ -1,5 +1,10 @@
 import { test, expect } from '@playwright/test'
-import { setupMockApi, makePlayer, type MockMarketDemandSummary } from '../../helpers/mock-api'
+import {
+  setupMockApi,
+  makePlayer,
+  type MockMarketDemandSummary,
+  type MockMarketPriceHistoryPoint,
+} from '../../helpers/mock-api'
 
 const CHAIR_PRODUCT_ID = 'pt-wooden-chair'
 const BREAD_PRODUCT_ID = 'pt-bread'
@@ -422,3 +427,105 @@ test('shows severe shortage badge for products below 40% satisfaction', async ({
   // 10% satisfaction → "Severe shortage" label (satisfactionPoor)
   await expect(page.getByText('Severe shortage').first()).toBeVisible()
 })
+
+test('shows partial shortage badge for products with 40-79% satisfaction', async ({ page }) => {
+  const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+  const state = setupMockApi(page, { players: [player] })
+  state.currentUserId = player.id
+  state.currentToken = `token-${player.id}`
+  state.marketOverviewByCityId = {
+    'city-ba': {
+      cityId: 'city-ba',
+      cityName: 'Bratislava',
+      currencyCode: 'EUR',
+      fromTick: 0,
+      toTick: 100,
+      products: [
+        {
+          productTypeId: BREAD_PRODUCT_ID,
+          productName: 'Bread',
+          industry: 'FOOD_PROCESSING',
+          totalDemand: 500,
+          totalQuantitySold: 300, // 60% satisfaction → "Partial shortage"
+          satisfactionRate: 0.6,
+          averageClearingPrice: 3.2,
+          totalRevenue: 960.0,
+          sellerCount: 2,
+        },
+      ],
+    },
+  }
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${player.id}`)
+
+  await page.goto('/market')
+  await expect(page.getByText('Bread')).toBeVisible()
+  // 60% satisfaction (≥40% and <80%) → "Partial shortage" badge
+  await expect(page.getByText('Partial shortage').first()).toBeVisible()
+})
+
+test('shows price history panel when a product row is clicked', async ({ page }) => {
+  const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+  const state = setupMockApi(page, { players: [player] })
+  state.currentUserId = player.id
+  state.currentToken = `token-${player.id}`
+  state.marketOverviewByCityId = {
+    'city-ba': makeMarketSummary('city-ba', 'Bratislava', 'EUR'),
+  }
+  // Seed price history for Wooden Chair (tick values <= default tick=42)
+  const historyPoints: MockMarketPriceHistoryPoint[] = [
+    { tick: 10, clearingPrice: 43.0, totalVolume: 18, totalRevenue: 774, sellerCount: 1 },
+    { tick: 20, clearingPrice: 43.5, totalVolume: 20, totalRevenue: 870, sellerCount: 1 },
+    { tick: 30, clearingPrice: 44.0, totalVolume: 22, totalRevenue: 968, sellerCount: 2 },
+    { tick: 40, clearingPrice: 45.0, totalVolume: 25, totalRevenue: 1125, sellerCount: 2 },
+    { tick: 42, clearingPrice: 45.0, totalVolume: 30, totalRevenue: 1350, sellerCount: 2 },
+  ]
+  state.marketPriceHistoryByProductId = { [CHAIR_PRODUCT_ID]: historyPoints }
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${player.id}`)
+
+  await page.goto('/market')
+  // Wait for table to load
+  const chairRow = page.locator('.product-row').first()
+  await expect(chairRow).toBeVisible()
+  // Click the Wooden Chair row to open price history panel
+  await chairRow.click()
+  // Price history panel heading should become visible
+  await expect(page.getByText('Price History (last 100 ticks)').first()).toBeVisible()
+  // The history table should contain at least one price entry
+  await expect(page.locator('.price-history-panel .history-table')).toBeVisible()
+})
+
+test('hides price history panel when same product row is clicked again', async ({ page }) => {
+  const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+  const state = setupMockApi(page, { players: [player] })
+  state.currentUserId = player.id
+  state.currentToken = `token-${player.id}`
+  state.marketOverviewByCityId = {
+    'city-ba': makeMarketSummary('city-ba', 'Bratislava', 'EUR'),
+  }
+  state.marketPriceHistoryByProductId = {
+    [CHAIR_PRODUCT_ID]: [
+      { tick: 40, clearingPrice: 45.0, totalVolume: 25, totalRevenue: 1125, sellerCount: 1 },
+    ],
+  }
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${player.id}`)
+
+  await page.goto('/market')
+  const chairRow = page.locator('.product-row').first()
+  await expect(chairRow).toBeVisible()
+  // First click — opens panel
+  await chairRow.click()
+  await expect(page.locator('.price-history-panel')).toBeVisible()
+  // Second click on same row — closes panel
+  await chairRow.click()
+  await expect(page.locator('.price-history-panel')).toBeHidden()
+})
+

@@ -4040,6 +4040,7 @@ export default {
     satisfactionPoor: 'Severe shortage',
     priceHistoryTitle: 'Price History (last 100 ticks)',
     priceHistoryEmpty: 'No price history available yet.',
+    tick: 'Tick',
     demandPanel: {
       title: 'Top Demanded Products',
       satisfaction: '{pct}% satisfied',

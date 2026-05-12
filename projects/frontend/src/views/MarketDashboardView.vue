@@ -6,7 +6,8 @@ import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
 import { useTickRefresh } from '@/composables/useTickRefresh'
 import { formatMoney } from '@/lib/currencyFormat'
-import type { CityDemandSummaryResult } from '@/types/analytics'
+import type { CityDemandSummaryResult, ProductDemandEntry } from '@/types/analytics'
+import MarketPriceHistoryPanel from '@/components/market/MarketPriceHistoryPanel.vue'
 
 interface City {
   id: string
@@ -22,6 +23,7 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const cities = ref<City[]>([])
 const overviewData = ref<CityDemandSummaryResult[]>([])
+const selectedProduct = ref<ProductDemandEntry | null>(null)
 
 const CITIES_QUERY = `{ cities { id name currencyCode } }`
 
@@ -63,6 +65,14 @@ function satisfactionLabel(rate: number): string {
   if (rate >= 0.8) return t('marketDashboard.satisfactionGood')
   if (rate >= 0.4) return t('marketDashboard.satisfactionPartial')
   return t('marketDashboard.satisfactionPoor')
+}
+
+function selectProduct(product: ProductDemandEntry) {
+  if (selectedProduct.value?.productTypeId === product.productTypeId) {
+    selectedProduct.value = null
+  } else {
+    selectedProduct.value = product
+  }
 }
 
 async function loadData(isRefresh = false) {
@@ -135,7 +145,13 @@ useTickRefresh(() => loadData(true))
           v-for="product in activeCityData.products"
           :key="product.productTypeId"
           class="product-row"
+          :class="{ 'product-row--selected': selectedProduct?.productTypeId === product.productTypeId }"
           role="row"
+          tabindex="0"
+          :aria-selected="selectedProduct?.productTypeId === product.productTypeId"
+          @click="selectProduct(product)"
+          @keydown.enter="selectProduct(product)"
+          @keydown.space.prevent="selectProduct(product)"
         >
           <span class="product-name" role="cell">{{ product.productName }}</span>
           <span class="product-industry" role="cell">{{ product.industry }}</span>
@@ -171,6 +187,14 @@ useTickRefresh(() => loadData(true))
           <span class="product-sellers col-right" role="cell">{{ product.sellerCount }}</span>
         </div>
       </div>
+
+      <!-- Price history panel (shown when a product row is clicked) -->
+      <MarketPriceHistoryPanel
+        v-if="selectedProduct && activeCityData"
+        :product="selectedProduct"
+        :city-id="activeCityData.cityId"
+        :currency-code="activeCityData.currencyCode"
+      />
     </template>
     <div v-else class="market-empty">{{ t('marketDashboard.noData') }}</div>
   </div>
@@ -319,6 +343,12 @@ useTickRefresh(() => loadData(true))
 
 .product-row:hover {
   background: var(--color-surface-hover);
+  cursor: pointer;
+}
+
+.product-row--selected {
+  background: var(--color-surface-hover);
+  border-left: 3px solid var(--color-accent);
 }
 
 .col-right {

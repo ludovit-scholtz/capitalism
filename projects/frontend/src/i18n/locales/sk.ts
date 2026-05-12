@@ -4028,6 +4028,7 @@ export default {
     satisfactionPoor: 'Vážny nedostatok',
     priceHistoryTitle: 'História cien (posledných 100 tikov)',
     priceHistoryEmpty: 'Zatiaľ nie je k dispozícii história cien.',
+    tick: 'Tick',
     demandPanel: {
       title: 'Najžiadanejšie produkty',
       satisfaction: '{pct}% uspokojené',

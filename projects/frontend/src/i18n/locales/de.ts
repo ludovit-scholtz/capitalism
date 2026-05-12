@@ -4047,6 +4047,7 @@ export default {
     satisfactionPoor: 'Starker Engpass',
     priceHistoryTitle: 'Preisverlauf (letzte 100 Ticks)',
     priceHistoryEmpty: 'Noch kein Preisverlauf verfügbar.',
+    tick: 'Tick',
     demandPanel: {
       title: 'Meistgefragte Produkte',
       satisfaction: '{pct}% gedeckt',

@@ -1323,6 +1323,8 @@ export type MockState = {
   } | null
   /** Mock marketOverview data returned by the marketOverview query. Keyed by cityId, or use '__all__' for all-city results. */
   marketOverviewByCityId: Record<string, MockMarketDemandSummary | null>
+  /** Mock marketPriceHistory data, keyed by productTypeId. Returns an empty array when not set. */
+  marketPriceHistoryByProductId: Record<string, MockMarketPriceHistoryPoint[]>
 }
 
 export interface MockMarketDemandSummary {
@@ -1342,6 +1344,14 @@ export interface MockMarketDemandSummary {
     totalRevenue: number
     sellerCount: number
   }>
+}
+
+export interface MockMarketPriceHistoryPoint {
+  tick: number
+  clearingPrice: number
+  totalVolume: number
+  totalRevenue: number
+  sellerCount: number
 }
 
 export interface MockBuildingMarketListing {
@@ -3115,6 +3125,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     marketReports: [],
     supplyChainData: {},
     marketOverviewByCityId: {},
+    marketPriceHistoryByProductId: {},
     buildingMarketListings: [],
     myBuildingListings: [],
     tradeRoutes: [],
@@ -9410,6 +9421,19 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { cityDemandSummary: result } }),
+      })
+    }
+
+    if (query.includes('marketPriceHistory') && !query.includes('marketOverview')) {
+      const productTypeId: string = body.variables?.productTypeId ?? ''
+      const lastNTicks: number = body.variables?.lastNTicks ?? 100
+      const tick = state.gameState.currentTick
+      const history = state.marketPriceHistoryByProductId[productTypeId] ?? []
+      const filtered = history.filter((p) => p.tick >= tick - lastNTicks)
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { marketPriceHistory: filtered } }),
       })
     }
 
