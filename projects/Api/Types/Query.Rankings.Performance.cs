@@ -259,6 +259,37 @@ public sealed partial class Query
             assetValue,
             maxAssetValue,
             currentTick);
+        var pendingProposal = await db.DividendProposals
+            .AsNoTracking()
+            .Where(proposal =>
+                proposal.CompanyId == company.Id
+                && proposal.Status == DividendProposalStatus.Voting
+                && proposal.TotalPayout <= 0m
+                && proposal.VotingCloseTick >= currentTick)
+            .OrderByDescending(proposal => proposal.ProposedAtTick)
+            .FirstOrDefaultAsync();
+        CompanyDividendPolicyProposalResult? pendingDividendProposal = null;
+        if (pendingProposal is not null)
+        {
+            var votes = await db.DividendVotes
+                .AsNoTracking()
+                .Where(vote => vote.ProposalId == pendingProposal.Id)
+                .ToListAsync();
+            pendingDividendProposal = new CompanyDividendPolicyProposalResult
+            {
+                Id = pendingProposal.Id,
+                DividendPercent = decimal.Round(pendingProposal.DividendPerShare * 100m, 2, MidpointRounding.AwayFromZero),
+                VotingCloseTick = pendingProposal.VotingCloseTick,
+                TicksRemaining = Math.Max(0, pendingProposal.VotingCloseTick - currentTick),
+                ForVotes = votes.Where(vote => vote.VoteChoice == DividendVoteChoice.For).Sum(vote => vote.SharesVoted),
+                AgainstVotes = votes.Where(vote => vote.VoteChoice == DividendVoteChoice.Against).Sum(vote => vote.SharesVoted),
+                MyVoteChoice = votes
+                    .Where(vote => vote.VoterAccountId == userId && vote.VoterAccountType == "PERSON")
+                    .OrderByDescending(vote => vote.CastAtTick)
+                    .Select(vote => vote.VoteChoice)
+                    .FirstOrDefault(),
+            };
+        }
 
         return new CompanySettingsResult
         {
@@ -273,6 +304,7 @@ public sealed partial class Query
             AssetFactor = assetFactor,
             AssetValue = assetValue,
             CurrencyCode = ResolvePrimaryCurrencyCode(company),
+            PendingDividendProposal = pendingDividendProposal,
             CitySalarySettings = cities
                 .Select(city =>
                 {
@@ -289,6 +321,55 @@ public sealed partial class Query
                 })
                 .ToList(),
         };
+    }
+
+    [Authorize]
+    public async Task<decimal?> CompanyAdministrationOverhead(
+        Guid companyId,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+        var company = await db.Companies
+            .Include(candidate => candidate.BankAccounts)
+            .Include(candidate => candidate.Buildings)
+            .FirstOrDefaultAsync(candidate => candidate.Id == companyId && candidate.PlayerId == userId);
+        if (company is null)
+        {
+            return null;
+        }
+
+        var allCompanies = await db.Companies
+            .Include(candidate => candidate.BankAccounts)
+            .Include(candidate => candidate.Buildings)
+            .ToListAsync();
+        var allOwnedLots = await db.BuildingLots
+            .Where(lot => lot.OwnerCompanyId.HasValue)
+            .ToListAsync();
+        var companyBuildingIds = allCompanies
+            .SelectMany(candidate => candidate.Buildings)
+            .Select(building => building.Id)
+            .ToList();
+        var allInventories = await db.Inventories
+            .Where(inventory => companyBuildingIds.Contains(inventory.BuildingId))
+            .Include(inventory => inventory.ResourceType)
+            .Include(inventory => inventory.ProductType)
+            .ToListAsync();
+        var companyAssetValues = allCompanies.ToDictionary(
+            candidate => candidate.Id,
+            candidate => ComputeCompanyAssetValue(candidate, allOwnedLots, allInventories));
+        var assetValue = companyAssetValues.GetValueOrDefault(company.Id);
+        var currentTick = await db.GameStates
+            .AsNoTracking()
+            .Select(state => state.CurrentTick)
+            .FirstOrDefaultDeterministicAsync();
+        var maxAssetValue = companyAssetValues.Values.DefaultIfEmpty(0m).Max();
+
+        return CompanyEconomyCalculator.ComputeAdministrationOverheadRate(
+            company,
+            assetValue,
+            maxAssetValue,
+            currentTick);
     }
 
     /// <summary>Gets the current game state (tick, tax info).</summary>

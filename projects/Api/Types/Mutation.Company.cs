@@ -163,6 +163,66 @@ public sealed partial class Mutation
         return company;
     }
 
+    [Authorize]
+    public async Task<CompanyCitySalarySetting> SetCompanySalaryLevel(
+        SetCompanySalaryLevelInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+        var company = await db.Companies
+            .Include(candidate => candidate.CitySalarySettings)
+            .FirstOrDefaultAsync(candidate => candidate.Id == input.CompanyId)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Company not found.")
+                    .SetCode("COMPANY_NOT_FOUND")
+                    .Build());
+        if (company.PlayerId != userId)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Only company owner can set salary levels.")
+                    .SetCode("NOT_OWNER")
+                    .Build());
+        }
+
+        var cityExists = await db.Cities.AnyAsync(city => city.Id == input.CityId);
+        if (!cityExists)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("City not found.")
+                    .SetCode("CITY_NOT_FOUND")
+                    .Build());
+        }
+
+        var multiplier = input.SalaryLevel switch
+        {
+            SalaryLevel.Minimum => 0.5m,
+            SalaryLevel.Standard => 1m,
+            SalaryLevel.Premium => 1.5m,
+            SalaryLevel.Executive => 2m,
+            _ => CompanyEconomyCalculator.DefaultSalaryMultiplier,
+        };
+        var existing = company.CitySalarySettings.FirstOrDefault(setting => setting.CityId == input.CityId);
+        if (existing is null)
+        {
+            existing = new CompanyCitySalarySetting
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                CityId = input.CityId,
+            };
+            db.CompanyCitySalarySettings.Add(existing);
+            company.CitySalarySettings.Add(existing);
+        }
+
+        existing.SalaryMultiplier = CompanyEconomyCalculator.ClampSalaryMultiplier(multiplier);
+        await db.SaveChangesAsync();
+        return existing;
+    }
+
     /// <summary>Places a new building on the game map for a company.</summary>
     [Authorize]
     public async Task<Building> PlaceBuilding(

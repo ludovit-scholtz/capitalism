@@ -4656,11 +4656,66 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     if (query.includes('proposeDividend')) {
       const input = body.variables?.input
       const player = state.players.find((candidate) => candidate.id === state.currentUserId)
-      const stockSymbol = String(input?.stockSymbol ?? '')
-      const company = state.players.flatMap((candidate) => candidate.companies).find((candidate) => stockSymbolForCompany(candidate.id) === stockSymbol)
+      const companyId = String(input?.companyId ?? '')
+      const stockSymbol = companyId ? stockSymbolForCompany(companyId) : String(input?.stockSymbol ?? '')
+      const company =
+        state.players.flatMap((candidate) => candidate.companies).find((candidate) => candidate.id === companyId) ??
+        state.players.flatMap((candidate) => candidate.companies).find((candidate) => stockSymbolForCompany(candidate.id) === stockSymbol)
 
       if (!player || !company) {
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Company not found or not authenticated.' }] }) })
+      }
+
+      const policyDividendPercent = Number(input?.dividendPercent ?? Number.NaN)
+      if (Number.isFinite(policyDividendPercent)) {
+        if (company.playerId !== player.id) {
+          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ extensions: { code: 'NOT_CEO' }, message: 'Only the acting CEO can propose dividend changes.' }] }) })
+        }
+
+        const currentTick = state.gameState.currentTick
+        const hasOpenPolicy = state.dividendProposals.some(
+          (candidate) =>
+            candidate.companyId === company.id &&
+            candidate.status === 'VOTING' &&
+            candidate.totalPayout <= 0 &&
+            candidate.votingCloseTick >= currentTick,
+        )
+        if (hasOpenPolicy) {
+          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ extensions: { code: 'PROPOSAL_ALREADY_PENDING' }, message: 'There is already a pending dividend proposal.' }] }) })
+        }
+
+        const proposalId = `proposal-${Math.random().toString(36).slice(2)}`
+        state.dividendProposals.unshift({
+          id: proposalId,
+          companyId: company.id,
+          stockSymbol: stockSymbolForCompany(company.id),
+          proposedByAccountId: player.id,
+          proposedByAccountType: 'PERSON',
+          dividendPerShare: Number((Math.max(0, Math.min(policyDividendPercent, 100)) / 100).toFixed(4)),
+          totalPayout: 0,
+          status: 'VOTING',
+          outcome: 'PENDING',
+          proposedAtTick: currentTick,
+          votingOpenTick: currentTick,
+          votingCloseTick: currentTick + 120,
+          settledAtTick: null,
+        })
+
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              proposeDividend: {
+                id: proposalId,
+                companyId: company.id,
+                stockSymbol: stockSymbolForCompany(company.id),
+                status: 'VOTING',
+                ticksRemaining: 120,
+              },
+            },
+          }),
+        })
       }
 
       const dividendPerShare = Number(input?.dividendPerShare ?? 0)
@@ -4709,6 +4764,75 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               stockSymbol,
               status: 'VOTING',
               votingCloseTick: currentTick + 10,
+            },
+          },
+        }),
+      })
+    }
+
+    if (query.includes('voteDividend(')) {
+      const input = body.variables?.input
+      const player = state.players.find((candidate) => candidate.id === state.currentUserId)
+      const companyId = String(input?.companyId ?? '')
+      const proposal = state.dividendProposals.find(
+        (candidate) => candidate.companyId === companyId && candidate.status === 'VOTING' && candidate.totalPayout <= 0,
+      )
+      if (!player || !proposal) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'No pending dividend proposal found.' }] }) })
+      }
+
+      const existingVote = state.dividendVotes.find(
+        (candidate) => candidate.proposalId === proposal.id && candidate.voterAccountId === player.id && candidate.voterAccountType === 'PERSON',
+      )
+      if (existingVote) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ extensions: { code: 'ALREADY_VOTED' }, message: 'You have already voted on this proposal.' }] }) })
+      }
+
+      const sharesVoted = state.shareholdings
+        .filter((holding) => holding.companyId === companyId && holding.ownerPlayerId === player.id && holding.shareCount > 0)
+        .reduce((sum, holding) => sum + holding.shareCount, 0)
+      if (sharesVoted <= 0) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Only shareholders can vote.' }] }) })
+      }
+
+      const voteChoice = String(input?.vote ?? '').toUpperCase() === 'REJECT' ? 'AGAINST' : 'FOR'
+      state.dividendVotes.push({
+        id: `vote-${Math.random().toString(36).slice(2)}`,
+        proposalId: proposal.id,
+        voterAccountId: player.id,
+        voterAccountType: 'PERSON',
+        sharesVoted,
+        voteChoice,
+        castAtTick: state.gameState.currentTick,
+      })
+
+      const company = state.players.flatMap((candidate) => candidate.companies).find((candidate) => candidate.id === companyId)
+      const allVotes = state.dividendVotes.filter((candidate) => candidate.proposalId === proposal.id)
+      const forVotes = allVotes.filter((candidate) => candidate.voteChoice === 'FOR').reduce((sum, candidate) => sum + candidate.sharesVoted, 0)
+      const againstVotes = allVotes.filter((candidate) => candidate.voteChoice === 'AGAINST').reduce((sum, candidate) => sum + candidate.sharesVoted, 0)
+      const totalShares = company ? getCompanyTotalShares(company) : 0
+      if (forVotes > totalShares / 2) {
+        proposal.status = 'SETTLED'
+        proposal.settledAtTick = state.gameState.currentTick
+        if (company) {
+          company.dividendPayoutRatio = proposal.dividendPerShare
+        }
+      } else if (againstVotes > totalShares / 2) {
+        proposal.status = 'REJECTED'
+        proposal.settledAtTick = state.gameState.currentTick
+      }
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            voteDividend: {
+              id: proposal.id,
+              status: proposal.status,
+              forVotes,
+              againstVotes,
+              myVoteChoice: voteChoice,
             },
           },
         }),
@@ -6790,20 +6914,54 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               assetFactor,
               assetValue: companyAssetValue,
               currencyCode: primaryCurrencyCode,
-              citySalarySettings: state.cities.map((city) => {
-                const salaryMultiplier = company.citySalaryMultipliers?.[city.id] ?? 1
-                return {
+                citySalarySettings: state.cities.map((city) => {
+                  const salaryMultiplier = company.citySalaryMultipliers?.[city.id] ?? 1
+                  return {
                   cityId: city.id,
                   cityName: city.name,
                   currencyCode: city.currencyCode ?? 'EUR',
                   baseSalaryPerManhour: city.baseSalaryPerManhour,
                   salaryMultiplier,
-                  effectiveSalaryPerManhour: Number((city.baseSalaryPerManhour * salaryMultiplier).toFixed(2)),
-                }
-              }),
+                    effectiveSalaryPerManhour: Number((city.baseSalaryPerManhour * salaryMultiplier).toFixed(2)),
+                  }
+                }),
+                pendingDividendProposal: (() => {
+                  const proposal = state.dividendProposals.find(
+                    (candidate) =>
+                      candidate.companyId === company.id &&
+                      candidate.status === 'VOTING' &&
+                      candidate.totalPayout <= 0 &&
+                      candidate.votingCloseTick >= state.gameState.currentTick,
+                  )
+                  if (!proposal) {
+                    return null
+                  }
+
+                  const votes = state.dividendVotes.filter((candidate) => candidate.proposalId === proposal.id)
+                  const forVotes = votes
+                    .filter((candidate) => candidate.voteChoice === 'FOR')
+                    .reduce((sum, candidate) => sum + candidate.sharesVoted, 0)
+                  const againstVotes = votes
+                    .filter((candidate) => candidate.voteChoice === 'AGAINST')
+                    .reduce((sum, candidate) => sum + candidate.sharesVoted, 0)
+                  const myVote = votes.find(
+                    (candidate) =>
+                      candidate.voterAccountId === player.id &&
+                      candidate.voterAccountType === 'PERSON',
+                  )
+                  return {
+                    id: proposal.id,
+                    dividendPercent: Number((proposal.dividendPerShare * 100).toFixed(2)),
+                    votingCloseTick: proposal.votingCloseTick,
+                    ticksRemaining: Math.max(0, proposal.votingCloseTick - state.gameState.currentTick),
+                    forVotes,
+                    againstVotes,
+                    myVoteChoice: myVote?.voteChoice ?? null,
+                  }
+                })(),
+              },
             },
-          },
-        }),
+          }),
       })
     }
 

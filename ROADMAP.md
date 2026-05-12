@@ -35,6 +35,7 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 - [x] (100%) FX Exchange with Gold Token AMM and liquidity pools is live: players can quote/execute currency swaps, create/add/remove Gold AMM liquidity positions, receive proportional 1% swap-fee accrual, and use the Forex UI route for trading and pool management.
 - [x] (100%) Stock Exchange is live: players can browse listed companies on `/stocks` and `/stock-exchange`, trade shares from personal or company USD settlement accounts, review shareholder pie charts and portfolio holdings, execute hostile takeovers with the explicit `replaceCEO` flow at 50% combined ownership, merge companies at 90% combined ownership, and track Race to the Top progress from the personal ledger.
+- [x] (100%) Company Settings, salary-level governance, and shareholder dividend voting are live: owners can manage per-city salary settings and overhead visibility on `/company/:id/settings`, CEOs can propose dividend-policy changes, shareholders vote with weighted ownership, and approved policies update annual dividend distributions.
 
 ### Consumer Demand & Price Elasticity Engine (Core Economic Simulation)
 

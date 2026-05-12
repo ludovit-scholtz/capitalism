@@ -58,6 +58,12 @@ public sealed class DividendGovernanceSettlementPhase : ITickPhase
                 .Where(vote => vote.VoteChoice == DividendVoteChoice.Against)
                 .Sum(vote => vote.SharesVoted);
 
+            if (proposal.TotalPayout <= 0m)
+            {
+                await SettleDividendPolicyProposalAsync(context, proposal, forVotes, againstVotes, currentTick);
+                continue;
+            }
+
             var passed = forVotes > againstVotes;
             proposal.SettledAtTick = currentTick;
             proposal.SettledAtUtc = DateTime.UtcNow;
@@ -89,6 +95,46 @@ public sealed class DividendGovernanceSettlementPhase : ITickPhase
                     PlayerNotificationType.DividendProposalSettled);
             }
         }
+    }
+
+    private static async Task SettleDividendPolicyProposalAsync(
+        TickContext context,
+        DividendProposal proposal,
+        decimal forVotes,
+        decimal againstVotes,
+        long currentTick)
+    {
+        var threshold = proposal.Company.TotalSharesIssued / 2m;
+        proposal.SettledAtTick = currentTick;
+        proposal.SettledAtUtc = DateTime.UtcNow;
+
+        if (forVotes > threshold)
+        {
+            proposal.Company.DividendPayoutRatio = decimal.Round(
+                Math.Clamp(proposal.DividendPerShare, 0m, 1m),
+                4,
+                MidpointRounding.AwayFromZero);
+            proposal.Status = DividendProposalStatus.Settled;
+            await NotifyShareholdersAsync(
+                context,
+                proposal.CompanyId,
+                currentTick,
+                "Dividend policy approved",
+                $"{proposal.Company.Name} dividend policy was updated to {(proposal.Company.DividendPayoutRatio * 100m):0.##}%.",
+                PlayerNotificationType.DividendProposalSettled);
+            return;
+        }
+
+        proposal.Status = againstVotes > threshold
+            ? DividendProposalStatus.Rejected
+            : DividendProposalStatus.Cancelled;
+        await NotifyShareholdersAsync(
+            context,
+            proposal.CompanyId,
+            currentTick,
+            "Dividend policy vote closed",
+            $"{proposal.Company.Name} dividend policy proposal expired without majority approval.",
+            PlayerNotificationType.DividendProposalSettled);
     }
 
     private static async Task SettleApprovedProposalAsync(
