@@ -2454,6 +2454,7 @@ export default {
     cityFinancialTitle: 'City Financial Breakdown',
     cityFinancialSubtitle: 'Revenue, costs, and profit by city.',
     cityRevenueTrend: 'City revenue trend sparkline',
+    viewPersonalLedger: 'Open personal ledger →',
   },
   companySettings: {
     eyebrow: 'Company Profile',

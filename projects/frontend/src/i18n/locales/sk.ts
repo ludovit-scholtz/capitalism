@@ -2449,6 +2449,7 @@ export default {
     cityFinancialTitle: 'Finančný prehľad podľa miest',
     cityFinancialSubtitle: 'Tržby, náklady a zisk podľa mesta.',
     cityRevenueTrend: 'Trend tržieb mesta',
+    viewPersonalLedger: 'Otvoriť osobný prehľad →',
   },
   companySettings: {
     eyebrow: 'Profil firmy',

@@ -2456,6 +2456,7 @@ export default {
     cityFinancialTitle: 'Finanzübersicht nach Stadt',
     cityFinancialSubtitle: 'Umsatz, Kosten und Gewinn pro Stadt.',
     cityRevenueTrend: 'Umsatztrend der Stadt',
+    viewPersonalLedger: 'Persönliches Hauptbuch öffnen →',
   },
   companySettings: {
     eyebrow: 'Unternehmensprofil',
