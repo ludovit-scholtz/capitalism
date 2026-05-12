@@ -3,6 +3,7 @@ using Api.Configuration;
 using Api.Data;
 using Api.Data.Entities;
 using Api.Security;
+using HotChocolate.CostAnalysis.Types;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -40,6 +41,7 @@ public sealed partial class Query
     /// <remarks>
     /// Read-only query — building configuration plans are applied exclusively by the tick engine.
     /// </remarks>
+    [Cost(30)]
     public async Task<City?> GetCity(Guid id, [Service] AppDbContext db)
     {
         return await db.Cities
@@ -184,6 +186,7 @@ public sealed partial class Query
     /// Within each tier products are sorted alphabetically by name.
     /// </summary>
     [Authorize]
+    [Cost(20)]
     public async Task<List<RankedProductResult>> GetRankedProductTypes(
         Guid buildingId,
         string unitType,

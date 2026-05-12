@@ -4,6 +4,7 @@ using MasterApi.Data;
 using MasterApi.Data.Entities;
 using MasterApi.Utilities;
 using Capitalism.Shared.Security;
+using HotChocolate.CostAnalysis.Types;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -11,6 +12,7 @@ namespace MasterApi.Types;
 
 public sealed partial class Query
 {
+    [Cost(20)]
     public async Task<List<GameServerSummary>> GetGameServers(
         [Service] MasterDbContext db,
         [Service] IOptions<MasterServerOptions> options)
@@ -82,6 +84,7 @@ public sealed partial class Query
         return await BuildGameAdministrationAccessAsync(db, gameAdministrationOptions.Value, email);
     }
 
+    [Cost(25)]
     public async Task<List<GlobalGameAdminGrantInfo>> GetGlobalGameAdminGrants(
         GetGlobalGameAdminGrantsInput input,
         [Service] MasterDbContext db,
@@ -114,6 +117,7 @@ public sealed partial class Query
             })
             .ToListAsync();
     }
+    [Cost(40)]
     public async Task<GameNewsFeedResult> GetGameNewsFeed(
         [Service] MasterDbContext db,
         [Service] IOptions<MasterServerOptions> masterServerOptions,
@@ -525,6 +529,7 @@ public sealed partial class Query
 
     /// <summary>Returns all player accounts with their gold token balances. Requires global admin or root admin.</summary>
     [HotChocolate.Authorization.Authorize]
+    [Cost(20)]
     public async Task<List<GoldTokenBalanceInfo>> GetGoldTokenBalances(
         ClaimsPrincipal claimsPrincipal,
         [Service] MasterDbContext db,
@@ -556,6 +561,7 @@ public sealed partial class Query
 
     /// <summary>Returns recent gold token transactions (audit log). Requires global admin or root admin.</summary>
     [HotChocolate.Authorization.Authorize]
+    [Cost(35)]
     public async Task<List<GoldTokenTransactionInfo>> GetGoldTokenTransactions(
         ClaimsPrincipal claimsPrincipal,
         [Service] MasterDbContext db,

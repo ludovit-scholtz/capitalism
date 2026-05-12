@@ -23,9 +23,11 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
     private const string SharedJwtSigningKey = "ChangeThisSigningKeyBeforeProduction123!";
 
     private readonly HttpClient _client;
+    private readonly MasterApiWebApplicationFactory _factory;
 
     public MasterApiIntegrationTests(MasterApiWebApplicationFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateClient();
     }
 
@@ -49,6 +51,137 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
         var body = await response.Content.ReadAsStringAsync();
         var doc = JsonDocument.Parse(body);
         return doc.RootElement.Clone();
+    }
+
+    private static async Task<(int StatusCode, JsonElement Body)> GraphQlRawAsync(
+        HttpClient client,
+        string query,
+        object? variables = null,
+        string? token = null)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/graphql");
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(new { query, variables }),
+            Encoding.UTF8,
+            "application/json");
+
+        if (token is not null)
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await client.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+        var doc = JsonDocument.Parse(body);
+        return ((int)response.StatusCode, doc.RootElement.Clone());
+    }
+
+    [Fact]
+    public async Task GraphQl_MaxDepthExceeded_ReturnsStructuredErrorCode()
+    {
+        using var limitedFactory = _factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.ConfigureAppConfiguration((_, config) =>
+            {
+                config.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["GraphQL:MaxDepth"] = "3",
+                });
+            });
+        });
+        using var client = limitedFactory.CreateClient();
+
+        var (_, result) = await GraphQlRawAsync(client, """
+            query {
+              gameNewsFeed(input: { serverKey: "", limit: 5 }) {
+                items {
+                  localizations {
+                    locale
+                  }
+                }
+              }
+            }
+            """);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Contains("MAX_DEPTH_EXCEEDED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task GraphQl_MaxComplexityExceeded_ReturnsStructuredErrorCode()
+    {
+        await RegisterDefaultGameServerAsync();
+
+        var (_, result) = await GraphQlRawAsync(_client, """
+            query {
+              a1: gameServers { id }
+              a2: gameServers { id }
+              a3: gameServers { id }
+              a4: gameServers { id }
+              a5: gameServers { id }
+              a6: gameServers { id }
+              a7: gameServers { id }
+              a8: gameServers { id }
+              a9: gameServers { id }
+              a10: gameServers { id }
+              a11: gameServers { id }
+              a12: gameServers { id }
+              a13: gameServers { id }
+              a14: gameServers { id }
+              a15: gameServers { id }
+              a16: gameServers { id }
+              a17: gameServers { id }
+              a18: gameServers { id }
+              a19: gameServers { id }
+              a20: gameServers { id }
+              a21: gameServers { id }
+              a22: gameServers { id }
+              a23: gameServers { id }
+              a24: gameServers { id }
+              a25: gameServers { id }
+              a26: gameServers { id }
+              a27: gameServers { id }
+              a28: gameServers { id }
+              a29: gameServers { id }
+              a30: gameServers { id }
+              a31: gameServers { id }
+              a32: gameServers { id }
+              a33: gameServers { id }
+              a34: gameServers { id }
+              a35: gameServers { id }
+              a36: gameServers { id }
+              a37: gameServers { id }
+              a38: gameServers { id }
+              a39: gameServers { id }
+              a40: gameServers { id }
+              a41: gameServers { id }
+              a42: gameServers { id }
+              a43: gameServers { id }
+              a44: gameServers { id }
+              a45: gameServers { id }
+              a46: gameServers { id }
+              a47: gameServers { id }
+              a48: gameServers { id }
+              a49: gameServers { id }
+              a50: gameServers { id }
+              a51: gameServers { id }
+            }
+            """);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Contains("MAX_COMPLEXITY_EXCEEDED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task GraphQl_Introspection_DisabledOutsideDevelopment_ReturnsForbidden()
+    {
+        var (_, result) = await GraphQlRawAsync(_client, """
+            query {
+              __type(name: "Query") { name }
+            }
+            """);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Contains("FORBIDDEN", errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
     private async Task RegisterDefaultGameServerAsync()
