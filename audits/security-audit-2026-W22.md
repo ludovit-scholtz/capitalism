@@ -76,7 +76,7 @@ This audit (W22) verified the closure status of all W21 open findings and perfor
 - **Description:** The game frontend (`projects/frontend`) serves security headers via `nginx.conf`: HSTS, CSP (with SHA hash), X-Frame-Options DENY, X-Content-Type-Options nosniff, X-XSS-Protection, and Referrer-Policy. The master portal (`projects/master-frontend`) has no equivalent configuration. When deployed, the master portal will be served without these browser protections, making it vulnerable to clickjacking, MIME-sniffing, and SSL-stripping attacks.
 - **OWASP:** A05 — Security Misconfiguration
 - **Recommended fix:** Add an `nginx.conf` (or a `Dockerfile` that includes one) for the master-frontend with the same security header set as the game frontend. The CSP may need to be adapted for any inline scripts in the master portal's build.
-- **Status:** Open <!-- issue: #441 -->
+- **Status:** Resolved <!-- issue: #441 -->
 
 ### 3) No JWT Session Revocation Mechanism
 - **Severity:** Low

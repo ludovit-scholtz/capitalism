@@ -9,6 +9,7 @@
     "build-only": "vite build",
     "preview": "vite preview --port 4174",
     "test:unit": "vitest run",
+    "test:security-headers": "node scripts/verify-security-headers.mjs",
     "test:e2e": "playwright test",
     "type-check": "vue-tsc --build",
     "lint": "run-s lint:*",

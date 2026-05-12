@@ -46,6 +46,10 @@ jobs:
         run: npm run test:unit
         working-directory: ${{ env.PROJECT_PATH }}
 
+      - name: Verify security headers
+        run: npm run test:security-headers
+        working-directory: ${{ env.PROJECT_PATH }}
+
   e2e:
     name: Playwright E2E Tests
     runs-on: ubuntu-latest
