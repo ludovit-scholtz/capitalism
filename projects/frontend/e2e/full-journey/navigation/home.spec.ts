@@ -236,7 +236,7 @@ test.describe('Header navigation', () => {
     })
     await authenticate(page, `token-${player.id}`)
     await page.goto('/')
-    await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Dashboard', exact: true })).toBeVisible()
     await expect(page.getByRole('banner').getByText(player.displayName)).toBeVisible()
   })
 

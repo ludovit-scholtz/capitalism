@@ -9,6 +9,7 @@ import CityLotDetailPanel from '@/components/cityMap/CityLotDetailPanel.vue'
 import CityMediaHousesSection from '@/components/cityMap/CityMediaHousesSection.vue'
 import CityPowerPlanningSection from '@/components/cityMap/CityPowerPlanningSection.vue'
 import HealthIndicatorsPanel from '@/components/cityMap/HealthIndicatorsPanel.vue'
+import CityDemandPanel from '@/components/cityMap/CityDemandPanel.vue'
 import type { City, BuildingLot, Company, PurchaseLotResult, CityMediaHouseInfo, CityWeatherForecast, CityPowerBalance, CityEconomicReportResult } from '@/types'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -276,6 +277,7 @@ onUnmounted(() => {
 
   <CityMediaHousesSection :media-houses="cityMediaHouses" :loading="mediaHousesLoading" />
   <CityPowerPlanningSection :city-weather="cityWeather" :city-power-balance="cityPowerBalance" />
+  <CityDemandPanel :city-id="cityId" :currency-code="city.currencyCode ?? 'EUR'" :top-n="5" :last-n-ticks="100" />
   <section class="city-economic-health-section">
     <h2 class="section-heading">{{ t('cityHealth.panelTitle') }}</h2>
     <HealthIndicatorsPanel :data="cityEconomicReport" :loading="economicReportLoading" />

@@ -1745,6 +1745,62 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         }
 
     [Fact]
+    public async Task SyncPersonalAccountNameFromMaster_Unauthenticated_WrongRegistrationKey_ReturnsInvalidRegistrationKeyError()
+    {
+        const string mutation = """
+            mutation SyncPersonalAccountNameFromMaster($input: SyncPersonalAccountNameFromMasterInput!) {
+                syncPersonalAccountNameFromMaster(input: $input) {
+                    playerFound
+                }
+            }
+            """;
+
+        var result = await ExecuteGraphQlAsync(mutation, new
+        {
+            input = new
+            {
+                registrationKey = "completely-wrong-registration-key",
+                serverKey = "capitalism-local",
+                playerEmail = "any@example.com",
+                personalAccountName = "Any Name",
+            },
+        });
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.NotEqual(0, errors.GetArrayLength());
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("INVALID_REGISTRATION_KEY", code);
+    }
+
+    [Fact]
+    public async Task SyncPersonalAccountNameFromMaster_WrongPlayer_WrongServerKey_Rejected()
+    {
+        const string mutation = """
+            mutation SyncPersonalAccountNameFromMaster($input: SyncPersonalAccountNameFromMasterInput!) {
+                syncPersonalAccountNameFromMaster(input: $input) {
+                    playerFound
+                }
+            }
+            """;
+
+        var result = await ExecuteGraphQlAsync(mutation, new
+        {
+            input = new
+            {
+                registrationKey = "local-master-registration-key",
+                serverKey = "wrong-server-key",
+                playerEmail = "any@example.com",
+                personalAccountName = "Any Name",
+            },
+        });
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.NotEqual(0, errors.GetArrayLength());
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("INVALID_SERVER_KEY", code);
+    }
+
+    [Fact]
     public async Task LegacySensitiveDisplayName_PublicIdentitySurfaces_UseSanitizedAlias()
     {
         var email = $"legacy-surface-{Guid.NewGuid():N}@example.com";

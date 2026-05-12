@@ -13996,6 +13996,224 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await expect(applyBtn).toBeEnabled()
   })
 
+  test('price recommendation badge shows competitive when price is at or below market', async ({ page }) => {
+    const { player } = makeShopPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    // makeShopPlayer unit has minPrice = 67.5 (basePrice 45 × 1.5)
+    // Market clearing price set higher → player price (67.5) ≤ market (80) → "Competitive"
+    const analytics: MockPublicSalesAnalytics = {
+      buildingUnitId: 'unit-shop-mi-ps',
+      buildingId: 'building-shop-mi',
+      buildingName: 'Market Intel Shop',
+      cityName: 'Bratislava',
+      totalRevenue: 800,
+      totalQuantitySold: 20,
+      averagePricePerUnit: 67.5,
+      currentSalesCapacity: 80,
+      dataFromTick: 1,
+      dataToTick: 5,
+      demandSignal: 'MODERATE',
+      actionHint: 'Hold steady.',
+      recentUtilization: 0.7,
+      revenueHistory: [],
+      priceHistory: [],
+      marketShare: [],
+      elasticityIndex: null,
+      unmetDemandShare: null,
+      populationIndex: null,
+      inventoryQuality: null,
+      brandAwareness: null,
+      totalProfit: null,
+      profitHistory: null,
+      demandDrivers: [],
+      cityMarketClearingPrice: 80, // 67.5 ≤ 80 → competitive
+    }
+    state.publicSalesAnalytics['unit-shop-mi-ps'] = analytics
+
+    await page.goto('/building/building-shop-mi')
+    const activeSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
+      .first()
+    const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
+    await psCell.click()
+    await clickUnitTab(page, 'Quick Actions')
+
+    const badge = page.locator('.price-recommendation-badge')
+    await expect(badge).toBeVisible()
+    await expect(badge.locator('.price-rec-label')).toContainText('Competitive')
+  })
+
+  test('price recommendation badge shows slightly above market when 10-30% over', async ({ page }) => {
+    const { player } = makeShopPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    // makeShopPlayer unit has minPrice = 67.5 (basePrice 45 × 1.5)
+    // Market clearing price 60: 67.5 > 60 (not competitive) and 67.5 ≤ 60*1.3=78 (slightly above)
+    const analytics: MockPublicSalesAnalytics = {
+      buildingUnitId: 'unit-shop-mi-ps',
+      buildingId: 'building-shop-mi',
+      buildingName: 'Market Intel Shop',
+      cityName: 'Bratislava',
+      totalRevenue: 1350,
+      totalQuantitySold: 20,
+      averagePricePerUnit: 67.5,
+      currentSalesCapacity: 80,
+      dataFromTick: 1,
+      dataToTick: 5,
+      demandSignal: 'MODERATE',
+      actionHint: 'Consider lowering price.',
+      recentUtilization: 0.5,
+      revenueHistory: [],
+      priceHistory: [],
+      marketShare: [],
+      elasticityIndex: null,
+      unmetDemandShare: null,
+      populationIndex: null,
+      inventoryQuality: null,
+      brandAwareness: null,
+      totalProfit: null,
+      profitHistory: null,
+      demandDrivers: [],
+      cityMarketClearingPrice: 60, // 67.5 > 60 and 67.5 ≤ 78 → amber
+    }
+    state.publicSalesAnalytics['unit-shop-mi-ps'] = analytics
+
+    await page.goto('/building/building-shop-mi')
+    const activeSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
+      .first()
+    const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
+    await psCell.click()
+    await clickUnitTab(page, 'Quick Actions')
+
+    const badge = page.locator('.price-recommendation-badge')
+    await expect(badge).toBeVisible()
+    await expect(badge.locator('.price-rec-label')).toContainText('Slightly above market')
+  })
+
+  test('price recommendation badge shows overpriced when more than 30% over market', async ({ page }) => {
+    const { player } = makeShopPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    // makeShopPlayer unit has minPrice = 67.5 (basePrice 45 × 1.5)
+    // Market clearing price 45: 67.5 > 45*1.3=58.5 → overpriced
+    const analytics: MockPublicSalesAnalytics = {
+      buildingUnitId: 'unit-shop-mi-ps',
+      buildingId: 'building-shop-mi',
+      buildingName: 'Market Intel Shop',
+      cityName: 'Bratislava',
+      totalRevenue: 1350,
+      totalQuantitySold: 20,
+      averagePricePerUnit: 67.5,
+      currentSalesCapacity: 80,
+      dataFromTick: 1,
+      dataToTick: 5,
+      demandSignal: 'WEAK',
+      actionHint: 'Lower price urgently.',
+      recentUtilization: 0.3,
+      revenueHistory: [],
+      priceHistory: [],
+      marketShare: [],
+      elasticityIndex: null,
+      unmetDemandShare: null,
+      populationIndex: null,
+      inventoryQuality: null,
+      brandAwareness: null,
+      totalProfit: null,
+      profitHistory: null,
+      demandDrivers: [],
+      cityMarketClearingPrice: 45, // 67.5 > 45*1.3=58.5 → red
+    }
+    state.publicSalesAnalytics['unit-shop-mi-ps'] = analytics
+
+    await page.goto('/building/building-shop-mi')
+    const activeSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
+      .first()
+    const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
+    await psCell.click()
+    await clickUnitTab(page, 'Quick Actions')
+
+    const badge = page.locator('.price-recommendation-badge')
+    await expect(badge).toBeVisible()
+    await expect(badge.locator('.price-rec-label')).toContainText('Overpriced')
+  })
+
+  test('price recommendation badge shows no-data state when cityMarketClearingPrice is null', async ({ page }) => {
+    const { player } = makeShopPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    const analytics: MockPublicSalesAnalytics = {
+      buildingUnitId: 'unit-shop-mi-ps',
+      buildingId: 'building-shop-mi',
+      buildingName: 'Market Intel Shop',
+      cityName: 'Bratislava',
+      totalRevenue: 0,
+      totalQuantitySold: 0,
+      averagePricePerUnit: 0,
+      currentSalesCapacity: 40,
+      dataFromTick: 0,
+      dataToTick: 0,
+      demandSignal: 'NO_DATA',
+      actionHint: 'No data yet.',
+      recentUtilization: 0,
+      revenueHistory: [],
+      priceHistory: [],
+      marketShare: [],
+      elasticityIndex: null,
+      unmetDemandShare: null,
+      populationIndex: null,
+      inventoryQuality: null,
+      brandAwareness: null,
+      totalProfit: null,
+      profitHistory: null,
+      demandDrivers: [],
+      cityMarketClearingPrice: null, // no market data yet
+    }
+    state.publicSalesAnalytics['unit-shop-mi-ps'] = analytics
+
+    await page.goto('/building/building-shop-mi')
+    const activeSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
+      .first()
+    const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
+    await psCell.click()
+    await clickUnitTab(page, 'Quick Actions')
+
+    const badge = page.locator('.price-recommendation-badge')
+    await expect(badge).toBeVisible()
+    await expect(badge).toContainText('No market data yet')
+  })
+
   test('shows gross profit metric and profit chart when profitHistory is provided', async ({ page }) => {
     const { player, chairProduct } = makeShopPlayer()
 

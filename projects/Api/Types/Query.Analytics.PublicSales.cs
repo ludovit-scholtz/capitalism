@@ -332,6 +332,29 @@ public sealed partial class Query
             cityAveragePrice = Math.Round(productTypeForAnalytics.BasePrice * fxRate, 2);
         }
 
+        // ── City-wide market clearing price ─────────────────────────────────────
+        // Compute a weighted-average clearing price across ALL sellers for the same
+        // product+city in the last 100 ticks.  This is the reference used by the
+        // price recommendation widget (green ≤ market, amber 10–30% above, red >30%).
+        decimal? cityMarketClearingPrice = null;
+        if (resolvedProductTypeId.HasValue && city is not null)
+        {
+            const int MarketPriceWindow = 100;
+            var marketWindowStart = dataToTick - MarketPriceWindow;
+            var marketRecords = await db.PublicSalesRecords
+                .AsNoTracking()
+                .Where(r => r.CityId == city.Id
+                         && r.ProductTypeId == resolvedProductTypeId.Value
+                         && r.Tick >= marketWindowStart)
+                .ToListAsync();
+            if (marketRecords.Count > 0)
+            {
+                var totalVol = marketRecords.Sum(r => r.QuantitySold);
+                var totalRev = marketRecords.Sum(r => r.Revenue);
+                cityMarketClearingPrice = totalVol > 0 ? Math.Round(totalRev / totalVol, 2) : null;
+            }
+        }
+
         // ── Seasonal outlook ─────────────────────────────────────────────────────
         // Load DemandSeasonality for the resolved product type and build a SeasonalOutlook
         // that the frontend can render without further computation.
@@ -433,6 +456,7 @@ public sealed partial class Query
             TrendFactor = currentTrendFactor,
             CityCurrencyCode = city?.CurrencyCode ?? "EUR",
             CityAveragePrice = cityAveragePrice,
+            CityMarketClearingPrice = cityMarketClearingPrice,
             SeasonalOutlook = seasonalOutlook,
         };
     }

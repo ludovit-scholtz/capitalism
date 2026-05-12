@@ -177,6 +177,7 @@ const mobileNavSections = computed(() => {
         { key: 'banking', label: t('nav.banking'), to: '/banking', icon: ['fas', 'landmark'], visible: true, badge: 0 },
         { key: 'bank-statement', label: t('nav.bankStatement'), to: '/bank-statement', icon: ['fas', 'file-invoice-dollar'], visible: auth.isAuthenticated, badge: 0 },
         { key: 'campaigns', label: t('nav.campaignAnalytics'), to: '/market-intelligence', icon: ['fas', 'bullhorn'], visible: auth.isAuthenticated, badge: 0 },
+        { key: 'market-dashboard', label: t('nav.marketDashboard'), to: '/market', icon: ['fas', 'chart-pie'], visible: true, badge: 0 },
         { key: 'trade-routes', label: t('tradeRoutes.nav'), to: '/trade-routes', icon: ['fas', 'route'], visible: auth.isAuthenticated, badge: 0 },
       ],
     },
@@ -279,6 +280,9 @@ useTickRefresh(async () => {
           </RouterLink>
           <RouterLink v-if="auth.isAuthenticated" to="/market-intelligence" :title="t('nav.campaignAnalytics')" class="nav-link" @click="closeMenu">
             <font-awesome-icon :icon="['fas', 'bullhorn']" class="mr-2" />
+          </RouterLink>
+          <RouterLink to="/market" :title="t('nav.market')" :aria-label="t('nav.marketDashboard')" class="nav-link" @click="closeMenu">
+            <font-awesome-icon :icon="['fas', 'chart-pie']" class="mr-2" />
           </RouterLink>
           <RouterLink to="/banking" :title="t('nav.banking')" class="nav-link" @click="closeMenu">
             <font-awesome-icon :icon="['fas', 'landmark']" class="mr-2" />
@@ -462,7 +466,7 @@ useTickRefresh(async () => {
 
 .desktop-nav-links {
   display: flex;
-  gap: 1.5rem;
+  gap: 1.25rem;
 }
 
 .nav-link {

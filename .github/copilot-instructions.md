@@ -1668,3 +1668,19 @@ Root-cause of a quality gap (May 2026, PR #437 follow-up):
 1. **When product owner requests merge-conflict resolution, always unshallow/fetch `origin/main` first and merge/rebase immediately before claiming completion.**
 2. **After resolving conflicts, scan edited roadmap/checklist files for duplicate items with opposite states (`[x]` and `[ ]`) and keep only the canonical current state.**
 3. **For merge-fix sessions, re-check branch CI statuses on the new head SHA (not the previous head) before replying to review comments.**
+
+## Nav link title conflicts — `aria-label` overrides `title` for Playwright accessible name
+
+Root-cause of repeated CI failures (May 2026, PR #451 Market Dashboard):
+- The Market nav link was added with `title="Market Dashboard"`. The Dashboard nav link already had `title="Dashboard"`.
+- Playwright's `getByRole('link', { name: 'Dashboard' })` does **partial** matching by default — "Market Dashboard" contains "Dashboard", so it matched both links, causing a strict-mode violation.
+- Even after switching to `title="Market"` and adding `aria-label="Market Dashboard"`, the aria-label made the accessible name "Market Dashboard" again (aria-label overrides title for accessible name computation).
+- Only using `{ name: 'Dashboard', exact: true }` in the E2E test reliably distinguishes the Dashboard link from the Market Dashboard link.
+- The responsive-layout overflow was triggered at 1920px by the extra nav icon; reducing `.desktop-nav-links` gap from `1.5rem` to `1.25rem` fixed it.
+
+**Rules to prevent recurrence:**
+1. **When adding a nav link whose title/aria-label contains an existing nav item's name as a substring, immediately add `exact: true` to all E2E selectors that target the original nav item.** Example: adding "Market Dashboard" requires updating `{ name: 'Dashboard' }` → `{ name: 'Dashboard', exact: true }`.
+2. **`aria-label` takes precedence over `title` for accessible name computation.** If a link has both, `getByRole` uses the `aria-label` value. Plan nav-link accessible names to avoid substring conflicts.
+3. **When a new nav icon is added, run the responsive-layout E2E test at 1920px viewport immediately** (`npx playwright test responsive-layout`) to confirm no overflow. If overflow occurs, reduce the `.desktop-nav-links` gap.
+4. **Before declaring nav changes "done", run both `home.spec.ts` and `responsive-layout.spec.ts`** — they are the canonical checks for nav strict-mode violations and layout overflow.
+5. **Always merge `origin/main` into the PR branch at the start of every session** to catch conflicts early, especially in shared files like `AppHeader.vue`, locale files, and `mock-api.ts`.

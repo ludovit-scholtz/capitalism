@@ -176,6 +176,13 @@ export interface PublicSalesAnalytics {
    * Null when no DemandSeasonality data exists for the product (defaults to 1.0× demand).
    */
   seasonalOutlook: SeasonalOutlook | null
+  /**
+   * City-wide market clearing price for this product (weighted average across all sellers)
+   * in the last 100 ticks, expressed in the city's local currency.
+   * Used by the price recommendation badge: green ≤ market, amber 10–30% above, red >30%.
+   * Null when no city-wide sales data exists yet.
+   */
+  cityMarketClearingPrice: number | null
 }
 
 /** Per-tick cost and production snapshot for a MANUFACTURING unit. */
@@ -442,4 +449,48 @@ export interface MediaHouseStatsResult {
   estimatedSalesImpact: number
   boostHistory: MediaHouseBoostHistoryPoint[]
   units: MediaHouseUnitState[]
+}
+
+// ── Market Dashboard types ────────────────────────────────────────────────
+
+export interface MarketPriceResult {
+  cityId: string
+  productTypeId: string
+  productName: string
+  clearingPrice: number
+  totalVolume: number
+  totalRevenue: number
+  sellerCount: number
+  currencyCode: string
+  fromTick: number
+  toTick: number
+}
+
+export interface MarketPriceHistoryPoint {
+  tick: number
+  clearingPrice: number
+  totalVolume: number
+  totalRevenue: number
+  sellerCount: number
+}
+
+export interface ProductDemandEntry {
+  productTypeId: string
+  productName: string
+  industry: string
+  totalDemand: number
+  totalQuantitySold: number
+  satisfactionRate: number
+  averageClearingPrice: number
+  totalRevenue: number
+  sellerCount: number
+}
+
+export interface CityDemandSummaryResult {
+  cityId: string
+  cityName: string
+  currencyCode: string
+  fromTick: number
+  toTick: number
+  products: ProductDemandEntry[]
 }
