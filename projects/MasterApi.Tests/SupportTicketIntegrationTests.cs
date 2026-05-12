@@ -13,7 +13,7 @@ public sealed class SupportTicketIntegrationTests : IClassFixture<MasterApiWebAp
 {
     private const string SharedJwtIssuer = "Capitalism";
     private const string SharedJwtAudience = "Capitalism";
-    private const string SharedJwtSigningKey = "ChangeThisSigningKeyBeforeProduction123!";
+    private const string SharedJwtSigningKey = "TestingOnlyStrongSigningKey0123456789ABCDEF!";
 
     private readonly HttpClient _client;
 

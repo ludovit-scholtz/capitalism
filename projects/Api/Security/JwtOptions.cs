@@ -5,6 +5,7 @@ namespace Api.Security;
 public sealed class JwtOptions
 {
     public const string SectionName = "Jwt";
+    public const string DefaultSigningKey = "ChangeThisSigningKeyBeforeProduction123!";
 
     [Required]
     public string Issuer { get; init; } = "Capitalism";
@@ -14,7 +15,7 @@ public sealed class JwtOptions
 
     [Required]
     [MinLength(32)]
-    public string SigningKey { get; init; } = "ChangeThisSigningKeyBeforeProduction123!";
+    public string SigningKey { get; init; } = DefaultSigningKey;
 
     [Range(5, 1440)]
     public int ExpiresMinutes { get; init; } = 120;

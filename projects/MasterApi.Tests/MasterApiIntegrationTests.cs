@@ -20,7 +20,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
 {
     private const string SharedJwtIssuer = "Capitalism";
     private const string SharedJwtAudience = "Capitalism";
-    private const string SharedJwtSigningKey = "ChangeThisSigningKeyBeforeProduction123!";
+    private const string SharedJwtSigningKey = "TestingOnlyStrongSigningKey0123456789ABCDEF!";
 
     private readonly HttpClient _client;
     private readonly MasterApiWebApplicationFactory _factory;
@@ -3964,7 +3964,7 @@ public sealed class JwtStartupGuardTests : IClassFixture<ProductionStartupGuardF
         // silently accepting forgeable tokens.
         var ex = Assert.Throws<InvalidOperationException>(() => _factory.CreateClient());
 
-        Assert.Contains("JWT SigningKey", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("default", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("placeholder or insecure value", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Jwt__SigningKey", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 }

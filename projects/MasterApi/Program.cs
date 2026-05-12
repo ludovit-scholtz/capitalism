@@ -61,18 +61,38 @@ public class Program
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        // Fail fast: prevent using the default JWT signing key in non-Development environments.
-        // If the key has not been changed from the shipped default, tokens could be forged by anyone
-        // who has read this source. Deployment must supply a strong unique key via configuration or
-        // environment variables (Jwt__SigningKey).
-        if (!builder.Environment.IsDevelopment()
-            && !builder.Environment.IsEnvironment("Testing")
-            && string.Equals(jwtOptions.SigningKey, JwtOptions.DefaultSigningKey, StringComparison.Ordinal))
+        using var startupLoggerFactory = LoggerFactory.Create(logging =>
         {
-            throw new InvalidOperationException(
-                "The JWT SigningKey has not been changed from its default value. " +
-                "Set a strong unique secret in the 'Jwt:SigningKey' configuration entry " +
-                "(or environment variable 'Jwt__SigningKey') before running outside Development.");
+            logging.AddConfiguration(builder.Configuration.GetSection("Logging"));
+            logging.AddConsole();
+        });
+        var startupLogger = startupLoggerFactory.CreateLogger("JwtSigningKeyStartupGuard");
+
+        if (JwtSigningKeyStartupGuard.TryGetUnsafeReason(
+                jwtOptions.SigningKey,
+                [JwtOptions.DefaultSigningKey],
+                out var unsafeSigningKeyReason))
+        {
+            if (builder.Environment.IsDevelopment())
+            {
+                startupLogger.LogWarning(
+                    "Development startup with insecure Jwt signing key. Environment={EnvironmentName} Reason={Reason} OverrideEnvironmentVariable={OverrideEnvironmentVariable}",
+                    builder.Environment.EnvironmentName,
+                    unsafeSigningKeyReason,
+                    "Jwt__SigningKey");
+            }
+            else
+            {
+                startupLogger.LogCritical(
+                    "Blocking startup because Jwt signing key is insecure. Environment={EnvironmentName} Reason={Reason} OverrideEnvironmentVariable={OverrideEnvironmentVariable}",
+                    builder.Environment.EnvironmentName,
+                    unsafeSigningKeyReason,
+                    "Jwt__SigningKey");
+                throw new InvalidOperationException(
+                    "Jwt:SigningKey is set to a placeholder or insecure value. " +
+                    "Set a strong secret via environment variable 'Jwt__SigningKey' before starting outside Development. " +
+                    $"Validation reason: {unsafeSigningKeyReason}");
+            }
         }
 
         builder.Services.AddCors(options =>
