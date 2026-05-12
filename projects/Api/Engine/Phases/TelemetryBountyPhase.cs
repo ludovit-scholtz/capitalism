@@ -1,4 +1,5 @@
 using Api.Configuration;
+using Api.Data;
 using Api.Data.Entities;
 using Api.Utilities;
 using Microsoft.EntityFrameworkCore;
@@ -16,6 +17,8 @@ public sealed class TelemetryBountyPhase(
     IMasterRankingTelemetryService telemetry,
     IOptions<MasterServerRegistrationOptions> masterOptions) : ITickPhase
 {
+    private static readonly TimeSpan MaxTelemetryDispatchWait = TimeSpan.FromMilliseconds(250);
+
     public string Name => "TelemetryBounty";
     public int Order => 1050; // After DividendPhase (1010) and before MarketReportPhase
 
@@ -34,10 +37,17 @@ public sealed class TelemetryBountyPhase(
                 kv => playersById.TryGetValue(kv.Value.PlayerId, out var email) ? email : null);
         var playerIdByCompanyId = context.CompaniesById
             .ToDictionary(kv => kv.Key, kv => kv.Value.PlayerId);
+        var governmentCompanyIds = context.CompaniesById.Values
+            .Where(company => playersById.TryGetValue(company.PlayerId, out var email)
+                && string.Equals(email, GovernmentActorConstants.GovernmentEmail, StringComparison.OrdinalIgnoreCase))
+            .Select(company => company.Id)
+            .ToHashSet();
 
-        var tasks = new List<Task>();
+        var queuedTelemetryByEmail = new Dictionary<string, List<(string BountyCode, string ScopeKey)>>(StringComparer.OrdinalIgnoreCase);
         var queuedScopeKeys = new HashSet<string>(StringComparer.Ordinal);
         var pendingBadgesByPlayer = new Dictionary<Guid, HashSet<string>>();
+
+        bool IsCompetitiveCompany(Guid companyId) => !governmentCompanyIds.Contains(companyId);
 
         void QueueBounty(string bountyCode, Guid playerId, string? email)
         {
@@ -52,10 +62,13 @@ public sealed class TelemetryBountyPhase(
                 return;
             }
 
-            tasks.Add(telemetry.ReportEventAsync(
-                bountyCode,
-                email,
-                uniqueScopeKey: scopeKey));
+            if (!queuedTelemetryByEmail.TryGetValue(email, out var playerTelemetry))
+            {
+                playerTelemetry = [];
+                queuedTelemetryByEmail[email] = playerTelemetry;
+            }
+
+            playerTelemetry.Add((bountyCode, scopeKey));
 
             var badgeType = BadgeType.FromBountyCode(bountyCode);
             if (badgeType is null)
@@ -98,6 +111,11 @@ public sealed class TelemetryBountyPhase(
 
         foreach (var companyId in manufacturerCompanyIds)
         {
+            if (!IsCompetitiveCompany(companyId))
+            {
+                continue;
+            }
+
             if (playerIdByCompanyId.TryGetValue(companyId, out var playerId)
                 && playerEmailByCompanyId.TryGetValue(companyId, out var email)
                 && email is not null)
@@ -132,6 +150,11 @@ public sealed class TelemetryBountyPhase(
 
         foreach (var companyId in wholesalerCompanyIds)
         {
+            if (!IsCompetitiveCompany(companyId))
+            {
+                continue;
+            }
+
             if (playerIdByCompanyId.TryGetValue(companyId, out var playerId)
                 && playerEmailByCompanyId.TryGetValue(companyId, out var email)
                 && email is not null)
@@ -148,6 +171,11 @@ public sealed class TelemetryBountyPhase(
 
         foreach (var companyId in researcherCompanyIds)
         {
+            if (!IsCompetitiveCompany(companyId))
+            {
+                continue;
+            }
+
             if (playerIdByCompanyId.TryGetValue(companyId, out var playerId)
                 && playerEmailByCompanyId.TryGetValue(companyId, out var email)
                 && email is not null)
@@ -169,6 +197,7 @@ public sealed class TelemetryBountyPhase(
             foreach (var building in buildings)
             {
                 if (building.OccupancyPercent is > 0
+                    && IsCompetitiveCompany(building.CompanyId)
                     && playerIdByCompanyId.TryGetValue(building.CompanyId, out var playerId)
                     && playerEmailByCompanyId.TryGetValue(building.CompanyId, out var email)
                     && email is not null)
@@ -185,6 +214,7 @@ public sealed class TelemetryBountyPhase(
             foreach (var building in mediaBuildings)
             {
                 if (building.ContentBudgetPerTick is > 0
+                    && IsCompetitiveCompany(building.CompanyId)
                     && playerIdByCompanyId.TryGetValue(building.CompanyId, out var playerId)
                     && playerEmailByCompanyId.TryGetValue(building.CompanyId, out var email)
                     && email is not null)
@@ -200,6 +230,7 @@ public sealed class TelemetryBountyPhase(
         {
             if (outputMw > 0
                 && context.BuildingsById.TryGetValue(plantBuildingId, out var plantBuilding)
+                && IsCompetitiveCompany(plantBuilding.CompanyId)
                 && playerIdByCompanyId.TryGetValue(plantBuilding.CompanyId, out var playerId)
                 && playerEmailByCompanyId.TryGetValue(plantBuilding.CompanyId, out var email)
                 && email is not null)
@@ -213,17 +244,35 @@ public sealed class TelemetryBountyPhase(
         if (context.BuildingsByType.TryGetValue(BuildingType.Bank, out var bankBuildings))
         {
             // External accounts = accounts linked to this bank building but owned by a different company.
-            var externalDepositBankIds = context.Db.BankAccounts
+            var bankBuildingIds = bankBuildings
+                .Select(building => building.Id)
+                .ToHashSet();
+            var externalDepositBankIds = await context.Db.BankAccounts
                 .Where(a => a.BankBuildingId.HasValue
+                    && bankBuildingIds.Contains(a.BankBuildingId.Value)
                     && a.Balance > 0
                     && (a.CompanyId.HasValue || a.PlayerId.HasValue))
-                .Select(a => a.BankBuildingId!.Value)
+                .Join(
+                    context.Db.Buildings.AsNoTracking(),
+                    account => account.BankBuildingId!.Value,
+                    bankBuilding => bankBuilding.Id,
+                    (account, bankBuilding) => new
+                    {
+                        BankBuildingId = account.BankBuildingId!.Value,
+                        account.CompanyId,
+                        account.PlayerId,
+                        BankOwnerCompanyId = bankBuilding.CompanyId,
+                    })
+                .Where(item => item.PlayerId.HasValue
+                    || (item.CompanyId.HasValue && item.CompanyId.Value != item.BankOwnerCompanyId))
+                .Select(item => item.BankBuildingId)
                 .Distinct()
-                .ToHashSet();
+                .ToHashSetAsync();
 
             foreach (var building in bankBuildings)
             {
                 if (externalDepositBankIds.Contains(building.Id)
+                    && IsCompetitiveCompany(building.CompanyId)
                     && playerIdByCompanyId.TryGetValue(building.CompanyId, out var playerId)
                     && playerEmailByCompanyId.TryGetValue(building.CompanyId, out var email)
                     && email is not null)
@@ -244,6 +293,7 @@ public sealed class TelemetryBountyPhase(
         foreach (var buildingId in lenderBuildingIds)
         {
             if (context.BuildingsById.TryGetValue(buildingId, out var lenderBuilding)
+                && IsCompetitiveCompany(lenderBuilding.CompanyId)
                 && playerIdByCompanyId.TryGetValue(lenderBuilding.CompanyId, out var playerId)
                 && playerEmailByCompanyId.TryGetValue(lenderBuilding.CompanyId, out var email)
                 && email is not null)
@@ -261,7 +311,16 @@ public sealed class TelemetryBountyPhase(
 
         foreach (var cityGroup in salaryByCityCompany)
         {
-            var bestEntry = cityGroup
+            var competitiveEntries = cityGroup
+                .Where(x => IsCompetitiveCompany(x.CompanyId))
+                .ToList();
+
+            if (competitiveEntries.Count == 0)
+            {
+                continue;
+            }
+
+            var bestEntry = competitiveEntries
                 .MaxBy(x => x.Setting.SalaryMultiplier);
 
             if (bestEntry.Setting.SalaryMultiplier > 1m
@@ -285,6 +344,11 @@ public sealed class TelemetryBountyPhase(
 
         foreach (var companyId in dividendCompanyIds)
         {
+            if (!IsCompetitiveCompany(companyId))
+            {
+                continue;
+            }
+
             if (playerIdByCompanyId.TryGetValue(companyId, out var playerId)
                 && playerEmailByCompanyId.TryGetValue(companyId, out var email)
                 && email is not null)
@@ -303,7 +367,7 @@ public sealed class TelemetryBountyPhase(
                     .Where(a => a.CompanyId == c.Id)
                     .Sum(a => a.Balance)
             })
-            .Where(x => x.TotalBalance > 0)
+            .Where(x => x.TotalBalance > 0 && IsCompetitiveCompany(x.Company.Id))
             .OrderByDescending(x => x.TotalBalance)
             .Take(10)
             .ToList();
@@ -350,10 +414,47 @@ public sealed class TelemetryBountyPhase(
             }
         }
 
-        // Fire all telemetry events (failures are swallowed inside the service).
-        if (tasks.Count > 0)
+        // Bound telemetry dispatch time so master-server latency never stalls the tick.
+        if (queuedTelemetryByEmail.Count > 0)
         {
-            await Task.WhenAll(tasks);
+            using var dispatchCancellation = new CancellationTokenSource(MaxTelemetryDispatchWait);
+            var dispatchTasks = queuedTelemetryByEmail
+                .Select(kvp => DispatchTelemetryForEmailAsync(
+                    telemetry,
+                    kvp.Key,
+                    kvp.Value,
+                    dispatchCancellation.Token))
+                .ToList();
+
+            await Task.WhenAll(dispatchTasks);
+        }
+    }
+
+    private static async Task DispatchTelemetryForEmailAsync(
+        IMasterRankingTelemetryService telemetry,
+        string email,
+        IReadOnlyList<(string BountyCode, string ScopeKey)> queuedTelemetry,
+        CancellationToken cancellationToken)
+    {
+        foreach (var (bountyCode, scopeKey) in queuedTelemetry)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            try
+            {
+                await telemetry.ReportEventAsync(
+                    bountyCode,
+                    email,
+                    uniqueScopeKey: scopeKey,
+                    cancellationToken: cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
         }
     }
 }

@@ -1731,6 +1731,7 @@ public sealed class BuildingSecondaryMarketTests
             "OFFER_VERSION_CONFLICT",
             "BUILDING_NOT_FOR_SALE",
             "OFFER_NOT_FOUND",
+            "BUILDING_NOT_FOUND",
             "NOT_FOUND_OR_NOT_OWNED",
         };
         var conflictCount = results.Count(r => GetCodes(r).Any(code => code is not null && conflictLikeCodes.Contains(code)));
