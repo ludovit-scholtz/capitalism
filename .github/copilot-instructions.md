@@ -1600,6 +1600,19 @@ Root-cause of a CI gate failure (May 2026, PR #391 security board):
 5. **When adding a new `audits/*.md` file, run `node .github/scripts/audit-board.mjs --gate` locally before committing** to verify the gate would pass. This is a zero-dependency Node.js script with no install required.
 6. **The gate only checks the latest audit file** (lexicographically last `*.md` filename in `audits/`). Older audits with unlinked findings do NOT cause gate failures once a newer audit exists.
 
+## Ranking telemetry duplicate-signature reservation — never rely on check-then-save
+
+Root-cause of a production failure (May 2026, `IX_RankingTelemetryEventSignatures_SignatureHash`):
+- `RankingTelemetryValidator.ValidateAndTrackAsync` used `AnyAsync(signatureHash)` and only queued the `RankingTelemetryEventSignature` insert for a later shared `SaveChangesAsync()` in `MasterRankingService.IngestEventAsync`.
+- Two concurrent identical telemetry ingests could both pass the read check before either wrote the reservation row.
+- PostgreSQL correctly rejected the loser on the unique index with `23505 duplicate key value violates unique constraint "IX_RankingTelemetryEventSignatures_SignatureHash"`, surfacing as a raw `DbUpdateException` from the later event save.
+
+**Rules to prevent recurrence:**
+1. **For ranking telemetry replay protection, reserve the `RankingTelemetryEventSignatures` row immediately, not at the tail end of a later shared save.** `AnyAsync(...)` is only a fast-path rejection; the unique index is the real guard.
+2. **Wrap `Mutation.IngestRankingEvent` in a relational transaction whenever telemetry validation writes a signature reservation and a later ranking-event save must succeed or fail atomically.** If the later event insert fails (for example duplicate proof reference), roll back the signature reservation too.
+3. **Translate `IX_RankingTelemetryEventSignatures_SignatureHash` unique violations into the domain error `DUPLICATE_EVENT_SIGNATURE` instead of leaking a raw `DbUpdateException`.** Persist the duplicate-audit row only after rolling back the failed ingest transaction.
+4. **Keep MasterApi telemetry schema changes code-first.** If this flow ever needs a new column, index, or table, update the C# entity and `MasterDbContext` first, scaffold the PostgreSQL EF migration from `projects/MasterApi`, and let startup apply it automatically. Never hot-fix the PostgreSQL schema first or hand-author migration metadata.
+
 ## Collateral hardening follow-up — race outcomes and lock-copy assertions must match runtime behavior
 
 Root-cause of repeated CI failures (May 2026, PR #379 collateral hardening):

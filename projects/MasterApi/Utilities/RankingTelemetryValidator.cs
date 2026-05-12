@@ -2,6 +2,7 @@ using System.Text.Json;
 using MasterApi.Data;
 using MasterApi.Data.Entities;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace MasterApi.Utilities;
 
@@ -117,6 +118,16 @@ public sealed class RankingTelemetryValidator(MasterDbContext db)
             isSuspicious,
             now);
 
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsSignatureHashUniqueConstraintViolation(ex))
+        {
+            db.ChangeTracker.Clear();
+            throw BuildForbiddenError("Duplicate telemetry signature detected.", RankingTelemetryAuditReason.DuplicateEventSignature);
+        }
+
         return new RankingTelemetryValidationResult
         {
             BatchId = batchId,
@@ -130,6 +141,52 @@ public sealed class RankingTelemetryValidator(MasterDbContext db)
                 ? $"Telemetry flagged for moderation: {suspiciousReasonCode}"
                 : null,
         };
+    }
+
+    public async Task RecordDuplicateSignatureAuditAsync(
+        string serverKey,
+        string eventType,
+        string playerEmail,
+        string? externalEventId,
+        string? uniqueScopeKey,
+        string payloadJson,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedServerKey = serverKey.Trim();
+        var serverKeyHash = ShardKeyProtector.ComputeHash(normalizedServerKey);
+        var maskedServerKey = ShardKeyProtector.Mask(normalizedServerKey);
+        var normalizedPayload = string.IsNullOrWhiteSpace(payloadJson) ? "{}" : payloadJson;
+        var payloadHash = ShardKeyProtector.ComputeHash(normalizedPayload);
+        var nonce = ResolveNonce(externalEventId, uniqueScopeKey);
+        var now = DateTime.UtcNow;
+
+        TrackAudit(
+            Guid.NewGuid(),
+            serverKeyHash,
+            maskedServerKey,
+            eventType,
+            playerEmail,
+            nonce,
+            payloadHash,
+            normalizedPayload,
+            RankingTelemetryAuditReason.DuplicateEventSignature,
+            true,
+            false,
+            now);
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    internal static bool IsDuplicateSignatureError(GraphQLException ex)
+    {
+        return ex.Errors.Any(error => string.Equals(error.Code, RankingTelemetryAuditReason.DuplicateEventSignature, StringComparison.Ordinal));
+    }
+
+    internal static bool IsShardValidationAuditOnlyError(GraphQLException ex)
+    {
+        return ex.Errors.Any(error =>
+            string.Equals(error.Code, RankingTelemetryAuditReason.UnknownShardKey, StringComparison.Ordinal)
+            || string.Equals(error.Code, RankingTelemetryAuditReason.StaleShardKey, StringComparison.Ordinal));
     }
 
     private void TrackAudit(
@@ -278,6 +335,13 @@ public sealed class RankingTelemetryValidator(MasterDbContext db)
         }
 
         return "NO_NONCE";
+    }
+
+    private static bool IsSignatureHashUniqueConstraintViolation(DbUpdateException ex)
+    {
+        return ex.InnerException is PostgresException postgresEx
+            && postgresEx.SqlState == PostgresErrorCodes.UniqueViolation
+            && string.Equals(postgresEx.ConstraintName, "IX_RankingTelemetryEventSignatures_SignatureHash", StringComparison.Ordinal);
     }
 
     private static GraphQLException BuildForbiddenError(string message, string code)
