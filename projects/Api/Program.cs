@@ -274,6 +274,7 @@ public class Program
         builder.Services.AddScoped<IMasterRankingTelemetryService, MasterRankingTelemetryService>();
         builder.Services.AddMemoryCache();
         builder.Services.AddSingleton<ILoginThrottleService, LoginThrottleService>();
+        builder.Services.AddSingleton<IChatRateLimitService, ChatRateLimitService>();
 
         // ── Game tick engine ──
         builder.Services.AddScoped<TickProcessor>();

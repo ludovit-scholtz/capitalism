@@ -22,9 +22,9 @@ public sealed class ChatMessage
     public Player Player { get; set; } = null!;
 
     /// <summary>
-    /// The text content of the message.  Maximum 300 characters.
+    /// The text content of the message.  Maximum 500 characters.
     /// </summary>
-    [Required, MaxLength(300)]
+    [Required, MaxLength(500)]
     public string Message { get; set; } = string.Empty;
 
     /// <summary>UTC timestamp when the message was recorded.</summary>

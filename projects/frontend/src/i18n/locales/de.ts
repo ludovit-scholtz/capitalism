@@ -221,6 +221,9 @@ export default {
     loadFailed: 'Der Chat konnte nicht geladen werden.',
     sendFailed: 'Die Chatnachricht konnte nicht gesendet werden.',
     closeChat: 'Chat schließen',
+    rateLimited: 'Sie senden Nachrichten zu schnell. Bitte warten Sie einen Moment.',
+    messageTooLong: 'Nachricht ist zu lang (max. 500 Zeichen).',
+    charCount: '{current} / {max}',
   },
   home: {
     heroTitle: 'Kapitalismus 5',

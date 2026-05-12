@@ -1,11 +1,17 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
-import { gqlRequest } from '@/lib/graphql'
+import { gqlRequest, GraphQLError } from '@/lib/graphql'
 import { deepEqual } from '@/lib/utils'
 import type { InGameChatMessage } from '@/types'
 
 const CHAT_REFRESH_INTERVAL_MS = 10_000
+
+/** Maximum character length for a single chat message (enforced server-side too). */
+export const MAX_CHAT_LENGTH = 500
+
+/** Character count threshold above which the counter widget becomes visible. */
+export const CHAR_COUNTER_THRESHOLD = 450
 
 /**
  * Shared composable that encapsulates chat message loading and sending.
@@ -27,6 +33,9 @@ export function useChat() {
   let refreshTimer: ReturnType<typeof setInterval> | null = null
 
   const trimmedDraft = computed(() => draftMessage.value.trim())
+  const charCount = computed(() => draftMessage.value.length)
+  const isOverLimit = computed(() => charCount.value > MAX_CHAT_LENGTH)
+  const showCharCounter = computed(() => charCount.value >= CHAR_COUNTER_THRESHOLD)
 
   function formatSentAt(sentAtUtc: string): string {
     return new Intl.DateTimeFormat(locale.value, {
@@ -75,7 +84,7 @@ export function useChat() {
   }
 
   async function sendMessage() {
-    if (!trimmedDraft.value) {
+    if (!trimmedDraft.value || isOverLimit.value) {
       return
     }
 
@@ -94,7 +103,13 @@ export function useChat() {
       draftMessage.value = ''
       await loadMessages(true)
     } catch (reason: unknown) {
-      sendError.value = reason instanceof Error ? reason.message : t('chat.sendFailed')
+      if (reason instanceof GraphQLError && reason.code === 'RATE_LIMITED') {
+        sendError.value = t('chat.rateLimited')
+      } else if (reason instanceof GraphQLError && reason.code === 'MESSAGE_TOO_LONG') {
+        sendError.value = t('chat.messageTooLong')
+      } else {
+        sendError.value = reason instanceof Error ? reason.message : t('chat.sendFailed')
+      }
     } finally {
       sending.value = false
     }
@@ -131,6 +146,9 @@ export function useChat() {
     sendError,
     sending,
     trimmedDraft,
+    charCount,
+    isOverLimit,
+    showCharCounter,
     formatSentAt,
     loadMessages,
     sendMessage,

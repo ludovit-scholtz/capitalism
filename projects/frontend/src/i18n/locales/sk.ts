@@ -221,6 +221,9 @@ export default {
     loadFailed: 'Nepodarilo sa načítať chat.',
     sendFailed: 'Nepodarilo sa odoslať správu.',
     closeChat: 'Zatvoriť chat',
+    rateLimited: 'Správy odosielate príliš rýchlo. Chvíľu počkajte.',
+    messageTooLong: 'Správa je príliš dlhá (max 500 znakov).',
+    charCount: '{current} / {max}',
   },
   home: {
     heroTitle: 'Kapitalizmus 5',
