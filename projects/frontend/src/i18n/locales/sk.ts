@@ -69,6 +69,7 @@ export default {
     buildingMarket: 'Trh budov',
     tutorial: 'Tutoriál',
     marketDashboard: 'Prehľad trhu',
+    market: 'Trh',
     mobileMenuLabel: 'Sekcie mobilného menu',
     sectionMain: 'Hlavné',
     sectionEconomy: 'Ekonomika',

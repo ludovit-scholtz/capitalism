@@ -324,3 +324,101 @@ test('market dashboard renders correctly at mobile viewport', async ({ page }) =
   const bodyWidth = await page.evaluate(() => document.body.scrollWidth)
   expect(bodyWidth).toBeLessThanOrEqual(395) // allow slight tolerance
 })
+
+test('shows all three starter industry products in market table', async ({ page }) => {
+  const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+  const state = setupMockApi(page, { players: [player] })
+  state.currentUserId = player.id
+  state.currentToken = `token-${player.id}`
+  state.marketOverviewByCityId = {
+    'city-ba': {
+      cityId: 'city-ba',
+      cityName: 'Bratislava',
+      currencyCode: 'EUR',
+      fromTick: 0,
+      toTick: 100,
+      products: [
+        {
+          productTypeId: 'pt-wooden-chair',
+          productName: 'Wooden Chair',
+          industry: 'FURNITURE',
+          totalDemand: 500,
+          totalQuantitySold: 450,
+          satisfactionRate: 0.9,
+          averageClearingPrice: 45.0,
+          totalRevenue: 20250.0,
+          sellerCount: 3,
+        },
+        {
+          productTypeId: 'pt-bread',
+          productName: 'Bread',
+          industry: 'FOOD_PROCESSING',
+          totalDemand: 800,
+          totalQuantitySold: 400,
+          satisfactionRate: 0.5,
+          averageClearingPrice: 3.0,
+          totalRevenue: 1200.0,
+          sellerCount: 1,
+        },
+        {
+          productTypeId: 'pt-basic-medicine',
+          productName: 'Basic Medicine',
+          industry: 'HEALTHCARE',
+          totalDemand: 300,
+          totalQuantitySold: 60,
+          satisfactionRate: 0.2,
+          averageClearingPrice: 50.0,
+          totalRevenue: 3000.0,
+          sellerCount: 1,
+        },
+      ],
+    },
+  }
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${player.id}`)
+
+  await page.goto('/market')
+  await expect(page.getByText('Wooden Chair')).toBeVisible()
+  await expect(page.getByText('Bread')).toBeVisible()
+  await expect(page.getByText('Basic Medicine')).toBeVisible()
+})
+
+test('shows severe shortage badge for products below 40% satisfaction', async ({ page }) => {
+  const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+  const state = setupMockApi(page, { players: [player] })
+  state.currentUserId = player.id
+  state.currentToken = `token-${player.id}`
+  state.marketOverviewByCityId = {
+    'city-ba': {
+      cityId: 'city-ba',
+      cityName: 'Bratislava',
+      currencyCode: 'EUR',
+      fromTick: 0,
+      toTick: 100,
+      products: [
+        {
+          productTypeId: 'pt-basic-medicine',
+          productName: 'Basic Medicine',
+          industry: 'HEALTHCARE',
+          totalDemand: 300,
+          totalQuantitySold: 30, // 10% satisfaction → "Scarce"
+          satisfactionRate: 0.1,
+          averageClearingPrice: 50.0,
+          totalRevenue: 1500.0,
+          sellerCount: 1,
+        },
+      ],
+    },
+  }
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${player.id}`)
+
+  await page.goto('/market')
+  await expect(page.getByText('Basic Medicine')).toBeVisible()
+  // 10% satisfaction → "Severe shortage" label (satisfactionPoor)
+  await expect(page.getByText('Severe shortage').first()).toBeVisible()
+})

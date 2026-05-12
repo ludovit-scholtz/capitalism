@@ -694,4 +694,261 @@ public sealed class MarketQueriesTests
             .FirstOrDefaultAsync(b => b.CompanyId == companyId && b.Type == BuildingType.SalesShop);
         return salesShop?.Id;
     }
+
+    // ── Public access (no auth required) ────────────────────────────────────
+
+    [Fact]
+    public async Task MarketPrice_IsAccessibleWithoutAuthToken()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.AsNoTracking().FirstOrDefaultAsync(c => c.Name == "Bratislava");
+        var product = await db.ProductTypes.AsNoTracking().FirstOrDefaultAsync(p => p.Slug == "wooden-chair");
+        Assert.NotNull(city);
+        Assert.NotNull(product);
+
+        // Execute WITHOUT any auth token — marketPrice is a public query.
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            query($cityId: UUID!, $productTypeId: UUID!, $lastNTicks: Int!) {
+              marketPrice(cityId: $cityId, productTypeId: $productTypeId, lastNTicks: $lastNTicks) {
+                clearingPrice
+                currencyCode
+              }
+            }
+            """,
+            new { cityId = city!.Id, productTypeId = product!.Id, lastNTicks = 100 });
+
+        // No auth errors — the query must succeed as a public endpoint.
+        Assert.False(result.TryGetProperty("errors", out _), "marketPrice should be accessible without auth");
+        Assert.Equal(JsonValueKind.Object, result.GetProperty("data").ValueKind);
+    }
+
+    [Fact]
+    public async Task CityDemandSummary_IsAccessibleWithoutAuthToken()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.AsNoTracking().FirstOrDefaultAsync(c => c.Name == "Bratislava");
+        Assert.NotNull(city);
+
+        // Execute WITHOUT any auth token — cityDemandSummary is a public query.
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            query($cityId: UUID!, $topN: Int!, $lastNTicks: Int!) {
+              cityDemandSummary(cityId: $cityId, topN: $topN, lastNTicks: $lastNTicks) {
+                cityName
+                products { productName }
+              }
+            }
+            """,
+            new { cityId = city!.Id, topN = 5, lastNTicks = 100 });
+
+        Assert.False(result.TryGetProperty("errors", out _), "cityDemandSummary should be accessible without auth");
+        Assert.Equal(JsonValueKind.Object, result.GetProperty("data").ValueKind);
+    }
+
+    [Fact]
+    public async Task MarketOverview_IsAccessibleWithoutAuthToken()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        // Execute WITHOUT any auth token — marketOverview is a public query.
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            query($topN: Int!, $lastNTicks: Int!) {
+              marketOverview(topN: $topN, lastNTicks: $lastNTicks) {
+                cityId
+                cityName
+                currencyCode
+              }
+            }
+            """,
+            new { topN = 5, lastNTicks = 100 });
+
+        Assert.False(result.TryGetProperty("errors", out _), "marketOverview should be accessible without auth");
+        var overview = result.GetProperty("data").GetProperty("marketOverview");
+        Assert.Equal(JsonValueKind.Array, overview.ValueKind);
+        Assert.True(overview.GetArrayLength() >= 3, "All 3 seeded cities should be visible without auth");
+    }
+
+    // ── Parameter clamping / filtering tests ─────────────────────────────────
+
+    [Fact]
+    public async Task CityDemandSummary_TopNLimitsResultCount()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.AsNoTracking().FirstOrDefaultAsync(c => c.Name == "Bratislava");
+        Assert.NotNull(city);
+
+        // Seed records for 3 distinct products so the database has multiple candidates.
+        var products = await db.ProductTypes.AsNoTracking().Take(3).ToListAsync();
+        Assert.True(products.Count >= 3, "Need at least 3 product types to test topN");
+
+        var gameState = await db.GameStates.FindAsync(1);
+        Assert.NotNull(gameState);
+        var currentTick = Math.Max(gameState!.CurrentTick, 1500L);
+        gameState.CurrentTick = currentTick;
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = Guid.NewGuid(),
+            Name = "TopN Test Co",
+            Cash = 1_000_000m,
+            FoundedAtUtc = DateTime.UtcNow,
+            FoundedAtTick = 1,
+            TotalSharesIssued = 10_000m,
+            DividendPayoutRatio = 0.2m,
+        };
+        db.Companies.Add(company);
+
+        for (var p = 0; p < 3; p++)
+        {
+            for (var i = 0; i < 3; i++)
+            {
+                db.PublicSalesRecords.Add(new PublicSalesRecord
+                {
+                    Id = Guid.NewGuid(),
+                    BuildingUnitId = Guid.NewGuid(),
+                    BuildingId = Guid.NewGuid(),
+                    CompanyId = company.Id,
+                    CityId = city!.Id,
+                    ProductTypeId = products[p].Id,
+                    Tick = currentTick - 3 + i,
+                    QuantitySold = 10m * (p + 1),
+                    PricePerUnit = 45m,
+                    Revenue = 450m * (p + 1),
+                    Demand = 12m * (p + 1),
+                    SalesCapacity = 20m,
+                    TrendFactor = 1.0m,
+                });
+            }
+        }
+
+        await db.SaveChangesAsync();
+
+        // Request topN=1 — must return exactly 1 product even though 3 are available.
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            query($cityId: UUID!, $topN: Int!, $lastNTicks: Int!) {
+              cityDemandSummary(cityId: $cityId, topN: $topN, lastNTicks: $lastNTicks) {
+                products {
+                  productTypeId
+                  productName
+                }
+              }
+            }
+            """,
+            new { cityId = city!.Id, topN = 1, lastNTicks = 50 });
+
+        var summary = result.GetProperty("data").GetProperty("cityDemandSummary");
+        Assert.NotEqual(JsonValueKind.Null, summary.ValueKind);
+        var productList = summary.GetProperty("products");
+        Assert.Equal(1, productList.GetArrayLength());
+    }
+
+    [Fact]
+    public async Task MarketPrice_LastNTicksFilteringExcludesOldRecords()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.AsNoTracking().FirstOrDefaultAsync(c => c.Name == "Bratislava");
+        var product = await db.ProductTypes.AsNoTracking().FirstOrDefaultAsync(p => p.Slug == "wooden-chair");
+        Assert.NotNull(city);
+        Assert.NotNull(product);
+
+        var gameState = await db.GameStates.FindAsync(1);
+        Assert.NotNull(gameState);
+        var currentTick = Math.Max(gameState!.CurrentTick, 2000L);
+        gameState.CurrentTick = currentTick;
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = Guid.NewGuid(),
+            Name = "LastNTicks Test Co",
+            Cash = 1_000_000m,
+            FoundedAtUtc = DateTime.UtcNow,
+            FoundedAtTick = 1,
+            TotalSharesIssued = 10_000m,
+            DividendPayoutRatio = 0.2m,
+        };
+        db.Companies.Add(company);
+
+        // OLD record — 100 ticks ago (outside a lastNTicks=10 window).
+        db.PublicSalesRecords.Add(new PublicSalesRecord
+        {
+            Id = Guid.NewGuid(),
+            BuildingUnitId = Guid.NewGuid(),
+            BuildingId = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city!.Id,
+            ProductTypeId = product!.Id,
+            Tick = currentTick - 100,
+            QuantitySold = 10m,
+            PricePerUnit = 100m,
+            Revenue = 1000m,
+            Demand = 12m,
+            SalesCapacity = 20m,
+            TrendFactor = 1.0m,
+        });
+
+        // RECENT record — 5 ticks ago (inside the lastNTicks=10 window).
+        db.PublicSalesRecords.Add(new PublicSalesRecord
+        {
+            Id = Guid.NewGuid(),
+            BuildingUnitId = Guid.NewGuid(),
+            BuildingId = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city!.Id,
+            ProductTypeId = product!.Id,
+            Tick = currentTick - 5,
+            QuantitySold = 10m,
+            PricePerUnit = 50m,
+            Revenue = 500m,
+            Demand = 12m,
+            SalesCapacity = 20m,
+            TrendFactor = 1.0m,
+        });
+
+        await db.SaveChangesAsync();
+
+        // lastNTicks=10 window: [currentTick-10, currentTick] — only recent record qualifies.
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            query($cityId: UUID!, $productTypeId: UUID!, $lastNTicks: Int!) {
+              marketPrice(cityId: $cityId, productTypeId: $productTypeId, lastNTicks: $lastNTicks) {
+                clearingPrice
+                totalVolume
+              }
+            }
+            """,
+            new { cityId = city!.Id, productTypeId = product!.Id, lastNTicks = 10 });
+
+        var mp = result.GetProperty("data").GetProperty("marketPrice");
+        Assert.NotEqual(JsonValueKind.Null, mp.ValueKind);
+        // Only the recent record at 50m/unit is within the window — old 100m record is excluded.
+        Assert.Equal(50m, mp.GetProperty("clearingPrice").GetDecimal());
+        Assert.Equal(10m, mp.GetProperty("totalVolume").GetDecimal());
+    }
 }

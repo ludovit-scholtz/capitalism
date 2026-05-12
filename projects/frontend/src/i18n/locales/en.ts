@@ -69,6 +69,7 @@ export default {
     buildingMarket: 'Building Market',
     tutorial: 'Tutorial',
     marketDashboard: 'Market Dashboard',
+    market: 'Market',
     mobileMenuLabel: 'Mobile menu sections',
     sectionMain: 'Main',
     sectionEconomy: 'Economy',

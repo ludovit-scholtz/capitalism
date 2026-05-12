@@ -281,7 +281,7 @@ useTickRefresh(async () => {
           <RouterLink v-if="auth.isAuthenticated" to="/market-intelligence" :title="t('nav.campaignAnalytics')" class="nav-link" @click="closeMenu">
             <font-awesome-icon :icon="['fas', 'bullhorn']" class="mr-2" />
           </RouterLink>
-          <RouterLink to="/market" :title="t('nav.marketDashboard')" class="nav-link" @click="closeMenu">
+          <RouterLink to="/market" :title="t('nav.market')" :aria-label="t('nav.marketDashboard')" class="nav-link" @click="closeMenu">
             <font-awesome-icon :icon="['fas', 'chart-pie']" class="mr-2" />
           </RouterLink>
           <RouterLink to="/banking" :title="t('nav.banking')" class="nav-link" @click="closeMenu">
@@ -466,7 +466,7 @@ useTickRefresh(async () => {
 
 .desktop-nav-links {
   display: flex;
-  gap: 1.5rem;
+  gap: 1.25rem;
 }
 
 .nav-link {
