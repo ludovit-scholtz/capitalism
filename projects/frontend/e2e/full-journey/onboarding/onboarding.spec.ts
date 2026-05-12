@@ -1415,6 +1415,43 @@ test.describe('Onboarding resume and progress persistence', () => {
     await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).toBeVisible()
   })
 
+  test('preserves a custom personal account name across refresh and guest migration', async ({ page }) => {
+    const state = setupMockApi(page)
+
+    await page.goto('/onboarding')
+    await chooseOnboardingCity(page)
+    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
+    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
+
+    const personalNameInput = page.locator('#onboarding-personal-account-name')
+    await expect(personalNameInput).toBeVisible()
+    await personalNameInput.fill('Captain Walnut')
+
+    await page.reload()
+
+    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
+    await expect(personalNameInput).toHaveValue('Captain Walnut')
+
+    await page.locator('.ipo-card', { hasText: 'Starter IPO' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
+    await page.getByRole('button', { name: 'List View' }).click()
+    await chooseStarterFactoryLot(page)
+    await page.getByRole('button', { name: 'Purchase First Factory' }).click()
+
+    await expect(page.getByRole('heading', { name: 'Choose Your First Shop Lot' })).toBeVisible()
+    await page.getByRole('button', { name: 'List View' }).click()
+    await chooseStarterShopLot(page)
+    await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
+
+    await expect(page.getByRole('heading', { name: 'Save Your Progress' })).toBeVisible()
+
+    await authenticateGuestAndMigrate(page, state)
+
+    await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
+    await page.goto('/leaderboard')
+    await expect(page.locator('.rank-card').getByText('Captain Walnut')).toBeVisible()
+  })
+
   test('resumes after first factory purchase and keeps the onboarding company state', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, { players: [player] })
@@ -4729,9 +4766,7 @@ test.describe('Guest save-progress conversion step — city, industry, and keeps
     await page.goto('/onboarding')
     await completeGuestSteps1to4(page)
 
-    await expect(
-      page.getByText(/google drive file creation access is required here/i),
-    ).toBeVisible()
+    await expect(page.getByText(/google drive file creation access is required here/i)).toBeVisible()
   })
 })
 
@@ -5792,9 +5827,7 @@ test.describe('Company name generator — generate, regenerate and edit (AC from
     expect(name.length).toBeGreaterThan(0)
   })
 
-  test('manual name survives IPO card selection and is still shown when returning to step', async ({
-    page,
-  }) => {
+  test('manual name survives IPO card selection and is still shown when returning to step', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/onboarding')
 
@@ -5838,9 +5871,7 @@ test.describe('Company name generator — generate, regenerate and edit (AC from
     expect(words[0]![0]).toBe(words[0]![0]!.toUpperCase())
   })
 
-  test('founder contribution and personal cash cards show the same currency on IPO step', async ({
-    page,
-  }) => {
+  test('founder contribution and personal cash cards show the same currency on IPO step', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/onboarding')
 
@@ -5928,9 +5959,7 @@ test.describe('Company name generator — generate, regenerate and edit (AC from
     expect(words[1]!.length).toBeGreaterThan(0)
   })
 
-  test('custom company name entered by player is submitted to the backend and reflected in factory name on completion', async ({
-    page,
-  }) => {
+  test('custom company name entered by player is submitted to the backend and reflected in factory name on completion', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, { players: [player] })
 
@@ -5971,9 +6000,7 @@ test.describe('Company name generator — generate, regenerate and edit (AC from
     await expect(page.locator('.completion-achievements')).toContainText('Stellar Ventures')
   })
 
-  test('company name is pre-populated from the generated suggestion (not empty) when IPO step first appears', async ({
-    page,
-  }) => {
+  test('company name is pre-populated from the generated suggestion (not empty) when IPO step first appears', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, { players: [player] })
 

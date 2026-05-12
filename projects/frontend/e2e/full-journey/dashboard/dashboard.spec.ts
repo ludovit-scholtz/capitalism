@@ -2831,6 +2831,7 @@ test.describe('Dashboard — personal account panel', () => {
     await page.getByRole('button', { name: 'Save changes' }).click()
 
     await expect(page.getByRole('status')).toContainText('Personal account name updated.')
+    await expect(page.getByLabel('Personal account name')).toHaveValue('Nova Alias')
 
     await page.goto('/leaderboard')
     await expect(page.locator('.rank-card').getByText('Nova Alias')).toBeVisible()

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { gqlRequest } from '@/lib/graphqlMasterServer'
+import { gqlRequest as gqlGameRequest } from '@/lib/graphql'
+import { gqlRequest as gqlMasterRequest } from '@/lib/graphqlMasterServer'
 import { useAuthStore } from '@/stores/auth'
 
 const emit = defineEmits<{
@@ -38,7 +39,7 @@ async function savePersonalAccountName() {
   successMessage.value = null
 
   try {
-    const data = await gqlRequest<{
+    await gqlMasterRequest<{
       updatePersonalAccountName: {
         personalAccountName: string
       }
@@ -55,7 +56,22 @@ async function savePersonalAccountName() {
       },
     )
 
-    const personalAccountName = data.updatePersonalAccountName.personalAccountName
+    const data = await gqlGameRequest<{
+      updateDisplayName: {
+        displayName: string
+      }
+    }>(
+      `mutation UpdateDisplayName($displayName: String!) {
+        updateDisplayName(input: { displayName: $displayName }) {
+          displayName
+        }
+      }`,
+      {
+        displayName: trimmedDraftName.value,
+      },
+    )
+
+    const personalAccountName = data.updateDisplayName.displayName
     if (auth.player) {
       auth.player.displayName = personalAccountName
       auth.player.personalAccountName = personalAccountName
@@ -63,7 +79,6 @@ async function savePersonalAccountName() {
 
     draftName.value = personalAccountName
     successMessage.value = t('dashboard.personalSettingsSaved')
-    await auth.fetchMe()
     emit('saved')
   } catch (error: unknown) {
     errorMessage.value = error instanceof Error ? error.message : t('dashboard.personalSettingsSaveError')

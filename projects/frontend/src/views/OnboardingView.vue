@@ -272,6 +272,12 @@ function regenerateCompanyName() {
 }
 
 function refreshSuggestedPersonalAccountName() {
+  const currentAlias = personalAccountName.value.trim()
+  if (currentAlias && !currentAlias.includes('@')) {
+    personalAccountName.value = currentAlias
+    return
+  }
+
   const existingAlias = (auth.player?.personalAccountName ?? auth.player?.displayName ?? '').trim()
   if (existingAlias && !existingAlias.includes('@')) {
     personalAccountName.value = existingAlias
@@ -543,6 +549,7 @@ function applyRouteSelections() {
   selectedCityId.value = typeof route.query.cityId === 'string' ? route.query.cityId : ''
   selectedFactoryLotId.value = typeof route.query.factoryLotId === 'string' ? route.query.factoryLotId : ''
   selectedShopLotId.value = typeof route.query.shopLotId === 'string' ? route.query.shopLotId : ''
+  personalAccountName.value = typeof route.query.personalAccountName === 'string' ? route.query.personalAccountName : ''
   selectedIpoRaiseTarget.value = parseIpoRaiseTarget(route.query.ipoRaiseTarget)
 }
 
@@ -557,6 +564,7 @@ function buildRouteQuery() {
   if (selectedIpoRaiseTarget.value !== null) query.ipoRaiseTarget = String(selectedIpoRaiseTarget.value)
   if (selectedFactoryLotId.value) query.factoryLotId = selectedFactoryLotId.value
   if (selectedShopLotId.value) query.shopLotId = selectedShopLotId.value
+  if (personalAccountName.value.trim()) query.personalAccountName = personalAccountName.value.trim()
 
   return query
 }
@@ -565,7 +573,7 @@ function isRouteQuerySynced(nextQuery: Record<string, string>): boolean {
   return Object.entries(nextQuery).every(([key, value]) => route.query[key] === value) && Object.keys(route.query).every((key) => nextQuery[key] !== undefined)
 }
 
-watch([step, selectedIndustry, selectedProductId, selectedCityId, selectedIpoRaiseTarget, selectedFactoryLotId, selectedShopLotId], async () => {
+watch([step, selectedIndustry, selectedProductId, selectedCityId, selectedIpoRaiseTarget, selectedFactoryLotId, selectedShopLotId, personalAccountName], async () => {
   if (factoryActionError.value) {
     factoryActionError.value = null
   }
@@ -1326,11 +1334,7 @@ watch(visibleIndustries, () => {
       </div>
       <OnboardingProgressTracker v-if="step < 7" :step="step" />
       <div v-if="error" class="bg-[rgba(248,113,113,0.1)] border border-[rgba(248,113,113,0.3)] text-bad px-4 py-3 rounded-lg text-sm mb-4" role="alert">{{ error }}</div>
-      <div
-        v-if="activeReferralCode"
-        class="referral-onboarding-banner mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200"
-        role="status"
-      >
+      <div v-if="activeReferralCode" class="referral-onboarding-banner mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200" role="status">
         <div class="flex items-start gap-3">
           <span aria-hidden="true" class="text-base">🎁</span>
           <div>
@@ -1339,9 +1343,7 @@ watch(visibleIndustries, () => {
             </p>
             <p class="text-amber-200/80">
               {{ t('onboarding.referralBannerBody') }}
-              <span
-                class="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full border border-amber-300/60 text-[0.65rem] font-bold"
-                :title="t('onboarding.referralBannerTooltip')"
+              <span class="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full border border-amber-300/60 text-[0.65rem] font-bold" :title="t('onboarding.referralBannerTooltip')"
                 >i</span
               >
             </p>
@@ -1456,18 +1458,12 @@ watch(visibleIndustries, () => {
               :placeholder="t('onboarding.companyNamePlaceholder')"
               class="flex-1 min-w-0 px-3 py-2 border border-divider rounded-lg bg-card text-primary focus:outline-none focus:border-brand transition-colors text-sm font-semibold"
             />
-            <button
-              type="button"
-              class="regenerate-name-btn btn btn-secondary text-sm whitespace-nowrap"
-              @click="regenerateCompanyName"
-            >{{ t('onboarding.regenerateName') }}</button>
+            <button type="button" class="regenerate-name-btn btn btn-secondary text-sm whitespace-nowrap" @click="regenerateCompanyName">{{ t('onboarding.regenerateName') }}</button>
           </div>
           <p class="text-xs text-muted m-0">{{ t('onboarding.companyNameHint') }}</p>
         </div>
         <div class="personal-account-name-editor flex flex-col gap-2 p-4 rounded-lg bg-page border border-divider">
-          <label class="text-xs font-semibold text-muted" for="onboarding-personal-account-name">{{
-            t('onboarding.personalAccountNameLabel')
-          }}</label>
+          <label class="text-xs font-semibold text-muted" for="onboarding-personal-account-name">{{ t('onboarding.personalAccountNameLabel') }}</label>
           <div class="flex gap-2 flex-wrap">
             <input
               id="onboarding-personal-account-name"
@@ -1482,7 +1478,9 @@ watch(visibleIndustries, () => {
               class="regenerate-personal-name-btn btn btn-secondary text-sm whitespace-nowrap"
               :title="t('onboarding.regeneratePersonalAccountName')"
               @click="regeneratePersonalAccountName"
-            >🎲</button>
+            >
+              🎲
+            </button>
           </div>
           <p class="text-xs text-amber-400 m-0">{{ t('onboarding.personalAccountNameWarning') }}</p>
         </div>
