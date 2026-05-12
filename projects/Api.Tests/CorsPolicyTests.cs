@@ -28,16 +28,6 @@ public sealed class CorsPolicyTests
     }
 
     [Fact]
-    public void IsOriginAllowed_NonDevelopment_RejectsUnlistedOrigin()
-    {
-        var environment = new TestHostEnvironment("Production");
-
-        var allowed = CorsPolicyHelper.IsOriginAllowed(environment, ["https://app.example.com"], "https://evil.com");
-
-        Assert.False(allowed);
-    }
-
-    [Fact]
     public void IsDevelopmentOpenPolicy_ReturnsTrueInDevelopment()
     {
         var environment = new TestHostEnvironment("Development");

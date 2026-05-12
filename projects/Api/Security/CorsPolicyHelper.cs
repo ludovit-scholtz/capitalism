@@ -28,9 +28,4 @@ public static class CorsPolicyHelper
     {
         return !environment.IsDevelopment() && allowedOrigins.Count == 0;
     }
-
-    public static bool IsOriginAllowed(IHostEnvironment environment, IReadOnlyCollection<string> allowedOrigins, string origin)
-    {
-        return environment.IsDevelopment() || allowedOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase);
-    }
 }
