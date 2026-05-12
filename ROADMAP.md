@@ -20,4 +20,4 @@ Create a fun game in the style of Capitalism II, where players experience realis
 - [x] (100%) Add `Strict-Transport-Security` header to `projects/frontend/nginx.conf` with `max-age=31536000; includeSubDomains`.
 - [x] (100%) Remove `unsafe-inline` from `script-src` in `projects/frontend/nginx.conf` CSP header; verify production Vite bundle works without it and implement nonce-based CSP if inline scripts are required.
 - [x] Implement a time-limited email-based password reset flow (or document OIDC re-linkage as the only recovery path) to prevent permanent player lock-out on credential loss. (100%)
-- [ ] Move `RootAdministratorEmails` and database credentials out of committed `appsettings.json` into environment-variable configuration or a secrets manager.
+- [x] (100%) Move `RootAdministratorEmails` and database credentials out of committed `appsettings.json` into environment-variable configuration or a secrets manager.

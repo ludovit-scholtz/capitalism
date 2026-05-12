@@ -8,5 +8,13 @@ This is attempt to create online mmorpg version of the capitalism game.
 
 ## Security configuration
 
-- Override `Jwt:SigningKey` with a strong secret via environment variable `Jwt__SigningKey` for any non-Development deployment of `projects/Api` and `projects/MasterApi`.
-- Both APIs now fail fast at startup when `Jwt:SigningKey` is placeholder, empty/whitespace, or shorter than 32 characters outside Development.
+- Required secure environment variables are listed in `.env.example`.
+- For non-Development deployments of `projects/Api`, set:
+  - `ConnectionStrings__GameCatalog`
+  - `Jwt__SigningKey` (strong 32+ character secret)
+- For non-Development deployments of `projects/MasterApi`, set:
+  - `ConnectionStrings__MasterCatalog`
+  - `Jwt__SigningKey` (strong 32+ character secret)
+  - `GameAdministration__RootAdministratorEmails__0` (plus indexed entries for additional root admins)
+- Startup now fails fast outside Development/Testing if any of the above values are missing or placeholder values.
+- Recommended secret providers for production: Azure Key Vault, Docker secrets, or Kubernetes Secrets (inject into environment variables at runtime).

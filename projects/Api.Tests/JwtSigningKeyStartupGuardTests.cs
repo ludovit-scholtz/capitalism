@@ -82,9 +82,35 @@ public sealed class ApiJwtSigningKeyStartupGuardHostTests
         Assert.Contains("Jwt:SigningKey is set to a placeholder or insecure value", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void Startup_Production_WithPlaceholderGameCatalogConnectionString_ThrowsInvalidOperation()
+    {
+        using var factory = new ApiJwtSigningKeyGuardFactory(
+            "Production",
+            "ProductionStrongSigningKey0123456789ABCDE!",
+            gameCatalogConnectionString: "__SET_IN_ENV__");
+
+        var ex = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+        Assert.Contains("ConnectionStrings:GameCatalog", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("ConnectionStrings__GameCatalog", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Startup_Testing_WithPlaceholderGameCatalogConnectionString_DoesNotThrow()
+    {
+        using var factory = new ApiJwtSigningKeyGuardFactory(
+            "Testing",
+            JwtOptions.DefaultSigningKey,
+            gameCatalogConnectionString: "__SET_IN_ENV__");
+
+        using var _ = factory.CreateClient();
+    }
 }
 
-internal sealed class ApiJwtSigningKeyGuardFactory(string environmentName, string? signingKey)
+internal sealed class ApiJwtSigningKeyGuardFactory(
+    string environmentName,
+    string? signingKey,
+    string? gameCatalogConnectionString = null)
     : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -99,7 +125,7 @@ internal sealed class ApiJwtSigningKeyGuardFactory(string environmentName, strin
         {
             configurationBuilder.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:GameCatalog"] = $"startup-guard-tests-{Guid.NewGuid():N}",
+                ["ConnectionStrings:GameCatalog"] = gameCatalogConnectionString ?? $"startup-guard-tests-{Guid.NewGuid():N}",
                 ["SeedData:AdminEmail"] = "admin@capitalism.local",
                 ["SeedData:AdminDisplayName"] = "Platform Admin",
                 ["SeedData:AdminPassword"] = "ChangeMe123!",

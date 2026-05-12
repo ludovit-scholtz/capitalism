@@ -94,6 +94,23 @@ public class Program
             }
         }
 
+        if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing"))
+        {
+            var gameCatalogConnectionString = builder.Configuration.GetConnectionString("GameCatalog");
+            if (RequiredSecretsStartupGuard.TryGetUnsafeConnectionStringReason(gameCatalogConnectionString, out var unsafeConnectionReason))
+            {
+                startupLogger.LogCritical(
+                    "Blocking startup because ConnectionStrings:GameCatalog is insecure. Environment={EnvironmentName} Reason={Reason} OverrideEnvironmentVariable={OverrideEnvironmentVariable}",
+                    builder.Environment.EnvironmentName,
+                    unsafeConnectionReason,
+                    "ConnectionStrings__GameCatalog");
+                throw new InvalidOperationException(
+                    "ConnectionStrings:GameCatalog is missing or uses a placeholder value. " +
+                    "Set a real PostgreSQL connection string via environment variable 'ConnectionStrings__GameCatalog' before starting outside Development. " +
+                    $"Validation reason: {unsafeConnectionReason}");
+            }
+        }
+
         builder.Services.AddCors(options =>
         {
             options.AddPolicy("frontend", policy =>
