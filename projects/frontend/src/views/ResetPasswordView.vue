@@ -44,7 +44,7 @@ async function handleSubmit() {
     successMessage.value = await resetPassword(token.value, newPassword.value)
     setTimeout(() => {
       router.push('/login')
-    }, 1000)
+    }, 2000)
   } catch (error: unknown) {
     if (error instanceof PasswordResetError && error.code === 'METHOD_NOT_ALLOWED') {
       errorMessage.value = t('auth.oidcOnlyBanner')

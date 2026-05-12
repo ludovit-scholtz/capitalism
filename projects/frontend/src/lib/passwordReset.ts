@@ -1,7 +1,7 @@
 const MASTER_GRAPHQL_URL =
   import.meta.env.VITE_MASTER_GRAPHQL_URL || 'https://localhost:44364/graphql'
 
-const PASSWORD_RESET_BASE_URL = MASTER_GRAPHQL_URL.replace(/\/graphql\/?$/i, '')
+const PASSWORD_RESET_BASE_URL = MASTER_GRAPHQL_URL.replace(/\/graphql\/?$/, '')
 
 export class PasswordResetError extends Error {
   constructor(

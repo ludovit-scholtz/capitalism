@@ -24,8 +24,7 @@ public sealed class PasswordResetEmailSender(
         if (string.IsNullOrWhiteSpace(options.PasswordResetSmtpHost))
         {
             logger.LogInformation(
-                "Skipping password reset email send because SMTP host is not configured. Recipient={RecipientEmail}",
-                recipientEmail);
+                "Skipping password reset email send because SMTP host is not configured.");
             return;
         }
 

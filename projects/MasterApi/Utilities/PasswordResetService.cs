@@ -111,6 +111,7 @@ public sealed class PasswordResetService(
 
     private static string GenerateRawToken()
     {
+        // Generate a URL-safe random token suitable for query-string transport in reset links.
         return Convert.ToBase64String(RandomNumberGenerator.GetBytes(48))
             .Replace("+", "-", StringComparison.Ordinal)
             .Replace("/", "_", StringComparison.Ordinal)

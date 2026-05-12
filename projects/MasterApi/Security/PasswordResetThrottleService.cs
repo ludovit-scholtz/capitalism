@@ -32,6 +32,7 @@ public sealed class PasswordResetThrottleService(
     {
         var key = RequestCountKey(normalizedEmail);
         var window = TimeSpan.FromMinutes(options.Value.ForgotPasswordWindowMinutes);
+        // Use a single-element array so we can update the cached counter atomically via Interlocked APIs.
         var counter = cache.GetOrCreate(key, entry =>
         {
             entry.SetAbsoluteExpiration(window);
