@@ -1599,6 +1599,67 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.Equal(generatedAlias, storedPlayer.DisplayName);
     }
 
+        [Fact]
+        public async Task MeAndRankings_MasterStyleToken_ExistingShardPlayer_ReconcilesToMasterPersonalAccountName()
+        {
+                var email = $"master-reconcile-{Guid.NewGuid():N}@example.com";
+                var localToken = await RegisterAndGetTokenAsync(email, "Second Shard Local Name");
+                await ExecuteGraphQlAsync(
+                        "mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }",
+                        new { input = new { name = "Master Alias Holdings" } },
+                        localToken);
+
+                const string masterAlias = "Captain Ledger Fox";
+                var masterToken = CreateSharedToken(Guid.NewGuid().ToString(), email, masterAlias);
+
+                var result = await ExecuteGraphQlAsync(
+                        """
+                        {
+                            me {
+                                id
+                                displayName
+                                personalAccountName
+                            }
+                            rankings {
+                                playerId
+                                displayName
+                                personalAccountName
+                            }
+                            companyRankings {
+                                playerId
+                                companyName
+                                ownerDisplayName
+                                ownerPersonalAccountName
+                            }
+                        }
+                        """,
+                        token: masterToken);
+
+                Assert.False(result.TryGetProperty("errors", out _));
+                var me = result.GetProperty("data").GetProperty("me");
+                var playerId = me.GetProperty("id").GetString();
+                Assert.Equal(masterAlias, me.GetProperty("displayName").GetString());
+                Assert.Equal(masterAlias, me.GetProperty("personalAccountName").GetString());
+
+                var playerRanking = result.GetProperty("data").GetProperty("rankings").EnumerateArray()
+                        .FirstOrDefault(entry => string.Equals(entry.GetProperty("playerId").GetString(), playerId, StringComparison.Ordinal));
+                Assert.True(playerRanking.ValueKind != JsonValueKind.Undefined, "Player must appear in the shard ranking leaderboard.");
+                Assert.Equal(masterAlias, playerRanking.GetProperty("displayName").GetString());
+                Assert.Equal(masterAlias, playerRanking.GetProperty("personalAccountName").GetString());
+
+                var companyRanking = result.GetProperty("data").GetProperty("companyRankings").EnumerateArray()
+                        .FirstOrDefault(entry => string.Equals(entry.GetProperty("playerId").GetString(), playerId, StringComparison.Ordinal));
+                Assert.True(companyRanking.ValueKind != JsonValueKind.Undefined, "Player company must appear in shard company rankings.");
+                Assert.Equal("Master Alias Holdings", companyRanking.GetProperty("companyName").GetString());
+                Assert.Equal(masterAlias, companyRanking.GetProperty("ownerDisplayName").GetString());
+                Assert.Equal(masterAlias, companyRanking.GetProperty("ownerPersonalAccountName").GetString());
+
+                await using var scope = _factory.Services.CreateAsyncScope();
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var storedPlayer = await db.Players.SingleAsync(player => player.Email == email);
+                Assert.Equal(masterAlias, storedPlayer.DisplayName);
+        }
+
     [Fact]
     public async Task LegacySensitiveDisplayName_PublicIdentitySurfaces_UseSanitizedAlias()
     {

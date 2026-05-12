@@ -44,22 +44,26 @@ public sealed class AuthenticatedPlayerClaimsSyncService(
         var normalizedEmail = email.ToLowerInvariant();
         var subjectClaim = principal.FindFirstValue(ClaimTypes.NameIdentifier);
         var claimedDisplayName = principal.FindFirstValue(ClaimsPrincipalExtensions.EffectivePlayerNameClaimType);
-        if (string.IsNullOrWhiteSpace(claimedDisplayName))
+        string? authoritativeDisplayName = null;
+        if (!string.Equals(TokenBoundaryClaims.GetTokenType(principal), TokenBoundaryClaims.TokenTypeGame, StringComparison.OrdinalIgnoreCase))
         {
-            if (TokenBoundaryClaims.IsMasterToken(principal))
+            authoritativeDisplayName = await TryGetMasterPersonalAccountNameAsync(normalizedEmail, cancellationToken);
+            if (string.IsNullOrWhiteSpace(authoritativeDisplayName) && TokenBoundaryClaims.IsMasterToken(principal))
             {
-                // Master tokens carry the already-provisioned public alias from MasterApi.
-                claimedDisplayName = principal.FindFirstValue(ClaimTypes.Name);
+                // Master tokens fall back to their embedded alias when the live master lookup is unavailable.
+                authoritativeDisplayName = principal.FindFirstValue(ClaimTypes.Name);
             }
-            else if (!string.Equals(TokenBoundaryClaims.GetTokenType(principal), TokenBoundaryClaims.TokenTypeGame, StringComparison.OrdinalIgnoreCase))
+
+            if (string.IsNullOrWhiteSpace(claimedDisplayName))
             {
-                claimedDisplayName = await TryGetMasterDisplayNameAsync(normalizedEmail, cancellationToken);
-                if (string.IsNullOrWhiteSpace(claimedDisplayName))
-                {
-                    logger.LogWarning(
-                        "Falling back to generated display name alias for player hash {PlayerHash} because master display name could not be resolved.",
-                        HashForLog(normalizedEmail));
-                }
+                claimedDisplayName = authoritativeDisplayName;
+            }
+
+            if (string.IsNullOrWhiteSpace(authoritativeDisplayName) && !TokenBoundaryClaims.IsMasterToken(principal))
+            {
+                logger.LogWarning(
+                    "Falling back to generated display name alias for player hash {PlayerHash} because master personal account name could not be resolved.",
+                    HashForLog(normalizedEmail));
             }
         }
 
@@ -67,6 +71,9 @@ public sealed class AuthenticatedPlayerClaimsSyncService(
             claimedDisplayName,
             normalizedEmail,
             subjectClaim);
+        var synchronizedDisplayName = string.IsNullOrWhiteSpace(authoritativeDisplayName)
+            ? resolvedDisplayName
+            : PlayerDisplayNameProvisioning.ResolveDisplayName(authoritativeDisplayName, normalizedEmail, subjectClaim);
 
         var player = await db.Players.FirstOrDefaultAsync(
             candidate => candidate.Email == email || candidate.Email.ToLower() == normalizedEmail,
@@ -82,7 +89,7 @@ public sealed class AuthenticatedPlayerClaimsSyncService(
             {
                 Id = playerId,
                 Email = normalizedEmail,
-                DisplayName = resolvedDisplayName,
+                DisplayName = synchronizedDisplayName,
                 Role = PlayerRole.Player,
                 ActiveAccountType = AccountContextType.Person,
                 CreatedAtUtc = DateTime.UtcNow,
@@ -101,9 +108,15 @@ public sealed class AuthenticatedPlayerClaimsSyncService(
                 changed = true;
             }
 
-            if (PlayerDisplayNameProvisioning.ShouldReplaceExistingDisplayName(player.DisplayName, normalizedEmail))
+            if (!string.IsNullOrWhiteSpace(authoritativeDisplayName)
+                && !string.Equals(player.DisplayName, synchronizedDisplayName, StringComparison.Ordinal))
             {
-                player.DisplayName = resolvedDisplayName;
+                player.DisplayName = synchronizedDisplayName;
+                changed = true;
+            }
+            else if (PlayerDisplayNameProvisioning.ShouldReplaceExistingDisplayName(player.DisplayName, normalizedEmail))
+            {
+                player.DisplayName = synchronizedDisplayName;
                 changed = true;
             }
         }
@@ -180,7 +193,7 @@ public sealed class AuthenticatedPlayerClaimsSyncService(
             && postgres.SqlState == PostgresErrorCodes.UniqueViolation
             && string.Equals(postgres.ConstraintName, "IX_Players_Email", StringComparison.Ordinal);
 
-    private async Task<string?> TryGetMasterDisplayNameAsync(string normalizedEmail, CancellationToken cancellationToken)
+    private async Task<string?> TryGetMasterPersonalAccountNameAsync(string normalizedEmail, CancellationToken cancellationToken)
     {
         if (cache.TryGetValue(GetMasterDisplayNameCacheKey(normalizedEmail), out string? cachedDisplayName))
         {
@@ -205,14 +218,14 @@ public sealed class AuthenticatedPlayerClaimsSyncService(
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
             request.Content = JsonContent.Create(new
             {
-                query = "{ me { displayName } }"
+                query = "{ me { personalAccountName displayName } }"
             });
 
             using var response = await client.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 logger.LogWarning(
-                    "Master display name lookup failed for player hash {PlayerHash} with status {StatusCode} via {MasterApiUrl}.",
+                    "Master personal account name lookup failed for player hash {PlayerHash} with status {StatusCode} via {MasterApiUrl}.",
                     HashForLog(normalizedEmail),
                     (int)response.StatusCode,
                     masterOptions.Value.ApiUrl);
@@ -222,11 +235,16 @@ public sealed class AuthenticatedPlayerClaimsSyncService(
             var payload = await response.Content.ReadFromJsonAsync<MasterMeGraphQlResponse>(JsonOptions, cancellationToken);
             if (payload?.Errors is { Count: > 0 })
             {
-                logger.LogWarning("Master display name lookup returned GraphQL error: {GraphQlErrorMessage}", payload.Errors[0].Message);
+                logger.LogWarning("Master personal account name lookup returned GraphQL error: {GraphQlErrorMessage}", payload.Errors[0].Message);
                 return null;
             }
 
-            var masterDisplayName = payload?.Data?.Me?.DisplayName?.Trim();
+            var masterDisplayName = payload?.Data?.Me?.PersonalAccountName?.Trim();
+            if (string.IsNullOrWhiteSpace(masterDisplayName))
+            {
+                masterDisplayName = payload?.Data?.Me?.DisplayName?.Trim();
+            }
+
             if (string.IsNullOrWhiteSpace(masterDisplayName))
             {
                 return null;
@@ -237,7 +255,7 @@ public sealed class AuthenticatedPlayerClaimsSyncService(
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception, "Master display name lookup failed.");
+            logger.LogWarning(exception, "Master personal account name lookup failed.");
             return null;
         }
     }
@@ -278,6 +296,8 @@ public sealed class AuthenticatedPlayerClaimsSyncService(
 
     private sealed class MasterMeResult
     {
+        public string? PersonalAccountName { get; init; }
+
         public string? DisplayName { get; init; }
     }
 

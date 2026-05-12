@@ -650,6 +650,83 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
 
     }
 
+        [Fact]
+        public async Task RankingLeaderboard_SharedAuthReentry_UsesPersistedPersonalAlias()
+        {
+                var email = $"leaderboard-alias-{Guid.NewGuid():N}@example.com";
+                var firstToken = CreateSharedToken(Guid.NewGuid().ToString(), email, email);
+
+                var firstResult = await GraphQlAsync("""
+                        query {
+                            me {
+                                displayName
+                                personalAccountName
+                            }
+                        }
+                        """, token: firstToken);
+
+                Assert.False(firstResult.TryGetProperty("errors", out _));
+                var generatedAlias = firstResult.GetProperty("data").GetProperty("me").GetProperty("personalAccountName").GetString();
+                Assert.False(string.IsNullOrWhiteSpace(generatedAlias));
+
+                var secondToken = CreateSharedToken(Guid.NewGuid().ToString(), email, "External OIDC Name");
+                var secondResult = await GraphQlAsync("""
+                        query {
+                            me {
+                                id
+                                displayName
+                                personalAccountName
+                            }
+                        }
+                        """, token: secondToken);
+
+                Assert.False(secondResult.TryGetProperty("errors", out _));
+                var me = secondResult.GetProperty("data").GetProperty("me");
+                Assert.Equal(generatedAlias, me.GetProperty("displayName").GetString());
+                Assert.Equal(generatedAlias, me.GetProperty("personalAccountName").GetString());
+
+                await using (var snapshotScope = _factory.Services.CreateAsyncScope())
+                {
+                    var snapshotDb = snapshotScope.ServiceProvider.GetRequiredService<MasterDbContext>();
+                    snapshotDb.MasterRankingPlayerSnapshots.Add(new MasterApi.Data.Entities.MasterRankingPlayerSnapshot
+                        {
+                                Id = Guid.NewGuid(),
+                                PlayerAccountId = Guid.Parse(me.GetProperty("id").GetString()!),
+                                TotalPoints = 125m,
+                                GlobalRank = 1,
+                                PreviousGlobalRank = 2,
+                                UpdatedAtUtc = DateTime.UtcNow,
+                        });
+                    await snapshotDb.SaveChangesAsync();
+                }
+
+                var leaderboardResult = await GraphQlAsync("""
+                        query {
+                            rankingLeaderboard(limit: 20, offset: 0) {
+                                playerId
+                                displayName
+                                personalAccountName
+                            }
+                        }
+                        """);
+
+                Assert.False(leaderboardResult.TryGetProperty("errors", out _));
+
+                var entry = leaderboardResult.GetProperty("data").GetProperty("rankingLeaderboard").EnumerateArray()
+                        .FirstOrDefault(candidate =>
+                                string.Equals(candidate.GetProperty("playerId").GetString(), me.GetProperty("id").GetString(), StringComparison.Ordinal));
+
+                Assert.True(entry.ValueKind != JsonValueKind.Undefined, "Player must appear in the master ranking leaderboard.");
+                Assert.Equal(generatedAlias, entry.GetProperty("displayName").GetString());
+                Assert.Equal(generatedAlias, entry.GetProperty("personalAccountName").GetString());
+
+                await using var scope = _factory.Services.CreateAsyncScope();
+                var db = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
+                var players = await db.PlayerAccounts.Where(player => player.Email == email).ToListAsync();
+                Assert.Single(players);
+                Assert.Equal(generatedAlias, players[0].DisplayName);
+        }
+
     [Fact]
     public async Task UpdatePersonalAccountName_Unauthenticated_ReturnsAuthError()
     {
