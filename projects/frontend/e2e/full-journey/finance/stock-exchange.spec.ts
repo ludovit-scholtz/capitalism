@@ -1032,7 +1032,7 @@ test.describe('Stock exchange', () => {
     await page.getByRole('button', { name: 'Save' }).click()
 
     await expect(page.getByRole('status')).toContainText('Company settings saved.')
-    await expect(page.getByText('35.0%')).toBeVisible()
+    await expect(page.getByLabel('Dividend payout ratio')).toHaveValue('35')
   })
 
   test('market overview shows market value column for each listing', async ({ page }) => {

@@ -16,6 +16,7 @@ public sealed class CompanySettingsResult
     public decimal AssetValue { get; set; }
     public string CurrencyCode { get; set; } = "EUR";
     public List<CompanyCitySalarySettingResult> CitySalarySettings { get; set; } = [];
+    public CompanyDividendPolicyProposalResult? PendingDividendProposal { get; set; }
 }
 
 public sealed class CompanyCitySalarySettingResult
@@ -27,4 +28,15 @@ public sealed class CompanyCitySalarySettingResult
     public decimal BaseSalaryPerManhour { get; set; }
     public decimal SalaryMultiplier { get; set; }
     public decimal EffectiveSalaryPerManhour { get; set; }
+}
+
+public sealed class CompanyDividendPolicyProposalResult
+{
+    public Guid Id { get; set; }
+    public decimal DividendPercent { get; set; }
+    public long VotingCloseTick { get; set; }
+    public long TicksRemaining { get; set; }
+    public decimal ForVotes { get; set; }
+    public decimal AgainstVotes { get; set; }
+    public string? MyVoteChoice { get; set; }
 }

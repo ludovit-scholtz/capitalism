@@ -40,6 +40,17 @@ export interface CompanySettings {
   /** ISO 4217 currency code for this company's local currency (e.g. "EUR", "CZK", "USD") */
   currencyCode: string
   citySalarySettings: CompanyCitySalarySetting[]
+  pendingDividendProposal: CompanyDividendPolicyProposal | null
+}
+
+export interface CompanyDividendPolicyProposal {
+  id: string
+  dividendPercent: number
+  votingCloseTick: number
+  ticksRemaining: number
+  forVotes: number
+  againstVotes: number
+  myVoteChoice: 'FOR' | 'AGAINST' | null
 }
 
 export interface PortfolioHolding {

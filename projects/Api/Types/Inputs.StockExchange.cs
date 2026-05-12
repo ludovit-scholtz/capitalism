@@ -4,10 +4,14 @@ namespace Api.Types;
 
 public sealed class ProposeDividendInput
 {
-    [Required, MaxLength(40)]
-    public string StockSymbol { get; set; } = string.Empty;
+    [MaxLength(40)]
+    public string? StockSymbol { get; set; }
 
-    public decimal DividendPerShare { get; set; }
+    public decimal? DividendPerShare { get; set; }
+
+    public Guid? CompanyId { get; set; }
+
+    public decimal? DividendPercent { get; set; }
 }
 
 public sealed class VoteDividendProposalInput

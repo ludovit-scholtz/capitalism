@@ -4,6 +4,7 @@ using System.Text.Json;
 using Api.Data;
 using Api.Data.Entities;
 using Api.Tests.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Api.Tests;

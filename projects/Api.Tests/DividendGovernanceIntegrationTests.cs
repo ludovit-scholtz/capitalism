@@ -399,4 +399,127 @@ public sealed class DividendGovernanceIntegrationTests
             Assert.Empty(dividendPayments);
         }
     }
+
+    [Fact]
+    public async Task ProposeDividend_PolicyProposal_NonCeoRejectedWithNotCeo()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var ownerToken = await RegisterAndGetTokenAsync(client, $"div-policy-owner-{Guid.NewGuid():N}@test.com", "Policy Owner");
+        var otherToken = await RegisterAndGetTokenAsync(client, $"div-policy-other-{Guid.NewGuid():N}@test.com", "Policy Other");
+        var ownerId = await GetCurrentPlayerIdAsync(client, ownerToken);
+        Guid companyId;
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var currentTick = await db.GameStates.Select(state => (long?)state.CurrentTick).FirstOrDefaultDeterministicAsync() ?? 0L;
+            var company = new Company
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = ownerId,
+                Name = "Policy Co",
+                TotalSharesIssued = 1_000m,
+                DividendPayoutRatio = 0.2m,
+                FoundedAtTick = currentTick,
+                FoundedAtUtc = DateTime.UtcNow,
+            };
+            db.Companies.Add(company);
+            await db.SaveChangesAsync();
+            companyId = company.Id;
+        }
+
+        var result = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            """
+            mutation ProposeDividend($input: ProposeDividendInput!) {
+              proposeDividend(input: $input) { id }
+            }
+            """,
+            new { input = new { companyId, dividendPercent = 35m } },
+            otherToken);
+        var error = result.GetProperty("errors")[0];
+        Assert.Equal("NOT_CEO", error.GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task VoteDividend_ApproveMajority_UpdatesCompanyDividendPayoutRatio()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var majorityToken = await RegisterAndGetTokenAsync(client, $"div-policy-majority-{Guid.NewGuid():N}@test.com", "Policy Majority");
+        var minorityToken = await RegisterAndGetTokenAsync(client, $"div-policy-minority-{Guid.NewGuid():N}@test.com", "Policy Minority");
+        var majorityPlayerId = await GetCurrentPlayerIdAsync(client, majorityToken);
+        var minorityPlayerId = await GetCurrentPlayerIdAsync(client, minorityToken);
+        Guid companyId;
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var currentTick = await db.GameStates.Select(state => (long?)state.CurrentTick).FirstOrDefaultDeterministicAsync() ?? 0L;
+            var company = new Company
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = majorityPlayerId,
+                Name = "Policy Voting Co",
+                TotalSharesIssued = 1_000m,
+                DividendPayoutRatio = 0.2m,
+                FoundedAtTick = currentTick,
+                FoundedAtUtc = DateTime.UtcNow,
+            };
+            db.Companies.Add(company);
+            db.Shareholdings.AddRange(
+                new Shareholding
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = company.Id,
+                    OwnerPlayerId = majorityPlayerId,
+                    ShareCount = 700m,
+                },
+                new Shareholding
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = company.Id,
+                    OwnerPlayerId = minorityPlayerId,
+                    ShareCount = 300m,
+                });
+            await db.SaveChangesAsync();
+            companyId = company.Id;
+        }
+
+        await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            """
+            mutation ProposeDividend($input: ProposeDividendInput!) {
+              proposeDividend(input: $input) { id }
+            }
+            """,
+            new { input = new { companyId, dividendPercent = 45m } },
+            majorityToken);
+        await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            """
+            mutation VoteDividend($input: VoteDividendInput!) {
+              voteDividend(input: $input) { id status }
+            }
+            """,
+            new { input = new { companyId, vote = "APPROVE" } },
+            majorityToken);
+        await using var assertScope = factory.Services.CreateAsyncScope();
+        var assertDb = assertScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var proposalStatus = await assertDb.DividendProposals
+            .AsNoTracking()
+            .Where(proposal => proposal.CompanyId == companyId && proposal.TotalPayout <= 0m)
+            .Select(proposal => proposal.Status)
+            .FirstOrDefaultDeterministicAsync();
+        Assert.Equal(DividendProposalStatus.Settled, proposalStatus);
+        var updatedRatio = await assertDb.Companies
+            .AsNoTracking()
+            .Where(company => company.Id == companyId)
+            .Select(company => company.DividendPayoutRatio)
+            .FirstOrDefaultDeterministicAsync();
+        Assert.Equal(0.45m, updatedRatio);
+    }
 }

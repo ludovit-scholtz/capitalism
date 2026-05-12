@@ -1684,3 +1684,14 @@ Root-cause of repeated CI failures (May 2026, PR #451 Market Dashboard):
 3. **When a new nav icon is added, run the responsive-layout E2E test at 1920px viewport immediately** (`npx playwright test responsive-layout`) to confirm no overflow. If overflow occurs, reduce the `.desktop-nav-links` gap.
 4. **Before declaring nav changes "done", run both `home.spec.ts` and `responsive-layout.spec.ts`** — they are the canonical checks for nav strict-mode violations and layout overflow.
 5. **Always merge `origin/main` into the PR branch at the start of every session** to catch conflicts early, especially in shared files like `AppHeader.vue`, locale files, and `mock-api.ts`.
+
+## Company Settings follow-up quality gate — tabbed UI + GraphQL surface inventory coverage
+
+Root-cause of CI failures (May 2026, PR #455 company settings/dividend governance):
+- `CompanySettingsView` moved salary/administration sections behind tabs, but existing Playwright tests still asserted tab content without switching tabs first, so CI reported hidden locators.
+- A new sensitive query (`companyAdministrationOverhead`) was added without the required GraphQL-surface coverage tests (`unauthenticated rejection` + `owner success`), so `graphql-surface-inventory` gate failed.
+
+**Rules to prevent recurrence:**
+1. **When moving existing content behind tabs (`v-show`/`v-if`), update all existing E2E tests to click the target tab before asserting tab-local elements.**
+2. **For each newly added sensitive GraphQL operation, add the boundary tests required by `graphql-surface-inventory` in the same PR** (at minimum unauthenticated rejection and authorized owner success).
+3. **When CI shows `graphql-surface-inventory` failure, inspect logs for the exact missing test contract string and implement those named tests before any additional refactoring.**
