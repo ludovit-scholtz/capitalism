@@ -222,6 +222,9 @@ export default {
     loadFailed: 'Failed to load the chat feed.',
     sendFailed: 'Failed to send the chat message.',
     closeChat: 'Close chat',
+    rateLimited: 'You are sending messages too fast. Please wait a moment.',
+    messageTooLong: 'Message is too long (max 500 characters).',
+    charCount: '{current} / {max}',
   },
   home: {
     heroTitle: 'Capitalism 5',

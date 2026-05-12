@@ -7,8 +7,20 @@ import { useChat } from '@/composables/useChat'
 const { t } = useI18n()
 const chatStore = useChatStore()
 
-const { messages, loading, error, draftMessage, sendError, sending, trimmedDraft, formatSentAt, sendMessage } =
-  useChat()
+const {
+  messages,
+  loading,
+  error,
+  draftMessage,
+  sendError,
+  sending,
+  trimmedDraft,
+  charCount,
+  isOverLimit,
+  showCharCounter,
+  formatSentAt,
+  sendMessage,
+} = useChat()
 
 // When new messages arrive, update the unread count in the store
 watch(messages, (newMessages) => {
@@ -99,9 +111,9 @@ watch(
               <span class="sr-only">{{ t('chat.inputLabel') }}</span>
               <input
                 v-model="draftMessage"
-                class="chat-input"
+                :class="['chat-input', { 'chat-input-over-limit': isOverLimit }]"
                 type="text"
-                maxlength="300"
+                maxlength="500"
                 :placeholder="t('chat.placeholder')"
                 :aria-label="t('chat.inputLabel')"
               />
@@ -109,11 +121,17 @@ watch(
             <button
               class="btn btn-primary chat-send-button"
               type="submit"
-              :disabled="sending || !trimmedDraft"
+              :disabled="sending || !trimmedDraft || isOverLimit"
             >
               {{ sending ? t('common.saving') : t('chat.send') }}
             </button>
           </form>
+          <div
+            v-if="showCharCounter"
+            :class="['chat-char-counter', { 'chat-char-counter-over': isOverLimit }]"
+          >
+            {{ t('chat.charCount', { current: charCount, max: 500 }) }}
+          </div>
         </div>
       </aside>
     </Transition>
@@ -321,6 +339,23 @@ watch(
 .chat-input {
   width: 100%;
   min-width: 0;
+}
+
+.chat-input-over-limit {
+  border-color: var(--color-danger, #e05252) !important;
+  outline-color: var(--color-danger, #e05252);
+}
+
+.chat-char-counter {
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+  text-align: right;
+  color: var(--color-text-secondary);
+}
+
+.chat-char-counter-over {
+  color: var(--color-danger, #e05252);
+  font-weight: 600;
 }
 
 .chat-send-button {

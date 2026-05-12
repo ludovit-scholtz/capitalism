@@ -3,7 +3,20 @@ import { useI18n } from 'vue-i18n'
 import { useChat } from '@/composables/useChat'
 
 const { t } = useI18n()
-const { messages, loading, error, draftMessage, sendError, sending, trimmedDraft, formatSentAt, sendMessage } = useChat()
+const {
+  messages,
+  loading,
+  error,
+  draftMessage,
+  sendError,
+  sending,
+  trimmedDraft,
+  charCount,
+  isOverLimit,
+  showCharCounter,
+  formatSentAt,
+  sendMessage,
+} = useChat()
 </script>
 
 <template>
@@ -35,16 +48,60 @@ const { messages, loading, error, draftMessage, sendError, sending, trimmedDraft
       </article>
     </div>
 
-    <form class="chat-form mt-4 flex gap-3 max-[720px]:flex-col" @submit.prevent="sendMessage">
-      <label class="chat-input-wrapper flex-1">
-        <span class="sr-only">{{ t('chat.inputLabel') }}</span>
-        <input v-model="draftMessage" class="chat-input min-w-0 w-full" type="text" maxlength="300" :placeholder="t('chat.placeholder')" :aria-label="t('chat.inputLabel')" />
-      </label>
-      <button class="btn btn-primary chat-send-button" type="submit" :disabled="sending || !trimmedDraft">
-        {{ sending ? t('common.saving') : t('chat.send') }}
-      </button>
+    <form class="chat-form mt-4 flex flex-col gap-2" @submit.prevent="sendMessage">
+      <div class="chat-input-row flex gap-3 max-[720px]:flex-col">
+        <label class="chat-input-wrapper flex-1">
+          <span class="sr-only">{{ t('chat.inputLabel') }}</span>
+          <input
+            v-model="draftMessage"
+            :class="['chat-input min-w-0 w-full', { 'chat-input-over-limit': isOverLimit }]"
+            type="text"
+            maxlength="500"
+            :placeholder="t('chat.placeholder')"
+            :aria-label="t('chat.inputLabel')"
+          />
+        </label>
+        <button
+          class="btn btn-primary chat-send-button"
+          type="submit"
+          :disabled="sending || !trimmedDraft || isOverLimit"
+        >
+          {{ sending ? t('common.saving') : t('chat.send') }}
+        </button>
+      </div>
+      <div v-if="showCharCounter" :class="['chat-char-counter text-xs text-right', { 'chat-char-counter-over': isOverLimit }]">
+        {{ t('chat.charCount', { current: charCount, max: 500 }) }}
+      </div>
     </form>
 
     <p v-if="sendError" class="chat-state chat-state-error py-3 text-[#ff9b9b]" role="alert">{{ sendError }}</p>
   </section>
 </template>
+
+<style scoped>
+.chat-input-over-limit {
+  border-color: var(--color-danger, #e05252) !important;
+  outline-color: var(--color-danger, #e05252);
+}
+
+.chat-char-counter {
+  color: var(--color-text-secondary);
+}
+
+.chat-char-counter-over {
+  color: var(--color-danger, #e05252);
+  font-weight: 600;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+</style>
