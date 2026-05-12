@@ -227,6 +227,10 @@ export default {
     loadBalancesError: 'Failed to load balances.',
     loadTxError: 'Failed to load transaction history.',
     adjustFailed: 'Adjustment failed.',
+    revokeSessions: 'Revoke sessions',
+    revokeSessionsConfirm: 'Revoke all active sessions for this player?',
+    revokeSessionsSuccess: 'Player sessions were revoked.',
+    revokeSessionsError: 'Failed to revoke player sessions.',
   },
   referralSetup: {
     title: 'Setup Referral Code',

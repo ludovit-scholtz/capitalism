@@ -14,6 +14,11 @@ public sealed class PlayerAccount
 
     public DateTime? LastLoginAtUtc { get; set; }
 
+    /// <summary>
+    /// Tokens issued before this UTC time are considered revoked.
+    /// </summary>
+    public DateTime? SessionRevokedBeforeUtc { get; set; }
+
     public DateTime? StartupPackClaimedAtUtc { get; set; }
 
     /// <summary>Email of the player who referred this account (null if self-registered).</summary>
@@ -39,4 +44,6 @@ public sealed class PlayerAccount
     public ICollection<MasterRankingRewardRecord> RankingRewardRecords { get; set; } = [];
 
     public ICollection<MasterRankingEvent> RankingEvents { get; set; } = [];
+
+    public ICollection<MasterPlayerSession> Sessions { get; set; } = [];
 }

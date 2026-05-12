@@ -24,6 +24,10 @@ const SIGNED_OUT_NOTICE_KEY = 'auth_signed_out_notice'
 const AUTH_PROVIDER_KEY = 'auth_provider'
 const AUTH_PROVIDER_LOCAL = 'local'
 const AUTH_PROVIDER_BIATEC = 'biatec_oidc'
+const API_BASE_URL = (import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:44356/graphql').replace(
+  /\/graphql\/?$/,
+  '',
+)
 
 interface OidcPendingState {
   state: string
@@ -684,9 +688,19 @@ export const useAuthStore = defineStore('auth', () => {
    * Returns true when federated redirect navigation was started.
    */
   function logout(options: LogoutOptions = {}): boolean {
+    const currentToken = token.value
     const shouldFederatedLogout = options.federated === true && getStoredAuthProvider() === AUTH_PROVIDER_BIATEC
     const idTokenHint = token.value
     const federatedLogoutUrl = shouldFederatedLogout ? buildBiatecEndSessionUrl(idTokenHint) : null
+
+    if (currentToken) {
+      void fetch(`${API_BASE_URL}/auth/logout`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${currentToken}`,
+        },
+      }).catch(() => undefined)
+    }
 
     clearRenewalTimer()
     token.value = null

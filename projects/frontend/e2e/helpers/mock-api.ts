@@ -3338,6 +3338,65 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     })
   })
 
+  page.route('**/auth/sessions', async (route) => {
+    if (route.request().method() !== 'GET') {
+      return route.fallback()
+    }
+
+    const currentToken = state.currentToken ?? ''
+    const currentJti = currentToken.startsWith('token-') ? currentToken.slice('token-'.length) : 'session-current'
+    const sessions = [
+      {
+        jti: currentJti,
+        device: 'Current Browser',
+        ipAddress: '127.0.0.1',
+        lastSeenAtUtc: new Date().toISOString(),
+        issuedAtUtc: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+        expiresAtUtc: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        isCurrent: true,
+        isRevoked: false,
+      },
+      {
+        jti: 'session-other-device',
+        device: 'Other Device',
+        ipAddress: '10.0.0.2',
+        lastSeenAtUtc: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+        issuedAtUtc: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+        expiresAtUtc: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        isCurrent: false,
+        isRevoked: false,
+      },
+    ]
+
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ sessions }),
+    })
+  })
+
+  page.route('**/auth/logout-all', async (route) => {
+    if (route.request().method() !== 'POST') {
+      return route.fallback()
+    }
+
+    return route.fulfill({
+      status: 204,
+      body: '',
+    })
+  })
+
+  page.route('**/auth/logout', async (route) => {
+    if (route.request().method() !== 'POST') {
+      return route.fallback()
+    }
+
+    return route.fulfill({
+      status: 204,
+      body: '',
+    })
+  })
+
   page.route('**/graphql', async (route) => {
     const routeJson = (data: unknown) =>
       route.fulfill({

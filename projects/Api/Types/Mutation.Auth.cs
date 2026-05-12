@@ -34,7 +34,8 @@ public sealed partial class Mutation
         [Service] IOptions<AuthOptions> authOptions,
         [Service] IMasterRankingTelemetryService rankingTelemetry,
         [Service] IOptions<MasterServerRegistrationOptions> masterOptions,
-        [Service] ILoginThrottleService throttle)
+        [Service] ILoginThrottleService throttle,
+        [Service] IHttpContextAccessor httpContextAccessor)
     {
         if (!authOptions.Value.PasswordAuthEnabled)
         {
@@ -77,6 +78,7 @@ public sealed partial class Mutation
         FireLoginTelemetry(rankingTelemetry, masterOptions.Value.ServerKey, player.Email);
 
         var session = GenerateToken(player, jwtOptions.Value);
+        await TrackIssuedSessionAsync(db, player.Id, session, httpContextAccessor.HttpContext, httpContextAccessor.HttpContext?.RequestAborted ?? CancellationToken.None);
         return new AuthPayload
         {
             Token = session.Token,
@@ -93,7 +95,8 @@ public sealed partial class Mutation
         [Service] IOptions<AuthOptions> authOptions,
         [Service] IMasterRankingTelemetryService rankingTelemetry,
         [Service] IOptions<MasterServerRegistrationOptions> masterOptions,
-        [Service] ILoginThrottleService throttle)
+        [Service] ILoginThrottleService throttle,
+        [Service] IHttpContextAccessor httpContextAccessor)
     {
         if (!authOptions.Value.PasswordAuthEnabled)
         {
@@ -154,6 +157,7 @@ public sealed partial class Mutation
         FireLoginTelemetry(rankingTelemetry, masterOptions.Value.ServerKey, player.Email);
 
         var session = GenerateToken(player, jwtOptions.Value);
+        await TrackIssuedSessionAsync(db, player.Id, session, httpContextAccessor.HttpContext, httpContextAccessor.HttpContext?.RequestAborted ?? CancellationToken.None);
         return new AuthPayload
         {
             Token = session.Token,
@@ -225,6 +229,7 @@ public sealed partial class Mutation
             impersonationContext.EffectiveAccountType,
             impersonationContext.EffectiveCompanyId,
             impersonationContext.EffectiveCompanyName));
+        await TrackIssuedSessionAsync(db, targetPlayer.Id, session, httpContextAccessor.HttpContext, httpContextAccessor.HttpContext.RequestAborted);
 
         return new AuthPayload
         {
@@ -252,6 +257,7 @@ public sealed partial class Mutation
                     .Build());
 
         var session = GenerateToken(actorPlayer, jwtOptions.Value);
+        await TrackIssuedSessionAsync(db, actorPlayer.Id, session, httpContextAccessor.HttpContext, httpContextAccessor.HttpContext.RequestAborted);
         return new AuthPayload
         {
             Token = session.Token,

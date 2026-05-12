@@ -137,6 +137,12 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Player-facing in-game notifications shown in the navbar bell.</summary>
     public DbSet<PlayerNotification> PlayerNotifications => Set<PlayerNotification>();
 
+    /// <summary>Tracked JWT session metadata per player.</summary>
+    public DbSet<PlayerSession> PlayerSessions => Set<PlayerSession>();
+
+    /// <summary>Revoked JWT token identifiers retained until natural expiry.</summary>
+    public DbSet<RevokedToken> RevokedTokens => Set<RevokedToken>();
+
     /// <summary>Buyer offers on buildings listed for player-to-player sale.</summary>
     public DbSet<BuildingSaleOffer> BuildingSaleOffers => Set<BuildingSaleOffer>();
     public DbSet<BuildingOfferSecurityAuditLog> BuildingOfferSecurityAuditLogs => Set<BuildingOfferSecurityAuditLog>();

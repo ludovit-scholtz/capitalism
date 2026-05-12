@@ -39,7 +39,8 @@ public sealed partial class Mutation
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(options.SigningKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-        var expires = DateTime.UtcNow.AddMinutes(options.ExpiresMinutes);
+        var issuedAtUtc = DateTime.UtcNow;
+        var expires = issuedAtUtc.AddMinutes(options.ExpiresMinutes);
 
         var claims = new[]
         {
@@ -47,12 +48,15 @@ public sealed partial class Mutation
             new Claim(ClaimTypes.Email, player.Email),
             new Claim(ClaimTypes.Name, player.DisplayName),
             new Claim(TokenBoundaryClaims.TokenTypeClaimType, TokenBoundaryClaims.TokenTypeMaster),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
+            new Claim(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(issuedAtUtc).ToString(), ClaimValueTypes.Integer64),
         };
 
         var token = new JwtSecurityToken(
             issuer: options.Issuer,
             audience: options.Audience,
             claims: claims,
+            notBefore: issuedAtUtc,
             expires: expires,
             signingCredentials: credentials);
 
@@ -131,6 +135,43 @@ public sealed partial class Mutation
         }
 
         return normalizedLocale;
+    }
+
+    private static async Task TrackIssuedSessionAsync(
+        MasterDbContext db,
+        Guid playerAccountId,
+        string token,
+        DateTime expiresAtUtc,
+        HttpContext? httpContext,
+        CancellationToken cancellationToken)
+    {
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
+        var jti = jwt.Claims.FirstOrDefault(claim => claim.Type == JwtRegisteredClaimNames.Jti)?.Value ?? jwt.Id;
+        if (string.IsNullOrWhiteSpace(jti))
+        {
+            return;
+        }
+
+        var existing = await db.MasterPlayerSessions.FirstOrDefaultAsync(candidate => candidate.Jti == jti, cancellationToken);
+        if (existing is not null)
+        {
+            existing.LastSeenAtUtc = DateTime.UtcNow;
+            existing.ExpiresAtUtc = expiresAtUtc;
+            await db.SaveChangesAsync(cancellationToken);
+            return;
+        }
+
+        db.MasterPlayerSessions.Add(new MasterPlayerSession
+        {
+            Jti = jti,
+            PlayerAccountId = playerAccountId,
+            IssuedAtUtc = jwt.ValidFrom,
+            ExpiresAtUtc = expiresAtUtc,
+            LastSeenAtUtc = DateTime.UtcNow,
+            LastSeenIpAddress = httpContext?.Connection.RemoteIpAddress?.ToString(),
+            UserAgent = httpContext?.Request.Headers.UserAgent.ToString(),
+        });
+        await db.SaveChangesAsync(cancellationToken);
     }
 
 

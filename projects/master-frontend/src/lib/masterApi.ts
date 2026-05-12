@@ -1,5 +1,7 @@
 import { gqlRequest } from './graphql'
 
+const MASTER_API_BASE_URL = (import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:44364/graphql').replace(/\/graphql\/?$/, '')
+
 export interface GameServerSummary {
   id: string
   serverKey: string
@@ -356,6 +358,18 @@ export async function adjustGoldTokenBalance(
     token,
   )
   return data.adjustGoldTokenBalance
+}
+
+export async function revokePlayerSessions(token: string, playerId: string): Promise<void> {
+  const response = await fetch(`${MASTER_API_BASE_URL}/admin/sessions/${playerId}/revoke-all`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+  if (!response.ok) {
+    throw new Error('Failed to revoke sessions.')
+  }
 }
 
 export interface SupportTicketAuditEventInfo {

@@ -12,6 +12,7 @@ const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const API_BASE_URL = (import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:44356/graphql').replace(/\/graphql\/?$/, '')
 
 // ── State ──────────────────────────────────────────────────────────────────────
 
@@ -32,6 +33,22 @@ const displayNameInput = ref('')
 const displayNameSaving = ref(false)
 const displayNameError = ref<string | null>(null)
 const displayNameSuccess = ref(false)
+const sessionsLoading = ref(false)
+const sessionsError = ref<string | null>(null)
+const logoutAllLoading = ref(false)
+const logoutAllSuccess = ref(false)
+const activeSessions = ref<
+  Array<{
+    jti: string
+    device: string
+    ipAddress: string
+    lastSeenAtUtc: string
+    issuedAtUtc: string
+    expiresAtUtc: string
+    isCurrent: boolean
+    isRevoked: boolean
+  }>
+>([])
 
 // ── Computed ───────────────────────────────────────────────────────────────────
 
@@ -206,6 +223,65 @@ function copyProfileUrl() {
   })
 }
 
+function formatSessionDate(value: string): string {
+  return new Intl.DateTimeFormat(
+    locale.value === 'sk' ? 'sk-SK' : locale.value === 'de' ? 'de-DE' : 'en-US',
+    { dateStyle: 'medium', timeStyle: 'short' },
+  ).format(new Date(value))
+}
+
+async function loadSessions() {
+  if (!auth.token || !isOwnProfile.value) {
+    return
+  }
+
+  sessionsLoading.value = true
+  sessionsError.value = null
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/sessions`, {
+      headers: {
+        Authorization: `Bearer ${auth.token}`,
+      },
+    })
+    if (!response.ok) {
+      throw new Error(t('playerProfile.securityLoadError'))
+    }
+    const payload = (await response.json()) as { sessions: typeof activeSessions.value }
+    activeSessions.value = payload.sessions ?? []
+  } catch (e) {
+    sessionsError.value = e instanceof Error ? e.message : t('playerProfile.securityLoadError')
+  } finally {
+    sessionsLoading.value = false
+  }
+}
+
+async function logoutAllDevices() {
+  if (!auth.token || !isOwnProfile.value) {
+    return
+  }
+
+  logoutAllLoading.value = true
+  sessionsError.value = null
+  logoutAllSuccess.value = false
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/logout-all`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${auth.token}`,
+      },
+    })
+    if (!response.ok) {
+      throw new Error(t('playerProfile.securityLogoutAllError'))
+    }
+    logoutAllSuccess.value = true
+    await loadSessions()
+  } catch (e) {
+    sessionsError.value = e instanceof Error ? e.message : t('playerProfile.securityLogoutAllError')
+  } finally {
+    logoutAllLoading.value = false
+  }
+}
+
 // ── Lifecycle ──────────────────────────────────────────────────────────────────
 
 onMounted(async () => {
@@ -218,6 +294,7 @@ onMounted(async () => {
     return
   }
   await fetchProfile()
+  await loadSessions()
 })
 
 onUnmounted(() => {
@@ -296,6 +373,41 @@ onUnmounted(() => {
               <p v-if="displayNameError" class="text-bad text-xs text-center">{{ displayNameError }}</p>
             </div>
           </div>
+
+          <section
+            v-if="isOwnProfile"
+            class="mx-auto mt-4 w-full max-w-[680px] rounded-xl border border-divider bg-surface p-4 text-left"
+            aria-label="Session security"
+          >
+            <div class="mb-3 flex items-center justify-between gap-3">
+              <h2 class="text-base font-semibold">{{ t('playerProfile.securityTitle') }}</h2>
+              <button class="btn btn-secondary btn-sm" :disabled="logoutAllLoading" @click="logoutAllDevices">
+                {{ logoutAllLoading ? t('common.loading') : t('playerProfile.logoutAllDevices') }}
+              </button>
+            </div>
+            <p v-if="logoutAllSuccess" class="text-good text-xs mb-2" role="status">
+              {{ t('playerProfile.securityLogoutAllSuccess') }}
+            </p>
+            <p v-if="sessionsError" class="text-bad text-xs mb-2" role="alert">{{ sessionsError }}</p>
+            <p v-if="sessionsLoading" class="text-muted text-xs">{{ t('common.loading') }}</p>
+            <p v-else-if="activeSessions.length === 0" class="text-muted text-xs">
+              {{ t('playerProfile.securityNoSessions') }}
+            </p>
+            <ul v-else class="space-y-2">
+              <li
+                v-for="session in activeSessions"
+                :key="session.jti"
+                class="rounded-lg border border-divider/70 px-3 py-2 text-xs text-muted"
+              >
+                <div class="flex items-center justify-between gap-2">
+                  <strong class="text-body">{{ session.device }}</strong>
+                  <span v-if="session.isCurrent" class="text-brand">{{ t('playerProfile.securityCurrentSession') }}</span>
+                </div>
+                <div>{{ t('playerProfile.securityIp', { ip: session.ipAddress }) }}</div>
+                <div>{{ t('playerProfile.securityLastSeen', { date: formatSessionDate(session.lastSeenAtUtc) }) }}</div>
+              </li>
+            </ul>
+          </section>
 
           <!-- Rank badge in hero -->
           <div v-if="profile.leaderboardRank > 0" class="text-2xl font-extrabold text-brand mb-2">

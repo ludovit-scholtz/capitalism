@@ -19,7 +19,8 @@ public sealed partial class Mutation
         [Service] IOptions<JwtOptions> jwtOptions,
         [Service] IOptions<AuthOptions> authOptions,
         [Service] MasterRankingService rankingService,
-        [Service] ILoginThrottleService throttle)
+        [Service] ILoginThrottleService throttle,
+        [Service] IHttpContextAccessor httpContextAccessor)
     {
         if (!authOptions.Value.PasswordAuthEnabled)
         {
@@ -142,6 +143,13 @@ public sealed partial class Mutation
         }
 
         var session = GenerateToken(player, jwtOptions.Value);
+        await TrackIssuedSessionAsync(
+            db,
+            player.Id,
+            session.Token,
+            session.ExpiresAtUtc,
+            httpContextAccessor.HttpContext,
+            httpContextAccessor.HttpContext?.RequestAborted ?? CancellationToken.None);
 
         return new MasterAuthPayload
         {
@@ -157,7 +165,8 @@ public sealed partial class Mutation
         [Service] MasterDbContext db,
         [Service] IOptions<JwtOptions> jwtOptions,
         [Service] IOptions<AuthOptions> authOptions,
-        [Service] ILoginThrottleService throttle)
+        [Service] ILoginThrottleService throttle,
+        [Service] IHttpContextAccessor httpContextAccessor)
     {
         if (!authOptions.Value.PasswordAuthEnabled)
         {
@@ -211,6 +220,13 @@ public sealed partial class Mutation
         await db.SaveChangesAsync();
 
         var session = GenerateToken(player, jwtOptions.Value);
+        await TrackIssuedSessionAsync(
+            db,
+            player.Id,
+            session.Token,
+            session.ExpiresAtUtc,
+            httpContextAccessor.HttpContext,
+            httpContextAccessor.HttpContext?.RequestAborted ?? CancellationToken.None);
 
         return new MasterAuthPayload
         {

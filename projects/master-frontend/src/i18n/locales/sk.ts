@@ -225,6 +225,10 @@ export default {
     loadBalancesError: 'Nepodarilo sa načítať zostatky.',
     loadTxError: 'Nepodarilo sa načítať históriu transakcií.',
     adjustFailed: 'Úprava zlyhala.',
+    revokeSessions: 'Zrušiť relácie',
+    revokeSessionsConfirm: 'Zrušiť všetky aktívne relácie tohto hráča?',
+    revokeSessionsSuccess: 'Relácie hráča boli zrušené.',
+    revokeSessionsError: 'Nepodarilo sa zrušiť relácie hráča.',
   },
   referralSetup: {
     title: 'Nastavenie odporúčacieho kódu',

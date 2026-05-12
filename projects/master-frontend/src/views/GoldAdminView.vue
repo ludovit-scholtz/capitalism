@@ -8,6 +8,7 @@ import {
   adjustGoldTokenBalance,
   fetchGoldTokenBalances,
   fetchGoldTokenTransactions,
+  revokePlayerSessions,
   type GoldTokenBalanceInfo,
   type GoldTokenTransactionInfo,
 } from '@/lib/masterApi'
@@ -34,6 +35,7 @@ const adjustNote = ref('')
 const adjustLoading = ref(false)
 const adjustError = ref('')
 const adjustSuccess = ref('')
+const sessionRevokeLoadingPlayerId = ref<string | null>(null)
 
 const txFilterEmail = ref('')
 
@@ -153,6 +155,22 @@ async function handleTxFilter() {
   await loadTransactions(txFilterEmail.value.trim() || undefined)
 }
 
+async function handleRevokeSessions(playerId: string) {
+  if (!auth.token || !confirm(t('goldAdmin.revokeSessionsConfirm'))) {
+    return
+  }
+
+  sessionRevokeLoadingPlayerId.value = playerId
+  try {
+    await revokePlayerSessions(auth.token, playerId)
+    adjustSuccess.value = t('goldAdmin.revokeSessionsSuccess')
+  } catch (e) {
+    adjustError.value = e instanceof Error ? e.message : t('goldAdmin.revokeSessionsError')
+  } finally {
+    sessionRevokeLoadingPlayerId.value = null
+  }
+}
+
 // ── Formatting ─────────────────────────────────────────────────────────────
 
 function formatGold(value: number): string {
@@ -260,9 +278,23 @@ onMounted(async () => {
                   <span class="gold-badge">⚙ {{ formatGold(row.goldTokenBalance) }} g</span>
                 </td>
                 <td>
-                  <button class="select-btn" type="button" @click.stop="selectUser(row.email)">
-                    {{ t('goldAdmin.manage') }}
-                  </button>
+                  <div class="flex flex-col gap-2">
+                    <button class="select-btn" type="button" @click.stop="selectUser(row.email)">
+                      {{ t('goldAdmin.manage') }}
+                    </button>
+                    <button
+                      class="select-btn"
+                      type="button"
+                      :disabled="sessionRevokeLoadingPlayerId === row.playerId"
+                      @click.stop="handleRevokeSessions(row.playerId)"
+                    >
+                      {{
+                        sessionRevokeLoadingPlayerId === row.playerId
+                          ? t('common.loading')
+                          : t('goldAdmin.revokeSessions')
+                      }}
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>

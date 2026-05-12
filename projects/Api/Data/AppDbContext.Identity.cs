@@ -18,6 +18,29 @@ public sealed partial class AppDbContext
             e.Property(p => p.OnboardingCurrentStep).HasMaxLength(40);
             e.Property(p => p.OnboardingIndustry).HasMaxLength(50);
             e.Property(p => p.ConcurrencyToken).IsConcurrencyToken();
+            e.HasMany(p => p.Sessions)
+                .WithOne(session => session.Player)
+                .HasForeignKey(session => session.PlayerId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PlayerSession>(e =>
+        {
+            e.HasKey(session => session.Jti);
+            e.Property(session => session.Jti).HasMaxLength(64);
+            e.Property(session => session.LastSeenIpAddress).HasMaxLength(64);
+            e.Property(session => session.UserAgent).HasMaxLength(512);
+            e.Property(session => session.RevokedReason).HasMaxLength(80);
+            e.HasIndex(session => new { session.PlayerId, session.LastSeenAtUtc });
+            e.HasIndex(session => session.ExpiresAtUtc);
+        });
+
+        modelBuilder.Entity<RevokedToken>(e =>
+        {
+            e.HasKey(token => token.Jti);
+            e.Property(token => token.Jti).HasMaxLength(64);
+            e.HasIndex(token => token.ExpiresAtUtc);
+            e.HasIndex(token => new { token.PlayerId, token.RevokedAtUtc });
         });
 
         modelBuilder.Entity<PlayerApiKey>(e =>

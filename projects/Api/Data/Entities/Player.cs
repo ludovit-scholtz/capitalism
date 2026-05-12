@@ -48,6 +48,12 @@ public sealed class Player
     /// <summary>UTC timestamp until which the player's Pro subscription remains active. Null when inactive.</summary>
     public DateTime? ProSubscriptionEndsAtUtc { get; set; }
 
+    /// <summary>
+    /// Tokens issued before this UTC timestamp are revoked for this player.
+    /// Used for "revoke all sessions" operations.
+    /// </summary>
+    public DateTime? SessionRevokedBeforeUtc { get; set; }
+
     /// <summary>Application-managed concurrency token for optimistic concurrency control.</summary>
     public Guid ConcurrencyToken { get; set; } = Guid.NewGuid();
 
@@ -114,6 +120,9 @@ public sealed class Player
 
     /// <summary>Referral registrations where this player is the referred account.</summary>
     public ICollection<ReferralRegistration> ReferralRegistrations { get; set; } = new List<ReferralRegistration>();
+
+    /// <summary>Known authenticated JWT sessions associated with this player.</summary>
+    public ICollection<PlayerSession> Sessions { get; set; } = new List<PlayerSession>();
 }
 
 /// <summary>Defines the available player roles.</summary>
