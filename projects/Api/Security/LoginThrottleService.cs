@@ -48,15 +48,15 @@ public sealed class LoginThrottleService(
         var lockoutWindow = TimeSpan.FromMinutes(options.Value.LockoutWindowMinutes);
         var countKey = FailureCountKey(normalizedEmail);
 
-        // Increment or initialize the failure counter with a sliding expiry matching the lockout window.
-        var count = cache.GetOrCreate(countKey, entry =>
+        // Store a long[] wrapper so Interlocked.Increment can operate atomically on the
+        // in-cache reference, avoiding TOCTOU races from concurrent failed logins.
+        var counter = cache.GetOrCreate(countKey, entry =>
         {
             entry.SetSlidingExpiration(lockoutWindow);
-            return 0;
+            return new long[] { 0 };
         });
 
-        count++;
-        cache.Set(countKey, count, new MemoryCacheEntryOptions().SetSlidingExpiration(lockoutWindow));
+        var count = Interlocked.Increment(ref counter![0]);
 
         if (count >= maxAttempts)
         {

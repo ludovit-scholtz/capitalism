@@ -66,14 +66,15 @@ public sealed class AuthRateLimitMiddleware(
         var windowSize = TimeSpan.FromMinutes(1);
         var limit = authOptions.Value.RateLimitRequestsPerMinute;
 
-        var count = cache.GetOrCreate(rateKey, entry =>
+        // Store a long[] wrapper so Interlocked.Increment can operate atomically on the
+        // in-cache reference, avoiding TOCTOU races from concurrent requests.
+        var counter = cache.GetOrCreate(rateKey, entry =>
         {
             entry.SetAbsoluteExpiration(windowSize);
-            return 0;
+            return new long[] { 0 };
         });
 
-        count++;
-        cache.Set(rateKey, count, new MemoryCacheEntryOptions().SetAbsoluteExpiration(windowSize));
+        var count = Interlocked.Increment(ref counter![0]);
 
         if (count > limit)
         {
