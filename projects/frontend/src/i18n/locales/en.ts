@@ -1932,6 +1932,14 @@ export default {
         invalid: 'Enter a valid threshold or leave empty.',
         saveFailed: 'Failed to save inventory alert threshold. Please try again.',
       },
+      priceRecommendation: {
+        title: 'Market Price',
+        competitive: 'Competitive',
+        slightlyAbove: 'Slightly above market',
+        overpriced: 'Overpriced',
+        noData: 'No market data yet',
+        tooltip: 'Your price vs the city-wide market clearing price (last 100 ticks). Green = at or below market, amber = 10–30% above, red = >30% above.',
+      },
     },
     unitProductAnalytics: {
       title: 'Product Performance',

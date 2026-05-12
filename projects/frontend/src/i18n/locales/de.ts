@@ -1940,6 +1940,14 @@ export default {
         invalid: 'Geben Sie eine gültige Schwelle ein oder lassen Sie das Feld leer.',
         saveFailed: 'Bestandswarn-Schwelle konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.',
       },
+      priceRecommendation: {
+        title: 'Marktpreis',
+        competitive: 'Wettbewerbsfähig',
+        slightlyAbove: 'Leicht über Markt',
+        overpriced: 'Zu teuer',
+        noData: 'Noch keine Marktdaten',
+        tooltip: 'Ihr Preis vs. stadtweitem Markt-Clearingpreis (letzte 100 Ticks). Grün = am Markt oder darunter, orange = 10–30% darüber, rot = >30% darüber.',
+      },
     },
     unitProductAnalytics: {
       title: 'Produktleistung',

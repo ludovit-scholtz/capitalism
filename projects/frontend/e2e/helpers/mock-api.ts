@@ -626,6 +626,8 @@ export type MockPublicSalesAnalytics = {
   cityCurrencyCode?: string
   /** City-average reference price for the product in the city's local currency. Null when no product configured. */
   cityAveragePrice?: number | null
+  /** City-wide market clearing price (weighted avg across all sellers, last 100 ticks). Null when no city-wide data. */
+  cityMarketClearingPrice?: number | null
   /** Seasonal demand outlook. Null when no DemandSeasonality data for the product. */
   seasonalOutlook?: MockSeasonalOutlook | null
 }

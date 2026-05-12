@@ -1931,6 +1931,14 @@ export default {
         invalid: 'Zadajte platnú prahovú hodnotu alebo nechajte prázdne.',
         saveFailed: 'Prahovú hodnotu upozornenia na zásoby sa nepodarilo uložiť. Skúste to znova.',
       },
+      priceRecommendation: {
+        title: 'Trhová cena',
+        competitive: 'Konkurencieschopná',
+        slightlyAbove: 'Mierne nad trhom',
+        overpriced: 'Príliš drahé',
+        noData: 'Zatiaľ žiadne trhové dáta',
+        tooltip: 'Vaša cena vs trhová zúčtovacia cena v meste (posledných 100 tikov). Zelená = na úrovni alebo pod trhom, oranžová = 10–30% nad, červená = >30% nad.',
+      },
     },
     unitProductAnalytics: {
       title: 'Výkonnosť produktu',

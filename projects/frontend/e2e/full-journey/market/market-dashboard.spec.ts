@@ -233,3 +233,94 @@ test('seller count and industry column are shown', async ({ page }) => {
   await expect(rows.first()).toContainText('FURNITURE')
   await expect(rows.first()).toContainText('3')
 })
+
+test('Vienna city tab shows EUR data', async ({ page }) => {
+  const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+  const state = setupMockApi(page, { players: [player] })
+  state.currentUserId = player.id
+  state.currentToken = `token-${player.id}`
+  state.marketOverviewByCityId = {
+    'city-ba': makeMarketSummary('city-ba', 'Bratislava', 'EUR'),
+    'city-pr': makeMarketSummary('city-pr', 'Prague', 'CZK'),
+    'city-vi': {
+      cityId: 'city-vi',
+      cityName: 'Vienna',
+      currencyCode: 'EUR',
+      fromTick: 0,
+      toTick: 100,
+      products: [
+        {
+          productTypeId: CHAIR_PRODUCT_ID,
+          productName: 'Wooden Chair',
+          industry: 'FURNITURE',
+          totalDemand: 200,
+          totalQuantitySold: 200,
+          satisfactionRate: 1.0,
+          averageClearingPrice: 48.0,
+          totalRevenue: 9600.0,
+          sellerCount: 2,
+        },
+      ],
+    },
+  }
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${player.id}`)
+
+  await page.goto('/market')
+  const cityTabs = page.locator('.city-tabs')
+  await expect(cityTabs.getByRole('button', { name: 'Vienna', exact: true })).toBeVisible()
+  await cityTabs.getByRole('button', { name: 'Vienna', exact: true }).click()
+  // After clicking Vienna, well-supplied badge should appear (100% satisfaction → 'Well supplied')
+  await expect(page.getByText('Well supplied').first()).toBeVisible()
+})
+
+test('shows error state when market data fails to load', async ({ page }) => {
+  const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+  const state = setupMockApi(page, { players: [player] })
+  state.currentUserId = player.id
+  state.currentToken = `token-${player.id}`
+  // Simulate API error by setting no marketOverviewByCityId and overriding the route
+  await page.route('**/graphql', async (route) => {
+    const body = route.request().postDataJSON() as { query?: string }
+    if (body?.query?.includes('marketOverview')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ errors: [{ message: 'Internal server error' }] }),
+      })
+      return
+    }
+    await route.continue()
+  })
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${player.id}`)
+
+  await page.goto('/market')
+  await expect(page.getByText('Failed to load market data', { exact: false })).toBeVisible()
+})
+
+test('market dashboard renders correctly at mobile viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 })
+  const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+  const state = setupMockApi(page, { players: [player] })
+  state.currentUserId = player.id
+  state.currentToken = `token-${player.id}`
+  state.marketOverviewByCityId = {
+    'city-ba': makeMarketSummary('city-ba', 'Bratislava', 'EUR'),
+  }
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${player.id}`)
+
+  await page.goto('/market')
+  await expect(page.getByRole('heading', { name: 'Market Dashboard' })).toBeVisible()
+  await expect(page.getByText('Wooden Chair')).toBeVisible()
+  // Verify no horizontal overflow at mobile width
+  const bodyWidth = await page.evaluate(() => document.body.scrollWidth)
+  expect(bodyWidth).toBeLessThanOrEqual(395) // allow slight tolerance
+})

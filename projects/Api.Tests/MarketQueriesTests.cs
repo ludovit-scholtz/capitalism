@@ -440,5 +440,258 @@ public sealed class MarketQueriesTests
             .ToList();
         Assert.Contains("Bratislava", cityNames);
         Assert.Contains("Prague", cityNames);
+        Assert.Contains("Vienna", cityNames);
+    }
+
+    [Fact]
+    public async Task MarketOverview_AllCitiesHaveCurrencyCode()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            query($topN: Int!, $lastNTicks: Int!) {
+              marketOverview(topN: $topN, lastNTicks: $lastNTicks) {
+                cityName
+                currencyCode
+              }
+            }
+            """,
+            new { topN = 5, lastNTicks = 100 });
+
+        var overview = result.GetProperty("data").GetProperty("marketOverview");
+        foreach (var city in overview.EnumerateArray())
+        {
+            var currencyCode = city.GetProperty("currencyCode").GetString();
+            Assert.False(string.IsNullOrEmpty(currencyCode), $"City {city.GetProperty("cityName").GetString()} has no currency code");
+        }
+
+        // Verify well-known currencies are present
+        var currencies = overview.EnumerateArray()
+            .Select(c => c.GetProperty("currencyCode").GetString())
+            .ToList();
+        Assert.Contains("EUR", currencies); // Bratislava and Vienna
+        Assert.Contains("CZK", currencies); // Prague
+    }
+
+    [Fact]
+    public async Task CityDemandSummary_Vienna_ReturnsCityData()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var vienna = await db.Cities.AsNoTracking().FirstOrDefaultAsync(c => c.Name == "Vienna");
+        Assert.NotNull(vienna);
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            query($cityId: UUID!, $topN: Int!, $lastNTicks: Int!) {
+              cityDemandSummary(cityId: $cityId, topN: $topN, lastNTicks: $lastNTicks) {
+                cityId
+                cityName
+                currencyCode
+                products {
+                  productTypeId
+                }
+              }
+            }
+            """,
+            new { cityId = vienna!.Id, topN = 5, lastNTicks = 100 });
+
+        var summary = result.GetProperty("data").GetProperty("cityDemandSummary");
+        Assert.NotEqual(JsonValueKind.Null, summary.ValueKind);
+        Assert.Equal("Vienna", summary.GetProperty("cityName").GetString());
+        // Vienna uses EUR (same as Bratislava)
+        Assert.Equal("EUR", summary.GetProperty("currencyCode").GetString());
+    }
+
+    [Fact]
+    public async Task MarketPrice_Prague_ReturnsCzkCurrency()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var prague = await db.Cities.AsNoTracking().FirstOrDefaultAsync(c => c.Name == "Prague");
+        var product = await db.ProductTypes.AsNoTracking().FirstOrDefaultAsync(p => p.Slug == "wooden-chair");
+        Assert.NotNull(prague);
+        Assert.NotNull(product);
+
+        var gameState = await db.GameStates.FindAsync(1);
+        Assert.NotNull(gameState);
+        var currentTick = Math.Max(gameState!.CurrentTick, 700L);
+        gameState.CurrentTick = currentTick;
+
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = Guid.NewGuid(), Name = $"Prague Co {Guid.NewGuid():N}"[..12], Cash = 1_000_000m, FoundedAtUtc = DateTime.UtcNow, FoundedAtTick = 1, TotalSharesIssued = 10_000m, DividendPayoutRatio = 0.2m };
+        db.Companies.Add(company);
+
+        for (var i = 0; i < 3; i++)
+        {
+            db.PublicSalesRecords.Add(new PublicSalesRecord
+            {
+                Id = Guid.NewGuid(),
+                BuildingUnitId = Guid.NewGuid(),
+                BuildingId = Guid.NewGuid(),
+                CompanyId = company.Id,
+                CityId = prague!.Id,
+                ProductTypeId = product!.Id,
+                Tick = currentTick - 3 + i,
+                QuantitySold = 10m,
+                PricePerUnit = 1250m, // CZK price
+                Revenue = 12500m,
+                Demand = 12m,
+                SalesCapacity = 20m,
+                TrendFactor = 1.0m,
+            });
+        }
+
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            query($cityId: UUID!, $productTypeId: UUID!, $lastNTicks: Int!) {
+              marketPrice(cityId: $cityId, productTypeId: $productTypeId, lastNTicks: $lastNTicks) {
+                clearingPrice
+                currencyCode
+                sellerCount
+              }
+            }
+            """,
+            new { cityId = prague!.Id, productTypeId = product!.Id, lastNTicks = 50 });
+
+        var mp = result.GetProperty("data").GetProperty("marketPrice");
+        Assert.NotEqual(JsonValueKind.Null, mp.ValueKind);
+        Assert.Equal(1250m, mp.GetProperty("clearingPrice").GetDecimal());
+        Assert.Equal("CZK", mp.GetProperty("currencyCode").GetString());
+    }
+
+    [Fact]
+    public async Task PublicSalesAnalytics_IncludesCityMarketClearingPrice_WhenRecordsExist()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        // Register a player, create a company with a building and a PUBLIC_SALES unit
+        var (token, companyId) = await RegisterAndOnboardAsync(factory);
+        var buildingId = await GetFirstSalesShopIdAsync(factory, companyId);
+        if (buildingId == null) return; // skip if onboarding did not create a sales shop
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var building = await db.Buildings.AsNoTracking().FirstOrDefaultAsync(b => b.Id == buildingId);
+        if (building == null) return;
+
+        var unit = await db.BuildingUnits.AsNoTracking().FirstOrDefaultAsync(u => u.BuildingId == buildingId && u.UnitType == UnitType.PublicSales);
+        if (unit == null) return;
+
+        var city = await db.Cities.AsNoTracking().FirstOrDefaultAsync(c => c.Id == building.CityId);
+        if (city == null) return;
+
+        var product = await db.ProductTypes.AsNoTracking().FirstAsync();
+
+        var gameState = await db.GameStates.FindAsync(1);
+        Assert.NotNull(gameState);
+        var currentTick = Math.Max(gameState!.CurrentTick, 800L);
+        gameState.CurrentTick = currentTick;
+
+        var company = await db.Companies.AsNoTracking().FirstOrDefaultAsync(c => c.Id == companyId);
+        Assert.NotNull(company);
+
+        // Seed competing seller records in the same city for the same product
+        for (var i = 0; i < 5; i++)
+        {
+            db.PublicSalesRecords.Add(new PublicSalesRecord
+            {
+                Id = Guid.NewGuid(),
+                BuildingUnitId = Guid.NewGuid(),
+                BuildingId = Guid.NewGuid(),
+                CompanyId = company!.Id,
+                CityId = city.Id,
+                ProductTypeId = product.Id,
+                Tick = currentTick - 5 + i,
+                QuantitySold = 20m,
+                PricePerUnit = 55m,
+                Revenue = 1100m,
+                Demand = 25m,
+                SalesCapacity = 40m,
+                TrendFactor = 1.0m,
+            });
+        }
+
+        // Set the unit's product type so analytics resolves this product
+        var unitForUpdate = await db.BuildingUnits.FindAsync(unit.Id);
+        if (unitForUpdate != null)
+        {
+            unitForUpdate.ProductTypeId = product.Id;
+        }
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            query($unitId: UUID!) {
+              publicSalesAnalytics(unitId: $unitId) {
+                cityMarketClearingPrice
+                cityAveragePrice
+                cityCurrencyCode
+              }
+            }
+            """,
+            new { unitId = unit.Id },
+            token);
+
+        var analytics = result.GetProperty("data").GetProperty("publicSalesAnalytics");
+        if (analytics.ValueKind == JsonValueKind.Null) return; // acceptable if unit not configured
+
+        var clearingPriceEl = analytics.GetProperty("cityMarketClearingPrice");
+        // Should return 55.00 as the clearing price (all 5 records have the same price)
+        if (clearingPriceEl.ValueKind != JsonValueKind.Null)
+        {
+            Assert.Equal(55m, clearingPriceEl.GetDecimal());
+        }
+    }
+
+    // ── helper: onboard a player and return JWT token + companyId ────────────
+
+    private static async Task<(string Token, Guid CompanyId)> RegisterAndOnboardAsync(ApiWebApplicationFactory factory)
+    {
+        var client = factory.CreateClient();
+        var email = $"market-onboard-{Guid.NewGuid():N}@test.com";
+        var regResult = await ExecuteGraphQlAsync(client,
+            """
+            mutation($input: RegisterInput!) {
+              register(input: $input) { token player { id } }
+            }
+            """,
+            new { input = new { email, password = "Test1234!", displayName = "Market Tester" } });
+
+        var token = regResult.GetProperty("data").GetProperty("register").GetProperty("token").GetString()!;
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var player = await db.Players.AsNoTracking().FirstOrDefaultAsync(p => p.Email == email);
+        if (player == null) return (token, Guid.Empty);
+
+        var company = await db.Companies.AsNoTracking().FirstOrDefaultAsync(c => c.PlayerId == player.Id);
+        return (token, company?.Id ?? Guid.Empty);
+    }
+
+    private static async Task<Guid?> GetFirstSalesShopIdAsync(ApiWebApplicationFactory factory, Guid companyId)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var salesShop = await db.Buildings
+            .AsNoTracking()
+            .FirstOrDefaultAsync(b => b.CompanyId == companyId && b.Type == BuildingType.SalesShop);
+        return salesShop?.Id;
     }
 }

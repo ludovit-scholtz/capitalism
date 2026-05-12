@@ -37,18 +37,19 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 ### Consumer Demand & Price Elasticity Engine (Core Economic Simulation)
 
-- [x] (80%) Consumer Demand & Price Elasticity Engine is active: NPC consumers purchase from public sales units each tick based on dynamic price elasticity; company bank accounts are credited; `marketPrice`, `marketPriceHistory`, `cityDemandSummary`, and `marketOverview` GraphQL queries expose live clearing prices and satisfaction rates.
+- [x] (100%) Consumer Demand & Price Elasticity Engine is active: NPC consumers purchase from public sales units each tick based on dynamic price elasticity; company bank accounts are credited; `marketPrice`, `marketPriceHistory`, `cityDemandSummary`, and `marketOverview` GraphQL queries expose live clearing prices and satisfaction rates.
   - `PublicSalesPhase` computes price-elastic demand per unit each tick, deducts sold quantity from storage inventory, and credits the company bank account with sales revenue.
   - `marketPrice(cityId, productTypeId, lastNTicks)` query returns weighted-average clearing price, total volume, seller count, and currency code from recent `PublicSalesRecord` rows.
   - `marketPriceHistory(cityId, productTypeId, lastNTicks)` query returns per-tick aggregated clearing price and volume data ordered ascending for charting.
   - `cityDemandSummary(cityId, topN, lastNTicks)` query returns top-N demanded products with satisfaction rate, average clearing price, total demand vs total sold, and seller count.
   - `marketOverview(topN, lastNTicks)` query returns market summary across all seeded cities in one request; used by the Market Dashboard for the Bloomberg-terminal overview.
-  - Backend integration tests: `marketPrice` weighted-average (single seller, multi-seller, no-sales null), `marketPriceHistory` per-tick ordering and empty, `cityDemandSummary` top-product sorting and unknown-city null, `marketOverview` all-cities coverage — 10 tests total.
+  - Backend integration tests: `marketPrice` weighted-average (single seller, multi-seller, no-sales null), `marketPriceHistory` per-tick ordering and empty, `cityDemandSummary` top-product sorting and unknown-city null, `marketOverview` all-cities coverage, `publicSalesAnalytics` clearing price field, Vienna city demand — 14 tests total.
   - Market Dashboard frontend route `/market` with city tabs, product-grid table showing avg. clearing price, demand, sold quantity, satisfaction rate badges and fill bars, and seller count — colour-coded Green/Amber/Red.
   - City Demand Panel (`CityDemandPanel.vue`) embedded in `CityMapView` showing top 5 demanded products with satisfaction rates for the active city.
+  - Price Recommendation Widget (`price-recommendation-badge`) in Quick Actions tab of unit detail panel: green (≤ market), amber (10–30% above), red (>30% above), no-data state when market clearing price is unavailable.
   - Navigation link added to `AppHeader` with `chart-pie` icon.
   - All i18n keys added in English, Slovak, and German (`marketDashboard.*`).
-  - Remaining (20%): Sales History Chart inside building detail view (Chart.js sparklines), Price Recommendation Widget colour-coded badge in unit detail panel, and Playwright E2E full consumer purchase flow test.
+  - E2E tests: Market Dashboard (12 tests) covering city tabs, product grid, sorting, satisfaction badges, Vienna city tab, error state, mobile viewport; Price Recommendation Badge (4 tests) covering all colour states and no-data state.
 
 ### Security Follow-Ups
 

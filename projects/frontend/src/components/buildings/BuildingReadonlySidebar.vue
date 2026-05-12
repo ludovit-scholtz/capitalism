@@ -331,6 +331,47 @@ function buildCompetitionPieGradient(entries: CompetitionLegendEntry[]): string 
                 <span class="mi-metric-label text-[0.65rem] font-semibold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.configuredPrice') }}</span
                 ><strong class="mi-metric-value text-base font-semibold text-foreground">{{ formatCurrency(currentPublicSalesMinPrice) }}</strong>
               </div>
+              <!-- Price Recommendation Badge — shows player price vs city-wide market clearing price -->
+              <div
+                v-if="publicSalesAnalytics"
+                class="price-recommendation-badge mt-3 flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs"
+                :class="
+                  publicSalesAnalytics.cityMarketClearingPrice == null
+                    ? 'border-divider bg-surface text-muted'
+                    : currentPublicSalesMinPrice <= 0 || currentPublicSalesMinPrice <= publicSalesAnalytics.cityMarketClearingPrice
+                      ? 'border-emerald-400/50 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300'
+                      : currentPublicSalesMinPrice <= publicSalesAnalytics.cityMarketClearingPrice * 1.3
+                        ? 'border-amber-400/50 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                        : 'border-red-400/50 bg-red-500/10 text-red-700 dark:text-red-300'
+                "
+                :title="t('buildingDetail.marketIntelligence.priceRecommendation.tooltip')"
+              >
+                <span class="font-semibold uppercase tracking-wide">{{ t('buildingDetail.marketIntelligence.priceRecommendation.title') }}</span>
+                <span v-if="publicSalesAnalytics.cityMarketClearingPrice == null" class="text-muted">
+                  {{ t('buildingDetail.marketIntelligence.priceRecommendation.noData') }}
+                </span>
+                <span v-else class="flex items-center gap-1.5">
+                  <strong>{{ formatCurrency(publicSalesAnalytics.cityMarketClearingPrice) }}</strong>
+                  <span
+                    class="price-rec-label rounded-full border px-1.5 py-0.5 text-[0.6rem] font-bold uppercase"
+                    :class="
+                      currentPublicSalesMinPrice <= 0 || currentPublicSalesMinPrice <= publicSalesAnalytics.cityMarketClearingPrice
+                        ? 'border-emerald-400/50 bg-emerald-500/15'
+                        : currentPublicSalesMinPrice <= publicSalesAnalytics.cityMarketClearingPrice * 1.3
+                          ? 'border-amber-400/50 bg-amber-500/15'
+                          : 'border-red-400/50 bg-red-500/15'
+                    "
+                  >
+                    {{
+                      currentPublicSalesMinPrice <= 0 || currentPublicSalesMinPrice <= publicSalesAnalytics.cityMarketClearingPrice
+                        ? t('buildingDetail.marketIntelligence.priceRecommendation.competitive')
+                        : currentPublicSalesMinPrice <= publicSalesAnalytics.cityMarketClearingPrice * 1.3
+                          ? t('buildingDetail.marketIntelligence.priceRecommendation.slightlyAbove')
+                          : t('buildingDetail.marketIntelligence.priceRecommendation.overpriced')
+                    }}
+                  </span>
+                </span>
+              </div>
               <div class="mt-3" :aria-label="t('buildingDetail.accessibility.quickPriceUpdate')">
                 <!-- Directional impact hint derived from elasticity -->
                 <div

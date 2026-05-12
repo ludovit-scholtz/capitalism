@@ -316,6 +316,14 @@ public sealed class PublicSalesAnalytics
     /// Null when no DemandSeasonality data exists for the product (defaults to 1.0× demand).
     /// </summary>
     public SeasonalOutlook? SeasonalOutlook { get; set; }
+    /// <summary>
+    /// City-wide market clearing price for this product in the last 100 ticks, computed as
+    /// the weighted average across all sellers in this city.  Used by the price recommendation
+    /// widget to show whether the player's price is competitive (green), slightly above market
+    /// (amber 10–30%), or significantly overpriced (red &gt;30%).
+    /// Null when no city-wide sales data exists yet.
+    /// </summary>
+    public decimal? CityMarketClearingPrice { get; set; }
 }
 
 public sealed class ProfitTickSnapshot
