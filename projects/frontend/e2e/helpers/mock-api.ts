@@ -1319,6 +1319,27 @@ export type MockState = {
       reserveRemaining: number
     }>
   } | null
+  /** Mock marketOverview data returned by the marketOverview query. Keyed by cityId, or use '__all__' for all-city results. */
+  marketOverviewByCityId: Record<string, MockMarketDemandSummary | null>
+}
+
+export interface MockMarketDemandSummary {
+  cityId: string
+  cityName: string
+  currencyCode: string
+  fromTick: number
+  toTick: number
+  products: Array<{
+    productTypeId: string
+    productName: string
+    industry: string
+    totalDemand: number
+    totalQuantitySold: number
+    satisfactionRate: number
+    averageClearingPrice: number
+    totalRevenue: number
+    sellerCount: number
+  }>
 }
 
 export interface MockBuildingMarketListing {
@@ -3091,6 +3112,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     goldAmmSwapHistory: [],
     marketReports: [],
     supplyChainData: {},
+    marketOverviewByCityId: {},
     buildingMarketListings: [],
     myBuildingListings: [],
     tradeRoutes: [],
@@ -9093,7 +9115,13 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       !q.includes('getMineDepletionForecast') &&
       !q.includes('getMineExtractionIntelligence') &&
       // endgameStatus contains 'me' as substring (endga**me**Status)
-      !q.includes('endgameStatus')
+      !q.includes('endgameStatus') &&
+      // market queries include cityName/productName fields which contain 'me' as substring
+      !q.includes('marketOverview') &&
+      !q.includes('marketPrice') &&
+      !q.includes('cityDemandSummary') &&
+      // cities query contains 'name' field which has 'me' as substring; not a me query
+      !q.includes('cities')
 
     if (isStandaloneMeQuery(query)) {
       const player = resolveCurrentPlayer()
@@ -9299,7 +9327,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
-    if (query.includes('marketIntelligence')) {
+    if (query.includes('marketIntelligence') && !query.includes('marketOverview')) {
       const cityId: string = body.variables?.cityId ?? ''
       const city = state.cities.find((entry) => entry.id === cityId)
       const result = state.marketIntelligenceByCity[cityId] ?? {
@@ -9314,6 +9342,72 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { marketIntelligence: result } }),
+      })
+    }
+
+    if (query.includes('marketOverview')) {
+      const topN: number = body.variables?.topN ?? 10
+      const tick = state.gameState.currentTick
+      const overviewResults = state.cities.map((city) => {
+        const overridden = state.marketOverviewByCityId[city.id]
+        if (overridden) return overridden
+        return {
+          cityId: city.id,
+          cityName: city.name,
+          currencyCode: city.currencyCode ?? 'EUR',
+          fromTick: Math.max(0, tick - 99),
+          toTick: tick,
+          products: (state.productTypes ?? [])
+            .slice(0, topN)
+            .map((pt, idx) => ({
+              productTypeId: pt.id,
+              productName: pt.name,
+              industry: pt.industry,
+              totalDemand: 500 + idx * 50,
+              totalQuantitySold: 400 + idx * 40,
+              satisfactionRate: 0.5 + idx * 0.05,
+              averageClearingPrice: pt.basePrice ?? (10 + idx * 5),
+              totalRevenue: (pt.basePrice ?? 15) * (400 + idx * 40),
+              sellerCount: 1 + idx,
+            })),
+        }
+      })
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { marketOverview: overviewResults } }),
+      })
+    }
+
+    if (query.includes('cityDemandSummary')) {
+      const cityId: string = body.variables?.cityId ?? ''
+      const topN: number = body.variables?.topN ?? 5
+      const tick = state.gameState.currentTick
+      const city = state.cities.find((c) => c.id === cityId)
+      const overridden = state.marketOverviewByCityId[cityId]
+      const products = (overridden?.products ?? (state.productTypes ?? []).slice(0, topN).map((pt, idx) => ({
+        productTypeId: pt.id,
+        productName: pt.name,
+        industry: pt.industry,
+        totalDemand: 500 + idx * 50,
+        totalQuantitySold: 400 + idx * 40,
+        satisfactionRate: 0.5 + idx * 0.05,
+        averageClearingPrice: pt.basePrice ?? (10 + idx * 5),
+        totalRevenue: (pt.basePrice ?? 15) * (400 + idx * 40),
+        sellerCount: 1 + idx,
+      }))).slice(0, topN)
+      const result = {
+        cityId,
+        cityName: city?.name ?? 'Unknown City',
+        currencyCode: city?.currencyCode ?? 'EUR',
+        fromTick: Math.max(0, tick - 99),
+        toTick: tick,
+        products,
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { cityDemandSummary: result } }),
       })
     }
 
