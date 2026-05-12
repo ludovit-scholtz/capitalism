@@ -3,6 +3,7 @@ using Api.Data.Entities;
 using Api.Engine;
 using Api.Security;
 using Api.Utilities;
+using HotChocolate.CostAnalysis.Types;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
 
@@ -35,6 +36,7 @@ public sealed partial class Query
         };
 
     /// <summary>Lists building lots for a city, including ownership and availability state.</summary>
+    [Cost(40)]
     public async Task<List<BuildingLot>> GetCityLots(Guid cityId, [Service] AppDbContext db)
     {
         await EnsureCanonicalResourceCatalogAsync(db);
@@ -166,6 +168,7 @@ public sealed partial class Query
     /// Covers finished goods, intermediate goods, and any product types on the exchange.
     /// This query is public and does not require authentication.
     /// </summary>
+    [Cost(20)]
     public async Task<List<GlobalExchangeProductListing>> GetGlobalExchangeProductListings(
         Guid? productTypeId,
         [Service] AppDbContext db)

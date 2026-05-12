@@ -3,6 +3,7 @@ using Api.Data.Entities;
 using Api.Engine;
 using Api.Security;
 using Api.Utilities;
+using HotChocolate.CostAnalysis.Types;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -16,6 +17,7 @@ public sealed partial class Query
 
     /// <summary>Returns a financial ledger summary for a company (requires auth — must own company).</summary>
     [Authorize]
+    [Cost(50)]
     public async Task<CompanyLedgerSummary?> GetCompanyLedger(
         Guid companyId,
         int? gameYear,
@@ -311,6 +313,7 @@ public sealed partial class Query
 
     /// <summary>Returns drill-down entries for a specific ledger category.</summary>
     [Authorize]
+    [Cost(35)]
     public async Task<List<LedgerEntryResult>> GetLedgerDrillDown(
         Guid companyId,
         string category,

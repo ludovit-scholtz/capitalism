@@ -9,6 +9,8 @@ using MasterApi.Data.Entities;
 using MasterApi.Security;
 using MasterApi.Utilities;
 using Capitalism.Shared.Security;
+using HotChocolate.AspNetCore;
+using HotChocolate.CostAnalysis;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -32,9 +34,16 @@ public class Program
             builder.Configuration.GetSection(BiatecOidcOptions.SectionName));
         builder.Services.Configure<AuthOptions>(
             builder.Configuration.GetSection(AuthOptions.SectionName));
+        builder.Services.Configure<GraphQlSecurityOptions>(
+            builder.Configuration.GetSection(GraphQlSecurityOptions.SectionName));
 
         var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
             ?? new JwtOptions();
+        var graphQlSecurityOptions = builder.Configuration.GetSection(GraphQlSecurityOptions.SectionName).Get<GraphQlSecurityOptions>()
+            ?? new GraphQlSecurityOptions();
+        var graphQlMaxDepth = Math.Max(1, graphQlSecurityOptions.MaxDepth);
+        var graphQlMaxComplexity = Math.Max(1, graphQlSecurityOptions.MaxComplexity);
+        var graphQlMaxPageSize = Math.Max(1, graphQlSecurityOptions.MaxPageSize);
         var biatecOidcOptions = builder.Configuration.GetSection(BiatecOidcOptions.SectionName).Get<BiatecOidcOptions>()
             ?? new BiatecOidcOptions();
         static string NormalizeIssuer(string issuer) => issuer.Trim().TrimEnd('/');
@@ -231,6 +240,24 @@ public class Program
                 options.IncludeExceptionDetails = builder.Environment.IsDevelopment()
                     || builder.Environment.IsEnvironment("Testing");
             })
+            .AddMaxExecutionDepthRule(
+                graphQlMaxDepth,
+                skipIntrospectionFields: false,
+                allowRequestOverrides: false,
+                (_, _) => true)
+            .AddCostAnalyzer()
+            .ModifyCostOptions(options =>
+            {
+                options.MaxFieldCost = graphQlMaxComplexity;
+                options.MaxTypeCost = graphQlMaxComplexity;
+                options.EnforceCostLimits = true;
+                options.ApplyCostDefaults = true;
+                options.SkipAnalyzer = false;
+            })
+            .ModifyPagingOptions(options =>
+            {
+                options.MaxPageSize = graphQlMaxPageSize;
+            })
             .AddAuthorization()
             .AddQueryType<MasterApi.Types.Query>()
             .AddMutationType<MasterApi.Types.Mutation>();
@@ -243,6 +270,7 @@ public class Program
         app.UseMiddleware<AuthRateLimitMiddleware>();
         app.UseAuthentication();
         app.UseAuthorization();
+        app.UseMiddleware<GraphQlRequestSecurityMiddleware>();
 
         app.MapGet("/", () => Results.Ok(new
         {
@@ -252,7 +280,14 @@ public class Program
         }));
 
         app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
-        app.MapGraphQL();
+        app.MapGraphQL().WithOptions(new GraphQLServerOptions
+        {
+            EnableSchemaRequests = builder.Environment.IsDevelopment(),
+            Tool =
+            {
+                Enable = builder.Environment.IsDevelopment(),
+            },
+        });
 
         using (var scope = app.Services.CreateScope())
         {
