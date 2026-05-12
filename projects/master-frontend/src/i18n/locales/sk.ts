@@ -40,6 +40,7 @@ export default {
     bounties: 'Odmeny',
     referralDashboard: 'Odporúčania',
     tokenizedGold: 'Tokenizované zlato',
+    gameSettings: 'Nastavenia hry',
     apiKeys: 'API kľúče',
   },
   themeSwitcher: {
@@ -183,6 +184,28 @@ export default {
     note: 'Poznámka',
     dash: '-',
   },
+  gameSettings: {
+    kicker: 'Identita naprieč servermi',
+    title: 'Nastavenia hry',
+    subtitle:
+      'Spravujte meno osobného účtu, ktoré sa zobrazuje na všetkých herných serveroch Capitalism a v rebríčkoch.',
+    cardTitle: 'Meno osobného účtu',
+    cardBody:
+      'Tento alias naprieč servermi je uložený na master serveri a znovu použitý každým bežiacim herným shard-om.',
+    warning:
+      'Nepoužívajte svoju skutočnú právnu identitu. Zvoľte si fiktívny alias pre verejné rebríčky a hráčske povrchy.',
+    nameLabel: 'Meno osobného účtu',
+    namePlaceholder: 'Zadajte meno osobného účtu',
+    save: 'Uložiť zmeny',
+    saved: 'Meno osobného účtu bolo aktualizované.',
+    saveError: 'Nepodarilo sa aktualizovať meno osobného účtu.',
+    usageTitleShard: 'Použitie na shard-e',
+    usageBodyShard:
+      'Aktualizovaný alias sa odošle na bežiace herné shard-y a zobrazí sa v shard rebríčkoch aj menovkách osobného účtu.',
+    usageTitleMaster: 'Použitie na masteri',
+    usageBodyMaster:
+      'Rovnaké meno sa používa v master rebríčku, vašom master profile a na zdieľaných povrchoch naprieč servermi.',
+  },
   goldAdmin: {
     kicker: 'Master administrácia',
     title: 'Správa zlatých tokenov',
@@ -288,10 +311,12 @@ export default {
     referralCode: 'Odporúčací kód',
     registeredUsers: 'Registrovaní používatelia',
     shareLinksTitle: 'Zdieľateľné odporúčacie odkazy',
-    shareLinksSubtitle: 'Skopírujte odkaz a zdieľajte ho s priateľmi. Noví hráči, ktorí sa zaregistrujú cez váš odkaz, dostanú 10% zľavu na nákupy v hre.',
+    shareLinksSubtitle:
+      'Skopírujte odkaz a zdieľajte ho s priateľmi. Noví hráči, ktorí sa zaregistrujú cez váš odkaz, dostanú 10% zľavu na nákupy v hre.',
     copyLink: 'Kopírovať odkaz',
     linkCopied: 'Skopírované!',
-    serverLoadFailed: 'Nepodarilo sa načítať herné servery. Zdieľateľné odkazy sú dočasne nedostupné.',
+    serverLoadFailed:
+      'Nepodarilo sa načítať herné servery. Zdieľateľné odkazy sú dočasne nedostupné.',
   },
   support: {
     title: 'Tikety podpory',
@@ -552,7 +577,8 @@ export default {
   },
   apiKeys: {
     title: 'API kľúče',
-    subtitle: 'Spravujte osobné API kľúče s rozsahmi oprávnení pre programový prístup k vašim herným spoločnostiam.',
+    subtitle:
+      'Spravujte osobné API kľúče s rozsahmi oprávnení pre programový prístup k vašim herným spoločnostiam.',
     generateButton: 'Vygenerovať nový kľúč',
     generateModalTitle: 'Nový API kľúč',
     generateModalNameLabel: 'Názov kľúča',
@@ -586,7 +612,8 @@ export default {
     loadError: 'Nepodarilo sa načítať API kľúče.',
     adminLoadError: 'Nepodarilo sa načítať administrátorské údaje o API kľúčoch.',
     never: 'Nikdy',
-    authInstructions: 'Použite váš API kľúč v požiadavkách s hlavičkou: Authorization: ApiKey <váš-kľúč>',
+    authInstructions:
+      'Použite váš API kľúč v požiadavkách s hlavičkou: Authorization: ApiKey <váš-kľúč>',
     auditTitle: 'Nedávna auditná stopa API kľúčov',
     auditOperation: 'Operácia',
     auditScope: 'Použitý rozsah',
@@ -604,7 +631,8 @@ export default {
     companyScopeTitle: 'Povolené firmy',
     companyScopeHelp: 'Kľúče s rozsahom company-bound môžu konať iba za vybrané firmy.',
     adminTitle: 'Administrátorská kontrola a núdzové odvolanie',
-    adminSubtitle: 'Filtrujte hráčske kľúče, kontrolujte auditné záznamy a odvolajte kompromitované kľúče.',
+    adminSubtitle:
+      'Filtrujte hráčske kľúče, kontrolujte auditné záznamy a odvolajte kompromitované kľúče.',
     adminFilterLabel: 'Filtrovať podľa e-mailu hráča',
     adminPlayer: 'Hráč',
     adminRevokeButton: 'Vynútiť odvolanie',
@@ -617,10 +645,14 @@ export default {
       companyBound: 'Viazané na firmu',
     },
     scopeDescriptions: {
-      readOnly: 'Povoľuje iba query operácie. Každá mutácia sa odmietne so štruktúrovanou odpoveďou 403.',
-      botOnly: 'Povoľuje automatizačné toky ako správa firiem a konfigurácia výroby, ale blokuje forex, akcie a priame mutácie nákupu budov.',
-      tradingOnly: 'Povoľuje iba forexové a akciové obchodné mutácie. Administrátorské, úverové a stavebné operácie ostávajú blokované.',
-      companyBound: 'Pridáva deny-by-default firemnú hranicu. Kľúč môže konať iba za vybrané identifikátory firiem.',
+      readOnly:
+        'Povoľuje iba query operácie. Každá mutácia sa odmietne so štruktúrovanou odpoveďou 403.',
+      botOnly:
+        'Povoľuje automatizačné toky ako správa firiem a konfigurácia výroby, ale blokuje forex, akcie a priame mutácie nákupu budov.',
+      tradingOnly:
+        'Povoľuje iba forexové a akciové obchodné mutácie. Administrátorské, úverové a stavebné operácie ostávajú blokované.',
+      companyBound:
+        'Pridáva deny-by-default firemnú hranicu. Kľúč môže konať iba za vybrané identifikátory firiem.',
     },
   },
   securityBoard: {
@@ -630,8 +662,7 @@ export default {
       'Živý pohľad na všetky zistenia auditu z /audits/*.md. Zistenia s vysokou a kritickou závažnosťou vyžadujú prepojenie s implementačným issues pred podpisom vydania.',
     allClearTitle: 'Všetko v poriadku 🎉',
     lastRun: 'Naposledy aktualizované: {date}',
-    gateWarning:
-      '{count} neprepojených High/Critical zistenie(í) blokuje bránu podpisu vydania.',
+    gateWarning: '{count} neprepojených High/Critical zistenie(í) blokuje bránu podpisu vydania.',
     gateHint:
       'Pridajte <!-- issue: #NNN --> do riadku Stav zistenia v súbore audit .md na prepojenie implementačného issues.',
     filterSeverity: 'Závažnosť',

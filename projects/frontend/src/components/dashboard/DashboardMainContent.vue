@@ -11,6 +11,7 @@ import SupplyChainPanel from '@/components/dashboard/SupplyChainPanel.vue'
 import FinancialSummaryCard from '@/components/dashboard/FinancialSummaryCard.vue'
 import StarterGuidance from '@/components/dashboard/StarterGuidance.vue'
 import DashboardChatPanel from '@/components/dashboard/DashboardChatPanel.vue'
+import DashboardPersonalSettingsPanel from '@/components/dashboard/DashboardPersonalSettingsPanel.vue'
 import DashboardTabNav from '@/components/dashboard/DashboardTabNav.vue'
 import EconomyCycleWidget from '@/components/dashboard/EconomyCycleWidget.vue'
 import BuildingHeaderFinancials from '@/components/buildings/BuildingHeaderFinancials.vue'
@@ -69,15 +70,16 @@ function setActiveTab(tab: 'overview' | 'buildings' | 'activity' | 'chat' | 'pro
 }
 
 const _savedPersonTab = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('person_account_tab') : null
-const personAccountTab = ref<'overview' | 'create-company' | 'ledger'>((_savedPersonTab as 'overview' | 'create-company' | 'ledger') || 'overview')
+const personAccountTab = ref<'overview' | 'create-company' | 'ledger' | 'settings'>((_savedPersonTab as 'overview' | 'create-company' | 'ledger' | 'settings') || 'overview')
 function setPersonAccountTab(tab: string) {
-  personAccountTab.value = tab as 'overview' | 'create-company' | 'ledger'
+  personAccountTab.value = tab as 'overview' | 'create-company' | 'ledger' | 'settings'
   if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('person_account_tab', tab)
 }
 const personAccountTabs = computed(() => [
   { key: 'overview', label: t('dashboard.personTabOverview') },
   { key: 'create-company', label: t('dashboard.personTabCreateCompany') },
   { key: 'ledger', label: t('dashboard.personTabLedger') },
+  { key: 'settings', label: t('dashboard.personTabSettings') },
 ])
 
 // ── Computed helpers ──────────────────────────────────────────────────────────
@@ -146,9 +148,7 @@ function powerBalanceClass(status: string): string {
 function miningEfficiencyPercent(building: Company['buildings'][number]): number | null {
   if (building.lotOriginalMaterialQuantity == null || building.lotOriginalMaterialQuantity <= 0) return null
   if (building.lotMaterialQuantity == null) return null
-  return Math.round(
-    computeMiningEfficiencyFactor(building.lotMaterialQuantity, building.lotOriginalMaterialQuantity) * 100,
-  )
+  return Math.round(computeMiningEfficiencyFactor(building.lotMaterialQuantity, building.lotOriginalMaterialQuantity) * 100)
 }
 
 function formatCurrency(value: number, currencyCode = 'EUR'): string {
@@ -274,12 +274,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <EconomyCycleWidget
-    :economic-cycle="economicCycle"
-    :active-market-events="activeMarketEvents"
-    :economic-history="economicHistory"
-    class="mb-6"
-  />
+  <EconomyCycleWidget :economic-cycle="economicCycle" :active-market-events="activeMarketEvents" :economic-history="economicHistory" class="mb-6" />
 
   <!-- Person account mode (no company selected) -->
   <section v-if="isPersonAccount" class="person-account-panel mt-6 p-6 border border-divider rounded-xl bg-card">
@@ -340,10 +335,7 @@ onMounted(() => {
         </div>
 
         <!-- Prerequisites checklist shown when NOT all met -->
-        <ul
-          v-if="!additionalCompanyPrerequisites.allRequirementsMet"
-          class="nc-prereq-list mt-4 flex flex-col gap-1.5 text-sm list-none p-0 m-0"
-        >
+        <ul v-if="!additionalCompanyPrerequisites.allRequirementsMet" class="nc-prereq-list mt-4 flex flex-col gap-1.5 text-sm list-none p-0 m-0">
           <li :class="additionalCompanyPrerequisites.companyAgeRequirementMet ? 'text-good' : 'text-muted'">
             {{
               additionalCompanyPrerequisites.companyAgeRequirementMet
@@ -355,7 +347,11 @@ onMounted(() => {
             {{ additionalCompanyPrerequisites.profitabilityRequirementMet ? t('dashboard.prereqProfitabilityMet') : t('dashboard.prereqProfitabilityNotMet') }}
           </li>
           <li :class="additionalCompanyPrerequisites.balanceRequirementMet ? 'text-good' : 'text-muted'">
-            {{ additionalCompanyPrerequisites.balanceRequirementMet ? t('dashboard.prereqBalanceMet') : t('dashboard.prereqBalanceNotMet', { required: '200,000', current: Math.floor(additionalCompanyPrerequisites.personalBalanceUsd).toLocaleString() }) }}
+            {{
+              additionalCompanyPrerequisites.balanceRequirementMet
+                ? t('dashboard.prereqBalanceMet')
+                : t('dashboard.prereqBalanceNotMet', { required: '200,000', current: Math.floor(additionalCompanyPrerequisites.personalBalanceUsd).toLocaleString() })
+            }}
           </li>
           <li :class="additionalCompanyPrerequisites.underMaxCap ? 'text-good' : 'text-bad'">
             {{ additionalCompanyPrerequisites.underMaxCap ? t('dashboard.prereqMaxCapMet') : t('dashboard.prereqMaxCapNotMet') }}
@@ -413,6 +409,11 @@ onMounted(() => {
       <div class="person-account-ledger-link mb-5">
         <RouterLink to="/personal-ledger" class="btn btn-primary inline-flex items-center gap-1.5"> 📒 {{ t('dashboard.viewPersonalLedger') }} </RouterLink>
       </div>
+    </div>
+
+    <!-- ── Settings tab ───────────────────────────────────────────────────── -->
+    <div v-show="personAccountTab === 'settings'" class="pt-5" role="tabpanel" :aria-label="t('dashboard.personTabSettings')">
+      <DashboardPersonalSettingsPanel @saved="emit('refresh-dashboard')" />
     </div>
   </section>
 
@@ -521,7 +522,7 @@ onMounted(() => {
                         ? 'bg-red-500/20 text-red-700 dark:text-red-400 border-red-400/30'
                         : 'bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-400/30'
                   "
-                  :title="t('mining.dashboardBadgeTooltip', { percent: Math.round((building.lotMaterialQuantity ?? 0) / (building.lotOriginalMaterialQuantity ?? 1) * 100) })"
+                  :title="t('mining.dashboardBadgeTooltip', { percent: Math.round(((building.lotMaterialQuantity ?? 0) / (building.lotOriginalMaterialQuantity ?? 1)) * 100) })"
                   :aria-label="t('mining.depletionRisk')"
                 >
                   {{
@@ -636,11 +637,5 @@ onMounted(() => {
   </div>
 
   <!-- Launch New Company Modal -->
-  <NewCompanyModal
-    :open="showNewCompanyModal"
-    :cities="dashboardCities"
-    :prerequisites="additionalCompanyPrerequisites"
-    @close="showNewCompanyModal = false"
-    @launched="onNewCompanyLaunched"
-  />
+  <NewCompanyModal :open="showNewCompanyModal" :cities="dashboardCities" :prerequisites="additionalCompanyPrerequisites" @close="showNewCompanyModal = false" @launched="onNewCompanyLaunched" />
 </template>

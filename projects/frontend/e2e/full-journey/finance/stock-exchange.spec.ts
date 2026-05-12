@@ -32,11 +32,7 @@ async function switchNavbarAccount(page: Page, accountName: string) {
   await switcher.getByRole('menuitemradio', { name: new RegExp(accountName) }).click()
 }
 
-function seedPersonalUsdSettlementAccount(
-  state: ReturnType<typeof setupMockApi>,
-  player: { id: string; displayName: string },
-  balance = 250_000,
-) {
+function seedPersonalUsdSettlementAccount(state: ReturnType<typeof setupMockApi>, player: { id: string; displayName: string }, balance = 250_000) {
   const accountDigits = makeTestAccountNumber(player.id, '9')
   state.myBankAccounts.push({
     id: `bank-person-usd-${player.id}`,
@@ -49,11 +45,7 @@ function seedPersonalUsdSettlementAccount(
   })
 }
 
-function seedCompanyUsdSettlementAccount(
-  state: ReturnType<typeof setupMockApi>,
-  company: MockCompany,
-  balance = 500_000,
-) {
+function seedCompanyUsdSettlementAccount(state: ReturnType<typeof setupMockApi>, company: MockCompany, balance = 500_000) {
   const accountDigits = makeTestAccountNumber(company.id, '8')
   state.myBankAccounts.push({
     id: `bank-company-usd-${company.id}`,
@@ -190,11 +182,9 @@ test.describe('Stock exchange', () => {
         { companyId: 'company-gov', ownerPlayerId: 'player-gov', ownerCompanyId: null, shareCount: 10000 },
       ],
     })
-    const currentPlayer = state.players.find((candidate) => candidate.id === player.id)
-    if (currentPlayer) {
-      currentPlayer.activeAccountType = 'PERSON'
-      currentPlayer.activeCompanyId = null
-    }
+    const currentPlayer = state.players.find((candidate) => candidate.id === player.id)!
+    currentPlayer.activeAccountType = 'PERSON'
+    currentPlayer.activeCompanyId = null
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
 
@@ -335,9 +325,7 @@ test.describe('Stock exchange', () => {
   test('table can be sorted by market value descending and ascending', async ({ page }) => {
     const player = makePlayer({
       personalCash: 100000,
-      companies: [
-        makeControlledCompany({ id: 'company-small', name: 'Small Corp', cash: 10000, totalSharesIssued: 1000 }),
-      ],
+      companies: [makeControlledCompany({ id: 'company-small', name: 'Small Corp', cash: 10000, totalSharesIssued: 1000 })],
     })
     const rival = makePlayer({
       id: 'player-sort',
@@ -487,9 +475,7 @@ test.describe('Stock exchange', () => {
     await expect(proposalCard).toContainText('Your vote: FOR')
   })
 
-  test('trade controls — quantity input and buy/sell buttons are vertically aligned in the same row', async ({
-    page,
-  }) => {
+  test('trade controls — quantity input and buy/sell buttons are vertically aligned in the same row', async ({ page }) => {
     const player = makePlayer({
       personalCash: 150000,
       companies: [makeControlledCompany()],
@@ -1600,9 +1586,7 @@ test.describe('Stock exchange', () => {
 
     const state = setupMockApi(page, {
       players: [rival],
-      shareholdings: [
-        { companyId: 'company-public', ownerPlayerId: 'player-public', ownerCompanyId: null, shareCount: 5000 },
-      ],
+      shareholdings: [{ companyId: 'company-public', ownerPlayerId: 'player-public', ownerCompanyId: null, shareCount: 5000 }],
     })
     // No currentUserId — unauthenticated
     state.currentUserId = null
@@ -2592,9 +2576,7 @@ test.describe('Stock exchange — merge company flow', () => {
 
     const state = setupMockApi(page, {
       players: [owner],
-      shareholdings: [
-        { companyId: 'company-home', ownerPlayerId: 'player-1', ownerCompanyId: null, shareCount: 10000 },
-      ],
+      shareholdings: [{ companyId: 'company-home', ownerPlayerId: 'player-1', ownerCompanyId: null, shareCount: 10000 }],
     })
     state.currentUserId = owner.id
     state.currentToken = `token-${owner.id}`
@@ -2713,9 +2695,7 @@ test.describe('Stock exchange — merge company flow', () => {
   test('shareholders section works after switching between companies', async ({ page }) => {
     const player = makePlayer({
       personalCash: 100000,
-      companies: [
-        makeControlledCompany({ id: 'company-home', name: 'Alpha Corp' }),
-      ],
+      companies: [makeControlledCompany({ id: 'company-home', name: 'Alpha Corp' })],
     })
     const other = makePlayer({
       id: 'player-2',
@@ -3162,12 +3142,8 @@ test.describe('Personal Ledger view', () => {
     await expect(page.locator('table[aria-label="Passive income activity"]')).toContainText('Dividend Corp')
     await expect(page.locator('table[aria-label="Passive income activity"]')).toContainText('Savings Holdings · City Bank')
     await page.getByRole('button', { name: 'Interest' }).click()
-    await expect(page.locator('table[aria-label="Passive income activity"]')).toContainText(
-      'Savings Holdings · City Bank',
-    )
-    await expect(page.locator('table[aria-label="Passive income activity"]')).not.toContainText(
-      'Dividend Corp',
-    )
+    await expect(page.locator('table[aria-label="Passive income activity"]')).toContainText('Savings Holdings · City Bank')
+    await expect(page.locator('table[aria-label="Passive income activity"]')).not.toContainText('Dividend Corp')
   })
 
   test('shows full trade history with BUY and SELL entries', async ({ page }) => {

@@ -240,8 +240,11 @@ public sealed partial class Mutation
     public async Task<UpdatePersonalAccountNamePayload> UpdatePersonalAccountName(
         UpdatePersonalAccountNameInput input,
         ClaimsPrincipal claimsPrincipal,
-        [Service] MasterDbContext db)
+        [Service] MasterDbContext db,
+        [Service] PersonalAccountNamePropagationService propagationService,
+        [Service] IHttpContextAccessor httpContextAccessor)
     {
+        var ct = httpContextAccessor.HttpContext?.RequestAborted ?? CancellationToken.None;
         var player = await Query.GetCurrentUserAsync(claimsPrincipal, db)
             ?? throw new GraphQLException(
                 ErrorBuilder.New()
@@ -283,7 +286,8 @@ public sealed partial class Mutation
         }
 
         player.DisplayName = personalAccountName;
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(ct);
+        await propagationService.PropagateAsync(player.Email, player.DisplayName, ct);
 
         return new UpdatePersonalAccountNamePayload
         {

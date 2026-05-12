@@ -36,6 +36,7 @@ export interface MockPlayer {
   id: string
   email: string
   displayName: string
+  personalAccountName?: string
   createdAtUtc: string
   startupPackClaimedAtUtc: string | null
   canClaimStartupPack: boolean
@@ -150,6 +151,7 @@ export interface MockRankingSummary {
 export interface MockRankingLeaderboardEntry {
   playerId: string
   displayName: string
+  personalAccountName?: string
   totalPoints: number
   globalRank: number
   rankMovement: number
@@ -323,7 +325,8 @@ export function makePlayer(overrides: Partial<MockPlayer> = {}): MockPlayer {
   return {
     id: 'player-001',
     email: 'alice@example.com',
-    displayName: 'Alice',
+    displayName: overrides.displayName ?? 'Alice',
+    personalAccountName: overrides.personalAccountName ?? overrides.displayName ?? 'Alice',
     createdAtUtc: '2026-01-01T00:00:00.000Z',
     startupPackClaimedAtUtc: null,
     canClaimStartupPack: true,
@@ -356,7 +359,9 @@ export function makeApiKey(overrides: Partial<MockApiKey> = {}): MockApiKey {
   }
 }
 
-export function makeApiKeyAuditLog(overrides: Partial<MockApiKeyAuditLog> = {}): MockApiKeyAuditLog {
+export function makeApiKeyAuditLog(
+  overrides: Partial<MockApiKeyAuditLog> = {},
+): MockApiKeyAuditLog {
   return {
     id: `api-audit-${Math.random().toString(36).slice(2)}`,
     keyId: overrides.keyId ?? 'api-key-001',
@@ -419,6 +424,7 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
       {
         playerId: 'rank-1',
         displayName: 'Alpha',
+        personalAccountName: 'Alpha',
         totalPoints: 320,
         globalRank: 1,
         rankMovement: 1,
@@ -426,6 +432,7 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
       {
         playerId: 'rank-2',
         displayName: 'Bravo',
+        personalAccountName: 'Bravo',
         totalPoints: 240,
         globalRank: 2,
         rankMovement: -1,
@@ -495,6 +502,7 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
         id: 'new-player-001',
         email: vars?.input?.email ?? 'test@example.com',
         displayName: vars?.input?.displayName ?? 'Test Player',
+        personalAccountName: vars?.input?.displayName ?? 'Test Player',
         createdAtUtc: new Date().toISOString(),
         startupPackClaimedAtUtc: null,
         canClaimStartupPack: true,
@@ -1141,7 +1149,12 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: 'Telemetry batch not found.', extensions: { code: 'TELEMETRY_BATCH_NOT_FOUND' } }],
+            errors: [
+              {
+                message: 'Telemetry batch not found.',
+                extensions: { code: 'TELEMETRY_BATCH_NOT_FOUND' },
+              },
+            ],
           }),
         })
         return
@@ -1166,7 +1179,12 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: 'Telemetry batch not found.', extensions: { code: 'TELEMETRY_BATCH_NOT_FOUND' } }],
+            errors: [
+              {
+                message: 'Telemetry batch not found.',
+                extensions: { code: 'TELEMETRY_BATCH_NOT_FOUND' },
+              },
+            ],
           }),
         })
         return
@@ -1326,6 +1344,89 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
       return
     }
 
+    if (query.includes('mutation') && query.includes('updatePersonalAccountName')) {
+      if (!state.currentPlayer) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              { message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } },
+            ],
+          }),
+        })
+        return
+      }
+
+      const vars = body.variables as { input?: { personalAccountName?: string } } | undefined
+      const personalAccountName = vars?.input?.personalAccountName?.trim() ?? ''
+      if (!personalAccountName) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              {
+                message: 'Personal account name is required.',
+                extensions: { code: 'PERSONAL_ACCOUNT_NAME_REQUIRED' },
+              },
+            ],
+          }),
+        })
+        return
+      }
+
+      const duplicate = state.rankingLeaderboard.some(
+        (entry) =>
+          entry.playerId !== state.currentPlayer?.id &&
+          (entry.personalAccountName ?? entry.displayName).toLowerCase() ===
+            personalAccountName.toLowerCase(),
+      )
+      if (duplicate) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              {
+                message: 'This personal account name is already taken.',
+                extensions: { code: 'PERSONAL_ACCOUNT_NAME_NOT_UNIQUE' },
+              },
+            ],
+          }),
+        })
+        return
+      }
+
+      state.currentPlayer = {
+        ...state.currentPlayer,
+        displayName: personalAccountName,
+        personalAccountName,
+      }
+      state.rankingLeaderboard = state.rankingLeaderboard.map((entry) =>
+        entry.playerId === state.currentPlayer?.id
+          ? {
+              ...entry,
+              displayName: personalAccountName,
+              personalAccountName,
+            }
+          : entry,
+      )
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            updatePersonalAccountName: {
+              personalAccountName,
+            },
+          },
+        }),
+      })
+      return
+    }
+
     // ProlongSubscription mutation
     if (query.includes('mutation') && query.includes('prolongSubscription')) {
       const newSub: MockSubscription = {
@@ -1465,7 +1566,9 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
 
         const allowed = matchedKey.scopes.includes('trading-only')
         const usedScope =
-          matchedKey.scopes.find((scope) => scope !== 'company-bound') ?? matchedKey.scopes[0] ?? 'none'
+          matchedKey.scopes.find((scope) => scope !== 'company-bound') ??
+          matchedKey.scopes[0] ??
+          'none'
         state.apiKeyAuditLogs = [
           makeApiKeyAuditLog({
             keyId: matchedKey.id,
@@ -1557,7 +1660,9 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
     }
 
     if (query.includes('adminApiKeyAuditLog')) {
-      const vars = body.variables as { playerEmail?: string | null; keyId?: string | null } | undefined
+      const vars = body.variables as
+        | { playerEmail?: string | null; keyId?: string | null }
+        | undefined
       const filter = vars?.playerEmail?.toLowerCase()
       const items = state.apiKeyAuditLogs.filter(
         (entry) =>

@@ -182,8 +182,7 @@ export default {
     globalAdminFailed: 'Nepodarilo sa zmeniť rolu globálneho admina.',
     globalAdminRemoved: 'Rola globálneho admina bola odobratá.',
     billionaireTitle: 'Benchmark reálnych miliardárov',
-    billionaireBody:
-      'Aktualizujte top-10 rebríček reálnych miliardárov používaný pre panel Preteky na vrchol a podmienku výhry shardu.',
+    billionaireBody: 'Aktualizujte top-10 rebríček reálnych miliardárov používaný pre panel Preteky na vrchol a podmienku výhry shardu.',
     billionaireSaved: 'Benchmark bol aktualizovaný.',
     billionaireSaveFailed: 'Aktualizácia benchmarku zlyhala.',
     stopImpersonation: 'Zastaviť impersonáciu',
@@ -267,13 +266,11 @@ export default {
     loginFailed: 'Prihl\u00e1senie zlyhalo. Skontrolujte prihlasovacie \u00fadaje a sk\u00faste znova.',
     loginRequired: 'Pred pokračovaním sa prihláste.',
     loginThrottledTitle: 'Príliš veľa neúspešných pokusov',
-    loginThrottledMessage:
-      'Príliš veľa neúspešných pokusov o prihlásenie. Skúste to znova o 15 minút.',
+    loginThrottledMessage: 'Príliš veľa neúspešných pokusov o prihlásenie. Skúste to znova o 15 minút.',
     loginWithBiatec: 'Prihlásiť cez Google',
     forgotPasswordLink: 'Zabudli ste heslo?',
     forgotPasswordTitle: 'Zabudnuté heslo',
-    forgotPasswordDescription:
-      'Zadajte e-mail účtu a ak účet existuje, pošleme vám jednorazový odkaz na obnovu hesla.',
+    forgotPasswordDescription: 'Zadajte e-mail účtu a ak účet existuje, pošleme vám jednorazový odkaz na obnovu hesla.',
     forgotPasswordSubmit: 'Poslať odkaz na obnovu',
     forgotPasswordGenericError: 'Obnovu hesla sa teraz nepodarilo spracovať. Skúste to neskôr.',
     resetPasswordTitle: 'Obnoviť heslo',
@@ -288,8 +285,7 @@ export default {
     passwordStrengthWeak: 'Slabé',
     passwordStrengthMedium: 'Stredné',
     passwordStrengthStrong: 'Silné',
-    oidcOnlyBanner:
-      'Tento server používa jednotné prihlásenie. Ak sa neviete dostať do účtu, znova sa prihláste cez poskytovateľa identity alebo kontaktujte podporu.',
+    oidcOnlyBanner: 'Tento server používa jednotné prihlásenie. Ak sa neviete dostať do účtu, znova sa prihláste cez poskytovateľa identity alebo kontaktujte podporu.',
     oidcRetryDriveAccessHint:
       'Na nastavenie Biatec peňaženky je potrebné povoliť vytváranie súborov v Google Drive. Spustite prihlásenie cez Google znova a povoľte prístup k Drive, aby sa autentifikácia dokončila.',
     oidcCallbackTitle: 'Dokončovanie prihlásenia',
@@ -307,8 +303,7 @@ export default {
     subtitle: 'Vyberte si odvetvie, získajte prvé mestské pozemky a spustite svoj prvý produkt.',
     referralBannerTitle: 'Aktívny odporúčací kód: {code}',
     referralBannerBody: 'Na oprávnené nákupy v hre získate 10% zľavu.',
-    referralBannerTooltip:
-      'Odporúčacia zľava sa serverovo aplikuje na oprávnené nákupy počas onboardingu aj po založení účtu.',
+    referralBannerTooltip: 'Odporúčacia zľava sa serverovo aplikuje na oprávnené nákupy počas onboardingu aj po založení účtu.',
     step1Title: 'Vyberte mesto',
     step1Desc: 'Vyberte mesto, v ktorom bude pôsobiť vaša prvá firma. Toto mesto sa zároveň nastaví ako aktívne v hornom prepínači kontextu.',
     step2Title: 'Vyberte odvetvie',
@@ -624,6 +619,16 @@ export default {
     personTabCreateCompany: 'Založiť firmu',
     personTabLedger: 'Účtovná kniha',
     personLedgerTabBody: 'Sledujte osobné bohatstvo, daňovú rezervu, obchody s akciami a dividendové príjmy v osobnej účtovnej knihe.',
+    personTabSettings: 'Nastavenia',
+    personalSettingsTitle: 'Meno osobného účtu',
+    personalSettingsBody: 'Tento alias naprieč servermi je uložený na master serveri a znovu použitý na každom bežiacom hernom shard-e Capitalism.',
+    personalSettingsWarning: 'Nepoužívajte svoju skutočnú právnu identitu. Zvoľte si fiktívny alias pre rebríčky a ďalšie verejné hráčske povrchy.',
+    personalSettingsSharedHint: 'Aktualizované meno sa používa aj v shard rebríčkoch a menovkách osobného účtu.',
+    personalSettingsLabel: 'Meno osobného účtu',
+    personalSettingsPlaceholder: 'Zadajte meno osobného účtu',
+    personalSettingsSave: 'Uložiť zmeny',
+    personalSettingsSaved: 'Meno osobného účtu bolo aktualizované.',
+    personalSettingsSaveError: 'Nepodarilo sa aktualizovať meno osobného účtu.',
     noBuildingsInCity: 'V tomto meste zatiaľ nemáte žiadne budovy.',
     launchNewCompany: 'Spustiť novú firmu',
     launchNewCompanySubtitle: 'Diverzifikujte svoje portfólio spustením druhej firmy.',
@@ -683,8 +688,7 @@ export default {
     viewMasterRanking: 'Zobraziť globálny master rebríček',
     raceBenchmarkTitle: 'Preteky na vrchol — benchmark reálneho sveta',
     realWorldBenchmarkTitle: 'Benchmark reálneho sveta',
-    realWorldBenchmarkBody:
-      'Najbohatší reálni miliardári sú zobrazení ako motivačný benchmark pre tento shard.',
+    realWorldBenchmarkBody: 'Najbohatší reálni miliardári sú zobrazení ako motivačný benchmark pre tento shard.',
     realWorldTarget: 'Cieľ výhry shardu (#1 benchmark): {amount}',
     shardLeaderProgress: 'Progres lídra shardu: {name}',
     shardLeaderProgressValue: '{percent} z cieľa #1',
@@ -1581,8 +1585,7 @@ export default {
     collateralLockedBadge: 'Kolaterál zamknutý',
     collateralLockedTooltip: 'Budova je založená ako kolaterál pôžičky.',
     collateralLockedToast: 'Táto budova je momentálne zamknutá ako kolaterál pôžičky a nemožno ju predať ani zničiť.',
-    collateralOwnershipConflictToast:
-      'Vlastníctvo tejto budovy sa zmenilo ešte pred dokončením úverovej akcie — obnovte stránku a skúste to znova.',
+    collateralOwnershipConflictToast: 'Vlastníctvo tejto budovy sa zmenilo ešte pred dokončením úverovej akcie — obnovte stránku a skúste to znova.',
     destroyedBadge: 'Zničená',
     destroyedHint: 'Táto budova bola zabavená a zničená po nesplatení pôžičky.',
     loanDefaultBadge: '⚠️ Zlyhanie pôžičky',
@@ -1594,8 +1597,7 @@ export default {
     sellRedirecting: 'Presmerovanie späť na vašu budovu…',
     listingSuccess: 'Budova úspešne zaradená na predaj!',
     cancelListingSuccess: 'Inzerát bol odstránený. Vaša budova už nie je na predaj.',
-    cancelSaleLockedTooltip:
-      'Predaj nemožno zrušiť — táto budova je kolaterálom nesplatenej pôžičky.',
+    cancelSaleLockedTooltip: 'Predaj nemožno zrušiť — táto budova je kolaterálom nesplatenej pôžičky.',
     setAskingPrice: 'Nastaviť požadovanú cenu',
     updateAskingPrice: 'Aktualizovať požadovanú cenu',
     updateListing: 'Aktualizovať inzerát',
@@ -3679,8 +3681,7 @@ export default {
     rejectOffer: 'Odmietnuť',
     offerAccepted: 'Ponuka prijatá. Budova prevedená na kupujúceho.',
     offerRejected: 'Ponuka odmietnutá.',
-    offerConflictRefreshing:
-      'Ponuka už bola obsadená — obnovujem trh…',
+    offerConflictRefreshing: 'Ponuka už bola obsadená — obnovujem trh…',
     processingOffer: 'Spracováva sa…',
     offerStatus: {
       PENDING: 'Čakajúca',

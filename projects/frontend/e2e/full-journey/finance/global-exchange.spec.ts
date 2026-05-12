@@ -296,12 +296,10 @@ test.describe('Global Exchange — Resources', () => {
     // Bratislava is the default selected city
     await expect(page.locator('.city-tab')).not.toHaveCount(0)
     // Click on Prague tab and verify it becomes the active selection
-    const pragueTab = page.locator('.city-tab', { hasText: /Prague/ })
+    const pragueTab = page.getByRole('tab', { name: /Prague/ })
     await expect(pragueTab).toBeVisible()
     await pragueTab.click()
-    await expect(pragueTab).toHaveClass(/active|selected|current/, { timeout: 3000 }).catch(() => {
-      // Some implementations use aria-current or similar — just assert offers reloaded
-    })
+    await expect(pragueTab).toHaveAttribute('aria-selected', 'true')
     // Exchange data should still be visible after tab switch
     await expect(page.locator('.resource-row').first()).toBeVisible()
   })

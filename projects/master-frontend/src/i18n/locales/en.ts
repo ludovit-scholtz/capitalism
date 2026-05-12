@@ -40,6 +40,7 @@ export default {
     bounties: 'Bounties',
     referralDashboard: 'Referal dashboard',
     tokenizedGold: 'Tokenized gold',
+    gameSettings: 'Game settings',
     apiKeys: 'API Keys',
   },
   themeSwitcher: {
@@ -184,6 +185,28 @@ export default {
     note: 'Note',
     dash: '-',
   },
+  gameSettings: {
+    kicker: 'Cross-server identity',
+    title: 'Game Settings',
+    subtitle:
+      'Manage the personal account name that appears across all Capitalism game servers and rankings.',
+    cardTitle: 'Personal account name',
+    cardBody:
+      'This cross-server alias is stored on the master server and reused by every running game shard.',
+    warning:
+      "Don't use your real legal identity. Choose a fictional alias for public rankings and player-facing surfaces.",
+    nameLabel: 'Personal account name',
+    namePlaceholder: 'Enter your personal account name',
+    save: 'Save changes',
+    saved: 'Personal account name updated.',
+    saveError: 'Failed to update the personal account name.',
+    usageTitleShard: 'Shard usage',
+    usageBodyShard:
+      'Your updated alias is pushed to running game shards and shown in shard rankings and personal account labels.',
+    usageTitleMaster: 'Master usage',
+    usageBodyMaster:
+      'The same name is used in the master ranking, your master profile, and shared cross-server account surfaces.',
+  },
   goldAdmin: {
     kicker: 'Master Administration',
     title: 'Gold Token Management',
@@ -291,7 +314,8 @@ export default {
     referralCode: 'Referral code',
     registeredUsers: 'Registered users',
     shareLinksTitle: 'Shareable referral links',
-    shareLinksSubtitle: 'Copy a link and share it with friends. New players who register via your link will receive a 10% discount on in-game purchases.',
+    shareLinksSubtitle:
+      'Copy a link and share it with friends. New players who register via your link will receive a 10% discount on in-game purchases.',
     copyLink: 'Copy link',
     linkCopied: 'Copied!',
     serverLoadFailed: 'Could not load game servers. Shareable links are temporarily unavailable.',
@@ -588,7 +612,8 @@ export default {
     loadError: 'Failed to load API keys.',
     adminLoadError: 'Failed to load admin API key data.',
     never: 'Never',
-    authInstructions: 'Use your API key in requests with the header: Authorization: ApiKey <your-key>',
+    authInstructions:
+      'Use your API key in requests with the header: Authorization: ApiKey <your-key>',
     auditTitle: 'Recent API key audit trail',
     auditOperation: 'Operation',
     auditScope: 'Scope used',
@@ -619,10 +644,14 @@ export default {
       companyBound: 'Company-bound',
     },
     scopeDescriptions: {
-      readOnly: 'Allows query operations only. Any mutation is denied with a structured 403 response.',
-      botOnly: 'Allows automation flows such as company management and production configuration, but blocks forex, stock, and direct building-purchase mutations.',
-      tradingOnly: 'Allows forex and stock trading mutations only. Admin, lending, and building operations stay blocked.',
-      companyBound: 'Adds a deny-by-default company fence. The key may act only on the selected company IDs.',
+      readOnly:
+        'Allows query operations only. Any mutation is denied with a structured 403 response.',
+      botOnly:
+        'Allows automation flows such as company management and production configuration, but blocks forex, stock, and direct building-purchase mutations.',
+      tradingOnly:
+        'Allows forex and stock trading mutations only. Admin, lending, and building operations stay blocked.',
+      companyBound:
+        'Adds a deny-by-default company fence. The key may act only on the selected company IDs.',
     },
   },
   securityBoard: {
@@ -632,9 +661,10 @@ export default {
       'Live view of all audit findings parsed from /audits/*.md. High and Critical findings require a linked implementation issue before a release can be signed off.',
     allClearTitle: 'All clear 🎉',
     lastRun: 'Last updated: {date}',
-    gateWarning: '{count} unlinked High/Critical finding(s) are blocking the release sign-off gate.',
+    gateWarning:
+      '{count} unlinked High/Critical finding(s) are blocking the release sign-off gate.',
     gateHint:
-      'Add <!-- issue: #NNN --> to the finding\'s Status line in the audit .md file to link an implementation issue.',
+      "Add <!-- issue: #NNN --> to the finding's Status line in the audit .md file to link an implementation issue.",
     filterSeverity: 'Severity',
     filterStatus: 'Status',
     findingCount: 'Showing {count} of {total} findings',

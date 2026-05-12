@@ -29,6 +29,11 @@ const router = createRouter({
       component: () => import('@/views/AccountView.vue'),
     },
     {
+      path: '/settings/game',
+      name: 'game-settings',
+      component: () => import('@/views/GameSettingsView.vue'),
+    },
+    {
       path: '/gold-admin',
       name: 'gold-admin',
       component: () => import('@/views/GoldAdminView.vue'),
