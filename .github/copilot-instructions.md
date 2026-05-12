@@ -1656,3 +1656,15 @@ Root-cause of a quality failure (May 2026, PR #437 follow-up):
 5. **Use low-entropy human-readable placeholders in `.env.example`** (for example `set-via-secrets-manager`) to reduce generic-api-key false positives.
 6. **When a reviewer says \"Fix build and fix tests\", always separate failing category by workflow logs first** (code tests vs workflow wiring) and fix all in-PR failures, including newly added workflow configuration errors.
 7. **For security configuration hardening PRs, include unit coverage for new guard helpers** (for example connection-string and root-admin placeholder detection), not only host-startup tests.
+
+## Merge-conflict completion quality — preserve both sides and remove duplicate roadmap drift
+
+Root-cause of a quality gap (May 2026, PR #437 follow-up):
+- The branch had unresolved `main` merge conflicts and could not be merged despite green checks on the previous head.
+- Conflict resolution in `ROADMAP.md` initially preserved both sides but left a duplicate checklist item (`Move RootAdministratorEmails...`) with conflicting completion states.
+- This made product-alignment proof ambiguous even though the implementation and tests were complete.
+
+**Rules to prevent recurrence:**
+1. **When product owner requests merge-conflict resolution, always unshallow/fetch `origin/main` first and merge/rebase immediately before claiming completion.**
+2. **After resolving conflicts, scan edited roadmap/checklist files for duplicate items with opposite states (`[x]` and `[ ]`) and keep only the canonical current state.**
+3. **For merge-fix sessions, re-check branch CI statuses on the new head SHA (not the previous head) before replying to review comments.**
