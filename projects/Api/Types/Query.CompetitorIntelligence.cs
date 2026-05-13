@@ -26,11 +26,12 @@ public sealed partial class Query
 
         // Determine the authenticated player's company that has presence in this city.
         // "Presence" means the company owns at least one building in the city.
+        // Using Guid? so that null (no company found) is clearly distinguished from a valid Guid.
         var myCompanyId = await db.Buildings
             .AsNoTracking()
             .Where(b => b.CityId == cityId)
             .Join(db.Companies.Where(c => c.PlayerId == userId),
-                  b => b.CompanyId, c => c.Id, (b, c) => c.Id)
+                  b => b.CompanyId, c => c.Id, (b, c) => (Guid?)c.Id)
             .FirstOrDefaultAsync();
 
         // Find all companies with a PRODUCT-scoped brand for this product type
@@ -72,7 +73,7 @@ public sealed partial class Query
                     CompanyName = brand.Company.Name,
                     QualityLevel = qualityLevel,
                     PricePremiumPct = pricePremiumPct,
-                    IsOwnCompany = myCompanyId != default && brand.CompanyId == myCompanyId,
+                    IsOwnCompany = myCompanyId.HasValue && brand.CompanyId == myCompanyId.Value,
                 };
             })
             .OrderByDescending(e => e.QualityLevel)

@@ -107,30 +107,15 @@ public sealed class QualityDecayTests
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        // Get a FoodProcessing product (should be marked perishable by initializer)
+        // Get a FoodProcessing product (should be marked perishable by EnsurePerishableProductsAsync).
+        // Assert it exists and is perishable rather than silently creating a fallback — this way
+        // a regression in the initializer will cause a clear test failure here.
         var perishableProduct = await db.ProductTypes
             .FirstOrDefaultAsync(p => p.Industry == Industry.FoodProcessing);
 
-        if (perishableProduct is null)
-        {
-            // If not seeded yet, create one manually
-            perishableProduct = new ProductType
-            {
-                Id = Guid.NewGuid(),
-                Name = "Test Bread",
-                Slug = $"test-bread-{Guid.NewGuid():N}",
-                Industry = Industry.FoodProcessing,
-                BasePrice = 2m,
-                IsPerishable = true,
-            };
-            db.ProductTypes.Add(perishableProduct);
-            await db.SaveChangesAsync();
-        }
-        else if (!perishableProduct.IsPerishable)
-        {
-            perishableProduct.IsPerishable = true;
-            await db.SaveChangesAsync();
-        }
+        Assert.NotNull(perishableProduct);
+        Assert.True(perishableProduct.IsPerishable,
+            "FoodProcessing product should be marked IsPerishable=true by AppDbInitializer.EnsurePerishableProductsAsync.");
 
         const decimal initialQuality = 0.5m;
         var (_, _, _, inventoryId) = await SeedStorageInventoryAsync(db, perishableProduct.Id, quality: initialQuality);

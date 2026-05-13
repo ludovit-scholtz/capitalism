@@ -5,7 +5,8 @@ namespace Api.Engine.Phases;
 /// <summary>
 /// Processes quality decay for perishable product inventory stored in STORAGE units.
 ///
-/// Each tick, inventory.Quality is reduced by <see cref="GameConstants.QualityDecayRatePerTick"/> (0.05%).
+/// Each tick, inventory.Quality is reduced by <see cref="GameConstants.QualityDecayRatePerTick"/>
+/// (0.0005 decimal = 0.05% of the full 0–1 quality range per tick).
 /// When quality reaches or falls below zero the entire inventory batch is removed and:
 ///   1. An <see cref="InventorySpoilageRecord"/> is written to the database.
 ///   2. A <see cref="LedgerEntry"/> with category <see cref="LedgerCategory.SpoilageLoss"/> is posted.
@@ -57,6 +58,8 @@ public sealed class QualityDecayPhase : ITickPhase
 
                     if (inventory.Quality <= 0m)
                     {
+                        // Floor quality to zero before recording — QualityAtSpoilage in the audit record
+                        // should read exactly 0.0, not a small negative due to floating-point drift.
                         inventory.Quality = 0m;
                         spoiledInventory.Add(inventory);
 
