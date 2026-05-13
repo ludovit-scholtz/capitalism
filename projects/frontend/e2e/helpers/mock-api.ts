@@ -92,6 +92,8 @@ export type MockLedgerSummary = {
   hasMixedCurrencies?: boolean
   totalRevenue: number
   totalMediaHouseIncome?: number
+  totalRentIncome?: number
+  totalPropertyMaintenance?: number
   totalPurchasingCosts: number
   totalShippingCosts?: number
   totalLaborCosts: number
@@ -1336,6 +1338,16 @@ export type MockState = {
   marketPriceHistoryByProductId: Record<string, MockMarketPriceHistoryPoint[]>
   /** Mock competitorQualityIntelligence data, keyed by `${cityId}:${productTypeId}`. Returns an empty array when not set. */
   competitorIntelligenceByKey: Record<string, MockCompetitorQualityEntry[]>
+  /** Rental revenue history per building for apartmentBuildingDetail query. */
+  rentalHistory?: Array<{
+    buildingId: string
+    tick: number
+    revenue: number
+    occupancyPercent: number
+    rentPerSqm: number
+  }>
+  /** City-average rent per m² used by apartmentBuildingDetail query. */
+  cityAverageRentPerSqm?: number
 }
 
 export interface MockMarketDemandSummary {
@@ -1826,6 +1838,8 @@ function buildMockLedgerSummaryPayload(summary: MockLedgerSummary, gameState: Mo
     totalStockSaleCashIn: summary.totalStockSaleCashIn ?? 0,
     totalShippingCosts: summary.totalShippingCosts ?? 0,
     totalMediaHouseIncome: summary.totalMediaHouseIncome ?? 0,
+    totalRentIncome: summary.totalRentIncome ?? 0,
+    totalPropertyMaintenance: summary.totalPropertyMaintenance ?? 0,
     taxableIncome:
       summary.taxableIncome ??
       Math.max(
@@ -3145,6 +3159,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     marketOverviewByCityId: {},
     marketPriceHistoryByProductId: {},
     competitorIntelligenceByKey: {},
+    rentalHistory: [],
+    cityAverageRentPerSqm: 10,
     buildingMarketListings: [],
     myBuildingListings: [],
     tradeRoutes: [],
@@ -5720,6 +5736,37 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               pricePerSqm: building.pricePerSqm ?? null,
               pendingPricePerSqm: building.pendingPricePerSqm,
               pendingPriceActivationTick: building.pendingPriceActivationTick,
+            },
+          },
+        }),
+      })
+    }
+
+    if (query.includes('ApartmentDetail') || query.includes('apartmentBuildingDetail')) {
+      const buildingId = body.variables?.buildingId
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      const building = player?.companies.flatMap((c) => c.buildings).find((b) => b.id === buildingId)
+      if (!building) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { apartmentBuildingDetail: null } }),
+        })
+      }
+      const rentalHistory = (state.rentalHistory ?? []).filter((r: { buildingId: string }) => r.buildingId === buildingId)
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            apartmentBuildingDetail: {
+              buildingId: building.id,
+              occupancyPercent: building.occupancyPercent ?? 0,
+              totalAreaSqm: building.totalAreaSqm ?? (building.type === 'COMMERCIAL' ? 1400 : 1800),
+              rentPerSqm: building.pricePerSqm ?? null,
+              cityAverageRentPerSqm: state.cityAverageRentPerSqm ?? 10,
+              currencyCode: 'EUR',
+              revenueHistory: rentalHistory,
             },
           },
         }),

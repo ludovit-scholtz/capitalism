@@ -17,6 +17,8 @@ public sealed class CompanyLedgerSummary
     // Income Statement
     public decimal TotalRevenue { get; set; }
     public decimal TotalMediaHouseIncome { get; set; }
+    public decimal TotalRentIncome { get; set; }
+    public decimal TotalPropertyMaintenance { get; set; }
     public decimal TotalPurchasingCosts { get; set; }
     public decimal TotalShippingCosts { get; set; }
     public decimal TotalLaborCosts { get; set; }

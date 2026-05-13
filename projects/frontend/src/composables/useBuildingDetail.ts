@@ -79,6 +79,7 @@ import type {
     MediaHouseStatsResult,
     SourcingCandidate,
     UnitProductAnalytics,
+    ApartmentBuildingDetail,
   } from '@/types'
 import type { HorizontalLinkState, VerticalLinkState } from '@/lib/linkHelpers'
 
@@ -430,6 +431,9 @@ export function useBuildingDetail() {
   const newRentPerSqm = ref<number | null>(null)
   const savingRent = ref(false)
   const rentSaveError = ref<string | null>(null)
+  // Rental revenue sparkline (APARTMENT / COMMERCIAL)
+  const rentalAnalytics = ref<ApartmentBuildingDetail | null>(null)
+  const rentalAnalyticsLoading = ref(false)
 
   // Media house content management (MEDIA_HOUSE)
   const contentBudgetInput = ref<number | null>(null)
@@ -4647,6 +4651,39 @@ export function useBuildingDetail() {
     }
   }
 
+  // ── Rental Income Analytics (APARTMENT / COMMERCIAL) ─────────────────────
+
+  async function loadRentalAnalytics(bId: string, isRefresh = false) {
+    if (!auth.token) {
+      rentalAnalytics.value = null
+      return
+    }
+    if (!isRefresh || rentalAnalytics.value == null) {
+      rentalAnalyticsLoading.value = true
+    }
+    try {
+      const data = await gqlRequest<{ apartmentBuildingDetail: ApartmentBuildingDetail | null }>(
+        `query ApartmentDetail($buildingId: UUID!) {
+          apartmentBuildingDetail(buildingId: $buildingId) {
+            buildingId
+            occupancyPercent
+            totalAreaSqm
+            rentPerSqm
+            cityAverageRentPerSqm
+            currencyCode
+            revenueHistory { tick revenue occupancyPercent rentPerSqm }
+          }
+        }`,
+        { buildingId: bId },
+      )
+      rentalAnalytics.value = data.apartmentBuildingDetail ?? null
+    } catch {
+      if (!isRefresh) rentalAnalytics.value = null
+    } finally {
+      rentalAnalyticsLoading.value = false
+    }
+  }
+
   async function loadBuilding(options: { preserveDraft?: boolean } = {}) {
     const requestId = ++activeBuildingLoadRequest
     const shouldShowLoading = !building.value
@@ -4957,6 +4994,9 @@ export function useBuildingDetail() {
       if (building.value?.type === 'FACTORY') {
         void loadSupplyChain(buildingId.value)
       }
+      if (building.value?.type === 'APARTMENT' || building.value?.type === 'COMMERCIAL') {
+        void loadRentalAnalytics(buildingId.value)
+      }
     } catch (reason: unknown) {
       if (requestId !== activeBuildingLoadRequest) {
         return
@@ -5052,6 +5092,9 @@ export function useBuildingDetail() {
     }
     if (building.value?.type === 'FACTORY') {
       void loadSupplyChain(buildingId.value)
+    }
+    if (building.value?.type === 'APARTMENT' || building.value?.type === 'COMMERCIAL') {
+      void loadRentalAnalytics(buildingId.value, true)
     }
   })
 
@@ -5301,6 +5344,8 @@ export function useBuildingDetail() {
     mediaHouseTargetCompanyId,
     mediaHouseUnitMediaType,
     mediaHouseCampaignBudgetPerTick,
+    rentalAnalytics,
+    rentalAnalyticsLoading,
     mediaHouseUnitActive,
     savingMediaHouseUnit,
     mediaHouseUnitError,
@@ -5556,6 +5601,7 @@ export function useBuildingDetail() {
     loadSupplyChain,
     loadBuildingFinancialTimeline,
     loadPowerPlantAnalytics,
+    loadRentalAnalytics,
     loadCityPowerBalance,
     setPlantDispatch,
     dispatchSaving,

@@ -204,6 +204,18 @@ function sparklineHeight(summary: CompanyCityFinancialSummary, revenue: number):
               {{ drillCategory === 'MEDIA_HOUSE_INCOME' ? '▲' : '▼' }}
             </button>
           </div>
+          <div v-if="(ledger.totalRentIncome ?? 0) > 0" class="statement-row rental-income-row">
+            <span class="row-label">🏠 {{ $t('ledger.rentalIncome') }}</span>
+            <span class="amount-positive">{{ formatAmount(ledger.totalRentIncome ?? 0) }}</span>
+            <button
+              class="drill-btn"
+              :class="{ active: drillCategory === 'RENT_INCOME' }"
+              :aria-label="$t('ledger.drillDown') + ': ' + $t('ledger.rentalIncome')"
+              @click="emit('drill-toggle', 'RENT_INCOME')"
+            >
+              {{ drillCategory === 'RENT_INCOME' ? '▲' : '▼' }}
+            </button>
+          </div>
           <div v-if="(ledger.totalDepositInterestReceived ?? 0) > 0" class="statement-row">
             <span class="row-label">{{ $t('ledger.depositInterestReceived') }}</span>
             <span class="amount-positive">{{ formatAmount(ledger.totalDepositInterestReceived ?? 0) }}</span>
@@ -271,6 +283,18 @@ function sparklineHeight(summary: CompanyCityFinancialSummary, revenue: number):
             <span class="amount-negative">{{ formatAmount(-ledger.totalMarketingCosts) }}</span>
             <button class="drill-btn" :class="{ active: drillCategory === 'MARKETING' }" :aria-label="$t('ledger.drillDown') + ': ' + $t('ledger.marketingCosts')" @click="emit('drill-toggle', 'MARKETING')">
               {{ drillCategory === 'MARKETING' ? '▲' : '▼' }}
+            </button>
+          </div>
+          <div v-if="(ledger.totalPropertyMaintenance ?? 0) > 0" class="statement-row cost-row">
+            <span class="row-label">🔧 {{ $t('ledger.propertyMaintenance') }}</span>
+            <span class="amount-negative">{{ formatAmount(-(ledger.totalPropertyMaintenance ?? 0)) }}</span>
+            <button
+              class="drill-btn"
+              :class="{ active: drillCategory === 'PROPERTY_MAINTENANCE' }"
+              :aria-label="$t('ledger.drillDown') + ': ' + $t('ledger.propertyMaintenance')"
+              @click="emit('drill-toggle', 'PROPERTY_MAINTENANCE')"
+            >
+              {{ drillCategory === 'PROPERTY_MAINTENANCE' ? '▲' : '▼' }}
             </button>
           </div>
           <div v-if="(ledger.totalDepositInterestPaid ?? 0) > 0" class="statement-row cost-row">

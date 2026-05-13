@@ -2415,6 +2415,8 @@ export default {
     depositsPlaced: 'Gelegte Bankeinlagen',
     cashFromBanking: 'Aus Bankgeschäften',
     mediaHouseIncome: 'Medienhaus-Einnahmen',
+    rentalIncome: 'Mieteinnahmen',
+    propertyMaintenance: 'Instandhaltungskosten',
     category: {
       REVENUE: 'Umsatz',
       PURCHASING_COST: 'Einkauf',
@@ -2444,6 +2446,8 @@ export default {
       MEDIA_HOUSE_INCOME: 'Medienhaus-Einnahmen',
       MEDIA_HOUSE_CONTENT: 'Inhaltsinvestition',
       SPOILAGE_LOSS: 'Verderbnisverlust',
+      RENT_INCOME: 'Mieteinnahmen',
+      PROPERTY_MAINTENANCE: 'Immobilienwartung',
     },
     currency: 'Währung',
     mixedCurrencies: 'Mehrwährung',
@@ -3025,6 +3029,9 @@ export default {
       'Das Diagramm zeigt die maximale erreichbare Belegung bei jedem Mietpreis. Preise unterhalb des städtischen Referenzsatzes ermöglichen volle Belegung; Preise über dem standortbereinigten Satz begrenzen die Belegung auf 90% oder weniger.',
     rentChartHintCommercial:
       'Das Diagramm zeigt die maximale erreichbare Belegung bei jedem Mietpreis. Gewerbeflächen mit Preisen unter dem städtischen Referenzsatz ziehen die meisten Mieter an; Preise über dem standortbereinigten Satz begrenzen die Belegung auf 90% oder weniger.',
+    revenueHistoryTitle: 'Umsatzhistorie (letzte 100 Ticks)',
+    cityAvgLabel: 'Stadtdurchschnitt',
+    noRevenueHistory: 'Noch keine Einnahmen aufgezeichnet. Setzen Sie einen Mietpreis, um mit dem Verdienen zu beginnen.',
   },
   research: {
     panelTitle: 'Forschungsfortschritt',

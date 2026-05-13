@@ -2408,6 +2408,8 @@ export default {
     depositsPlaced: 'Bankové vklady',
     cashFromBanking: 'Z bankových operácií',
     mediaHouseIncome: 'Príjem mediálneho domu',
+    rentalIncome: 'Príjem z nájmu',
+    propertyMaintenance: 'Údržba nehnuteľnosti',
     category: {
       REVENUE: 'Tržby',
       PURCHASING_COST: 'Nákup',
@@ -2437,6 +2439,8 @@ export default {
       MEDIA_HOUSE_INCOME: 'Príjem mediálneho domu',
       MEDIA_HOUSE_CONTENT: 'Investícia do obsahu',
       SPOILAGE_LOSS: 'Strata skazením',
+      RENT_INCOME: 'Príjem z nájmu',
+      PROPERTY_MAINTENANCE: 'Údržba nehnuteľnosti',
     },
     currency: 'Mena',
     mixedCurrencies: 'Viac mien',
@@ -3013,6 +3017,9 @@ export default {
       'Graf zobrazuje maximálnu dosiahnuteľnú obsadenosť pri každej výške nájmu. Cena pod mestskou referenčnou sadzbou umožňuje plnú obsadenosť; cena nad upravenou sadzbou lokality obmedzuje obsadenosť na 90% a menej.',
     rentChartHintCommercial:
       'Graf zobrazuje maximálnu dosiahnuteľnú obsadenosť pri každej výške nájmu. Komerčné priestory s cenou pod mestskou referenčnou sadzbou priťahujú najviac nájomníkov; cena nad upravenou sadzbou lokality obmedzuje obsadenosť na 90% a menej.',
+    revenueHistoryTitle: 'História výnosov (posledných 100 tikov)',
+    cityAvgLabel: 'Mestský priemer',
+    noRevenueHistory: 'Žiadne výnosy ešte neboli zaznamenané. Nastavte cenu nájmu na začatie zárobku.',
   },
   research: {
     panelTitle: 'Výskumný pokrok',

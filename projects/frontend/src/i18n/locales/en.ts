@@ -2413,6 +2413,8 @@ export default {
     depositsPlaced: 'Bank Deposits Placed',
     cashFromBanking: 'From Banking',
     mediaHouseIncome: 'Media House Income',
+    rentalIncome: 'Rental Income',
+    propertyMaintenance: 'Property Maintenance',
     category: {
       REVENUE: 'Revenue',
       PURCHASING_COST: 'Purchasing',
@@ -2442,6 +2444,8 @@ export default {
       MEDIA_HOUSE_INCOME: 'Media House Income',
       MEDIA_HOUSE_CONTENT: 'Content Investment',
       SPOILAGE_LOSS: 'Spoilage Loss',
+      RENT_INCOME: 'Rental Income',
+      PROPERTY_MAINTENANCE: 'Property Maintenance',
     },
     currency: 'Currency',
     mixedCurrencies: 'Multi-currency',
@@ -3020,6 +3024,9 @@ export default {
       'The chart shows maximum achievable occupancy at each rent level. Pricing below the city reference rate gives access to full occupancy; pricing above the adjusted location rate caps occupancy at 90% or lower.',
     rentChartHintCommercial:
       'The chart shows maximum achievable occupancy at each rent level. Commercial premises priced below the city reference attract the most tenants; pricing above the adjusted location rate caps occupancy at 90% or lower.',
+    revenueHistoryTitle: 'Revenue History (last 100 ticks)',
+    cityAvgLabel: 'City avg',
+    noRevenueHistory: 'No revenue recorded yet. Set a rent price to start earning.',
   },
   research: {
     panelTitle: 'Research Progress',

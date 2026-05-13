@@ -6,7 +6,7 @@ import RentReferenceChart from '@/components/buildings/RentReferenceChart.vue'
 
 const { t } = useI18n()
 const bd = inject(BUILDING_DETAIL_KEY)!
-const { locale, building, currentTick, showRentDialog, newRentPerSqm, savingRent, rentSaveError, openRentDialog, closeRentDialog, saveRentPerSqm, formatCurrency, formatTickDuration } = bd
+const { locale, building, currentTick, showRentDialog, newRentPerSqm, savingRent, rentSaveError, openRentDialog, closeRentDialog, saveRentPerSqm, formatCurrency, formatTickDuration, rentalAnalytics, rentalAnalyticsLoading } = bd
 
 /** Price ratio of current rent vs. adjusted market rate (location-adjusted). */
 const priceRatio = computed(() => {
@@ -61,6 +61,23 @@ const occupancyPercent = computed<number>(() => {
   const occupancy = building.value?.occupancyPercent
   if (occupancy == null) return 0
   return occupancy
+})
+
+// ── Revenue sparkline ─────────────────────────────────────────────────────
+
+/** Bar heights normalised to [0, 1] relative to max revenue in history. */
+const revenueBarHeights = computed<number[]>(() => {
+  const history = rentalAnalytics.value?.revenueHistory ?? []
+  if (history.length === 0) return []
+  const maxRev = history.reduce((m, s) => Math.max(m, s.revenue), 0)
+  if (maxRev <= 0) return history.map(() => 0)
+  return history.map((s) => s.revenue / maxRev)
+})
+
+const cityAvgRentDisplay = computed<string | null>(() => {
+  const avg = rentalAnalytics.value?.cityAverageRentPerSqm
+  if (avg == null) return null
+  return formatCurrency(avg) + ' / m²'
 })
 </script>
 
@@ -217,6 +234,44 @@ const occupancyPercent = computed<number>(() => {
           })
         }}
       </span>
+    </div>
+
+    <!-- ── Revenue Sparkline ─────────────────────────────────────────────── -->
+    <div
+      v-if="rentalAnalytics != null || rentalAnalyticsLoading"
+      class="rental-sparkline-section mt-5 rounded-xl border border-divider bg-surface p-4"
+    >
+      <div class="rental-sparkline-header mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h3 class="text-sm font-semibold uppercase tracking-wide text-muted">
+          {{ t('property.revenueHistoryTitle') }}
+        </h3>
+        <span
+          v-if="cityAvgRentDisplay"
+          class="city-avg-rent-badge rounded-full bg-surface-muted px-2 py-0.5 text-xs text-muted"
+        >
+          {{ t('property.cityAvgLabel') }}: {{ cityAvgRentDisplay }}
+        </span>
+      </div>
+
+      <div v-if="rentalAnalyticsLoading && rentalAnalytics == null" class="text-xs text-muted">
+        {{ t('common.loading') }}
+      </div>
+      <div v-else-if="revenueBarHeights.length === 0" class="text-xs text-muted">
+        {{ t('property.noRevenueHistory') }}
+      </div>
+      <div
+        v-else
+        class="rental-revenue-bars rental-sparkline flex h-14 items-end gap-px overflow-hidden rounded"
+        role="img"
+        :aria-label="t('property.revenueHistoryTitle')"
+      >
+        <div
+          v-for="(h, i) in revenueBarHeights"
+          :key="i"
+          class="rental-bar flex-1 rounded-sm bg-[var(--color-success)]"
+          :style="{ height: Math.max(h * 100, 2) + '%', opacity: h <= 0 ? 0.15 : 1 }"
+        />
+      </div>
     </div>
 
     <!-- Occupancy empty-state hint -->
