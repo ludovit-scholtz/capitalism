@@ -121,6 +121,7 @@ test.describe('Account page — with gold balance', () => {
     await loginAs(page, state, player, 'token-player')
     await page.goto('/account')
 
+    await expect(page.getByRole('table', { name: 'Recent gold transactions' })).toBeVisible()
     await expect(page.locator('.amount-negative').first()).toContainText('-')
   })
 
@@ -155,12 +156,11 @@ test.describe('Account page — error state', () => {
     })
 
     await page.addInitScript(
-      ({ tok, exp }: { tok: string; exp: string }) => {
-        localStorage.setItem('master_auth_token', tok)
+      ({ exp }: { exp: string }) => {
         localStorage.setItem('master_auth_expires', exp)
+        localStorage.setItem('master_auth_provider', 'local')
       },
       {
-        tok: 'token-player',
         exp: new Date(Date.now() + 7200000).toISOString(),
       },
     )

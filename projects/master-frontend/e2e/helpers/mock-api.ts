@@ -1940,6 +1940,15 @@ export async function loginAs(
 ) {
   state.currentPlayer = player
   state.currentToken = token
+  await page.addInitScript(
+    ({ expiresAtUtc }: { expiresAtUtc: string }) => {
+      localStorage.setItem('master_auth_expires', expiresAtUtc)
+      localStorage.setItem('master_auth_provider', 'local')
+    },
+    {
+      expiresAtUtc: new Date(Date.now() + 7_200_000).toISOString(),
+    },
+  )
   await page.context().addCookies([
     {
       name: 'auth_token',
