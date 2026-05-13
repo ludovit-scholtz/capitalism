@@ -122,8 +122,28 @@ public sealed class RentPhase : ITickPhase
                 });
             }
 
+            // ── Write RentalIncomeRecord for sparkline history ──────────────────────
+            var currencyCode = city.CurrencyCode ?? "EUR";
+            context.Db.RentalIncomeRecords.Add(new RentalIncomeRecord
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = building.Id,
+                Tick = context.CurrentTick,
+                Revenue = rentIncome,
+                Costs = constantCosts,
+                OccupancyPercent = building.OccupancyPercent.Value,
+                RentPerSqm = building.PricePerSqm.Value,
+                CurrencyCode = currencyCode
+            });
+
+            // Prune old records — keep only the last 100 ticks per building.
+            var pruneThreshold = context.CurrentTick - 100;
+            var old = context.Db.RentalIncomeRecords.Local
+                .Where(r => r.BuildingId == building.Id && r.Tick < pruneThreshold)
+                .ToList();
+            foreach (var rec in old) context.Db.RentalIncomeRecords.Remove(rec);
+
             // ── Occupancy adjustment ────────────────────────────────────────────────
-            // Compute the price ratio relative to the location-adjusted market rate.
             var priceRatio = building.PricePerSqm.Value / adjustedMarketRate;
 
             // Determine the maximum achievable occupancy based on pricing position.

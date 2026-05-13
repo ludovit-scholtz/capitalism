@@ -70,6 +70,8 @@ public sealed partial class Query
 
         var totalRevenue = LedgerCalculator.GetTotalRevenue(entries);
         var totalMediaHouseIncome = LedgerCalculator.GetTotalMediaHouseIncome(entries);
+        var totalRentIncome = LedgerCalculator.GetTotalRentIncome(entries);
+        var totalPropertyMaintenance = LedgerCalculator.GetTotalPropertyMaintenance(entries);
         var totalPurchasingCosts = LedgerCalculator.GetTotalPurchasingCosts(entries);
         var totalShippingCosts = LedgerCalculator.GetTotalShippingCosts(entries);
         var totalLaborCosts = LedgerCalculator.GetTotalLaborCosts(entries);
@@ -169,6 +171,8 @@ public sealed partial class Query
             HasMixedCurrencies = buildingCurrencies.Count > 1,
             TotalRevenue = totalRevenue,
             TotalMediaHouseIncome = totalMediaHouseIncome,
+            TotalRentIncome = totalRentIncome,
+            TotalPropertyMaintenance = totalPropertyMaintenance,
             TotalPurchasingCosts = totalPurchasingCosts,
             TotalShippingCosts = totalShippingCosts,
             TotalLaborCosts = totalLaborCosts,
@@ -186,9 +190,9 @@ public sealed partial class Query
             TotalDepositInterestPaid = totalDepositInterestPaid,
             TotalLoanInterestIncome = totalLoanInterestIncome,
             TotalLoanInterestExpense = totalLoanInterestExpense,
-            NetIncome = totalRevenue + totalMediaHouseIncome + totalDepositInterestReceived + totalLoanInterestIncome
+            NetIncome = totalRevenue + totalMediaHouseIncome + totalRentIncome + totalDepositInterestReceived + totalLoanInterestIncome
                 - totalPurchasingCosts - totalShippingCosts - totalLaborCosts - totalEnergyCosts
-                - totalMarketingCosts - totalTaxPaid - totalOtherCosts
+                - totalMarketingCosts - totalTaxPaid - totalOtherCosts - totalPropertyMaintenance
                 - totalDepositInterestPaid - totalLoanInterestExpense,
             PropertyValue = propertyValue,
             PropertyAppreciation = propertyValue - totalPropertyPurchases,
@@ -196,9 +200,9 @@ public sealed partial class Query
             InventoryValue = inventoryValue,
             TotalDepositsPlaced = totalDepositsPlaced,
             TotalAssets = currentCash + propertyValue + buildingValue + inventoryValue,
-            CashFromOperations = totalRevenue + totalMediaHouseIncome + totalDepositInterestReceived + totalLoanInterestIncome
+            CashFromOperations = totalRevenue + totalMediaHouseIncome + totalRentIncome + totalDepositInterestReceived + totalLoanInterestIncome
                 - totalPurchasingCosts - totalShippingCosts - totalLaborCosts - totalEnergyCosts
-                - totalMarketingCosts - totalDepositInterestPaid - totalLoanInterestExpense,
+                - totalMarketingCosts - totalDepositInterestPaid - totalLoanInterestExpense - totalPropertyMaintenance,
             CashFromInvestments = totalStockSaleCashIn - totalPropertyPurchases - totalStockPurchaseCashOut,
             CashFromBanking = totalLoanOriginations + totalDepositsWithdrawn
                 - totalDepositsMade - totalLoanRepaymentPrincipal,
@@ -414,6 +418,8 @@ public sealed partial class Query
     {
         var totalRevenue = projections.Where(e => e.Category == LedgerCategory.Revenue && e.Amount > 0).Sum(e => e.Amount);
         var totalMediaHouseIncome = projections.Where(e => e.Category == LedgerCategory.MediaHouseIncome && e.Amount > 0).Sum(e => e.Amount);
+        var totalRentIncome = projections.Where(e => e.Category == LedgerCategory.RentIncome && e.Amount > 0).Sum(e => e.Amount);
+        var totalPropertyMaintenance = Math.Abs(projections.Where(e => e.Category == LedgerCategory.PropertyMaintenance && e.Amount < 0).Sum(e => e.Amount));
         var totalPurchasingCosts = Math.Abs(projections.Where(e => e.Category == LedgerCategory.PurchasingCost && e.Amount < 0).Sum(e => e.Amount));
         var totalShippingCosts = Math.Abs(projections.Where(e => e.Category == LedgerCategory.ShippingCost && e.Amount < 0).Sum(e => e.Amount));
         var totalLaborCosts = Math.Abs(projections.Where(e => e.Category == LedgerCategory.LaborCost && e.Amount < 0).Sum(e => e.Amount));
@@ -421,8 +427,8 @@ public sealed partial class Query
         var totalMarketingCosts = Math.Abs(projections.Where(e => e.Category == LedgerCategory.Marketing && e.Amount < 0).Sum(e => e.Amount));
         var totalTaxPaid = Math.Abs(projections.Where(e => e.Category == LedgerCategory.Tax && e.Amount < 0).Sum(e => e.Amount));
         var totalOtherCosts = Math.Abs(projections.Where(e => e.Category == LedgerCategory.Other && e.Amount < 0).Sum(e => e.Amount));
-        // Taxable income = revenue + media house income minus all deductible operating costs (excluding tax itself).
-        var taxableIncome = Math.Max(totalRevenue + totalMediaHouseIncome - totalPurchasingCosts - totalShippingCosts - totalLaborCosts - totalEnergyCosts - totalMarketingCosts, 0m);
+        // Taxable income = revenue + media house income + rent income minus all deductible operating costs (excluding tax itself).
+        var taxableIncome = Math.Max(totalRevenue + totalMediaHouseIncome + totalRentIncome - totalPurchasingCosts - totalShippingCosts - totalLaborCosts - totalEnergyCosts - totalMarketingCosts - totalPropertyMaintenance, 0m);
         var estimatedIncomeTax = gameYear == currentGameYear
             ? GameTime.ComputeEstimatedIncomeTax(taxableIncome, taxRate)
             : totalTaxPaid;
@@ -434,7 +440,7 @@ public sealed partial class Query
             TotalRevenue = totalRevenue,
             TotalLaborCosts = totalLaborCosts,
             TotalEnergyCosts = totalEnergyCosts,
-            NetIncome = totalRevenue + totalMediaHouseIncome - totalPurchasingCosts - totalShippingCosts - totalLaborCosts - totalEnergyCosts - totalMarketingCosts - totalTaxPaid - totalOtherCosts,
+            NetIncome = totalRevenue + totalMediaHouseIncome + totalRentIncome - totalPurchasingCosts - totalShippingCosts - totalLaborCosts - totalEnergyCosts - totalMarketingCosts - totalPropertyMaintenance - totalTaxPaid - totalOtherCosts,
             TotalTaxPaid = totalTaxPaid,
             TaxableIncome = taxableIncome,
             EstimatedIncomeTax = estimatedIncomeTax,

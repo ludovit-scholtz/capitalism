@@ -200,6 +200,9 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Per-tick extraction history records written by the mining phase.</summary>
     public DbSet<MineExtractionRecord> MineExtractionRecords => Set<MineExtractionRecord>();
 
+    /// <summary>Per-tick rental income records written by the rent phase for sparkline charts.</summary>
+    public DbSet<RentalIncomeRecord> RentalIncomeRecords => Set<RentalIncomeRecord>();
+
     /// <summary>Per-city scheduling rows for the annual resource replenishment cycle.</summary>
     public DbSet<ResourceReplenishmentSchedule> ResourceReplenishmentSchedules => Set<ResourceReplenishmentSchedule>();
 

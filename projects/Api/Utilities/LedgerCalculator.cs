@@ -20,6 +20,8 @@ public static class LedgerCalculator
         // Banking operating costs are deductible (interest paid to depositors, loan interest expense)
         LedgerCategory.DepositInterestPaid,
         LedgerCategory.LoanInterestExpense,
+        // Property maintenance on Apartment/Commercial buildings is a deductible operating cost
+        LedgerCategory.PropertyMaintenance,
     ];
 
     public static decimal GetTotalRevenue(IEnumerable<LedgerEntry> entries)
@@ -108,6 +110,22 @@ public static class LedgerCalculator
             .Sum(entry => entry.Amount);
     }
 
+    /// <summary>Rental income earned from Apartment and Commercial buildings each tick.</summary>
+    public static decimal GetTotalRentIncome(IEnumerable<LedgerEntry> entries)
+    {
+        return entries
+            .Where(entry => entry.Category == LedgerCategory.RentIncome && entry.Amount > 0m)
+            .Sum(entry => entry.Amount);
+    }
+
+    /// <summary>Property maintenance costs associated with Apartment and Commercial buildings.</summary>
+    public static decimal GetTotalPropertyMaintenance(IEnumerable<LedgerEntry> entries)
+    {
+        return Math.Abs(entries
+            .Where(entry => entry.Category == LedgerCategory.PropertyMaintenance && entry.Amount < 0m)
+            .Sum(entry => entry.Amount));
+    }
+
     // ── Banking income/expense helpers ────────────────────────────────────────
 
     /// <summary>Deposit interest earned by this company as a depositor (income).</summary>
@@ -186,10 +204,11 @@ public static class LedgerCalculator
         // Banking interest income and media house advertising income are also taxable
         var bankingIncome = GetTotalDepositInterestReceived(ledgerEntries) + GetTotalLoanInterestIncome(ledgerEntries);
         var mediaHouseIncome = GetTotalMediaHouseIncome(ledgerEntries);
+        var rentIncome = GetTotalRentIncome(ledgerEntries);
         var deductibleCosts = Math.Abs(ledgerEntries
             .Where(entry => DeductibleCategories.Contains(entry.Category) && entry.Amount < 0m)
             .Sum(entry => entry.Amount));
 
-        return Math.Max(revenue + bankingIncome + mediaHouseIncome - deductibleCosts, 0m);
+        return Math.Max(revenue + bankingIncome + mediaHouseIncome + rentIncome - deductibleCosts, 0m);
     }
 }

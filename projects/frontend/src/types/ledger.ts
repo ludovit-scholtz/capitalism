@@ -15,6 +15,8 @@ export interface CompanyLedgerSummary {
   hasMixedCurrencies: boolean
   totalRevenue: number
   totalMediaHouseIncome: number
+  totalRentIncome: number
+  totalPropertyMaintenance: number
   totalPurchasingCosts: number
   totalShippingCosts: number
   totalLaborCosts: number
