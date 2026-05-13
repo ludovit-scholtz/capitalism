@@ -26,6 +26,8 @@ public sealed partial class Query
 
         if (building is null)
             return null;
+        if (building.Company is null)
+            return null;
 
         var userId = httpContextAccessor.HttpContext?.User.GetUserId();
         var isOwner = userId.HasValue && building.Company.PlayerId == userId.Value;
@@ -51,7 +53,7 @@ public sealed partial class Query
         decimal? revenueThisTick = null;
         if (isOwner)
         {
-            var currentTick = (await db.GameStates.FirstOrDefaultDeterministicAsync())?.CurrentTick ?? 0;
+            var currentTick = (await db.GameStates.AsNoTracking().FirstOrDefaultDeterministicAsync())?.CurrentTick ?? 0;
             revenueThisTick = await db.LedgerEntries
                 .Where(e => e.BuildingId == building.Id
                     && e.Category == LedgerCategory.MediaHouseIncome

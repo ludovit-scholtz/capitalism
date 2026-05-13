@@ -775,6 +775,16 @@ public sealed class MediaHousePhaseTests
                 Name = "TV House",
                 MediaType = MediaType.Tv,
                 Level = 1,
+            },
+            new Building
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                CityId = city.Id,
+                Type = BuildingType.MediaHouse,
+                Name = "Newspaper House",
+                MediaType = MediaType.Newspaper,
+                Level = 1,
             });
         await db.SaveChangesAsync();
 
@@ -790,5 +800,70 @@ public sealed class MediaHousePhaseTests
         var houses = result.GetProperty("data").GetProperty("cityMediaHouses").EnumerateArray().ToList();
         Assert.NotEmpty(houses);
         Assert.All(houses, house => Assert.Equal("RADIO", house.GetProperty("mediaType").GetString()));
+        Assert.DoesNotContain(houses, house => house.GetProperty("mediaType").GetString() == "TV");
+        Assert.DoesNotContain(houses, house => house.GetProperty("mediaType").GetString() == "NEWSPAPER");
+    }
+
+    [Fact]
+    public async Task CityMediaHouses_Query_WithoutCategory_ReturnsAllMediaTypes()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = await db.Cities.FirstDeterministicAsync();
+        var player = new Player
+        {
+            Id = Guid.NewGuid(),
+            Email = $"media-all-{Guid.NewGuid():N}@test.com",
+            DisplayName = "All Types Player",
+            PasswordHash = "hash",
+            Role = PlayerRole.Player,
+        };
+        db.Players.Add(player);
+        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync() ?? throw new InvalidOperationException("Game state missing.");
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "All Types Co", FoundedAtUtc = DateTime.UtcNow, FoundedAtTick = gameState.CurrentTick };
+        db.Companies.Add(company);
+        db.Buildings.AddRange(
+            new Building
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                CityId = city.Id,
+                Type = BuildingType.MediaHouse,
+                Name = "All Radio",
+                MediaType = MediaType.Radio,
+                Level = 1,
+            },
+            new Building
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                CityId = city.Id,
+                Type = BuildingType.MediaHouse,
+                Name = "All TV",
+                MediaType = MediaType.Tv,
+                Level = 1,
+            });
+        await db.SaveChangesAsync();
+
+        const string query = """
+            query CityMedia($cityId: UUID!) {
+              cityMediaHouses(cityId: $cityId) {
+                mediaType
+              }
+            }
+            """;
+
+        var result = await TestHelpers.ExecuteGraphQlAsync(client, query, new { cityId = city.Id });
+        var mediaTypes = result.GetProperty("data").GetProperty("cityMediaHouses")
+            .EnumerateArray()
+            .Select(h => h.GetProperty("mediaType").GetString())
+            .Where(v => v is not null)
+            .ToHashSet();
+
+        Assert.Contains("RADIO", mediaTypes);
+        Assert.Contains("TV", mediaTypes);
     }
 }

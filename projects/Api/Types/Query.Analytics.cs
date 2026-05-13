@@ -298,12 +298,12 @@ public sealed partial class Query
     {
         var normalizedCategory = string.IsNullOrWhiteSpace(category)
             ? null
-            : category.Trim().ToUpperInvariant();
+            : category.Trim().ToUpper();
 
         var mediaHouses = await db.Buildings
             .Where(b => b.CityId == cityId
                 && b.Type == Data.Entities.BuildingType.MediaHouse
-                && (normalizedCategory == null || (b.MediaType ?? string.Empty) == normalizedCategory))
+                && (normalizedCategory == null || (b.MediaType ?? string.Empty).ToUpper() == normalizedCategory))
             .Include(b => b.Company)
             .Include(b => b.City)
             .AsNoTracking()
