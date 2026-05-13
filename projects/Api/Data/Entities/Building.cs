@@ -213,6 +213,17 @@ public sealed class Building
     public string? SuspendedReason { get; set; }
 
     /// <summary>
+    /// Maximum price per kWh (in city local currency) the building owner is willing to pay
+    /// on the energy spot market to restore power when the building goes OFFLINE.
+    ///
+    /// When <c>null</c> or zero, the building will NOT auto-purchase spot-market energy —
+    /// it stays OFFLINE until city supply is restored or the bid price is raised.
+    /// Set via the <c>setMaxEnergyBidPrice</c> mutation.
+    /// Only meaningful for non-power-plant buildings.
+    /// </summary>
+    public decimal? MaxEnergyBidPrice { get; set; }
+
+    /// <summary>
     /// Player-set dispatch target as a percentage (0–100) of the plant's rated capacity.
     /// 100 = run at full output; 50 = run at half capacity, halving both fuel costs and output.
     /// Applies to POWER_PLANT buildings only; ignored for all other building types.

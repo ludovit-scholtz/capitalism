@@ -185,7 +185,11 @@ public sealed class PowerPlantAnalytics
     public decimal TotalOperatingCosts { get; set; }
     /// <summary>Total fuel procurement costs over the analytics window (COAL/GAS plants only).</summary>
     public decimal TotalFuelCosts { get; set; }
+    /// <summary>Total energy spot-market sales revenue over the analytics window.</summary>
+    public decimal TotalSpotMarketRevenue { get; set; }
     public decimal TotalNetProfit { get; set; }
+    /// <summary>Active energy spot-market listing (null if the plant has no active listing).</summary>
+    public EnergyMarketListingDto? ActiveListing { get; set; }
     public List<PowerPlantTickSnapshot> Timeline { get; set; } = [];
 }
 
@@ -198,6 +202,8 @@ public sealed class PowerPlantTickSnapshot
     public decimal OperatingCosts { get; set; }
     /// <summary>Fuel procurement cost for this tick (COAL/GAS plants only).</summary>
     public decimal FuelCosts { get; set; }
+    /// <summary>Spot-market energy sales revenue for this tick.</summary>
+    public decimal SpotMarketRevenue { get; set; }
     public decimal NetProfit { get; set; }
 }
 
