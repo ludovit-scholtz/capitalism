@@ -23,7 +23,7 @@ const generatedKey = ref<string | null>(null)
 const copied = ref(false)
 const actionError = ref<string | null>(null)
 
-const activeKeys = computed(() => keys.value.filter((key) => !key.revokedAtUtc))
+const activeKeys = computed(() => keys.value)
 
 function formatDate(iso: string | null): string {
   if (!iso) return t('dashboard.apiKeysNeverUsed')
@@ -50,7 +50,7 @@ async function loadKeys() {
         revokedAtUtc
       }
     }`)
-    keys.value = data.myApiKeys.filter((key) => !key.revokedAtUtc)
+    keys.value = data.myApiKeys
   } catch (error: unknown) {
     loadError.value = error instanceof Error ? error.message : t('dashboard.apiKeysLoadError')
   } finally {
@@ -82,7 +82,7 @@ async function generateKey() {
       {
         input: {
           name: trimmedName,
-          scopes: ['bot-only', 'trading-only'],
+          scopes: ['read-only', 'bot-only', 'trading-only'],
         },
       },
     )
