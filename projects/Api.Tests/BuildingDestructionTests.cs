@@ -1,3 +1,6 @@
+using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json;
 using Api.Data;
 using Api.Data.Entities;
 using Api.Engine;
@@ -733,5 +736,228 @@ public sealed class BuildingDestructionTests
     public async Task GameConstants_ForeclosureAutoListDiscount_IsTenPercent()
     {
         Assert.Equal(0.10m, GameConstants.ForeclosureAutoListDiscount);
+    }
+
+    // ── DestroyedReason / IsDismissedByOwner tests ───────────────────────────
+
+    [Fact]
+    public async Task BuildingDestructionPhase_SetsDestroyedReason_ToGracePeriodExpired_OnBuilding()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        factory.CreateClient();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var (db, _, company, building, _, loanOffer) = await SeedBaseAsync(scope);
+
+        var defaultedAtTick = 400L;
+        building.IsForSale = true;
+        building.AskingPrice = 400_000m;
+        building.ListedAtUtc = DateTime.UtcNow.AddDays(-5);
+
+        await AddDefaultedLoanAsync(db, company, building, loanOffer, 600_000m, defaultedAtTick);
+
+        var gs = await db.GameStates.FindAsync(1);
+        gs!.CurrentTick = defaultedAtTick + BuildingDestructionPhase.ForeclosureWindowTicks;
+        await db.SaveChangesAsync();
+
+        var processor = CreateProcessor(scope);
+        await processor.ProcessTickAsync();
+
+        await db.Entry(building).ReloadAsync();
+        Assert.NotNull(building.DestroyedAtUtc);
+        Assert.Equal(BuildingDestructionReason.GracePeriodExpired, building.DestroyedReason);
+        Assert.False(building.IsDismissedByOwner);
+    }
+
+    [Fact]
+    public async Task DestroyBuilding_Mutation_SetsPlayerDemolishedReason()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        // Register a player and set up a company with a building.
+        var token = await RegisterTestPlayerAsync(client);
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var playerId = await GetPlayerIdAsync(client, token);
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = playerId, Name = "Demo Corp" };
+        db.Companies.Add(company);
+
+        var building = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.Factory,
+            Name = "Demolition Target",
+            Latitude = 48.15,
+            Longitude = 17.1,
+            Level = 1,
+        };
+        db.Buildings.Add(building);
+        await db.SaveChangesAsync();
+
+        // Call the destroyBuilding mutation.
+        var result = await ExecHttpAsync(client,
+            @"mutation DB($input: DestroyBuildingInput!) {
+                destroyBuilding(input: $input) { buildingId buildingName refundAmount }
+            }",
+            new { input = new { buildingId = building.Id } },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _), "Mutation returned errors");
+        var returnedId = result.GetProperty("data").GetProperty("destroyBuilding").GetProperty("buildingId").GetString();
+        Assert.Equal(building.Id.ToString(), returnedId, ignoreCase: true);
+
+        // Verify in database: destroyedAtUtc and destroyedReason are set.
+        await db.Entry(building).ReloadAsync();
+        Assert.NotNull(building.DestroyedAtUtc);
+        Assert.Equal(BuildingDestructionReason.PlayerDemolished, building.DestroyedReason);
+        Assert.False(building.IsDismissedByOwner);
+    }
+
+    [Fact]
+    public async Task RemoveDestroyedBuilding_Mutation_SetsIsDismissedByOwner()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        // Register a player and create a pre-destroyed building.
+        var token = await RegisterTestPlayerAsync(client);
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var playerId = await GetPlayerIdAsync(client, token);
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = playerId, Name = "Remove Corp" };
+        db.Companies.Add(company);
+
+        var building = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.Factory,
+            Name = "Already Destroyed",
+            Latitude = 48.15,
+            Longitude = 17.1,
+            Level = 1,
+            DestroyedAtUtc = DateTime.UtcNow.AddDays(-1),
+            DestroyedReason = BuildingDestructionReason.PlayerDemolished,
+        };
+        db.Buildings.Add(building);
+        await db.SaveChangesAsync();
+
+        // Call removeDestroyedBuilding mutation.
+        var result = await ExecHttpAsync(client,
+            @"mutation RDB($input: RemoveDestroyedBuildingInput!) {
+                removeDestroyedBuilding(input: $input) { id isDismissedByOwner }
+            }",
+            new { input = new { buildingId = building.Id } },
+            token);
+
+        var returned = result.GetProperty("data").GetProperty("removeDestroyedBuilding");
+        Assert.True(returned.GetProperty("isDismissedByOwner").GetBoolean());
+
+        // Verify persisted state.
+        await db.Entry(building).ReloadAsync();
+        Assert.True(building.IsDismissedByOwner);
+    }
+
+    [Fact]
+    public async Task RemoveDestroyedBuilding_Mutation_Unauthenticated_Fails()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var result = await ExecHttpAsync(client,
+            @"mutation RDB($input: RemoveDestroyedBuildingInput!) {
+                removeDestroyedBuilding(input: $input) { id }
+            }",
+            new { input = new { buildingId = Guid.NewGuid() } },
+            token: null);
+
+        var root = result.GetProperty("data");
+        // Unauthorized should produce errors or null data for the mutation.
+        Assert.True(
+            root.ValueKind == JsonValueKind.Null ||
+            result.TryGetProperty("errors", out _),
+            "Expected auth error for unauthenticated removeDestroyedBuilding call");
+    }
+
+    [Fact]
+    public async Task RemoveDestroyedBuilding_Mutation_ActiveBuilding_Fails()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var token = await RegisterTestPlayerAsync(client);
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var playerId = await GetPlayerIdAsync(client, token);
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = playerId, Name = "Active Corp" };
+        db.Companies.Add(company);
+
+        var building = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.Factory,
+            Name = "Still Standing",
+            Latitude = 48.15,
+            Longitude = 17.1,
+            Level = 1,
+            // NOT destroyed
+        };
+        db.Buildings.Add(building);
+        await db.SaveChangesAsync();
+
+        var result = await ExecHttpAsync(client,
+            @"mutation RDB($input: RemoveDestroyedBuildingInput!) {
+                removeDestroyedBuilding(input: $input) { id }
+            }",
+            new { input = new { buildingId = building.Id } },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out _), "Expected error for active building");
+    }
+
+    // ── HTTP helpers shared by mutation tests ─────────────────────────────────
+
+    private static async Task<JsonElement> ExecHttpAsync(
+        HttpClient client, string query, object? variables = null, string? token = null)
+    {
+        var req = new HttpRequestMessage(HttpMethod.Post, "/graphql")
+        {
+            Content = new StringContent(
+                JsonSerializer.Serialize(new { query, variables }),
+                Encoding.UTF8,
+                "application/json"),
+        };
+        if (token is not null)
+            req.Headers.Authorization = new("Bearer", token);
+
+        var resp = await client.SendAsync(req);
+        resp.EnsureSuccessStatusCode();
+        return await resp.Content.ReadFromJsonAsync<JsonElement>();
+    }
+
+    private static async Task<string> RegisterTestPlayerAsync(HttpClient client)
+    {
+        var email = $"test-{Guid.NewGuid():N}@destroy.test";
+        var result = await ExecHttpAsync(client,
+            "mutation R($i: RegisterInput!) { register(input: $i) { token } }",
+            new { i = new { email, displayName = "Destroy Tester", password = "TestPass123!" } });
+        return result.GetProperty("data").GetProperty("register").GetProperty("token").GetString()!;
+    }
+
+    private static async Task<Guid> GetPlayerIdAsync(HttpClient client, string token)
+    {
+        var result = await ExecHttpAsync(client, "query { me { id } }", token: token);
+        return Guid.Parse(result.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
     }
 }

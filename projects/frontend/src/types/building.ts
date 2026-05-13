@@ -163,6 +163,8 @@ export interface Building {
   lotOriginalMaterialQuantity?: number | null
   /** UTC timestamp when the building was destroyed by loan default foreclosure. Null when still standing. */
   destroyedAtUtc: string | null
+  /** Reason the building was destroyed: 'PlayerDemolished', 'GracePeriodExpired', 'DefaultedLoan', or null. */
+  destroyedReason: string | null
   /** True when at least one DEFAULTED loan uses this building as collateral. */
   hasDefaultedCollateralLoan?: boolean
   /** True when this building is currently locked as unpaid loan collateral. */
@@ -253,6 +255,7 @@ export interface BuildingLot {
     isForSale: boolean
     askingPrice: number | null
     destroyedAtUtc: string | null
+    destroyedReason: string | null
     hasDefaultedCollateralLoan?: boolean
   } | null
   /** Raw material available for extraction — null when no resource on this lot */

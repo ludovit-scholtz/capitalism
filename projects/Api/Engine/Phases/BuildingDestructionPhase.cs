@@ -208,6 +208,7 @@ public sealed class BuildingDestructionPhase : ITickPhase
             building.AskingPrice = null;
             building.ListedAtUtc = null;
             building.DestroyedAtUtc = DateTime.UtcNow;
+            building.DestroyedReason = BuildingDestructionReason.GracePeriodExpired;
             building.ConcurrencyToken = Guid.NewGuid();
 
             // Clear the collateral reference on the loan so we don't reprocess.

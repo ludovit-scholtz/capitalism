@@ -61,4 +61,7 @@ public static class BuildingDestructionReason
 
     /// <summary>Building destroyed for another reason.</summary>
     public const string Other = "Other";
+
+    /// <summary>Building demolished by the player via the destroy-building mutation.</summary>
+    public const string PlayerDemolished = "PlayerDemolished";
 }

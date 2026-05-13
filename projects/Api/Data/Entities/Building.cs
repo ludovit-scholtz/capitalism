@@ -239,11 +239,26 @@ public sealed class Building
     public decimal FuelReserveMwh { get; set; } = 0m;
 
     /// <summary>
-    /// UTC timestamp when the building was destroyed (loan default foreclosure).
+    /// UTC timestamp when the building was destroyed (loan default foreclosure or player demolition).
     /// Null when the building is still standing.
     /// When set, the building is inoperative and shows a "Destroyed" status.
     /// </summary>
     public DateTime? DestroyedAtUtc { get; set; }
+
+    /// <summary>
+    /// The reason this building was destroyed. Mirrors the corresponding
+    /// <see cref="BuildingDestructionRecord.DestructionReason" /> value.
+    /// Values: "PlayerDemolished" | "GracePeriodExpired" | "DefaultedLoan" | null (legacy rows).
+    /// </summary>
+    [MaxLength(50)]
+    public string? DestroyedReason { get; set; }
+
+    /// <summary>
+    /// True when the owner has dismissed the destroyed building from their list.
+    /// Dismissed buildings are filtered out of <c>myCompanies.buildings</c> so they
+    /// no longer appear in the dashboard or building detail view.
+    /// </summary>
+    public bool IsDismissedByOwner { get; set; }
 
     /// <summary>
     /// Optimistic concurrency token for commit-time ownership and collateral-lock revalidation.
