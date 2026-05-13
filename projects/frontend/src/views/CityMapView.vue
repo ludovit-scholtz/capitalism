@@ -1,65 +1,69 @@
 <template>
   <div class="city-map-view container">
     <div class="page-header">
-      <div>
+      <div class="header-main">
         <button class="btn btn-secondary btn-sm" @click="router.push('/dashboard')">← {{ t('cityMap.backToDashboard') }}</button>
-        <h1 v-if="city">🗺️ {{ city.name }} — {{ t('cityMap.title') }}</h1>
+        <h1 v-if="city">🏙️ {{ city.name }} — {{ t('cityMap.title') }}</h1>
         <p class="subtitle">{{ t('cityMap.subtitle') }}</p>
       </div>
-      <div class="header-controls">
-        <div class="view-toggle">
-          <button class="toggle-btn" :class="{ active: viewMode === 'map' }" @click="viewMode = 'map'">🗺️ {{ t('cityMap.mapView') }}</button>
-          <button class="toggle-btn" :class="{ active: viewMode === 'list' }" @click="viewMode = 'list'">📋 {{ t('cityMap.listView') }}</button>
-        </div>
-        <div class="filter-toggle">
-          <button class="toggle-btn" :class="{ active: !showAvailableOnly }" @click="showAvailableOnly = false">{{ t('cityMap.filterAll') }}</button>
-          <button class="toggle-btn" :class="{ active: showAvailableOnly }" @click="showAvailableOnly = true">{{ t('cityMap.filterAvailable') }}</button>
-        </div>
-        <button class="toggle-btn resource-layer-toggle" :class="{ active: showResourceLayer }" @click="showResourceLayer = !showResourceLayer">
-          ⛏️ {{ t('cityMap.resourceLayer') }}
-        </button>
-        <span class="lot-count">{{ t('cityMap.lotCount', { count: filteredLots.length }) }}</span>
+      <div v-if="city" class="city-context">
+        <span class="context-chip">{{ city.currencyCode }}</span>
+        <span class="context-chip">{{ city.population.toLocaleString() }}</span>
       </div>
     </div>
+
+    <nav class="city-tabs" aria-label="City tabs">
+      <RouterLink
+        v-for="tab in tabs"
+        :key="tab.name"
+        :to="{ name: tab.name, params: { cityId } }"
+        class="city-tab"
+        :class="{ 'city-tab--active': activeTab === tab.key }"
+      >
+        <span>{{ tab.icon }}</span>
+        <span>{{ t(tab.labelKey) }}</span>
+      </RouterLink>
+    </nav>
 
     <div v-if="loading" class="loading">{{ t('common.loading') }}</div>
 
     <div v-else-if="error" class="error-message" role="alert">
       {{ error }}
-      <button class="btn btn-secondary" @click="fetchData()">{{ t('common.tryAgain') }}</button>
+      <button class="btn btn-secondary" @click="fetchAll()">{{ t('common.tryAgain') }}</button>
     </div>
 
-    <CityMapContent
-      v-else-if="city"
-      :city="city"
-      :filtered-lots="filteredLots"
-      :lots="lots"
-      :companies="companies"
-      :view-mode="viewMode"
-      :city-weather="cityWeather"
-      :city-power-balance="cityPowerBalance"
-      :city-economic-report="cityEconomicReport"
-      :economic-report-loading="economicReportLoading"
-      :city-media-houses="cityMediaHouses"
-      :media-houses-loading="mediaHousesLoading"
-      :highlighted-building-id="highlightedBuildingId"
-      :city-id="cityId"
-      :show-resource-layer="showResourceLayer"
-      @purchase-complete="handlePurchaseComplete"
-      @lot-refreshed="handleLotRefreshed"
-    />
+    <RouterView v-else-if="city" v-slot="{ Component }">
+      <component
+        :is="Component"
+        :city="city"
+        :city-id="cityId"
+        :lots="lots"
+        :companies="companies"
+        :city-weather="cityWeather"
+        :city-power-balance="cityPowerBalance"
+        :city-economic-report="cityEconomicReport"
+        :economic-report-loading="economicReportLoading"
+        :city-media-houses="cityMediaHouses"
+        :media-houses-loading="mediaHousesLoading"
+        :highlighted-building-id="highlightedBuildingId"
+        :economy-cycle="economyCycle"
+        :active-market-events="activeMarketEvents"
+        :economic-history="economicHistory"
+        @purchase-complete="handlePurchaseComplete"
+        @lot-refreshed="handleLotRefreshed"
+      />
+    </RouterView>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
-import CityMapContent from '@/components/cityMap/CityMapContent.vue'
-import type { City, BuildingLot, Company, PurchaseLotResult, CityMediaHouseInfo, CityWeatherForecast, CityPowerBalance, CityEconomicReportResult } from '@/types'
+import type { City, BuildingLot, Company, PurchaseLotResult, CityMediaHouseInfo, CityWeatherForecast, CityPowerBalance, CityEconomicReportResult, EconomicCycleView, MarketEventView, EconomicCycleHistoryPoint } from '@/types'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -67,7 +71,15 @@ const router = useRouter()
 const auth = useAuthStore()
 const { selectedCityId } = storeToRefs(auth)
 
-const cityId = computed(() => route.params.id as string)
+const tabs = [
+  { key: 'overview', name: 'city-map', icon: '📍', labelKey: 'cityMap.tabs.overview' },
+  { key: 'economy', name: 'city-economy', icon: '📈', labelKey: 'cityMap.tabs.economy' },
+  { key: 'buildings', name: 'city-buildings', icon: '🏗️', labelKey: 'cityMap.tabs.buildings' },
+  { key: 'market', name: 'city-market', icon: '🛒', labelKey: 'cityMap.tabs.market' },
+] as const
+
+const cityId = computed(() => route.params.cityId as string)
+const activeTab = computed(() => (route.name === 'city-economy' ? 'economy' : route.name === 'city-buildings' ? 'buildings' : route.name === 'city-market' ? 'market' : 'overview'))
 const highlightedBuildingId = computed(() => (typeof route.query.building === 'string' ? route.query.building : null))
 
 const loading = ref(true)
@@ -75,9 +87,6 @@ const error = ref<string | null>(null)
 const city = ref<City | null>(null)
 const lots = ref<BuildingLot[]>([])
 const companies = ref<Company[]>([])
-const showAvailableOnly = ref(false)
-const showResourceLayer = ref(false)
-const viewMode = ref<'map' | 'list'>('map')
 
 const cityWeather = ref<CityWeatherForecast | null>(null)
 const cityPowerBalance = ref<CityPowerBalance | null>(null)
@@ -87,12 +96,9 @@ const economicReportLoading = ref(false)
 const cityMediaHouses = ref<CityMediaHouseInfo[]>([])
 const mediaHousesLoading = ref(false)
 
-const filteredLots = computed(() => {
-  if (showAvailableOnly.value) {
-    return lots.value.filter((lot) => !lot.ownerCompanyId)
-  }
-  return lots.value
-})
+const economyCycle = ref<EconomicCycleView | null>(null)
+const activeMarketEvents = ref<MarketEventView[]>([])
+const economicHistory = ref<EconomicCycleHistoryPoint[]>([])
 
 async function fetchData() {
   loading.value = true
@@ -225,6 +231,45 @@ async function fetchCityEconomicReport() {
   }
 }
 
+async function fetchEconomyData() {
+  if (!cityId.value) return
+  try {
+    const data = await gqlRequest<{
+      getCurrentEconomicCycle: EconomicCycleView | null
+      getActiveMarketEvents: MarketEventView[]
+      getEconomicHistory: EconomicCycleHistoryPoint[]
+    }>(
+      `query CityEconomy($cityId: UUID!) {
+        getCurrentEconomicCycle {
+          id phase phaseStartedTick expectedDurationTicks intensityFactor phaseEndTick ticksRemaining
+        }
+        getActiveMarketEvents(cityId: $cityId) {
+          id eventType title description magnitudeMultiplier startsAtTick expiresAtTick ticksRemaining
+          affectedResourceTypeId affectedResourceName affectedResourceSlug
+          affectedCityId affectedCityName
+        }
+        getEconomicHistory(last: 365) {
+          tick phase intensityFactor
+        }
+      }`,
+      { cityId: cityId.value },
+    )
+
+    economyCycle.value = data.getCurrentEconomicCycle
+    activeMarketEvents.value = data.getActiveMarketEvents ?? []
+    economicHistory.value = data.getEconomicHistory ?? []
+  } catch {
+    economyCycle.value = null
+    activeMarketEvents.value = []
+    economicHistory.value = []
+  }
+}
+
+async function fetchAll() {
+  await fetchData()
+  await Promise.all([fetchMediaHouses(), fetchWeatherForecast(), fetchCityPowerBalance(), fetchCityEconomicReport(), fetchEconomyData()])
+}
+
 function handlePurchaseComplete(result: PurchaseLotResult) {
   const lotIdx = lots.value.findIndex((lot) => lot.id === result.lot.id)
   if (lotIdx >= 0) {
@@ -244,13 +289,6 @@ function handleLotRefreshed(lot: BuildingLot) {
   }
 }
 
-watch(selectedCityId, (nextCityId) => {
-  if (!nextCityId || nextCityId === cityId.value) {
-    return
-  }
-  router.push({ name: 'city-map', params: { id: nextCityId } })
-})
-
 watch(cityId, async () => {
   if (selectedCityId.value !== cityId.value) {
     auth.switchCity(cityId.value)
@@ -258,13 +296,13 @@ watch(cityId, async () => {
 
   cityWeather.value = null
   cityPowerBalance.value = null
-  viewMode.value = 'map'
+  cityEconomicReport.value = null
+  cityMediaHouses.value = []
+  economyCycle.value = null
+  activeMarketEvents.value = []
+  economicHistory.value = []
 
-  await fetchData()
-  void fetchMediaHouses()
-  void fetchWeatherForecast()
-  void fetchCityPowerBalance()
-  void fetchCityEconomicReport()
+  await fetchAll()
 })
 
 onMounted(async () => {
@@ -272,13 +310,7 @@ onMounted(async () => {
     auth.switchCity(cityId.value)
   }
 
-  await fetchData()
-  void fetchMediaHouses()
-  void fetchWeatherForecast()
-  void fetchCityPowerBalance()
-  void fetchCityEconomicReport()
-
-  await nextTick()
+  await fetchAll()
 })
 </script>
 
@@ -292,11 +324,11 @@ onMounted(async () => {
   justify-content: space-between;
   align-items: flex-start;
   gap: 1rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.75rem;
   flex-wrap: wrap;
 }
 
-.page-header h1 {
+.header-main h1 {
   font-size: 1.5rem;
   margin: 0.5rem 0 0.25rem;
 }
@@ -307,43 +339,57 @@ onMounted(async () => {
   margin: 0;
 }
 
-.header-controls {
+.city-context {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.5rem;
   flex-wrap: wrap;
 }
 
-.view-toggle,
-.filter-toggle {
-  display: flex;
+.context-chip {
+  background: var(--color-card);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  overflow: hidden;
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
 }
 
-.toggle-btn {
-  padding: 0.375rem 0.75rem;
-  font-size: 0.8125rem;
+.city-tabs {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+  position: sticky;
+  top: 0.5rem;
+  z-index: 4;
   background: var(--color-bg);
+}
+
+.city-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   color: var(--color-text-secondary);
-  border: none;
-  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
   transition: all 0.15s;
 }
 
-.toggle-btn.active {
-  background: var(--color-primary);
-  color: #fff;
+.city-tab:hover {
+  border-color: var(--color-primary);
+  color: var(--color-text);
 }
 
-.toggle-btn:not(:last-child) {
-  border-right: 1px solid var(--color-border);
-}
-
-.lot-count {
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary);
+.city-tab--active {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: rgba(0, 71, 255, 0.08);
 }
 
 .loading {

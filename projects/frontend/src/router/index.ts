@@ -44,7 +44,36 @@ const router = createRouter({
     { path: '/buy-building/:companyId', name: 'buy-building', component: () => import('@/views/BuyBuildingView.vue') },
     { path: '/building/:id', name: 'building-detail', component: () => import('@/views/BuildingDetailView.vue') },
     { path: '/building/:id/sell', name: 'sell-building', component: () => import('@/views/SellBuildingView.vue') },
-    { path: '/city/:id', name: 'city-map', component: () => import('@/views/CityMapView.vue') },
+    {
+      path: '/city/:cityId',
+      component: () => import('@/views/CityMapView.vue'),
+      children: [
+        {
+          path: '',
+          redirect: (to) => ({ name: 'city-map', params: { cityId: to.params.cityId } }),
+        },
+        {
+          path: 'overview',
+          name: 'city-map',
+          component: () => import('@/components/cityTabs/CityOverviewTab.vue'),
+        },
+        {
+          path: 'economy',
+          name: 'city-economy',
+          component: () => import('@/components/cityTabs/CityEconomyTab.vue'),
+        },
+        {
+          path: 'buildings',
+          name: 'city-buildings',
+          component: () => import('@/components/cityTabs/CityBuildingsTab.vue'),
+        },
+        {
+          path: 'market',
+          name: 'city-market',
+          component: () => import('@/components/cityTabs/CityMarketTab.vue'),
+        },
+      ],
+    },
     { path: '/ledger/:companyId', name: 'ledger', alias: '/company/:companyId/ledger', component: () => import('@/views/LedgerView.vue') },
     { path: '/company/:companyId/settings', name: 'company-settings', component: () => import('@/views/CompanySettingsView.vue') },
     { path: '/company/:companyId/research', name: 'company-research', component: () => import('@/views/CompanyResearchView.vue') },

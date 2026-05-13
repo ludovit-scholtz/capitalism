@@ -159,7 +159,7 @@ test.describe('Responsive layout baseline checks', () => {
       await expect(page.getByRole('heading', { name: /Building Market/i })).toBeVisible()
       await expectNoHorizontalOverflow(page)
 
-      await page.goto(`/city/${cityId}`)
+      await page.goto(`/city/${cityId}/buildings`)
       await expect(page.locator('.map-container')).toBeVisible()
       await expectNoHorizontalOverflow(page)
     }
@@ -219,7 +219,7 @@ test.describe('Responsive layout baseline checks', () => {
     await page.setViewportSize({ width: 390, height: 844 })
 
     const cityId = state.cities[0]?.id ?? 'city-ba'
-    await page.goto(`/city/${cityId}`)
+    await page.goto(`/city/${cityId}/buildings`)
 
     await expect(page.locator('.map-container')).toBeVisible()
     const mapHeight = await page.locator('.map-container').evaluate((element) => element.getBoundingClientRect().height)

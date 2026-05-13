@@ -23,9 +23,6 @@ import type {
   CompanyLedgerSummary,
   City,
   BuildingUnitOperationalStatus,
-  EconomicCycleView,
-  MarketEventView,
-  EconomicCycleHistoryPoint,
 } from '@/types'
 
 // Module-level cache for city names - cities are static and never change during a session.
@@ -49,9 +46,6 @@ const companyLedgers = ref<Record<string, CompanyLedgerSummary>>({})
 const ledgerLoading = ref(false)
 const cityNames = ref<Record<string, string>>({})
 const cityCurrencies = ref<Record<string, string>>({})
-const economicCycle = ref<EconomicCycleView | null>(null)
-const activeMarketEvents = ref<MarketEventView[]>([])
-const economicHistory = ref<EconomicCycleHistoryPoint[]>([])
 /** Map from buildingId -> per-unit operational statuses for supply-chain live status display. */
 const buildingUnitStatuses = ref<Record<string, BuildingUnitOperationalStatus[]>>({})
 /** Map from buildingId -> aggregated financial totals (revenue, costs, profit). */
@@ -109,36 +103,6 @@ async function refreshCompanyDerivedData() {
   await Promise.all([loadCityPowerBalances(cityIds), loadCityNames(), loadLedgers(companyIds), loadBuildingUnitStatuses(buildingIds), loadBuildingFinancials(buildingIds)])
 }
 
-async function loadEconomyData() {
-  try {
-    const data = await gqlRequest<{
-      getCurrentEconomicCycle: EconomicCycleView | null
-      getActiveMarketEvents: MarketEventView[]
-      getEconomicHistory: EconomicCycleHistoryPoint[]
-    }>(`{
-      getCurrentEconomicCycle {
-        id phase phaseStartedTick expectedDurationTicks intensityFactor phaseEndTick ticksRemaining
-      }
-      getActiveMarketEvents {
-        id eventType title description magnitudeMultiplier startsAtTick expiresAtTick ticksRemaining
-        affectedResourceTypeId affectedResourceName affectedResourceSlug
-        affectedCityId affectedCityName
-      }
-      getEconomicHistory(last: 365) {
-        tick phase intensityFactor
-      }
-    }`)
-
-    economicCycle.value = data.getCurrentEconomicCycle
-    activeMarketEvents.value = data.getActiveMarketEvents ?? []
-    economicHistory.value = data.getEconomicHistory ?? []
-  } catch {
-    economicCycle.value = null
-    activeMarketEvents.value = []
-    economicHistory.value = []
-  }
-}
-
 onMounted(async () => {
   if (!auth.isAuthenticated) {
     router.push('/login')
@@ -160,9 +124,6 @@ onMounted(async () => {
       gameState: GameState
       myPendingActions: ScheduledActionSummary[]
       cities: City[]
-      getCurrentEconomicCycle: EconomicCycleView | null
-      getActiveMarketEvents: MarketEventView[]
-      getEconomicHistory: EconomicCycleHistoryPoint[]
       tutorialProgress: Array<{ milestone: string; isCompleted: boolean; completedAtUtc: string | null }>
     }>(
       `{
@@ -184,17 +145,6 @@ onMounted(async () => {
           name
           currencyCode
         }
-        getCurrentEconomicCycle {
-          id phase phaseStartedTick expectedDurationTicks intensityFactor phaseEndTick ticksRemaining
-        }
-        getActiveMarketEvents {
-          id eventType title description magnitudeMultiplier startsAtTick expiresAtTick ticksRemaining
-          affectedResourceTypeId affectedResourceName affectedResourceSlug
-          affectedCityId affectedCityName
-        }
-        getEconomicHistory(last: 365) {
-          tick phase intensityFactor
-        }
         tutorialProgress {
           milestone
           isCompleted
@@ -207,9 +157,6 @@ onMounted(async () => {
     pendingActions.value = initialData.myPendingActions
     gameState.value = initialData.gameState
     applyCityMaps(initialData.cities)
-    economicCycle.value = initialData.getCurrentEconomicCycle
-    activeMarketEvents.value = initialData.getActiveMarketEvents ?? []
-    economicHistory.value = initialData.getEconomicHistory ?? []
     startTickCountdown()
 
     // Hydrate tooltip dismissed state from backend progress
@@ -245,7 +192,6 @@ useTickRefresh(async () => {
 
   const scrollPos = saveScrollPosition()
   await Promise.all([loadDashboardData(), loadPendingActions()])
-  await loadEconomyData()
   startTickCountdown()
   // Refresh ledger, unit statuses, and building financials on tick but keep loading state quiet (non-critical).
   const companiesForDerived = activeCompany.value ? [activeCompany.value] : []
@@ -409,7 +355,7 @@ async function loadBuildingFinancials(buildingIds: string[], isRefresh = false) 
 
 async function handleRefreshDashboard() {
   await loadDashboardData()
-  await Promise.all([refreshCompanyDerivedData(), loadPendingActions(), loadEconomyData()])
+  await Promise.all([refreshCompanyDerivedData(), loadPendingActions()])
 }
 
 function handleCompanyLaunched() {
@@ -471,9 +417,6 @@ function handleCompanyLaunched() {
       :building-financials="buildingFinancials"
       :building-financials-loading="buildingFinancialsLoading"
       :building-unit-statuses="buildingUnitStatuses"
-      :economic-cycle="economicCycle"
-      :active-market-events="activeMarketEvents"
-      :economic-history="economicHistory"
       @refresh-dashboard="handleRefreshDashboard"
       @company-launched="handleCompanyLaunched"
     />
