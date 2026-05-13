@@ -22,7 +22,8 @@
 - Master frontend router configuration is in `projects/master-frontend/src/router/index.ts`.
 
 ## Changelog
-Update /CHANGELOG.csv with a new entry for each meaningful change. Create guid id, use current timestamp, and write short one sentence summary in each language (en, sk, de). This is the canonical source of truth for player-visible changes and is used to generate the in-game news feed.
+- Update /CHANGELOG.csv with a new entry for each meaningful change. Create guid id, use current timestamp, and write short one sentence summary in each language (en, sk, de). This is the canonical source of truth for player-visible changes and is used to generate the in-game news feed.
+- Changelog entries should have 3 to 10 words prefix description followed by a colon and a more detailed explanation. For example: "New building type - Media House: Added a new building type that produces media products and increases brand awareness."
 
 ## Technology and conventions
 - Frontends use Vue 3 + TypeScript + Vite.
