@@ -4204,4 +4204,10 @@ export default {
     listingError: 'Failed to create listing.',
     spotRevenue: 'Spot revenue',
   },
+  storage: {
+    freshness: {
+      label: 'Freshness',
+      tooltip: 'Freshness: {pct}% — this perishable product loses ~0.05% quality per tick.',
+    },
+  },
 }

@@ -4830,6 +4830,7 @@ export function useBuildingDetail() {
             unitSymbol
             isProOnly
             isUnlockedForCurrentPlayer
+            isPerishable
             description
             recipes {
               quantity

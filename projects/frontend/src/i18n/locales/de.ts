@@ -4209,4 +4209,10 @@ export default {
     listingError: 'Angebot konnte nicht erstellt werden.',
     spotRevenue: 'Spot-Erlöse',
   },
+  storage: {
+    freshness: {
+      label: 'Frische',
+      tooltip: 'Frische: {pct}% — dieses verderbliche Produkt verliert ~0,05 % Qualität pro Tick.',
+    },
+  },
 }

@@ -113,7 +113,7 @@ async function loadCompetitorIntelligence(productTypeId: string) {
       COMPETITOR_INTELLIGENCE_QUERY,
       { cityId, productTypeId },
     )
-    competitorEntries.value = result.competitorQualityIntelligence
+    competitorEntries.value = result.competitorQualityIntelligence ?? []
   } catch (err) {
     console.error('[CompetitorIntelligence] Failed to load competitor intelligence:', err)
     competitorError.value = t('research.competitors.loadFailed')

@@ -4193,4 +4193,10 @@ export default {
     listingError: 'Nepodarilo sa vytvoriť ponuku.',
     spotRevenue: 'Výnosy zo spotu',
   },
+  storage: {
+    freshness: {
+      label: 'Čerstvosť',
+      tooltip: 'Čerstvosť: {pct}% — tento skaziteľný produkt stráca ~0,05 % kvality za tik.',
+    },
+  },
 }

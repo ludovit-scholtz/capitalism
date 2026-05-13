@@ -51,6 +51,7 @@ const {
   formatTickDuration,
   formatPercent,
   formatUnitQuantity,
+  productTypes,
 } = bd
 
 const selectedConfigTab = ref<'config' | 'performance' | 'maintenance'>('config')
@@ -76,6 +77,25 @@ const purchaseSourcingHistory = computed(() => {
     })
     .slice(0, 8)
 })
+
+/** Returns true when the inventory item belongs to a perishable product. */
+function isPerishableInventory(inventory: { productTypeId: string | null }): boolean {
+  if (!inventory.productTypeId) return false
+  return productTypes.value.find((p) => p.id === inventory.productTypeId)?.isPerishable ?? false
+}
+
+/** Returns the freshness percentage (0–100) for an inventory item based on quality. */
+function freshnessPercent(quality: number): number {
+  return Math.round(Math.max(0, Math.min(1, quality)) * 100)
+}
+
+/** Returns the CSS class for the freshness bar colour tier. */
+function freshnessTierClass(quality: number): string {
+  const pct = freshnessPercent(quality)
+  if (pct > 66) return 'freshness-bar--green'
+  if (pct > 33) return 'freshness-bar--amber'
+  return 'freshness-bar--red'
+}
 </script>
 
 <template>
@@ -295,6 +315,19 @@ const purchaseSourcingHistory = computed(() => {
               </div>
               <div class="inventory-col-quality">
                 <span class="inventory-item-quality">{{ formatPercent(inventory.quality) }}</span>
+                <span
+                  v-if="isPerishableInventory(inventory)"
+                  class="freshness-bar"
+                  :class="freshnessTierClass(inventory.quality)"
+                  :title="t('storage.freshness.tooltip', { pct: freshnessPercent(inventory.quality) })"
+                  role="progressbar"
+                  :aria-valuenow="freshnessPercent(inventory.quality)"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  :aria-label="t('storage.freshness.label')"
+                >
+                  <span class="freshness-bar__fill" :style="{ width: `${freshnessPercent(inventory.quality)}%` }"></span>
+                </span>
               </div>
               <div class="inventory-col-cost">
                 <span class="inventory-item-cost">{{ getInventoryItemSourcingCostLabel(inventory) }}</span>
@@ -445,3 +478,25 @@ const purchaseSourcingHistory = computed(() => {
 <style scoped src="./BuildingSidebar.shared.css"></style>
 <style scoped src="./BuildingSidebar.analytics.css"></style>
 <style scoped src="./BuildingSidebar.exchange.css"></style>
+<style scoped>
+/* Freshness bar for perishable storage inventory items */
+.freshness-bar {
+  display: block;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-surface-2);
+  overflow: hidden;
+  margin-top: 3px;
+  cursor: default;
+}
+.freshness-bar__fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+.freshness-bar--green .freshness-bar__fill { background: #22c55e; }
+.freshness-bar--amber .freshness-bar__fill { background: #f59e0b; }
+.freshness-bar--red   .freshness-bar__fill { background: #ef4444; }
+</style>

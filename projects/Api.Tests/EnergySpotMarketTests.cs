@@ -41,21 +41,21 @@ public sealed class EnergySpotMarketTests
 
     private static City MakeCity(AppDbContext db)
     {
-        var c = new City { Id = Guid.NewGuid(), Name = $"EC{Guid.NewGuid():N[..6]}", CountryCode = "TS",
+        var c = new City { Id = Guid.NewGuid(), Name = $"EC{Guid.NewGuid().ToString("N")[..6]}", CountryCode = "TS",
             Population = 500_000, Latitude = 48.0, Longitude = 17.0, CurrencyCode = "EUR",
             AverageRentPerSqm = 10m, BaseSalaryPerManhour = 10m };
         db.Cities.Add(c); return c;
     }
     private static Building MakePlant(AppDbContext db, Guid cityId, Guid companyId)
     {
-        var b = new Building { Id = Guid.NewGuid(), Name = $"P{Guid.NewGuid():N[..4]}", Type = BuildingType.PowerPlant,
+        var b = new Building { Id = Guid.NewGuid(), Name = $"P{Guid.NewGuid().ToString("N")[..4]}", Type = BuildingType.PowerPlant,
             CityId = cityId, CompanyId = companyId, Latitude = 48.1, Longitude = 17.1,
             PowerStatus = PowerStatus.Powered, PowerPlantType = "COAL", PowerOutput = 50m };
         db.Buildings.Add(b); return b;
     }
     private static Building MakeConsumer(AppDbContext db, Guid cityId, Guid companyId, decimal? maxBid)
     {
-        var b = new Building { Id = Guid.NewGuid(), Name = $"C{Guid.NewGuid():N[..4]}", Type = BuildingType.Factory,
+        var b = new Building { Id = Guid.NewGuid(), Name = $"C{Guid.NewGuid().ToString("N")[..4]}", Type = BuildingType.Factory,
             CityId = cityId, CompanyId = companyId, Latitude = 48.2, Longitude = 17.2,
             PowerStatus = PowerStatus.Offline, PowerConsumption = 5m, MaxEnergyBidPrice = maxBid };
         db.Buildings.Add(b); return b;
