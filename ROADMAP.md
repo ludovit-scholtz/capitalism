@@ -31,6 +31,10 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 - [x] (100%) Personal account name is generated in the onboarding process before user signs in. The game server now resolves public player labels from the stored player profile across rankings, chat, account ownership labels, and player GraphQL surfaces instead of exposing JWT auth names.
 
+### Bot API Authorization
+
+- [x] (100%) Bot API Authorization is live: players can generate/revoke personal API keys, list active keys in dashboard settings with shown-once key warnings, authenticate scripts via `Authorization: ApiKey <key>`, and admins can review/revoke keys through API-key audit and admin GraphQL surfaces while ownership and scope enforcement remain active.
+
 ### Economy & Markets
 
 - [x] (100%) FX Exchange with Gold Token AMM and liquidity pools is live: players can quote/execute currency swaps, create/add/remove Gold AMM liquidity positions, receive proportional 1% swap-fee accrual, and use the Forex UI route for trading and pool management.

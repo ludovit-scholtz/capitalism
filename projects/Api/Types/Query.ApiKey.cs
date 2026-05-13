@@ -20,7 +20,7 @@ public sealed partial class Query
 
         var keys = await db.PlayerApiKeys
             .AsNoTracking()
-            .Where(k => k.PlayerId == playerId)
+            .Where(k => k.PlayerId == playerId && k.RevokedAtUtc == null)
             .OrderByDescending(k => k.CreatedAtUtc)
             .ToListAsync(ct);
 

@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { gqlRequest as gqlGameRequest } from '@/lib/graphql'
 import { gqlRequest as gqlMasterRequest } from '@/lib/graphqlMasterServer'
 import { useAuthStore } from '@/stores/auth'
+import DashboardApiKeysPanel from '@/components/dashboard/DashboardApiKeysPanel.vue'
 
 const emit = defineEmits<{
   (e: 'saved'): void
@@ -124,5 +125,7 @@ async function savePersonalAccountName() {
     <p v-if="errorMessage" class="m-0 rounded-lg bg-[rgba(248,113,113,0.12)] px-3 py-3 text-sm text-bad" role="alert">
       {{ errorMessage }}
     </p>
+
+    <DashboardApiKeysPanel />
   </div>
 </template>

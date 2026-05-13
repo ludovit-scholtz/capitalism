@@ -2842,6 +2842,72 @@ test.describe('Dashboard — personal account panel', () => {
     await page.goto('/leaderboard')
     await expect(page.locator('.rank-card').getByText('Nova Alias')).toBeVisible()
   })
+
+  test('generates a personal API key from Settings and shows shown-once warning', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    page.on('dialog', (dialog) => dialog.accept())
+
+    await page.goto('/dashboard')
+    await page.getByRole('tab', { name: 'Settings' }).click()
+    await page.getByLabel('Key name').fill('Overnight Bot')
+    await page.getByRole('button', { name: 'Generate new API key' }).click()
+
+    await expect(page.locator('.api-key-generated-card')).toContainText('This is the only time your full API key is shown.')
+    await expect(page.locator('.api-key-generated-card code')).toContainText('sk_live_')
+    await expect(page.locator('table').getByText('Overnight Bot')).toBeVisible()
+  })
+
+  test('revokes a personal API key from Settings and removes it from list', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.apiKeys = [
+      {
+        id: 'api-key-revoke-1',
+        playerId: player.id,
+        name: 'Scalper Bot',
+        keyPrefix: 'sk_live_',
+        plaintextKey: 'sk_live_seeded',
+        createdAtUtc: '2026-01-01T00:00:00Z',
+        lastUsedAtUtc: null,
+        revokedAtUtc: null,
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    page.on('dialog', (dialog) => dialog.accept())
+
+    await page.goto('/dashboard')
+    await page.getByRole('tab', { name: 'Settings' }).click()
+    await expect(page.locator('table').getByText('Scalper Bot')).toBeVisible()
+
+    await page.locator('tr', { hasText: 'Scalper Bot' }).getByRole('button', { name: 'Revoke' }).click()
+
+    await expect(page.locator('table').getByText('Scalper Bot')).toHaveCount(0)
+    await expect(page.locator('.api-keys-empty-state')).toContainText('No active API keys yet')
+  })
 })
 
 test.describe('Dashboard — Pro subscription tab', () => {
