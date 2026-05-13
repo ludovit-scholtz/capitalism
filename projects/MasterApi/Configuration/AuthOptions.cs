@@ -33,6 +33,12 @@ public sealed class AuthOptions
     public int RateLimitRequestsPerMinute { get; init; } = 10;
 
     /// <summary>
+    /// When enabled, auth rate limiting also runs in Testing environment.
+    /// Defaults to false so existing test suites are not affected unless explicitly opted in.
+    /// </summary>
+    public bool EnableRateLimitInTesting { get; init; } = false;
+
+    /// <summary>
     /// Maximum number of forgot-password requests per normalized email during the reset window.
     /// Default is 3.
     /// </summary>

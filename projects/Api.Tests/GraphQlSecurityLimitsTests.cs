@@ -212,6 +212,31 @@ public sealed class GraphQlSecurityLimitsTests : IClassFixture<ApiWebApplication
     }
 
     [Fact]
+    public async Task AuthRateLimit_SpoofedXForwardedFor_FromUntrustedProxy_DoesNotBypassLimit()
+    {
+        await using var factory = new SecurityLimitsApiWebApplicationFactory(
+            rateLimitPerMinute: 1,
+            forwardedForHopCount: 1);
+        using var client = factory.CreateClient();
+
+        var requestA = CreateGraphQlMutationRequest(
+            $"xforwarded-untrusted-a-{Guid.NewGuid():N}@example.com",
+            "1.1.1.1");
+        var responseA = await client.SendAsync(requestA);
+        Assert.Equal(StatusCodes.Status200OK, (int)responseA.StatusCode);
+
+        var requestB = CreateGraphQlMutationRequest(
+            $"xforwarded-untrusted-b-{Guid.NewGuid():N}@example.com",
+            "2.2.2.2");
+        var responseB = await client.SendAsync(requestB);
+        var bodyB = JsonSerializer.Deserialize<JsonElement>(await responseB.Content.ReadAsStringAsync());
+        Assert.Equal(StatusCodes.Status429TooManyRequests, (int)responseB.StatusCode);
+        Assert.Equal(
+            "RATE_LIMIT_EXCEEDED",
+            bodyB.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
     public async Task GraphQlRequestSecurityMiddleware_Development_AllowsIntrospection()
     {
         var nextCalled = false;
@@ -307,6 +332,34 @@ public sealed class GraphQlSecurityLimitsTests : IClassFixture<ApiWebApplication
         return ((int)response.StatusCode, JsonSerializer.Deserialize<JsonElement>(body));
     }
 
+    private static HttpRequestMessage CreateGraphQlMutationRequest(string email, string forwardedFor)
+    {
+        var payload = JsonSerializer.Serialize(new
+        {
+            query = """
+                    mutation Register($input: RegisterInput!) {
+                      register(input: $input) { token }
+                    }
+                    """,
+            variables = new
+            {
+                input = new
+                {
+                    email,
+                    displayName = "Forwarded Header Test",
+                    password = "TestPass123!"
+                }
+            }
+        });
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/graphql")
+        {
+            Content = new StringContent(payload, Encoding.UTF8, "application/json")
+        };
+        request.Headers.TryAddWithoutValidation("X-Forwarded-For", forwardedFor);
+        return request;
+    }
+
     private static async Task<JsonElement> ExecuteGraphQlAsync(
         HttpClient client,
         string query,
@@ -322,18 +375,29 @@ public sealed class GraphQlSecurityLimitsTests : IClassFixture<ApiWebApplication
         return body;
     }
 
-    private sealed class SecurityLimitsApiWebApplicationFactory(int rateLimitPerMinute) : ApiWebApplicationFactory
+    private sealed class SecurityLimitsApiWebApplicationFactory(
+        int rateLimitPerMinute,
+        int forwardedForHopCount = 0,
+        string[]? trustedProxies = null) : ApiWebApplicationFactory
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             base.ConfigureWebHost(builder);
             builder.ConfigureAppConfiguration((_, configurationBuilder) =>
             {
-                configurationBuilder.AddInMemoryCollection(new Dictionary<string, string?>
+                var entries = new Dictionary<string, string?>
                 {
                     ["Auth:EnableRateLimitInTesting"] = "true",
                     ["Auth:RateLimitRequestsPerMinute"] = rateLimitPerMinute.ToString(),
-                });
+                    ["ReverseProxy:ForwardedForHopCount"] = forwardedForHopCount.ToString(),
+                };
+                var trustedProxyEntries = trustedProxies ?? [];
+                for (var i = 0; i < trustedProxyEntries.Length; i++)
+                {
+                    entries[$"ReverseProxy:TrustedProxies:{i}"] = trustedProxyEntries[i];
+                }
+
+                configurationBuilder.AddInMemoryCollection(entries);
             });
         }
     }

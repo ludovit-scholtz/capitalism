@@ -274,12 +274,6 @@ public sealed class JwtSessionRevocationService(AppDbContext db) : IJwtSessionRe
 
     private static string? ResolveClientIpAddress(HttpContext httpContext)
     {
-        var forwarded = httpContext.Request.Headers["X-Forwarded-For"].ToString();
-        if (!string.IsNullOrWhiteSpace(forwarded))
-        {
-            return forwarded.Split(',')[0].Trim();
-        }
-
         return httpContext.Connection.RemoteIpAddress?.ToString();
     }
 

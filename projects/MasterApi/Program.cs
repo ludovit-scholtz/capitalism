@@ -14,6 +14,7 @@ using Capitalism.Shared.Security;
 using HotChocolate.AspNetCore;
 using HotChocolate.CostAnalysis;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -38,6 +39,8 @@ public class Program
             builder.Configuration.GetSection(BiatecOidcOptions.SectionName));
         builder.Services.Configure<AuthOptions>(
             builder.Configuration.GetSection(AuthOptions.SectionName));
+        builder.Services.Configure<ReverseProxyOptions>(
+            builder.Configuration.GetSection(ReverseProxyOptions.SectionName));
         builder.Services.Configure<GraphQlSecurityOptions>(
             builder.Configuration.GetSection(GraphQlSecurityOptions.SectionName));
 
@@ -45,9 +48,31 @@ public class Program
             ?? new JwtOptions();
         var graphQlSecurityOptions = builder.Configuration.GetSection(GraphQlSecurityOptions.SectionName).Get<GraphQlSecurityOptions>()
             ?? new GraphQlSecurityOptions();
+        var reverseProxyOptions = builder.Configuration.GetSection(ReverseProxyOptions.SectionName).Get<ReverseProxyOptions>()
+            ?? new ReverseProxyOptions();
         var graphQlMaxDepth = Math.Max(1, graphQlSecurityOptions.MaxDepth);
         var graphQlMaxComplexity = Math.Max(1, graphQlSecurityOptions.MaxComplexity);
         var graphQlMaxPageSize = Math.Max(1, graphQlSecurityOptions.MaxPageSize);
+        var forwardedHeadersEnabled = ForwardedHeadersConfiguration.TryBuild(reverseProxyOptions, out var forwardedHeadersOptions);
+        if (forwardedHeadersEnabled)
+        {
+            builder.Services.Configure<ForwardedHeadersOptions>(options =>
+            {
+                options.ForwardedHeaders = forwardedHeadersOptions.ForwardedHeaders;
+                options.ForwardLimit = forwardedHeadersOptions.ForwardLimit;
+                options.KnownIPNetworks.Clear();
+                options.KnownProxies.Clear();
+                foreach (var proxy in forwardedHeadersOptions.KnownProxies)
+                {
+                    options.KnownProxies.Add(proxy);
+                }
+
+                foreach (var network in forwardedHeadersOptions.KnownIPNetworks)
+                {
+                    options.KnownIPNetworks.Add(network);
+                }
+            });
+        }
         var biatecOidcOptions = builder.Configuration.GetSection(BiatecOidcOptions.SectionName).Get<BiatecOidcOptions>()
             ?? new BiatecOidcOptions();
         static string NormalizeIssuer(string issuer) => issuer.Trim().TrimEnd('/');
@@ -418,6 +443,11 @@ public class Program
 
                 await next();
             });
+        }
+
+        if (forwardedHeadersEnabled)
+        {
+            app.UseForwardedHeaders();
         }
 
         app.UseCors("frontend");
