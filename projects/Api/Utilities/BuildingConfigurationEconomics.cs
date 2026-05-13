@@ -21,6 +21,13 @@ public static class BuildingConfigurationEconomics
             UnitType.PublicSales => 6_000m,
             UnitType.ProductQuality => 8_500m,
             UnitType.BrandQuality => 8_500m,
+            UnitType.PowerGeneration => 15_000m,
+            UnitType.BatteryStorage => 12_000m,
+            UnitType.FuelPurchase => 12_000m,
+            UnitType.WindTurbine => 18_000m,
+            UnitType.WaterTurbine => 25_000m,
+            UnitType.EnergyStorage => 14_000m,
+            UnitType.EnergyProducing => 22_000m,
             _ => 0m,
         };
     }

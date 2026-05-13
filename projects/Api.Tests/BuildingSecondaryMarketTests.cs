@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Api.Data;
 using Api.Data.Entities;
+using Api.Engine;
 using Api.Tests.Infrastructure;
 using Api.Utilities;
 using Microsoft.EntityFrameworkCore;
@@ -1035,12 +1036,12 @@ public sealed class BuildingSecondaryMarketTests
 
         var result = await ExecAsync(client,
             "mutation S($i: SetBuildingForSaleInput!) { setBuildingForSale(input: $i) { id isForSale askingPrice } }",
-            new { i = new { buildingId, isForSale = true, askingPrice = 217_000m } },
+            new { i = new { buildingId, isForSale = true, askingPrice = 52_500m } },
             token);
 
         var listed = result.GetProperty("data").GetProperty("setBuildingForSale");
         Assert.True(listed.GetProperty("isForSale").GetBoolean());
-        Assert.Equal(217_000m, listed.GetProperty("askingPrice").GetDecimal());
+        Assert.Equal(52_500m, listed.GetProperty("askingPrice").GetDecimal());
     }
 
     [Fact]
@@ -1118,11 +1119,20 @@ public sealed class BuildingSecondaryMarketTests
             .First(candidate => candidate.GetProperty("id").GetString() == buildingId.ToString())
             .GetProperty("marketValuation");
 
+        var expectedUnitsValue = BuildingConfigurationEconomics.GetUnitConstructionCost(UnitType.Purchase)
+            + BuildingConfigurationEconomics.GetUnitConstructionCost(UnitType.Storage)
+            + GameConstants.UnitUpgradeCost(UnitType.Storage, 1);
+        var expectedTotalValue = 50_000m + GameConstants.ConstructionCost(BuildingType.Factory) + expectedUnitsValue;
+        var expectedMinimumSalePrice = decimal.Round(
+            expectedTotalValue * BuildingMarketValuationCalculator.MinimumSalePriceFactor,
+            2,
+            MidpointRounding.AwayFromZero);
+
         Assert.Equal(50_000m, valuation.GetProperty("landValue").GetDecimal());
-        Assert.Equal(200_000m, valuation.GetProperty("structureValue").GetDecimal());
-        Assert.Equal(60_000m, valuation.GetProperty("unitsValue").GetDecimal());
-        Assert.Equal(310_000m, valuation.GetProperty("totalValue").GetDecimal());
-        Assert.Equal(217_000m, valuation.GetProperty("minimumSalePrice").GetDecimal());
+        Assert.Equal(GameConstants.ConstructionCost(BuildingType.Factory), valuation.GetProperty("structureValue").GetDecimal());
+        Assert.Equal(expectedUnitsValue, valuation.GetProperty("unitsValue").GetDecimal());
+        Assert.Equal(expectedTotalValue, valuation.GetProperty("totalValue").GetDecimal());
+        Assert.Equal(expectedMinimumSalePrice, valuation.GetProperty("minimumSalePrice").GetDecimal());
         Assert.Equal("EUR", valuation.GetProperty("currencyCode").GetString());
     }
 
@@ -1325,9 +1335,17 @@ public sealed class BuildingSecondaryMarketTests
             token);
 
         var payload = result.GetProperty("data").GetProperty("destroyBuilding");
+        var expectedBuildingValue = 80_000m
+            + GameConstants.ConstructionCost(BuildingType.Factory)
+            + BuildingConfigurationEconomics.GetUnitConstructionCost(UnitType.Storage);
+        var expectedRefund = decimal.Round(
+            expectedBuildingValue * GameConstants.ForeclosureRefundFraction,
+            2,
+            MidpointRounding.AwayFromZero);
+
         Assert.Equal(buildingId.ToString(), payload.GetProperty("buildingId").GetString());
         Assert.Equal("EUR", payload.GetProperty("currencyCode").GetString());
-        Assert.Equal(240_000m, payload.GetProperty("refundAmount").GetDecimal());
+        Assert.Equal(expectedRefund, payload.GetProperty("refundAmount").GetDecimal());
 
         await using var verifyScope = factory.Services.CreateAsyncScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -1341,7 +1359,7 @@ public sealed class BuildingSecondaryMarketTests
         Assert.NotNull(lotAfter);
 
         var accountAfter = await verifyDb.BankAccounts.FirstAsync(a => a.Id == accountId);
-        Assert.Equal(240_000m, accountAfter.Balance);
+        Assert.Equal(expectedRefund, accountAfter.Balance);
     }
 
     [Fact]

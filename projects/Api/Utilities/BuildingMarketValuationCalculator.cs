@@ -1,5 +1,6 @@
 using Api.Data;
 using Api.Data.Entities;
+using Api.Engine;
 using Microsoft.EntityFrameworkCore;
 
 namespace Api.Utilities;
@@ -16,7 +17,6 @@ public sealed class BuildingMarketValuation
 
 public static class BuildingMarketValuationCalculator
 {
-    public const decimal UnitBaseValue = 20_000m;
     public const decimal MinimumSalePriceFactor = 0.70m;
 
     public static async Task<BuildingMarketValuation> CalculateAsync(
@@ -39,33 +39,68 @@ public static class BuildingMarketValuationCalculator
             .Where(lot => lot.BuildingId == building.Id)
             .Select(lot => lot.Price)
             .FirstOrDefaultAsync(cancellationToken);
-        landValue = Math.Max(landValue, 0m);
+        landValue = RoundCurrency(Math.Max(landValue, 0m));
 
-        var structureValue = decimal.Round(
-            WealthCalculator.GetBuildingValue(building) * cityFxRate,
-            2,
-            MidpointRounding.AwayFromZero);
+        var structureValue = RoundCurrency(
+            GetCurrentStructureReplacementCostEur(building) * cityFxRate);
 
-        var unitLevels = await db.BuildingUnits
+        var units = await db.BuildingUnits
             .AsNoTracking()
             .Where(unit => unit.BuildingId == building.Id)
-            .Select(unit => unit.Level)
+            .Select(unit => new { unit.UnitType, unit.Level })
             .ToListAsync(cancellationToken);
 
-        var unitValueEur = unitLevels.Sum(level => Math.Max(level, 1) * UnitBaseValue);
-        var unitsValue = decimal.Round(unitValueEur * cityFxRate, 2, MidpointRounding.AwayFromZero);
+        var unitsValue = RoundCurrency(
+            units.Sum(unit => GetCurrentUnitReplacementCostEur(unit.UnitType, unit.Level)) * cityFxRate);
 
-        var totalValue = decimal.Round(landValue + structureValue + unitsValue, 2, MidpointRounding.AwayFromZero);
-        var minimumSalePrice = decimal.Round(totalValue * MinimumSalePriceFactor, 2, MidpointRounding.AwayFromZero);
+        var totalValue = RoundCurrency(landValue + structureValue + unitsValue);
+        var minimumSalePrice = RoundCurrency(totalValue * MinimumSalePriceFactor);
 
         return new BuildingMarketValuation
         {
-            LandValue = decimal.Round(landValue, 2, MidpointRounding.AwayFromZero),
+            LandValue = landValue,
             StructureValue = structureValue,
             UnitsValue = unitsValue,
             TotalValue = totalValue,
             MinimumSalePrice = minimumSalePrice,
             CurrencyCode = currencyCode,
         };
+    }
+
+    private static decimal GetCurrentStructureReplacementCostEur(Building building)
+    {
+        var currentLevel = Math.Max(1, building.Level);
+        var replacementCost = GameConstants.ConstructionCost(building.Type);
+
+        if (string.Equals(building.Type, BuildingType.MediaHouse, StringComparison.OrdinalIgnoreCase))
+        {
+            for (var level = 1; level < currentLevel; level++)
+            {
+                replacementCost += GameConstants.MediaHouseUpgradeCost(level);
+            }
+        }
+
+        return replacementCost;
+    }
+
+    private static decimal GetCurrentUnitReplacementCostEur(string unitType, int level)
+    {
+        var currentLevel = Math.Max(1, level);
+        var replacementCost = BuildingConfigurationEconomics.GetUnitConstructionCost(unitType);
+
+        if (currentLevel > 1 && GameConstants.IsUpgradableUnitType(unitType))
+        {
+            for (var upgradeFromLevel = 1; upgradeFromLevel < currentLevel; upgradeFromLevel++)
+            {
+                replacementCost += GameConstants.UnitUpgradeCost(unitType, upgradeFromLevel);
+            }
+        }
+
+        return replacementCost;
+    }
+
+    private static decimal RoundCurrency(decimal amount)
+    {
+        return decimal.Round(amount, 2, MidpointRounding.AwayFromZero);
     }
 }
