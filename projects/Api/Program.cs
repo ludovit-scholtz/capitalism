@@ -393,6 +393,7 @@ public class Program
         builder.Services.AddScoped<ITickPhase, WeatherUpdatePhase>();
         builder.Services.AddScoped<ITickPhase, FuelProcurementPhase>();
         builder.Services.AddScoped<ITickPhase, PowerDistributionPhase>();
+        builder.Services.AddScoped<ITickPhase, EnergySpotMarketPhase>();
         builder.Services.AddScoped<ITickPhase, PowerGridEconomicsPhase>();
         builder.Services.AddScoped<ITickPhase, ConstructionPhase>();
         builder.Services.AddScoped<ITickPhase, BuildingUpgradePhase>();

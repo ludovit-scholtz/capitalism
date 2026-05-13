@@ -71,6 +71,7 @@ public sealed partial class Query
                 && e.RecordedAtTick >= windowStart
                 && e.RecordedAtTick <= currentTick
                 && (e.Category == LedgerCategory.GridSurplusIncome
+                    || e.Category == LedgerCategory.EnergyRevenue
                     || e.Category == LedgerCategory.GridFine
                     || e.Category == LedgerCategory.LaborCost
                     || e.Category == LedgerCategory.EnergyCost
@@ -89,6 +90,9 @@ public sealed partial class Query
             var surplusIncome = tickEntries
                 .Where(e => e.Category == LedgerCategory.GridSurplusIncome)
                 .Sum(e => e.Amount);
+            var spotMarketRevenue = tickEntries
+                .Where(e => e.Category == LedgerCategory.EnergyRevenue)
+                .Sum(e => e.Amount);
             var gridFine = tickEntries
                 .Where(e => e.Category == LedgerCategory.GridFine)
                 .Sum(e => Math.Abs(e.Amount));
@@ -103,10 +107,11 @@ public sealed partial class Query
             {
                 Tick = tick,
                 SurplusIncome = surplusIncome,
+                SpotMarketRevenue = spotMarketRevenue,
                 GridFine = gridFine,
                 OperatingCosts = opCosts,
                 FuelCosts = fuelCosts,
-                NetProfit = surplusIncome - gridFine - opCosts - fuelCosts,
+                NetProfit = surplusIncome + spotMarketRevenue - gridFine - opCosts - fuelCosts,
             });
         }
 
@@ -155,6 +160,27 @@ public sealed partial class Query
             ? GameConstants.FuelCostPerMwhForPlantType(building.PowerPlantType)
             : 0m;
 
+        // Active energy listing (if any)
+        var activeListing = await db.EnergyListings
+            .AsNoTracking()
+            .Where(l => l.BuildingId == buildingId && l.IsActive)
+            .Select(l => new EnergyMarketListingDto
+            {
+                ListingId = l.Id,
+                BuildingId = l.BuildingId,
+                BuildingName = building.Name,
+                CompanyId = l.CompanyId,
+                CompanyName = building.Company.Name,
+                CityId = l.CityId,
+                PlantType = building.PowerPlantType ?? PowerPlantType.Coal,
+                PricePerKwhLocal = l.PricePerKwhLocal,
+                CapacityKw = l.CapacityKw,
+                AvailableKw = l.AvailableKw,
+                CreatedAtTick = l.CreatedAtTick,
+                CreatedAtUtc = l.CreatedAtUtc,
+            })
+            .FirstOrDefaultAsync();
+
         return new PowerPlantAnalytics
         {
             BuildingId = building.Id,
@@ -178,7 +204,9 @@ public sealed partial class Query
             TotalGridFines = snapshots.Sum(s => s.GridFine),
             TotalOperatingCosts = snapshots.Sum(s => s.OperatingCosts),
             TotalFuelCosts = snapshots.Sum(s => s.FuelCosts),
+            TotalSpotMarketRevenue = snapshots.Sum(s => s.SpotMarketRevenue),
             TotalNetProfit = snapshots.Sum(s => s.NetProfit),
+            ActiveListing = activeListing,
             Timeline = snapshots,
         };
     }

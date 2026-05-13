@@ -69,7 +69,7 @@ const router = createRouter({
     {
       path: '/energy-market',
       name: 'energy-market',
-      component: () => import('@/views/MarketDashboardView.vue'),
+      component: () => import('@/views/EnergyMarketView.vue'),
     },
     {
       path: '/marketing-analytics',

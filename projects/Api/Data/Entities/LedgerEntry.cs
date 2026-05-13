@@ -97,4 +97,15 @@ public static class LedgerCategory
     /// Amount is positive (income). A corresponding debit is recorded on the buyer's ledger.
     /// </summary>
     public const string BuildingSale = "BUILDING_SALE";
+    /// <summary>
+    /// Income earned by a power plant owner when spot-market energy is purchased by deficit buildings.
+    /// Amount is positive. Written each tick when auto-matching settles in <c>EnergySpotMarketPhase</c>.
+    /// </summary>
+    public const string EnergyRevenue = "ENERGY_REVENUE";
+    /// <summary>
+    /// Expense charged to a building owner each tick when the building purchases energy
+    /// from the spot market (i.e., via an <see cref="EnergyListing"/>).
+    /// Amount is negative. Written each tick in <c>EnergySpotMarketPhase</c>.
+    /// </summary>
+    public const string SpotMarketEnergyCost = "SPOT_MARKET_ENERGY_COST";
 }

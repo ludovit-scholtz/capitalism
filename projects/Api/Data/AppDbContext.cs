@@ -49,6 +49,9 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Buildings placed on the game map.</summary>
     public DbSet<Building> Buildings => Set<Building>();
 
+    /// <summary>Active and historical energy spot-market listings offered by power plant owners.</summary>
+    public DbSet<EnergyListing> EnergyListings => Set<EnergyListing>();
+
     /// <summary>Audit records for automatically destroyed buildings (loan default foreclosure).</summary>
     public DbSet<BuildingDestructionRecord> BuildingDestructionRecords => Set<BuildingDestructionRecord>();
 
