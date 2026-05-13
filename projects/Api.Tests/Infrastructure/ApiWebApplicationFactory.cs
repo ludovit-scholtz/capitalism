@@ -6,6 +6,8 @@ namespace Api.Tests.Infrastructure;
 
 public class ApiWebApplicationFactory : WebApplicationFactory<Program>
 {
+    public const string TestSeedAdminPassword = "TestSeedAdminPassword123!";
+
     private readonly string _databaseName = $"capitalism-tests-{Guid.NewGuid():N}";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -25,7 +27,7 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>
                 ["ConnectionStrings:GameCatalog"] = _databaseName,
                 ["SeedData:AdminEmail"] = "admin@capitalism.local",
                 ["SeedData:AdminDisplayName"] = "Platform Admin",
-                ["SeedData:AdminPassword"] = "ChangeMe123!",
+                ["SeedData:AdminPassword"] = TestSeedAdminPassword,
                 ["GameEngine:Enabled"] = "false",
                 ["MasterServer:RegistrationEnabled"] = "false",
                 // Enable password auth in tests so all existing auth tests continue to pass.

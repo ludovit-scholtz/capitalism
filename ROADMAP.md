@@ -85,6 +85,6 @@ Create a fun game in the style of Capitalism II, where players experience realis
 - [x] (100%) Harden GraphQL pre-execution middlewares to inspect every selected root field in named operations and every JSON-array batched item, covering auth rate limits, introspection, depth, and complexity.
 - [x] (100%) Trust `X-Forwarded-For` only from configured reverse proxies, fall back to `RemoteIpAddress` otherwise, and test that spoofed headers cannot rotate rate-limit identities.
 - [ ] Normalize duplicate registration errors so message, extension code, and timing do not reveal whether an email already exists in either API.
-- [ ] Move the game API seed admin password out of committed defaults, and block non-Development startup when password auth uses a placeholder seed credential.
+- [x] (100%) Move the game API seed admin password out of committed defaults (`__SET_IN_ENV__` + `.env.example`/README guidance), and block non-Development startup when `Auth:PasswordAuthEnabled=true` and `SeedData:AdminPassword` is missing/placeholder while keeping Development warning-only.
 - [ ] Evaluate moving frontend auth sessions from `localStorage` to HttpOnly SameSite cookies or a backend-for-frontend session pattern to reduce XSS token theft blast radius.
 - [ ] Finish canonical object-authorization error normalization in legacy economy CRUD paths and keep the GraphQL surface inventory gate aligned with the normalized contract.

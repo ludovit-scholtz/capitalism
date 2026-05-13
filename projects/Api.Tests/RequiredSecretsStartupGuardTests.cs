@@ -62,4 +62,33 @@ public sealed class RequiredSecretsStartupGuardTests
         Assert.False(isUnsafe);
         Assert.Equal(string.Empty, reason);
     }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("__SET_IN_ENV__")]
+    [InlineData("changeme")]
+    [InlineData("password")]
+    [InlineData("admin")]
+    [InlineData("seed")]
+    [InlineData("default")]
+    public void TryGetUnsafeSeedAdminPasswordReason_ReturnsTrue_ForMissingOrPlaceholderValues(string? adminPassword)
+    {
+        var isUnsafe = RequiredSecretsStartupGuard.TryGetUnsafeSeedAdminPasswordReason(adminPassword, out var reason);
+
+        Assert.True(isUnsafe);
+        Assert.False(string.IsNullOrWhiteSpace(reason));
+    }
+
+    [Theory]
+    [InlineData("StrongSeedPassword123!")]
+    [InlineData("prod-seed-admin-password-2026")]
+    public void TryGetUnsafeSeedAdminPasswordReason_ReturnsFalse_ForStrongValue(string adminPassword)
+    {
+        var isUnsafe = RequiredSecretsStartupGuard.TryGetUnsafeSeedAdminPasswordReason(adminPassword, out var reason);
+
+        Assert.False(isUnsafe);
+        Assert.Equal(string.Empty, reason);
+    }
 }
