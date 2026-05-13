@@ -39,31 +39,7 @@ referralStore.initFromStorage()
 auth.initFromStorage()
 const masterPortalUrl = import.meta.env.VITE_MASTER_WEB_URL || 'http://localhost:5174'
 
-function hasStoredSessionToken() {
-  if (typeof localStorage !== 'undefined') {
-    const stored = localStorage.getItem('auth_token')
-    const expires = localStorage.getItem('auth_expires')
-    if (stored && expires && new Date(expires) > new Date()) {
-      return true
-    }
-  }
-
-  if (typeof document === 'undefined') {
-    return false
-  }
-
-  const readCookie = (name: string) => {
-    const prefix = `${name}=`
-    const match = document.cookie.split('; ').find((entry) => entry.startsWith(prefix))
-    return match ? decodeURIComponent(match.slice(prefix.length)) : null
-  }
-
-  const cookieToken = readCookie('auth_token')
-  const cookieExpires = readCookie('auth_expires')
-  return !!cookieToken && !!cookieExpires && new Date(cookieExpires) > new Date()
-}
-
-const hasAuthenticatedSession = computed(() => auth.isAuthenticated || !!auth.player || hasStoredSessionToken())
+const hasAuthenticatedSession = computed(() => auth.isAuthenticated || !!auth.player)
 const activeReferralCode = computed(() => auth.player?.appliedReferralCode ?? referralStore.pendingCode)
 
 const PERSONAL_STARTING_CASH = 200_000
@@ -736,12 +712,13 @@ async function migrateGuestProgressToAuthenticated() {
 }
 
 onMounted(async () => {
+  if (!auth.player) {
+    await auth.fetchMe()
+  }
+
   trackOnboardingEvent('onboarding_start', { authenticated: hasAuthenticatedSession.value })
 
   if (hasAuthenticatedSession.value) {
-    if (!auth.player) {
-      await auth.fetchMe()
-    }
 
     if (auth.player?.onboardingFirstSaleCompletedAtUtc) {
       router.push('/dashboard')

@@ -40,4 +40,18 @@ describe('gqlRequest ownership error handling', () => {
       message: "This item could not be found or you don't have permission to access it.",
     })
   })
+
+  it('sends requests with cookie credentials and without bearer headers', async () => {
+    const fetchMock = vi.fn(async () => ({
+      json: async () => ({ data: { me: { id: 'player-1' } } }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await gqlRequest<{ me: { id: string } }>('{ me { id } }')
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [, options] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(options.credentials).toBe('include')
+    expect((options.headers as Record<string, string>)['Authorization']).toBeUndefined()
+  })
 })

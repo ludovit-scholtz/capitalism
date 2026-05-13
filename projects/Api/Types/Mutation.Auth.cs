@@ -31,6 +31,7 @@ public sealed partial class Mutation
         RegisterInput input,
         [Service] AppDbContext db,
         [Service] IOptions<JwtOptions> jwtOptions,
+        [Service] IHostEnvironment hostEnvironment,
         [Service] IOptions<AuthOptions> authOptions,
         [Service] IMasterRankingTelemetryService rankingTelemetry,
         [Service] IOptions<MasterServerRegistrationOptions> masterOptions,
@@ -79,6 +80,7 @@ public sealed partial class Mutation
 
         var session = GenerateToken(player, jwtOptions.Value);
         await TrackIssuedSessionAsync(db, player.Id, session, httpContextAccessor.HttpContext, httpContextAccessor.HttpContext?.RequestAborted ?? CancellationToken.None);
+        AuthSessionCookieService.SetSessionCookies(httpContextAccessor.HttpContext, hostEnvironment, session.Token, session.ExpiresAtUtc);
         return new AuthPayload
         {
             Token = session.Token,
@@ -92,6 +94,7 @@ public sealed partial class Mutation
         LoginInput input,
         [Service] AppDbContext db,
         [Service] IOptions<JwtOptions> jwtOptions,
+        [Service] IHostEnvironment hostEnvironment,
         [Service] IOptions<AuthOptions> authOptions,
         [Service] IMasterRankingTelemetryService rankingTelemetry,
         [Service] IOptions<MasterServerRegistrationOptions> masterOptions,
@@ -158,6 +161,7 @@ public sealed partial class Mutation
 
         var session = GenerateToken(player, jwtOptions.Value);
         await TrackIssuedSessionAsync(db, player.Id, session, httpContextAccessor.HttpContext, httpContextAccessor.HttpContext?.RequestAborted ?? CancellationToken.None);
+        AuthSessionCookieService.SetSessionCookies(httpContextAccessor.HttpContext, hostEnvironment, session.Token, session.ExpiresAtUtc);
         return new AuthPayload
         {
             Token = session.Token,
@@ -206,6 +210,7 @@ public sealed partial class Mutation
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor,
         [Service] IOptions<JwtOptions> jwtOptions,
+        [Service] IHostEnvironment hostEnvironment,
         [Service] GameAdminAuthorizationService gameAdminAuthorizationService)
     {
         var principal = httpContextAccessor.HttpContext!.User;
@@ -230,6 +235,7 @@ public sealed partial class Mutation
             impersonationContext.EffectiveCompanyId,
             impersonationContext.EffectiveCompanyName));
         await TrackIssuedSessionAsync(db, targetPlayer.Id, session, httpContextAccessor.HttpContext, httpContextAccessor.HttpContext.RequestAborted);
+        AuthSessionCookieService.SetSessionCookies(httpContextAccessor.HttpContext, hostEnvironment, session.Token, session.ExpiresAtUtc);
 
         return new AuthPayload
         {
@@ -243,7 +249,8 @@ public sealed partial class Mutation
     public async Task<AuthPayload> StopAdminImpersonation(
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor,
-        [Service] IOptions<JwtOptions> jwtOptions)
+        [Service] IOptions<JwtOptions> jwtOptions,
+        [Service] IHostEnvironment hostEnvironment)
     {
         var actorUserId = httpContextAccessor.HttpContext!.User.GetAuthenticatedActorUserId();
         var actorPlayer = await db.Players
@@ -258,6 +265,7 @@ public sealed partial class Mutation
 
         var session = GenerateToken(actorPlayer, jwtOptions.Value);
         await TrackIssuedSessionAsync(db, actorPlayer.Id, session, httpContextAccessor.HttpContext, httpContextAccessor.HttpContext.RequestAborted);
+        AuthSessionCookieService.SetSessionCookies(httpContextAccessor.HttpContext, hostEnvironment, session.Token, session.ExpiresAtUtc);
         return new AuthPayload
         {
             Token = session.Token,

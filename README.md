@@ -19,3 +19,5 @@ This is attempt to create online mmorpg version of the capitalism game.
   - `GameAdministration__RootAdministratorEmails__0` (plus indexed entries for additional root admins)
 - Startup now fails fast outside Development/Testing if any of the above values are missing or placeholder values.
 - Recommended secret providers for production: Azure Key Vault, Docker secrets, or Kubernetes Secrets (inject into environment variables at runtime).
+- Browser authentication now uses server-issued session cookies (`auth_token`) with `HttpOnly`, `SameSite=Strict`, and `Secure` (outside Development) flags instead of persisting JWTs in `localStorage` or `sessionStorage`.
+- Frontend GraphQL requests use `credentials: include` cookie sessions; browser code no longer injects `Authorization: Bearer` headers for normal player sessions.

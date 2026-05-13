@@ -22,22 +22,16 @@ export class GraphQLError extends Error {
 
 /**
  * Lightweight GraphQL client that sends requests to the Master API.
- * Automatically attaches the JWT bearer token from localStorage when available.
+ * Uses cookie-based browser sessions with credentials included.
  * Throws `GraphQLError` (with `.code` from `extensions.code`) on API errors.
  */
 export async function gqlRequest<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-
-  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-
   const res = await fetch(GRAPHQL_URL, {
     method: 'POST',
-    headers,
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({ query, variables }),
   })
 
