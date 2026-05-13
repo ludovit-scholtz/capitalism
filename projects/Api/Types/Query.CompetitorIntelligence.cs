@@ -46,10 +46,15 @@ public sealed partial class Query
             .ToListAsync();
 
         // Deduplicate by company (a company may have multiple PRODUCT brands for the same product
-        // if data inconsistency exists — keep the highest quality).
+        // if data inconsistency exists — keep the one with highest combined quality).
         var bestBrandByCompany = brandEntries
             .GroupBy(b => b.CompanyId)
-            .Select(g => g.OrderByDescending(b => b.Quality + b.MarketingQuality).First())
+            .Select(g => g.OrderByDescending(b =>
+            {
+                var rd = Math.Clamp(b.Quality, 0m, 1m);
+                var mkt = Math.Clamp(b.MarketingQuality, 0m, 1m);
+                return 1m - (1m - rd) * (1m - mkt);
+            }).First())
             .ToList();
 
         var result = bestBrandByCompany

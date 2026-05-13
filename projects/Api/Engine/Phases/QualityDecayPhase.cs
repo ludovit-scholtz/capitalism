@@ -60,11 +60,8 @@ public sealed class QualityDecayPhase : ITickPhase
                         inventory.Quality = 0m;
                         spoiledInventory.Add(inventory);
 
-                        // Estimated loss: sourcing cost per unit × quantity
-                        var sourcingCostPerUnit = inventory.Quantity > 0m
-                            ? inventory.SourcingCostTotal / inventory.Quantity
-                            : 0m;
-                        var estimatedLoss = inventory.Quantity * sourcingCostPerUnit;
+                        // Estimated loss: total sourcing cost of the spoiled inventory
+                        var estimatedLoss = inventory.SourcingCostTotal;
 
                         spoilageRecords.Add(new InventorySpoilageRecord
                         {

@@ -26,7 +26,7 @@ public sealed class InventorySpoilageRecord
     /// <summary>Quality level at the time the stock was written off (always ≤ 0).</summary>
     public decimal QualityAtSpoilage { get; set; }
 
-    /// <summary>Estimated financial loss: QuantitySpoiled × ProductType.BasePrice × SourcingCostTotal factor.</summary>
+    /// <summary>Estimated financial loss: the total sourcing cost of the spoiled inventory (SourcingCostTotal at time of spoilage).</summary>
     public decimal EstimatedLossValue { get; set; }
 
     public long RecordedAtTick { get; set; }

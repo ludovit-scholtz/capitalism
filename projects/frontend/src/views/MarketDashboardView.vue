@@ -114,7 +114,8 @@ async function loadCompetitorIntelligence(productTypeId: string) {
       { cityId, productTypeId },
     )
     competitorEntries.value = result.competitorQualityIntelligence
-  } catch {
+  } catch (err) {
+    console.error('[CompetitorIntelligence] Failed to load competitor intelligence:', err)
     competitorError.value = t('research.competitors.loadFailed')
   } finally {
     competitorLoading.value = false
@@ -294,7 +295,7 @@ useTickRefresh(() => loadData(true))
                 {{ entry.qualityLevel.toFixed(1) }}
               </span>
             </span>
-            <span class="competitor-premium col-right" role="cell">+{{ entry.pricePremiumPct.toFixed(1) }}%</span>
+            <span class="competitor-premium col-right" role="cell">{{ entry.pricePremiumPct > 0 ? '+' : '' }}{{ entry.pricePremiumPct.toFixed(1) }}%</span>
           </div>
         </div>
       </section>
