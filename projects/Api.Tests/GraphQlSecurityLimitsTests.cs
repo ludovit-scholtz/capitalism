@@ -1,6 +1,14 @@
 using System.Text;
 using System.Text.Json;
+using Api.Configuration;
+using Api.Security;
 using Api.Tests.Infrastructure;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Api.Tests;
 
@@ -14,7 +22,46 @@ public sealed class GraphQlSecurityLimitsTests : IClassFixture<ApiWebApplication
     }
 
     [Fact]
-    public async Task GraphQl_MaxDepthExceeded_ReturnsStructuredErrorCode()
+    public async Task GraphQl_NamedOperation_SecondRootIntrospectionField_IsBlocked()
+    {
+        var (_, result) = await ExecuteGraphQlRawAsync(
+            _client,
+            """
+            query MultiRootIntrospection {
+              cities { id }
+              __type(name: "Query") { name }
+            }
+            """,
+            operationName: "MultiRootIntrospection");
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        var extensions = errors[0].GetProperty("extensions");
+        Assert.Equal("INTROSPECTION_DISABLED", extensions.GetProperty("code").GetString());
+        Assert.Equal("__type", extensions.GetProperty("field").GetString());
+        Assert.Equal(0, extensions.GetProperty("batchIndex").GetInt32());
+    }
+
+    [Fact]
+    public async Task GraphQl_BatchRequest_SecondItemIntrospectionField_IsBlocked()
+    {
+        var batchBody = """
+        [
+          { "query": "query { cities { id } }" },
+          { "query": "query { __schema { queryType { name } } }" }
+        ]
+        """;
+
+        var (_, result) = await ExecuteGraphQlRawBodyAsync(_client, batchBody);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        var extensions = errors[0].GetProperty("extensions");
+        Assert.Equal("INTROSPECTION_DISABLED", extensions.GetProperty("code").GetString());
+        Assert.Equal(1, extensions.GetProperty("batchIndex").GetInt32());
+        Assert.Equal("__schema", extensions.GetProperty("field").GetString());
+    }
+
+    [Fact]
+    public async Task GraphQl_MaxDepthExceeded_ReturnsQueryTooDeepCodeWithLimits()
     {
         var (_, result) = await ExecuteGraphQlRawAsync(
             _client,
@@ -30,9 +77,7 @@ public sealed class GraphQlSecurityLimitsTests : IClassFixture<ApiWebApplication
                             recipes {
                               inputProductType {
                                 recipes {
-                                  inputProductType {
-                                    id
-                                  }
+                                  inputProductType { id }
                                 }
                               }
                             }
@@ -47,15 +92,13 @@ public sealed class GraphQlSecurityLimitsTests : IClassFixture<ApiWebApplication
             """);
 
         Assert.True(result.TryGetProperty("errors", out var errors));
-        var resultJson = JsonSerializer.Serialize(result);
-        Assert.NotNull(resultJson);
-        Assert.True(
-            (errors[0].GetProperty("extensions").GetProperty("code").GetString() ?? string.Empty).Contains("MAX_DEPTH_EXCEEDED", StringComparison.Ordinal),
-            resultJson);
+        var extensions = errors[0].GetProperty("extensions");
+        Assert.Equal("QUERY_TOO_DEEP", extensions.GetProperty("code").GetString());
+        Assert.True(extensions.GetProperty("actualDepth").GetInt32() > extensions.GetProperty("maxDepth").GetInt32());
     }
 
     [Fact]
-    public async Task GraphQl_MaxComplexityExceeded_ReturnsStructuredErrorCode()
+    public async Task GraphQl_MaxComplexityExceeded_ReturnsQueryTooComplexCodeWithBreakdown()
     {
         var cityResult = await ExecuteGraphQlAsync(
             _client,
@@ -105,15 +148,14 @@ public sealed class GraphQlSecurityLimitsTests : IClassFixture<ApiWebApplication
             new { cityId });
 
         Assert.True(result.TryGetProperty("errors", out var errors));
-        var resultJson = JsonSerializer.Serialize(result);
-        Assert.NotNull(resultJson);
-        Assert.True(
-            (errors[0].GetProperty("extensions").GetProperty("code").GetString() ?? string.Empty).Contains("MAX_COMPLEXITY_EXCEEDED", StringComparison.Ordinal),
-            resultJson);
+        var extensions = errors[0].GetProperty("extensions");
+        Assert.Equal("QUERY_TOO_COMPLEX", extensions.GetProperty("code").GetString());
+        Assert.True(extensions.GetProperty("actualComplexity").GetInt32() > extensions.GetProperty("maxComplexity").GetInt32());
+        Assert.True(extensions.GetProperty("rootFields").EnumerateObject().Any());
     }
 
     [Fact]
-    public async Task GraphQl_Introspection_DisabledOutsideDevelopment_ReturnsForbidden()
+    public async Task GraphQl_Introspection_DisabledOutsideDevelopment_ReturnsIntrospectionDisabled()
     {
         var (_, result) = await ExecuteGraphQlRawAsync(
             _client,
@@ -124,24 +166,136 @@ public sealed class GraphQlSecurityLimitsTests : IClassFixture<ApiWebApplication
             """);
 
         Assert.True(result.TryGetProperty("errors", out var errors));
-        var resultJson = JsonSerializer.Serialize(result);
-        Assert.NotNull(resultJson);
-        Assert.True(
-            (errors[0].GetProperty("extensions").GetProperty("code").GetString() ?? string.Empty).Contains("FORBIDDEN", StringComparison.Ordinal),
-            resultJson);
+        Assert.Equal(
+            "INTROSPECTION_DISABLED",
+            errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task AuthRateLimit_MultiFieldMutation_CountsEveryAuthField()
+    {
+        await using var factory = new SecurityLimitsApiWebApplicationFactory(rateLimitPerMinute: 1);
+        using var client = factory.CreateClient();
+        var testRunId = Guid.NewGuid().ToString("N");
+
+        var mutationBody =
+            "mutation { "
+            + $"a: register(input: {{ email: \"limit-a-{testRunId}@example.com\", displayName: \"A\", password: \"TestPass123!\" }}) {{ token }} "
+            + $"b: register(input: {{ email: \"limit-b-{testRunId}@example.com\", displayName: \"B\", password: \"TestPass123!\" }}) {{ token }} "
+            + "}";
+
+        var (statusCode, body) = await ExecuteGraphQlRawAsync(client, mutationBody);
+        Assert.Equal(StatusCodes.Status429TooManyRequests, statusCode);
+        Assert.Equal(
+            "RATE_LIMIT_EXCEEDED",
+            body.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task AuthRateLimit_BatchRequest_CountsEveryBatchItem()
+    {
+        await using var factory = new SecurityLimitsApiWebApplicationFactory(rateLimitPerMinute: 1);
+        using var client = factory.CreateClient();
+        var testRunId = Guid.NewGuid().ToString("N");
+
+        var batchBody1 =
+            "["
+            + "{ \"query\": \"mutation { register(input: { email: \\\"batch-a-" + testRunId + "@example.com\\\", displayName: \\\"A\\\", password: \\\"TestPass123!\\\" }) { token } }\" },"
+            + "{ \"query\": \"mutation { register(input: { email: \\\"batch-b-" + testRunId + "@example.com\\\", displayName: \\\"B\\\", password: \\\"TestPass123!\\\" }) { token } }\" }"
+            + "]";
+
+        var (status3, body3) = await ExecuteGraphQlRawBodyAsync(client, batchBody1);
+        Assert.Equal(StatusCodes.Status429TooManyRequests, status3);
+        Assert.Equal(
+            "RATE_LIMIT_EXCEEDED",
+            body3.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task GraphQlRequestSecurityMiddleware_Development_AllowsIntrospection()
+    {
+        var nextCalled = false;
+        var middleware = new GraphQlRequestSecurityMiddleware(
+            _ =>
+            {
+                nextCalled = true;
+                return Task.CompletedTask;
+            },
+            Options.Create(new GraphQlSecurityOptions
+            {
+                MaxDepth = 8,
+                MaxComplexity = 200,
+            }),
+            NullLogger<GraphQlRequestSecurityMiddleware>.Instance,
+            new TestWebHostEnvironment("Development"));
+
+        var context = new DefaultHttpContext();
+        context.Request.Method = HttpMethods.Post;
+        context.Request.Path = "/graphql";
+        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes("""{ "query": "query { __schema { queryType { name } } }" }"""));
+        context.Response.Body = new MemoryStream();
+
+        await middleware.InvokeAsync(context);
+
+        Assert.True(nextCalled);
+        Assert.Equal(0, context.Response.Body.Length);
+    }
+
+    [Fact]
+    public async Task GraphQlRequestSecurityMiddleware_Testing_BlocksIntrospection()
+    {
+        var nextCalled = false;
+        var middleware = new GraphQlRequestSecurityMiddleware(
+            _ =>
+            {
+                nextCalled = true;
+                return Task.CompletedTask;
+            },
+            Options.Create(new GraphQlSecurityOptions
+            {
+                MaxDepth = 8,
+                MaxComplexity = 200,
+            }),
+            NullLogger<GraphQlRequestSecurityMiddleware>.Instance,
+            new TestWebHostEnvironment("Testing"));
+
+        var context = new DefaultHttpContext();
+        context.Request.Method = HttpMethods.Post;
+        context.Request.Path = "/graphql";
+        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes("""{ "query": "query { __schema { queryType { name } } }" }"""));
+        context.Response.Body = new MemoryStream();
+
+        await middleware.InvokeAsync(context);
+
+        Assert.False(nextCalled);
+        Assert.True(context.Response.Body.Length > 0);
+        context.Response.Body.Position = 0;
+        using var reader = new StreamReader(context.Response.Body, leaveOpen: true);
+        var payload = await reader.ReadToEndAsync();
+        var response = JsonSerializer.Deserialize<JsonElement>(payload);
+        Assert.Equal(
+            "INTROSPECTION_DISABLED",
+            response.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
     private static async Task<(int StatusCode, JsonElement Body)> ExecuteGraphQlRawAsync(
         HttpClient client,
         string query,
         object? variables = null,
+        string? operationName = null,
+        string? token = null)
+    {
+        var payload = JsonSerializer.Serialize(new { query, variables, operationName });
+        return await ExecuteGraphQlRawBodyAsync(client, payload, token);
+    }
+
+    private static async Task<(int StatusCode, JsonElement Body)> ExecuteGraphQlRawBodyAsync(
+        HttpClient client,
+        string payload,
         string? token = null)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, "/graphql");
-        request.Content = new StringContent(
-            JsonSerializer.Serialize(new { query, variables }),
-            Encoding.UTF8,
-            "application/json");
+        request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
 
         if (token is not null)
         {
@@ -159,12 +313,38 @@ public sealed class GraphQlSecurityLimitsTests : IClassFixture<ApiWebApplication
         object? variables = null,
         string? token = null)
     {
-        var (statusCode, body) = await ExecuteGraphQlRawAsync(client, query, variables, token);
+        var (statusCode, body) = await ExecuteGraphQlRawAsync(client, query, variables, token: token);
         if (statusCode >= 400)
         {
             throw new HttpRequestException($"HTTP {statusCode}: {JsonSerializer.Serialize(body)}");
         }
 
         return body;
+    }
+
+    private sealed class SecurityLimitsApiWebApplicationFactory(int rateLimitPerMinute) : ApiWebApplicationFactory
+    {
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            base.ConfigureWebHost(builder);
+            builder.ConfigureAppConfiguration((_, configurationBuilder) =>
+            {
+                configurationBuilder.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Auth:EnableRateLimitInTesting"] = "true",
+                    ["Auth:RateLimitRequestsPerMinute"] = rateLimitPerMinute.ToString(),
+                });
+            });
+        }
+    }
+
+    private sealed class TestWebHostEnvironment(string environmentName) : IWebHostEnvironment
+    {
+        public string ApplicationName { get; set; } = nameof(TestWebHostEnvironment);
+        public IFileProvider WebRootFileProvider { get; set; } = new NullFileProvider();
+        public string WebRootPath { get; set; } = string.Empty;
+        public string EnvironmentName { get; set; } = environmentName;
+        public string ContentRootPath { get; set; } = string.Empty;
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
 }

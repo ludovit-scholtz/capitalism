@@ -35,44 +35,97 @@ public sealed class GraphQlRequestSecurityMiddleware(
         var requestBody = await ReadRequestBodyAsync(context.Request);
         context.Request.Body.Position = 0;
 
-        if (!TryExtractQuery(requestBody, out var query) || string.IsNullOrWhiteSpace(query))
+        if (!TryParseRequestItems(requestBody, out var requestItems) || requestItems.Count == 0)
         {
             await next(context);
-            return;
-        }
-
-        if (!TryParseDocument(query, out var document))
-        {
-            await next(context);
-            return;
-        }
-
-        if (!environment.IsDevelopment() && ContainsIntrospection(document))
-        {
-            await RejectAsync(context, "FORBIDDEN", "This operation is forbidden.", "IntrospectionForbidden");
             return;
         }
 
         var maxDepth = Math.Max(1, options.Value.MaxDepth);
-        var depth = ComputeMaxDepth(document);
-        if (depth > maxDepth)
-        {
-            await RejectAsync(context, "MAX_DEPTH_EXCEEDED", "Request exceeds the allowed query depth.", "MaxDepthExceeded");
-            return;
-        }
-
         var maxComplexity = Math.Max(1, options.Value.MaxComplexity);
-        var complexity = ComputeComplexity(document);
-        if (complexity > maxComplexity)
+        for (var index = 0; index < requestItems.Count; index++)
         {
-            await RejectAsync(context, "MAX_COMPLEXITY_EXCEEDED", "Request exceeds the allowed query complexity.", "MaxComplexityExceeded");
-            return;
+            var requestItem = requestItems[index];
+            if (string.IsNullOrWhiteSpace(requestItem.Query))
+            {
+                continue;
+            }
+
+            if (!TryParseDocument(requestItem.Query, out var document))
+            {
+                continue;
+            }
+
+            var operations = SelectOperations(document, requestItem.OperationName);
+            if (operations.Count == 0)
+            {
+                continue;
+            }
+
+            var fragments = document.Definitions
+                .OfType<FragmentDefinitionNode>()
+                .ToDictionary(definition => definition.Name.Value, definition => definition, StringComparer.Ordinal);
+
+            if (!environment.IsDevelopment() && TryGetIntrospectionField(operations, fragments, out var introspectionField))
+            {
+                await RejectAsync(
+                    context,
+                    code: "INTROSPECTION_DISABLED",
+                    message: "GraphQL introspection is disabled outside Development.",
+                    violationType: "IntrospectionDisabled",
+                    extensions: new Dictionary<string, object?>
+                    {
+                        ["batchIndex"] = index,
+                        ["field"] = introspectionField,
+                    });
+                return;
+            }
+
+            var depth = ComputeMaxDepth(operations, fragments);
+            if (depth > maxDepth)
+            {
+                await RejectAsync(
+                    context,
+                    code: "QUERY_TOO_DEEP",
+                    message: "Request exceeds the allowed query depth.",
+                    violationType: "MaxDepthExceeded",
+                    extensions: new Dictionary<string, object?>
+                    {
+                        ["batchIndex"] = index,
+                        ["maxDepth"] = maxDepth,
+                        ["actualDepth"] = depth,
+                    });
+                return;
+            }
+
+            var complexityBreakdown = ComputeComplexity(operations, fragments);
+            if (complexityBreakdown.Total > maxComplexity)
+            {
+                await RejectAsync(
+                    context,
+                    code: "QUERY_TOO_COMPLEX",
+                    message: "Request exceeds the allowed query complexity.",
+                    violationType: "MaxComplexityExceeded",
+                    extensions: new Dictionary<string, object?>
+                    {
+                        ["batchIndex"] = index,
+                        ["maxComplexity"] = maxComplexity,
+                        ["actualComplexity"] = complexityBreakdown.Total,
+                        ["rootFields"] = complexityBreakdown.RootFields,
+                    });
+                return;
+            }
         }
 
         await next(context);
     }
 
-    private async Task RejectAsync(HttpContext context, string code, string message, string violationType)
+    private async Task RejectAsync(
+        HttpContext context,
+        string code,
+        string message,
+        string violationType,
+        IReadOnlyDictionary<string, object?>? extensions = null)
     {
         var playerId = context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "anonymous";
         var email = context.User.FindFirstValue(ClaimTypes.Email) ?? "anonymous";
@@ -92,7 +145,7 @@ public sealed class GraphQlRequestSecurityMiddleware(
                     new
                     {
                         message,
-                        extensions = new { code },
+                        extensions = MergeExtensions(code, extensions),
                     }
                 }
             }));
@@ -104,21 +157,62 @@ public sealed class GraphQlRequestSecurityMiddleware(
         return await reader.ReadToEndAsync();
     }
 
-    private static bool TryExtractQuery(string requestBody, out string? query)
+    private static IReadOnlyDictionary<string, object?> MergeExtensions(
+        string code,
+        IReadOnlyDictionary<string, object?>? extensions)
+    {
+        var merged = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["code"] = code,
+        };
+        if (extensions is null)
+        {
+            return merged;
+        }
+
+        foreach (var pair in extensions)
+        {
+            merged[pair.Key] = pair.Value;
+        }
+
+        return merged;
+    }
+
+    private static bool TryParseRequestItems(string requestBody, out List<GraphQlRequestItem> items)
     {
         try
         {
             using var document = JsonDocument.Parse(requestBody);
-            query = document.RootElement.TryGetProperty("query", out var queryElement)
-                ? queryElement.GetString()
-                : null;
+            items = document.RootElement.ValueKind switch
+            {
+                JsonValueKind.Object => new List<GraphQlRequestItem> { ParseRequestItem(document.RootElement) },
+                JsonValueKind.Array => document.RootElement
+                    .EnumerateArray()
+                    .Where(static element => element.ValueKind == JsonValueKind.Object)
+                    .Select(ParseRequestItem)
+                    .ToList(),
+                _ => new List<GraphQlRequestItem>(),
+            };
             return true;
         }
         catch (JsonException)
         {
-            query = null;
+            items = [];
             return false;
         }
+    }
+
+    private static GraphQlRequestItem ParseRequestItem(JsonElement requestElement)
+    {
+        var query = requestElement.TryGetProperty("query", out var queryElement)
+            && queryElement.ValueKind == JsonValueKind.String
+            ? queryElement.GetString()
+            : null;
+        var operationName = requestElement.TryGetProperty("operationName", out var operationNameElement)
+            && operationNameElement.ValueKind == JsonValueKind.String
+            ? operationNameElement.GetString()
+            : null;
+        return new GraphQlRequestItem(query, operationName);
     }
 
     private static bool TryParseDocument(string query, out DocumentNode document)
@@ -135,47 +229,86 @@ public sealed class GraphQlRequestSecurityMiddleware(
         }
     }
 
-    private static bool ContainsIntrospection(DocumentNode document)
+    private static IReadOnlyList<OperationDefinitionNode> SelectOperations(DocumentNode document, string? operationName)
     {
-        return document.Definitions
-            .OfType<OperationDefinitionNode>()
-            .Any(definition => SelectionSetContainsIntrospection(definition.SelectionSet));
+        var operations = document.Definitions.OfType<OperationDefinitionNode>().ToList();
+        if (!string.IsNullOrWhiteSpace(operationName))
+        {
+            var selected = operations
+                .Where(operation => operation.Name?.Value.Equals(operationName, StringComparison.Ordinal) == true)
+                .ToList();
+            if (selected.Count > 0)
+            {
+                return selected;
+            }
+        }
+
+        if (operations.Count == 1)
+        {
+            return operations;
+        }
+
+        // For unnamed multi-operation documents, inspect all operations defensively.
+        return operations;
     }
 
-    private static bool SelectionSetContainsIntrospection(SelectionSetNode selectionSet)
+    private static bool TryGetIntrospectionField(
+        IReadOnlyList<OperationDefinitionNode> operations,
+        IReadOnlyDictionary<string, FragmentDefinitionNode> fragments,
+        out string fieldName)
+    {
+        foreach (var operation in operations)
+        {
+            foreach (var field in EnumerateRootFields(operation.SelectionSet, fragments, new HashSet<string>(StringComparer.Ordinal)))
+            {
+                if (field.Name.Value is "__schema" or "__type" or "__typename")
+                {
+                    fieldName = field.Name.Value;
+                    return true;
+                }
+            }
+        }
+
+        fieldName = string.Empty;
+        return false;
+    }
+
+    private static IEnumerable<FieldNode> EnumerateRootFields(
+        SelectionSetNode selectionSet,
+        IReadOnlyDictionary<string, FragmentDefinitionNode> fragments,
+        HashSet<string> visitedFragments)
     {
         foreach (var selection in selectionSet.Selections)
         {
             switch (selection)
             {
                 case FieldNode field:
-                    if (field.Name.Value is "__schema" or "__type")
+                    yield return field;
+                    break;
+                case InlineFragmentNode inlineFragment:
+                    foreach (var nestedField in EnumerateRootFields(inlineFragment.SelectionSet, fragments, visitedFragments))
                     {
-                        return true;
-                    }
-
-                    if (field.SelectionSet is not null && SelectionSetContainsIntrospection(field.SelectionSet))
-                    {
-                        return true;
+                        yield return nestedField;
                     }
                     break;
-                case InlineFragmentNode inlineFragment
-                    when SelectionSetContainsIntrospection(inlineFragment.SelectionSet):
-                    return true;
+                case FragmentSpreadNode spread
+                    when fragments.TryGetValue(spread.Name.Value, out var fragment)
+                        && visitedFragments.Add(spread.Name.Value):
+                    foreach (var nestedField in EnumerateRootFields(fragment.SelectionSet, fragments, visitedFragments))
+                    {
+                        yield return nestedField;
+                    }
+                    break;
             }
         }
-
-        return false;
     }
 
-    private static int ComputeMaxDepth(DocumentNode document)
+    private static int ComputeMaxDepth(
+        IReadOnlyList<OperationDefinitionNode> operations,
+        IReadOnlyDictionary<string, FragmentDefinitionNode> fragments)
     {
-        var fragments = document.Definitions
-            .OfType<FragmentDefinitionNode>()
-            .ToDictionary(definition => definition.Name.Value, definition => definition, StringComparer.Ordinal);
-
         var maxDepth = 0;
-        foreach (var operation in document.Definitions.OfType<OperationDefinitionNode>())
+        foreach (var operation in operations)
         {
             maxDepth = Math.Max(maxDepth, ComputeDepth(operation.SelectionSet, 1, fragments, new HashSet<string>(StringComparer.Ordinal)));
         }
@@ -212,19 +345,32 @@ public sealed class GraphQlRequestSecurityMiddleware(
         return maxDepth;
     }
 
-    private static int ComputeComplexity(DocumentNode document)
+    private static ComplexityBreakdown ComputeComplexity(
+        IReadOnlyList<OperationDefinitionNode> operations,
+        IReadOnlyDictionary<string, FragmentDefinitionNode> fragments)
     {
-        var fragments = document.Definitions
-            .OfType<FragmentDefinitionNode>()
-            .ToDictionary(definition => definition.Name.Value, definition => definition, StringComparer.Ordinal);
-
+        var rootFields = new Dictionary<string, int>(StringComparer.Ordinal);
         var total = 0;
-        foreach (var operation in document.Definitions.OfType<OperationDefinitionNode>())
+
+        foreach (var operation in operations)
         {
             total += ComputeSelectionSetComplexity(operation.SelectionSet, fragments, new HashSet<string>(StringComparer.Ordinal));
+
+            foreach (var rootField in EnumerateRootFields(operation.SelectionSet, fragments, new HashSet<string>(StringComparer.Ordinal)))
+            {
+                var weight = ResolveFieldWeight(rootField.Name.Value);
+                if (rootFields.TryGetValue(rootField.Name.Value, out var existing))
+                {
+                    rootFields[rootField.Name.Value] = existing + weight;
+                }
+                else
+                {
+                    rootFields[rootField.Name.Value] = weight;
+                }
+            }
         }
 
-        return total;
+        return new ComplexityBreakdown(total, rootFields);
     }
 
     private static int ComputeSelectionSetComplexity(
@@ -261,4 +407,16 @@ public sealed class GraphQlRequestSecurityMiddleware(
 
     private static int ResolveFieldWeight(string fieldName)
         => FieldWeights.TryGetValue(fieldName, out var weight) ? weight : 1;
+
+    /// <summary>
+    /// Parsed GraphQL HTTP payload item with optional operation name.
+    /// Supports both single-object and JSON-array batch request bodies.
+    /// </summary>
+    private sealed record GraphQlRequestItem(string? Query, string? OperationName);
+
+    /// <summary>
+    /// Aggregate complexity values for a selected operation set.
+    /// Includes the total complexity score and per-root-field contribution map.
+    /// </summary>
+    private sealed record ComplexityBreakdown(int Total, IReadOnlyDictionary<string, int> RootFields);
 }
