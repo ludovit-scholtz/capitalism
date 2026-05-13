@@ -2,6 +2,11 @@ import { test, expect } from '@playwright/test'
 import { setupMockApi, makePlayer } from '../../helpers/mock-api'
 
 async function authenticate(page: Parameters<typeof test>[0]['page'], token: string) {
+  await page.addInitScript((storedToken) => {
+    localStorage.setItem('auth_token', storedToken)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7_200_000).toISOString())
+    localStorage.setItem('auth_provider', 'local')
+  }, token)
   await page.context().addCookies([
     {
       name: 'auth_token',
