@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
 
@@ -22,8 +22,6 @@ const newKeyName = ref('')
 const generatedKey = ref<string | null>(null)
 const copied = ref(false)
 const actionError = ref<string | null>(null)
-
-const activeKeys = computed(() => keys.value)
 
 function formatDate(iso: string | null): string {
   if (!iso) return t('dashboard.apiKeysNeverUsed')
@@ -82,6 +80,7 @@ async function generateKey() {
       {
         input: {
           name: trimmedName,
+          // Until dedicated scope-selection UI is added, generate full player automation access.
           scopes: ['read-only', 'bot-only', 'trading-only'],
         },
       },
@@ -175,7 +174,7 @@ onMounted(() => {
     </p>
     <p v-if="loading" class="mt-4 m-0 text-sm text-muted">{{ t('common.loading') }}</p>
 
-    <div v-else-if="activeKeys.length === 0" class="api-keys-empty-state mt-4 rounded-lg border border-divider bg-card-raised p-4">
+    <div v-else-if="keys.length === 0" class="api-keys-empty-state mt-4 rounded-lg border border-divider bg-card-raised p-4">
       <p class="m-0 text-sm text-muted">{{ t('dashboard.apiKeysEmptyState') }}</p>
     </div>
 
@@ -191,7 +190,7 @@ onMounted(() => {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="key in activeKeys" :key="key.id" class="border-b border-divider/70 align-top">
+          <tr v-for="key in keys" :key="key.id" class="border-b border-divider/70 align-top">
             <td class="px-3 py-2 font-mono text-xs text-body">{{ maskKeyPrefix(key) }}</td>
             <td class="px-3 py-2 text-body">{{ key.name }}</td>
             <td class="px-3 py-2 text-muted">{{ formatDate(key.createdAtUtc) }}</td>

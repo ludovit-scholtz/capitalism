@@ -13,6 +13,7 @@ import type { Page } from '@playwright/test'
 
 export const GOVERNMENT_PLAYER_EMAIL = 'government@capitalism.game'
 const MOCK_BUILDING_BASE_VALUE = 75_000
+let mockApiKeyCounter = 0
 
 export type MockPlayer = {
   id: string
@@ -7620,12 +7621,13 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         })
       }
 
-      const randomToken = Math.random().toString(36).slice(2, 18)
+      mockApiKeyCounter += 1
+      const randomToken = `${Date.now().toString(36)}${mockApiKeyCounter.toString(36)}`.slice(0, 16)
       const plaintextKey = `sk_live_${randomToken}`
       const keyPrefix = plaintextKey.slice(0, 8)
       const now = new Date().toISOString()
       const createdKey: MockPlayerApiKey = {
-        id: `api-key-${Math.random().toString(36).slice(2, 10)}`,
+        id: `api-key-${Date.now().toString(36)}-${mockApiKeyCounter}`,
         playerId: state.currentUserId,
         name: keyName,
         keyPrefix,
