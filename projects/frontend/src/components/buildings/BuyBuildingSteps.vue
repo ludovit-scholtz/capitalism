@@ -1,11 +1,23 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
 import { formatMoney } from '@/lib/currencyFormat'
+import { nearestBuildingsForLot, syncSelectedLotId } from '@/lib/buyBuildingMap'
 import type { BuildingLot, City, CurrencyBalance, PurchaseLotResult } from '@/types'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+
+interface BuyBuildingPlayerBuilding {
+  id: string
+  cityId: string
+  name: string
+  type: string
+  latitude: number
+  longitude: number
+}
 
 const props = defineProps<{
   cities: City[]
@@ -35,6 +47,16 @@ const lendingRatePercent = ref<number>(8)
 const selectedResourceFilter = ref<string>('')
 const playerBalances = ref<CurrencyBalance[]>([])
 const companyBankAccounts = ref<Array<{ id: string; currencyCode: string; balance: number; companyId: string | null; ownerType: string }>>([])
+const playerBuildings = ref<BuyBuildingPlayerBuilding[]>([])
+const hoveredLotId = ref('')
+const showMapOnMobile = ref(false)
+const mapFullscreen = ref(false)
+const mapContainer = ref<HTMLDivElement | null>(null)
+
+let lotMap: L.Map | null = null
+let lotMarkers: L.Marker[] = []
+let playerBuildingMarkers: L.Marker[] = []
+let nearestDistanceLines: L.Polyline[] = []
 
 // ── Mutations ──────────────────────────────────────────────────────────────────
 
@@ -166,19 +188,54 @@ const filteredLots = computed(() => {
   return availableLots.value.filter((lot) => lot.resourceType?.slug === selectedResourceFilter.value)
 })
 
+const selectedOrHoveredLot = computed(
+  () =>
+    filteredLots.value.find((lot) => lot.id === selectedLotId.value)
+    ?? filteredLots.value.find((lot) => lot.id === hoveredLotId.value)
+    ?? null,
+)
+
+const cityPlayerBuildings = computed(() =>
+  playerBuildings.value.filter((building) => building.cityId === selectedCityId.value),
+)
+
+const nearestBuildings = computed(() =>
+  nearestBuildingsForLot(selectedOrHoveredLot.value, cityPlayerBuildings.value, 3),
+)
+
 // ── Lifecycle ──────────────────────────────────────────────────────────────────
 
 onMounted(async () => {
   try {
-    const [balancesData, accountsData] = await Promise.all([
+    const [balancesData, accountsData, companiesData] = await Promise.all([
       gqlRequest<{ playerCurrencyBalances: CurrencyBalance[] }>('{ playerCurrencyBalances { currencyCode currencySymbol balance } }'),
       gqlRequest<{ myBankAccounts: Array<{ id: string; currencyCode: string; balance: number; companyId: string | null; ownerType: string }> }>('{ myBankAccounts { id currencyCode balance companyId ownerType } }'),
+      gqlRequest<{ myCompanies: Array<{ buildings: BuyBuildingPlayerBuilding[] }> }>(`{
+        myCompanies {
+          buildings {
+            id
+            cityId
+            name
+            type
+            latitude
+            longitude
+          }
+        }
+      }`),
     ])
     playerBalances.value = balancesData.playerCurrencyBalances ?? []
     companyBankAccounts.value = accountsData.myBankAccounts ?? []
+    playerBuildings.value = (companiesData.myCompanies ?? []).flatMap((company) => company.buildings ?? [])
   } catch {
     // Non-fatal: financial data may be missing; displayed values fall back to 0
   }
+
+  await nextTick()
+  ensureLotMap()
+})
+
+onUnmounted(() => {
+  destroyLotMap()
 })
 
 watch(
@@ -222,6 +279,10 @@ watch(
         }
         return true
       })
+      selectedLotId.value = syncSelectedLotId(selectedLotId.value, availableLots.value)
+      await nextTick()
+      ensureLotMap()
+      updateMapMarkers()
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : t('cityMap.purchaseError')
     } finally {
@@ -229,6 +290,42 @@ watch(
     }
   },
   { immediate: true },
+)
+
+watch(filteredLots, async (lots) => {
+  const synced = syncSelectedLotId(selectedLotId.value, lots)
+  if (synced !== selectedLotId.value) {
+    selectedLotId.value = synced
+  }
+  await nextTick()
+  ensureLotMap()
+  updateMapMarkers()
+})
+
+watch(
+  () => selectedLotId.value,
+  () => {
+    if (!lotMap) return
+    updateMapMarkers()
+  },
+)
+
+watch(cityPlayerBuildings, () => {
+  if (!lotMap) return
+  updateMapMarkers()
+})
+
+watch(
+  () => [showMapOnMobile.value, mapFullscreen.value],
+  async ([mobileVisible]) => {
+    if (!mobileVisible) return
+    await nextTick()
+    if (!lotMap) {
+      ensureLotMap()
+      return
+    }
+    lotMap.invalidateSize()
+  },
 )
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -263,6 +360,158 @@ function buyBuildingMaterialQualityLabel(quality: number): string {
   if (quality >= 0.6) return t('cityMap.rawMaterialQualityGood')
   if (quality >= 0.4) return t('cityMap.rawMaterialQualityFair')
   return t('cityMap.rawMaterialQualityPoor')
+}
+
+function formatDistanceKm(distanceKm: number): string {
+  return `${distanceKm.toFixed(1)} km`
+}
+
+function lotMarkerColor(lot: BuildingLot): string {
+  if (selectedLotId.value === lot.id) return '#f59e0b'
+  return '#22c55e'
+}
+
+function createLotMarkerIcon(color: string, isSelected: boolean): L.DivIcon {
+  const size = isSelected ? 20 : 14
+  const border = isSelected ? '3px solid #fff' : '2px solid rgba(255,255,255,0.9)'
+  return L.divIcon({
+    className: `buy-lot-marker ${isSelected ? 'selected' : 'available'}`,
+    html: `<div style="width:${size}px;height:${size}px;background:${color};border-radius:50%;border:${border};box-shadow:0 2px 8px rgba(0,0,0,0.35);"></div>`,
+    iconSize: [size + 8, size + 8],
+    iconAnchor: [(size + 8) / 2, (size + 8) / 2],
+  })
+}
+
+function createPlayerBuildingMarkerIcon(buildingType: string): L.DivIcon {
+  const buildingIcon = t(`buildings.typeIcons.${buildingType}`)
+  const iconText = buildingIcon.startsWith('buildings.typeIcons.') ? '🏢' : buildingIcon
+  return L.divIcon({
+    className: 'buy-player-building-marker',
+    html: `<div class="buy-player-marker-dot"><span>${iconText}</span></div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+  })
+}
+
+function clearMapLayers() {
+  lotMarkers.forEach((marker) => marker.remove())
+  playerBuildingMarkers.forEach((marker) => marker.remove())
+  nearestDistanceLines.forEach((line) => line.remove())
+  lotMarkers = []
+  playerBuildingMarkers = []
+  nearestDistanceLines = []
+}
+
+function drawNearestDistanceLines() {
+  if (!lotMap || !selectedOrHoveredLot.value) return
+
+  nearestDistanceLines.forEach((line) => line.remove())
+  nearestDistanceLines = []
+
+  for (const nearby of nearestBuildings.value) {
+    const line = L.polyline(
+      [
+        [selectedOrHoveredLot.value.latitude, selectedOrHoveredLot.value.longitude],
+        [nearby.latitude, nearby.longitude],
+      ],
+      {
+        color: '#60a5fa',
+        weight: 2,
+        dashArray: '5, 5',
+        opacity: 0.8,
+      },
+    ).addTo(lotMap)
+    nearestDistanceLines.push(line)
+  }
+}
+
+function fitMapToVisibleMarkers() {
+  if (!lotMap || filteredLots.value.length === 0) return
+
+  const allPoints: Array<[number, number]> = [
+    ...filteredLots.value.map((lot) => [lot.latitude, lot.longitude] as [number, number]),
+    ...cityPlayerBuildings.value.map((building) => [building.latitude, building.longitude] as [number, number]),
+  ]
+  const bounds = L.latLngBounds(allPoints)
+  lotMap.fitBounds(bounds.pad(0.15), { animate: false })
+}
+
+function updateMapMarkers() {
+  if (!lotMap) return
+
+  clearMapLayers()
+
+  for (const lot of filteredLots.value) {
+    const marker = L.marker([lot.latitude, lot.longitude], {
+      icon: createLotMarkerIcon(lotMarkerColor(lot), selectedLotId.value === lot.id),
+    }).addTo(lotMap)
+
+    marker.bindTooltip(`${lot.name}\n${formatCurrency(lot.price)}`)
+    marker.on('click', () => {
+      selectedLotId.value = lot.id
+      showMapOnMobile.value = true
+    })
+    marker.on('mouseover', () => {
+      hoveredLotId.value = lot.id
+      drawNearestDistanceLines()
+    })
+    marker.on('mouseout', () => {
+      hoveredLotId.value = ''
+      drawNearestDistanceLines()
+    })
+    lotMarkers.push(marker)
+  }
+
+  for (const building of cityPlayerBuildings.value) {
+    const marker = L.marker([building.latitude, building.longitude], {
+      icon: createPlayerBuildingMarkerIcon(building.type),
+    }).addTo(lotMap)
+    marker.bindTooltip(`${building.name}\n${t(`buildings.types.${building.type}`)}`)
+    playerBuildingMarkers.push(marker)
+  }
+
+  drawNearestDistanceLines()
+  fitMapToVisibleMarkers()
+}
+
+function ensureLotMap() {
+  if (lotMap || !mapContainer.value || filteredLots.value.length === 0) return
+
+  const firstLot = filteredLots.value[0]
+  if (!firstLot) return
+
+  lotMap = L.map(mapContainer.value, {
+    center: [firstLot.latitude, firstLot.longitude],
+    zoom: 13,
+    zoomControl: true,
+    zoomAnimation: false,
+    fadeAnimation: false,
+    markerZoomAnimation: false,
+  })
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19,
+  }).addTo(lotMap)
+
+  updateMapMarkers()
+}
+
+function destroyLotMap() {
+  clearMapLayers()
+  if (!lotMap) return
+  lotMap.stop()
+  lotMap.off()
+  lotMap.remove()
+  lotMap = null
+}
+
+function selectLotFromList(lotId: string) {
+  selectedLotId.value = lotId
+  if (!lotMap) return
+  const lot = filteredLots.value.find((candidate) => candidate.id === lotId)
+  if (!lot) return
+  lotMap.panTo([lot.latitude, lot.longitude], { animate: false })
 }
 
 async function buyBuilding() {
@@ -543,6 +792,40 @@ async function buyBuilding() {
         {{ t('buildings.noLotsForResource') }}
       </div>
 
+      <div v-if="filteredLots.length > 0" class="buy-building-map-panel mb-4 rounded-lg border border-divider bg-page p-3">
+        <div class="mb-3 flex items-center justify-between gap-2">
+          <div class="flex flex-col">
+            <strong class="text-sm">{{ t('buildings.landMapTitle') }}</strong>
+            <span class="text-xs text-muted">{{ t('buildings.landMapHint') }}</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              class="buy-building-map-toggle btn btn-sm border border-divider bg-card px-2 py-1 text-xs md:hidden"
+              @click="showMapOnMobile = !showMapOnMobile"
+            >
+              {{ showMapOnMobile ? t('buildings.hideMap') : t('buildings.showMap') }}
+            </button>
+            <button class="btn btn-sm border border-divider bg-card px-2 py-1 text-xs" @click="mapFullscreen = !mapFullscreen">
+              {{ mapFullscreen ? t('buildings.exitFullscreenMap') : t('buildings.fullscreenMap') }}
+            </button>
+          </div>
+        </div>
+        <div
+          class="buy-building-map"
+          :class="{
+            'hidden md:block': !showMapOnMobile,
+            fullscreen: mapFullscreen,
+          }"
+        >
+          <div ref="mapContainer" class="buy-building-map-canvas" />
+        </div>
+        <div class="mt-3 flex flex-wrap gap-3 text-xs text-muted">
+          <span class="inline-flex items-center gap-1"><span class="legend-dot lot"></span>{{ t('buildings.landMapLegendLots') }}</span>
+          <span class="inline-flex items-center gap-1"><span class="legend-dot selected"></span>{{ t('buildings.landMapLegendSelectedLot') }}</span>
+          <span class="inline-flex items-center gap-1"><span class="legend-dot building"></span>{{ t('buildings.landMapLegendYourBuildings') }}</span>
+        </div>
+      </div>
+
       <!-- Lot grid -->
       <div v-if="filteredLots.length > 0" class="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
         <button
@@ -550,7 +833,9 @@ async function buyBuilding() {
           :key="lot.id"
           class="lot-card flex flex-col gap-2 p-4 border-2 border-divider rounded-lg bg-page text-body text-left cursor-pointer transition-all duration-200 hover:border-brand hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           :class="selectedLotId === lot.id ? 'selected border-brand ring-1 ring-brand bg-[rgba(0,71,255,0.08)]' : ''"
-          @click="selectedLotId = lot.id"
+          @mouseenter="hoveredLotId = lot.id"
+          @mouseleave="hoveredLotId = ''"
+          @click="selectLotFromList(lot.id)"
         >
           <div class="flex justify-between items-baseline gap-4">
             <span class="font-bold">{{ lot.name }}</span>
@@ -606,6 +891,18 @@ async function buyBuilding() {
             {{ t('buildings.propertySize') }}: <strong class="text-body">{{ formatSqm(selectedPropertyAreaSqm) }}</strong>
           </span>
         </div>
+        <div v-if="nearestBuildings.length > 0" class="buy-building-nearest rounded-md border border-divider bg-surface p-3">
+          <strong class="text-xs">{{ t('buildings.landMapNearestTitle') }}</strong>
+          <ul class="mt-2 flex flex-col gap-1.5 m-0 p-0 list-none">
+            <li v-for="building in nearestBuildings" :key="building.id" class="text-xs text-muted">
+              <span class="font-semibold text-body">{{ building.name }}</span>
+              <span class="mx-1">·</span>
+              <span>{{ t(`buildings.types.${building.type}`) }}</span>
+              <span class="mx-1">·</span>
+              <span>{{ formatDistanceKm(building.distanceKm) }}</span>
+            </li>
+          </ul>
+        </div>
         <!-- Mining deposit investment summary -->
         <div
           v-if="selectedType === 'MINE' && selectedLot.resourceType"
@@ -657,3 +954,63 @@ async function buyBuilding() {
     </div>
   </div>
 </template>
+
+<style scoped>
+.buy-building-map {
+  min-height: 320px;
+}
+
+.buy-building-map-canvas {
+  min-height: 320px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.buy-building-map.fullscreen {
+  position: fixed;
+  inset: 1rem;
+  z-index: 60;
+  background: var(--color-bg);
+  border-radius: var(--radius-lg);
+  padding: 0.5rem;
+  min-height: auto;
+}
+
+.buy-building-map.fullscreen .buy-building-map-canvas {
+  height: calc(100vh - 3rem);
+  min-height: calc(100vh - 3rem);
+}
+
+.legend-dot {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.legend-dot.lot {
+  background: #22c55e;
+}
+
+.legend-dot.selected {
+  background: #f59e0b;
+}
+
+.legend-dot.building {
+  background: #2563eb;
+}
+
+:deep(.buy-player-marker-dot) {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  background: #2563eb;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  font-size: 12px;
+}
+</style>

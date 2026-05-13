@@ -44,6 +44,156 @@ test.describe('Buy Building View', () => {
     await expect(starterFactoryLot.getByText(/Population index/i)).toBeVisible()
   })
 
+  test('shows interactive map with player-building markers and synced lot selection', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-1',
+          playerId: 'player-1',
+          name: 'Map Test Corp',
+          cash: 500000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [
+            {
+              id: 'existing-factory',
+              companyId: 'company-1',
+              cityId: 'city-ba',
+              type: 'FACTORY',
+              name: 'Existing Factory',
+              latitude: 48.1495,
+              longitude: 17.1065,
+              level: 1,
+              powerConsumption: 10,
+              isForSale: false,
+              units: [],
+              pendingConfiguration: null,
+            },
+          ],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticate(page, player.id)
+    await page.goto('/buy-building/company-1')
+
+    await page.getByRole('button', { name: /Factory/i }).click()
+    await switchCityViaContextSwitcher(page, 'Bratislava')
+
+    await expect(page.locator('.buy-building-map-canvas')).toBeVisible()
+    await expect(page.locator('.buy-player-building-marker')).not.toHaveCount(0)
+
+    await page.locator('.buy-lot-marker').first().click()
+
+    await expect(page.locator('.lot-card.selected')).toBeVisible()
+    await expect(page.locator('.buy-building-nearest')).toBeVisible()
+  })
+
+  test('allows buying lot via map marker selection', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-1',
+          playerId: 'player-1',
+          name: 'Map Purchase Corp',
+          cash: 500000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.buildingLots = [
+      {
+        id: 'lot-map-only',
+        cityId: 'city-ba',
+        name: 'Map Factory Site',
+        description: 'Single affordable lot for map purchase flow.',
+        district: 'Industrial Zone',
+        latitude: 48.151,
+        longitude: 17.11,
+        populationIndex: 0.75,
+        basePrice: 90_000,
+        price: 90_000,
+        suitableTypes: 'FACTORY',
+        ownerCompanyId: null,
+        buildingId: null,
+        ownerCompany: null,
+        building: null,
+        resourceType: null,
+        materialQuality: null,
+        materialQuantity: null,
+      },
+    ]
+
+    await authenticate(page, player.id)
+    await page.goto('/buy-building/company-1')
+
+    await page.getByRole('button', { name: /Factory/i }).click()
+    await page.getByLabel('Building Name').fill('Map Selected Works')
+    await switchCityViaContextSwitcher(page, 'Bratislava')
+
+    await page.locator('.buy-lot-marker').first().click()
+    await expect(page.locator('.lot-card.selected', { hasText: 'Map Factory Site' })).toBeVisible()
+    await page.getByRole('button', { name: /^Buy Now$/i }).click()
+
+    await page.waitForURL(/\/building\//)
+    await expect(page.getByRole('heading', { name: /Map Selected Works/i })).toBeVisible()
+  })
+
+  test('renders map lot markers for Vienna city selection', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-1',
+          playerId: 'player-1',
+          name: 'Three Cities Corp',
+          cash: 5_000_000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.buildingLots.push({
+        id: 'lot-vienna-map',
+        cityId: 'city-vi',
+        name: 'Vienna Map Lot',
+        description: 'Vienna lot for map test.',
+        district: 'Innerstadt',
+        latitude: 48.206,
+        longitude: 16.37,
+        populationIndex: 0.76,
+        basePrice: 90_000,
+        price: 90_000,
+        suitableTypes: 'FACTORY',
+        ownerCompanyId: null,
+        buildingId: null,
+        ownerCompany: null,
+        building: null,
+        resourceType: null,
+        materialQuality: null,
+        materialQuantity: null,
+      })
+
+    await authenticate(page, player.id)
+    await page.goto('/buy-building/company-1')
+
+    await page.getByRole('button', { name: /Factory/i }).click()
+    await switchCityViaContextSwitcher(page, 'Vienna')
+    await expect(page.locator('.lot-card', { hasText: 'Vienna Map Lot' })).toBeVisible()
+    await expect(page.locator('.buy-building-map-canvas')).toBeVisible()
+  })
+
   test('shows apartment property size in land cards and selected summary', async ({ page }) => {
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
