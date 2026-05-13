@@ -11,6 +11,16 @@ public static class RequiredSecretsStartupGuard
         "<REQUIRED",
     ];
 
+    private static readonly string[] KnownSeedAdminPasswordPlaceholders =
+    [
+        "admin",
+        "changeme",
+        "password",
+        "seed",
+        "default",
+        "__SET_IN_ENV__",
+    ];
+
     public static bool TryGetUnsafeConnectionStringReason(string? connectionString, out string reason)
     {
         if (string.IsNullOrWhiteSpace(connectionString))
@@ -45,6 +55,31 @@ public static class RequiredSecretsStartupGuard
         if (emails.Any(ContainsPlaceholderMarker))
         {
             reason = "contains placeholder marker values";
+            return true;
+        }
+
+        reason = string.Empty;
+        return false;
+    }
+
+    public static bool TryGetUnsafeSeedAdminPasswordReason(string? adminPassword, out string reason)
+    {
+        var normalizedPassword = adminPassword?.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedPassword))
+        {
+            reason = "is missing or empty";
+            return true;
+        }
+
+        if (ContainsPlaceholderMarker(normalizedPassword))
+        {
+            reason = "contains a placeholder marker";
+            return true;
+        }
+
+        if (KnownSeedAdminPasswordPlaceholders.Contains(normalizedPassword, StringComparer.OrdinalIgnoreCase))
+        {
+            reason = "matches a known placeholder credential";
             return true;
         }
 

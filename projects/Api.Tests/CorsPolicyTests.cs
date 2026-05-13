@@ -92,7 +92,7 @@ public sealed class CorsPolicyTests
             ["ConnectionStrings:GameCatalog"] = $"cors-policy-tests-{Guid.NewGuid():N}",
             ["SeedData:AdminEmail"] = "admin@capitalism.local",
             ["SeedData:AdminDisplayName"] = "Platform Admin",
-            ["SeedData:AdminPassword"] = "ChangeMe123!",
+            ["SeedData:AdminPassword"] = ApiWebApplicationFactory.TestSeedAdminPassword,
             ["Auth:PasswordAuthEnabled"] = "true",
             ["GameEngine:Enabled"] = "false",
             ["MasterServer:RegistrationEnabled"] = "false",

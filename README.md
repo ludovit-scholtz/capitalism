@@ -12,6 +12,7 @@ This is attempt to create online mmorpg version of the capitalism game.
 - For non-Development deployments of `projects/Api`, set:
   - `ConnectionStrings__GameCatalog`
   - `Jwt__SigningKey` (strong 32+ character secret)
+  - `SeedData__AdminPassword` (required whenever `Auth__PasswordAuthEnabled=true`; must not be a placeholder)
 - For non-Development deployments of `projects/MasterApi`, set:
   - `ConnectionStrings__MasterCatalog`
   - `Jwt__SigningKey` (strong 32+ character secret)

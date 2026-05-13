@@ -1,4 +1,5 @@
 using Api.Security;
+using Api.Tests.Infrastructure;
 using Capitalism.Shared.Security;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -96,6 +97,70 @@ public sealed class ApiJwtSigningKeyStartupGuardHostTests
     }
 
     [Fact]
+    public void Startup_Production_WithPlaceholderSeedAdminPasswordAndPasswordAuthEnabled_ThrowsInvalidOperation()
+    {
+        using var factory = new ApiJwtSigningKeyGuardFactory(
+            "Production",
+            "ProductionStrongSigningKey0123456789ABCDE!",
+            seedAdminPassword: "changeme",
+            passwordAuthEnabled: true);
+
+        var ex = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+        Assert.Contains("SeedData:AdminPassword", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("SeedData__AdminPassword", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Startup_Production_WithPlaceholderSeedAdminPasswordAndPasswordAuthSettingOmitted_ThrowsInvalidOperation()
+    {
+        using var factory = new ApiJwtSigningKeyGuardFactory(
+            "Production",
+            "ProductionStrongSigningKey0123456789ABCDE!",
+            seedAdminPassword: "changeme",
+            passwordAuthEnabled: null);
+
+        var ex = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+        Assert.Contains("SeedData:AdminPassword", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Startup_Production_WithPlaceholderSeedAdminPasswordAndPasswordAuthDisabled_DoesNotThrow()
+    {
+        using var factory = new ApiJwtSigningKeyGuardFactory(
+            "Production",
+            "ProductionStrongSigningKey0123456789ABCDE!",
+            seedAdminPassword: "changeme",
+            passwordAuthEnabled: false);
+
+        using var _ = factory.CreateClient();
+    }
+
+    [Fact]
+    public void Startup_Production_WithMissingSeedDataSectionAndPasswordAuthEnabled_ThrowsInvalidOperation()
+    {
+        using var factory = new ApiJwtSigningKeyGuardFactory(
+            "Production",
+            "ProductionStrongSigningKey0123456789ABCDE!",
+            includeSeedDataSection: false,
+            passwordAuthEnabled: true);
+
+        var ex = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+        Assert.Contains("SeedData:AdminPassword", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Startup_Development_WithPlaceholderSeedAdminPasswordAndPasswordAuthEnabled_DoesNotThrow()
+    {
+        using var factory = new ApiJwtSigningKeyGuardFactory(
+            "Development",
+            JwtOptions.DefaultSigningKey,
+            seedAdminPassword: "changeme",
+            passwordAuthEnabled: true);
+
+        using var _ = factory.CreateClient();
+    }
+
+    [Fact]
     public void Startup_Testing_WithPlaceholderGameCatalogConnectionString_DoesNotThrow()
     {
         using var factory = new ApiJwtSigningKeyGuardFactory(
@@ -110,7 +175,10 @@ public sealed class ApiJwtSigningKeyStartupGuardHostTests
 internal sealed class ApiJwtSigningKeyGuardFactory(
     string environmentName,
     string? signingKey,
-    string? gameCatalogConnectionString = null)
+    string? gameCatalogConnectionString = null,
+    string? seedAdminPassword = null,
+    bool? passwordAuthEnabled = null,
+    bool includeSeedDataSection = true)
     : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -123,16 +191,22 @@ internal sealed class ApiJwtSigningKeyGuardFactory(
 
         builder.ConfigureAppConfiguration((_, configurationBuilder) =>
         {
-            configurationBuilder.AddInMemoryCollection(new Dictionary<string, string?>
+            var values = new Dictionary<string, string?>
             {
                 ["ConnectionStrings:GameCatalog"] = gameCatalogConnectionString ?? $"startup-guard-tests-{Guid.NewGuid():N}",
-                ["SeedData:AdminEmail"] = "admin@capitalism.local",
-                ["SeedData:AdminDisplayName"] = "Platform Admin",
-                ["SeedData:AdminPassword"] = "ChangeMe123!",
                 ["GameEngine:Enabled"] = "false",
                 ["MasterServer:RegistrationEnabled"] = "false",
-                ["Auth:PasswordAuthEnabled"] = "true",
-            });
+                ["Auth:PasswordAuthEnabled"] = (passwordAuthEnabled ?? true).ToString(),
+            };
+
+            if (includeSeedDataSection)
+            {
+                values["SeedData:AdminEmail"] = "admin@capitalism.local";
+                values["SeedData:AdminDisplayName"] = "Platform Admin";
+                values["SeedData:AdminPassword"] = seedAdminPassword ?? ApiWebApplicationFactory.TestSeedAdminPassword;
+            }
+
+            configurationBuilder.AddInMemoryCollection(values);
         });
     }
 }

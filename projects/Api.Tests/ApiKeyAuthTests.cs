@@ -1387,7 +1387,7 @@ public sealed class ApiKeyAuthTests : IClassFixture<ApiWebApplicationFactory>
         var (plaintext, keyId) = await GenerateApiKeyAsync(playerToken, "Admin Visible Key", [ApiKeyScopes.ReadOnly]);
         _ = await SendAsync(_client, "query { me { email } }", apiKey: plaintext);
 
-        var adminToken = await LoginAsync("admin@capitalism.local", "ChangeMe123!");
+        var adminToken = await LoginAsync("admin@capitalism.local", ApiWebApplicationFactory.TestSeedAdminPassword);
 
         var adminList = await SendAsync(
             _client,

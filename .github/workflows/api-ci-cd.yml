@@ -15,6 +15,7 @@ permissions:
 env:
   PROJECT_PATH: projects/Api
   IMAGE_NAME: harbor.de-4.biatec.io/biatec/capitalism-api
+  SeedData__AdminPassword: TestSeedAdminPassword123!
 
 jobs:
   build-test:

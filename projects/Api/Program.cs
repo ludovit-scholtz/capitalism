@@ -41,6 +41,10 @@ public class Program
 
         var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
             ?? throw new InvalidOperationException("JWT configuration is missing.");
+        var seedDataOptions = builder.Configuration.GetSection(SeedDataOptions.SectionName).Get<SeedDataOptions>()
+            ?? new SeedDataOptions();
+        var authOptions = builder.Configuration.GetSection(AuthOptions.SectionName).Get<AuthOptions>()
+            ?? new AuthOptions();
         var graphQlSecurityOptions = builder.Configuration.GetSection(GraphQlSecurityOptions.SectionName).Get<GraphQlSecurityOptions>()
             ?? new GraphQlSecurityOptions();
         var reverseProxyOptions = builder.Configuration.GetSection(ReverseProxyOptions.SectionName).Get<ReverseProxyOptions>()
@@ -134,6 +138,32 @@ public class Program
                     "ConnectionStrings:GameCatalog is missing or uses a placeholder value. " +
                     "Set a real PostgreSQL connection string via environment variable 'ConnectionStrings__GameCatalog' before starting outside Development. " +
                     $"Validation reason: {unsafeConnectionReason}");
+            }
+        }
+
+        if (authOptions.PasswordAuthEnabled
+            && RequiredSecretsStartupGuard.TryGetUnsafeSeedAdminPasswordReason(seedDataOptions.AdminPassword, out var unsafeSeedAdminPasswordReason))
+        {
+            if (builder.Environment.IsDevelopment())
+            {
+                startupLogger.LogWarning(
+                    "Startup with insecure SeedData:AdminPassword is allowed only in Development. Environment={EnvironmentName} Reason={Reason} OverrideEnvironmentVariable={OverrideEnvironmentVariable}",
+                    builder.Environment.EnvironmentName,
+                    unsafeSeedAdminPasswordReason,
+                    "SeedData__AdminPassword");
+            }
+            else
+            {
+                startupLogger.LogCritical(
+                    "Blocking startup because SeedData:AdminPassword is insecure while password auth is enabled. Environment={EnvironmentName} Reason={Reason} OverrideEnvironmentVariable={OverrideEnvironmentVariable}",
+                    builder.Environment.EnvironmentName,
+                    unsafeSeedAdminPasswordReason,
+                    "SeedData__AdminPassword");
+                throw new InvalidOperationException(
+                    "SeedData:AdminPassword is missing or uses a placeholder value while Auth:PasswordAuthEnabled=true. " +
+                    "Set a strong admin seed password via environment variable 'SeedData__AdminPassword' before starting outside Development. " +
+                    "See README.md#security-configuration for setup guidance. " +
+                    $"Validation reason: {unsafeSeedAdminPasswordReason}");
             }
         }
 
