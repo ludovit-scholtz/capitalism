@@ -22,6 +22,23 @@ Most player-impacting game mutations resolve ownership on the server, but the re
 - **Demolition or sale valuation drift from construction pricing**: Mitigated. Building market valuation now derives from the exact recorded lot purchase amount plus the current building construction cost and active-unit replacement cost including upgrade steps. Residual requirement: whenever land, shell, or unit pricing changes, update the shared valuation calculator and keep destroy/sale regression tests aligned so refund arbitrage does not reappear.
 - **API-key company-bound trading drift**: Mitigated by root-field scope rules and company binding resolution. Residual requirement: high-value trading mutations must continue to prove both positive scope access and foreign-company denial in tests.
 
+## Business Logic and Currency Arbitrage
+
+The bank-account migration introduced strong local-currency rules in some paths, but this audit confirmed that a few high-value business flows still mix “nominal amount” handling with multi-currency company balances. That creates a distinct risk category: a player does not need auth bypass to cheat if the economic settlement rules themselves can be routed through the wrong asset, account, or currency.
+
+- **Off-floor building transfers through accepted offers**: Open. `setBuildingForSale` enforces the valuation floor on the public asking price, but `makeOfferOnBuilding` and `acceptBuildingOffer` still allow any positive accepted offer. A colluding seller and buyer can therefore transfer a building below the intended minimum floor after listing it compliantly.
+- **Defaulted-collateral lender strip via cheap friendly repurchase**: Open. Defaulted loans are intentionally allowed to list the collateral building so the borrower can resolve the debt. Because accepted offers are not floor-protected, a borrower can default, sell the collateral to a friendly company at a token price, and leave the lender with residual unsecured principal after the lien is cleared.
+- **Loan origination funded from the wrong lender currency**: Open. `acceptLoan` still checks and debits aggregate lender-company balances with no currency filter. A bank in one city can therefore disburse a loan denominated in its own city currency while actually consuming nominal balances held in other city currencies.
+- **Loan repayment credited into the wrong lender currency**: Open. Scheduled loan repayment and manual debt repayment still have lender-credit paths that use `TryCredit(..., null)` rather than the loan currency, allowing repayment to land in whichever lender company account is currently preferred.
+- **Defaulted-loan repayment after closing the scheduled account**: Open. `closeCompanyBankAccount` blocks repayment-account closure only for `Active` and `Overdue` loans, not `Defaulted` ones. Once the designated account is closed, `repayLoanDebt` falls back to aggregate company balances with no FX normalization.
+- **Editable pledged buildings**: Open. Collateral locks currently protect sale, transfer, and demolition, but not building-configuration changes. A borrower can still modify a pledged building after origination unless another domain-specific check happens to block the exact action.
+- **Pending building offers are non-reserved**: Open. Buyers can post multiple pending offers across different buildings using the same money because the market does not reserve funds at offer time.
+- **Defaulted principal omitted from fresh lending-capacity checks**: Partially mitigated. Actual lender cash still constrains some abuse, but `acceptLoan` excludes defaulted unpaid principal from the deposit-capacity calculation, so regulatory-style capacity can reopen too early.
+- **Local-currency lot purchase enforcement**: Mitigated. `PrepareLotPurchaseAsync` debits a company account already in the lot city currency and returns `INSUFFICIENT_LOCAL_CURRENCY_FUNDS` when that balance is missing.
+- **Same-currency transfer and account-context enforcement**: Mitigated. `transferFunds` allows only same-currency moves and confines transfers to the active personal or company context.
+- **Company-context forex routing**: Mitigated. `executeForexSwap` requires explicit matching-currency source and destination accounts and rejects mismatches with `CURRENCY_MISMATCH`.
+- **Forced-sale building currency and FX debt settlement**: Mitigated. defaulted collateral is listed in the building city currency, while debt settlement converts internally into the lending bank currency.
+
 ## GraphQL and API Infrastructure Security
 
 GraphQL's flexible query language introduces DoS, schema-disclosure, batching, and pre-execution middleware risks that need explicit server-side controls.
