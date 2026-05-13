@@ -80,7 +80,7 @@ async function generateKey() {
       {
         input: {
           name: trimmedName,
-          // Until dedicated scope-selection UI is added, generate full player automation access.
+          // Until dedicated scope-selection UI is added, generate read + bot + trading scopes by default.
           scopes: ['read-only', 'bot-only', 'trading-only'],
         },
       },
@@ -160,7 +160,7 @@ onMounted(() => {
     >
       <strong class="text-sm text-amber-200">{{ t('dashboard.apiKeysShownOnceTitle') }}</strong>
       <p class="m-0 text-sm text-amber-100">{{ t('dashboard.apiKeysShownOnceBody') }}</p>
-      <code class="rounded border border-amber-400/30 bg-black/20 px-2 py-1 text-xs break-all">{{ generatedKey }}</code>
+      <code aria-label="Generated API key" class="rounded border border-amber-400/30 bg-black/20 px-2 py-1 text-xs break-all">{{ generatedKey }}</code>
       <button class="btn btn-secondary w-fit" type="button" @click="copyGeneratedKey">
         {{ copied ? t('dashboard.apiKeysCopied') : t('dashboard.apiKeysCopy') }}
       </button>

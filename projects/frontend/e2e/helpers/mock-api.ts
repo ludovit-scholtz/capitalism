@@ -7622,7 +7622,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       }
 
       mockApiKeyCounter += 1
-      const randomToken = `${Date.now().toString(36)}${mockApiKeyCounter.toString(36)}`.slice(0, 16)
+      const tsPart = Date.now().toString(36).slice(-8).padStart(8, '0')
+      const counterPart = mockApiKeyCounter.toString(36).slice(-8).padStart(8, '0')
+      const randomToken = `${tsPart}${counterPart}`
       const plaintextKey = `sk_live_${randomToken}`
       const keyPrefix = plaintextKey.slice(0, 8)
       const now = new Date().toISOString()
