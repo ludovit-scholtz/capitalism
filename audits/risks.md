@@ -2,81 +2,89 @@
 
 ## Identity and Credential Boundaries
 
-The repository relies on JWTs, scoped API keys, password login, and service credentials across multiple applications. The main risk in this category is letting a caller act outside the identity or abuse limits that the server intended.
+The repository relies on JWTs, scoped API keys, password login, OIDC, bot automation credentials, and service-to-service secrets. The main risk in this category is allowing a caller to act outside the identity boundary or to abuse authentication flows until an account is compromised.
 
-- **Password-auth abuse and account enumeration**: Mitigated. `LoginThrottleService` enforces 5-failure lockout per account, `AuthRateLimitMiddleware` enforces 10 requests/IP/minute, and registration now returns a neutral non-enumerating response on duplicate email. Controls are disabled in Development/Testing environments. Residual requirement: keep throttle settings in sync as Auth configuration evolves.
+- **Password-auth abuse and rate-limit bypass**: Partially mitigated. `LoginThrottleService` still enforces account-aware lockout and `AuthRateLimitMiddleware` applies per-IP throttling outside Development/Testing. Residual risk: the rate limiter trusts client-supplied `X-Forwarded-For`, only deserializes single JSON-object GraphQL bodies, and skips auth operations when `operationName` is not literally `login` or `register` even if the selected root field is a login/register mutation. Mitigation: resolve client IP only through trusted proxy configuration, parse selected GraphQL root fields, and inspect or reject batched request bodies.
+- **Account enumeration through duplicate registration codes**: Partially mitigated. Duplicate registration uses a neutral human-readable message, but both APIs still return the machine-readable extension code `DUPLICATE_EMAIL`. A scripted caller can use that code as an account-existence oracle when password auth is enabled. Mitigation: normalize the public error code and timing while keeping internal telemetry for abuse response.
+- **JWT session revocation**: Mitigated. Both APIs track issued JWT sessions, validate active sessions during token validation, expose logout and logout-all endpoints, and provide admin revocation endpoints plus cleanup hosted services.
 - **API key overreach**: Mitigated by `ApiKeyScopes`, deny-by-default `ApiKeyScopeMiddleware`, `BotOwnershipGuard`, and server-side ownership resolution. Residual requirement: every newly added sensitive mutation must be registered in the middleware and covered by negative tests.
 - **Master versus game token confusion**: Mitigated by shared token-boundary claims, explicit issuer and token-type checks, and privileged admin resolution from authenticated claims instead of caller-supplied email fields.
-- **NPC bot credential reuse**: Mitigated by the empty committed default password, `BotStartupValidator`, and API-key mode support. Residual requirement: non-Development deployments must provide either a real secret or an API key.
-- **No JWT session revocation**: Open. JWTs issued by both APIs are stateless with 120-minute TTL. There is no token revocation list or logout mechanism that invalidates existing tokens. A stolen JWT remains valid for up to 2 hours after compromise is detected. Mitigation: implement a server-side revocation set (Redis or DB) for explicit logout and admin-initiated session termination.
+- **NPC bot credential reuse**: Mitigated by the empty committed default password, `BotStartupValidator`, and API-key mode support. Residual requirement: non-Development deployments must provide either a real secret or a scoped API key.
 
 ## Authorization and Economy Surfaces
 
-Most player-impacting game mutations already resolve ownership on the server, but the remaining risk is inconsistent behavior in older mutation paths that still expose extra state through their errors.
+Most player-impacting game mutations resolve ownership on the server, but the remaining risk is inconsistent behavior in legacy paths or concurrency-sensitive economy flows where small leaks can become competitive intelligence.
 
-- Cross-owner mutation abuse: Mitigated by `[Authorize]`, `ObjectAuthorizationService`, `BotOwnershipGuard`, account-context resolution from the authenticated principal, and ownership checks in finance, lending, building, and shareholder mutations.
-- **Object enumeration and balance disclosure**: Mitigated. `NOT_FOUND_OR_NOT_OWNED` normalization plus balance-redaction has been applied across building-market, exchange, forex, and bank-transfer mutations. Residual risk: older CRUD mutations (`TradeRoutes`, `CompanyMerge`) use `ACCESS_DENIED` codes which still enforce ownership but do not collapse to the normalized pattern.
+- **Cross-owner mutation abuse**: Mitigated by `[Authorize]`, `ObjectAuthorizationService`, `BotOwnershipGuard`, account-context resolution from the authenticated principal, and ownership checks in finance, lending, building, and shareholder mutations.
+- **Object enumeration and balance disclosure**: Mostly mitigated. `NOT_FOUND_OR_NOT_OWNED` normalization plus balance redaction has been applied across building-market, exchange, forex, and bank-transfer mutations. Residual risk: older CRUD surfaces still use non-canonical `ACCESS_DENIED` or object-specific codes in some paths, which enforce ownership but do not always collapse the response contract.
 - **Stale-quote or replayed FX execution**: Mitigated by quote nonces, TTL validation, slippage bounds, and concurrency handling in the forex mutation path.
-- **Market and collateral race conditions**: Mitigated by optimistic offer versions, collateral locks, and commit-time revalidation, but these paths remain sensitive and need continued regression coverage when new secondary-market features are added.
-
-## Rich Content and Browser Surfaces
-
-This codebase intentionally renders HTML in several places, which makes sanitization and dependency hygiene part of the security boundary.
-
-- **Player news rendering**: Mitigated by `DOMPurify` in the game frontend before `v-html` renders localized news HTML.
-- **Support markdown preview rendering**: Mitigated by the shared `AllowlistHtmlSanitizer` in MasterApi plus integration tests that strip dangerous payloads and preserve safe formatting. Residual requirement: keep expanding the payload corpus when new rich-text features or sinks are introduced.
-- **Inline SVG flag rendering**: Mitigated because `CountryFlag.vue` renders SVGs from the static `country-flag-icons` library rather than user-supplied SVG input. This should stay isolated from user-controlled content.
-- **Admin rich-text authoring**: The editor intentionally uses `innerHTML` for authoring convenience. This is acceptable only while the loaded content stays trusted and downstream display paths remain sanitized.
-
-## Dependency and Supply-Chain Hygiene
-
-Package-level security posture is clean. Dependency drift remains an operational risk.
-
-- **Game frontend production dependencies**: Mitigated. `npm audit` (both `--omit=dev` and full) reports zero advisories as of 2026-W22.
-- **Master frontend dependencies**: Mitigated. `npm audit` (both `--omit=dev` and full) reports zero advisories as of 2026-W22.
-- **.NET package vulnerabilities**: Mitigated. `dotnet list package --vulnerable --include-transitive` scans for `Api`, `Api.Tests`, `MasterApi`, `MasterApi.Tests`, `Shared`, `NPCBot` report no known vulnerable packages as of 2026-W22.
-- **CVE-2026-40324 — HotChocolate stack overflow (patched)**: Mitigated. CVE-2026-40324 / GHSA-qr3m-xw4c-jqw3 (Critical, CVSS 9.1). Affects `Utf8GraphQLParser` in HotChocolate `< 15.1.14`. Current version is 15.1.15. No action required. Note: NuGet Advisory DB may lag GitHub Advisory DB; monitor for delayed propagation.
-
-## Security Assurance and Regression Control
-
-Several major security fixes are now live in code. The remaining risk is silent regression when those boundaries are not locked in by focused tests.
-
-- **Authentication abuse regression**: Mitigated. `LoginThrottleService`, `AuthRateLimitMiddleware`, and neutral duplicate-email registration responses are implemented. Residual requirement: add dedicated automated backend tests for lockout triggering and non-enumerating response behavior.
-- **MasterApi news trust boundary regression**: Mitigated by trusted server or privileged admin identity resolution together with dedicated integration tests for spoofed requester rejection, draft visibility rules, and service-derived author identity. Residual requirement: keep those tests aligned with future auth changes.
-- **GraphQL auth and ownership drift**: Mitigated in part by the generated `audits/graphql-surface-report.md`. Residual gap: older CRUD mutations still use `ACCESS_DENIED` rather than `NOT_FOUND_OR_NOT_OWNED` response codes.
-- **Rich-content sink drift**: Mitigated by the generated `audits/frontend-sink-inventory.json`, which keeps `v-html` and `innerHTML` surfaces visible for review before they silently expand.
+- **Market and collateral race conditions**: Mitigated by optimistic offer versions, collateral locks, and commit-time revalidation. Residual requirement: keep invariant-based race tests when secondary-market, loan, or collateral rules change.
+- **API-key company-bound trading drift**: Mitigated by root-field scope rules and company binding resolution. Residual requirement: high-value trading mutations must continue to prove both positive scope access and foreign-company denial in tests.
 
 ## GraphQL and API Infrastructure Security
 
-GraphQL's flexible query language introduces DoS and schema-disclosure risks that require explicit server-side configuration.
+GraphQL's flexible query language introduces DoS, schema-disclosure, batching, and pre-execution middleware risks that need explicit server-side controls.
 
-- **Query depth and complexity attacks**: Mitigated. Both `Api` and `MasterApi` configure `AddMaxExecutionDepth` (default 10) and `AddCostAnalyzer` (MaxFieldCost and MaxTypeCost = 1000). The `GraphQlRequestSecurityMiddleware` pre-parses requests and rejects depth and complexity violations with structured error codes (`MAX_DEPTH_EXCEEDED`, `MAX_COMPLEXITY_EXCEEDED`).
-- **Chat spam and abuse**: Mitigated. `ChatRateLimitService` enforces 20 messages/60 seconds per user. Maximum message length is 500 characters. `RATE_LIMITED` and `MESSAGE_TOO_LONG` error codes are returned on violation.
-- **GraphQL schema introspection in production**: Mitigated. Both APIs gate Nitro IDE (`Tool.Enable = IsDevelopment()`) and schema requests (`EnableSchemaRequests = IsDevelopment()`). The `GraphQlRequestSecurityMiddleware` additionally rejects raw introspection queries in non-Development environments with `FORBIDDEN`.
-- **CORS open fallback**: Mitigated. `CorsPolicyHelper.IsDevelopmentOpenPolicy()` checks the environment before applying `AllowAnyOrigin()`. Non-Development deployments with an empty `Cors:AllowedOrigins` list reject all cross-origin requests with a 403 and a startup warning log.
+- **Query depth and complexity attacks**: Mitigated. Both `Api` and `MasterApi` configure HotChocolate max execution depth, cost analysis, max page size, and `GraphQlRequestSecurityMiddleware` rejection responses for excessive depth or complexity.
+- **GraphQL schema introspection in production**: Mitigated for single-request bodies. Both APIs gate Nitro IDE and schema requests to Development and reject raw introspection fields in non-Development environments. Residual risk: the custom middleware currently extracts only the `query` property from JSON-object request bodies, so JSON-array batched bodies may not receive the same pre-execution inspection if HotChocolate accepts batching.
+- **GraphQL auth operation detection**: Open. `AuthRateLimitMiddleware` trusts the request `operationName` before inspecting the selected field. A named operation can execute `login` or `register` with a non-auth operation name and avoid the per-IP limiter. Mitigation: parse the GraphQL document and selected operation root fields before deciding whether the request is auth-sensitive.
+- **Chat spam and abuse**: Mitigated. `ChatRateLimitService` enforces 20 messages per 60 seconds per user, maximum message length is 500 characters, and structured rate-limit errors are returned.
+- **CORS open fallback**: Mitigated. `CorsPolicyHelper.IsDevelopmentOpenPolicy()` checks the environment before applying `AllowAnyOrigin()`. Non-Development deployments with an empty `Cors:AllowedOrigins` list reject cross-origin requests with a 403 and startup warning log.
+
+## Rich Content and Browser Surfaces
+
+The frontends intentionally render rich HTML in news and support flows. Browser-side token storage also makes XSS prevention part of the authentication boundary.
+
+- **Player news rendering**: Mitigated by `DOMPurify` in the game frontend before `v-html` renders localized news HTML.
+- **Support markdown preview rendering**: Mitigated by the shared MasterApi allowlist sanitizer plus frontend DOMPurify before previews are rendered. Residual requirement: keep expanding the payload corpus when new rich-text features or sinks are introduced.
+- **Inline SVG flag rendering**: Mitigated because `CountryFlag.vue` renders SVGs from the static `country-flag-icons` library rather than user-supplied SVG input. This must stay isolated from user-controlled content.
+- **Browser JWT storage in `localStorage`**: Open. Both frontends persist bearer tokens in `localStorage`, so a successful XSS could read tokens directly. CSP, DOMPurify, revocation, and short token lifetimes reduce likelihood and blast radius, but the safer target is HttpOnly SameSite cookies or a backend-for-frontend session pattern.
+- **Admin rich-text authoring**: Acceptable with controls. The editor is allowed for authoring convenience only while loaded content remains trusted and downstream display paths remain sanitized.
+
+## Dependency and Supply-Chain Hygiene
+
+Package-level security posture is currently clean. Dependency drift remains an operational risk because both frontend and backend ecosystems move quickly.
+
+- **Game frontend dependencies**: Mitigated. `npm audit --omit=dev` and full `npm audit` both report zero vulnerabilities as of 2026-05-13.
+- **Master frontend dependencies**: Mitigated. `npm audit --omit=dev` and full `npm audit` both report zero vulnerabilities as of 2026-05-13.
+- **.NET package vulnerabilities**: Mitigated. Individual `dotnet list package --vulnerable --include-transitive` scans for `Api`, `Api.Tests`, `MasterApi`, `MasterApi.Tests`, `Shared`, `NPCBot`, and `NPCBot.Tests` report no known vulnerable packages as of 2026-05-13. Solution-level scanning still has tooling friction because the compose project uses legacy package configuration.
+- **CVE-2026-40324 / GHSA-qr3m-xw4c-jqw3 HotChocolate stack overflow**: Mitigated. The advisory affects HotChocolate versions before 15.1.14; current projects use 15.1.15.
+
+## Security Assurance and Regression Control
+
+Several major security fixes are now live in code. The remaining risk is silent regression when these boundaries are not locked in by focused tests and generated inventories.
+
+- **Authentication abuse regression**: Partially mitigated. Login lockout and auth rate limiting are implemented, but tests should cover named-operation, batched-body, and spoofed-forwarded-header bypass attempts.
+- **MasterApi news trust boundary regression**: Mitigated by trusted server or privileged admin identity resolution together with integration tests for spoofed requester rejection, draft visibility rules, and service-derived author identity.
+- **GraphQL auth and ownership drift**: Mitigated in part by generated `audits/graphql-surface-inventory.json`. Residual gap: keep adding boundary tests whenever a sensitive GraphQL operation is added or an older operation's response contract is normalized.
+- **Rich-content sink drift**: Mitigated by generated `audits/frontend-sink-inventory.json`, which keeps `v-html` and `innerHTML` surfaces visible for review before they silently expand.
 
 ## Infrastructure and Secrets Management
 
-Default configuration values committed to source create a risk path if production deployments accidentally use those defaults.
+Default configuration values committed to source create a risk path if production deployments accidentally use local defaults.
 
-- **Placeholder JWT signing keys in source**: Partially mitigated. Both APIs have a startup guard (`JwtSigningKeyStartupGuard`) that throws `InvalidOperationException` in non-Development environments when `SigningKey` matches the placeholder. The placeholder keys remain in committed `appsettings.json` as documentation anchors for local development. Production deployments must inject via environment variables.
-- **Default database password in source**: Open. The committed `appsettings.json` connection strings use `Password=password`. Mitigation: document required secret rotation; ensure production deployments use environment variables or a secrets manager.
-- **Root administrator email committed to source**: Open. `MasterApi/appsettings.json` contains the root admin's real email address. This discloses a high-value target for phishing or social engineering. Mitigation: move `RootAdministratorEmails` to environment-variable configuration or a secrets manager.
-- **Admin seed password in source**: Open. `Api/appsettings.json` contains `"AdminPassword": "ChangeMe123!"`. The `PasswordAuthEnabled: false` default reduces immediate risk, but the value should not be committed. Mitigation: remove from source; use environment-variable injection.
+- **Placeholder JWT signing keys in source**: Mitigated for non-Development. Both APIs have a startup guard that throws `InvalidOperationException` outside Development/Testing when `Jwt:SigningKey` is missing, short, or matches a placeholder.
+- **Database connection strings and root administrator emails in source**: Mitigated for non-Development. `appsettings.json` now uses `__SET_IN_ENV__` connection-string placeholders and `MasterApi` blocks non-Development startup when root administrator emails are missing or placeholder values.
+- **Admin seed password in source**: Open. `projects/Api/appsettings.json` and `SeedDataOptions` still default the seed admin password to `ChangeMe123!`. `PasswordAuthEnabled=false` reduces immediate exposure, but a production deployment that enables password auth without overriding `SeedData__AdminPassword` would seed a known administrator credential.
+- **Local Docker Compose credentials**: Accepted local-development risk. Compose defaults are still human-readable and must not be reused for production deployments. The production startup guards cover the application-level connection-string path.
 
 ## HTTP Security Headers
 
-Browser-security HTTP headers are configured for the game frontend. The master portal is not yet hardened.
+Browser-security HTTP headers are now configured for both shipped frontend deployments.
 
-- **HSTS header (game frontend)**: Mitigated. `projects/frontend/nginx.conf` includes `add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;`.
-- **CSP `unsafe-inline` for scripts (game frontend)**: Mitigated. The CSP in `nginx.conf` uses `sha256-...` hash-based allowlisting for the inline theme-bootstrap script instead of `unsafe-inline`.
-- **Missing security headers for master-frontend**: Open. `projects/master-frontend` has no nginx.conf or deployment-level security header configuration. HSTS, CSP, X-Frame-Options, X-Content-Type-Options, and Referrer-Policy are not set. Mitigation: add an nginx.conf (or equivalent deployment config) mirroring the game frontend header set.
+- **Game frontend security headers**: Mitigated. `projects/frontend/nginx.conf` sets HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, and Permissions-Policy.
+- **Master frontend security headers**: Mitigated. `projects/master-frontend/nginx.conf` now sets HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, and Permissions-Policy.
 
 ## Account Lifecycle and Recovery
 
-- **Password reset flow**: Mitigated. MasterApi implements a time-limited email-based password reset flow (`/auth/forgot-password`, `/auth/reset-password`) with `PasswordResetThrottleService` rate limiting and token expiry. Game API has no independent password reset (relies on MasterApi or OIDC re-linkage).
-- **No JWT session revocation**: Open. JWTs issued by both APIs are stateless with 120-minute TTL. There is no token revocation list or logout mechanism. A stolen JWT remains valid for up to 2 hours after compromise is detected. Mitigation: implement a server-side revocation set (Redis or DB) for explicit logout and admin-initiated session termination.
+Account lifecycle controls reduce the impact of credential loss and token compromise.
+
+- **Password reset flow**: Mitigated. MasterApi implements time-limited email reset endpoints with `PasswordResetThrottleService` rate limiting and token expiry. Game API has no independent password reset and relies on MasterApi or OIDC re-linkage.
+- **Explicit logout and admin session termination**: Mitigated. Both APIs expose current-session logout, logout-all, active session listing, and admin revoke-all endpoints backed by persistent session/revocation data.
 
 ## SSL/TLS and Outbound Connection Security
 
-- **SSL certificate validation bypass for master-server client**: Open. In `Api/Program.cs`, the HTTP client for `master-server` disables SSL validation when `MasterServer:ApiUrl` contains the string `"masterapi"` (the Docker Compose container hostname). This condition is URL-string-based rather than environment-based, meaning Docker Compose production deployments also bypass certificate validation, making MasterApi registration traffic susceptible to MITM attacks. Mitigation: replace the URL-string check with an explicit `IsDevelopment()` or a dedicated `MasterServer:DisableSslValidation` opt-in flag.
+Outbound calls to the master server and external dependencies must not weaken TLS validation outside local development.
+
+- **SSL certificate validation bypass for master-server client**: Mitigated. `MasterServerHttpClientRegistration` now enables `DangerousAcceptAnyServerCertificateValidator` only in Development. Non-Development registrations use the default HTTP client certificate validation path.
+- **OIDC metadata HTTPS requirement**: Partially mitigated. OIDC token validation enforces issuer, audience, lifetime, and signature. Residual requirement: keep `RequireHttpsMetadata` enabled outside local development and cover configuration drift in startup tests.
