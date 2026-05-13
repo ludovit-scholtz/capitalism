@@ -146,6 +146,54 @@ public sealed class TradeRouteQueryTests
         return (company.Id, route.Id);
     }
 
+    private static async Task<(Guid fromBuildingId, Guid toBuildingId, Guid productTypeId)> SeedShippingQuoteAsync(
+        AppDbContext db,
+        Guid ownerPlayerId)
+    {
+        var bratislava = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+        var prague = await db.Cities.FirstAsync(c => c.Name == "Prague");
+        var chair = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = ownerPlayerId,
+            Name = $"Shipping Quote Co {Guid.NewGuid():N}",
+            FoundedAtUtc = DateTime.UtcNow,
+            FoundedAtTick = 1,
+        };
+
+        var fromBuilding = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = bratislava.Id,
+            Type = BuildingType.Factory,
+            Name = "Shipping Source",
+            Latitude = bratislava.Latitude + 0.02d,
+            Longitude = bratislava.Longitude + 0.02d,
+            Level = 1,
+        };
+
+        var toBuilding = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = prague.Id,
+            Type = BuildingType.SalesShop,
+            Name = "Shipping Destination",
+            Latitude = prague.Latitude - 0.02d,
+            Longitude = prague.Longitude - 0.02d,
+            Level = 1,
+        };
+
+        db.Companies.Add(company);
+        db.Buildings.AddRange(fromBuilding, toBuilding);
+        await db.SaveChangesAsync();
+
+        return (fromBuilding.Id, toBuilding.Id, chair.Id);
+    }
+
     [Fact]
     public async Task MyTradeRoutes_WithoutCompanyId_ReturnsOnlyCurrentPlayersRoutes()
     {
@@ -211,5 +259,116 @@ public sealed class TradeRouteQueryTests
         Assert.Equal(routeAId.ToString(), routes[0].GetProperty("id").GetString());
         Assert.Equal(companyAId.ToString(), routes[0].GetProperty("companyId").GetString());
         Assert.NotEqual(companyBId.ToString(), routes[0].GetProperty("companyId").GetString());
+    }
+
+    [Fact]
+    public async Task ShippingCostQuote_Authenticated_ReturnsPositiveQuote()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var token = await RegisterAndGetTokenAsync(client, $"shipping-quote-{Guid.NewGuid():N}@test.com");
+        var playerId = await GetPlayerIdAsync(client, token);
+
+        Guid fromBuildingId;
+        Guid toBuildingId;
+        Guid productTypeId;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            (fromBuildingId, toBuildingId, productTypeId) = await SeedShippingQuoteAsync(db, playerId);
+        }
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            @"query ShippingCostQuote($fromBuildingId: UUID!, $toBuildingId: UUID!, $productTypeId: UUID!, $quantity: Decimal!) {
+                shippingCostQuote(
+                    fromBuildingId: $fromBuildingId
+                    toBuildingId: $toBuildingId
+                    productTypeId: $productTypeId
+                    quantity: $quantity
+                ) {
+                    distanceKm
+                    weightKgPerUnit
+                    quantity
+                    costPerUnit
+                    totalCost
+                    currencyCode
+                }
+            }",
+            new { fromBuildingId, toBuildingId, productTypeId, quantity = 5m },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _), result.ToString());
+        var quote = result.GetProperty("data").GetProperty("shippingCostQuote");
+
+        Assert.True(quote.GetProperty("distanceKm").GetDecimal() > 0m);
+        Assert.True(quote.GetProperty("weightKgPerUnit").GetDecimal() > 0m);
+        Assert.Equal(5m, quote.GetProperty("quantity").GetDecimal());
+        Assert.True(quote.GetProperty("costPerUnit").GetDecimal() > 0m);
+        Assert.True(quote.GetProperty("totalCost").GetDecimal() > quote.GetProperty("costPerUnit").GetDecimal());
+        Assert.Equal("CZK", quote.GetProperty("currencyCode").GetString());
+    }
+
+    [Fact]
+    public async Task ShippingCostQuote_Unauthenticated_ReturnsAuthError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            @"query ShippingCostQuote($fromBuildingId: UUID!, $toBuildingId: UUID!, $productTypeId: UUID!, $quantity: Decimal!) {
+                shippingCostQuote(
+                    fromBuildingId: $fromBuildingId
+                    toBuildingId: $toBuildingId
+                    productTypeId: $productTypeId
+                    quantity: $quantity
+                ) {
+                    totalCost
+                }
+            }",
+            new { fromBuildingId = Guid.NewGuid(), toBuildingId = Guid.NewGuid(), productTypeId = Guid.NewGuid(), quantity = 1m });
+
+        Assert.True(result.TryGetProperty("errors", out var errors), result.ToString());
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.StartsWith("AUTH_", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ShippingCostQuote_UnknownBuilding_ReturnsBuildingNotFound()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var token = await RegisterAndGetTokenAsync(client, $"shipping-unknown-{Guid.NewGuid():N}@test.com");
+        var playerId = await GetPlayerIdAsync(client, token);
+
+        Guid toBuildingId;
+        Guid productTypeId;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            (_, toBuildingId, productTypeId) = await SeedShippingQuoteAsync(db, playerId);
+        }
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            @"query ShippingCostQuote($fromBuildingId: UUID!, $toBuildingId: UUID!, $productTypeId: UUID!, $quantity: Decimal!) {
+                shippingCostQuote(
+                    fromBuildingId: $fromBuildingId
+                    toBuildingId: $toBuildingId
+                    productTypeId: $productTypeId
+                    quantity: $quantity
+                ) {
+                    totalCost
+                }
+            }",
+            new { fromBuildingId = Guid.NewGuid(), toBuildingId, productTypeId, quantity = 1m },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors), result.ToString());
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("BUILDING_NOT_FOUND", code);
     }
 }

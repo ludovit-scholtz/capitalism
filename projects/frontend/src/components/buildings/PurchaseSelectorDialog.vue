@@ -27,11 +27,32 @@ const sourcingComparisonRows = computed(() =>
   sourcingCandidates.value.filter((candidate) => candidate.deliveredPricePerUnit != null),
 )
 
+type TransitEfficiency = 'good' | 'warning' | 'bad' | 'neutral'
+
 const bestEligibleDeliveredPrice = computed(() => {
   const eligible = sourcingComparisonRows.value.filter((candidate) => candidate.isEligible)
   if (eligible.length === 0) return null
   return Math.min(...eligible.map((candidate) => candidate.deliveredPricePerUnit ?? Number.POSITIVE_INFINITY))
 })
+
+function getTransitEfficiency(pricePerUnit: number | null | undefined, transitCostPerUnit: number | null | undefined): TransitEfficiency {
+  if (pricePerUnit == null || pricePerUnit <= 0 || transitCostPerUnit == null) {
+    return 'neutral'
+  }
+
+  const ratio = transitCostPerUnit / pricePerUnit
+  if (ratio < 0.05) return 'good'
+  if (ratio <= 0.2) return 'warning'
+  return 'bad'
+}
+
+function getTransitEfficiencyLabel(pricePerUnit: number | null | undefined, transitCostPerUnit: number | null | undefined): string {
+  const efficiency = getTransitEfficiency(pricePerUnit, transitCostPerUnit)
+  if (efficiency === 'good') return t('buildingDetail.purchaseSelector.transitEfficiencyGood')
+  if (efficiency === 'warning') return t('buildingDetail.purchaseSelector.transitEfficiencyWarning')
+  if (efficiency === 'bad') return t('buildingDetail.purchaseSelector.transitEfficiencyBad')
+  return t('buildingDetail.purchaseSelector.transitEfficiencyUnknown')
+}
 </script>
 
 <template>
@@ -106,8 +127,15 @@ const bestEligibleDeliveredPrice = computed(() => {
               <span v-if="option.pricePerUnit != null" class="purchase-vendor-pricing text-xs font-medium text-muted">
                 {{ t('buildingDetail.purchaseSelector.vendorPrice', { price: formatCurrency(option.pricePerUnit) }) }}
               </span>
-              <span class="purchase-vendor-pricing text-xs font-medium text-muted">
+              <span class="purchase-vendor-pricing purchase-vendor-transit-line text-xs font-medium text-muted">
+                <span aria-hidden="true">🚚</span>
                 {{ getPurchaseVendorTransitLabel(option.transitCostPerUnit) }}
+                <span
+                  class="purchase-vendor-transit-badge"
+                  :class="`is-${getTransitEfficiency(option.pricePerUnit, option.transitCostPerUnit)}`"
+                >
+                  {{ getTransitEfficiencyLabel(option.pricePerUnit, option.transitCostPerUnit) }}
+                </span>
               </span>
             </button>
           </div>
@@ -177,3 +205,43 @@ const bestEligibleDeliveredPrice = computed(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.purchase-vendor-transit-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.purchase-vendor-transit-badge {
+  border-radius: 9999px;
+  border: 1px solid var(--color-border);
+  padding: 0.05rem 0.45rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+.purchase-vendor-transit-badge.is-good {
+  border-color: color-mix(in srgb, var(--color-success) 50%, var(--color-border));
+  background: color-mix(in srgb, var(--color-success) 18%, transparent);
+  color: var(--color-success);
+}
+
+.purchase-vendor-transit-badge.is-warning {
+  border-color: color-mix(in srgb, var(--color-warning) 50%, var(--color-border));
+  background: color-mix(in srgb, var(--color-warning) 18%, transparent);
+  color: var(--color-warning);
+}
+
+.purchase-vendor-transit-badge.is-bad {
+  border-color: color-mix(in srgb, var(--color-danger) 55%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger) 18%, transparent);
+  color: var(--color-danger);
+}
+
+.purchase-vendor-transit-badge.is-neutral {
+  color: var(--color-text-secondary);
+}
+</style>

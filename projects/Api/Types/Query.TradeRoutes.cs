@@ -157,6 +157,78 @@ public sealed partial class Query
     }
 
     /// <summary>
+    /// Returns a point-to-point shipping quote between two buildings for the requested product quantity.
+    /// The quote always enforces a positive non-zero minimum transit cost per unit.
+    /// </summary>
+    [Authorize]
+    [GraphQLName("shippingCostQuote")]
+    public async Task<ShippingCostQuoteResult> GetShippingCostQuote(
+        Guid fromBuildingId,
+        Guid toBuildingId,
+        Guid productTypeId,
+        decimal quantity,
+        [Service] AppDbContext db)
+    {
+        if (quantity <= 0m)
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("Quantity must be positive.").SetCode("INVALID_QUANTITY").Build());
+
+        var fromBuilding = await db.Buildings
+            .Include(b => b.City)
+            .FirstOrDefaultAsync(b => b.Id == fromBuildingId)
+            ?? throw new GraphQLException(ErrorBuilder.New().SetMessage("Source building not found.").SetCode("BUILDING_NOT_FOUND").Build());
+
+        var toBuilding = await db.Buildings
+            .Include(b => b.City)
+            .FirstOrDefaultAsync(b => b.Id == toBuildingId)
+            ?? throw new GraphQLException(ErrorBuilder.New().SetMessage("Destination building not found.").SetCode("BUILDING_NOT_FOUND").Build());
+
+        var productType = await db.ProductTypes
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == productTypeId)
+            ?? throw new GraphQLException(ErrorBuilder.New().SetMessage("Product type not found.").SetCode("PRODUCT_TYPE_NOT_FOUND").Build());
+
+        var recipesByProduct = (await db.ProductRecipes
+                .AsNoTracking()
+                .ToListAsync())
+            .GroupBy(r => r.ProductTypeId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+        var resourceTypesById = await db.ResourceTypes.AsNoTracking().ToDictionaryAsync(r => r.Id);
+        var productTypesById = await db.ProductTypes.AsNoTracking().ToDictionaryAsync(p => p.Id);
+
+        var weightKgPerUnit = GlobalExchangeCalculator.ComputeItemWeightPerUnit(
+            null,
+            productType.Id,
+            resourceTypesById,
+            productTypesById,
+            recipesByProduct);
+
+        var destinationFuelPriceIndex = toBuilding.City?.FuelPriceIndex ?? 1m;
+        var costPerUnit = GlobalExchangeCalculator.ComputeTransitCostPerUnit(
+            fromBuilding.Latitude,
+            fromBuilding.Longitude,
+            toBuilding.Latitude,
+            toBuilding.Longitude,
+            weightKgPerUnit,
+            destinationFuelPriceIndex);
+
+        var distanceKm = GlobalExchangeCalculator.ComputeDistanceKm(
+            fromBuilding.Latitude,
+            fromBuilding.Longitude,
+            toBuilding.Latitude,
+            toBuilding.Longitude);
+
+        var currencyCode = toBuilding.City?.CurrencyCode ?? "EUR";
+
+        return new ShippingCostQuoteResult(
+            DistanceKm: decimal.Round((decimal)distanceKm, 3, MidpointRounding.AwayFromZero),
+            WeightKgPerUnit: decimal.Round(weightKgPerUnit, 4, MidpointRounding.AwayFromZero),
+            Quantity: quantity,
+            CostPerUnit: costPerUnit,
+            TotalCost: decimal.Round(costPerUnit * quantity, 2, MidpointRounding.AwayFromZero),
+            CurrencyCode: currencyCode);
+    }
+
+    /// <summary>
     /// Returns freight estimate for sourcing from an origin building to another city.
     /// Uses the product-definition transit rule: ceil(distance / 500), minimum 1 tick.
     /// </summary>
@@ -287,3 +359,11 @@ public record LogisticsCostEstimateResult(
     decimal TotalFreightCost,
     long TransitTicks,
     long EstimatedArrivalTick);
+
+public record ShippingCostQuoteResult(
+    decimal DistanceKm,
+    decimal WeightKgPerUnit,
+    decimal Quantity,
+    decimal CostPerUnit,
+    decimal TotalCost,
+    string CurrencyCode);
