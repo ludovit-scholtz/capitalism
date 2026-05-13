@@ -4,6 +4,15 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 ## Active issues to work on
 
+### City view
+
+- [ ] Redisign the city view to tab page layout. Make sure the tabs are in the routing /city/:cityId/:tab
+- [ ] Move the `Economy cycle` from /dashboard to tab in a city. Make sure every city has different economy cycle.
+
+### Map selection at /buy-building/
+
+- [ ] In /buy-building/ make sure the map is visible when player chooses the land to buy. He should optimize the distance to his own other buildings. Make it similar as it is in the onboarding now.
+
 ### Building Unit Grid Configuration System (Core Production Chain)
 
 - [ ] Move Energy Settings to building editation tab
