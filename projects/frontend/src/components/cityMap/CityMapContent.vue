@@ -6,11 +6,7 @@ import { formatMoney } from '@/lib/currencyFormat'
 import { getLotStatus as lotStatusFromOwnership, getLotMarkerColor as markerColorFromStatus, getResourceLayerMarkerColor } from '@/lib/cityMapHelpers'
 import { getActiveCompany } from '@/lib/accountContext'
 import CityLotDetailPanel from '@/components/cityMap/CityLotDetailPanel.vue'
-import CityMediaHousesSection from '@/components/cityMap/CityMediaHousesSection.vue'
-import CityPowerPlanningSection from '@/components/cityMap/CityPowerPlanningSection.vue'
-import HealthIndicatorsPanel from '@/components/cityMap/HealthIndicatorsPanel.vue'
-import CityDemandPanel from '@/components/cityMap/CityDemandPanel.vue'
-import type { City, BuildingLot, Company, PurchaseLotResult, CityMediaHouseInfo, CityWeatherForecast, CityPowerBalance, CityEconomicReportResult } from '@/types'
+import type { City, BuildingLot, Company, PurchaseLotResult, CityWeatherForecast } from '@/types'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -24,13 +20,7 @@ const props = defineProps<{
   companies: Company[]
   viewMode: 'map' | 'list'
   cityWeather: CityWeatherForecast | null
-  cityPowerBalance: CityPowerBalance | null
-  cityEconomicReport: CityEconomicReportResult | null
-  economicReportLoading: boolean
-  cityMediaHouses: CityMediaHouseInfo[]
-  mediaHousesLoading: boolean
   highlightedBuildingId: string | null
-  cityId: string
   showResourceLayer: boolean
 }>()
 
@@ -270,18 +260,10 @@ onUnmounted(() => {
       @lot-refreshed="handleLotRefreshedInternal"
     />
 
-    <aside v-else class="detail-panel empty-panel">
+  <aside v-else class="detail-panel empty-panel">
       <p class="select-prompt">{{ t('cityMap.selectLot') }}</p>
     </aside>
   </div>
-
-  <CityMediaHousesSection :media-houses="cityMediaHouses" :loading="mediaHousesLoading" />
-  <CityPowerPlanningSection :city-weather="cityWeather" :city-power-balance="cityPowerBalance" />
-  <CityDemandPanel :city-id="cityId" :currency-code="city.currencyCode ?? 'EUR'" :top-n="5" :last-n-ticks="100" />
-  <section class="city-economic-health-section">
-    <h2 class="section-heading">{{ t('cityHealth.panelTitle') }}</h2>
-    <HealthIndicatorsPanel :data="cityEconomicReport" :loading="economicReportLoading" />
-  </section>
 </template>
 
 <style scoped>

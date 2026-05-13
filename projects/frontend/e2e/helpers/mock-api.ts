@@ -7838,29 +7838,24 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
-    if (query.includes('getCurrentEconomicCycle')) {
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ data: { getCurrentEconomicCycle: state.economicCycle } }),
-      })
-    }
-
-    if (query.includes('getActiveMarketEvents')) {
+    if (query.includes('getCurrentEconomicCycle') || query.includes('getActiveMarketEvents') || query.includes('getEconomicHistory')) {
       const cityId = body.variables?.cityId ?? null
-      const events = cityId ? (state.activeMarketEvents ?? []).filter((event) => event.affectedCityId == null || event.affectedCityId === cityId) : (state.activeMarketEvents ?? [])
+      const responseData: Record<string, unknown> = {}
+      if (query.includes('getCurrentEconomicCycle')) {
+        responseData.getCurrentEconomicCycle = state.economicCycle
+      }
+      if (query.includes('getActiveMarketEvents')) {
+        responseData.getActiveMarketEvents = cityId
+          ? (state.activeMarketEvents ?? []).filter((event) => event.affectedCityId == null || event.affectedCityId === cityId)
+          : (state.activeMarketEvents ?? [])
+      }
+      if (query.includes('getEconomicHistory')) {
+        responseData.getEconomicHistory = state.economicHistory ?? []
+      }
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { getActiveMarketEvents: events } }),
-      })
-    }
-
-    if (query.includes('getEconomicHistory')) {
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ data: { getEconomicHistory: state.economicHistory ?? [] } }),
+        body: JSON.stringify({ data: responseData }),
       })
     }
 

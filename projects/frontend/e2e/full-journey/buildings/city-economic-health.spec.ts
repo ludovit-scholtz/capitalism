@@ -58,7 +58,7 @@ test.describe('City Economic Health Indicators', () => {
       'city-ba': [makeEconomicReport()],
     }
     await authenticateViaLocalStorage(page, player.id)
-    await page.goto('/city/city-ba')
+    await page.goto('/city/city-ba/economy')
 
     await expect(page.getByRole('heading', { name: /Economic Health/i })).toBeVisible()
   })
@@ -69,7 +69,7 @@ test.describe('City Economic Health Indicators', () => {
       'city-ba': [makeEconomicReport({ economicIndex: 75 })],
     }
     await authenticateViaLocalStorage(page, player.id)
-    await page.goto('/city/city-ba')
+    await page.goto('/city/city-ba/economy')
 
     // Score ring shows the index value
     await expect(page.locator('.score-value').filter({ hasText: '75' })).toBeVisible()
@@ -81,7 +81,7 @@ test.describe('City Economic Health Indicators', () => {
       'city-ba': [makeEconomicReport({ economicIndex: 80 })],
     }
     await authenticateViaLocalStorage(page, player.id)
-    await page.goto('/city/city-ba')
+    await page.goto('/city/city-ba/economy')
 
     await expect(page.locator('.status-badge').filter({ hasText: /Thriving/i })).toBeVisible()
   })
@@ -92,7 +92,7 @@ test.describe('City Economic Health Indicators', () => {
       'city-ba': [makeEconomicReport({ economicIndex: 55 })],
     }
     await authenticateViaLocalStorage(page, player.id)
-    await page.goto('/city/city-ba')
+    await page.goto('/city/city-ba/economy')
 
     await expect(page.locator('.status-badge').filter({ hasText: /Stable/i })).toBeVisible()
   })
@@ -103,7 +103,7 @@ test.describe('City Economic Health Indicators', () => {
       'city-ba': [makeEconomicReport({ economicIndex: 25 })],
     }
     await authenticateViaLocalStorage(page, player.id)
-    await page.goto('/city/city-ba')
+    await page.goto('/city/city-ba/economy')
 
     await expect(page.locator('.status-badge').filter({ hasText: /Declining/i })).toBeVisible()
   })
@@ -112,7 +112,7 @@ test.describe('City Economic Health Indicators', () => {
     const { state, player } = setupAuthenticatedCityMap(page)
     state.cityEconomicReports = { 'city-ba': [] }
     await authenticateViaLocalStorage(page, player.id)
-    await page.goto('/city/city-ba')
+    await page.goto('/city/city-ba/economy')
 
     await expect(page.getByText(/No reports yet/i)).toBeVisible()
   })
@@ -132,7 +132,7 @@ test.describe('City Economic Health Indicators', () => {
       ],
     }
     await authenticateViaLocalStorage(page, player.id)
-    await page.goto('/city/city-ba')
+    await page.goto('/city/city-ba/economy')
 
     const panel = page.locator('.health-panel')
     await expect(panel.locator('.metric-card')).toHaveCount(4)
@@ -146,7 +146,7 @@ test.describe('City Economic Health Indicators', () => {
       'city-ba': [makeEconomicReport({ economicIndex: 75, taxCycleEnd: 100 })],
     }
     await authenticateViaLocalStorage(page, player.id)
-    await page.goto('/city/city-ba')
+    await page.goto('/city/city-ba/economy')
 
     await page.getByRole('button', { name: /View Details/i }).click()
 
@@ -160,7 +160,7 @@ test.describe('City Economic Health Indicators', () => {
       'city-ba': [makeEconomicReport()],
     }
     await authenticateViaLocalStorage(page, player.id)
-    await page.goto('/city/city-ba')
+    await page.goto('/city/city-ba/economy')
 
     await page.getByRole('button', { name: /View Details/i }).click()
     await expect(page.locator('.health-modal')).toBeVisible()
@@ -181,7 +181,7 @@ test.describe('City Economic Health Indicators', () => {
       ],
     }
     await authenticateViaLocalStorage(page, player.id)
-    await page.goto('/city/city-ba')
+    await page.goto('/city/city-ba/economy')
 
     await expect(page.locator('.sparkline')).toBeVisible()
   })

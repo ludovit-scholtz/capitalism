@@ -39,10 +39,10 @@ test.describe('Real-world Map Integration', () => {
     const { player } = setupAuthenticatedPlayer(page)
     await authenticateViaLocalStorage(page, player.id)
 
-    await page.goto('/city/city-ba')
+    await page.goto('/city/city-ba/buildings')
 
     // Map header must show city name
-    await expect(page.getByRole('heading', { name: /Bratislava/i })).toBeVisible()
+    await expect(page.locator('.page-header h1')).toContainText('Bratislava')
     // Lot count summary is shown
     await expect(page.getByText(/5 lots/i)).toBeVisible()
   })
@@ -51,10 +51,10 @@ test.describe('Real-world Map Integration', () => {
     // AC: cityLots query is public (no auth required)
     setupMockApi(page)
 
-    await page.goto('/city/city-ba')
+    await page.goto('/city/city-ba/buildings')
 
     // Map must render even without authentication
-    await expect(page.getByRole('heading', { name: /Bratislava/i })).toBeVisible()
+    await expect(page.locator('.page-header h1')).toContainText('Bratislava')
   })
 
   test('resource layer toggle enables resource-based lot coloring', async ({ page }) => {
@@ -66,7 +66,7 @@ test.describe('Real-world Map Integration', () => {
       lot.ownerCompanyId = 'other-company'
     }
 
-    await page.goto('/city/city-ba')
+    await page.goto('/city/city-ba/buildings')
     const resourceLayerToggle = page.getByRole('button', { name: /Resource Layer/i })
     await expect(resourceLayerToggle).toBeVisible()
 
@@ -86,7 +86,7 @@ test.describe('Real-world Map Integration', () => {
     const { player } = setupAuthenticatedPlayer(page)
     await authenticateViaLocalStorage(page, player.id)
 
-    await page.goto('/city/city-ba')
+    await page.goto('/city/city-ba/buildings')
     await page.getByRole('button', { name: /List View/i }).click()
     await page.getByRole('button', { name: /High Street Retail Space/i }).click()
 
@@ -101,7 +101,7 @@ test.describe('Real-world Map Integration', () => {
     const { player } = setupAuthenticatedPlayer(page)
     await authenticateViaLocalStorage(page, player.id)
 
-    await page.goto('/city/city-ba')
+    await page.goto('/city/city-ba/buildings')
     await page.getByRole('button', { name: /List View/i }).click()
 
     // Verify Factory Site B1 coordinates (lat=48.15, lon=17.13) are shown
@@ -118,7 +118,7 @@ test.describe('Real-world Map Integration', () => {
     const { player } = setupAuthenticatedPlayer(page)
     await authenticateViaLocalStorage(page, player.id)
 
-    await page.goto('/city/city-ba')
+    await page.goto('/city/city-ba/buildings')
     await page.getByRole('button', { name: /List View/i }).click()
 
     // All 5 fixture lots should be listed
@@ -135,7 +135,7 @@ test.describe('Real-world Map Integration', () => {
     const { player } = setupAuthenticatedPlayer(page)
     await authenticateViaLocalStorage(page, player.id)
 
-    await page.goto('/city/city-ba')
+    await page.goto('/city/city-ba/buildings')
     await page.getByRole('button', { name: /List View/i }).click()
     await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
 
@@ -157,7 +157,7 @@ test.describe('Real-world Map Integration', () => {
     player.activeCompanyId = 'company-1'
     await authenticateViaLocalStorage(page, player.id)
 
-    await page.goto('/city/city-ba')
+    await page.goto('/city/city-ba/buildings')
     await page.getByRole('button', { name: /List View/i }).click()
 
     // Capture the GPS coordinates shown before purchase using the specific data-testid
@@ -182,7 +182,7 @@ test.describe('Real-world Map Integration', () => {
     player.activeCompanyId = 'company-1'
     await authenticateViaLocalStorage(page, player.id)
 
-    await page.goto('/city/city-ba')
+    await page.goto('/city/city-ba/buildings')
     await page.getByRole('button', { name: /List View/i }).click()
 
     // Residential lot — only APARTMENT type should be offered
@@ -200,7 +200,7 @@ test.describe('Real-world Map Integration', () => {
     const { player } = setupAuthenticatedPlayer(page)
     await authenticateViaLocalStorage(page, player.id)
 
-    await page.goto('/city/city-ba')
+    await page.goto('/city/city-ba/buildings')
     await page.getByRole('button', { name: /List View/i }).click()
 
     // Industrial lot (outskirts) should have low pop index
@@ -279,7 +279,7 @@ test.describe('Real-world Map Integration', () => {
     }
     await authenticateViaLocalStorage(page, player.id)
 
-    await page.goto('/city/city-ba')
+    await page.goto('/city/city-ba/economy')
 
     const powerSection = page.getByTestId('city-power-section')
     await powerSection.scrollIntoViewIfNeeded()
@@ -390,7 +390,7 @@ test.describe('Real-world Map Integration', () => {
     state.currentToken = `token-${player.id}`
     await authenticateViaLocalStorage(page, player.id)
 
-    await page.goto('/city/city-ba')
+    await page.goto('/city/city-ba/economy')
 
     const balanceCard = page.getByTestId('city-power-balance-card')
     await balanceCard.scrollIntoViewIfNeeded()
@@ -456,7 +456,7 @@ test.describe('Real-world Map Integration', () => {
     }, `token-${player.id}`)
 
     const start = Date.now()
-    await page.goto('/city/city-ba')
+    await page.goto('/city/city-ba/buildings')
 
     // Verify the map loaded with 100 lots in the count
     await expect(page.getByText(/100 lots/i)).toBeVisible()
@@ -485,7 +485,7 @@ test.describe('Real-world Map Integration', () => {
       },
     }
     setupMockApi(page, { buildingLots: lots })
-    await page.goto('/city/city-ba')
+    await page.goto('/city/city-ba/buildings')
     await page.getByRole('button', { name: /List View/i }).click()
     await page.getByRole('button', { name: /High Street Retail Space/i }).click()
     await expect(page.getByTestId('lot-for-sale-badge')).toBeVisible()
@@ -510,7 +510,7 @@ test.describe('Real-world Map Integration', () => {
       },
     }
     setupMockApi(page, { buildingLots: lots })
-    await page.goto('/city/city-ba')
+    await page.goto('/city/city-ba/buildings')
     await page.getByRole('button', { name: /List View/i }).click()
     await page.getByRole('button', { name: /High Street Retail Space/i }).click()
     await expect(page.getByTestId('lot-for-sale-badge')).toHaveCount(0)

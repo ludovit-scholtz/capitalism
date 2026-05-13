@@ -903,8 +903,8 @@ export function useBuildingDetail() {
     if (!building.value) return null
 
     return {
-      name: 'city-map',
-      params: { id: building.value.cityId },
+      name: 'city-buildings',
+      params: { cityId: building.value.cityId },
       query: { building: building.value.id },
     }
   })

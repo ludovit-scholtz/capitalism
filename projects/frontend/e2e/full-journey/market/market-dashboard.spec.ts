@@ -212,7 +212,7 @@ test('city demand panel is visible in city map view', async ({ page }) => {
     localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
   }, `token-${player.id}`)
 
-  await page.goto('/city/city-ba')
+  await page.goto('/city/city-ba/market')
   // City demand panel should be visible
   await expect(page.locator('.city-demand-panel')).toBeVisible()
   await expect(page.getByText('Top Demanded Products')).toBeVisible()

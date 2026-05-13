@@ -169,7 +169,7 @@ test.describe('Dashboard — tick countdown', () => {
     await expect(page.locator('.tick-clock-widget')).toHaveAttribute('title', /43/, { timeout: 5000 })
   })
 
-  test('shows economy cycle widget with active market event summary', async ({ page }) => {
+  test('does not show economy cycle widget on dashboard', async ({ page }) => {
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
       companies: [{ id: 'comp-econ', playerId: 'player-1', name: 'Macro Corp', cash: 400000, foundedAtUtc: '2026-01-01T00:00:00Z', buildings: [] }],
@@ -212,9 +212,8 @@ test.describe('Dashboard — tick countdown', () => {
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/dashboard')
 
-    await expect(page.getByText('Economy cycle')).toBeVisible()
-    await expect(page.getByText('🔴 Recession')).toBeVisible()
-    await expect(page.getByText('Commodity shock: Wood')).toBeVisible()
+    await expect(page.getByText('Economy cycle')).toHaveCount(0)
+    await expect(page.getByText('Commodity shock: Wood')).toHaveCount(0)
   })
 })
 

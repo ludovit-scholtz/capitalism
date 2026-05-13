@@ -869,7 +869,7 @@ test.describe('Building detail upgrades', () => {
 
     await overview.getByRole('link', { name: 'Show on Map' }).click()
 
-    await expect(page).toHaveURL(/\/city\/city-ba\?building=building-overview/)
+    await expect(page).toHaveURL(/\/city\/city-ba\/buildings\?building=building-overview/)
     await expect(page.getByRole('heading', { name: 'Central Factory Lot' })).toBeVisible()
     // Scope to the detail panel (aside/complementary) so the hidden lot-list status badge
     // (which is kept in DOM via v-show) does not interfere with the assertion.
