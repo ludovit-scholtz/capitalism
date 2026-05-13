@@ -244,7 +244,7 @@ test.describe('Rankings – display name shown', () => {
     await page.goto('/')
 
     // The generated alias must appear in the home page leaderboard snippet
-    await expect(page.getByText('Bold Navigator 237')).toBeVisible()
+    await expect(page.getByRole('cell', { name: 'Bold Navigator 237', exact: true })).toBeVisible()
     // The email must not appear in the leaderboard
     await expect(page.getByText('home-algo@example.com')).toBeHidden()
   })

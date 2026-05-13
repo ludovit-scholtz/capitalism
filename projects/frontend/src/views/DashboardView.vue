@@ -78,7 +78,7 @@ async function loadDashboardData() {
   const companiesData = await gqlRequest<{ myCompanies: Company[] }>(
     `{ myCompanies {
       id name cash foundedAtUtc
-      buildings { id name type level cityId powerStatus isAdvertisingActive lotMaterialQuantity lotOriginalMaterialQuantity destroyedAtUtc hasDefaultedCollateralLoan units { id unitType gridX gridY level } }
+      buildings { id name type level cityId powerStatus isAdvertisingActive lotMaterialQuantity lotOriginalMaterialQuantity destroyedAtUtc destroyedReason hasDefaultedCollateralLoan units { id unitType gridX gridY level } }
     } }`,
   )
 
@@ -168,7 +168,7 @@ onMounted(async () => {
       `{
         myCompanies {
           id name cash foundedAtUtc
-          buildings { id name type level cityId powerStatus isAdvertisingActive lotMaterialQuantity lotOriginalMaterialQuantity destroyedAtUtc hasDefaultedCollateralLoan units { id unitType gridX gridY level } }
+          buildings { id name type level cityId powerStatus isAdvertisingActive lotMaterialQuantity lotOriginalMaterialQuantity destroyedAtUtc destroyedReason hasDefaultedCollateralLoan units { id unitType gridX gridY level } }
         }
         gameState {
           currentTick lastTickAtUtc tickIntervalSeconds taxCycleTicks taxRate

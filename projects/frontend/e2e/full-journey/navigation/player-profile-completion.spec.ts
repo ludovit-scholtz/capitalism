@@ -205,9 +205,10 @@ test.describe('Player Profile – Statistics Export', () => {
 
   test('Export Stats button is hidden for unauthenticated users', async ({ page }) => {
     const player = makePlayer()
-    setupMockApi(page, { players: [player] })
+    const shadowPlayer = makePlayer({ id: 'player-profile-shadow' })
+    setupMockApi(page, { players: [player, shadowPlayer] })
     await page.goto(`/player/${player.id}`)
-    await expect(page.locator('.export-btn')).toBeHidden()
+    await expect(page.locator('.export-btn')).toHaveCount(0)
   })
 })
 

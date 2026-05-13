@@ -233,3 +233,10 @@ public sealed class SellToExchangeResult
     public static SellToExchangeResult Fail(string message, string code) =>
         new() { Success = false, ErrorMessage = message, ErrorCode = code };
 }
+
+/// <summary>Input for dismissing a destroyed building from the owner's list.</summary>
+public sealed class RemoveDestroyedBuildingInput
+{
+    /// <summary>The ID of the destroyed building to dismiss.</summary>
+    public Guid BuildingId { get; set; }
+}

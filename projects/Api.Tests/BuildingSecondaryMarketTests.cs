@@ -971,11 +971,18 @@ public sealed class BuildingSecondaryMarketTests
             await db.SaveChangesAsync();
         }
 
-        // Market value = land 50k + structure 200k + units (1+2)*20k = 310k
-        // Minimum allowed sale price = 217k
+        var expectedUnitsValue = BuildingConfigurationEconomics.GetUnitConstructionCost(UnitType.Purchase)
+            + BuildingConfigurationEconomics.GetUnitConstructionCost(UnitType.Storage)
+            + GameConstants.UnitUpgradeCost(UnitType.Storage, 1);
+        var expectedTotalValue = 50_000m + GameConstants.ConstructionCost(BuildingType.Factory) + expectedUnitsValue;
+        var minimumAllowedPrice = decimal.Round(
+            expectedTotalValue * BuildingMarketValuationCalculator.MinimumSalePriceFactor,
+            2,
+            MidpointRounding.AwayFromZero);
+
         var result = await ExecAsync(client,
             "mutation S($i: SetBuildingForSaleInput!) { setBuildingForSale(input: $i) { id } }",
-            new { i = new { buildingId, isForSale = true, askingPrice = 216_999m } },
+            new { i = new { buildingId, isForSale = true, askingPrice = minimumAllowedPrice - 1m } },
             token);
 
         var errors = result.GetProperty("errors");
@@ -1133,6 +1140,83 @@ public sealed class BuildingSecondaryMarketTests
         Assert.Equal(expectedUnitsValue, valuation.GetProperty("unitsValue").GetDecimal());
         Assert.Equal(expectedTotalValue, valuation.GetProperty("totalValue").GetDecimal());
         Assert.Equal(expectedMinimumSalePrice, valuation.GetProperty("minimumSalePrice").GetDecimal());
+        Assert.Equal("EUR", valuation.GetProperty("currencyCode").GetString());
+    }
+
+    [Fact]
+    public async Task BuildingMarketValuation_UsesRecordedLotPurchaseCostInsteadOfReappraisedLotPrice()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "market-valuation-paid-land@market.test");
+        var (buildingId, companyId, _) = await SeedOwnerWithBuildingAsync(factory, token);
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var building = await db.Buildings.FirstAsync(b => b.Id == buildingId);
+
+            db.BuildingLots.Add(new BuildingLot
+            {
+                Id = Guid.NewGuid(),
+                CityId = building.CityId,
+                Name = "Paid land cost lot",
+                Description = "Valuation should use the exact recorded purchase cost",
+                District = "Test",
+                Latitude = 48.15,
+                Longitude = 17.11,
+                BasePrice = 75_000m,
+                Price = 83_437m,
+                SuitableTypes = "FACTORY",
+                OwnerCompanyId = companyId,
+                BuildingId = buildingId,
+            });
+
+            db.LedgerEntries.Add(new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = companyId,
+                BuildingId = buildingId,
+                Category = LedgerCategory.PropertyPurchase,
+                Description = "Purchased lot: Paid land cost lot",
+                Amount = -63_000m,
+                RecordedAtTick = 12,
+                RecordedAtUtc = DateTime.UtcNow,
+            });
+
+            await db.SaveChangesAsync();
+        }
+
+        var result = await ExecAsync(client,
+            """
+            query {
+              myCompanies {
+                buildings {
+                  id
+                  marketValuation {
+                    landValue
+                    structureValue
+                    unitsValue
+                    totalValue
+                    minimumSalePrice
+                    currencyCode
+                  }
+                }
+              }
+            }
+            """,
+            token: token);
+
+        var buildings = result.GetProperty("data").GetProperty("myCompanies")[0].GetProperty("buildings");
+        var valuation = buildings.EnumerateArray()
+            .First(candidate => candidate.GetProperty("id").GetString() == buildingId.ToString())
+            .GetProperty("marketValuation");
+
+        Assert.Equal(63_000m, valuation.GetProperty("landValue").GetDecimal());
+        Assert.Equal(GameConstants.ConstructionCost(BuildingType.Factory), valuation.GetProperty("structureValue").GetDecimal());
+        Assert.Equal(0m, valuation.GetProperty("unitsValue").GetDecimal());
+        Assert.Equal(78_000m, valuation.GetProperty("totalValue").GetDecimal());
+        Assert.Equal(54_600m, valuation.GetProperty("minimumSalePrice").GetDecimal());
         Assert.Equal("EUR", valuation.GetProperty("currencyCode").GetString());
     }
 

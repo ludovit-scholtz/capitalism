@@ -97,6 +97,15 @@ test.describe('Building detail upgrades', () => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
     }, `token-${player.id}`)
+    await page.context().addCookies([
+      {
+        name: 'auth_token',
+        value: `token-${player.id}`,
+        url: process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173',
+        httpOnly: true,
+        sameSite: 'Strict',
+      },
+    ])
 
     await page.goto('/building/building-autoselect')
     await expect(page.getByRole('heading', { name: 'Auto Select Factory' })).toBeVisible()
@@ -752,7 +761,7 @@ test.describe('Building detail upgrades', () => {
     // Enter below-minimum price (minimum is 70% of market value)
     await page.locator('#asking-price').fill('60000')
     await expect(page.locator('.sell-form-section')).toContainText('Minimum listing price')
-    await expect(page.locator('.sell-form-section')).toContainText('70% of market value')
+    await expect(page.locator('.sell-form-section')).toContainText('70% of current building value')
     await expect(listBtn).toBeDisabled()
 
     // Enter valid price at the minimum threshold
@@ -20097,13 +20106,25 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
   test('unauthenticated user sees connect prompt and local-only fallback section', async ({ page }) => {
     // No auth token — user is not logged in to the master portal
     const player = makeLayoutTestPlayer()
-    setupMockApi(page, { players: [player] })
+    const shadowPlayer = makePlayer({ id: 'layout-shadow-player' })
+    const state = setupMockApi(page, { players: [player, shadowPlayer] })
     // Do NOT set currentUserId/Token — simulate unauthenticated state for cloud
     // But DO set localStorage auth so the game itself is authenticated (player owns the building)
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
     }, `token-${player.id}`)
+    await page.context().addCookies([
+      {
+        name: 'auth_token',
+        value: `token-${player.id}`,
+        url: process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173',
+        httpOnly: true,
+        sameSite: 'Strict',
+      },
+    ])
 
     await page.goto('/building/building-lt')
     await page.getByRole('button', { name: 'Edit Building' }).click()

@@ -4732,6 +4732,7 @@ export function useBuildingDetail() {
               isSuspendedForFunds
               suspendedReason
               destroyedAtUtc
+              destroyedReason
               isCollateralized
               foreclosureTicksRemaining
               dispatchTargetPercent
@@ -5248,6 +5249,32 @@ export function useBuildingDetail() {
     },
   )
 
+  // ── Remove destroyed building from list ──────────────────────────────────
+  const removingBuilding = ref(false)
+  const removeError = ref<string | null>(null)
+  const removeSuccess = ref(false)
+
+  async function removeDestroyedBuilding() {
+    if (!building.value?.id || !auth.token) return
+    removingBuilding.value = true
+    removeError.value = null
+    removeSuccess.value = false
+    try {
+      await gqlRequest<{ removeDestroyedBuilding: { id: string } }>(
+        `mutation RemoveDestroyedBuilding($input: RemoveDestroyedBuildingInput!) {
+          removeDestroyedBuilding(input: $input) { id }
+        }`,
+        { input: { buildingId: building.value.id } },
+      )
+      removeSuccess.value = true
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      removeError.value = msg || t('buildingDetail.removeFromListError')
+    } finally {
+      removingBuilding.value = false
+    }
+  }
+
   return {
     locale,
     building,
@@ -5629,5 +5656,9 @@ export function useBuildingDetail() {
     dismissSalesChainPanel,
     gridIndexes,
     SUPPORTED_INDUSTRIES,
+    removingBuilding,
+    removeError,
+    removeSuccess,
+    removeDestroyedBuilding,
   }
 }

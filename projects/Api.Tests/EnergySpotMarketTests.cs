@@ -290,8 +290,8 @@ public sealed class EnergySpotMarketTests
             new { cityId = city.Id.ToString() });
 
         var arr = result.GetProperty("data").GetProperty("energyMarket");
-        Assert.False(arr.EnumerateArray().Any(l =>
-            string.Equals(l.GetProperty("listingId").GetString(), cancelled.Id.ToString(), StringComparison.OrdinalIgnoreCase)));
+        Assert.DoesNotContain(arr.EnumerateArray(), l =>
+            string.Equals(l.GetProperty("listingId").GetString(), cancelled.Id.ToString(), StringComparison.OrdinalIgnoreCase));
     }
 
     // ---- tick phase tests -------------------------------------------------------
@@ -307,18 +307,18 @@ public sealed class EnergySpotMarketTests
         var sp = new Player { Id = Guid.NewGuid(), Email = $"sp-{Guid.NewGuid():N}@t.com", DisplayName = "SP", PasswordHash = "h", Role = PlayerRole.Player };
         var sc = new Company { Id = Guid.NewGuid(), PlayerId = sp.Id, Name = "SC" };
         db.Players.Add(sp); db.Companies.Add(sc);
-        MakePlant(db, city.Id, sc.Id);
+        var plant = MakePlant(db, city.Id, sc.Id);
+        plant.DispatchTargetPercent = 0;
 
         var bp = new Player { Id = Guid.NewGuid(), Email = $"bp-{Guid.NewGuid():N}@t.com", DisplayName = "BP", PasswordHash = "h", Role = PlayerRole.Player };
         var bc = new Company { Id = Guid.NewGuid(), PlayerId = bp.Id, Name = "BC" };
         db.Players.Add(bp); db.Companies.Add(bc);
         var consumer = MakeConsumer(db, city.Id, bc.Id, 0.10m);
-        var plant = await db.Buildings.Where(b => b.CompanyId == sc.Id).FirstAsync();
         db.BankAccounts.Add(new BankAccount { Id = Guid.NewGuid(), AccountNumber = Guid.NewGuid().ToString("N")[..16],
             CurrencyCode = "EUR", CompanyId = bc.Id, Balance = 50_000m, CreatedAtUtc = DateTime.UtcNow });
 
         var listing = new EnergyListing { Id = Guid.NewGuid(), BuildingId = plant.Id, CompanyId = sc.Id,
-            CityId = city.Id, PricePerKwhLocal = 0.05m, CapacityKw = 1000m, AvailableKw = 1000m, IsActive = true, CreatedAtTick = 0 };
+            CityId = city.Id, PricePerKwhLocal = 0.05m, CapacityKw = 5_000m, AvailableKw = 5_000m, IsActive = true, CreatedAtTick = 0 };
         db.EnergyListings.Add(listing);
 
         if (!await db.GameStates.AnyAsync())
@@ -353,6 +353,7 @@ public sealed class EnergySpotMarketTests
         var sc = new Company { Id = Guid.NewGuid(), PlayerId = sp.Id, Name = "SC2" };
         db.Players.Add(sp); db.Companies.Add(sc);
         var plant = MakePlant(db, city.Id, sc.Id);
+        plant.DispatchTargetPercent = 0;
 
         var bp = new Player { Id = Guid.NewGuid(), Email = $"bp2-{Guid.NewGuid():N}@t.com", DisplayName = "BP2", PasswordHash = "h", Role = PlayerRole.Player };
         var bc = new Company { Id = Guid.NewGuid(), PlayerId = bp.Id, Name = "BC2" };
@@ -362,7 +363,7 @@ public sealed class EnergySpotMarketTests
             CurrencyCode = "EUR", CompanyId = bc.Id, Balance = 50_000m, CreatedAtUtc = DateTime.UtcNow });
 
         var listing = new EnergyListing { Id = Guid.NewGuid(), BuildingId = plant.Id, CompanyId = sc.Id,
-            CityId = city.Id, PricePerKwhLocal = 0.05m, CapacityKw = 1000m, AvailableKw = 1000m, IsActive = true, CreatedAtTick = 0 };
+            CityId = city.Id, PricePerKwhLocal = 0.05m, CapacityKw = 5_000m, AvailableKw = 5_000m, IsActive = true, CreatedAtTick = 0 };
         db.EnergyListings.Add(listing);
 
         if (!await db.GameStates.AnyAsync())

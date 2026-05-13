@@ -204,14 +204,7 @@ public class Program
             {
                 options.ForwardDefaultSelector = context =>
                 {
-                    var authorization = context.Request.Headers.Authorization.ToString();
-                    if (!authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
-                    {
-                        return "local-jwt";
-                    }
-
-                    var token = authorization["Bearer ".Length..].Trim();
-                    if (string.IsNullOrWhiteSpace(token))
+                    if (!TryReadRequestToken(context, out var token))
                     {
                         return "local-jwt";
                     }
@@ -249,6 +242,14 @@ public class Program
                 };
                 options.Events = new JwtBearerEvents
                 {
+                    OnMessageReceived = context =>
+                    {
+                        if (TryReadRequestToken(context.HttpContext, out var token))
+                        {
+                            context.Token = token;
+                        }
+                        return Task.CompletedTask;
+                    },
                     OnTokenValidated = async context =>
                     {
                         if (context.Principal?.Identity is ClaimsIdentity identity && identity.IsAuthenticated)
@@ -308,6 +309,14 @@ public class Program
                 };
                 options.Events = new JwtBearerEvents
                 {
+                    OnMessageReceived = context =>
+                    {
+                        if (TryReadRequestToken(context.HttpContext, out var token))
+                        {
+                            context.Token = token;
+                        }
+                        return Task.CompletedTask;
+                    },
                     OnTokenValidated = async context =>
                     {
                         if (context.Principal?.Identity is not ClaimsIdentity identity || !identity.IsAuthenticated)
@@ -478,12 +487,14 @@ public class Program
 
         app.MapPost("/auth/logout", async (HttpContext httpContext, IJwtSessionRevocationService revocationService) =>
         {
-            if (!TryReadBearerJwt(httpContext, out var jwt))
+            if (!TryReadRequestJwt(httpContext, out var jwt))
             {
                 return Results.Unauthorized();
             }
 
             await revocationService.RevokeCurrentAsync(httpContext.User, jwt, httpContext.RequestAborted);
+            var hostEnvironment = httpContext.RequestServices.GetRequiredService<IHostEnvironment>();
+            AuthSessionCookieService.ClearSessionCookies(httpContext, hostEnvironment);
             return Results.NoContent();
         }).RequireAuthorization();
 
@@ -494,7 +505,7 @@ public class Program
                 return Results.Unauthorized();
             }
 
-            if (!TryReadBearerJwt(httpContext, out var jwt))
+            if (!TryReadRequestJwt(httpContext, out var jwt))
             {
                 return Results.Unauthorized();
             }
@@ -506,6 +517,20 @@ public class Program
             }
 
             await revocationService.RevokeOtherSessionsForPlayerAsync(playerId, currentJti, "PLAYER_LOGOUT_ALL", httpContext.RequestAborted);
+            var hostEnvironment = httpContext.RequestServices.GetRequiredService<IHostEnvironment>();
+            AuthSessionCookieService.ClearSessionCookies(httpContext, hostEnvironment);
+            return Results.NoContent();
+        }).RequireAuthorization();
+
+        app.MapPost("/auth/session", (HttpContext httpContext) =>
+        {
+            if (!TryReadRequestJwt(httpContext, out var jwt))
+            {
+                return Results.Unauthorized();
+            }
+
+            var hostEnvironment = httpContext.RequestServices.GetRequiredService<IHostEnvironment>();
+            AuthSessionCookieService.SetSessionCookies(httpContext, hostEnvironment, jwt.RawData, jwt.ValidTo);
             return Results.NoContent();
         }).RequireAuthorization();
 
@@ -666,17 +691,10 @@ public class Program
             }
         }
 
-        static bool TryReadBearerJwt(HttpContext httpContext, out JwtSecurityToken token)
+        static bool TryReadRequestJwt(HttpContext httpContext, out JwtSecurityToken token)
         {
             token = null!;
-            var authorization = httpContext.Request.Headers.Authorization.ToString();
-            if (!authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            var rawToken = authorization["Bearer ".Length..].Trim();
-            if (string.IsNullOrWhiteSpace(rawToken))
+            if (!TryReadRequestToken(httpContext, out var rawToken))
             {
                 return false;
             }
@@ -690,6 +708,31 @@ public class Program
             {
                 return false;
             }
+        }
+
+        static bool TryReadRequestToken(HttpContext httpContext, out string token)
+        {
+            token = string.Empty;
+
+            var authorization = httpContext.Request.Headers.Authorization.ToString();
+            if (authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            {
+                var rawToken = authorization["Bearer ".Length..].Trim();
+                if (!string.IsNullOrWhiteSpace(rawToken))
+                {
+                    token = rawToken;
+                    return true;
+                }
+            }
+
+            if (httpContext.Request.Cookies.TryGetValue(AuthSessionCookieService.AccessTokenCookieName, out var cookieToken)
+                && !string.IsNullOrWhiteSpace(cookieToken))
+            {
+                token = cookieToken.Trim();
+                return true;
+            }
+
+            return false;
         }
 
         static bool TryResolveJwtSecurityToken(SecurityToken? token, out JwtSecurityToken jwt)

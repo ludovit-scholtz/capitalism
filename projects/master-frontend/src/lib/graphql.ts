@@ -1,4 +1,5 @@
 const GRAPHQL_URL = import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:44364/graphql'
+const COOKIE_SESSION_SENTINEL = 'cookie-session'
 
 export interface GraphQLResponse<T> {
   data?: T
@@ -22,12 +23,13 @@ export async function gqlRequest<T>(
     'Content-Type': 'application/json',
   }
 
-  if (token) {
+  if (token && token !== COOKIE_SESSION_SENTINEL) {
     headers['Authorization'] = `Bearer ${token}`
   }
 
   const res = await fetch(overrideUrl ?? GRAPHQL_URL, {
     method: 'POST',
+    credentials: 'include',
     headers,
     body: JSON.stringify({ query, variables }),
   })

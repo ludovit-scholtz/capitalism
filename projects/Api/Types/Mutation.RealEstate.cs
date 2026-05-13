@@ -194,6 +194,7 @@ public sealed partial class Mutation
         building.AskingPrice = null;
         building.ListedAtUtc = null;
         building.DestroyedAtUtc = DateTime.UtcNow;
+        building.DestroyedReason = BuildingDestructionReason.PlayerDemolished;
         building.ConcurrencyToken = Guid.NewGuid();
 
         db.LedgerEntries.Add(new LedgerEntry
@@ -220,7 +221,7 @@ public sealed partial class Mutation
             OriginalPropertyValue = estimatedMarketValue,
             CompensationPaid = refundAmount,
             DestructionTickCount = currentTick,
-            DestructionReason = BuildingDestructionReason.Other,
+            DestructionReason = BuildingDestructionReason.PlayerDemolished,
             CreatedAtUtc = DateTime.UtcNow,
         });
 
@@ -510,5 +511,46 @@ public sealed partial class Mutation
         await db.SaveChangesAsync();
 
         return player;
+    }
+
+    /// <summary>
+    /// Dismisses a destroyed building from the owner's building list.
+    /// The building must already be destroyed (<see cref="Building.DestroyedAtUtc"/> is set).
+    /// Once dismissed, the building no longer appears in <c>myCompanies.buildings</c>.
+    /// </summary>
+    [Authorize]
+    public async Task<Building> RemoveDestroyedBuilding(
+        RemoveDestroyedBuildingInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var building = await db.Buildings
+            .Include(b => b.Company)
+            .FirstOrDefaultAsync(b => b.Id == input.BuildingId);
+
+        if (building is null || building.Company.PlayerId != userId)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
+                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
+                    .Build());
+        }
+
+        if (building.DestroyedAtUtc is null)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Only destroyed buildings can be removed from the list.")
+                    .SetCode("BUILDING_NOT_DESTROYED")
+                    .Build());
+        }
+
+        building.IsDismissedByOwner = true;
+        building.ConcurrencyToken = Guid.NewGuid();
+        await db.SaveChangesAsync();
+        return building;
     }
 }

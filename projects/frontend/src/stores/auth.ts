@@ -24,10 +24,14 @@ const SIGNED_OUT_NOTICE_KEY = 'auth_signed_out_notice'
 const AUTH_PROVIDER_KEY = 'auth_provider'
 const AUTH_PROVIDER_LOCAL = 'local'
 const AUTH_PROVIDER_BIATEC = 'biatec_oidc'
+const COOKIE_SESSION_SENTINEL = 'cookie-session'
 const API_BASE_URL = (import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:44356/graphql').replace(
   /\/graphql\/?$/,
   '',
 )
+const MASTER_API_BASE_URL = (
+  import.meta.env.VITE_MASTER_GRAPHQL_URL || 'http://localhost:44364/graphql'
+).replace(/\/graphql\/?$/, '')
 
 interface OidcPendingState {
   state: string
@@ -493,14 +497,17 @@ export const useAuthStore = defineStore('auth', () => {
     scheduleTokenRenewal(expiresAtUtc)
   }
 
-  async function establishCookieSession(tokenValue: string) {
-    await fetch(`${API_BASE_URL}/auth/session`, {
+  async function establishCookieSession(apiBaseUrl: string, tokenValue: string) {
+    const response = await fetch(`${apiBaseUrl}/auth/session`, {
       method: 'POST',
       credentials: 'include',
       headers: {
         Authorization: `Bearer ${tokenValue}`,
       },
     })
+    if (!response.ok) {
+      throw new Error('Failed to establish secure session.')
+    }
   }
 
   async function fetchCurrentPlayer(options: FetchMeOptions = {}) {
@@ -525,6 +532,10 @@ export const useAuthStore = defineStore('auth', () => {
         input.referralCode = referralCode
       }
       const data = await gqlMasterRequest<{ register: MasterSessionPayload }>(MASTER_REGISTER_MUTATION, { input })
+      await Promise.all([
+        establishCookieSession(API_BASE_URL, data.register.token),
+        establishCookieSession(MASTER_API_BASE_URL, data.register.token),
+      ])
       player.value = null
       applyStoredSession(data.register.token, data.register.expiresAtUtc)
       await fetchCurrentPlayer({ reconcileCityContext: true })
@@ -541,6 +552,10 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
     try {
       const data = await gqlMasterRequest<{ login: MasterSessionPayload }>(MASTER_LOGIN_MUTATION, { input: { email, password } })
+      await Promise.all([
+        establishCookieSession(API_BASE_URL, data.login.token),
+        establishCookieSession(MASTER_API_BASE_URL, data.login.token),
+      ])
       player.value = null
       applyStoredSession(data.login.token, data.login.expiresAtUtc)
       await fetchCurrentPlayer({ reconcileCityContext: true })
@@ -589,7 +604,10 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function completeBiatecOidcSignIn() {
     const callbackSession = getTokenFromCallback()
-    await establishCookieSession(callbackSession.token)
+    await Promise.all([
+      establishCookieSession(API_BASE_URL, callbackSession.token),
+      establishCookieSession(MASTER_API_BASE_URL, callbackSession.token),
+    ])
     applyStoredSession(callbackSession.token, callbackSession.expiresAtUtc, AUTH_PROVIDER_BIATEC)
 
     try {
@@ -610,7 +628,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       await fetchCurrentPlayer(options)
       if (!token.value) {
-        token.value = 'cookie-session'
+        token.value = COOKIE_SESSION_SENTINEL
       }
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : 'Failed to load account'
@@ -669,7 +687,7 @@ export const useAuthStore = defineStore('auth', () => {
    */
   function logout(options: LogoutOptions = {}): boolean {
     const shouldFederatedLogout = options.federated === true && getStoredAuthProvider() === AUTH_PROVIDER_BIATEC
-    const idTokenHint = token.value && token.value !== 'cookie-session' ? token.value : null
+    const idTokenHint = token.value && token.value !== COOKIE_SESSION_SENTINEL ? token.value : null
     const federatedLogoutUrl = shouldFederatedLogout ? buildBiatecEndSessionUrl(idTokenHint) : null
 
     void fetch(`${API_BASE_URL}/auth/logout`, {

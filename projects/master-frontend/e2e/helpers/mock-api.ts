@@ -1940,11 +1940,13 @@ export async function loginAs(
 ) {
   state.currentPlayer = player
   state.currentToken = token
-  await page.addInitScript(
-    ({ tok, exp }) => {
-      localStorage.setItem('master_auth_token', tok)
-      localStorage.setItem('master_auth_expires', exp)
+  await page.context().addCookies([
+    {
+      name: 'auth_token',
+      value: token,
+      url: process.env.CI ? 'http://localhost:4174' : 'http://localhost:5174',
+      httpOnly: true,
+      sameSite: 'Strict',
     },
-    { tok: token, exp: new Date(Date.now() + 7200000).toISOString() },
-  )
+  ])
 }

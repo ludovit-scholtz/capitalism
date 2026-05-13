@@ -14,7 +14,18 @@ const {
   isLoanDefaulted,
   ticksUntilDestruction,
   formatBuildingType,
+  removingBuilding,
+  removeError,
+  removeSuccess,
+  removeDestroyedBuilding,
 } = bd
+
+function getDestroyedHintKey(): string {
+  if (building.value?.destroyedReason === 'PlayerDemolished') {
+    return 'buildingDetail.destroyedHintDemolished'
+  }
+  return 'buildingDetail.destroyedHintForeclosed'
+}
 </script>
 
 <template>
@@ -28,7 +39,7 @@ const {
       <span
         v-if="building?.destroyedAtUtc"
         class="destroyed-badge inline-flex items-center gap-1 rounded-full border border-red-300/60 bg-red-500/15 px-3 py-1 text-xs font-semibold text-red-700 dark:text-red-300"
-        :title="t('buildingDetail.destroyedHint')"
+        :title="t(getDestroyedHintKey())"
       >
         <font-awesome-icon icon="skull" class="text-[10px]" />
         {{ t('buildingDetail.destroyedBadge') }}
@@ -119,10 +130,23 @@ const {
       </span>
     </p>
 
-    <!-- Destroyed notice -->
-    <p v-if="building?.destroyedAtUtc" class="mt-2 rounded-lg border border-red-300/60 bg-red-500/10 px-3 py-2 text-xs text-red-700 dark:text-red-300">
-      <font-awesome-icon icon="skull" class="mr-1" />
-      {{ t('buildingDetail.destroyedHint') }}
-    </p>
+    <!-- Destroyed notice + remove button -->
+    <div v-if="building?.destroyedAtUtc" class="destroyed-notice mt-2 rounded-lg border border-red-300/60 bg-red-500/10 px-3 py-2 text-xs text-red-700 dark:text-red-300">
+      <p>
+        <font-awesome-icon icon="skull" class="mr-1" />
+        {{ t(getDestroyedHintKey()) }}
+      </p>
+      <p v-if="removeSuccess" class="mt-1 font-semibold text-green-700 dark:text-green-300">{{ t('buildingDetail.removeFromListSuccess') }}</p>
+      <p v-if="removeError" class="mt-1 font-semibold">{{ removeError }}</p>
+      <button
+        v-if="!removeSuccess"
+        class="btn btn-secondary btn-sm mt-2"
+        :disabled="removingBuilding"
+        @click="removeDestroyedBuilding()"
+      >
+        <font-awesome-icon v-if="removingBuilding" icon="spinner" spin class="mr-1" />
+        {{ t('buildingDetail.removeFromList') }}
+      </button>
+    </div>
   </div>
 </template>

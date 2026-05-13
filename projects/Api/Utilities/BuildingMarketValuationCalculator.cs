@@ -34,12 +34,7 @@ public static class BuildingMarketValuationCalculator
         var fxRates = await FxRateHelper.BuildEurRatesLookupAsync(db, [currencyCode]);
         var cityFxRate = FxRateHelper.GetEurRate(fxRates, currencyCode);
 
-        var landValue = await db.BuildingLots
-            .AsNoTracking()
-            .Where(lot => lot.BuildingId == building.Id)
-            .Select(lot => lot.Price)
-            .FirstOrDefaultAsync(cancellationToken);
-        landValue = RoundCurrency(Math.Max(landValue, 0m));
+        var landValue = await GetLandValueAsync(db, building, cancellationToken);
 
         var structureValue = RoundCurrency(
             GetCurrentStructureReplacementCostEur(building) * cityFxRate);
@@ -65,6 +60,34 @@ public static class BuildingMarketValuationCalculator
             MinimumSalePrice = minimumSalePrice,
             CurrencyCode = currencyCode,
         };
+    }
+
+    private static async Task<decimal> GetLandValueAsync(
+        AppDbContext db,
+        Building building,
+        CancellationToken cancellationToken)
+    {
+        var recordedPurchaseCost = await db.LedgerEntries
+            .AsNoTracking()
+            .Where(entry => entry.BuildingId == building.Id && entry.Category == LedgerCategory.PropertyPurchase)
+            .OrderBy(entry => entry.RecordedAtTick)
+            .ThenBy(entry => entry.RecordedAtUtc)
+            .ThenBy(entry => entry.Id)
+            .Select(entry => (decimal?)(entry.Amount < 0m ? -entry.Amount : entry.Amount))
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (recordedPurchaseCost is > 0m)
+        {
+            return RoundCurrency(recordedPurchaseCost.Value);
+        }
+
+        var fallbackLotPrice = await db.BuildingLots
+            .AsNoTracking()
+            .Where(lot => lot.BuildingId == building.Id)
+            .Select(lot => lot.Price)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return RoundCurrency(Math.Max(fallbackLotPrice, 0m));
     }
 
     private static decimal GetCurrentStructureReplacementCostEur(Building building)

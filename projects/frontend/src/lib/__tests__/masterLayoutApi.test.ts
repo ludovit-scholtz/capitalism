@@ -28,8 +28,7 @@ import {
   type LayoutUnit,
 } from '../masterLayoutApi'
 
-const MASTER_TOKEN_KEY = 'auth_token'
-const MASTER_EXPIRES_KEY = 'auth_expires'
+const AUTH_PROVIDER_KEY = 'auth_provider'
 
 const mockUnit: LayoutUnit = {
   unitType: 'MANUFACTURING',
@@ -66,18 +65,15 @@ describe('masterLayoutApi — session helpers', () => {
   })
 
   it('isMasterConnected returns false when token is expired', () => {
-    localStorageMock.setItem(MASTER_TOKEN_KEY, 'tok')
-    localStorageMock.setItem(MASTER_EXPIRES_KEY, new Date(Date.now() - 1000).toISOString())
+    localStorageMock.clear()
     expect(isMasterConnected()).toBe(false)
-    // Expired token should be cleaned up
     expect(getMasterToken()).toBeNull()
   })
 
   it('isMasterConnected returns true for a valid future-expiry token', () => {
-    localStorageMock.setItem(MASTER_TOKEN_KEY, 'tok')
-    localStorageMock.setItem(MASTER_EXPIRES_KEY, new Date(Date.now() + 3600_000).toISOString())
+    localStorageMock.setItem(AUTH_PROVIDER_KEY, 'local')
     expect(isMasterConnected()).toBe(true)
-    expect(getMasterToken()).toBe('tok')
+    expect(getMasterToken()).toBe('cookie-session')
   })
 })
 

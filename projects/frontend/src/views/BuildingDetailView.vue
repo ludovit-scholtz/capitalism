@@ -121,6 +121,7 @@ onMounted(async () => {
 
     <template v-else-if="building">
       <BuildingDetailHeader />
+      <template v-if="!building.destroyedAtUtc">
       <PurchaseSelectorDialog />
       <BuildingPropertyPanel v-if="building.type === 'APARTMENT' || building.type === 'COMMERCIAL'" />
       <BuildingMediaHousePanel v-if="building.type === 'MEDIA_HOUSE'" />
@@ -224,6 +225,7 @@ onMounted(async () => {
           <BuildingOverviewSidebar v-if="showOverviewSidebar" />
         </template>
       </div>
+      </template><!-- end v-if="!building.destroyedAtUtc" -->
     </template>
   </div>
 </template>

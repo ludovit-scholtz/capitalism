@@ -796,13 +796,13 @@ A building owner can choose to destroy a building from the sell-building workflo
 
 1. Player opens sell-building form and selects the destroy action.
 2. UI must show refund preview before confirmation.
-3. On confirmation, building is destroyed and owner receives 80% of the current rebuild value.
-4. Rebuild value is defined as: current lot purchase price + current building construction cost for that building type + replacement cost of every active unit at its active level (base unit construction cost plus all required upgrade steps).
+3. On confirmation, building is destroyed and owner receives 80% of the exact building value.
+4. Exact building value is defined as: the recorded lot purchase amount paid for that parcel + current building construction cost for that building type + replacement cost of every active unit at its active level (base unit construction cost plus all required upgrade steps).
 5. Destroyed lot becomes available for purchase again.
 6. If collateralized loan has missed payments, system forces building sale at market appraised value minus 10% and user cannot cancel that sale.
 7. If missed-payment debt is still unresolved after 72 ticks (3 game days), building is destroyed and remaining debt is settled from collateral sale proceeds.
 
-The same rebuild-value basis is used for the market-valuation preview and minimum sale price in the sell-building workflow so players never receive a demolition or forced-sale valuation that exceeds the cost to rebuild the same asset now.
+The same exact-value basis is used for the market-valuation preview and minimum sale price in the sell-building workflow so players never receive a demolition or forced-sale valuation that exceeds the real recorded land cost plus the active structure and unit build costs.
 
 ### Building secondary market
 

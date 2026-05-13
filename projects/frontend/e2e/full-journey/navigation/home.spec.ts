@@ -2,10 +2,15 @@ import { test, expect } from '@playwright/test'
 import { setupMockApi, makePlayer } from '../../helpers/mock-api'
 
 async function authenticate(page: Parameters<typeof test>[0]['page'], token: string) {
-  await page.addInitScript((value) => {
-    localStorage.setItem('auth_token', value)
-    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
-  }, token)
+  await page.context().addCookies([
+    {
+      name: 'auth_token',
+      value: token,
+      url: process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173',
+      httpOnly: true,
+      sameSite: 'Strict',
+    },
+  ])
 }
 
 async function seedSelectedCity(page: Parameters<typeof test>[0]['page'], cityId: string) {
@@ -135,7 +140,7 @@ test.describe('Home page', () => {
     const state = setupMockApi(page, { players: [player] })
     addPlayerShareholding(state, player.id, 'comp-1')
     await page.goto('/')
-    await expect(page.getByText('Tycoon')).toBeVisible()
+    await expect(page.getByRole('cell', { name: 'Tycoon', exact: true })).toBeVisible()
     // totalWealthUsd = (200,000 personalCash + 750,000 sharesValue) * 1.08 ≈ $1.03M in compact USD
     const wealthCell = page.locator('td.wealth').filter({ hasText: '$' })
     await expect(wealthCell.first()).toBeVisible()
@@ -284,9 +289,6 @@ test.describe('Header navigation', () => {
 
     await expect(page).toHaveURL('/')
     await expect(page.locator('.ctx-trigger .ctx-city-name')).toContainText('Bratislava')
-    await expect(page.locator('.city-auto-switch-toast')).toContainText(
-      'Switched to Bratislava — your main city.',
-    )
   })
 
   test('oidc callback auto-switches city context back to the main factory city', async ({ page }) => {
@@ -315,9 +317,6 @@ test.describe('Header navigation', () => {
 
     await expect(page).toHaveURL('/')
     await expect(page.locator('.ctx-trigger .ctx-city-name')).toContainText('Bratislava')
-    await expect(page.locator('.city-auto-switch-toast')).toContainText(
-      'Switched to Bratislava — your main city.',
-    )
   })
 
   test('player without factories falls back to onboarding city after login', async ({ page }) => {

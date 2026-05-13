@@ -326,6 +326,8 @@ export type MockBuilding = {
   lotMaterialQuality?: number | null
   /** UTC timestamp when building was destroyed (by loan default); null for active buildings. */
   destroyedAtUtc?: string | null
+  /** Reason for destruction: 'PlayerDemolished', 'GracePeriodExpired', 'DefaultedLoan', or null. */
+  destroyedReason?: string | null
   /** True when this building is locked as loan collateral. */
   isCollateralized?: boolean
   /** Foreclosure countdown in ticks for defaulted collateral buildings. */
