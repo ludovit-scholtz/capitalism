@@ -65,6 +65,40 @@ public sealed class CityPowerBalance
     public int ConsumerBuildingCount { get; set; }
 }
 
+/// <summary>City energy-grid snapshot including load-shed buildings.</summary>
+public sealed class EnergyGridStatus
+{
+    public Guid CityId { get; set; }
+    public decimal TotalSupplyKw { get; set; }
+    public decimal TotalDemandKw { get; set; }
+    public decimal SurplusOrDeficitKw { get; set; }
+    public List<OfflineEnergyBuilding> OfflineBuildings { get; set; } = [];
+}
+
+/// <summary>Offline or constrained building in city energy-grid output.</summary>
+public sealed class OfflineEnergyBuilding
+{
+    public Guid BuildingId { get; set; }
+    public Guid CompanyId { get; set; }
+    public string BuildingName { get; set; } = string.Empty;
+    public string PowerStatus { get; set; } = Data.Entities.PowerStatus.Offline;
+    public int PowerPriority { get; set; }
+}
+
+/// <summary>Per-building energy state details.</summary>
+public sealed class BuildingEnergyStatus
+{
+    public Guid BuildingId { get; set; }
+    public Guid CityId { get; set; }
+    public string PowerStatus { get; set; } = Data.Entities.PowerStatus.Powered;
+    public int PowerPriority { get; set; }
+    public decimal PowerDemandKw { get; set; }
+    public decimal CitySupplyKw { get; set; }
+    public decimal CityDemandKw { get; set; }
+    public string Source { get; set; } = "CITY_GRID";
+    public decimal CostPerTickLocal { get; set; }
+}
+
 /// <summary>Summary of a single power plant building for the city power balance view.</summary>
 public sealed class PowerPlantSummary
 {

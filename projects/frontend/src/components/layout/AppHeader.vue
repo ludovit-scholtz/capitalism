@@ -178,6 +178,7 @@ const mobileNavSections = computed(() => {
         { key: 'bank-statement', label: t('nav.bankStatement'), to: '/bank-statement', icon: ['fas', 'file-invoice-dollar'], visible: auth.isAuthenticated, badge: 0 },
         { key: 'campaigns', label: t('nav.campaignAnalytics'), to: '/market-intelligence', icon: ['fas', 'bullhorn'], visible: auth.isAuthenticated, badge: 0 },
         { key: 'market-dashboard', label: t('nav.marketDashboard'), to: '/market', icon: ['fas', 'chart-pie'], visible: true, badge: 0 },
+        { key: 'energy-market', label: t('nav.energy'), to: '/energy-market', icon: ['fas', 'chart-bar'], visible: true, badge: 0 },
         { key: 'trade-routes', label: t('tradeRoutes.nav'), to: '/trade-routes', icon: ['fas', 'route'], visible: auth.isAuthenticated, badge: 0 },
       ],
     },
@@ -283,6 +284,9 @@ useTickRefresh(async () => {
           </RouterLink>
           <RouterLink to="/market" :title="t('nav.market')" :aria-label="t('nav.marketDashboard')" class="nav-link" @click="closeMenu">
             <font-awesome-icon :icon="['fas', 'chart-pie']" class="mr-2" />
+          </RouterLink>
+          <RouterLink to="/energy-market" :title="t('nav.energy')" class="nav-link" @click="closeMenu">
+            <font-awesome-icon :icon="['fas', 'chart-bar']" class="mr-2" />
           </RouterLink>
           <RouterLink to="/banking" :title="t('nav.banking')" class="nav-link" @click="closeMenu">
             <font-awesome-icon :icon="['fas', 'landmark']" class="mr-2" />

@@ -71,19 +71,41 @@ public sealed class PowerDistributionPhase : ITickPhase
 
             var totalDemandMw = consumers.Sum(b => b.PowerConsumption);
 
-            string cityStatus;
-            if (totalDemandMw == 0m || totalSupplyMw >= totalDemandMw)
-                cityStatus = PowerStatus.Powered;
-            else if (totalSupplyMw >= totalDemandMw * 0.5m)
-                cityStatus = PowerStatus.Constrained;
-            else
-                cityStatus = PowerStatus.Offline;
-
             foreach (var plant in powerPlants)
                 plant.PowerStatus = PowerStatus.Powered;
 
-            foreach (var consumer in consumers)
-                consumer.PowerStatus = cityStatus;
+            if (totalDemandMw <= 0m || totalSupplyMw >= totalDemandMw)
+            {
+                foreach (var consumer in consumers)
+                    consumer.PowerStatus = PowerStatus.Powered;
+                continue;
+            }
+
+            var remainingSupply = totalSupplyMw;
+            var orderedConsumers = consumers
+                .OrderByDescending(b => b.PowerPriority)
+                .ThenByDescending(b => b.PowerConsumption)
+                .ThenBy(b => b.Id)
+                .ToList();
+
+            foreach (var consumer in orderedConsumers)
+            {
+                if (remainingSupply <= 0m)
+                {
+                    consumer.PowerStatus = PowerStatus.Offline;
+                    continue;
+                }
+
+                if (remainingSupply >= consumer.PowerConsumption)
+                {
+                    consumer.PowerStatus = PowerStatus.Powered;
+                    remainingSupply -= consumer.PowerConsumption;
+                    continue;
+                }
+
+                consumer.PowerStatus = PowerStatus.Constrained;
+                remainingSupply = 0m;
+            }
         }
 
         return Task.CompletedTask;

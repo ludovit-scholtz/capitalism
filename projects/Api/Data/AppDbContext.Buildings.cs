@@ -19,6 +19,7 @@ public sealed partial class AppDbContext
             e.Property(b => b.TotalAreaSqm).HasPrecision(18, 2);
             e.Property(b => b.PowerOutput).HasPrecision(18, 2);
             e.Property(b => b.PowerStatus).HasMaxLength(20);
+            e.Property(b => b.PowerPriority).HasDefaultValue(5);
             e.Property(b => b.InterestRate).HasPrecision(5, 2);
             e.Property(b => b.DepositInterestRatePercent).HasPrecision(8, 4);
             e.Property(b => b.LendingInterestRatePercent).HasPrecision(8, 4);

@@ -64,6 +64,45 @@ public sealed partial class Mutation
         await db.SaveChangesAsync();
         return building;
     }
+
+    /// <summary>
+    /// Sets owner-defined building power priority (1-10) used by load shedding in deficit.
+    /// Higher-priority buildings are kept online first.
+    /// </summary>
+    [Authorize]
+    public async Task<Building> SetPowerPriority(
+        SetPowerPriorityInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var building = await db.Buildings
+            .Include(b => b.Company)
+            .FirstOrDefaultAsync(b => b.Id == input.BuildingId);
+
+        if (building is null || building.Company.PlayerId != userId)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
+                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
+                    .Build());
+        }
+
+        if (input.Priority < 1 || input.Priority > 10)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Power priority must be between 1 and 10.")
+                    .SetCode("INVALID_POWER_PRIORITY")
+                    .Build());
+        }
+
+        building.PowerPriority = input.Priority;
+        await db.SaveChangesAsync();
+        return building;
+    }
 }
 
 /// <summary>Input for <see cref="Mutation.SetPlantDispatch"/>.</summary>
@@ -77,4 +116,14 @@ public sealed class SetPlantDispatchInput
     /// 100 = full output (default), 0 = effectively offline.
     /// </summary>
     public int DispatchTargetPercent { get; set; }
+}
+
+/// <summary>Input for <see cref="Mutation.SetPowerPriority"/>.</summary>
+public sealed class SetPowerPriorityInput
+{
+    /// <summary>ID of the building to prioritize.</summary>
+    public Guid BuildingId { get; set; }
+
+    /// <summary>Priority value from 1 (lowest) to 10 (highest).</summary>
+    public int Priority { get; set; }
 }

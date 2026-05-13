@@ -203,6 +203,17 @@ test.describe('Header navigation', () => {
     await expect(page).toHaveURL(/\/$/)
   })
 
+  test('energy navigation link opens energy market route', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/')
+
+    const energyLink = page.locator('a[title="Energy"]').first()
+    await expect(energyLink).toBeVisible()
+    await energyLink.click()
+
+    await expect(page).toHaveURL(/\/energy-market$/)
+  })
+
   test('login view redirects to Biatec authorize endpoint', async ({ page }) => {
     setupMockApi(page)
     await page.route('https://google.biatec.io/**', async (route) => {
