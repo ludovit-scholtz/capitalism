@@ -153,14 +153,6 @@ public sealed class AuthRateLimitMiddleware(
             ? queryElement.GetString()
             : null;
 
-        if (!string.IsNullOrWhiteSpace(operationName)
-            && (operationName.Equals("login", StringComparison.OrdinalIgnoreCase)
-                || operationName.Equals("register", StringComparison.OrdinalIgnoreCase))
-            && string.IsNullOrWhiteSpace(query))
-        {
-            return 1;
-        }
-
         if (string.IsNullOrWhiteSpace(query))
         {
             return 0;
@@ -236,7 +228,7 @@ public sealed class AuthRateLimitMiddleware(
             return operations;
         }
 
-        // For malformed unnamed multi-operation documents, inspect all operations defensively.
+        // For unnamed multi-operation documents, inspect all operations defensively.
         return operations;
     }
 
