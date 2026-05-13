@@ -231,7 +231,7 @@ function formatSessionDate(value: string): string {
 }
 
 async function loadSessions() {
-  if (!auth.token || !isOwnProfile.value) {
+  if (!isOwnProfile.value) {
     return
   }
 
@@ -239,9 +239,7 @@ async function loadSessions() {
   sessionsError.value = null
   try {
     const response = await fetch(`${API_BASE_URL}/auth/sessions`, {
-      headers: {
-        Authorization: `Bearer ${auth.token}`,
-      },
+      credentials: 'include',
     })
     if (!response.ok) {
       throw new Error(t('playerProfile.securityLoadError'))
@@ -256,7 +254,7 @@ async function loadSessions() {
 }
 
 async function logoutAllDevices() {
-  if (!auth.token || !isOwnProfile.value) {
+  if (!isOwnProfile.value) {
     return
   }
 
@@ -266,9 +264,7 @@ async function logoutAllDevices() {
   try {
     const response = await fetch(`${API_BASE_URL}/auth/logout-all`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${auth.token}`,
-      },
+      credentials: 'include',
     })
     if (!response.ok) {
       throw new Error(t('playerProfile.securityLogoutAllError'))

@@ -2,7 +2,7 @@
  * Master Portal layout API client.
  *
  * Provides authenticated access to the BuildingLayoutTemplate endpoints on the
- * Master API using the shared Capitalism session token. Falls back silently to
+ * Master API using the shared Capitalism cookie session. Falls back silently to
  * localStorage when no authenticated session is active so the building editor
  * always has a working save/load path.
  */
@@ -10,8 +10,7 @@
 const MASTER_GRAPHQL_URL =
   import.meta.env.VITE_MASTER_GRAPHQL_URL || 'http://localhost:44364/graphql'
 
-const MASTER_TOKEN_KEY = 'auth_token'
-const MASTER_EXPIRES_KEY = 'auth_expires'
+const AUTH_PROVIDER_KEY = 'auth_provider'
 
 // ── Local-storage layout key (fallback) ──────────────────────────────────────
 const LOCAL_LAYOUT_KEY = 'capitalism_building_layouts'
@@ -61,14 +60,7 @@ export interface BuildingLayoutTemplate {
 
 export function getMasterToken(): string | null {
   if (typeof localStorage === 'undefined') return null
-  const token = localStorage.getItem(MASTER_TOKEN_KEY)
-  const expires = localStorage.getItem(MASTER_EXPIRES_KEY)
-  if (!token || !expires) return null
-  if (new Date(expires) <= new Date()) {
-    clearMasterSession()
-    return null
-  }
-  return token
+  return localStorage.getItem(AUTH_PROVIDER_KEY) ? 'cookie-session' : null
 }
 
 export function isMasterConnected(): boolean {
@@ -77,8 +69,7 @@ export function isMasterConnected(): boolean {
 
 export function clearMasterSession(): void {
   if (typeof localStorage === 'undefined') return
-  localStorage.removeItem(MASTER_TOKEN_KEY)
-  localStorage.removeItem(MASTER_EXPIRES_KEY)
+  localStorage.removeItem(AUTH_PROVIDER_KEY)
 }
 
 // ── Low-level GraphQL request to master API ──────────────────────────────────
@@ -87,13 +78,10 @@ async function masterGql<T>(
   query: string,
   variables?: Record<string, unknown>,
 ): Promise<T> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  const tok = getMasterToken()
-  if (tok) headers['Authorization'] = `Bearer ${tok}`
-
   const res = await fetch(MASTER_GRAPHQL_URL, {
     method: 'POST',
-    headers,
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, variables }),
   })
 

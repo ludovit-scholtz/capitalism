@@ -11,13 +11,13 @@ import {
   registerAccount,
 } from '@/lib/masterApi'
 
-const TOKEN_KEY = 'master_auth_token'
 const EXPIRES_KEY = 'master_auth_expires'
 const AUTH_PROVIDER_KEY = 'master_auth_provider'
 const OIDC_STATE_KEY = 'master_biatec_oidc_state'
 const OIDC_LOGOUT_STATE_KEY = 'master_biatec_oidc_logout_state'
 const AUTH_PROVIDER_LOCAL = 'local'
 const AUTH_PROVIDER_BIATEC = 'biatec_oidc'
+const COOKIE_SESSION_SENTINEL = 'cookie-session'
 const BIATEC_OIDC_AUTHORIZE_URL =
   import.meta.env.VITE_BIATEC_OIDC_AUTHORIZE_URL || 'https://google.biatec.io/authorize'
 const BIATEC_OIDC_END_SESSION_URL = import.meta.env.VITE_BIATEC_OIDC_END_SESSION_URL || ''
@@ -330,7 +330,6 @@ export const useAuthStore = defineStore('masterAuth', () => {
     subscription.value = null
     isGameAdmin.value = false
     gameAdminChecked.value = false
-    localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(EXPIRES_KEY)
     localStorage.removeItem(AUTH_PROVIDER_KEY)
     clearStoredOidcState()
@@ -343,28 +342,39 @@ export const useAuthStore = defineStore('masterAuth', () => {
   }
 
   function initFromStorage() {
-    const stored = localStorage.getItem(TOKEN_KEY)
     const expires = localStorage.getItem(EXPIRES_KEY)
-    if (stored && expires && new Date(expires) > new Date()) {
-      token.value = stored
+    const provider = localStorage.getItem(AUTH_PROVIDER_KEY)
+    if (provider && expires && new Date(expires) > new Date()) {
+      token.value = COOKIE_SESSION_SENTINEL
       scheduleTokenRenewal(expires)
     } else {
-      localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem(EXPIRES_KEY)
       localStorage.removeItem(AUTH_PROVIDER_KEY)
     }
   }
 
   function setSession(auth: MasterAuthPayload, provider = AUTH_PROVIDER_LOCAL) {
-    token.value = auth.token
+    token.value = provider === AUTH_PROVIDER_BIATEC ? auth.token : COOKIE_SESSION_SENTINEL
     player.value = auth.player
     subscription.value = null
     isGameAdmin.value = false
     gameAdminChecked.value = false
-    localStorage.setItem(TOKEN_KEY, auth.token)
     localStorage.setItem(EXPIRES_KEY, auth.expiresAtUtc)
     setStoredAuthProvider(provider)
     scheduleTokenRenewal(auth.expiresAtUtc)
+  }
+
+  async function establishCookieSession(tokenValue: string) {
+    const response = await fetch(`${API_BASE_URL}/auth/session`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        Authorization: `Bearer ${tokenValue}`,
+      },
+    })
+    if (!response.ok) {
+      throw new Error('Failed to establish secure session.')
+    }
   }
 
   async function refreshGameAdminAccess() {
@@ -387,6 +397,7 @@ export const useAuthStore = defineStore('masterAuth', () => {
     error.value = null
     try {
       const auth = await registerAccount(email, displayName, password)
+      await establishCookieSession(auth.token)
       setSession(auth)
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : 'Registration failed'
@@ -401,6 +412,7 @@ export const useAuthStore = defineStore('masterAuth', () => {
     error.value = null
     try {
       const auth = await loginAccount(email, password)
+      await establishCookieSession(auth.token)
       setSession(auth)
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : 'Login failed'
@@ -452,13 +464,13 @@ export const useAuthStore = defineStore('masterAuth', () => {
 
   async function completeBiatecOidcSignIn() {
     const callbackSession = getBiatecTokenFromCallback()
-    token.value = callbackSession.token
-    player.value = null
+      await establishCookieSession(callbackSession.token)
+      token.value = callbackSession.token
+      player.value = null
     subscription.value = null
     isGameAdmin.value = false
     gameAdminChecked.value = false
-    localStorage.setItem(TOKEN_KEY, callbackSession.token)
-    localStorage.setItem(EXPIRES_KEY, callbackSession.expiresAtUtc)
+      localStorage.setItem(EXPIRES_KEY, callbackSession.expiresAtUtc)
     setStoredAuthProvider(AUTH_PROVIDER_BIATEC)
     scheduleTokenRenewal(callbackSession.expiresAtUtc)
 
@@ -475,7 +487,6 @@ export const useAuthStore = defineStore('masterAuth', () => {
       subscription.value = null
       isGameAdmin.value = false
       gameAdminChecked.value = false
-      localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem(EXPIRES_KEY)
       localStorage.removeItem(AUTH_PROVIDER_KEY)
       throw e
@@ -521,20 +532,15 @@ export const useAuthStore = defineStore('masterAuth', () => {
   }
 
   function logout(options: LogoutOptions = {}) {
-    const currentToken = token.value
     const shouldFederatedLogout =
       options.federated === true && getStoredAuthProvider() === AUTH_PROVIDER_BIATEC
-    const idTokenHint = token.value
+    const idTokenHint = token.value && token.value !== COOKIE_SESSION_SENTINEL ? token.value : null
     const federatedLogoutUrl = shouldFederatedLogout ? buildBiatecEndSessionUrl(idTokenHint) : null
 
-    if (currentToken) {
-      void fetch(`${API_BASE_URL}/auth/logout`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${currentToken}`,
-        },
-      }).catch(() => undefined)
-    }
+    void fetch(`${API_BASE_URL}/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+    }).catch(() => undefined)
 
     clearRenewalTimer()
     token.value = null
@@ -542,7 +548,6 @@ export const useAuthStore = defineStore('masterAuth', () => {
     subscription.value = null
     isGameAdmin.value = false
     gameAdminChecked.value = false
-    localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(EXPIRES_KEY)
     localStorage.removeItem(AUTH_PROVIDER_KEY)
     clearStoredOidcState()

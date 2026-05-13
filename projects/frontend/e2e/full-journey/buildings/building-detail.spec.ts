@@ -96,7 +96,17 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
+    await page.context().addCookies([
+      {
+        name: 'auth_token',
+        value: `token-${player.id}`,
+        url: process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173',
+        httpOnly: true,
+        sameSite: 'Strict',
+      },
+    ])
 
     await page.goto('/building/building-autoselect')
     await expect(page.getByRole('heading', { name: 'Auto Select Factory' })).toBeVisible()
@@ -216,6 +226,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-1')
@@ -368,6 +379,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-upgrade-blocked')
@@ -459,6 +471,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-cfg')
@@ -552,6 +565,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-warn')
@@ -598,6 +612,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     // Navigate directly to the sell page for the building
@@ -682,6 +697,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-collateral')
@@ -730,6 +746,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     // Navigate directly to the dedicated sell page
@@ -752,7 +769,7 @@ test.describe('Building detail upgrades', () => {
     // Enter below-minimum price (minimum is 70% of market value)
     await page.locator('#asking-price').fill('60000')
     await expect(page.locator('.sell-form-section')).toContainText('Minimum listing price')
-    await expect(page.locator('.sell-form-section')).toContainText('70% of market value')
+    await expect(page.locator('.sell-form-section')).toContainText('70% of current building value')
     await expect(listBtn).toBeDisabled()
 
     // Enter valid price at the minimum threshold
@@ -828,6 +845,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-overview')
@@ -909,6 +927,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-empty-fin')
@@ -976,6 +995,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-neg-profit')
@@ -1046,6 +1066,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-fin-refresh')
@@ -1133,6 +1154,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-ro')
@@ -1202,6 +1224,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-exchange')
@@ -1274,6 +1297,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-route')
@@ -1353,6 +1377,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-flush')
@@ -1476,6 +1501,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-b2b')
@@ -1531,6 +1557,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-b2b-layout')
@@ -1627,6 +1654,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-b2b-autofill')
@@ -1725,6 +1753,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-mine-b2b')
@@ -1806,6 +1835,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-b2b-readonly')
@@ -1873,6 +1903,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-b2b-nosource')
@@ -1960,6 +1991,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-b2b-withsource')
@@ -2011,6 +2043,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-b2b-defvis')
@@ -2105,6 +2138,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-display')
@@ -2262,6 +2296,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-history')
@@ -2358,6 +2393,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-rd')
@@ -2480,6 +2516,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-rd-prio')
@@ -2597,6 +2634,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-rd-portfolio')
@@ -2706,6 +2744,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-rd-ctx')
@@ -2848,6 +2887,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-advanced')
@@ -2967,6 +3007,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-linked')
@@ -3071,6 +3112,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-img')
@@ -3200,6 +3242,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-pro-lock')
@@ -3287,6 +3330,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-cancel')
@@ -3373,6 +3417,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-hide-cancel')
@@ -3456,6 +3501,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-revert')
@@ -3537,6 +3583,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-dir')
@@ -3657,6 +3704,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-warn-link')
@@ -3796,6 +3844,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
     await page.goto('/building/building-smart')
     await expect(page.getByRole('heading', { name: 'Smart Defaults Factory' })).toBeVisible()
@@ -3921,6 +3970,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-diag')
@@ -4078,6 +4128,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-diag-warn')
@@ -4207,6 +4258,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-prediag')
@@ -4294,6 +4346,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-sparse-diag')
@@ -4399,6 +4452,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-solo-hit')
@@ -4496,6 +4550,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-hbkwd')
@@ -4588,6 +4643,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-vert')
@@ -4716,6 +4772,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-rev')
@@ -4856,6 +4913,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-ar2')
@@ -4997,6 +5055,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-glyph')
@@ -5146,6 +5205,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-cross')
@@ -5290,6 +5350,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-no-artifact')
@@ -5402,6 +5463,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-mine')
@@ -5496,6 +5558,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-mine-flow')
@@ -5570,6 +5633,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-storage-flow')
@@ -5643,6 +5707,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-no-flow')
@@ -5722,6 +5787,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-ps-sold')
@@ -5821,6 +5887,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-flow-labels')
@@ -5902,6 +5969,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-ps-flow-label')
@@ -6007,6 +6075,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-factory')
@@ -6128,6 +6197,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-focus')
@@ -6213,6 +6283,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-gate')
@@ -6289,6 +6360,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-upgrade-preview')
@@ -6377,6 +6449,7 @@ test.describe('Building detail upgrades', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-max-concurrent')
@@ -6453,6 +6526,7 @@ test.describe('Global exchange market', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-exmkt')
@@ -6539,6 +6613,7 @@ test.describe('Global exchange market', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-local')
@@ -6607,6 +6682,7 @@ test.describe('Global exchange market', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-optimal')
@@ -6658,6 +6734,7 @@ test.describe('Global exchange market', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-cfg')
@@ -6752,6 +6829,7 @@ test.describe('Global exchange market', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-breakdown')
@@ -6833,6 +6911,7 @@ test.describe('Global exchange market', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-blocked-price')
@@ -6911,6 +6990,7 @@ test.describe('Global exchange market', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-blocked-qual')
@@ -6984,6 +7064,7 @@ test.describe('Global exchange market', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-best-badge')
@@ -7098,6 +7179,7 @@ test.describe('Global exchange market', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-nearby-wins')
@@ -7244,6 +7326,7 @@ test.describe('Global exchange market', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-qual-filter')
@@ -7341,6 +7424,7 @@ test.describe('Global exchange market — narrow layout', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.setViewportSize({ width: 375, height: 812 })
@@ -7373,6 +7457,7 @@ test.describe('Global exchange market — narrow layout', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.setViewportSize({ width: 375, height: 812 })
@@ -7451,6 +7536,7 @@ test.describe('Global exchange market — narrow layout', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.setViewportSize({ width: 375, height: 812 })
@@ -7530,6 +7616,7 @@ test.describe('Global exchange sourcing — end-to-end flow', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-e2e-flow')
@@ -7656,6 +7743,7 @@ test.describe('Global exchange sourcing — end-to-end flow', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-stale')
@@ -7727,6 +7815,7 @@ test.describe('Starter factory setup banner', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-empty-factory')
@@ -7750,6 +7839,7 @@ test.describe('Starter factory setup banner', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-empty-factory')
@@ -7788,6 +7878,7 @@ test.describe('Starter factory setup banner', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-empty-factory')
@@ -7860,6 +7951,7 @@ test.describe('Starter factory setup banner', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-factory-with-units')
@@ -7967,6 +8059,7 @@ test.describe('Production chain configuration', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
     return state
   }
@@ -8255,6 +8348,7 @@ test.describe('Production chain configuration', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-pending-factory')
@@ -8557,6 +8651,7 @@ test.describe('Starter sales-shop setup banner', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-empty-shop')
@@ -8580,6 +8675,7 @@ test.describe('Starter sales-shop setup banner', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-empty-shop')
@@ -8614,6 +8710,7 @@ test.describe('Starter sales-shop setup banner', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-empty-shop')
@@ -8686,6 +8783,7 @@ test.describe('Starter sales-shop setup banner', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-shop-with-units')
@@ -8773,6 +8871,7 @@ test.describe('Sales chain status panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
     await page.goto(url)
     return state
@@ -9009,6 +9108,7 @@ test.describe('Sales shop PUBLIC_SALES price validation and persistence', () => 
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-persist-shop')
@@ -9045,6 +9145,7 @@ test.describe('Sales shop PUBLIC_SALES price validation and persistence', () => 
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-pricing-shop')
@@ -9102,6 +9203,7 @@ test.describe('Sales shop PUBLIC_SALES price validation and persistence', () => 
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-pricing-shop')
@@ -9192,6 +9294,7 @@ test.describe('Product picker UX — collapsible trigger and dropdown', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-picker-shop')
@@ -9237,6 +9340,7 @@ test.describe('Product picker UX — collapsible trigger and dropdown', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-picker-shop')
@@ -9278,6 +9382,7 @@ test.describe('Product picker UX — collapsible trigger and dropdown', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-picker-shop')
@@ -9315,6 +9420,7 @@ test.describe('Product picker UX — collapsible trigger and dropdown', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-picker-shop')
@@ -9463,6 +9569,7 @@ test.describe('Link-aware product picker — PUBLIC_SALES unit', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
     await page.goto('/building/building-sales-picker')
     await page.getByRole('button', { name: /Edit Building/i }).click()
@@ -9664,6 +9771,7 @@ test.describe('Link-aware product picker — STORAGE unit', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-storage-picker')
@@ -9698,6 +9806,7 @@ test.describe('Link-aware product picker — STORAGE unit', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-storage-picker')
@@ -9796,6 +9905,7 @@ test.describe('Link-aware product picker — B2B_SALES unit', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-b2b-picker')
@@ -9827,6 +9937,7 @@ test.describe('Link-aware product picker — B2B_SALES unit', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-b2b-picker')
@@ -9864,6 +9975,7 @@ test.describe('Link-aware product picker — B2B_SALES unit', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-b2b-picker')
@@ -9956,6 +10068,7 @@ test.describe('Link-aware product picker — B2B_SALES unit', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-b2b-filter')
@@ -10039,6 +10152,7 @@ test.describe('Link-aware product picker — B2B_SALES unit', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-b2b-empty')
@@ -10144,6 +10258,7 @@ test.describe('Product picker — contextual ranking section headers', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-ctx-storage')
@@ -10234,6 +10349,7 @@ test.describe('Product picker — contextual ranking section headers', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-ctx-b2b')
@@ -10336,6 +10452,7 @@ test.describe('Product picker — contextual ranking section headers', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-ctx-ps')
@@ -10401,6 +10518,7 @@ test.describe('Product picker — contextual ranking section headers', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-icon-shop')
@@ -10505,6 +10623,7 @@ test.describe('Product picker — contextual ranking section headers', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-stale-shop')
@@ -10602,6 +10721,7 @@ test.describe('Product picker — contextual ranking section headers', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-storage-b2b')
@@ -10743,6 +10863,7 @@ test.describe('Product picker — contextual ranking section headers', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-full-chain')
@@ -10840,6 +10961,7 @@ test.describe('Purchase selector dialog — navbar visibility and z-index', () =
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-ps-z')
@@ -10877,6 +10999,7 @@ test.describe('Purchase selector dialog — navbar visibility and z-index', () =
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-ps-z')
@@ -10915,6 +11038,7 @@ test.describe('Purchase selector dialog — navbar visibility and z-index', () =
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-ps-z')
@@ -11039,6 +11163,7 @@ test.describe('Purchase selector list visuals and same-city vendor context', () 
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-city-shop')
@@ -11194,6 +11319,7 @@ test.describe('Purchase selector list visuals and same-city vendor context', () 
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-current-factory')
@@ -11296,6 +11422,7 @@ test.describe('Complete building configuration end-to-end journey', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     // ── Step 1: Navigate to the building
@@ -11375,6 +11502,7 @@ test.describe('Property management panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-apt')
@@ -11405,6 +11533,7 @@ test.describe('Property management panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-apt')
@@ -11423,6 +11552,7 @@ test.describe('Property management panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-apt')
@@ -11478,6 +11608,7 @@ test.describe('Property management panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-fac')
@@ -11523,6 +11654,7 @@ test.describe('Property management panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-comm')
@@ -11541,6 +11673,7 @@ test.describe('Property management panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-apt')
@@ -11575,6 +11708,7 @@ test.describe('Property management panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-apt')
@@ -11600,6 +11734,7 @@ test.describe('Property management panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-apt')
@@ -11617,6 +11752,7 @@ test.describe('Property management panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-apt')
@@ -11635,6 +11771,7 @@ test.describe('Property management panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-apt')
@@ -11655,6 +11792,7 @@ test.describe('Property management panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-apt')
@@ -11673,6 +11811,7 @@ test.describe('Property management panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-apt')
@@ -11740,6 +11879,7 @@ test.describe('Property management panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-comm2')
@@ -11766,6 +11906,7 @@ test.describe('Property management panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-apt')
@@ -11818,6 +11959,7 @@ test.describe('Property management panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-apt2')
@@ -11905,6 +12047,7 @@ test.describe('Grid editor: save and reload persistence', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-persist')
@@ -11986,6 +12129,7 @@ test.describe('R&D Research Progress Panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-rd-progress')
@@ -12012,6 +12156,7 @@ test.describe('R&D Research Progress Panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-rd-progress')
@@ -12072,6 +12217,7 @@ test.describe('R&D Research Progress Panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-rd-progress')
@@ -12135,6 +12281,7 @@ test.describe('R&D Research Progress Panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-rd-progress')
@@ -12182,6 +12329,7 @@ test.describe('R&D Research Progress Panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-factory-rd-test')
@@ -12257,6 +12405,7 @@ test.describe('R&D Research Progress Panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-rd-warn')
@@ -12319,6 +12468,7 @@ test.describe('R&D Research Progress Panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-rd-progress')
@@ -12388,6 +12538,7 @@ test.describe('R&D Research Progress Panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-rd-progress')
@@ -12457,6 +12608,7 @@ test.describe('R&D Research Progress Panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-rd-scope-help')
@@ -12528,6 +12680,7 @@ test.describe('R&D Research Progress Panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-rd-progress')
@@ -12611,6 +12764,7 @@ test.describe('Global exchange market — per-industry resource coverage', () =>
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-grain-exch')
@@ -12672,6 +12826,7 @@ test.describe('Global exchange market — per-industry resource coverage', () =>
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-chem-exch')
@@ -12815,6 +12970,7 @@ test.describe('Global exchange market — per-industry resource coverage', () =>
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-reactive-qual')
@@ -12936,6 +13092,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -13023,6 +13180,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     // Analytics with empty history (just configured, no sales yet)
@@ -13088,6 +13246,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -13145,6 +13304,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -13203,6 +13363,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -13309,6 +13470,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-factory-mi')
@@ -13334,6 +13496,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -13399,6 +13562,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -13456,6 +13620,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -13527,6 +13692,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     // Demand exceeds total sold: 40% sold, 60% unmet
@@ -13590,6 +13756,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -13654,6 +13821,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const currentMinPrice = chairProduct.basePrice * 1.5 // e.g. 45
@@ -13716,6 +13884,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const currentMinPrice = chairProduct.basePrice * 1.5
@@ -13778,6 +13947,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -13856,6 +14026,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -13933,6 +14104,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -14008,6 +14180,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     // makeShopPlayer unit has minPrice = 67.5 (basePrice 45 × 1.5)
@@ -14063,6 +14236,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     // makeShopPlayer unit has minPrice = 67.5 (basePrice 45 × 1.5)
@@ -14118,6 +14292,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     // makeShopPlayer unit has minPrice = 67.5 (basePrice 45 × 1.5)
@@ -14173,6 +14348,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -14227,6 +14403,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const profitHistory = Array.from({ length: 5 }, (_, i) => ({
@@ -14297,6 +14474,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -14375,6 +14553,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -14451,6 +14630,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -14510,6 +14690,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -14581,6 +14762,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -14639,6 +14821,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -14713,6 +14896,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     // Explicitly set null analytics so the mock returns null for this unit
@@ -14751,6 +14935,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -14834,6 +15019,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     // Analytics reflects a unit priced 20% below the market baseline (price discount).
@@ -14933,6 +15119,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -15032,6 +15219,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -15112,6 +15300,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -15193,6 +15382,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -15274,6 +15464,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -15341,6 +15532,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -15403,6 +15595,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -15466,6 +15659,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -15549,6 +15743,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -15618,6 +15813,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     // 100 ticks of history — the ROADMAP requires "last 100 ticks" to be shown
@@ -15686,6 +15882,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -15760,6 +15957,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -15834,6 +16032,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     const analytics: MockPublicSalesAnalytics = {
@@ -15920,6 +16119,7 @@ test.describe('Mine building edit mode', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-mine-edit')
@@ -16000,6 +16200,7 @@ test.describe('Mine building edit mode', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-mine-types')
@@ -16114,6 +16315,7 @@ test.describe('Mine building edit mode', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-mine-lock')
@@ -16185,6 +16387,7 @@ test.describe('Power plant edit mode — unit type picker', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-power-picker')
@@ -16256,6 +16459,7 @@ test.describe('Sales shop edit mode — unit type picker', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-shop-picker')
@@ -16292,6 +16496,7 @@ test.describe('Sales shop edit mode — unit type picker', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-shop-picker')
@@ -16322,6 +16527,7 @@ test.describe('Sales shop edit mode — unit type picker', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-shop-picker')
@@ -16360,6 +16566,7 @@ test.describe('Sales shop edit mode — unit type picker', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-shop-picker')
@@ -16408,6 +16615,7 @@ test.describe('Sales shop edit mode — unit type picker', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-shop-picker')
@@ -16506,6 +16714,7 @@ test.describe('Building grid editor — mobile viewport (375px)', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-mobile')
@@ -16605,6 +16814,7 @@ test.describe('Operational status panel and recent activity', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-opstat')
@@ -16676,6 +16886,7 @@ test.describe('Operational status panel and recent activity', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-opstat-active')
@@ -16746,6 +16957,7 @@ test.describe('Operational status panel and recent activity', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-activity')
@@ -16850,6 +17062,7 @@ test.describe('Destination-aware purchase sourcing', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-trap')
@@ -16906,6 +17119,7 @@ test.describe('Destination-aware purchase sourcing', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-notrap')
@@ -16960,6 +17174,7 @@ test.describe('Destination-aware purchase sourcing', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-sort')
@@ -17019,6 +17234,7 @@ test.describe('Destination-aware purchase sourcing', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-link')
@@ -17064,6 +17280,7 @@ test.describe('Destination-aware purchase sourcing', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-linkro')
@@ -17149,6 +17366,7 @@ test.describe('Procurement mode configuration', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-proc-edit')
@@ -17196,6 +17414,7 @@ test.describe('Procurement mode configuration', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-proc-exchange')
@@ -17240,6 +17459,7 @@ test.describe('Procurement mode configuration', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-proc-local')
@@ -17365,6 +17585,7 @@ test.describe('Procurement mode configuration', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-own-shop')
@@ -17423,6 +17644,7 @@ test.describe('Procurement mode configuration', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-proc-preview')
@@ -17473,6 +17695,7 @@ test.describe('Procurement mode configuration', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-proc-blocked')
@@ -17510,6 +17733,7 @@ test.describe('Procurement mode configuration', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-proc-clr')
@@ -17594,6 +17818,7 @@ test.describe('Procurement mode configuration', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-opcost-tile')
@@ -17664,6 +17889,7 @@ test.describe('Procurement mode configuration', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-opcost-sidebar')
@@ -17749,6 +17975,7 @@ test.describe('Sourcing Comparison Panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-sc-panel')
@@ -17783,6 +18010,7 @@ test.describe('Sourcing Comparison Panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-sc-ranked')
@@ -17872,6 +18100,7 @@ test.describe('Sourcing Comparison Panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-sc-lc')
@@ -17957,6 +18186,7 @@ test.describe('Sourcing Comparison Panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-sc-blk')
@@ -17997,6 +18227,7 @@ test.describe('Sourcing Comparison Panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-sc-qlt')
@@ -18079,6 +18310,7 @@ test.describe('Unit upgrade panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-uu-1')
@@ -18124,6 +18356,7 @@ test.describe('Unit upgrade panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-uu-1')
@@ -18164,6 +18397,7 @@ test.describe('Unit upgrade panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-uu-1')
@@ -18227,6 +18461,7 @@ test.describe('Unit upgrade panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-uu-1')
@@ -18297,6 +18532,7 @@ test.describe('Unit upgrade panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-uu-1')
@@ -18332,6 +18568,7 @@ test.describe('Unit upgrade panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-uu-1')
@@ -18458,6 +18695,7 @@ test.describe('Unit upgrade panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-uu-1')
@@ -18523,6 +18761,7 @@ test.describe('Unit upgrade panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-uu-1')
@@ -18563,6 +18802,7 @@ test.describe('Unit upgrade panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-uu-1')
@@ -18612,6 +18852,7 @@ test.describe('Unit upgrade panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-uu-1')
@@ -18656,6 +18897,7 @@ test.describe('Unit upgrade panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-uu-1')
@@ -18762,6 +19004,7 @@ test.describe('Unit upgrade panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-uu-czk')
@@ -18828,6 +19071,7 @@ test.describe('Unit placement FX pricing in non-EUR city', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-czk-place')
@@ -18919,6 +19163,7 @@ test.describe('Building detail tick-refresh stability', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-tick-stable')
@@ -18989,6 +19234,7 @@ test.describe('Building detail tick-refresh stability', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-unit-stable')
@@ -19067,6 +19313,7 @@ test.describe('Building detail tick-refresh stability', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-draft-stable')
@@ -19143,6 +19390,7 @@ test.describe('Building detail tick-refresh stability', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     // Navigate directly with the unit query param to test deep-link restore
@@ -19257,6 +19505,7 @@ test.describe('Manufacturing unit product analytics panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
     await page.goto('/building/building-upa')
 
@@ -19318,6 +19567,7 @@ test.describe('Manufacturing unit product analytics panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
     await page.goto('/building/building-upa')
 
@@ -19364,6 +19614,7 @@ test.describe('Manufacturing unit product analytics panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
     await page.goto('/building/building-upa')
 
@@ -19420,6 +19671,7 @@ test.describe('Manufacturing unit product analytics panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
     await page.goto('/building/building-upa')
 
@@ -19507,6 +19759,7 @@ test.describe('Sales shop building financial overview', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-shop-fin')
@@ -19547,6 +19800,7 @@ test.describe('Sales shop building financial overview', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-shop-loss')
@@ -19585,6 +19839,7 @@ test.describe('Sales shop building financial overview', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-shop-empty')
@@ -19648,6 +19903,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-lt')
@@ -19664,6 +19920,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-lt')
@@ -19681,6 +19938,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-lt')
@@ -19703,6 +19961,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-lt')
@@ -19765,6 +20024,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-lt')
@@ -19830,6 +20090,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-lt')
@@ -19864,6 +20125,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-lt')
@@ -19914,6 +20176,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-lt')
@@ -19987,6 +20250,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-mine')
@@ -20053,6 +20317,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     // ── Step 1: Open Factory A, apply starter layout and save it ──
@@ -20097,13 +20362,26 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
   test('unauthenticated user sees connect prompt and local-only fallback section', async ({ page }) => {
     // No auth token — user is not logged in to the master portal
     const player = makeLayoutTestPlayer()
-    setupMockApi(page, { players: [player] })
+    const shadowPlayer = makePlayer({ id: 'layout-shadow-player' })
+    const state = setupMockApi(page, { players: [player, shadowPlayer] })
     // Do NOT set currentUserId/Token — simulate unauthenticated state for cloud
     // But DO set localStorage auth so the game itself is authenticated (player owns the building)
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
+    await page.context().addCookies([
+      {
+        name: 'auth_token',
+        value: `token-${player.id}`,
+        url: process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173',
+        httpOnly: true,
+        sameSite: 'Strict',
+      },
+    ])
 
     await page.goto('/building/building-lt')
     await page.getByRole('button', { name: 'Edit Building' }).click()
@@ -20190,6 +20468,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-lt')
@@ -20336,6 +20615,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-lt')
@@ -20384,6 +20664,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-lt')
@@ -20418,6 +20699,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-lt')
@@ -20480,6 +20762,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-lt')
@@ -20585,6 +20868,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-lt')
@@ -20702,6 +20986,7 @@ test.describe('Building link validation errors — backend error display', () =>
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-clink')
@@ -20866,6 +21151,7 @@ test.describe('Local city currency in building unit config', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-eur-shop')
@@ -20909,6 +21195,7 @@ test.describe('Local city currency in building unit config', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-czk-shop')
@@ -20955,6 +21242,7 @@ test.describe('Local city currency in building unit config', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     // Check EUR building shows EUR
@@ -21035,6 +21323,7 @@ test.describe('Local city currency in building unit config', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-czk-shop')
@@ -21118,6 +21407,7 @@ test.describe('Media house management panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
     await page.goto('/building/building-mh')
 
@@ -21140,6 +21430,7 @@ test.describe('Media house management panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
     await page.goto('/building/building-mh')
 
@@ -21193,6 +21484,7 @@ test.describe('Media house management panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
     await page.goto('/building/building-mh')
 
@@ -21215,6 +21507,7 @@ test.describe('Media house management panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
     await page.goto('/building/building-mh')
 
@@ -21256,6 +21549,7 @@ test.describe('Media house management panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
     await page.goto('/building/building-mh')
 
@@ -21275,6 +21569,7 @@ test.describe('Media house management panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
     await page.goto('/building/building-mh')
 
@@ -21331,6 +21626,7 @@ test.describe('Power plant analytics panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/pp-building-1')
@@ -21359,6 +21655,7 @@ test.describe('Power plant analytics panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/pp-building-1')
@@ -21392,6 +21689,7 @@ test.describe('Power plant analytics panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/pp-building-1')
@@ -21439,6 +21737,7 @@ test.describe('Power plant analytics panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/factory-1')
@@ -21503,6 +21802,7 @@ test.describe('Power plant analytics panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/pp-building-1')
@@ -21531,6 +21831,7 @@ test.describe('Power plant analytics panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/pp-building-1')
@@ -21565,6 +21866,7 @@ test.describe('Power plant analytics panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/pp-building-1')
@@ -21599,6 +21901,7 @@ test.describe('Power plant analytics panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/pp-building-1')
@@ -21631,6 +21934,7 @@ test.describe('Power plant analytics panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/pp-building-1')
@@ -21692,6 +21996,7 @@ test.describe('Power plant analytics panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/pp-building-1')
@@ -21778,6 +22083,7 @@ test.describe('Power plant analytics panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/pp-building-1')
@@ -21850,6 +22156,7 @@ test.describe('Power plant analytics panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/pp-building-1')
@@ -21907,6 +22214,7 @@ test.describe('Power plant analytics panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/pp-building-1')
@@ -21965,6 +22273,7 @@ test.describe('Power plant analytics panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/pp-building-1')
@@ -22023,6 +22332,7 @@ test.describe('Power plant analytics panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/pp-building-1')
@@ -22064,6 +22374,7 @@ test.describe('Power plant analytics panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/pp-building-1')
@@ -22097,6 +22408,7 @@ test.describe('Power plant analytics panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/pp-building-1')
@@ -22139,6 +22451,7 @@ test.describe('Power plant analytics panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/pp-building-1')
@@ -22177,6 +22490,7 @@ test.describe('Power plant analytics panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/pp-building-1')
@@ -22260,6 +22574,7 @@ test.describe('Public sales pricing guidance panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-ps-guidance')
@@ -22294,6 +22609,7 @@ test.describe('Public sales pricing guidance panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-ps-guidance')
@@ -22327,6 +22643,7 @@ test.describe('Public sales pricing guidance panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-ps-guidance')
@@ -22425,6 +22742,7 @@ test.describe('Public sales pricing guidance panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-live-link')
@@ -22512,6 +22830,7 @@ test.describe('Public sales pricing guidance panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-inactive-link')
@@ -22597,6 +22916,7 @@ test.describe('Public sales pricing guidance panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-sel-path')
@@ -22699,6 +23019,7 @@ test.describe('Public sales pricing guidance panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-sec-diag-ur')
@@ -22791,6 +23112,7 @@ test.describe('Public sales pricing guidance panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-sec-diag-dl')
@@ -22880,6 +23202,7 @@ test.describe('Public sales pricing guidance panel', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-tooltip-link')
@@ -22984,6 +23307,7 @@ test.describe('Supply chain tab', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-sc-factory')
@@ -23064,6 +23388,7 @@ test.describe('Supply chain tab', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-sc-factory')
@@ -23126,6 +23451,7 @@ test.describe('Supply chain tab', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-sc-factory')
@@ -23176,6 +23502,7 @@ test.describe('Supply chain tab', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-sc-factory')
@@ -23198,6 +23525,7 @@ test.describe('Supply chain tab', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-sc-factory')
@@ -23247,6 +23575,7 @@ test.describe('Supply chain tab', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-no-sc-shop')
@@ -23289,6 +23618,7 @@ test.describe('Supply chain tab', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     // Navigate directly to the dedicated sell page
@@ -23370,6 +23700,7 @@ test.describe('Supply chain tab', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-collateral-count')
@@ -23417,6 +23748,7 @@ test.describe('Supply chain tab', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-destroyed')
@@ -23464,6 +23796,7 @@ test.describe('Supply chain tab', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-already-listed/sell')
@@ -23544,6 +23877,7 @@ test.describe('Supply chain tab', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-locked-sale/sell')
@@ -23591,6 +23925,7 @@ test.describe('Supply chain tab', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-destroy-sell/sell')
@@ -23664,6 +23999,7 @@ test.describe('Supply chain tab', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/building-defaulted')
@@ -23722,6 +24058,7 @@ test.describe('energy status badge and power settings', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/energy-bld-1')
@@ -23752,6 +24089,7 @@ test.describe('energy status badge and power settings', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/energy-bld-1')
@@ -23781,6 +24119,7 @@ test.describe('energy status badge and power settings', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/energy-bld-1')
@@ -23810,6 +24149,7 @@ test.describe('energy status badge and power settings', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/energy-bld-1')
@@ -23876,6 +24216,7 @@ test.describe('energy status badge and power settings', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/pp-energy-bld')
@@ -23932,6 +24273,7 @@ test.describe('energy status badge and power settings', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
     }, `token-${player.id}`)
 
     await page.goto('/building/pp-listing-bld')

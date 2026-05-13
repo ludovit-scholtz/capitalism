@@ -17,6 +17,7 @@ public sealed partial class Mutation
         RegisterInput input,
         [Service] MasterDbContext db,
         [Service] IOptions<JwtOptions> jwtOptions,
+        [Service] IHostEnvironment hostEnvironment,
         [Service] IOptions<AuthOptions> authOptions,
         [Service] MasterRankingService rankingService,
         [Service] ILoginThrottleService throttle,
@@ -150,6 +151,7 @@ public sealed partial class Mutation
             session.ExpiresAtUtc,
             httpContextAccessor.HttpContext,
             httpContextAccessor.HttpContext?.RequestAborted ?? CancellationToken.None);
+        AuthSessionCookieService.SetSessionCookies(httpContextAccessor.HttpContext, hostEnvironment, session.Token, session.ExpiresAtUtc);
 
         return new MasterAuthPayload
         {
@@ -164,6 +166,7 @@ public sealed partial class Mutation
         LoginInput input,
         [Service] MasterDbContext db,
         [Service] IOptions<JwtOptions> jwtOptions,
+        [Service] IHostEnvironment hostEnvironment,
         [Service] IOptions<AuthOptions> authOptions,
         [Service] ILoginThrottleService throttle,
         [Service] IHttpContextAccessor httpContextAccessor)
@@ -227,6 +230,7 @@ public sealed partial class Mutation
             session.ExpiresAtUtc,
             httpContextAccessor.HttpContext,
             httpContextAccessor.HttpContext?.RequestAborted ?? CancellationToken.None);
+        AuthSessionCookieService.SetSessionCookies(httpContextAccessor.HttpContext, hostEnvironment, session.Token, session.ExpiresAtUtc);
 
         return new MasterAuthPayload
         {

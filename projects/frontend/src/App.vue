@@ -63,12 +63,17 @@ onMounted(() => {
   // Capture referral code from URL before potentially redirecting
   referralStore.initFromUrl()
   referralStore.initFromStorage()
-  if (auth.token) {
-    void auth.fetchMe({ reconcileCityContext: true })
-    void newsStore.fetchUnreadCount()
-    void notificationsStore.fetchUnreadCount()
-    void gameAdminStore.fetchSession()
-  }
+  void auth
+    .fetchMe({ reconcileCityContext: true })
+    .then(() => {
+      if (!auth.isAuthenticated) {
+        return
+      }
+      void newsStore.fetchUnreadCount()
+      void notificationsStore.fetchUnreadCount()
+      void gameAdminStore.fetchSession()
+    })
+    .catch(() => undefined)
 
   showSignedOutToastIfPending()
 })

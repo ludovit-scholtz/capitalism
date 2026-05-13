@@ -103,7 +103,7 @@ test.describe('Game servers page', () => {
 test.describe('Login page', () => {
   test('shows sign in form by default', async ({ page }) => {
     setupMockApi(page)
-    await page.goto('/login')
+    await page.goto('/login?oidc_retry=consent')
 
     await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible()
     await expect(page.getByLabel('Email')).toBeVisible()
@@ -112,7 +112,7 @@ test.describe('Login page', () => {
 
   test('switches to register form', async ({ page }) => {
     setupMockApi(page)
-    await page.goto('/login')
+    await page.goto('/login?oidc_retry=consent')
 
     await page.getByRole('button', { name: 'Register' }).click()
     await expect(page.getByRole('button', { name: 'Create account' })).toBeVisible()
@@ -121,7 +121,7 @@ test.describe('Login page', () => {
 
   test('shows error on bad credentials', async ({ page }) => {
     setupMockApi(page, { servers: [] })
-    await page.goto('/login')
+    await page.goto('/login?oidc_retry=consent')
 
     await page.getByLabel('Email').fill('wrong@example.com')
     await page.getByLabel('Password').fill('badpass')
@@ -132,11 +132,11 @@ test.describe('Login page', () => {
 
   test('redirects to Biatec authorize endpoint with required OIDC params', async ({ page }) => {
     setupMockApi(page)
-    await page.goto('/login')
+    await page.route('https://google.biatec.io/**', (route) => route.abort())
+    await page.goto('/login?oidc_retry=consent')
 
     // window.location.href navigation to the OIDC endpoint is captured as a request.
     // Route intercept aborts the navigation so the test stays on the login page.
-    await page.route('https://google.biatec.io/**', (route) => route.abort())
 
     const [request] = await Promise.all([
       page.waitForRequest((req) => req.url().startsWith('https://google.biatec.io/authorize')),

@@ -36,6 +36,15 @@ async function authenticateViaLocalStorage(page: Page, token: string) {
     localStorage.setItem('auth_token', storedToken)
     localStorage.setItem('auth_expires', new Date(Date.now() + 7_200_000).toISOString())
   }, token)
+  await page.context().addCookies([
+    {
+      name: 'auth_token',
+      value: token,
+      url: process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173',
+      httpOnly: true,
+      sameSite: 'Strict',
+    },
+  ])
 }
 
 async function authenticateGuestAndMigrate(page: Page, state: ReturnType<typeof setupMockApi>, player = makePlayer()) {
@@ -46,10 +55,7 @@ async function authenticateGuestAndMigrate(page: Page, state: ReturnType<typeof 
   const token = `token-${player.id}`
   state.currentUserId = player.id
   state.currentToken = token
-  await page.evaluate((storedToken) => {
-    localStorage.setItem('auth_token', storedToken)
-    localStorage.setItem('auth_expires', new Date(Date.now() + 7_200_000).toISOString())
-  }, token)
+  await authenticateViaLocalStorage(page, token)
 
   await page.reload()
 }
@@ -869,7 +875,7 @@ test.describe('Guest onboarding wizard', () => {
 
   test('login-mode migration: existing player logs in and migrates guest progress', async ({ page }) => {
     const existingPlayer = makePlayer({ email: 'existing@test.com', password: 'TestPass1!' })
-    const state = setupMockApi(page, { players: [existingPlayer] })
+    const state = setupMockApi(page, { players: [existingPlayer, makePlayer({ id: 'guest-shadow-player' })] })
     await page.goto('/onboarding')
     await completeGuestSteps1to4(page)
 
@@ -887,7 +893,7 @@ test.describe('Guest onboarding wizard', () => {
       onboardingCompletedAtUtc: new Date().toISOString(),
       onboardingShopBuildingId: 'building-shop-done',
     })
-    const state = setupMockApi(page, { players: [completedPlayer] })
+    const state = setupMockApi(page, { players: [completedPlayer, makePlayer({ id: 'guest-shadow-player-2' })] })
     await page.goto('/onboarding')
     await completeGuestSteps1to4(page)
 
@@ -1280,7 +1286,7 @@ test.describe('Full onboarding journey', () => {
     await page.getByLabel('Password').fill('TestPass1!')
     await page.getByRole('button', { name: 'Create Account' }).first().click()
     await page.waitForURL('/')
-    await page.waitForFunction(() => !!localStorage.getItem('auth_token'))
+    await expect(page.getByRole('link', { name: 'Start Your Empire' })).toBeVisible()
 
     // Go to onboarding
     await page.goto('/onboarding')

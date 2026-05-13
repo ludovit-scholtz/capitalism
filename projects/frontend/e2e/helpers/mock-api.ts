@@ -3472,6 +3472,17 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     })
   })
 
+  page.route('**/auth/session', async (route) => {
+    if (route.request().method() !== 'POST') {
+      return route.fallback()
+    }
+
+    return route.fulfill({
+      status: 204,
+      body: '',
+    })
+  })
+
   page.route('**/graphql', async (route) => {
     const routeJson = (data: unknown) =>
       route.fulfill({

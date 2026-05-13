@@ -394,9 +394,13 @@ export async function adjustGoldTokenBalance(
 export async function revokePlayerSessions(token: string, playerId: string): Promise<void> {
   const response = await fetch(`${MASTER_API_BASE_URL}/admin/sessions/${playerId}/revoke-all`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    credentials: 'include',
+    headers:
+      token && token !== 'cookie-session'
+        ? {
+            Authorization: `Bearer ${token}`,
+          }
+        : undefined,
   })
   if (!response.ok) {
     throw new Error('Failed to revoke sessions.')

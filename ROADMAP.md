@@ -103,5 +103,5 @@ Create a fun game in the style of Capitalism II, where players experience realis
 - [x] (100%) Trust `X-Forwarded-For` only from configured reverse proxies, fall back to `RemoteIpAddress` otherwise, and test that spoofed headers cannot rotate rate-limit identities.
 - [ ] Normalize duplicate registration errors so message, extension code, and timing do not reveal whether an email already exists in either API.
 - [x] (100%) Move the game API seed admin password out of committed defaults (`__SET_IN_ENV__` + `.env.example`/README guidance), and block non-Development startup when `Auth:PasswordAuthEnabled=true` and `SeedData:AdminPassword` is missing/placeholder while keeping Development warning-only.
-- [ ] Evaluate moving frontend auth sessions from `localStorage` to HttpOnly SameSite cookies or a backend-for-frontend session pattern to reduce XSS token theft blast radius.
+- [x] (100%) Move game-frontend browser sessions to HttpOnly SameSite cookie auth (`credentials: include`) and stop persisting JWT session tokens in `localStorage`/`sessionStorage` for normal gameplay requests.
 - [ ] Finish canonical object-authorization error normalization in legacy economy CRUD paths and keep the GraphQL surface inventory gate aligned with the normalized contract.
