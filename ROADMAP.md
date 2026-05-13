@@ -82,7 +82,7 @@ Create a fun game in the style of Capitalism II, where players experience realis
 ### Security Improvements
 
 - [x] (100%) Harden GraphQL pre-execution middlewares to inspect every selected root field in named operations and every JSON-array batched item, covering auth rate limits, introspection, depth, and complexity.
-- [ ] Trust `X-Forwarded-For` only from configured reverse proxies, fall back to `RemoteIpAddress` otherwise, and test that spoofed headers cannot rotate rate-limit identities.
+- [x] (100%) Trust `X-Forwarded-For` only from configured reverse proxies, fall back to `RemoteIpAddress` otherwise, and test that spoofed headers cannot rotate rate-limit identities.
 - [ ] Normalize duplicate registration errors so message, extension code, and timing do not reveal whether an email already exists in either API.
 - [ ] Move the game API seed admin password out of committed defaults, and block non-Development startup when password auth uses a placeholder seed credential.
 - [ ] Evaluate moving frontend auth sessions from `localStorage` to HttpOnly SameSite cookies or a backend-for-frontend session pattern to reduce XSS token theft blast radius.

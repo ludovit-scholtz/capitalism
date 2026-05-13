@@ -26,7 +26,7 @@ public sealed class AuthRateLimitMiddleware(
         ILogger<AuthRateLimitMiddleware> logger)
     {
         // Disable rate limiting in Development and Testing to avoid slowing local dev and CI.
-        if (env.IsDevelopment() || env.IsEnvironment("Testing"))
+        if (env.IsDevelopment() || (env.IsEnvironment("Testing") && !authOptions.Value.EnableRateLimitInTesting))
         {
             await next(context);
             return;
@@ -137,18 +137,6 @@ public sealed class AuthRateLimitMiddleware(
 
     private static string GetClientIp(HttpContext context)
     {
-        // Respect X-Forwarded-For set by a trusted reverse proxy.
-        var forwarded = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(forwarded))
-        {
-            // Take only the first (leftmost) address in the chain.
-            var first = forwarded.Split(',')[0].Trim();
-            if (!string.IsNullOrWhiteSpace(first))
-            {
-                return first;
-            }
-        }
-
         return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
     }
 
