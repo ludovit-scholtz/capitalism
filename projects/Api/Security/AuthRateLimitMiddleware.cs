@@ -281,7 +281,12 @@ public sealed class AuthRateLimitMiddleware(
     private static bool TryGetBearerSubject(HttpContext context, out string subject)
     {
         subject = string.Empty;
-        var authorization = context.Request.Headers.Authorization.ToString();
+        if (!context.Request.Headers.TryGetValue("Authorization", out var authorizationHeader))
+        {
+            return false;
+        }
+
+        var authorization = authorizationHeader.FirstOrDefault() ?? string.Empty;
         if (!authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
         {
             return false;

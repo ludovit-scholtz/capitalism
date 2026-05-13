@@ -410,7 +410,15 @@ public sealed class GraphQlRequestSecurityMiddleware(
     private static int ResolveFieldWeight(string fieldName)
         => FieldWeights.TryGetValue(fieldName, out var weight) ? weight : 1;
 
+    /// <summary>
+    /// Parsed GraphQL HTTP payload item with optional operation name.
+    /// Supports both single-object and JSON-array batch request bodies.
+    /// </summary>
     private sealed record GraphQlRequestItem(string? Query, string? OperationName);
 
+    /// <summary>
+    /// Aggregate complexity values for a selected operation set.
+    /// Includes the total complexity score and per-root-field contribution map.
+    /// </summary>
     private sealed record ComplexityBreakdown(int Total, IReadOnlyDictionary<string, int> RootFields);
 }
