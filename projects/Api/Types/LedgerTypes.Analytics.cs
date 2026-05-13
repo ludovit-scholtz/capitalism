@@ -242,6 +242,27 @@ public sealed class MediaHouseAnalyticsResult
 }
 
 /// <summary>
+/// Lightweight public detail for a single media house.
+/// </summary>
+public sealed class MediaHouseDetailResult
+{
+    public Guid BuildingId { get; set; }
+    public string BuildingName { get; set; } = string.Empty;
+    public Guid CityId { get; set; }
+    public string CityName { get; set; } = string.Empty;
+    /// <summary>NEWSPAPER | RADIO | TV</summary>
+    public string MediaType { get; set; } = string.Empty;
+    /// <summary>Content quality score as percentage 0–100 relative to city+type leader.</summary>
+    public decimal ContentQualityScore { get; set; }
+    public decimal AccumulatedContent { get; set; }
+    public int CityRank { get; set; }
+    /// <summary>Current owner-configured spending level per tick. Hidden for non-owners.</summary>
+    public decimal? SpendingLevelPerTick { get; set; }
+    /// <summary>Advertising revenue for the latest game tick. Hidden for non-owners.</summary>
+    public decimal? RevenueThisTick { get; set; }
+}
+
+/// <summary>
 /// Seasonal demand outlook for a public sales unit.
 /// Shows the demand multiplier for each game-year quarter and the current seasonal context.
 /// </summary>

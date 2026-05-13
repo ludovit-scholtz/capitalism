@@ -65,6 +65,20 @@ public sealed class SetMediaHouseContentBudgetInput
     public decimal? ContentBudgetPerTick { get; set; }
 }
 
+/// <summary>Input for setting the per-tick spending level for a media house building.</summary>
+public sealed class SetMediaHouseSpendingLevelInput
+{
+    /// <summary>MEDIA_HOUSE building to configure.</summary>
+    public Guid BuildingId { get; set; }
+
+    /// <summary>
+    /// Amount to spend on content per tick.
+    /// Set to null or 0 to stop content investment.
+    /// Must be non-negative.
+    /// </summary>
+    public decimal? SpendingLevelPerTick { get; set; }
+}
+
 /// <summary>Input for upgrading a media house building to the next level.</summary>
 public sealed class UpgradeMediaHouseInput
 {

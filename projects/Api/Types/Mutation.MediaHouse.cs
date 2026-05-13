@@ -11,6 +11,26 @@ namespace Api.Types;
 public sealed partial class Mutation
 {
     /// <summary>
+    /// Alias mutation for setting the per-tick spending level on a MEDIA_HOUSE.
+    /// Delegates to <see cref="SetMediaHouseContentBudget"/>.
+    /// </summary>
+    [Authorize]
+    public Task<Building> SetMediaHouseSpendingLevel(
+        SetMediaHouseSpendingLevelInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        return SetMediaHouseContentBudget(
+            new SetMediaHouseContentBudgetInput
+            {
+                BuildingId = input.BuildingId,
+                ContentBudgetPerTick = input.SpendingLevelPerTick,
+            },
+            db,
+            httpContextAccessor);
+    }
+
+    /// <summary>
     /// Sets the per-tick content spending budget for a player-owned MEDIA_HOUSE building.
     /// Each tick the specified amount is deducted from the company cash and converted to
     /// accumulated content using the level-based efficiency formula
