@@ -6,15 +6,23 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 ### Building Unit Grid Configuration System (Core Production Chain)
 
-- [x] (100%) Building Unit Grid Configuration System is fully live: players configure interactive 4×4 production-unit grids inside Mine, Factory, Sales Shop, and R&D buildings. The system is the core gameplay mechanic that turns map buildings into a living economic simulation.
-  - `storeBuildingConfiguration` mutation validates grid constraints (max 1 unit per cell, valid unit type per building type, link validity), deducts upgrade costs from company bank account, and applies layout atomically.
-  - `scheduleUnitUpgrade` mutation queues a unit-level upgrade with tick countdown and 90% cost refund on cancellation.
-  - `cancelPendingConfiguration` mutation discards a staged plan and unlocks the building for new changes.
-  - Mine buildings allow MINING, STORAGE, B2B_SALES; Factory adds PURCHASE, MANUFACTURING, BRANDING; Sales Shop allows PURCHASE, MARKETING, STORAGE, PUBLIC_SALES; R&D allows PRODUCT_QUALITY, BRAND_QUALITY.
-  - Tick engine phases execute unit processing: MiningPhase fills mining-unit inventory from deposit lots each tick respecting diminishing-return efficiency; ManufacturingPhase converts linked inputs to outputs; PublicSalesPhase and B2BSalesPhase settle sales and credit company bank accounts.
-  - `buildingDetail` query returns full unit grid with resource history sparklines (last 100 ticks per unit).
-  - Frontend `BuildingDetailView` renders the 4×4 interactive grid with unit-type icons, fill bars, level badges, link arrows, edit/staging mode, and desktop side-by-side layout.
-  - Integration tests: happy-path Mine/Factory/SalesShop configuration, invalid unit type rejection, unauthenticated access rejection, cancel pending plan, tick-engine mining inventory production, upgrade lifecycle.
+- [ ] Move Energy Settings to building editation tab
+- [ ] When building is in editation mode, make sure the tabs are properly used in routing
+- [ ] Unit configuration - the performance tab is not styled properly. Make sure to use the best practices, use tailwind and redisign the whole tab.
+- [ ] Unit configuration - the maintanance tab is not styled properly. Make sure to use the best practices, use tailwind and redisign the whole tab.
+
+### Products definition
+
+- [ ] Make sure every product and resource has different picture. Please use high quality photographic pictures for each resource
+
+### Onboarding
+
+- [ ] In onboarding and in the personal account name configuration in game frontend and also in the master frontend add an icons to select a gender - male or female (using icons). When user clicks on the icon generate either female or generate male make sure to generate friendly personal account name in specified gender.
+
+### Stock exchange
+
+- [ ] For trading specific company create a full page layout. Make sure the routing is correctly setup - /stock/trade/:companyId. 
+- [ ] Move the `Limit-order book` component to the full page layout for trading one company and remove the stock selection in the limit order book (should be selected by the companyId in the routing).
 
 ### Buildings & Land Map System (Core Gameplay Loop)
 
