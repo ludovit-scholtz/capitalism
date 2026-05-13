@@ -293,10 +293,17 @@ public sealed partial class Query
     public async Task<List<CityMediaHouseInfo>> GetCityMediaHouses(
         Guid cityId,
         Guid? ownerCompanyId,
+        string? category,
         [Service] AppDbContext db)
     {
+        var normalizedCategory = string.IsNullOrWhiteSpace(category)
+            ? null
+            : category.Trim().ToUpperInvariant();
+
         var mediaHouses = await db.Buildings
-            .Where(b => b.CityId == cityId && b.Type == Data.Entities.BuildingType.MediaHouse)
+            .Where(b => b.CityId == cityId
+                && b.Type == Data.Entities.BuildingType.MediaHouse
+                && (normalizedCategory == null || (b.MediaType ?? string.Empty) == normalizedCategory))
             .Include(b => b.Company)
             .Include(b => b.City)
             .AsNoTracking()

@@ -10,6 +10,71 @@ namespace Api.Types;
 public sealed partial class Query
 {
     /// <summary>
+    /// Returns detail for a single MEDIA_HOUSE including content score and city rank.
+    /// Spending level and latest-tick revenue are returned only to the owner.
+    /// </summary>
+    public async Task<MediaHouseDetailResult?> GetMediaHouseDetail(
+        Guid buildingId,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var building = await db.Buildings
+            .Include(b => b.Company)
+            .Include(b => b.City)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(b => b.Id == buildingId && b.Type == BuildingType.MediaHouse);
+
+        if (building is null)
+            return null;
+
+        var userId = httpContextAccessor.HttpContext?.User.GetUserId();
+        var isOwner = userId.HasValue && building.Company.PlayerId == userId.Value;
+
+        var peers = await db.Buildings
+            .Where(b => b.CityId == building.CityId
+                && b.Type == BuildingType.MediaHouse
+                && (b.MediaType ?? string.Empty) == (building.MediaType ?? string.Empty))
+            .AsNoTracking()
+            .ToListAsync();
+
+        var maxContent = peers.Count > 0 ? peers.Max(b => b.ContentValue) : 0m;
+        var contentScore = maxContent > 0m
+            ? Math.Round(Math.Clamp(building.ContentValue / maxContent, 0m, 1m) * 100m, 1)
+            : 0m;
+
+        var rank = peers
+            .OrderByDescending(b => b.ContentValue)
+            .ThenBy(b => b.Id)
+            .Select((b, index) => new { b.Id, Rank = index + 1 })
+            .FirstOrDefault(x => x.Id == building.Id)?.Rank ?? 1;
+
+        decimal? revenueThisTick = null;
+        if (isOwner)
+        {
+            var currentTick = (await db.GameStates.FirstOrDefaultDeterministicAsync())?.CurrentTick ?? 0;
+            revenueThisTick = await db.LedgerEntries
+                .Where(e => e.BuildingId == building.Id
+                    && e.Category == LedgerCategory.MediaHouseIncome
+                    && e.RecordedAtTick == currentTick)
+                .SumAsync(e => e.Amount);
+        }
+
+        return new MediaHouseDetailResult
+        {
+            BuildingId = building.Id,
+            BuildingName = building.Name,
+            CityId = building.CityId,
+            CityName = building.City.Name,
+            MediaType = building.MediaType ?? MediaType.Newspaper,
+            ContentQualityScore = contentScore,
+            AccumulatedContent = building.ContentValue,
+            CityRank = rank,
+            SpendingLevelPerTick = isOwner ? building.ContentBudgetPerTick : null,
+            RevenueThisTick = isOwner ? revenueThisTick : null,
+        };
+    }
+
+    /// <summary>
     /// Returns brand-impact analytics for a MEDIA_HOUSE building.
     /// Shows how the outlet's content value, content ranking, and advertising income
     /// influence brand awareness and marketing quality across the city.

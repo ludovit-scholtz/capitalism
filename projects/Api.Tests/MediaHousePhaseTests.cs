@@ -595,4 +595,200 @@ public sealed class MediaHousePhaseTests
         Assert.True(stats.GetProperty("campaignCostThisTaxCycle").GetDecimal() > 0m);
         Assert.True(stats.GetProperty("units").GetArrayLength() > 0);
     }
+
+    [Fact]
+    public async Task SetMediaHouseSpendingLevel_Mutation_UpdatesBudget()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var email = $"media-spending-{Guid.NewGuid():N}@test.com";
+        var register = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            RegisterMutation,
+            new { input = new { email, displayName = "Spending User", password = "TestPass123!" } });
+        var token = register.GetProperty("data").GetProperty("register").GetProperty("token").GetString()!;
+        var userId = Guid.Parse(register.GetProperty("data").GetProperty("register").GetProperty("player").GetProperty("id").GetString()!);
+
+        var city = await db.Cities.FirstDeterministicAsync();
+        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync() ?? throw new InvalidOperationException("Game state missing.");
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = userId, Name = "Spending Corp", FoundedAtUtc = DateTime.UtcNow, FoundedAtTick = gameState.CurrentTick };
+        db.Companies.Add(company);
+        var building = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.MediaHouse,
+            Name = "Spending Station",
+            MediaType = MediaType.Radio,
+            Level = 1,
+        };
+        db.Buildings.Add(building);
+        await db.SaveChangesAsync();
+
+        const string mutation = """
+            mutation SetSpending($input: SetMediaHouseSpendingLevelInput!) {
+              setMediaHouseSpendingLevel(input: $input) {
+                id
+                contentBudgetPerTick
+              }
+            }
+            """;
+
+        var result = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            mutation,
+            new { input = new { buildingId = building.Id, spendingLevelPerTick = 450m } },
+            token);
+
+        var updated = result.GetProperty("data").GetProperty("setMediaHouseSpendingLevel");
+        Assert.Equal(450m, updated.GetProperty("contentBudgetPerTick").GetDecimal());
+    }
+
+    [Fact]
+    public async Task SetMediaHouseSpendingLevel_Mutation_Unauthenticated_ReturnsError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        const string mutation = """
+            mutation SetSpending($input: SetMediaHouseSpendingLevelInput!) {
+              setMediaHouseSpendingLevel(input: $input) { id }
+            }
+            """;
+
+        var result = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            mutation,
+            new { input = new { buildingId = Guid.NewGuid(), spendingLevelPerTick = 100m } });
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.True(errors.GetArrayLength() > 0);
+    }
+
+    [Fact]
+    public async Task MediaHouseDetail_Query_RedactsOwnerOnlyFieldsForForeignViewer()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var ownerEmail = $"media-owner-{Guid.NewGuid():N}@test.com";
+        var ownerRegister = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            RegisterMutation,
+            new { input = new { email = ownerEmail, displayName = "Owner", password = "TestPass123!" } });
+        var ownerId = Guid.Parse(ownerRegister.GetProperty("data").GetProperty("register").GetProperty("player").GetProperty("id").GetString()!);
+
+        var viewerEmail = $"media-viewer-{Guid.NewGuid():N}@test.com";
+        var viewerRegister = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            RegisterMutation,
+            new { input = new { email = viewerEmail, displayName = "Viewer", password = "TestPass123!" } });
+        var viewerToken = viewerRegister.GetProperty("data").GetProperty("register").GetProperty("token").GetString()!;
+
+        var city = await db.Cities.FirstDeterministicAsync();
+        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync() ?? throw new InvalidOperationException("Game state missing.");
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = ownerId, Name = "Owner Media", FoundedAtUtc = DateTime.UtcNow, FoundedAtTick = gameState.CurrentTick };
+        db.Companies.Add(company);
+        var building = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.MediaHouse,
+            Name = "Foreign Station",
+            MediaType = MediaType.Tv,
+            ContentValue = 900m,
+            ContentBudgetPerTick = 300m,
+            Level = 1,
+        };
+        db.Buildings.Add(building);
+        await db.SaveChangesAsync();
+
+        const string query = """
+            query Detail($buildingId: UUID!) {
+              mediaHouseDetail(buildingId: $buildingId) {
+                buildingId
+                contentQualityScore
+                spendingLevelPerTick
+                revenueThisTick
+              }
+            }
+            """;
+
+        var result = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            query,
+            new { buildingId = building.Id },
+            viewerToken);
+
+        var detail = result.GetProperty("data").GetProperty("mediaHouseDetail");
+        Assert.Equal(building.Id.ToString(), detail.GetProperty("buildingId").GetString());
+        Assert.True(detail.GetProperty("contentQualityScore").GetDecimal() >= 0m);
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, detail.GetProperty("spendingLevelPerTick").ValueKind);
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, detail.GetProperty("revenueThisTick").ValueKind);
+    }
+
+    [Fact]
+    public async Task CityMediaHouses_Query_CategoryFilter_ReturnsOnlyRequestedCategory()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = await db.Cities.FirstDeterministicAsync();
+        var player = new Player
+        {
+            Id = Guid.NewGuid(),
+            Email = $"media-filter-{Guid.NewGuid():N}@test.com",
+            DisplayName = "Filter Player",
+            PasswordHash = "hash",
+            Role = PlayerRole.Player,
+        };
+        db.Players.Add(player);
+        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync() ?? throw new InvalidOperationException("Game state missing.");
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Filter Co", FoundedAtUtc = DateTime.UtcNow, FoundedAtTick = gameState.CurrentTick };
+        db.Companies.Add(company);
+        db.Buildings.AddRange(
+            new Building
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                CityId = city.Id,
+                Type = BuildingType.MediaHouse,
+                Name = "Radio House",
+                MediaType = MediaType.Radio,
+                Level = 1,
+            },
+            new Building
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                CityId = city.Id,
+                Type = BuildingType.MediaHouse,
+                Name = "TV House",
+                MediaType = MediaType.Tv,
+                Level = 1,
+            });
+        await db.SaveChangesAsync();
+
+        const string query = """
+            query CityMedia($cityId: UUID!, $category: String) {
+              cityMediaHouses(cityId: $cityId, category: $category) {
+                mediaType
+              }
+            }
+            """;
+
+        var result = await TestHelpers.ExecuteGraphQlAsync(client, query, new { cityId = city.Id, category = "RADIO" });
+        var houses = result.GetProperty("data").GetProperty("cityMediaHouses").EnumerateArray().ToList();
+        Assert.NotEmpty(houses);
+        Assert.All(houses, house => Assert.Equal("RADIO", house.GetProperty("mediaType").GetString()));
+    }
 }
