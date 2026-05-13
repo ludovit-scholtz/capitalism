@@ -2441,6 +2441,7 @@ export default {
       CENTRAL_BANK_REPAY: 'Central Bank Repayment',
       MEDIA_HOUSE_INCOME: 'Media House Income',
       MEDIA_HOUSE_CONTENT: 'Content Investment',
+      SPOILAGE_LOSS: 'Spoilage Loss',
     },
     currency: 'Currency',
     mixedCurrencies: 'Multi-currency',
@@ -3055,6 +3056,17 @@ export default {
       topCompetitor: 'Top competitor budget (USD)',
       qualityPricePremium: 'Quality price premium',
       decayHint: 'Research budgets are normalized to USD for fair cross-city comparison and decay 0.1% per tick. Keep investing to maintain or grow your quality lead.',
+    },
+    competitors: {
+      title: 'Competitor Intelligence',
+      subtitle: 'Product quality rankings for this market',
+      rank: 'Rank',
+      company: 'Company',
+      qualityLevel: 'Quality',
+      pricePremium: 'Price Premium',
+      you: 'You',
+      noCompetitors: 'No competitors found for this product in this city.',
+      loadFailed: 'Failed to load competitor intelligence.',
     },
   },
   supplyChain: {
@@ -4191,5 +4203,11 @@ export default {
     listingCreated: 'Listing created successfully.',
     listingError: 'Failed to create listing.',
     spotRevenue: 'Spot revenue',
+  },
+  storage: {
+    freshness: {
+      label: 'Freshness',
+      tooltip: 'Freshness: {pct}% — this perishable product loses ~0.05% quality per tick.',
+    },
   },
 }

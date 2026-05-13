@@ -212,6 +212,9 @@ public sealed partial class AppDbInitializer(
 
         // Idempotent: backfill OriginalMaterialQuantity for lots that pre-date depletion tracking.
         await EnsureLotOriginalMaterialQuantityBackfillAsync();
+
+        // Idempotent: ensure FoodProcessing and Healthcare products are flagged as perishable.
+        await EnsurePerishableProductsAsync();
     }
 
     private async Task SeedFxRatesAsync()
@@ -276,6 +279,30 @@ public sealed partial class AppDbInitializer(
         }
 
         await dbContext.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Idempotent: sets <see cref="ProductType.IsPerishable"/> = true for all FoodProcessing
+    /// and Healthcare industry products.  Safe to run multiple times — only updates rows that
+    /// are not already marked perishable.
+    /// </summary>
+    private async Task EnsurePerishableProductsAsync()
+    {
+        var perishableIndustries = new[] { Industry.FoodProcessing, Industry.Healthcare };
+
+        var productsToMark = await dbContext.ProductTypes
+            .Where(p => perishableIndustries.Contains(p.Industry) && !p.IsPerishable)
+            .ToListAsync();
+
+        foreach (var product in productsToMark)
+        {
+            product.IsPerishable = true;
+        }
+
+        if (productsToMark.Count > 0)
+        {
+            await dbContext.SaveChangesAsync();
+        }
     }
 
 }

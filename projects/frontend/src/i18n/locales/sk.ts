@@ -2436,6 +2436,7 @@ export default {
       CENTRAL_BANK_REPAY: 'Splátka centrálnej banke',
       MEDIA_HOUSE_INCOME: 'Príjem mediálneho domu',
       MEDIA_HOUSE_CONTENT: 'Investícia do obsahu',
+      SPOILAGE_LOSS: 'Strata skazením',
     },
     currency: 'Mena',
     mixedCurrencies: 'Viac mien',
@@ -3049,6 +3050,17 @@ export default {
       qualityPricePremium: 'Cenová prémia za kvalitu',
       decayHint:
         'Výskumné rozpočty sú normalizované v USD pre spravodlivé porovnanie naprieč mestami a klesajú o 0,1 % za tik. Pokračujte v investíciách, aby ste si udržali alebo zvýšili vedúce postavenie v kvalite.',
+    },
+    competitors: {
+      title: 'Prieskum konkurencie',
+      subtitle: 'Rebríček kvality produktov na tomto trhu',
+      rank: 'Poradie',
+      company: 'Spoločnosť',
+      qualityLevel: 'Kvalita',
+      pricePremium: 'Cenová prémia',
+      you: 'Vy',
+      noCompetitors: 'Pre tento produkt v tomto meste neboli nájdení žiadni konkurenti.',
+      loadFailed: 'Načítanie prieskumu konkurencie zlyhalo.',
     },
   },
   supplyChain: {
@@ -4180,5 +4192,11 @@ export default {
     listingCreated: 'Ponuka úspešne vytvorená.',
     listingError: 'Nepodarilo sa vytvoriť ponuku.',
     spotRevenue: 'Výnosy zo spotu',
+  },
+  storage: {
+    freshness: {
+      label: 'Čerstvosť',
+      tooltip: 'Čerstvosť: {pct}% — tento skaziteľný produkt stráca ~0,05 % kvality za tik.',
+    },
   },
 }

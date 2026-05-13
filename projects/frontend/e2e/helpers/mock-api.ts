@@ -533,6 +533,7 @@ export type MockProductType = {
   imageUrl?: string | null
   isProOnly: boolean
   isUnlockedForCurrentPlayer?: boolean
+  isPerishable?: boolean
   description: string | null
   recipes: {
     resourceType?: { id: string; name: string; slug?: string; unitName?: string; unitSymbol?: string } | null
@@ -1333,6 +1334,8 @@ export type MockState = {
   marketOverviewByCityId: Record<string, MockMarketDemandSummary | null>
   /** Mock marketPriceHistory data, keyed by productTypeId. Returns an empty array when not set. */
   marketPriceHistoryByProductId: Record<string, MockMarketPriceHistoryPoint[]>
+  /** Mock competitorQualityIntelligence data, keyed by `${cityId}:${productTypeId}`. Returns an empty array when not set. */
+  competitorIntelligenceByKey: Record<string, MockCompetitorQualityEntry[]>
 }
 
 export interface MockMarketDemandSummary {
@@ -1360,6 +1363,14 @@ export interface MockMarketPriceHistoryPoint {
   totalVolume: number
   totalRevenue: number
   sellerCount: number
+}
+
+export interface MockCompetitorQualityEntry {
+  companyId: string
+  companyName: string
+  qualityLevel: number
+  pricePremiumPct: number
+  isOwnCompany: boolean
 }
 
 export interface MockBuildingMarketListing {
@@ -3133,6 +3144,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     supplyChainData: {},
     marketOverviewByCityId: {},
     marketPriceHistoryByProductId: {},
+    competitorIntelligenceByKey: {},
     buildingMarketListings: [],
     myBuildingListings: [],
     tradeRoutes: [],
@@ -9376,7 +9388,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       // R&D research queries contain 'name' / 'productName' fields which have 'me' as substring
       !q.includes('brandQualityOverview') &&
       !q.includes('productQualityProfile') &&
-      !q.includes('buildingResearchProgress')
+      !q.includes('buildingResearchProgress') &&
+      // competitorQualityIntelligence contains companyName which has 'me' as substring
+      !q.includes('competitorQualityIntelligence')
 
     if (isStandaloneMeQuery(query)) {
       const player = resolveCurrentPlayer()
@@ -9698,6 +9712,25 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { cityDemandSummary: result } }),
+      })
+    }
+
+    if (query.includes('competitorQualityIntelligence')) {
+      if (!state.currentUserId) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Not authenticated', extensions: { code: 'AUTH_NOT_AUTHORIZED' } }] }),
+        })
+      }
+      const cityId: string = body.variables?.cityId ?? ''
+      const productTypeId: string = body.variables?.productTypeId ?? ''
+      const key = `${cityId}:${productTypeId}`
+      const entries = state.competitorIntelligenceByKey[key] ?? state.competitorIntelligenceByKey[productTypeId] ?? []
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { competitorQualityIntelligence: entries } }),
       })
     }
 

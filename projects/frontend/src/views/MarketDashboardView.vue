@@ -25,7 +25,31 @@ const cities = ref<City[]>([])
 const overviewData = ref<CityDemandSummaryResult[]>([])
 const selectedProduct = ref<ProductDemandEntry | null>(null)
 
+interface CompetitorQualityEntry {
+  companyId: string
+  companyName: string
+  qualityLevel: number
+  pricePremiumPct: number
+  isOwnCompany: boolean
+}
+
+const competitorEntries = ref<CompetitorQualityEntry[]>([])
+const competitorLoading = ref(false)
+const competitorError = ref<string | null>(null)
+
 const CITIES_QUERY = `{ cities { id name currencyCode } }`
+
+const COMPETITOR_INTELLIGENCE_QUERY = `
+  query CompetitorIntelligence($cityId: UUID!, $productTypeId: UUID!) {
+    competitorQualityIntelligence(cityId: $cityId, productTypeId: $productTypeId) {
+      companyId
+      companyName
+      qualityLevel
+      pricePremiumPct
+      isOwnCompany
+    }
+  }
+`
 
 const MARKET_OVERVIEW_QUERY = `
   query MarketOverview($topN: Int!, $lastNTicks: Int!) {
@@ -70,9 +94,46 @@ function satisfactionLabel(rate: number): string {
 function selectProduct(product: ProductDemandEntry) {
   if (selectedProduct.value?.productTypeId === product.productTypeId) {
     selectedProduct.value = null
+    competitorEntries.value = []
   } else {
     selectedProduct.value = product
+    loadCompetitorIntelligence(product.productTypeId)
   }
+}
+
+async function loadCompetitorIntelligence(productTypeId: string) {
+  const cityId = activeCityData.value?.cityId
+  if (!cityId) return
+
+  competitorLoading.value = true
+  competitorError.value = null
+  competitorEntries.value = []
+  try {
+    const result = await gqlRequest<{ competitorQualityIntelligence: CompetitorQualityEntry[] }>(
+      COMPETITOR_INTELLIGENCE_QUERY,
+      { cityId, productTypeId },
+    )
+    competitorEntries.value = result.competitorQualityIntelligence ?? []
+  } catch (err) {
+    console.error('[CompetitorIntelligence] Failed to load competitor intelligence:', err)
+    competitorError.value = t('research.competitors.loadFailed')
+  } finally {
+    competitorLoading.value = false
+  }
+}
+
+function rankMedal(rank: number): string {
+  if (rank === 1) return '🥇'
+  if (rank === 2) return '🥈'
+  if (rank === 3) return '🥉'
+  return String(rank)
+}
+
+function qualityBadgeClass(level: number): string {
+  if (level >= 8) return 'quality-gold'
+  if (level >= 5) return 'quality-green'
+  if (level >= 2) return 'quality-blue'
+  return 'quality-dim'
 }
 
 async function loadData(isRefresh = false) {
@@ -195,6 +256,49 @@ useTickRefresh(() => loadData(true))
         :city-id="activeCityData.cityId"
         :currency-code="activeCityData.currencyCode"
       />
+
+      <!-- Competitor Intelligence (shown when a product row is clicked) -->
+      <section v-if="selectedProduct" class="competitor-section">
+        <header class="competitor-header">
+          <h2 class="competitor-title">{{ t('research.competitors.title') }}</h2>
+          <p class="competitor-subtitle">{{ t('research.competitors.subtitle') }}</p>
+        </header>
+
+        <div v-if="competitorLoading" class="market-loading">
+          <span class="spinner" aria-busy="true" />
+        </div>
+        <p v-else-if="competitorError" class="market-error">{{ competitorError }}</p>
+        <p v-else-if="competitorEntries.length === 0" class="market-empty">
+          {{ t('research.competitors.noCompetitors') }}
+        </p>
+        <div v-else class="competitor-grid" role="table" :aria-label="t('research.competitors.title')">
+          <div class="competitor-grid-header" role="row">
+            <span role="columnheader">{{ t('research.competitors.rank') }}</span>
+            <span role="columnheader">{{ t('research.competitors.company') }}</span>
+            <span role="columnheader" class="col-right">{{ t('research.competitors.qualityLevel') }}</span>
+            <span role="columnheader" class="col-right">{{ t('research.competitors.pricePremium') }}</span>
+          </div>
+          <div
+            v-for="(entry, index) in competitorEntries"
+            :key="entry.companyId"
+            class="competitor-row"
+            :class="{ 'competitor-row--own': entry.isOwnCompany }"
+            role="row"
+          >
+            <span class="competitor-rank" role="cell">{{ rankMedal(index + 1) }}</span>
+            <span class="competitor-name" role="cell">
+              {{ entry.companyName }}
+              <span v-if="entry.isOwnCompany" class="you-badge">{{ t('research.competitors.you') }}</span>
+            </span>
+            <span class="competitor-quality col-right" role="cell">
+              <span class="quality-badge" :class="qualityBadgeClass(entry.qualityLevel)">
+                {{ entry.qualityLevel.toFixed(1) }}
+              </span>
+            </span>
+            <span class="competitor-premium col-right" role="cell">{{ entry.pricePremiumPct > 0 ? '+' : '' }}{{ entry.pricePremiumPct.toFixed(1) }}%</span>
+          </div>
+        </div>
+      </section>
     </template>
     <div v-else class="market-empty">{{ t('marketDashboard.noData') }}</div>
   </div>
@@ -441,5 +545,111 @@ useTickRefresh(() => loadData(true))
   .product-sellers {
     display: none;
   }
+}
+
+/* ── Competitor Intelligence ── */
+.competitor-section {
+  margin-top: 1rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.competitor-header {
+  padding: 1rem 1.25rem 0.75rem;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.competitor-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 0.2rem;
+  color: var(--color-text-primary);
+}
+
+.competitor-subtitle {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.competitor-grid {
+  display: flex;
+  flex-direction: column;
+}
+
+.competitor-grid-header,
+.competitor-row {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr 6rem 7rem;
+  align-items: center;
+  padding: 0.5rem 1.25rem;
+  gap: 0.5rem;
+}
+
+.competitor-grid-header {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.competitor-row {
+  border-bottom: 1px solid var(--color-divider);
+  font-size: 0.875rem;
+}
+
+.competitor-row:last-child {
+  border-bottom: none;
+}
+
+.competitor-row--own {
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.competitor-rank {
+  font-size: 1.1rem;
+  text-align: center;
+}
+
+.competitor-name {
+  color: var(--color-text-primary);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.you-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  background: rgba(99, 102, 241, 0.2);
+  color: #818cf8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.quality-badge {
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.quality-gold  { background: rgba(234, 179, 8, 0.2);  color: #eab308; }
+.quality-green { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+.quality-blue  { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+.quality-dim   { background: var(--color-surface-2); color: var(--color-text-muted); }
+
+.competitor-premium {
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
 }
 </style>

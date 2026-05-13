@@ -25,7 +25,8 @@ public sealed partial class AppDbInitializer
             IsProOnly = proOnlySlugs.Contains(seed.Slug),
             UnitName = seed.UnitName,
             UnitSymbol = seed.UnitSymbol,
-            Description = seed.Description
+            Description = seed.Description,
+            IsPerishable = seed.IsPerishable
         }));
     }
 

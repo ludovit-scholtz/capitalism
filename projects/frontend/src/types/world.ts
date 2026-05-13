@@ -32,6 +32,8 @@ export interface ProductType {
   isProOnly: boolean
   isUnlockedForCurrentPlayer: boolean
   description: string | null
+  /** Whether this product decays in storage (food, beverage, healthcare). */
+  isPerishable: boolean
   recipes: Recipe[]
 }
 

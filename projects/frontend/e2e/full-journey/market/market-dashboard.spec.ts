@@ -4,6 +4,7 @@ import {
   makePlayer,
   type MockMarketDemandSummary,
   type MockMarketPriceHistoryPoint,
+  type MockCompetitorQualityEntry,
 } from '../../helpers/mock-api'
 
 const CHAIR_PRODUCT_ID = 'pt-wooden-chair'
@@ -528,4 +529,143 @@ test('hides price history panel when same product row is clicked again', async (
   await chairRow.click()
   await expect(page.locator('.price-history-panel')).toBeHidden()
 })
+
+// ─── Competitor Intelligence ────────────────────────────────────────────────
+
+function setupPlayerWithMarketData(page: Parameters<typeof setupMockApi>[0]) {
+  const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+  const state = setupMockApi(page, { players: [player] })
+  state.currentUserId = player.id
+  state.currentToken = `token-${player.id}`
+  state.marketOverviewByCityId = {
+    'city-ba': makeMarketSummary('city-ba', 'Bratislava', 'EUR'),
+  }
+  return { player, state }
+}
+
+test('shows "Competitor Intelligence" section after clicking a product row', async ({ page }) => {
+  const { player, state } = setupPlayerWithMarketData(page)
+  // No competitors seeded → empty state expected
+  state.competitorIntelligenceByKey = {}
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${player.id}`)
+
+  await page.goto('/market')
+  const chairRow = page.locator('.product-row').first()
+  await expect(chairRow).toBeVisible()
+  await chairRow.click()
+
+  // Competitor Intelligence heading must appear
+  await expect(page.getByRole('heading', { name: 'Competitor Intelligence' })).toBeVisible()
+  // Empty state message when no data seeded
+  await expect(page.getByText('No competitors found for this product in this city.')).toBeVisible()
+})
+
+test('shows competitor quality leaderboard with ranked entries', async ({ page }) => {
+  const { player, state } = setupPlayerWithMarketData(page)
+
+  const competitors: MockCompetitorQualityEntry[] = [
+    { companyId: 'comp-a', companyName: 'Apex Furniture', qualityLevel: 8.5, pricePremiumPct: 8.5, isOwnCompany: false },
+    { companyId: 'comp-b', companyName: 'BestWood Co.', qualityLevel: 6.0, pricePremiumPct: 6.0, isOwnCompany: false },
+    { companyId: 'comp-c', companyName: 'MyFactory Ltd', qualityLevel: 4.5, pricePremiumPct: 4.5, isOwnCompany: true },
+  ]
+  // Key by productTypeId for simplicity (mock supports bare productTypeId key)
+  state.competitorIntelligenceByKey = { [CHAIR_PRODUCT_ID]: competitors }
+
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${player.id}`)
+
+  await page.goto('/market')
+  const chairRow = page.locator('.product-row').first()
+  await expect(chairRow).toBeVisible()
+  await chairRow.click()
+
+  // Leaderboard table is visible
+  const grid = page.locator('.competitor-grid')
+  await expect(grid).toBeVisible()
+
+  // All three competitor names visible
+  await expect(grid.getByText('Apex Furniture')).toBeVisible()
+  await expect(grid.getByText('BestWood Co.')).toBeVisible()
+  await expect(grid.getByText('MyFactory Ltd')).toBeVisible()
+
+  // Own company row has "You" badge
+  const ownRow = page.locator('.competitor-row--own')
+  await expect(ownRow).toBeVisible()
+  await expect(ownRow.getByText('You')).toBeVisible()
+
+  // Quality badges for first and last
+  const rows = page.locator('.competitor-row')
+  await expect(rows).toHaveCount(3)
+
+  // Medal icons: 🥇 for rank 1 (Apex), 🥈 for rank 2 (BestWood), 🥉 for rank 3 (MyFactory)
+  await expect(rows.nth(0).locator('.competitor-rank')).toContainText('🥇')
+  await expect(rows.nth(1).locator('.competitor-rank')).toContainText('🥈')
+  await expect(rows.nth(2).locator('.competitor-rank')).toContainText('🥉')
+})
+
+test('competitor leaderboard disappears when product row is deselected', async ({ page }) => {
+  const { player, state } = setupPlayerWithMarketData(page)
+
+  const competitors: MockCompetitorQualityEntry[] = [
+    { companyId: 'comp-a', companyName: 'Rival Corp', qualityLevel: 7.0, pricePremiumPct: 7.0, isOwnCompany: false },
+  ]
+  state.competitorIntelligenceByKey = { [CHAIR_PRODUCT_ID]: competitors }
+
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${player.id}`)
+
+  await page.goto('/market')
+  const chairRow = page.locator('.product-row').first()
+  await expect(chairRow).toBeVisible()
+
+  // Open
+  await chairRow.click()
+  await expect(page.locator('.competitor-section')).toBeVisible()
+
+  // Close by clicking the same row again
+  await chairRow.click()
+  await expect(page.locator('.competitor-section')).toBeHidden()
+})
+
+test('competitor quality badge colours reflect quality tier', async ({ page }) => {
+  const { player, state } = setupPlayerWithMarketData(page)
+
+  const competitors: MockCompetitorQualityEntry[] = [
+    { companyId: 'comp-gold', companyName: 'Gold Co', qualityLevel: 8.2, pricePremiumPct: 8.2, isOwnCompany: false },
+    { companyId: 'comp-green', companyName: 'Green Co', qualityLevel: 5.5, pricePremiumPct: 5.5, isOwnCompany: false },
+    { companyId: 'comp-blue', companyName: 'Blue Co', qualityLevel: 2.3, pricePremiumPct: 2.3, isOwnCompany: false },
+    { companyId: 'comp-dim', companyName: 'Dim Co', qualityLevel: 0.0, pricePremiumPct: 0.0, isOwnCompany: false },
+  ]
+  state.competitorIntelligenceByKey = { [CHAIR_PRODUCT_ID]: competitors }
+
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${player.id}`)
+
+  await page.goto('/market')
+  const chairRow = page.locator('.product-row').first()
+  await expect(chairRow).toBeVisible()
+  await chairRow.click()
+
+  const rows = page.locator('.competitor-row')
+  await expect(rows).toHaveCount(4)
+
+  // Gold tier (≥8.0)
+  await expect(rows.nth(0).locator('.quality-badge')).toHaveClass(/quality-gold/)
+  // Green tier (≥5.0)
+  await expect(rows.nth(1).locator('.quality-badge')).toHaveClass(/quality-green/)
+  // Blue tier (≥2.0)
+  await expect(rows.nth(2).locator('.quality-badge')).toHaveClass(/quality-blue/)
+  // Dim tier (<2.0)
+  await expect(rows.nth(3).locator('.quality-badge')).toHaveClass(/quality-dim/)
+})
+
 

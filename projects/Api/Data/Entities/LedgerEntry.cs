@@ -108,4 +108,6 @@ public static class LedgerCategory
     /// Amount is negative. Written each tick in <c>EnergySpotMarketPhase</c>.
     /// </summary>
     public const string SpotMarketEnergyCost = "SPOT_MARKET_ENERGY_COST";
+    /// <summary>Expense recorded when perishable inventory quality reaches zero and the entire stock is written off.</summary>
+    public const string SpoilageLoss = "SPOILAGE_LOSS";
 }

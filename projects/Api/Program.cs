@@ -411,6 +411,7 @@ public class Program
         builder.Services.AddScoped<ITickPhase, MediaHouseContentPhase>();
         builder.Services.AddScoped<ITickPhase, MarketingPhase>();
         builder.Services.AddScoped<ITickPhase, ResearchPhase>();
+        builder.Services.AddScoped<ITickPhase, QualityDecayPhase>();
         builder.Services.AddScoped<ITickPhase, RentPhase>();
         builder.Services.AddScoped<ITickPhase, StockLimitOrderMatchingPhase>();
         builder.Services.AddScoped<ITickPhase, LoanRepaymentPhase>();

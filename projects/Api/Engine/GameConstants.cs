@@ -324,6 +324,13 @@ public static partial class GameConstants
     public const decimal ResearchDecayRate = 0.001m;
 
     /// <summary>
+    /// Quality decay rate per tick for perishable product inventory stored in STORAGE units.
+    /// 0.0005 = 0.05% per tick — a fully-fresh product (quality 1.0) will lose 0.05% per game hour.
+    /// At 24 ticks/day, quality drops ~1.2% per in-game day; full spoilage from 1.0 takes ~2000 ticks.
+    /// </summary>
+    public const decimal QualityDecayRatePerTick = 0.0005m;
+
+    /// <summary>
     /// Minimum accumulated research budget required to reach 100% product quality when uncontested
     /// (i.e., the company is the sole researcher for that product).
     /// Computed as max(5 000, basePrice × 1 000) to give cheaper products a sensible floor.
