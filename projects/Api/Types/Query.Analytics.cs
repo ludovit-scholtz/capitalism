@@ -76,6 +76,104 @@ public sealed partial class Query
     }
 
     /// <summary>
+    /// Compatibility query for energy-grid status naming used by the product definition.
+    /// Returns city supply/demand in kW with currently constrained/offline buildings.
+    /// </summary>
+    public async Task<EnergyGridStatus> GetEnergyGridStatus(Guid cityId, [Service] AppDbContext db)
+    {
+        var buildings = await db.Buildings
+            .AsNoTracking()
+            .Where(b => b.CityId == cityId)
+            .ToListAsync();
+
+        var powerPlants = buildings.Where(b => b.Type == Data.Entities.BuildingType.PowerPlant).ToList();
+        var consumers = buildings.Where(b => b.Type != Data.Entities.BuildingType.PowerPlant).ToList();
+
+        var totalSupplyMw = powerPlants.Sum(plant =>
+            plant.PowerOutput > 0m
+                ? plant.PowerOutput!.Value
+                : GameConstants.DefaultPowerOutputMw(plant.PowerPlantType));
+
+        var totalDemandMw = consumers.Sum(building =>
+            building.PowerConsumption > 0m
+                ? building.PowerConsumption
+                : GameConstants.PowerDemandMw(building.Type, building.Level));
+
+        var offlineBuildings = consumers
+            .Where(b => b.PowerStatus is Data.Entities.PowerStatus.Offline or Data.Entities.PowerStatus.Constrained)
+            .Select(b => new OfflineEnergyBuilding
+            {
+                BuildingId = b.Id,
+                CompanyId = b.CompanyId,
+                BuildingName = b.Name,
+                PowerStatus = b.PowerStatus,
+                PowerPriority = b.PowerPriority,
+            })
+            .OrderByDescending(b => b.PowerPriority)
+            .ThenBy(b => b.BuildingName)
+            .ToList();
+
+        return new EnergyGridStatus
+        {
+            CityId = cityId,
+            TotalSupplyKw = decimal.Round(totalSupplyMw * 1000m, 2, MidpointRounding.AwayFromZero),
+            TotalDemandKw = decimal.Round(totalDemandMw * 1000m, 2, MidpointRounding.AwayFromZero),
+            SurplusOrDeficitKw = decimal.Round((totalSupplyMw - totalDemandMw) * 1000m, 2, MidpointRounding.AwayFromZero),
+            OfflineBuildings = offlineBuildings,
+        };
+    }
+
+    /// <summary>
+    /// Alias of <see cref="GetEnergyGridStatus"/> for city-level energy overview consumers.
+    /// </summary>
+    public Task<EnergyGridStatus> GetCityEnergyOverview(Guid cityId, [Service] AppDbContext db)
+        => GetEnergyGridStatus(cityId, db);
+
+    /// <summary>
+    /// Returns per-building energy state and city aggregate context for the owning player.
+    /// </summary>
+    [Authorize]
+    public async Task<BuildingEnergyStatus> GetBuildingEnergyStatus(
+        Guid buildingId,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var building = await db.Buildings
+            .AsNoTracking()
+            .Include(b => b.Company)
+            .FirstOrDefaultAsync(b => b.Id == buildingId);
+
+        if (building is null || building.Company.PlayerId != userId)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
+                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
+                    .Build());
+        }
+
+        var grid = await GetEnergyGridStatus(building.CityId, db);
+        var hasPowerPlants = grid.TotalSupplyKw > 0m;
+
+        return new BuildingEnergyStatus
+        {
+            BuildingId = building.Id,
+            CityId = building.CityId,
+            PowerStatus = building.PowerStatus,
+            PowerPriority = building.PowerPriority,
+            PowerDemandKw = decimal.Round(building.PowerConsumption * 1000m, 2, MidpointRounding.AwayFromZero),
+            CitySupplyKw = grid.TotalSupplyKw,
+            CityDemandKw = grid.TotalDemandKw,
+            Source = building.PowerStatus == Data.Entities.PowerStatus.Offline
+                ? "NO_POWER"
+                : hasPowerPlants ? "CITY_GRID" : "LEGACY_GRID",
+            CostPerTickLocal = 0m,
+        };
+    }
+
+    /// <summary>
     /// Returns the authenticated player's first-sale mission status.
     /// The mission tracks the player's onboarding sales shop from initial configuration
     /// through to the moment a real public-sales record is created in the simulation.

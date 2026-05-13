@@ -69,6 +69,7 @@ export default {
     buildingMarket: 'Gebäudemarkt',
     tutorial: 'Tutorial',
     marketDashboard: 'Markt-Dashboard',
+    energy: 'Energie',
     market: 'Markt',
     mobileMenuLabel: 'Mobile-Menübereiche',
     sectionMain: 'Hauptmenü',

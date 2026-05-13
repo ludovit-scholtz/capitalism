@@ -88,6 +88,13 @@ public sealed class Building
     [MaxLength(20)]
     public string PowerStatus { get; set; } = Entities.PowerStatus.Powered;
 
+    /// <summary>
+    /// Player-configurable power priority used for city load-shedding.
+    /// Higher values are kept online first when city supply is insufficient.
+    /// Valid range: 1 (lowest) to 10 (highest).
+    /// </summary>
+    public int PowerPriority { get; set; } = 5;
+
     /// <summary>Media type: NEWSPAPER, RADIO, TV (only for media houses).</summary>
     [MaxLength(20)]
     public string? MediaType { get; set; }
