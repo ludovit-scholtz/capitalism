@@ -17,6 +17,28 @@ function formatUsd(amount: number | null | undefined): string {
     maximumFractionDigits: 2,
   }).format(amount)
 }
+
+/** Return the combined quality level on 0–10 display scale (1 decimal). */
+function qualityLevelDisplay(brand: { quality: number; marketingQuality: number }): string {
+  const combined = 1 - (1 - brand.quality) * (1 - brand.marketingQuality)
+  return Math.round(Math.min(10, combined * 10) * 10) / 10 + ''
+}
+
+/** CSS classes for the quality level badge based on level tier. */
+function qualityLevelClass(brand: { quality: number; marketingQuality: number }): string {
+  const combined = 1 - (1 - brand.quality) * (1 - brand.marketingQuality)
+  const level = combined * 10
+  if (level >= 8) return 'bg-amber-400/20 text-amber-300'
+  if (level >= 5) return 'bg-emerald-400/20 text-emerald-400'
+  if (level >= 2) return 'bg-primary/15 text-primary'
+  return 'bg-surface-muted text-muted'
+}
+
+/** Compute quality price premium percentage (0–50%). */
+function qualityPremiumPct(brand: { quality: number; marketingQuality: number }): string {
+  const combined = 1 - (1 - brand.quality) * (1 - brand.marketingQuality)
+  return (combined * 50).toFixed(1)
+}
 </script>
 
 <template>
@@ -44,6 +66,15 @@ function formatUsd(amount: number | null | undefined): string {
           <span class="research-brand-name text-[0.9375rem] font-semibold text-foreground">{{ brand.productName || brand.name }}</span>
           <span class="research-brand-scope-badge inline-flex rounded-full bg-primary/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-primary">
             {{ brand.scope === 'PRODUCT' ? t('buildingDetail.config.scopeProduct') : brand.scope === 'CATEGORY' ? t('buildingDetail.config.scopeCategory') : t('buildingDetail.config.scopeCompany') }}
+          </span>
+          <!-- Quality level badge (Lv 0–10) -->
+          <span
+            v-if="brand.quality > 0 || brand.marketingQuality > 0"
+            class="quality-level-badge inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[0.75rem] font-bold"
+            :class="qualityLevelClass(brand)"
+            :title="t('research.qualityLevelBadgeTitle', { level: qualityLevelDisplay(brand) })"
+          >
+            Lv {{ qualityLevelDisplay(brand) }}
           </span>
         </div>
         <div v-if="brand.industryCategory" class="research-brand-industry mb-2 text-[0.8125rem] text-muted">
@@ -114,14 +145,23 @@ function formatUsd(amount: number | null | undefined): string {
             <span class="research-budget-label text-[0.8125rem] text-muted">{{ t('research.budget.topCompetitor') }}</span>
             <span class="research-budget-value research-budget-value--warn text-[0.8125rem] font-semibold text-warning">{{ formatUsd(brand.maxCompetitorBudget) }}</span>
           </div>
+          <!-- Quality price premium indicator -->
+          <div
+            v-if="brand.quality > 0 || brand.marketingQuality > 0"
+            class="research-price-premium mt-1 flex items-center justify-between gap-2 border-t border-divider pt-1.5"
+          >
+            <span class="research-budget-label text-[0.8125rem] text-muted">{{ t('research.budget.qualityPricePremium') }}</span>
+            <span class="research-price-premium-value text-[0.8125rem] font-bold text-emerald-400">+{{ qualityPremiumPct(brand) }}%</span>
+          </div>
           <p class="research-budget-hint mt-1.5 text-xs italic text-muted">{{ t('research.budget.decayHint') }}</p>
         </div>
 
         <p class="research-brand-effect mt-2 flex flex-col gap-0.5 text-[0.8125rem] text-muted">
           <span v-if="brand.quality > 0">
             {{
-              /* Brand quality contributes up to 30% quality bonus to manufactured output (game formula: quality * 30). */
-              t('research.qualityEffect', { pct: (brand.quality * 30).toFixed(1) })
+              /* Quality price premium: qualityLevel × 5% per level on 0–10 scale.
+                 brandQuality (0–1) × 50 = percentage premium at that quality level. */
+              t('research.qualityEffect', { pct: (brand.quality * 50).toFixed(1) })
             }}
           </span>
           <span v-if="brand.marketingEfficiencyMultiplier > 1">

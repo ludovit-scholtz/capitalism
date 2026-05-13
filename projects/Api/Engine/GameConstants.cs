@@ -332,6 +332,16 @@ public static partial class GameConstants
         Math.Max(5_000m, basePrice * 1_000m);
 
     /// <summary>
+    /// Rate at which product quality (R&amp;D brand quality, 0–1) adjusts the effective reference
+    /// price used for the public-sales price-index calculation.
+    /// Formula: qualityAdjustedBasePrice = localBasePrice × (1 + QualityPricePremiumRate × brandQuality).
+    /// At brandQuality = 0.5 (equivalent to quality level 5 on a 1–10 display scale): 25% premium.
+    /// At brandQuality = 1.0 (quality level 10): 50% premium.
+    /// This allows high-quality products to command a pricing premium with equivalent consumer demand.
+    /// </summary>
+    public const decimal QualityPricePremiumRate = 0.5m;
+
+    /// <summary>
     /// Number of game ticks between resource replenishment events (one game year = 8 760 ticks).
     /// Every this many ticks a fraction of fully-depleted mine lots in each city is partially restored.
     /// </summary>

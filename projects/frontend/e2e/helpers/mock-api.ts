@@ -572,6 +572,10 @@ export type MockResearchBrandState = {
   industryCategory: string | null
   awareness: number
   quality: number
+  /** Marketing-driven prestige quality (0.0–1.0). */
+  marketingQuality?: number
+  /** Combined effective quality: 1 - (1 - quality) × (1 - marketingQuality). */
+  combinedBrandQuality?: number
   /** ≥ 1.0: driven by BRAND_QUALITY R&D. >1.0 = marketing budget is more effective. */
   marketingEfficiencyMultiplier: number
   /** Accumulated R&D research budget for this product (game currency). Null if none. */
@@ -9304,7 +9308,11 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       !q.includes('marketPrice') &&
       !q.includes('cityDemandSummary') &&
       // cities query contains 'name' field which has 'me' as substring; not a me query
-      !q.includes('cities')
+      !q.includes('cities') &&
+      // R&D research queries contain 'name' / 'productName' fields which have 'me' as substring
+      !q.includes('brandQualityOverview') &&
+      !q.includes('productQualityProfile') &&
+      !q.includes('buildingResearchProgress')
 
     if (isStandaloneMeQuery(query)) {
       const player = resolveCurrentPlayer()
@@ -9461,6 +9469,38 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { ledgerDrillDown: enrichedEntries } }),
+      })
+    }
+
+    if (query.includes('brandQualityOverview') || query.includes('BrandQualityOverview')) {
+      const companyId = body.variables?.companyId
+      const player = resolveCurrentPlayer()
+      const company = player?.companies.find((c) => c.id === companyId)
+      if (!player || !company) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { brandQualityOverview: { companyId, brands: [], totalResearchBudgetUsd: 0 } } }),
+        })
+      }
+      const brands = companyId ? (state.researchBrands[companyId] ?? []) : []
+      const totalBudget = brands.reduce((s, b) => s + (b.accumulatedResearchBudget ?? 0), 0)
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            brandQualityOverview: {
+              companyId,
+              brands: brands.map((b) => ({
+                ...b,
+                marketingQuality: b.marketingQuality ?? 0,
+                combinedBrandQuality: b.combinedBrandQuality ?? b.quality,
+              })),
+              totalResearchBudgetUsd: totalBudget,
+            },
+          },
+        }),
       })
     }
 

@@ -47,6 +47,7 @@ const router = createRouter({
     { path: '/city/:id', name: 'city-map', component: () => import('@/views/CityMapView.vue') },
     { path: '/ledger/:companyId', name: 'ledger', alias: '/company/:companyId/ledger', component: () => import('@/views/LedgerView.vue') },
     { path: '/company/:companyId/settings', name: 'company-settings', component: () => import('@/views/CompanySettingsView.vue') },
+    { path: '/company/:companyId/research', name: 'company-research', component: () => import('@/views/CompanyResearchView.vue') },
     { path: '/banking', name: 'loan-marketplace', alias: '/loans', component: () => import('@/views/LoanMarketplaceView.vue') },
     { path: '/bank/:buildingId', name: 'bank-management', component: () => import('@/views/BankManagementView.vue') },
     { path: '/bank/:buildingId/request-loan', name: 'bank-loan-request', component: () => import('@/views/BankLoanRequestView.vue') },
