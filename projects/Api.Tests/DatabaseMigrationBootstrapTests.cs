@@ -81,4 +81,52 @@ public sealed class DatabaseMigrationBootstrapTests
             Assert.True(await secondRunContext.ProductTypes.AnyAsync());
         }
     }
+
+    [Fact]
+    public async Task InitializeAsync_BackfillsMissingPlnFxRate_WhenOtherRatesAlreadyExist()
+    {
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase($"migration-bootstrap-fx-{Guid.NewGuid():N}")
+            .Options;
+
+        var seedOptions = Options.Create(new SeedDataOptions
+        {
+            AdminEmail = "admin@migration-test.local",
+            AdminDisplayName = "Migration Test Admin",
+            AdminPassword = "TestPassword123!"
+        });
+
+        await using (var firstRunContext = new AppDbContext(options))
+        {
+            var initializer = new AppDbInitializer(firstRunContext, seedOptions, TestHelpers.CreateFallbackNbsService());
+            await initializer.InitializeAsync();
+        }
+
+        await using (var mutateContext = new AppDbContext(options))
+        {
+            var plnRates = await mutateContext.FxRates
+                .Where(rate => rate.BaseCurrencyCode == "EUR" && rate.QuoteCurrencyCode == "PLN")
+                .ToListAsync();
+
+            Assert.NotEmpty(plnRates);
+
+            mutateContext.FxRates.RemoveRange(plnRates);
+            await mutateContext.SaveChangesAsync();
+        }
+
+        await using (var secondRunContext = new AppDbContext(options))
+        {
+            var initializer = new AppDbInitializer(secondRunContext, seedOptions, TestHelpers.CreateFallbackNbsService());
+            await initializer.InitializeAsync();
+
+            var plnRate = await secondRunContext.FxRates
+                .AsNoTracking()
+                .Where(rate => rate.BaseCurrencyCode == "EUR" && rate.QuoteCurrencyCode == "PLN")
+                .OrderByDescending(rate => rate.RateDate)
+                .FirstOrDefaultAsync();
+
+            Assert.NotNull(plnRate);
+            Assert.True(plnRate.Rate > 0m);
+        }
+    }
 }

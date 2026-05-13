@@ -105,6 +105,40 @@ public sealed class FxQuoteLifecycleTests
     }
 
     [Fact]
+    public async Task GetForexQuote_EurToPln_ReturnsQuote()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndLoginAsync(client, $"quote-pln-{Guid.NewGuid():N}@example.com");
+
+        var meResult = await ExecuteGraphQlAsync(client, "{ me { id } }", token: token);
+        var playerId = Guid.Parse(meResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await SetPersonalSettlementBalanceAsync(db, playerId, 500m);
+
+        var result = await ExecuteGraphQlAsync(client,
+            """
+            query Q($input: GetForexQuoteInput!) {
+                forexQuote(input: $input) {
+                    quoteNonce toCurrencyCode rate toAmount
+                }
+            }
+            """,
+            new { input = new { fromCurrencyCode = "EUR", toCurrencyCode = "PLN", amount = 100m } },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _), "PLN forex quote should succeed.");
+
+        var quote = result.GetProperty("data").GetProperty("forexQuote");
+        Assert.False(string.IsNullOrEmpty(quote.GetProperty("quoteNonce").GetString()));
+        Assert.Equal("PLN", quote.GetProperty("toCurrencyCode").GetString());
+        Assert.True(quote.GetProperty("rate").GetDecimal() > 0m);
+        Assert.True(quote.GetProperty("toAmount").GetDecimal() > 0m);
+    }
+
+    [Fact]
     public async Task ExecuteForexSwap_WithValidQuoteNonce_Succeeds()
     {
         await using var factory = new ApiWebApplicationFactory();

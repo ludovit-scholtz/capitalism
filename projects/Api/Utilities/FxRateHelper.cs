@@ -19,6 +19,7 @@ public static class FxRateHelper
         {
             ["EUR"] = 1m,
             ["CZK"] = 25.20m,
+            ["PLN"] = 4.25m,
             ["USD"] = 1.08m,
             ["GBP"] = 0.86m,
             ["CNY"] = 7.84m,

@@ -110,6 +110,8 @@ public sealed partial class AppDbInitializer(
             await SeedFxRatesAsync();
         }
 
+        await EnsureRequiredFxRatesAsync();
+
         if (!await dbContext.BuildingLots.AnyAsync())
         {
             await SeedBuildingLotsAsync();
@@ -221,6 +223,90 @@ public sealed partial class AppDbInitializer(
     {
         var rates = await nbsExchangeRateService.FetchLatestRatesAsync();
         dbContext.FxRates.AddRange(rates);
+        await dbContext.SaveChangesAsync();
+    }
+
+    private async Task EnsureRequiredFxRatesAsync()
+    {
+        var cityCurrencyCodes = (await dbContext.Cities
+                .AsNoTracking()
+                .Select(city => city.CurrencyCode)
+                .ToListAsync())
+            .Where(code => !string.IsNullOrWhiteSpace(code))
+            .Select(code => code.ToUpperInvariant());
+
+        var requiredCodes = cityCurrencyCodes
+            .Concat(FxRateHelper.FallbackEurRates.Keys)
+            .Where(code => !string.Equals(code, "EUR", StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (requiredCodes.Count == 0)
+        {
+            return;
+        }
+
+        var existingCodes = (await dbContext.FxRates
+                .AsNoTracking()
+                .Where(rate => rate.BaseCurrencyCode == "EUR")
+                .Select(rate => rate.QuoteCurrencyCode)
+                .ToListAsync())
+            .Where(code => !string.IsNullOrWhiteSpace(code))
+            .Select(code => code.ToUpperInvariant())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var missingCodes = requiredCodes
+            .Where(code => !existingCodes.Contains(code))
+            .ToList();
+
+        if (missingCodes.Count == 0)
+        {
+            return;
+        }
+
+        var fetchedRatesByCode = (await nbsExchangeRateService.FetchLatestRatesAsync())
+            .Where(rate => rate.BaseCurrencyCode == "EUR")
+            .GroupBy(rate => rate.QuoteCurrencyCode, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.OrderByDescending(rate => rate.RateDate).First(),
+                StringComparer.OrdinalIgnoreCase);
+
+        var fallbackRateDate = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        foreach (var code in missingCodes)
+        {
+            if (fetchedRatesByCode.TryGetValue(code, out var fetchedRate))
+            {
+                dbContext.FxRates.Add(new FxRate
+                {
+                    Id = Guid.NewGuid(),
+                    BaseCurrencyCode = fetchedRate.BaseCurrencyCode,
+                    QuoteCurrencyCode = code,
+                    Rate = fetchedRate.Rate,
+                    RateDate = fetchedRate.RateDate,
+                    FetchedAtUtc = fetchedRate.FetchedAtUtc,
+                    Source = fetchedRate.Source
+                });
+
+                continue;
+            }
+
+            if (FxRateHelper.FallbackEurRates.TryGetValue(code, out var fallbackRate))
+            {
+                dbContext.FxRates.Add(new FxRate
+                {
+                    Id = Guid.NewGuid(),
+                    BaseCurrencyCode = "EUR",
+                    QuoteCurrencyCode = code,
+                    Rate = fallbackRate,
+                    RateDate = fallbackRateDate,
+                    FetchedAtUtc = DateTime.UtcNow,
+                    Source = "FALLBACK"
+                });
+            }
+        }
+
         await dbContext.SaveChangesAsync();
     }
 

@@ -303,6 +303,16 @@ public sealed partial class Query
             .Select(r => r.Rate)
             .FirstOrDefaultDeterministicAsync();
 
+        if (rate > 0)
+        {
+            return rate;
+        }
+
+        if (FxRateHelper.FallbackEurRates.TryGetValue(quoteCurrencyCode, out var fallbackRate) && fallbackRate > 0)
+        {
+            return fallbackRate;
+        }
+
         if (rate == 0)
         {
             throw new GraphQLException(new Error($"No exchange rate found for currency '{quoteCurrencyCode}'.", "RATE_NOT_FOUND"));
