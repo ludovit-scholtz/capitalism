@@ -73,10 +73,10 @@ public sealed class GraphQlRequestSecurityMiddleware(
                     code: "INTROSPECTION_DISABLED",
                     message: "GraphQL introspection is disabled outside Development.",
                     violationType: "IntrospectionDisabled",
-                    extensions: new
+                    extensions: new Dictionary<string, object?>
                     {
-                        batchIndex = index,
-                        field = introspectionField,
+                        ["batchIndex"] = index,
+                        ["field"] = introspectionField,
                     });
                 return;
             }
@@ -89,11 +89,11 @@ public sealed class GraphQlRequestSecurityMiddleware(
                     code: "QUERY_TOO_DEEP",
                     message: "Request exceeds the allowed query depth.",
                     violationType: "MaxDepthExceeded",
-                    extensions: new
+                    extensions: new Dictionary<string, object?>
                     {
-                        batchIndex = index,
-                        maxDepth,
-                        actualDepth = depth,
+                        ["batchIndex"] = index,
+                        ["maxDepth"] = maxDepth,
+                        ["actualDepth"] = depth,
                     });
                 return;
             }
@@ -106,12 +106,12 @@ public sealed class GraphQlRequestSecurityMiddleware(
                     code: "QUERY_TOO_COMPLEX",
                     message: "Request exceeds the allowed query complexity.",
                     violationType: "MaxComplexityExceeded",
-                    extensions: new
+                    extensions: new Dictionary<string, object?>
                     {
-                        batchIndex = index,
-                        maxComplexity,
-                        actualComplexity = complexityBreakdown.Total,
-                        rootFields = complexityBreakdown.RootFields,
+                        ["batchIndex"] = index,
+                        ["maxComplexity"] = maxComplexity,
+                        ["actualComplexity"] = complexityBreakdown.Total,
+                        ["rootFields"] = complexityBreakdown.RootFields,
                     });
                 return;
             }
@@ -125,7 +125,7 @@ public sealed class GraphQlRequestSecurityMiddleware(
         string code,
         string message,
         string violationType,
-        object? extensions = null)
+        IReadOnlyDictionary<string, object?>? extensions = null)
     {
         var playerId = context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "anonymous";
         var email = context.User.FindFirstValue(ClaimTypes.Email) ?? "anonymous";
@@ -157,17 +157,25 @@ public sealed class GraphQlRequestSecurityMiddleware(
         return await reader.ReadToEndAsync();
     }
 
-    private static object MergeExtensions(string code, object? extensions)
+    private static IReadOnlyDictionary<string, object?> MergeExtensions(
+        string code,
+        IReadOnlyDictionary<string, object?>? extensions)
     {
+        var merged = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["code"] = code,
+        };
         if (extensions is null)
         {
-            return new { code };
+            return merged;
         }
 
-        var extra = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(JsonSerializer.Serialize(extensions))
-            ?? new Dictionary<string, JsonElement>(StringComparer.Ordinal);
-        extra["code"] = JsonDocument.Parse(JsonSerializer.Serialize(code)).RootElement.Clone();
-        return extra;
+        foreach (var pair in extensions)
+        {
+            merged[pair.Key] = pair.Value;
+        }
+
+        return merged;
     }
 
     private static bool TryParseRequestItems(string requestBody, out List<GraphQlRequestItem> items)
@@ -290,6 +298,7 @@ public sealed class GraphQlRequestSecurityMiddleware(
                     {
                         yield return nestedField;
                     }
+                    // Remove after the current branch so sibling branches can still traverse this fragment.
                     visitedFragments.Remove(spread.Name.Value);
                     break;
             }

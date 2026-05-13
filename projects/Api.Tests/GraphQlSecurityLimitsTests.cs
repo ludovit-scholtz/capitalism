@@ -241,6 +241,43 @@ public sealed class GraphQlSecurityLimitsTests : IClassFixture<ApiWebApplication
         Assert.Equal(0, context.Response.Body.Length);
     }
 
+    [Fact]
+    public async Task GraphQlRequestSecurityMiddleware_Testing_BlocksIntrospection()
+    {
+        var nextCalled = false;
+        var middleware = new GraphQlRequestSecurityMiddleware(
+            _ =>
+            {
+                nextCalled = true;
+                return Task.CompletedTask;
+            },
+            Options.Create(new GraphQlSecurityOptions
+            {
+                MaxDepth = 8,
+                MaxComplexity = 200,
+            }),
+            NullLogger<GraphQlRequestSecurityMiddleware>.Instance,
+            new TestWebHostEnvironment("Testing"));
+
+        var context = new DefaultHttpContext();
+        context.Request.Method = HttpMethods.Post;
+        context.Request.Path = "/graphql";
+        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes("""{ "query": "query { __schema { queryType { name } } }" }"""));
+        context.Response.Body = new MemoryStream();
+
+        await middleware.InvokeAsync(context);
+
+        Assert.False(nextCalled);
+        Assert.True(context.Response.Body.Length > 0);
+        context.Response.Body.Position = 0;
+        using var reader = new StreamReader(context.Response.Body, leaveOpen: true);
+        var payload = await reader.ReadToEndAsync();
+        var response = JsonSerializer.Deserialize<JsonElement>(payload);
+        Assert.Equal(
+            "INTROSPECTION_DISABLED",
+            response.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
     private static async Task<(int StatusCode, JsonElement Body)> ExecuteGraphQlRawAsync(
         HttpClient client,
         string query,
@@ -304,10 +341,10 @@ public sealed class GraphQlSecurityLimitsTests : IClassFixture<ApiWebApplication
     private sealed class TestWebHostEnvironment(string environmentName) : IWebHostEnvironment
     {
         public string ApplicationName { get; set; } = nameof(TestWebHostEnvironment);
-        public IFileProvider WebRootFileProvider { get; set; } = null!;
+        public IFileProvider WebRootFileProvider { get; set; } = new NullFileProvider();
         public string WebRootPath { get; set; } = string.Empty;
         public string EnvironmentName { get; set; } = environmentName;
         public string ContentRootPath { get; set; } = string.Empty;
-        public IFileProvider ContentRootFileProvider { get; set; } = null!;
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
 }

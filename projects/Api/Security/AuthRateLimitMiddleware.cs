@@ -16,6 +16,8 @@ public sealed class AuthRateLimitMiddleware(
     RequestDelegate next,
     IWebHostEnvironment env)
 {
+    private static readonly JwtSecurityTokenHandler JwtTokenHandler = new();
+
     public async Task InvokeAsync(
         HttpContext context,
         IMemoryCache cache,
@@ -166,7 +168,8 @@ public sealed class AuthRateLimitMiddleware(
 
         if (!TryParseDocument(query, out var parsedDocument))
         {
-            return CountAuthOperationsByStringFallback(query);
+            // If AST parsing fails, do not guess from string contents to avoid false positives.
+            return 0;
         }
 
         return CountAuthOperationFields(parsedDocument, operationName);
@@ -184,28 +187,6 @@ public sealed class AuthRateLimitMiddleware(
             document = null!;
             return false;
         }
-    }
-
-    private static int CountAuthOperationsByStringFallback(string query)
-    {
-        var lowered = query.ToLowerInvariant();
-        if (!lowered.Contains("mutation", StringComparison.Ordinal))
-        {
-            return 0;
-        }
-
-        var count = 0;
-        if (lowered.Contains("login(", StringComparison.Ordinal) || lowered.Contains("login (", StringComparison.Ordinal))
-        {
-            count++;
-        }
-
-        if (lowered.Contains("register(", StringComparison.Ordinal) || lowered.Contains("register (", StringComparison.Ordinal))
-        {
-            count++;
-        }
-
-        return count;
     }
 
     private static int CountAuthOperationFields(DocumentNode document, string? operationName)
@@ -284,6 +265,7 @@ public sealed class AuthRateLimitMiddleware(
                     {
                         yield return nestedField;
                     }
+                    // Remove after the current branch so sibling branches can still traverse this fragment.
                     visitedFragments.Remove(spread.Name.Value);
                     break;
             }
@@ -321,7 +303,7 @@ public sealed class AuthRateLimitMiddleware(
 
         try
         {
-            var token = new JwtSecurityTokenHandler().ReadJwtToken(rawToken);
+            var token = JwtTokenHandler.ReadJwtToken(rawToken);
             subject = token.Claims.FirstOrDefault(claim => claim.Type == JwtRegisteredClaimNames.Sub)?.Value
                 ?? token.Claims.FirstOrDefault(claim => claim.Type == System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                 ?? string.Empty;
