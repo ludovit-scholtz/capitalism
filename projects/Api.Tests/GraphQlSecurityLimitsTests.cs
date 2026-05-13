@@ -176,13 +176,13 @@ public sealed class GraphQlSecurityLimitsTests : IClassFixture<ApiWebApplication
     {
         await using var factory = new SecurityLimitsApiWebApplicationFactory(rateLimitPerMinute: 1);
         using var client = factory.CreateClient();
+        var testRunId = Guid.NewGuid().ToString("N");
 
-        var mutationBody = """
-        mutation {
-          a: register(input: { email: "limit-a@example.com", displayName: "A", password: "TestPass123!" }) { token }
-          b: register(input: { email: "limit-b@example.com", displayName: "B", password: "TestPass123!" }) { token }
-        }
-        """;
+        var mutationBody =
+            "mutation { "
+            + $"a: register(input: {{ email: \"limit-a-{testRunId}@example.com\", displayName: \"A\", password: \"TestPass123!\" }}) {{ token }} "
+            + $"b: register(input: {{ email: \"limit-b-{testRunId}@example.com\", displayName: \"B\", password: \"TestPass123!\" }}) {{ token }} "
+            + "}";
 
         var (statusCode, body) = await ExecuteGraphQlRawAsync(client, mutationBody);
         Assert.Equal(StatusCodes.Status429TooManyRequests, statusCode);
@@ -196,13 +196,13 @@ public sealed class GraphQlSecurityLimitsTests : IClassFixture<ApiWebApplication
     {
         await using var factory = new SecurityLimitsApiWebApplicationFactory(rateLimitPerMinute: 1);
         using var client = factory.CreateClient();
+        var testRunId = Guid.NewGuid().ToString("N");
 
-        var batchBody1 = """
-        [
-          { "query": "mutation { register(input: { email: \"batch-a@example.com\", displayName: \"A\", password: \"TestPass123!\" }) { token } }" },
-          { "query": "mutation { register(input: { email: \"batch-b@example.com\", displayName: \"B\", password: \"TestPass123!\" }) { token } }" }
-        ]
-        """;
+        var batchBody1 =
+            "["
+            + "{ \"query\": \"mutation { register(input: { email: \\\"batch-a-" + testRunId + "@example.com\\\", displayName: \\\"A\\\", password: \\\"TestPass123!\\\" }) { token } }\" },"
+            + "{ \"query\": \"mutation { register(input: { email: \\\"batch-b-" + testRunId + "@example.com\\\", displayName: \\\"B\\\", password: \\\"TestPass123!\\\" }) { token } }\" }"
+            + "]";
 
         var (status3, body3) = await ExecuteGraphQlRawBodyAsync(client, batchBody1);
         Assert.Equal(StatusCodes.Status429TooManyRequests, status3);

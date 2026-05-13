@@ -298,8 +298,6 @@ public sealed class GraphQlRequestSecurityMiddleware(
                     {
                         yield return nestedField;
                     }
-                    // Remove after the current branch so sibling branches can still traverse this fragment.
-                    visitedFragments.Remove(spread.Name.Value);
                     break;
             }
         }
