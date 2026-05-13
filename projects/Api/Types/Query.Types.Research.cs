@@ -166,3 +166,25 @@ public sealed class BuildingUnitResearchProgress
     /// </summary>
     public decimal QualityPricePremiumPct { get; set; }
 }
+
+/// <summary>
+/// A single entry in the competitor quality intelligence list.
+/// Returned by the <c>competitorQualityIntelligence</c> query.
+/// </summary>
+public sealed class CompetitorQualityEntry
+{
+    /// <summary>Company identifier.</summary>
+    public Guid CompanyId { get; set; }
+
+    /// <summary>Company display name.</summary>
+    public string CompanyName { get; set; } = string.Empty;
+
+    /// <summary>Combined quality level on 0–10 display scale.</summary>
+    public decimal QualityLevel { get; set; }
+
+    /// <summary>Price premium percentage unlocked (0–50%).</summary>
+    public decimal PricePremiumPct { get; set; }
+
+    /// <summary>Whether this entry belongs to the authenticated player's own company.</summary>
+    public bool IsOwnCompany { get; set; }
+}

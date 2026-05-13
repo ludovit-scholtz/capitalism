@@ -203,6 +203,9 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Per-city scheduling rows for the annual resource replenishment cycle.</summary>
     public DbSet<ResourceReplenishmentSchedule> ResourceReplenishmentSchedules => Set<ResourceReplenishmentSchedule>();
 
+    /// <summary>Audit records for automatically spoiled perishable inventory batches.</summary>
+    public DbSet<InventorySpoilageRecord> InventorySpoilageRecords => Set<InventorySpoilageRecord>();
+
     /// <summary>Per-player tutorial milestone completion tracking.</summary>
     public DbSet<TutorialProgress> TutorialProgresses => Set<TutorialProgress>();
 

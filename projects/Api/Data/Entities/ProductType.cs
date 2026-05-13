@@ -64,6 +64,9 @@ public sealed class ProductType
     [MaxLength(1000)]
     public string? Description { get; set; }
 
+    /// <summary>Whether this product degrades in quality over time when stored.</summary>
+    public bool IsPerishable { get; set; }
+
     /// <summary>Required raw materials to manufacture this product.</summary>
     public ICollection<ProductRecipe> Recipes { get; set; } = [];
 }

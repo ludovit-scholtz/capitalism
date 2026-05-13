@@ -248,7 +248,8 @@ public sealed partial class AppDbInitializer
         decimal EnergyConsumptionMwh,
         decimal BasicLaborHours,
         decimal PriceElasticity,
-        IReadOnlyList<RecipeSeed> Ingredients);
+        IReadOnlyList<RecipeSeed> Ingredients,
+        bool IsPerishable = false);
 
     private sealed record RecipeSeed(string? ResourceSlug, string? ProductSlug, decimal Quantity);
 }

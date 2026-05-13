@@ -2443,6 +2443,7 @@ export default {
       CENTRAL_BANK_REPAY: 'Rückzahlung Zentralbank',
       MEDIA_HOUSE_INCOME: 'Medienhaus-Einnahmen',
       MEDIA_HOUSE_CONTENT: 'Inhaltsinvestition',
+      SPOILAGE_LOSS: 'Verderbnisverlust',
     },
     currency: 'Währung',
     mixedCurrencies: 'Mehrwährung',
@@ -3061,6 +3062,17 @@ export default {
       qualityPricePremium: 'Qualitätspreisaufschlag',
       decayHint:
         'Forschungsbudgets werden in USD normalisiert für fairen stadtübergreifenden Vergleich und verfallen um 0,1 % pro Takt. Investieren Sie weiter, um Ihre Qualitätsführerschaft zu halten oder auszubauen.',
+    },
+    competitors: {
+      title: 'Wettbewerbsanalyse',
+      subtitle: 'Produktqualitätsranking für diesen Markt',
+      rank: 'Rang',
+      company: 'Unternehmen',
+      qualityLevel: 'Qualität',
+      pricePremium: 'Preisaufschlag',
+      you: 'Sie',
+      noCompetitors: 'Keine Wettbewerber für dieses Produkt in dieser Stadt gefunden.',
+      loadFailed: 'Laden der Wettbewerbsanalyse fehlgeschlagen.',
     },
   },
   supplyChain: {

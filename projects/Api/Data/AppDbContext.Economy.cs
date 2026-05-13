@@ -415,5 +415,19 @@ public sealed partial class AppDbContext
             // full table scan on every game tick.
             e.HasIndex(r => new { r.Status, r.ExpectedArrivalTick });
         });
+
+        modelBuilder.Entity<InventorySpoilageRecord>(e =>
+        {
+            e.HasKey(r => r.Id);
+            e.Property(r => r.QuantitySpoiled).HasPrecision(18, 4);
+            e.Property(r => r.QualityAtSpoilage).HasPrecision(5, 4);
+            e.Property(r => r.EstimatedLossValue).HasPrecision(18, 2);
+            e.HasOne(r => r.Company).WithMany().HasForeignKey(r => r.CompanyId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(r => r.Building).WithMany().HasForeignKey(r => r.BuildingId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(r => r.BuildingUnit).WithMany().HasForeignKey(r => r.BuildingUnitId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(r => r.ProductType).WithMany().HasForeignKey(r => r.ProductTypeId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(r => new { r.BuildingId, r.RecordedAtTick });
+            e.HasIndex(r => new { r.CompanyId, r.RecordedAtTick });
+        });
     }
 }
