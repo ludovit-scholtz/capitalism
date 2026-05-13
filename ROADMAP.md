@@ -56,7 +56,21 @@ Create a fun game in the style of Capitalism II, where players experience realis
   - All i18n keys added in English, Slovak, and German (`marketDashboard.*`).
   - E2E tests: Market Dashboard (12 tests) covering city tabs, product grid, sorting, satisfaction badges, Vienna city tab, error state, mobile viewport; Price Recommendation Badge (4 tests) covering all colour states and no-data state.
 
-### Security Follow-Ups
+### R&D / Product Quality System
+
+- [x] (90%) R&D Phase Tick Engine & Product Quality Economics is live: the `ResearchPhase` tick processor runs each tick, accumulating research budgets per company per product type and computing quality levels (0–1 scale, equivalent to 0–10 display). Quality levels drive a price premium of up to 50% in `PublicSalesPhase`. The Company Research Dashboard at `/company/:id/research` displays all product research states, quality level badges, and price premium breakdown.
+  - `ResearchPhase` processes PRODUCT_QUALITY and BRAND_QUALITY units each tick: each active unit converts a fraction of its operating costs into an `AccumulatedResearchBudget` (stored in USD for cross-city fairness). Budgets decay 0.1%/tick when investment stops. Quality is computed as `min(1, budget / baseTarget)` relative to the top competitor globally.
+  - `PublicSalesPhase` applies quality multiplier: `effectivePrice = basePrice × (1 + QualityPricePremiumRate × combinedQuality)`. At quality level 5 (combinedQuality = 0.5), sellers earn a 25% price premium with equivalent consumer demand. At quality level 10 (combinedQuality = 1.0), the premium reaches 50%.
+  - `productQualityProfile(companyId, productTypeId)` GraphQL query returns detailed quality state (rdQuality, marketingQuality, combinedQuality, qualityLevel 0–10, accumulated/base/competitor budgets in USD, price premium %, estimated ticks to next level).
+  - `brandQualityOverview(companyId)` GraphQL query returns all research states for a company across all products and categories, with total R&D budget in USD.
+  - `buildingResearchProgress(buildingId)` GraphQL query exposes per-unit research progress: current quality level, combined quality, fractional progress to next level, and price premium.
+  - Company Research Dashboard (`/company/:id/research`): product quality table with quality level badges (Lv 0–10), price premium column, R&D/marketing quality progress bars, and total R&D investment summary. Empty state guides players to build an R&D facility. Navigation link added to company action row on the Dashboard.
+  - R&D Building Detail panel: quality level badge `Lv N` overlaid on research brand entries, price premium indicator row in budget panel (`+X%`), quality level colour tiers (gold ≥ 8, green ≥ 5, blue ≥ 2, dim = 0).
+  - All i18n keys added in English, Slovak, and German (`research.dashboard.*`, `research.qualityLevelBadgeTitle`, `research.budget.qualityPricePremium`).
+  - 11 backend integration tests: `productQualityProfile` own company, foreign company (null), missing company (null), with brand (quality level populated), `brandQualityOverview` own company, foreign/missing company (empty), `buildingResearchProgress` own building, foreign building (empty), non-RD building (empty), full tick cycle quality increment, PublicSalesPhase quality premium application.
+  - Pending (10%): Competitor intelligence (spying on other companies' quality levels) and quality decay on product stockpiles are deferred to a future issue.
+
+
 
 - [x] (100%) Finished `NOT_FOUND_OR_NOT_OWNED` plus balance-redaction normalization across building-market, exchange, and bank-transfer mutations so authenticated probes cannot infer foreign object existence, listing state, company linkage, or exact available funds.
 - [x] Add password-auth abuse controls across `projects/Api` and `projects/MasterApi`: account-aware login throttling or temporary lockout, endpoint rate limiting, duplicate-email response normalization, and monitoring for repeated failed attempts. *(100% — LoginThrottleService with 5-failure lockout, AuthRateLimitMiddleware with 10 req/IP/min, neutral duplicate-email message, structured lockout warning logs; disabled in Development/Testing)*

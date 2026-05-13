@@ -95,7 +95,6 @@ public sealed partial class PublicSalesPhase : ITickPhase
                     if (price <= 0m) price = localBasePrice;
 
                     var populationIndex = lot?.PopulationIndex > 0m ? lot.PopulationIndex : 1m;
-                    var priceIndex = PublicSalesPricingModel.ComputePriceIndex(localBasePrice, price, priceElasticity);
                     var qualityMultiplier = Math.Max(0.15m, inv.Quality);
                     var qualityDemandFactor = ComputeQualityDemandFactor(inv.Quality);
 
@@ -103,6 +102,14 @@ public sealed partial class PublicSalesPhase : ITickPhase
                     brandAwareness = Math.Clamp(brand?.Awareness ?? 0m, 0m, 1m);
                     var brandQuality = ComputeCombinedBrandQuality(brand);
                     var brandFactor = ComputeBrandFactor(brandAwareness.Value, brandQuality);
+
+                    // Quality price premium: R&D quality (0-1, equivalent to qualityLevel 0-10)
+                    // shifts the effective reference price upward so higher-quality products
+                    // can command a premium with equivalent consumer demand.
+                    // Formula: qualityAdjustedBasePrice = localBasePrice × (1 + 0.5 × brandQuality)
+                    // At brandQuality=0.5 (qualityLevel=5): 25% premium → acceptance criterion met.
+                    var qualityAdjustedBasePrice = localBasePrice * (1m + GameConstants.QualityPricePremiumRate * brandQuality);
+                    var priceIndex = PublicSalesPricingModel.ComputePriceIndex(qualityAdjustedBasePrice, price, priceElasticity);
 
                     // Competitiveness score determines market-share allocation.
                     // PopulationIndex represents foot traffic / location advantage.
