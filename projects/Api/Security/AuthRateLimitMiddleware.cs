@@ -1,5 +1,7 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json;
 using Api.Configuration;
+using HotChocolate.Language;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 
@@ -8,25 +10,20 @@ namespace Api.Security;
 /// <summary>
 /// Middleware that applies per-IP rate limiting to GraphQL login and register operations.
 /// Returns HTTP 429 when the configured threshold is exceeded.
-/// Rate limiting is disabled in Development and Testing environments.
+/// Rate limiting is disabled in Development and is disabled in Testing unless explicitly enabled.
 /// </summary>
 public sealed class AuthRateLimitMiddleware(
     RequestDelegate next,
     IWebHostEnvironment env)
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
-    {
-        PropertyNameCaseInsensitive = true,
-    };
-
     public async Task InvokeAsync(
         HttpContext context,
         IMemoryCache cache,
         IOptions<AuthOptions> authOptions,
         ILogger<AuthRateLimitMiddleware> logger)
     {
-        // Disable rate limiting in Development and Testing to avoid slowing local dev and CI.
-        if (env.IsDevelopment() || env.IsEnvironment("Testing"))
+        // Disable rate limiting in Development and, by default, in Testing to avoid slowing local dev and CI.
+        if (env.IsDevelopment() || (env.IsEnvironment("Testing") && !authOptions.Value.EnableRateLimitInTesting))
         {
             await next(context);
             return;
@@ -40,29 +37,31 @@ public sealed class AuthRateLimitMiddleware(
 
         context.Request.EnableBuffering();
 
-        GraphQlHttpRequest? requestBody = null;
+        string requestBody;
         try
         {
-            requestBody = await JsonSerializer.DeserializeAsync<GraphQlHttpRequest>(
-                context.Request.Body, JsonOptions, context.RequestAborted);
+            requestBody = await ReadRequestBodyAsync(context.Request.Body, context.RequestAborted);
         }
         catch
         {
             // Malformed JSON — pass through and let HotChocolate handle the error.
+            await next(context);
+            return;
         }
         finally
         {
             context.Request.Body.Position = 0;
         }
 
-        if (!IsAuthOperation(requestBody))
+        var authOperationCount = CountAuthOperations(requestBody);
+        if (authOperationCount <= 0)
         {
             await next(context);
             return;
         }
 
-        var ip = GetClientIp(context);
-        var rateKey = $"auth_rate:{ip}";
+        var identity = GetRateLimitIdentity(context);
+        var rateKey = $"auth_rate:{identity}";
         var windowSize = TimeSpan.FromMinutes(1);
         var limit = authOptions.Value.RateLimitRequestsPerMinute;
 
@@ -74,13 +73,15 @@ public sealed class AuthRateLimitMiddleware(
             return new long[] { 0 };
         });
 
-        var count = Interlocked.Increment(ref counter![0]);
+        var count = Interlocked.Add(ref counter![0], authOperationCount);
 
         if (count > limit)
         {
             logger.LogWarning(
-                "Auth rate limit exceeded for IP {ClientIp}: {Count} requests in the last minute (limit {Limit}).",
-                ip, count, limit);
+                "Auth rate limit exceeded for identity {RateLimitIdentity}: {Count} auth fields in the last minute (limit {Limit}).",
+                identity,
+                count,
+                limit);
 
             context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
             context.Response.ContentType = "application/json";
@@ -101,60 +102,234 @@ public sealed class AuthRateLimitMiddleware(
         await next(context);
     }
 
+    private static async Task<string> ReadRequestBodyAsync(Stream body, CancellationToken cancellationToken)
+    {
+        using var reader = new StreamReader(body, leaveOpen: true);
+        var requestBody = await reader.ReadToEndAsync(cancellationToken);
+        return requestBody;
+    }
+
     private static bool IsGraphQlPost(HttpContext context)
     {
         return HttpMethods.IsPost(context.Request.Method)
             && context.Request.Path.Equals("/graphql", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool IsAuthOperation(GraphQlHttpRequest? request)
+    private static int CountAuthOperations(string requestBody)
     {
-        if (request is null)
+        if (string.IsNullOrWhiteSpace(requestBody))
         {
-            return false;
+            return 0;
         }
 
-        // Check the explicit operation name first (fastest path).
-        if (!string.IsNullOrWhiteSpace(request.OperationName))
+        try
         {
-            return request.OperationName.Equals("login", StringComparison.OrdinalIgnoreCase)
-                || request.OperationName.Equals("register", StringComparison.OrdinalIgnoreCase);
+            using var document = JsonDocument.Parse(requestBody);
+            return document.RootElement.ValueKind switch
+            {
+                JsonValueKind.Object => CountAuthOperationsInRequestItem(document.RootElement),
+                JsonValueKind.Array => document.RootElement.EnumerateArray()
+                    .Where(static element => element.ValueKind == JsonValueKind.Object)
+                    .Sum(CountAuthOperationsInRequestItem),
+                _ => 0,
+            };
         }
-
-        // Fall back to query body inspection for un-named operations.
-        var query = request.Query?.Trim() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(query))
+        catch (JsonException)
         {
-            return false;
+            return 0;
         }
-
-        return (query.Contains("login(", StringComparison.OrdinalIgnoreCase)
-                || query.Contains("login (", StringComparison.OrdinalIgnoreCase)
-                || query.Contains("register(", StringComparison.OrdinalIgnoreCase)
-                || query.Contains("register (", StringComparison.OrdinalIgnoreCase))
-            && query.Contains("mutation", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string GetClientIp(HttpContext context)
+    private static int CountAuthOperationsInRequestItem(JsonElement requestItem)
     {
-        // Respect X-Forwarded-For set by a trusted reverse proxy.
-        var forwarded = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(forwarded))
+        var operationName = requestItem.TryGetProperty("operationName", out var operationNameElement)
+            && operationNameElement.ValueKind == JsonValueKind.String
+            ? operationNameElement.GetString()
+            : null;
+        var query = requestItem.TryGetProperty("query", out var queryElement)
+            && queryElement.ValueKind == JsonValueKind.String
+            ? queryElement.GetString()
+            : null;
+
+        if (!string.IsNullOrWhiteSpace(operationName)
+            && (operationName.Equals("login", StringComparison.OrdinalIgnoreCase)
+                || operationName.Equals("register", StringComparison.OrdinalIgnoreCase))
+            && string.IsNullOrWhiteSpace(query))
         {
-            // Take only the first (leftmost) address in the chain.
-            var first = forwarded.Split(',')[0].Trim();
-            if (!string.IsNullOrWhiteSpace(first))
+            return 1;
+        }
+
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return 0;
+        }
+
+        if (!TryParseDocument(query, out var parsedDocument))
+        {
+            return CountAuthOperationsByStringFallback(query);
+        }
+
+        return CountAuthOperationFields(parsedDocument, operationName);
+    }
+
+    private static bool TryParseDocument(string query, out DocumentNode document)
+    {
+        try
+        {
+            document = Utf8GraphQLParser.Parse(query);
+            return true;
+        }
+        catch
+        {
+            document = null!;
+            return false;
+        }
+    }
+
+    private static int CountAuthOperationsByStringFallback(string query)
+    {
+        var lowered = query.ToLowerInvariant();
+        if (!lowered.Contains("mutation", StringComparison.Ordinal))
+        {
+            return 0;
+        }
+
+        var count = 0;
+        if (lowered.Contains("login(", StringComparison.Ordinal) || lowered.Contains("login (", StringComparison.Ordinal))
+        {
+            count++;
+        }
+
+        if (lowered.Contains("register(", StringComparison.Ordinal) || lowered.Contains("register (", StringComparison.Ordinal))
+        {
+            count++;
+        }
+
+        return count;
+    }
+
+    private static int CountAuthOperationFields(DocumentNode document, string? operationName)
+    {
+        var fragments = document.Definitions
+            .OfType<FragmentDefinitionNode>()
+            .ToDictionary(definition => definition.Name.Value, definition => definition, StringComparer.Ordinal);
+        var selectedOperations = SelectOperations(document, operationName);
+        var count = 0;
+
+        foreach (var operation in selectedOperations)
+        {
+            if (operation.Operation != OperationType.Mutation)
             {
-                return first;
+                continue;
+            }
+
+            foreach (var field in EnumerateRootFields(operation.SelectionSet, fragments, new HashSet<string>(StringComparer.Ordinal)))
+            {
+                if (field.Name.Value.Equals("login", StringComparison.OrdinalIgnoreCase)
+                    || field.Name.Value.Equals("register", StringComparison.OrdinalIgnoreCase))
+                {
+                    count++;
+                }
             }
         }
 
-        return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return count;
     }
 
-    private sealed class GraphQlHttpRequest
+    private static IEnumerable<OperationDefinitionNode> SelectOperations(DocumentNode document, string? operationName)
     {
-        public string? OperationName { get; init; }
-        public string? Query { get; init; }
+        var operations = document.Definitions.OfType<OperationDefinitionNode>().ToList();
+        if (!string.IsNullOrWhiteSpace(operationName))
+        {
+            var selected = operations
+                .Where(operation => operation.Name?.Value.Equals(operationName, StringComparison.Ordinal) == true)
+                .ToList();
+            if (selected.Count > 0)
+            {
+                return selected;
+            }
+        }
+
+        if (operations.Count == 1)
+        {
+            return operations;
+        }
+
+        // For malformed unnamed multi-operation documents, inspect all operations defensively.
+        return operations;
+    }
+
+    private static IEnumerable<FieldNode> EnumerateRootFields(
+        SelectionSetNode selectionSet,
+        IReadOnlyDictionary<string, FragmentDefinitionNode> fragments,
+        HashSet<string> visitedFragments)
+    {
+        foreach (var selection in selectionSet.Selections)
+        {
+            switch (selection)
+            {
+                case FieldNode field:
+                    yield return field;
+                    break;
+                case InlineFragmentNode inlineFragment:
+                    foreach (var nestedField in EnumerateRootFields(inlineFragment.SelectionSet, fragments, visitedFragments))
+                    {
+                        yield return nestedField;
+                    }
+                    break;
+                case FragmentSpreadNode spread
+                    when fragments.TryGetValue(spread.Name.Value, out var fragment)
+                        && visitedFragments.Add(spread.Name.Value):
+                    foreach (var nestedField in EnumerateRootFields(fragment.SelectionSet, fragments, visitedFragments))
+                    {
+                        yield return nestedField;
+                    }
+                    visitedFragments.Remove(spread.Name.Value);
+                    break;
+            }
+        }
+    }
+
+    private static string GetRateLimitIdentity(HttpContext context)
+    {
+        var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        if (TryGetBearerSubject(context, out var bearerSubject))
+        {
+            return $"{ip}:{bearerSubject}";
+        }
+
+        var user = context.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? context.User?.Identity?.Name
+            ?? "anonymous";
+        return $"{ip}:{user}";
+    }
+
+    private static bool TryGetBearerSubject(HttpContext context, out string subject)
+    {
+        subject = string.Empty;
+        var authorization = context.Request.Headers.Authorization.ToString();
+        if (!authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var rawToken = authorization["Bearer ".Length..].Trim();
+        if (string.IsNullOrWhiteSpace(rawToken))
+        {
+            return false;
+        }
+
+        try
+        {
+            var token = new JwtSecurityTokenHandler().ReadJwtToken(rawToken);
+            subject = token.Claims.FirstOrDefault(claim => claim.Type == JwtRegisteredClaimNames.Sub)?.Value
+                ?? token.Claims.FirstOrDefault(claim => claim.Type == System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? string.Empty;
+            return !string.IsNullOrWhiteSpace(subject);
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

@@ -31,4 +31,10 @@ public sealed class AuthOptions
     /// Applies in non-Development environments only. Default is 10.
     /// </summary>
     public int RateLimitRequestsPerMinute { get; init; } = 10;
+
+    /// <summary>
+    /// When enabled, auth rate limiting also runs in Testing environment.
+    /// Defaults to false so existing test suites are not affected unless explicitly opted in.
+    /// </summary>
+    public bool EnableRateLimitInTesting { get; init; } = false;
 }
