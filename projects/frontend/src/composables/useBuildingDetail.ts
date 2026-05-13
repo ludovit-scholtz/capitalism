@@ -4436,13 +4436,29 @@ export function useBuildingDetail() {
             totalGridFines
             totalOperatingCosts
             totalFuelCosts
+            totalSpotMarketRevenue
             totalNetProfit
+            activeListing {
+              listingId
+              buildingId
+              buildingName
+              companyId
+              companyName
+              cityId
+              plantType
+              pricePerKwhLocal
+              capacityKw
+              availableKw
+              createdAtTick
+              createdAtUtc
+            }
             timeline {
               tick
               surplusIncome
               gridFine
               operatingCosts
               fuelCosts
+              spotMarketRevenue
               netProfit
             }
           }
@@ -4490,6 +4506,115 @@ export function useBuildingDetail() {
       dispatchError.value = e instanceof Error ? e.message : 'Failed to update dispatch target.'
     } finally {
       dispatchSaving.value = false
+    }
+  }
+
+  // ─── Power priority ───────────────────────────────────────────────────────
+  const prioritySaving = ref(false)
+  const priorityError = ref<string | null>(null)
+  const prioritySuccess = ref(false)
+
+  async function setPowerPriority(buildingId: string, priority: number) {
+    prioritySaving.value = true
+    priorityError.value = null
+    prioritySuccess.value = false
+    try {
+      await gqlRequest<{ setPowerPriority: { id: string; powerPriority: number } }>(
+        `mutation SetPowerPriority($input: SetPowerPriorityInput!) {
+          setPowerPriority(input: $input) {
+            id
+            powerPriority
+          }
+        }`,
+        { input: { buildingId, priority } },
+      )
+      if (building.value) {
+        building.value = { ...building.value, powerPriority: priority }
+      }
+      prioritySuccess.value = true
+    } catch (e) {
+      priorityError.value = e instanceof Error ? e.message : 'Failed to update power priority.'
+    } finally {
+      prioritySaving.value = false
+    }
+  }
+
+  // ─── Energy spot-market listing (power plant buildings) ───────────────────
+  const energyListingSaving = ref(false)
+  const energyListingError = ref<string | null>(null)
+  const energyListingSuccess = ref(false)
+
+  async function listEnergyForSale(buildingId: string, pricePerKwhLocal: number, capacityKw: number) {
+    energyListingSaving.value = true
+    energyListingError.value = null
+    energyListingSuccess.value = false
+    try {
+      await gqlRequest<{ listEnergyForSale: { listingId: string } }>(
+        `mutation ListEnergyForSale($input: ListEnergyForSaleInput!) {
+          listEnergyForSale(input: $input) {
+            listingId
+          }
+        }`,
+        { input: { buildingId, pricePerKwhLocal, capacityKw } },
+      )
+      energyListingSuccess.value = true
+      void loadPowerPlantAnalytics(buildingId, true)
+    } catch (e) {
+      energyListingError.value = e instanceof Error ? e.message : 'Failed to create energy listing.'
+    } finally {
+      energyListingSaving.value = false
+    }
+  }
+
+  const energyCancelSaving = ref(false)
+  const energyCancelError = ref<string | null>(null)
+
+  async function cancelEnergyListing(listingId: string) {
+    energyCancelSaving.value = true
+    energyCancelError.value = null
+    const bid = building.value?.id ?? ''
+    try {
+      await gqlRequest<{ cancelEnergyListing: boolean }>(
+        `mutation CancelEnergyListing($input: CancelEnergyListingInput!) {
+          cancelEnergyListing(input: $input)
+        }`,
+        { input: { listingId } },
+      )
+      if (bid) void loadPowerPlantAnalytics(bid, true)
+    } catch (e) {
+      energyCancelError.value = e instanceof Error ? e.message : 'Failed to cancel energy listing.'
+    } finally {
+      energyCancelSaving.value = false
+    }
+  }
+
+  // ─── Max energy bid price (consumer buildings) ────────────────────────────
+  const maxBidSaving = ref(false)
+  const maxBidError = ref<string | null>(null)
+  const maxBidSuccess = ref(false)
+
+  async function setMaxEnergyBidPrice(buildingId: string, maxBidPricePerKwh: number | null) {
+    maxBidSaving.value = true
+    maxBidError.value = null
+    maxBidSuccess.value = false
+    try {
+      await gqlRequest<{ setMaxEnergyBidPrice: { id: string; maxEnergyBidPrice: number | null } }>(
+        `mutation SetMaxEnergyBidPrice($input: SetMaxEnergyBidPriceInput!) {
+          setMaxEnergyBidPrice(input: $input) {
+            id
+            maxEnergyBidPrice
+          }
+        }`,
+        { input: { buildingId, maxBidPricePerKwh } },
+      )
+      if (building.value) {
+        building.value = { ...building.value, maxEnergyBidPrice: maxBidPricePerKwh }
+      }
+      maxBidSuccess.value = true
+    } catch (e) {
+      maxBidError.value = e instanceof Error ? e.message : 'Failed to update max bid price.'
+    } finally {
+      maxBidSaving.value = false
     }
   }
 
@@ -4574,6 +4699,8 @@ export function useBuildingDetail() {
               foreclosureTicksRemaining
               dispatchTargetPercent
               fuelReserveMwh
+              powerPriority
+              maxEnergyBidPrice
               cityReferenceRentPerSqm
               adjustedMarketRentPerSqm
               populationIndex
@@ -5433,6 +5560,21 @@ export function useBuildingDetail() {
     dispatchSaving,
     dispatchError,
     dispatchSuccess,
+    setPowerPriority,
+    prioritySaving,
+    priorityError,
+    prioritySuccess,
+    listEnergyForSale,
+    energyListingSaving,
+    energyListingError,
+    energyListingSuccess,
+    cancelEnergyListing,
+    energyCancelSaving,
+    energyCancelError,
+    setMaxEnergyBidPrice,
+    maxBidSaving,
+    maxBidError,
+    maxBidSuccess,
     fetchRankedProducts,
     getB2BPriceSource,
     getB2BSuggestedPrice,
