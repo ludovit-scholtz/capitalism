@@ -5,7 +5,25 @@ export interface PowerPlantTickSnapshot {
   operatingCosts: number
   /** Fuel procurement costs this tick (COAL/GAS plants only). */
   fuelCosts: number
+  /** Spot-market energy sales revenue this tick. */
+  spotMarketRevenue: number
   netProfit: number
+}
+
+/** An active energy spot-market listing (power plant selling surplus capacity). */
+export interface EnergyMarketListing {
+  listingId: string
+  buildingId: string
+  buildingName: string
+  companyId: string
+  companyName: string
+  cityId: string
+  plantType: string
+  pricePerKwhLocal: number
+  capacityKw: number
+  availableKw: number
+  createdAtTick: number
+  createdAtUtc: string
 }
 
 export interface PowerPlantAnalytics {
@@ -38,7 +56,11 @@ export interface PowerPlantAnalytics {
   totalOperatingCosts: number
   /** Total fuel procurement costs across the analytics window (COAL/GAS only). */
   totalFuelCosts: number
+  /** Total energy spot-market sales revenue across the analytics window. */
+  totalSpotMarketRevenue: number
   totalNetProfit: number
+  /** Active energy spot-market listing for this power plant (null if none). */
+  activeListing: EnergyMarketListing | null
   timeline: PowerPlantTickSnapshot[]
 }
 

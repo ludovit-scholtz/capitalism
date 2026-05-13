@@ -169,6 +169,16 @@ export interface Building {
   isCollateralized?: boolean
   /** Foreclosure countdown in ticks when collateral is in DEFAULTED status. */
   foreclosureTicksRemaining?: number | null
+  /**
+   * Power priority for load-shedding. Higher priority buildings stay online longer during
+   * a grid shortage. Range 1 (lowest) to 10 (highest). Default 5.
+   */
+  powerPriority: number
+  /**
+   * Maximum price per kWh (local currency) this building will auto-bid on the energy spot market.
+   * Null means no auto-purchasing (power plant buildings always have null here).
+   */
+  maxEnergyBidPrice: number | null
   marketValuation?: {
     landValue: number
     structureValue: number

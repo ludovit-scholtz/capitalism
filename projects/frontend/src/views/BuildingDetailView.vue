@@ -11,6 +11,7 @@ import BuildingPropertyPanel from '@/components/buildings/BuildingPropertyPanel.
 import BuildingMediaHousePanel from '@/components/buildings/BuildingMediaHousePanel.vue'
 import BuildingPowerPlantPanel from '@/components/buildings/BuildingPowerPlantPanel.vue'
 import BuildingResearchPanel from '@/components/buildings/BuildingResearchPanel.vue'
+import BuildingEnergyPanel from '@/components/buildings/BuildingEnergyPanel.vue'
 import BuildingChainStatusPanel from '@/components/buildings/BuildingChainStatusPanel.vue'
 import BuildingUnitGrid from '@/components/buildings/BuildingUnitGrid.vue'
 import BuildingEditingSidebar from '@/components/buildings/BuildingEditingSidebar.vue'
@@ -132,6 +133,7 @@ onMounted(async () => {
       </div>
 
       <BuildingPowerPlantPanel v-if="building.type === 'POWER_PLANT'" />
+      <BuildingEnergyPanel />
       <BuildingResearchPanel v-if="building.type === 'RESEARCH_DEVELOPMENT'" />
 
       <div v-if="showStarterSetupBanner" class="starter-setup-banner" role="region" aria-label="starter setup">

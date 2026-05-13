@@ -316,6 +316,10 @@ export type MockBuilding = {
   isCollateralized?: boolean
   /** Foreclosure countdown in ticks for defaulted collateral buildings. */
   foreclosureTicksRemaining?: number | null
+  /** Power priority for load-shedding (1–10). Default 5. */
+  powerPriority?: number
+  /** Maximum spot-market bid price per kWh. Null = no auto-purchase. */
+  maxEnergyBidPrice?: number | null
   units: MockBuildingUnit[]
   pendingConfiguration: MockBuildingConfigurationPlan | null
 }
@@ -5829,6 +5833,63 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    // ── setPowerPriority ──────────────────────────────────────────────────────
+    if (query.includes('SetPowerPriority') || query.includes('setPowerPriority')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const input = body.variables?.input as { buildingId?: string; priority?: number } | undefined
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      const building = player?.companies.flatMap((c) => c.buildings).find((b) => b.id === (input?.buildingId ?? ''))
+      if (!building) return routeJsonError('Building not found', 'BUILDING_NOT_FOUND')
+      const priority = Number(input?.priority ?? 5)
+      building.powerPriority = Math.min(10, Math.max(1, priority))
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { setPowerPriority: { id: building.id, powerPriority: building.powerPriority } } }),
+      })
+    }
+
+    // ── listEnergyForSale ─────────────────────────────────────────────────────
+    if (query.includes('ListEnergyForSale') || query.includes('listEnergyForSale')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const input = body.variables?.input as { buildingId?: string; pricePerKwhLocal?: number; capacityKw?: number } | undefined
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      if (!player) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const building = player.companies.flatMap((c) => c.buildings).find((b) => b.id === (input?.buildingId ?? ''))
+      if (!building) return routeJsonError('Building not found', 'BUILDING_NOT_FOUND')
+      const listingId = `listing-${building.id}-${Date.now()}`
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { listEnergyForSale: { listingId } } }),
+      })
+    }
+
+    // ── cancelEnergyListing ───────────────────────────────────────────────────
+    if (query.includes('CancelEnergyListing') || query.includes('cancelEnergyListing')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { cancelEnergyListing: true } }),
+      })
+    }
+
+    // ── setMaxEnergyBidPrice ──────────────────────────────────────────────────
+    if (query.includes('SetMaxEnergyBidPrice') || query.includes('setMaxEnergyBidPrice')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const input = body.variables?.input as { buildingId?: string; maxBidPricePerKwh?: number | null } | undefined
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      const building = player?.companies.flatMap((c) => c.buildings).find((b) => b.id === (input?.buildingId ?? ''))
+      if (!building) return routeJsonError('Building not found', 'BUILDING_NOT_FOUND')
+      building.maxEnergyBidPrice = input?.maxBidPricePerKwh ?? null
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { setMaxEnergyBidPrice: { id: building.id, maxEnergyBidPrice: building.maxEnergyBidPrice } } }),
+      })
+    }
+
     if (query.includes('PurchaseLot') || query.includes('purchaseLot')) {
       const input = body.variables?.input
       const player = state.players.find((p) => p.id === state.currentUserId)
@@ -6572,12 +6633,15 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         totalOperatingCosts: 12,
         totalFuelCosts: isThermal ? 85 : 0,
         totalNetProfit: 128,
+        totalSpotMarketRevenue: 0,
+        activeListing: null,
         timeline: Array.from({ length: Math.min(limit, 5) }, (_, i) => ({
           tick: dataToTick - 4 + i,
           surplusIncome: 45,
           gridFine: 0,
           operatingCosts: 2.4,
           fuelCosts: isThermal ? 17 : 0,
+          spotMarketRevenue: 0,
           netProfit: 25.6,
         })),
       }

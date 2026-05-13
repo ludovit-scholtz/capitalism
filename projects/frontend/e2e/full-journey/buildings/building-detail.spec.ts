@@ -23672,3 +23672,283 @@ test.describe('Supply chain tab', () => {
     await expect(page.locator('.collateral-warning')).toBeHidden()
   })
 })
+
+// ─── Energy Panel & Power Status Tests ─────────────────────────────────────
+test.describe('energy status badge and power settings', () => {
+  function makeEnergyBuilding(
+    powerStatus: 'POWERED' | 'CONSTRAINED' | 'OFFLINE',
+    buildingId = 'energy-bld-1',
+  ) {
+    return {
+      id: buildingId,
+      companyId: 'company-energy',
+      cityId: 'city-ba',
+      type: 'FACTORY',
+      name: 'Test Factory',
+      latitude: 48.15,
+      longitude: 17.11,
+      level: 1,
+      powerConsumption: 2,
+      powerStatus,
+      powerPriority: 5,
+      maxEnergyBidPrice: null,
+      isForSale: false,
+      builtAtUtc: '2026-01-01T00:00:00Z',
+      pendingConfiguration: null,
+      units: [],
+    }
+  }
+
+  test('shows POWERED energy status badge on building header', async ({ page }) => {
+    const player = makePlayer()
+    player.companies = [
+      {
+        id: 'company-energy',
+        playerId: player.id,
+        name: 'Energy Corp',
+        cash: 1_000_000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [makeEnergyBuilding('POWERED')],
+      },
+    ]
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/energy-bld-1')
+
+    // The badge should be visible with the POWERED class
+    const badge = page.locator('.power-status-powered')
+    await expect(badge).toBeVisible()
+    // Text is the i18n translation "Powered"
+    await expect(badge).toContainText('Powered')
+  })
+
+  test('shows CONSTRAINED energy status badge on building header', async ({ page }) => {
+    const player = makePlayer()
+    player.companies = [
+      {
+        id: 'company-energy',
+        playerId: player.id,
+        name: 'Energy Corp',
+        cash: 1_000_000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [makeEnergyBuilding('CONSTRAINED')],
+      },
+    ]
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/energy-bld-1')
+
+    // The badge should be visible with the CONSTRAINED class and translated text
+    const badge = page.locator('.power-status-constrained')
+    await expect(badge).toBeVisible()
+    await expect(badge).toContainText('Reduced Output')
+  })
+
+  test('shows OFFLINE energy status badge on building header', async ({ page }) => {
+    const player = makePlayer()
+    player.companies = [
+      {
+        id: 'company-energy',
+        playerId: player.id,
+        name: 'Energy Corp',
+        cash: 1_000_000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [makeEnergyBuilding('OFFLINE')],
+      },
+    ]
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/energy-bld-1')
+
+    // The badge should be visible with the OFFLINE class and translated text
+    const badge = page.locator('.power-status-offline')
+    await expect(badge).toBeVisible()
+    await expect(badge).toContainText('Offline')
+  })
+
+  test('can set power priority for a building and save persists', async ({ page }) => {
+    const player = makePlayer()
+    player.companies = [
+      {
+        id: 'company-energy',
+        playerId: player.id,
+        name: 'Energy Corp',
+        cash: 1_000_000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [makeEnergyBuilding('POWERED')],
+      },
+    ]
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/energy-bld-1')
+
+    const energyPanel = page.locator('[aria-label="Energy Settings"]')
+    await expect(energyPanel).toBeVisible()
+
+    // Change priority to 8
+    const prioritySelect = energyPanel.locator('.power-priority-select')
+    await prioritySelect.selectOption('8')
+
+    // Save
+    const saveBtn = energyPanel.locator('.priority-save-btn')
+    await saveBtn.click()
+
+    // Success message
+    await expect(energyPanel.locator('.priority-success')).toBeVisible()
+
+    // The building in mock state now has priority 8
+    const building = state.players
+      .flatMap((p) => p.companies)
+      .flatMap((c) => c.buildings)
+      .find((b) => b.id === 'energy-bld-1')
+    expect(building?.powerPriority).toBe(8)
+  })
+
+  test('shows energy panel for POWER_PLANT buildings with spot market section', async ({ page }) => {
+    const player = makePlayer()
+    player.companies = [
+      {
+        id: 'company-energy',
+        playerId: player.id,
+        name: 'Energy Corp',
+        cash: 1_000_000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [
+          {
+            id: 'pp-energy-bld',
+            companyId: 'company-energy',
+            cityId: 'city-ba',
+            type: 'POWER_PLANT',
+            name: 'Solar Plant',
+            latitude: 48.15,
+            longitude: 17.11,
+            level: 1,
+            powerConsumption: 0,
+            powerOutput: 30,
+            powerPlantType: 'SOLAR',
+            powerStatus: 'POWERED',
+            powerPriority: 5,
+            maxEnergyBidPrice: null,
+            isForSale: false,
+            builtAtUtc: '2026-01-01T00:00:00Z',
+            pendingConfiguration: null,
+            units: [],
+          },
+        ],
+      },
+    ]
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/pp-energy-bld')
+
+    // The Power Plant analytics panel should appear
+    const analyticsPanel = page.locator('[aria-label="power plant analytics"]')
+    await expect(analyticsPanel).toBeVisible()
+
+    // The spot market section should be visible (section heading from energyPanel.spotMarketSection)
+    await expect(analyticsPanel.getByText('Spot Market Listing')).toBeVisible()
+
+    // The create energy listing button should appear
+    await expect(analyticsPanel.locator('.create-listing-btn')).toBeVisible()
+    await expect(analyticsPanel.locator('.create-listing-btn')).toContainText('List surplus energy for sale')
+  })
+
+  test('can create an energy spot market listing', async ({ page }) => {
+    const player = makePlayer()
+    player.companies = [
+      {
+        id: 'company-energy',
+        playerId: player.id,
+        name: 'Energy Corp',
+        cash: 1_000_000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [
+          {
+            id: 'pp-listing-bld',
+            companyId: 'company-energy',
+            cityId: 'city-ba',
+            type: 'POWER_PLANT',
+            name: 'Coal Plant',
+            latitude: 48.15,
+            longitude: 17.11,
+            level: 1,
+            powerConsumption: 0,
+            powerOutput: 50,
+            powerPlantType: 'COAL',
+            powerStatus: 'POWERED',
+            powerPriority: 5,
+            maxEnergyBidPrice: null,
+            isForSale: false,
+            builtAtUtc: '2026-01-01T00:00:00Z',
+            pendingConfiguration: null,
+            units: [],
+          },
+        ],
+      },
+    ]
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/pp-listing-bld')
+
+    const analyticsPanel = page.locator('[aria-label="power plant analytics"]')
+    await expect(analyticsPanel).toBeVisible()
+
+    // Click "List surplus energy for sale" to expand the form
+    await analyticsPanel.locator('.create-listing-btn').click()
+
+    // Fill in price and capacity
+    const priceInput = analyticsPanel.locator('#listing-price-input')
+    await priceInput.fill('0.05')
+
+    const capacityInput = analyticsPanel.locator('#listing-capacity-input')
+    await capacityInput.fill('10000')
+
+    // Submit
+    await analyticsPanel.locator('.submit-listing-btn').click()
+
+    // Success message should appear
+    await expect(analyticsPanel.locator('.listing-success')).toBeVisible()
+  })
+})

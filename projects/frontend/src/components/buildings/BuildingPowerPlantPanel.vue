@@ -16,6 +16,13 @@ const {
   dispatchSaving,
   dispatchError,
   dispatchSuccess,
+  listEnergyForSale,
+  energyListingSaving,
+  energyListingError,
+  energyListingSuccess,
+  cancelEnergyListing,
+  energyCancelSaving,
+  energyCancelError,
   formatCurrency,
 } = bd
 
@@ -88,6 +95,28 @@ const chartMaxValue = computed(() => {
   if (!tl || tl.length === 0) return 1
   return Math.max(...tl.map((s) => Math.max(s.surplusIncome ?? 0, (s.gridFine ?? 0) + (s.operatingCosts ?? 0) + (s.fuelCosts ?? 0)))) || 1
 })
+
+// ── Energy spot-market listing ────────────────────────────────────────────
+const showCreateListingForm = ref(false)
+const draftListingPrice = ref<string>('')
+const draftListingCapacity = ref<string>('')
+
+async function submitListing() {
+  if (!building.value) return
+  const price = parseFloat(draftListingPrice.value)
+  const capacity = parseFloat(draftListingCapacity.value)
+  if (isNaN(price) || isNaN(capacity) || price <= 0 || capacity <= 0) return
+  await listEnergyForSale(building.value.id, price, capacity)
+  if (energyListingSuccess.value) {
+    draftListingPrice.value = ''
+    draftListingCapacity.value = ''
+    // Keep form open to show success message; will collapse when analytics reload returns activeListing
+  }
+}
+
+async function doCancel(listingId: string) {
+  await cancelEnergyListing(listingId)
+}
 </script>
 
 <template>
@@ -238,6 +267,85 @@ const chartMaxValue = computed(() => {
         <p v-if="dispatchSuccess" class="dispatch-success mt-1 text-xs text-green-400">{{ t('powerPlant.dispatch.success') }}</p>
       </div>
 
+      <!-- Energy spot-market listing ──────────────────────────────────────── -->
+      <div class="energy-listing-section mb-4 rounded-lg border border-divider bg-surface p-3">
+        <span class="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted">💱 {{ t('energyPanel.spotMarketSection') }}</span>
+
+        <!-- Active listing -->
+        <template v-if="powerPlantAnalytics.activeListing">
+          <div class="active-listing flex flex-wrap items-center justify-between gap-2 rounded-md border border-green-300/40 bg-green-500/10 px-3 py-2">
+            <div class="text-sm">
+              <span class="font-semibold text-green-700 dark:text-green-300">{{ t('energyPanel.activeListing') }}</span>
+              <span class="ml-2 text-foreground">
+                {{ t('energyPanel.listingPrice', { price: formatCurrency(powerPlantAnalytics.activeListing.pricePerKwhLocal) }) }}
+              </span>
+              <span class="ml-2 text-muted">
+                {{ t('energyPanel.listingCapacity', { capacity: powerPlantAnalytics.activeListing.capacityKw }) }}
+              </span>
+              <span class="ml-2 text-muted">
+                {{ t('energyPanel.listingAvailable', { available: powerPlantAnalytics.activeListing.availableKw }) }}
+              </span>
+            </div>
+            <button
+              class="btn btn-ghost btn-sm cancel-listing-btn text-red-500"
+              :disabled="energyCancelSaving"
+              @click="doCancel(powerPlantAnalytics.activeListing.listingId)"
+            >
+              {{ energyCancelSaving ? t('energyPanel.cancellingListing') : t('energyPanel.cancelListing') }}
+            </button>
+          </div>
+          <p v-if="energyCancelError" class="cancel-error mt-1 text-xs text-red-400">{{ energyCancelError }}</p>
+        </template>
+
+        <!-- No active listing — show create form toggle or form -->
+        <template v-else>
+          <button
+            v-if="!showCreateListingForm"
+            class="create-listing-btn btn btn-secondary btn-sm"
+            @click="showCreateListingForm = true"
+          >
+            {{ t('energyPanel.createListing') }}
+          </button>
+          <div v-else class="create-listing-form mt-2 space-y-3">
+            <h4 class="text-xs font-semibold text-foreground">{{ t('energyPanel.createListingTitle') }}</h4>
+            <div>
+              <label class="mb-1 block text-xs text-muted" for="listing-price-input">{{ t('energyPanel.priceLabel') }}</label>
+              <input
+                id="listing-price-input"
+                v-model="draftListingPrice"
+                type="number"
+                min="0.001"
+                step="0.001"
+                class="listing-price-input w-36 rounded-md border border-divider bg-card px-2 py-1.5 text-sm text-foreground"
+              />
+            </div>
+            <div>
+              <label class="mb-1 block text-xs text-muted" for="listing-capacity-input">{{ t('energyPanel.capacityLabel') }}</label>
+              <input
+                id="listing-capacity-input"
+                v-model="draftListingCapacity"
+                type="number"
+                min="1"
+                step="1"
+                class="listing-capacity-input w-36 rounded-md border border-divider bg-card px-2 py-1.5 text-sm text-foreground"
+              />
+            </div>
+            <div class="flex gap-2">
+              <button
+                class="submit-listing-btn btn btn-primary btn-sm"
+                :disabled="energyListingSaving"
+                @click="submitListing"
+              >
+                {{ energyListingSaving ? t('energyPanel.creatingListing') : t('energyPanel.submitListing') }}
+              </button>
+              <button class="btn btn-ghost btn-sm text-muted" @click="showCreateListingForm = false">{{ t('common.cancel') }}</button>
+            </div>
+            <p v-if="energyListingError" class="listing-error text-xs text-red-400">{{ energyListingError }}</p>
+            <p v-if="energyListingSuccess" class="listing-success text-xs text-green-400">{{ t('energyPanel.listingCreated') }}</p>
+          </div>
+        </template>
+      </div>
+
       <!-- Fuel reserve (thermal plants only) — richer capacity bar, chain visualization, multi-fuel badge -->
       <div
         v-if="isThermalPlant"
@@ -373,6 +481,10 @@ const chartMaxValue = computed(() => {
         <div v-if="isThermalPlant" class="ppa-metric rounded-lg border border-divider bg-surface p-3">
           <span class="ppa-metric-label">{{ t('powerPlant.analytics.fuelCosts') }}</span>
           <strong class="ppa-metric-value ppa-fuel-cost mt-1 block text-base">{{ formatCurrency(powerPlantAnalytics.totalFuelCosts) }}</strong>
+        </div>
+        <div v-if="(powerPlantAnalytics.totalSpotMarketRevenue ?? 0) > 0" class="ppa-metric rounded-lg border border-divider bg-surface p-3">
+          <span class="ppa-metric-label">{{ t('energyPanel.spotRevenue') }}</span>
+          <strong class="ppa-metric-value ppa-spot-revenue mt-1 block text-base text-green-600 dark:text-green-400">{{ formatCurrency(powerPlantAnalytics.totalSpotMarketRevenue ?? 0) }}</strong>
         </div>
         <div class="ppa-metric rounded-lg border border-divider bg-surface p-3">
           <span class="ppa-metric-label">{{ t('powerPlant.analytics.netProfit') }}</span>
