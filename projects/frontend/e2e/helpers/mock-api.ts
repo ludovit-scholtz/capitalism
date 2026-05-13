@@ -13,6 +13,7 @@ import type { Page } from '@playwright/test'
 
 export const GOVERNMENT_PLAYER_EMAIL = 'government@capitalism.game'
 const MOCK_BUILDING_BASE_VALUE = 75_000
+let mockApiKeyCounter = 0
 
 export type MockPlayer = {
   id: string
@@ -42,6 +43,17 @@ export type MockPlayer = {
   dividendPayments: MockDividendPayment[]
   stockTrades: MockPersonTradeRecord[]
   companies: MockCompany[]
+}
+
+export type MockPlayerApiKey = {
+  id: string
+  playerId: string
+  name: string
+  keyPrefix: string
+  plaintextKey: string
+  createdAtUtc: string
+  lastUsedAtUtc: string | null
+  revokedAtUtc: string | null
 }
 
 export type MockPersonalInterestPayment = {
@@ -992,6 +1004,7 @@ export type MockEconomicHistoryPoint = {
 export type MockState = {
   serverKey: string
   players: MockPlayer[]
+  apiKeys: MockPlayerApiKey[]
   shareholdings: MockShareholding[]
   cities: MockCity[]
   buildingLots: MockBuildingLot[]
@@ -3063,6 +3076,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
   const state: MockState = {
     serverKey: 'test-server',
     players: [],
+    apiKeys: [],
     shareholdings: [],
     cities: makeDefaultCities(),
     buildingLots: makeDefaultBuildingLots(),
@@ -7558,6 +7572,123 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             },
           },
         }),
+      })
+    }
+
+    if (query.includes('myApiKeys')) {
+      if (!state.currentUserId) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Not authenticated.' }] }),
+        })
+      }
+
+      const playerKeys = state.apiKeys
+        .filter((key) => key.playerId === state.currentUserId && !key.revokedAtUtc)
+        .map((key) => ({
+          id: key.id,
+          name: key.name,
+          createdAtUtc: key.createdAtUtc,
+          lastUsedAtUtc: key.lastUsedAtUtc,
+          revokedAtUtc: key.revokedAtUtc,
+        }))
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { myApiKeys: playerKeys } }),
+      })
+    }
+
+    if (query.includes('generateApiKey')) {
+      if (!state.currentUserId) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Not authenticated.' }] }),
+        })
+      }
+
+      const keyName = (body.variables?.input?.name as string | undefined)?.trim() ?? ''
+      if (!keyName) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [{ message: 'API key name is required.', extensions: { code: 'VALIDATION_ERROR' } }],
+          }),
+        })
+      }
+
+      mockApiKeyCounter += 1
+      const tsPart = Date.now().toString(36).slice(-8).padStart(8, '0')
+      const counterPart = mockApiKeyCounter.toString(36).slice(-8).padStart(8, '0')
+      const randomToken = `${tsPart}${counterPart}`
+      const plaintextKey = `sk_live_${randomToken}`
+      const keyPrefix = plaintextKey.slice(0, 8)
+      const now = new Date().toISOString()
+      const createdKey: MockPlayerApiKey = {
+        id: `api-key-${Date.now().toString(36)}-${mockApiKeyCounter}`,
+        playerId: state.currentUserId,
+        name: keyName,
+        keyPrefix,
+        plaintextKey,
+        createdAtUtc: now,
+        lastUsedAtUtc: null,
+        revokedAtUtc: null,
+      }
+      state.apiKeys.unshift(createdKey)
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            generateApiKey: {
+              plaintextKey: createdKey.plaintextKey,
+              apiKey: {
+                id: createdKey.id,
+                name: createdKey.name,
+                createdAtUtc: createdKey.createdAtUtc,
+                lastUsedAtUtc: createdKey.lastUsedAtUtc,
+                totalCallCount: 0,
+                revokedAtUtc: null,
+                scopes: ['bot-only', 'trading-only'],
+                companyIds: [],
+              },
+            },
+          },
+        }),
+      })
+    }
+
+    if (query.includes('revokeApiKey')) {
+      if (!state.currentUserId) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Not authenticated.' }] }),
+        })
+      }
+
+      const keyId = (body.variables?.input?.keyId as string | undefined) ?? ''
+      const key = state.apiKeys.find((apiKey) => apiKey.id === keyId && apiKey.playerId === state.currentUserId)
+      if (!key) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [{ message: 'API key not found or does not belong to you.', extensions: { code: 'NOT_FOUND' } }],
+          }),
+        })
+      }
+      key.revokedAtUtc = key.revokedAtUtc ?? new Date().toISOString()
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { revokeApiKey: true } }),
       })
     }
 

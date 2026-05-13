@@ -573,14 +573,12 @@ public sealed class ApiKeyAuthTests : IClassFixture<ApiWebApplicationFactory>
             revokeVars, token);
         Assert.True(revokeResult.GetProperty("data").GetProperty("revokeApiKey").GetBoolean());
 
-        // Key should now appear as revoked in the list.
+        // Revoked keys are hidden from the player's list.
         var listResult = await SendAsync(_client,
             @"query { myApiKeys { id revokedAtUtc } }",
             token: token);
         var keys = listResult.GetProperty("data").GetProperty("myApiKeys").EnumerateArray().ToList();
-        var revokedKey = keys.FirstOrDefault(k => k.GetProperty("id").GetString() == keyId);
-        Assert.NotEqual(default, revokedKey);
-        Assert.NotEqual(JsonValueKind.Null, revokedKey.GetProperty("revokedAtUtc").ValueKind);
+        Assert.DoesNotContain(keys, key => key.GetProperty("id").GetString() == keyId);
     }
 
     [Fact]
