@@ -115,6 +115,16 @@ describe('productImages mapping', () => {
     expect(existsSync(new URL('wooden-bed.svg', assetDir))).toBe(true)
   })
 
+  it('keeps every seeded catalog SVG source unique and distinct from fallback artwork', () => {
+    const fallbackSource = readFileSync(new URL('fallback.svg', assetDir), 'utf8').trim()
+    const mappedSources = [...RESOURCE_IMAGE_SLUGS, ...PRODUCT_IMAGE_SLUGS].map((slug) =>
+      readFileSync(new URL(`${slug}.svg`, assetDir), 'utf8').trim(),
+    )
+
+    expect(mappedSources).not.toContain(fallbackSource)
+    expect(new Set(mappedSources).size).toBe(mappedSources.length)
+  })
+
   it('keeps the specifically reported regressions classified as product-only mappings', () => {
     const reportedProductSlugs = [
       'analgesic-syrup',
