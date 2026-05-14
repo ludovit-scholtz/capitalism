@@ -18368,6 +18368,14 @@ test.describe('Unit upgrade panel', () => {
     // Should show duration
     await expect(upgradePanel.locator('.unit-upgrade-duration')).toBeVisible()
 
+    // Layout wrappers keep the maintenance content readable after Tailwind refactors.
+    await expect(async () => {
+      const metaDisplay = await upgradePanel.locator('.unit-upgrade-meta').evaluate((element) => getComputedStyle(element).display)
+      const statRowDisplay = await upgradePanel.locator('.unit-upgrade-stat-row').first().evaluate((element) => getComputedStyle(element).display)
+      expect(metaDisplay).toBe('flex')
+      expect(statRowDisplay).toBe('grid')
+    }).toPass()
+
     // Should show confirm button
     await expect(upgradePanel.getByRole('button', { name: 'Upgrade Now' })).toBeVisible()
   })
