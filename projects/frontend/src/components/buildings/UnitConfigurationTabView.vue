@@ -165,75 +165,70 @@ watch(
     </nav>
 
     <div class="unit-detail">
-
       <!-- ── Tab: General Settings ── -->
       <template v-if="selectedConfigTab === 'config'">
         <div class="unit-basic-info mt-3">
-        <h4>{{ t(`buildingDetail.unitTypes.${currentUnit.unitType}`) }}</h4>
-        <p class="unit-desc">{{ t(`buildingDetail.unitDescriptions.${currentUnit.unitType}`) }}</p>
-        <div class="unit-stats">
-          <span class="stat">{{ t('common.level') }}: {{ currentUnit.level }}</span>
-          <span class="stat">{{ t('buildingDetail.gridPosition', { x: selectedCell.x, y: selectedCell.y }) }}</span>
-          <span v-if="getDraftUnitConstructionCostLabel(currentUnit)" class="stat">
-            {{ t('buildingDetail.unitCost', { cost: getDraftUnitConstructionCostLabel(currentUnit) }) }}
-          </span>
-          <span
-            v-if="getDisplayedTicks(currentUnit) > 0"
-            class="stat"
-            :title="getDisplayedTicks(currentUnit) + ' ticks'"
-          >
-            {{ t('buildingDetail.unitUnavailableFor', { time: formatTickDuration(getDisplayedTicks(currentUnit), locale) }) }}
-          </span>
-        </div>
-        <div class="unit-links">
-          <span class="link-label">{{ t('buildingDetail.links') }}:</span>
-          <span v-if="currentUnit.linkUp" class="link-badge">{{ t('buildingDetail.linkUp') }}</span>
-          <span v-if="currentUnit.linkDown" class="link-badge">{{ t('buildingDetail.linkDown') }}</span>
-          <span v-if="currentUnit.linkLeft" class="link-badge">{{ t('buildingDetail.linkLeft') }}</span>
-          <span v-if="currentUnit.linkRight" class="link-badge">{{ t('buildingDetail.linkRight') }}</span>
-          <span v-if="currentUnit.linkUpLeft" class="link-badge">{{ t('buildingDetail.linkUpLeft') }}</span>
-          <span v-if="currentUnit.linkUpRight" class="link-badge">{{ t('buildingDetail.linkUpRight') }}</span>
-          <span v-if="currentUnit.linkDownLeft" class="link-badge">{{ t('buildingDetail.linkDownLeft') }}</span>
-          <span v-if="currentUnit.linkDownRight" class="link-badge">{{ t('buildingDetail.linkDownRight') }}</span>
-        </div>
-
-        <!-- Unit-specific configuration (shown on default tab so settings are immediately visible) -->
-        <BuildingUnitConfigFields />
-
-        <div v-if="currentUnit.unitType === 'PURCHASE'" class="unit-insight-card purchase-history-panel">
-          <h5>{{ t('buildingDetail.purchasePriceQualityHistory.title') }}</h5>
-          <p class="config-help">{{ t('buildingDetail.purchasePriceQualityHistory.subtitle') }}</p>
-          <p v-if="sourcingCandidatesLoading" class="config-help">{{ t('common.loading') }}</p>
-          <div v-else-if="purchaseSourcingHistory.length > 0" class="inventory-table mt-2">
-            <div class="inventory-table-header">
-              <span class="inventory-col-item">{{ t('common.city') }}</span>
-              <span class="inventory-col-cost">{{ t('buildingDetail.purchasePriceQualityHistory.purchasePrice') }}</span>
-              <span class="inventory-col-quality">{{ t('buildingDetail.purchasePriceQualityHistory.quality') }}</span>
-            </div>
-            <div v-for="entry in purchaseSourcingHistory" :key="`${entry.sourceType}-${entry.sourceCityId ?? 'none'}-${entry.rank}`" class="inventory-table-row">
-              <div class="inventory-col-item">
-                <span class="inventory-item-name">{{ entry.sourceCityName }}</span>
-              </div>
-              <div class="inventory-col-cost">
-                <span class="inventory-item-cost">{{ entry.deliveredPricePerUnit != null ? formatCurrency(entry.deliveredPricePerUnit) : '—' }}</span>
-              </div>
-              <div class="inventory-col-quality">
-                <span class="inventory-item-quality">{{ entry.estimatedQuality != null ? formatPercent(entry.estimatedQuality) : '—' }}</span>
-              </div>
-            </div>
+          <h4>{{ t(`buildingDetail.unitTypes.${currentUnit.unitType}`) }}</h4>
+          <p class="unit-desc">{{ t(`buildingDetail.unitDescriptions.${currentUnit.unitType}`) }}</p>
+          <div class="unit-stats">
+            <span class="stat">{{ t('common.level') }}: {{ currentUnit.level }}</span>
+            <span class="stat">{{ t('buildingDetail.gridPosition', { x: selectedCell.x, y: selectedCell.y }) }}</span>
+            <span v-if="getDraftUnitConstructionCostLabel(currentUnit)" class="stat">
+              {{ t('buildingDetail.unitCost', { cost: getDraftUnitConstructionCostLabel(currentUnit) }) }}
+            </span>
+            <span v-if="getDisplayedTicks(currentUnit) > 0" class="stat" :title="getDisplayedTicks(currentUnit) + ' ticks'">
+              {{ t('buildingDetail.unitUnavailableFor', { time: formatTickDuration(getDisplayedTicks(currentUnit), locale) }) }}
+            </span>
           </div>
-          <p v-else class="config-help">{{ t('buildingDetail.purchasePriceQualityHistory.empty') }}</p>
-        </div>
+          <div class="unit-links">
+            <span class="link-label">{{ t('buildingDetail.links') }}:</span>
+            <span v-if="currentUnit.linkUp" class="link-badge">{{ t('buildingDetail.linkUp') }}</span>
+            <span v-if="currentUnit.linkDown" class="link-badge">{{ t('buildingDetail.linkDown') }}</span>
+            <span v-if="currentUnit.linkLeft" class="link-badge">{{ t('buildingDetail.linkLeft') }}</span>
+            <span v-if="currentUnit.linkRight" class="link-badge">{{ t('buildingDetail.linkRight') }}</span>
+            <span v-if="currentUnit.linkUpLeft" class="link-badge">{{ t('buildingDetail.linkUpLeft') }}</span>
+            <span v-if="currentUnit.linkUpRight" class="link-badge">{{ t('buildingDetail.linkUpRight') }}</span>
+            <span v-if="currentUnit.linkDownLeft" class="link-badge">{{ t('buildingDetail.linkDownLeft') }}</span>
+            <span v-if="currentUnit.linkDownRight" class="link-badge">{{ t('buildingDetail.linkDownRight') }}</span>
+          </div>
 
-        <UnitResourceHistoryPanel
-          v-if="currentUnit.unitType === 'PURCHASE' && selectedHistoryItemOptions.length > 0"
-          :items="selectedHistoryItemOptions"
-          :selected-item-key="selectedHistoryItemKey"
-          :history="selectedUnitResourceHistory"
-          borderless
-          @update:selected-item-key="selectedHistoryItemKey = $event"
-        />
-        <BuildingEnergyPanel v-if="isEditing" />
+          <!-- Unit-specific configuration (shown on default tab so settings are immediately visible) -->
+          <BuildingUnitConfigFields />
+
+          <div v-if="currentUnit.unitType === 'PURCHASE'" class="unit-insight-card purchase-history-panel">
+            <h5>{{ t('buildingDetail.purchasePriceQualityHistory.title') }}</h5>
+            <p class="config-help">{{ t('buildingDetail.purchasePriceQualityHistory.subtitle') }}</p>
+            <p v-if="sourcingCandidatesLoading" class="config-help">{{ t('common.loading') }}</p>
+            <div v-else-if="purchaseSourcingHistory.length > 0" class="inventory-table mt-2">
+              <div class="inventory-table-header">
+                <span class="inventory-col-item">{{ t('common.city') }}</span>
+                <span class="inventory-col-cost">{{ t('buildingDetail.purchasePriceQualityHistory.purchasePrice') }}</span>
+                <span class="inventory-col-quality">{{ t('buildingDetail.purchasePriceQualityHistory.quality') }}</span>
+              </div>
+              <div v-for="entry in purchaseSourcingHistory" :key="`${entry.sourceType}-${entry.sourceCityId ?? 'none'}-${entry.rank}`" class="inventory-table-row">
+                <div class="inventory-col-item">
+                  <span class="inventory-item-name">{{ entry.sourceCityName }}</span>
+                </div>
+                <div class="inventory-col-cost">
+                  <span class="inventory-item-cost">{{ entry.deliveredPricePerUnit != null ? formatCurrency(entry.deliveredPricePerUnit) : '—' }}</span>
+                </div>
+                <div class="inventory-col-quality">
+                  <span class="inventory-item-quality">{{ entry.estimatedQuality != null ? formatPercent(entry.estimatedQuality) : '—' }}</span>
+                </div>
+              </div>
+            </div>
+            <p v-else class="config-help">{{ t('buildingDetail.purchasePriceQualityHistory.empty') }}</p>
+          </div>
+
+          <UnitResourceHistoryPanel
+            v-if="currentUnit.unitType === 'PURCHASE' && selectedHistoryItemOptions.length > 0"
+            :items="selectedHistoryItemOptions"
+            :selected-item-key="selectedHistoryItemKey"
+            :history="selectedUnitResourceHistory"
+            borderless
+            @update:selected-item-key="selectedHistoryItemKey = $event"
+          />
+          <BuildingEnergyPanel v-if="isEditing" />
         </div>
 
         <!-- Exchange offers panel — shown on General tab when PURCHASE unit has EXCHANGE/OPTIMAL source -->
@@ -329,10 +324,7 @@ watch(
                   })
                 }}
               </p>
-              <span
-                class="mt-2 inline-flex rounded-full border px-2 py-1 text-xs font-semibold"
-                :class="fillHealthBadgeClass(currentInventorySummary.quantity, currentInventorySummary.capacity)"
-              >
+              <span class="mt-2 inline-flex rounded-full border px-2 py-1 text-xs font-semibold" :class="fillHealthBadgeClass(currentInventorySummary.quantity, currentInventorySummary.capacity)">
                 {{ formatPercent(Math.min(1, currentInventorySummary.quantity / Math.max(1, currentInventorySummary.capacity))) }}
               </span>
             </article>
@@ -345,10 +337,7 @@ watch(
               </p>
             </article>
 
-            <article
-              v-if="currentInventorySummary.averageQuality != null"
-              class="rounded-xl border border-divider bg-card p-4"
-            >
+            <article v-if="currentInventorySummary.averageQuality != null" class="rounded-xl border border-divider bg-card p-4">
               <p class="text-xs font-semibold uppercase tracking-wide text-muted">{{ t('buildingDetail.inventory.averageQuality') }}</p>
               <div class="mt-2 flex items-center gap-2">
                 <p class="text-lg font-semibold text-foreground">{{ formatPercent(currentInventorySummary.averageQuality) }}</p>
@@ -373,7 +362,9 @@ watch(
           </div>
 
           <div v-if="getUnitInventories(currentUnit).length > 0" class="inventory-table rounded-xl border border-divider bg-card">
-            <div class="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2 border-b border-divider px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted max-sm:hidden">
+            <div
+              class="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2 border-b border-divider px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted max-sm:hidden"
+            >
               <span>{{ t('buildingDetail.inventory.item') }}</span>
               <span>{{ t('buildingDetail.inventory.amount') }}</span>
               <span>{{ t('buildingDetail.inventory.quality') }}</span>
@@ -386,8 +377,15 @@ watch(
                 class="grid gap-3 px-4 py-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] sm:items-center"
               >
                 <div class="flex items-center gap-2">
-                  <img v-if="getInventoryItemImageUrl(inventory)" class="inventory-item-image h-8 w-8 rounded-md object-cover" :src="getInventoryItemImageUrl(inventory)!" :alt="getInventoryItemName(inventory)" />
-                  <span v-else class="inventory-item-avatar inline-flex h-8 w-8 items-center justify-center rounded-md border border-divider bg-surface text-xs font-semibold text-muted">{{ getInventoryItemMonogram(inventory) }}</span>
+                  <img
+                    v-if="getInventoryItemImageUrl(inventory)"
+                    class="inventory-item-image h-8 w-8 rounded-md object-cover"
+                    :src="getInventoryItemImageUrl(inventory)!"
+                    :alt="getInventoryItemName(inventory)"
+                  />
+                  <span v-else class="inventory-item-avatar inline-flex h-8 w-8 items-center justify-center rounded-md border border-divider bg-surface text-xs font-semibold text-muted">{{
+                    getInventoryItemMonogram(inventory)
+                  }}</span>
                   <span class="inventory-item-name text-sm font-semibold text-foreground">{{ getInventoryItemName(inventory) }}</span>
                 </div>
                 <div class="text-sm text-foreground">
@@ -430,15 +428,8 @@ watch(
           <h5 class="mb-4 text-sm font-semibold uppercase tracking-wide text-muted">{{ t('buildingDetail.unitUpgrade.sectionTitle') }}</h5>
 
           <!-- Upgrade in progress -->
-          <div
-            v-if="selectedCellPendingUpgrade"
-            class="unit-upgrade-in-progress flex items-start gap-3 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4"
-          >
-            <div
-              class="unit-upgrade-progress-badge inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-amber-300/30 bg-amber-400/15 text-lg"
-            >
-              ⏳
-            </div>
+          <div v-if="selectedCellPendingUpgrade" class="unit-upgrade-in-progress flex items-start gap-3 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4">
+            <div class="unit-upgrade-progress-badge inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-amber-300/30 bg-amber-400/15 text-lg">⏳</div>
             <div class="unit-upgrade-progress-body min-w-0 space-y-2">
               <strong class="block text-sm font-semibold text-foreground">{{ t('buildingDetail.unitUpgrade.pendingTitle') }}</strong>
               <p class="unit-upgrade-progress-desc text-sm leading-6 text-foreground/90" :title="selectedCellPendingUpgrade.ticksRemaining + ' ticks remaining'">
@@ -454,15 +445,8 @@ watch(
           </div>
 
           <!-- Max level -->
-          <div
-            v-else-if="selectedCellUpgradeInfo.isMaxLevel"
-            class="unit-upgrade-max-level flex items-start gap-3 rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-4"
-          >
-            <span
-              class="unit-upgrade-max-badge inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-emerald-300/30 bg-emerald-400/15 text-lg"
-            >
-              ✅
-            </span>
+          <div v-else-if="selectedCellUpgradeInfo.isMaxLevel" class="unit-upgrade-max-level flex items-start gap-3 rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-4">
+            <span class="unit-upgrade-max-badge inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-emerald-300/30 bg-emerald-400/15 text-lg"> ✅ </span>
             <div class="space-y-1.5">
               <span class="block text-sm font-semibold text-foreground">{{ t('buildingDetail.unitUpgrade.maxLevel') }}</span>
               <p class="unit-upgrade-max-note text-sm leading-6 text-emerald-100/95">{{ t('buildingDetail.unitUpgrade.maxLevelNote') }}</p>
@@ -477,15 +461,11 @@ watch(
           <!-- Upgrade available -->
           <div v-else class="unit-upgrade-available space-y-4">
             <div class="unit-upgrade-levels flex flex-wrap items-center gap-3 rounded-xl border border-divider bg-surface px-4 py-3">
-              <span
-                class="unit-upgrade-level current-level inline-flex items-center rounded-full border border-divider bg-card px-3 py-1.5 text-sm font-semibold text-foreground"
-              >
+              <span class="unit-upgrade-level current-level inline-flex items-center rounded-full border border-divider bg-card px-3 py-1.5 text-sm font-semibold text-foreground">
                 {{ t('buildingDetail.unitUpgrade.currentLevel', { level: selectedCellUpgradeInfo.currentLevel }) }}
               </span>
               <span class="unit-upgrade-arrow text-lg font-semibold text-muted">→</span>
-              <span
-                class="unit-upgrade-level next-level inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-semibold text-primary"
-              >
+              <span class="unit-upgrade-level next-level inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-semibold text-primary">
                 {{ t('buildingDetail.unitUpgrade.nextLevel', { level: selectedCellUpgradeInfo.nextLevel }) }}
               </span>
             </div>
@@ -526,10 +506,7 @@ watch(
                   </span>
                 </span>
               </div>
-              <div
-                class="unit-upgrade-stat-row grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
-                :aria-label="t('buildingDetail.accessibility.energyCostDelta')"
-              >
+              <div class="unit-upgrade-stat-row grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center" :aria-label="t('buildingDetail.accessibility.energyCostDelta')">
                 <span class="unit-upgrade-stat-label text-xs font-semibold uppercase tracking-wide text-muted">{{ t('buildingDetail.unitUpgrade.energyCost') }}</span>
                 <span class="unit-upgrade-stat-values flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-foreground sm:justify-end">
                   <span class="stat-current">{{ formatCurrency(selectedCellUpgradeInfo.currentEnergyCostPerTick) }}</span>
@@ -560,9 +537,7 @@ watch(
             </div>
             <p v-if="unitUpgradeError" class="form-error rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">{{ unitUpgradeError }}</p>
             <div v-if="isSelectedCellStaged" class="unit-upgrade-staged space-y-3 rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-4">
-              <span
-                class="unit-upgrade-staged-badge inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-400/15 px-3 py-1.5 text-sm font-semibold text-emerald-100"
-              >
+              <span class="unit-upgrade-staged-badge inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-400/15 px-3 py-1.5 text-sm font-semibold text-emerald-100">
                 ✅ {{ t('buildingDetail.unitUpgrade.stagedBadge') }}
               </span>
               <p class="unit-upgrade-stage-info text-sm leading-6 text-emerald-100/95">{{ t('buildingDetail.unitUpgrade.stageInfo') }}</p>
@@ -600,7 +575,6 @@ watch(
         </div>
         <p v-else class="unit-desc">{{ t('buildingDetail.unitUpgrade.notUpgradable') }}</p>
       </template>
-
     </div>
   </div>
 </template>

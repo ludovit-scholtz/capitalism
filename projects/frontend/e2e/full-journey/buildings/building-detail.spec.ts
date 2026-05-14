@@ -11076,7 +11076,10 @@ test.describe('Purchase selector dialog — navbar visibility and z-index', () =
 
     await page.goto('/building/building-ps-z')
     await page.getByRole('button', { name: /Edit Building/i }).click()
-    const plannedSection = page.locator('.grid-section').filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) }).first()
+    const plannedSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
+      .first()
     await plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
 
     const dialog = await openPurchaseSelector(page)
@@ -18371,7 +18374,10 @@ test.describe('Unit upgrade panel', () => {
     // Layout wrappers keep the maintenance content readable after Tailwind refactors.
     await expect(async () => {
       const metaDisplay = await upgradePanel.locator('.unit-upgrade-meta').evaluate((element) => getComputedStyle(element).display)
-      const statRowDisplay = await upgradePanel.locator('.unit-upgrade-stat-row').first().evaluate((element) => getComputedStyle(element).display)
+      const statRowDisplay = await upgradePanel
+        .locator('.unit-upgrade-stat-row')
+        .first()
+        .evaluate((element) => getComputedStyle(element).display)
       expect(metaDisplay).toBe('flex')
       expect(statRowDisplay).toBe('grid')
     }).toPass()
@@ -23926,10 +23932,7 @@ test.describe('Supply chain tab', () => {
 
     const cancelBtn = page.locator('.cancel-listing-btn')
     await expect(cancelBtn).toBeDisabled()
-    await expect(cancelBtn).toHaveAttribute(
-      'title',
-      /Sale cannot be cancelled/i,
-    )
+    await expect(cancelBtn).toHaveAttribute('title', /Sale cannot be cancelled/i)
   })
 
   test('sell form destroy workflow shows confirmation and success credit message', async ({ page }) => {
@@ -24057,10 +24060,7 @@ test.describe('Supply chain tab', () => {
 
 // ─── Energy Panel & Power Status Tests ─────────────────────────────────────
 test.describe('energy status badge and power settings', () => {
-  function makeEnergyBuilding(
-    powerStatus: 'POWERED' | 'CONSTRAINED' | 'OFFLINE',
-    buildingId = 'energy-bld-1',
-  ) {
+  function makeEnergyBuilding(powerStatus: 'POWERED' | 'CONSTRAINED' | 'OFFLINE', buildingId = 'energy-bld-1') {
     return {
       id: buildingId,
       companyId: 'company-energy',
