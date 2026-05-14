@@ -69,4 +69,13 @@ describe('productImages mapping', () => {
       expect(getProductCatalogImageUrl(slug)).toContain(`${slug}.webp`)
     }
   })
+
+  it('keeps dedicated subject files for the specifically reported product regressions', () => {
+    expect(getProductCatalogImageUrl('analgesic-syrup')).toContain('analgesic-syrup.webp')
+    expect(getProductCatalogImageUrl('antibiotic')).toContain('antibiotic.webp')
+    expect(getProductCatalogImageUrl('antiseptic-gel')).toContain('antiseptic-gel.webp')
+    expect(getProductCatalogImageUrl('aspirin')).toContain('aspirin.webp')
+    expect(getProductCatalogImageUrl('assembly-pallet')).toContain('assembly-pallet.webp')
+    expect(getProductCatalogImageUrl('wooden-bed')).toContain('wooden-bed.webp')
+  })
 })
