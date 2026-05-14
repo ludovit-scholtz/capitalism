@@ -30,8 +30,8 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 ### Stock exchange
 
-- [ ] For trading specific company create a full page layout. Make sure the routing is correctly setup - /stock/trade/:companyId. 
-- [ ] Move the `Limit-order book` component to the full page layout for trading one company and remove the stock selection in the limit order book (should be selected by the companyId in the routing).
+- [x] (100%) For trading specific company create a full page layout. Make sure the routing is correctly setup - /stock/trade/:companyId. 
+- [x] (100%) Move the `Limit-order book` component to the full page layout for trading one company and remove the stock selection in the limit order book (should be selected by the companyId in the routing).
 
 ### Economy integrity hardening
 
