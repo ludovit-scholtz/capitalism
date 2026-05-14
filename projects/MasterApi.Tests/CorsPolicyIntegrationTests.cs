@@ -9,6 +9,25 @@ namespace MasterApi.Tests;
 public sealed class CorsPolicyIntegrationTests
 {
     [Fact]
+    public async Task ConfiguredOrigin_AuthSessionPreflight_AllowsExplicitOriginWithCredentials()
+    {
+        using var factory = CreateFactory("Testing", "http://localhost:5173");
+        using var client = factory.CreateClient();
+        using var request = CreatePreflightRequest(
+            "http://localhost:5173",
+            "/auth/session",
+            "authorization,content-type");
+
+        using var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.True(response.Headers.TryGetValues("Access-Control-Allow-Origin", out var allowedValues));
+        Assert.Equal("http://localhost:5173", allowedValues.Single());
+        Assert.True(response.Headers.TryGetValues("Access-Control-Allow-Credentials", out var credentialValues));
+        Assert.Equal("true", credentialValues.Single());
+    }
+
+    [Fact]
     public async Task NonDevelopment_EmptyAllowedOrigins_RejectsCrossOriginWith403()
     {
         using var factory = CreateFactory("Testing");
@@ -77,11 +96,19 @@ public sealed class CorsPolicyIntegrationTests
         return values;
     }
 
-    private static HttpRequestMessage CreatePreflightRequest(string origin)
+    private static HttpRequestMessage CreatePreflightRequest(
+        string origin,
+        string path = "/graphql",
+        string? requestedHeaders = null)
     {
-        var request = new HttpRequestMessage(HttpMethod.Options, "/graphql");
+        var request = new HttpRequestMessage(HttpMethod.Options, path);
         request.Headers.Add("Origin", origin);
         request.Headers.Add("Access-Control-Request-Method", "POST");
+        if (!string.IsNullOrWhiteSpace(requestedHeaders))
+        {
+            request.Headers.Add("Access-Control-Request-Headers", requestedHeaders);
+        }
+
         return request;
     }
 }

@@ -8,6 +8,18 @@ public static class CorsPolicyHelper
     public const string MisconfiguredWarningMessage =
         "CORS_MISCONFIGURED: No allowed origins configured; all cross-origin requests will be rejected";
 
+    private static readonly string[] DevelopmentDefaultOrigins =
+    [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
+        "http://localhost:4174",
+        "http://127.0.0.1:4174",
+    ];
+
     public static string[] ResolveAllowedOrigins(IConfiguration configuration)
     {
         return configuration.GetSection("Cors:AllowedOrigins")
@@ -19,9 +31,20 @@ public static class CorsPolicyHelper
             ?? [];
     }
 
-    public static bool IsDevelopmentOpenPolicy(IHostEnvironment environment)
+    public static string[] ResolveEffectiveAllowedOrigins(IConfiguration configuration, IHostEnvironment environment)
     {
-        return environment.IsDevelopment();
+        var configuredOrigins = ResolveAllowedOrigins(configuration);
+        if (configuredOrigins.Length > 0)
+        {
+            return configuredOrigins;
+        }
+
+        if (environment.IsDevelopment())
+        {
+            return DevelopmentDefaultOrigins;
+        }
+
+        return [];
     }
 
     public static bool IsNonDevelopmentMisconfigured(IHostEnvironment environment, IReadOnlyCollection<string> allowedOrigins)
