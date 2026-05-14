@@ -47,7 +47,8 @@ public sealed partial class Query
 
         var outstandingByBank = await db.Loans
             .Where(l => bankIds.Contains(l.BankBuildingId)
-                && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue))
+                && l.RemainingPrincipal > 0m
+                && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue || l.Status == LoanStatus.Defaulted))
             .GroupBy(l => l.BankBuildingId)
             .Select(g => new { BankBuildingId = g.Key, Outstanding = g.Sum(l => l.RemainingPrincipal) })
             .ToDictionaryAsync(x => x.BankBuildingId, x => x.Outstanding);
@@ -317,7 +318,8 @@ public sealed partial class Query
         var loanExposureRows = await db.Loans
             .Where(l => l.CollateralBuildingId.HasValue
                         && buildingIds.Contains(l.CollateralBuildingId!.Value)
-                        && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue))
+                        && l.RemainingPrincipal > 0m
+                        && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue || l.Status == LoanStatus.Defaulted))
             .Select(l => new
             {
                 BuildingId = l.CollateralBuildingId!.Value,
@@ -386,7 +388,7 @@ public sealed partial class Query
                 CurrencyCode = outputCurrencyCode,
                 IsEligible = !isPledged,
                 IneligibilityReason = isPledged
-                    ? "This building is already pledged as collateral for another active loan."
+                    ? "This building is already pledged as collateral for an unpaid loan."
                     : null,
             };
         }).OrderByDescending(s => s.RemainingBorrowingCapacity).ToList();

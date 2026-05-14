@@ -119,25 +119,28 @@ public sealed class LoanRepaymentPhase : ITickPhase
             ticksPerPayment = 1;
         }
 
+        var loanCurrencyCode = context.BuildingsById.TryGetValue(loan.BankBuildingId, out var loanBankBuilding)
+            && context.CitiesById.TryGetValue(loanBankBuilding.CityId, out var loanBankCity)
+            ? loanBankCity.CurrencyCode
+            : "EUR";
+
         var borrowerSettlementAccount = loan.BorrowerBankAccountId.HasValue
             && context.BankAccountsById.TryGetValue(loan.BorrowerBankAccountId.Value, out var configuredAccount)
+            && string.Equals(configuredAccount.CurrencyCode, loanCurrencyCode, StringComparison.OrdinalIgnoreCase)
             ? configuredAccount
-            : null;
-        var availableBorrowerBalance = borrowerSettlementAccount?.Balance ?? context.GetCompanyBankBalance(borrower.Id);
+            : CompanyBankingService.FindPreferredAccount(context.GetCompanyBankAccounts(borrower.Id), loanCurrencyCode);
+        var availableBorrowerBalance = borrowerSettlementAccount?.Balance ?? 0m;
 
         if (availableBorrowerBalance >= totalPayment)
         {
             // Successful payment.
-            if (borrowerSettlementAccount is not null)
+            if (borrowerSettlementAccount is null)
             {
-                borrowerSettlementAccount.Balance -= totalPayment;
+                return;
             }
-            else
-            {
-                CompanyBankingService.TryDebit(context.GetCompanyBankAccounts(borrower.Id), totalPayment);
-            }
+            borrowerSettlementAccount.Balance -= totalPayment;
 
-            CompanyBankingService.TryCredit(context.GetCompanyBankAccounts(lender.Id), totalPayment, null, out var lenderCreditedAccount);
+            CompanyBankingService.TryCredit(context.GetCompanyBankAccounts(lender.Id), totalPayment, loanCurrencyCode, out var lenderCreditedAccount);
             loan.RemainingPrincipal = Math.Max(0m, loan.RemainingPrincipal - principalPayment);
             loan.PaymentsMade++;
             loan.PaymentAmount = totalPayment;
@@ -274,15 +277,15 @@ public sealed class LoanRepaymentPhase : ITickPhase
                     var buildingCurrencyCode = context.CitiesById.TryGetValue(collateralBuilding.CityId, out var buildingCity)
                         ? buildingCity.CurrencyCode
                         : "EUR";
-                    var loanCurrencyCode = context.BuildingsById.TryGetValue(loan.BankBuildingId, out var loanBankBuilding)
-                        && context.CitiesById.TryGetValue(loanBankBuilding.CityId, out var bankCity)
+                    var foreclosureLoanCurrencyCode = context.BuildingsById.TryGetValue(loan.BankBuildingId, out var foreclosureLoanBankBuilding)
+                        && context.CitiesById.TryGetValue(foreclosureLoanBankBuilding.CityId, out var bankCity)
                         ? bankCity.CurrencyCode
                         : buildingCurrencyCode;
 
                     var collateralAppraisedInBuildingCurrency = decimal.Round(
                         FxRateHelper.ConvertAmount(
                             loan.CollateralAppraisedValue.Value,
-                            loanCurrencyCode,
+                            foreclosureLoanCurrencyCode,
                             buildingCurrencyCode,
                             context.EurFxRates),
                         2,

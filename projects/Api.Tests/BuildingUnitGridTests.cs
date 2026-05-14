@@ -132,6 +132,102 @@ public sealed class BuildingUnitGridTests
         return errors[0].GetProperty("extensions").GetProperty("code").GetString()!;
     }
 
+    private static async Task SeedPledgedCollateralLoanAsync(
+        ApiWebApplicationFactory factory,
+        string borrowerCompanyId,
+        string collateralBuildingId,
+        string status = LoanStatus.Active)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+
+        var lenderPlayer = new Player
+        {
+            Id = Guid.NewGuid(),
+            Email = $"pledge-lender-{Guid.NewGuid():N}@test.com",
+            DisplayName = "Pledge Lender",
+            PasswordHash = "hash",
+            Role = PlayerRole.Player,
+        };
+        db.Players.Add(lenderPlayer);
+
+        var lenderCompany = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = lenderPlayer.Id,
+            Name = $"PledgeLenderCo-{Guid.NewGuid():N}",
+        };
+        db.Companies.Add(lenderCompany);
+
+        var bankBuilding = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = lenderCompany.Id,
+            CityId = city.Id,
+            Type = BuildingType.Bank,
+            Name = "Pledge Bank",
+            Latitude = city.Latitude,
+            Longitude = city.Longitude,
+            BaseCapitalDeposited = true,
+            TotalDeposits = 500_000m,
+            LendingInterestRatePercent = 8m,
+        };
+        db.Buildings.Add(bankBuilding);
+
+        db.BankAccounts.Add(new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = city.CurrencyCode,
+            CompanyId = lenderCompany.Id,
+            Balance = 200_000m,
+            CreatedAtUtc = DateTime.UtcNow,
+        });
+
+        var offer = new LoanOffer
+        {
+            Id = Guid.NewGuid(),
+            BankBuildingId = bankBuilding.Id,
+            LenderCompanyId = lenderCompany.Id,
+            AnnualInterestRatePercent = 8m,
+            MaxPrincipalPerLoan = 200_000m,
+            TotalCapacity = 500_000m,
+            UsedCapacity = 100_000m,
+            DurationTicks = 1440L,
+            IsActive = false,
+            CreatedAtTick = 1,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.LoanOffers.Add(offer);
+
+        db.Loans.Add(new Loan
+        {
+            Id = Guid.NewGuid(),
+            LoanOfferId = offer.Id,
+            BorrowerCompanyId = Guid.Parse(borrowerCompanyId),
+            BankBuildingId = bankBuilding.Id,
+            LenderCompanyId = lenderCompany.Id,
+            OriginalPrincipal = 100_000m,
+            RemainingPrincipal = 80_000m,
+            AnnualInterestRatePercent = 8m,
+            DurationTicks = 1440L,
+            StartTick = 1,
+            DueTick = 1441,
+            NextPaymentTick = 721,
+            PaymentAmount = 10_000m,
+            TotalPayments = 10,
+            Status = status,
+            MissedPayments = status == LoanStatus.Defaulted ? 3 : 0,
+            DefaultedAtTick = status == LoanStatus.Defaulted ? 10 : null,
+            CollateralBuildingId = Guid.Parse(collateralBuildingId),
+            CollateralAppraisedValue = 150_000m,
+            AcceptedAtUtc = DateTime.UtcNow.AddDays(-2),
+        });
+
+        await db.SaveChangesAsync();
+    }
+
     // ── Tests ──────────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -734,6 +830,87 @@ public sealed class BuildingUnitGridTests
 
         var code = GetErrorCode(result);
         Assert.Equal("INSUFFICIENT_FUNDS", code);
+    }
+
+    [Fact]
+    public async Task StoreBuildingConfiguration_PledgedCollateral_ReturnsPledgedCollateralError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var token = await RegisterAsync(client, $"pledged-store-{Guid.NewGuid():N}@test.com");
+        var companyId = await CreateCompanyAsync(client, token, "Pledged Store Corp");
+        var buildingId = await SeedBuildingAsync(factory, companyId, BuildingType.Factory);
+        await SeedPledgedCollateralLoanAsync(factory, companyId, buildingId, LoanStatus.Defaulted);
+
+        var result = await GqlAsync(client,
+            """
+            mutation Store($input: StoreBuildingConfigurationInput!) {
+              storeBuildingConfiguration(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    buildingId,
+                    units = new object[]
+                    {
+                        new { unitType = "PURCHASE", gridX = 0, gridY = 0,
+                              linkUp = false, linkDown = false, linkLeft = false, linkRight = true, linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false },
+                        new { unitType = "MANUFACTURING", gridX = 1, gridY = 0,
+                              linkUp = false, linkDown = false, linkLeft = false, linkRight = false, linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false }
+                    }
+                }
+            },
+            token);
+
+        var code = GetErrorCode(result);
+        Assert.Equal("BUILDING_IS_PLEDGED_COLLATERAL", code);
+    }
+
+    [Fact]
+    public async Task ScheduleUnitUpgrade_PledgedCollateral_ReturnsPledgedCollateralError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var token = await RegisterAsync(client, $"pledged-upgrade-{Guid.NewGuid():N}@test.com");
+        var companyId = await CreateCompanyAsync(client, token, "Pledged Upgrade Corp");
+        await FundCompanyAsync(factory, companyId, 2_000_000m);
+        var buildingId = await SeedBuildingAsync(factory, companyId, BuildingType.Factory);
+
+        string unitId;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var unit = new BuildingUnit
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = Guid.Parse(buildingId),
+                UnitType = UnitType.Storage,
+                GridX = 0,
+                GridY = 0,
+                Level = 1,
+            };
+            db.BuildingUnits.Add(unit);
+            unitId = unit.Id.ToString();
+            await db.SaveChangesAsync();
+        }
+
+        await SeedPledgedCollateralLoanAsync(factory, companyId, buildingId, LoanStatus.Active);
+
+        var result = await GqlAsync(client,
+            """
+            mutation Upgrade($input: ScheduleUnitUpgradeInput!) {
+              scheduleUnitUpgrade(input: $input) { id }
+            }
+            """,
+            new { input = new { unitId } },
+            token);
+
+        var code = GetErrorCode(result);
+        Assert.Equal("BUILDING_IS_PLEDGED_COLLATERAL", code);
     }
 
     /// <summary>

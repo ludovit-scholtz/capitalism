@@ -452,7 +452,7 @@ public sealed class BuildingSecondaryMarketTests
     }
 
     [Fact]
-    public async Task AcceptBuildingOffer_ReturnsError_WhenBuyerHasInsufficientFunds()
+    public async Task AcceptBuildingOffer_UsesEscrowedFunds_WhenBuyerBalanceChangesAfterOffer()
     {
         await using var factory = new ApiWebApplicationFactory();
         var client = factory.CreateClient();
@@ -473,7 +473,7 @@ public sealed class BuildingSecondaryMarketTests
         var offerId = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("id").GetString()!);
         var offerVersion = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("offerVersion").GetString()!);
 
-        // Drain buyer's bank account
+        // Drain buyer's remaining free balance after the offer has already reserved escrow.
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var buyerAccount = await db.BankAccounts.FirstAsync(a => a.CompanyId == buyerCompanyId);
@@ -485,10 +485,133 @@ public sealed class BuildingSecondaryMarketTests
             new { input = new { offerId, offerVersion } },
             sellerToken);
 
-        var errors = result.GetProperty("errors");
+        var acceptedBuilding = result.GetProperty("data").GetProperty("acceptBuildingOffer").GetProperty("building");
+        Assert.Equal(buildingId.ToString(), acceptedBuilding.GetProperty("id").GetString());
+    }
+
+    [Fact]
+    public async Task AcceptBuildingOffer_RejectsOfferBelowComputedSaleFloor_AtSettlement()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var sellerToken = await RegisterAsync(client, $"seller-floor-{Guid.NewGuid():N}@market.test");
+        var buyerToken = await RegisterAsync(client, $"buyer-floor-{Guid.NewGuid():N}@market.test");
+        var (buildingId, _, _) = await SeedOwnerWithBuildingAsync(factory, sellerToken);
+        var (_, buyerCompanyId, _) = await SeedOwnerWithBuildingAsync(factory, buyerToken, 2_000_000m);
+
+        decimal minimumSaleFloor;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var building = await db.Buildings.FirstAsync(b => b.Id == buildingId);
+            var valuation = await BuildingMarketValuationCalculator.CalculateAsync(db, building);
+            minimumSaleFloor = valuation.MinimumSalePrice;
+        }
+
+        await ExecAsync(client,
+            "mutation S($input: SetBuildingForSaleInput!) { setBuildingForSale(input: $input) { id } }",
+            new { input = new { buildingId, isForSale = true, askingPrice = minimumSaleFloor } },
+            sellerToken);
+
+        var belowFloorOffer = decimal.Round(minimumSaleFloor * 0.90m, 2, MidpointRounding.AwayFromZero);
+        var offerResult = await ExecAsync(client,
+            "mutation O($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id offerVersion } }",
+            new { input = new { buildingId, buyerCompanyId, offeredPrice = belowFloorOffer } },
+            buyerToken);
+        var offerId = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("id").GetString()!);
+        var offerVersion = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("offerVersion").GetString()!);
+
+        var acceptResult = await ExecAsync(client,
+            "mutation A($input: AcceptBuildingOfferInput!) { acceptBuildingOffer(input: $input) { building { id } } }",
+            new { input = new { offerId, offerVersion } },
+            sellerToken);
+
+        var errors = acceptResult.GetProperty("errors");
         Assert.True(errors.GetArrayLength() > 0);
-        Assert.Contains("INSUFFICIENT_FUNDS",
-            errors.EnumerateArray().Select(e => e.GetProperty("extensions").GetProperty("code").GetString()));
+        var error = errors[0];
+        Assert.Equal("OFFER_BELOW_FLOOR", error.GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal(minimumSaleFloor, error.GetProperty("extensions").GetProperty("minimumSaleFloor").GetDecimal());
+    }
+
+    [Fact]
+    public async Task CancelBuildingOffer_ReleasesEscrowBackToBuyer()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var sellerToken = await RegisterAsync(client, $"seller-escrow-release-{Guid.NewGuid():N}@market.test");
+        var buyerToken = await RegisterAsync(client, $"buyer-escrow-release-{Guid.NewGuid():N}@market.test");
+        var (buildingId, _, _) = await SeedOwnerWithBuildingAsync(factory, sellerToken);
+        var (_, buyerCompanyId, buyerAccountId) = await SeedOwnerWithBuildingAsync(factory, buyerToken, 1_500_000m);
+
+        await ExecAsync(client,
+            "mutation S($input: SetBuildingForSaleInput!) { setBuildingForSale(input: $input) { id } }",
+            new { input = new { buildingId, isForSale = true, askingPrice = 700_000m } },
+            sellerToken);
+
+        var offerAmount = 600_000m;
+        var offerResult = await ExecAsync(client,
+            "mutation O($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id offerVersion } }",
+            new { input = new { buildingId, buyerCompanyId, offeredPrice = offerAmount } },
+            buyerToken);
+        var offerId = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("id").GetString()!);
+        var offerVersion = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("offerVersion").GetString()!);
+
+        await using (var afterOfferScope = factory.Services.CreateAsyncScope())
+        {
+            var db = afterOfferScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var buyerAccount = await db.BankAccounts.FirstAsync(a => a.Id == buyerAccountId);
+            var offer = await db.BuildingSaleOffers.FirstAsync(o => o.Id == offerId);
+            Assert.Equal(900_000m, buyerAccount.Balance);
+            Assert.Equal(offerAmount, offer.EscrowAmount);
+        }
+
+        await ExecAsync(client,
+            "mutation C($input: CancelBuildingOfferInput!) { cancelBuildingOffer(input: $input) { id status } }",
+            new { input = new { offerId, offerVersion } },
+            sellerToken);
+
+        await using var verifyScope = factory.Services.CreateAsyncScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var buyerAfterCancel = await verifyDb.BankAccounts.FirstAsync(a => a.Id == buyerAccountId);
+        var offerAfterCancel = await verifyDb.BuildingSaleOffers.FirstAsync(o => o.Id == offerId);
+        Assert.Equal(1_500_000m, buyerAfterCancel.Balance);
+        Assert.Equal(0m, offerAfterCancel.EscrowAmount);
+    }
+
+    [Fact]
+    public async Task MakeOfferOnBuilding_EscrowReservation_PreventsDoubleSpendAcrossListings()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var sellerAToken = await RegisterAsync(client, $"seller-a-{Guid.NewGuid():N}@market.test");
+        var sellerBToken = await RegisterAsync(client, $"seller-b-{Guid.NewGuid():N}@market.test");
+        var buyerToken = await RegisterAsync(client, $"buyer-double-spend-{Guid.NewGuid():N}@market.test");
+        var (buildingAId, _, _) = await SeedOwnerWithBuildingAsync(factory, sellerAToken);
+        var (buildingBId, _, _) = await SeedOwnerWithBuildingAsync(factory, sellerBToken);
+        var (_, buyerCompanyId, _) = await SeedOwnerWithBuildingAsync(factory, buyerToken, 1_000_000m);
+
+        await ExecAsync(client,
+            "mutation SA($input: SetBuildingForSaleInput!) { setBuildingForSale(input: $input) { id } }",
+            new { input = new { buildingId = buildingAId, isForSale = true, askingPrice = 600_000m } },
+            sellerAToken);
+        await ExecAsync(client,
+            "mutation SB($input: SetBuildingForSaleInput!) { setBuildingForSale(input: $input) { id } }",
+            new { input = new { buildingId = buildingBId, isForSale = true, askingPrice = 600_000m } },
+            sellerBToken);
+
+        await ExecAsync(client,
+            "mutation OA($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id } }",
+            new { input = new { buildingId = buildingAId, buyerCompanyId, offeredPrice = 600_000m } },
+            buyerToken);
+
+        var secondOffer = await ExecAsync(client,
+            "mutation OB($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id } }",
+            new { input = new { buildingId = buildingBId, buyerCompanyId, offeredPrice = 600_000m } },
+            buyerToken);
+
+        var errors = secondOffer.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0);
+        Assert.Equal("INSUFFICIENT_FUNDS", errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
     [Fact]
@@ -1491,6 +1614,128 @@ public sealed class BuildingSecondaryMarketTests
     }
 
     [Fact]
+    public async Task AcceptBuildingOffer_DefaultedCollateral_RejectsWhenSaleCannotCoverLien()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var sellerToken = await RegisterAsync(client, $"seller-underfunded-{Guid.NewGuid():N}@market.test");
+        var buyerToken = await RegisterAsync(client, $"buyer-underfunded-{Guid.NewGuid():N}@market.test");
+        var lenderToken = await RegisterAsync(client, $"lender-underfunded-{Guid.NewGuid():N}@market.test");
+        var (sellerBuildingId, sellerCompanyId, _) = await SeedOwnerWithBuildingAsync(factory, sellerToken);
+        var (_, buyerCompanyId, _) = await SeedOwnerWithBuildingAsync(factory, buyerToken, 1_000_000m);
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var lenderPlayerId = Guid.Parse((await ExecAsync(client, "query { me { id } }", token: lenderToken))
+                .GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+            var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+
+            var lenderCompany = new Company
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = lenderPlayerId,
+                Name = "Lien Lender Co",
+            };
+            db.Companies.Add(lenderCompany);
+
+            var bankBuilding = new Building
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = lenderCompany.Id,
+                CityId = city.Id,
+                Type = BuildingType.Bank,
+                Name = "Lien Lender Bank",
+                Latitude = city.Latitude,
+                Longitude = city.Longitude,
+                BaseCapitalDeposited = true,
+                TotalDeposits = 2_000_000m,
+                LendingInterestRatePercent = 8m,
+            };
+            db.Buildings.Add(bankBuilding);
+
+            db.BankAccounts.Add(new BankAccount
+            {
+                Id = Guid.NewGuid(),
+                AccountNumber = NewAccountNumber(),
+                CurrencyCode = city.CurrencyCode,
+                CompanyId = lenderCompany.Id,
+                Balance = 0m,
+            });
+
+            var loanOffer = new LoanOffer
+            {
+                Id = Guid.NewGuid(),
+                BankBuildingId = bankBuilding.Id,
+                LenderCompanyId = lenderCompany.Id,
+                AnnualInterestRatePercent = 8m,
+                MaxPrincipalPerLoan = 500_000m,
+                TotalCapacity = 1_000_000m,
+                UsedCapacity = 300_000m,
+                DurationTicks = 1440L,
+                IsActive = false,
+                CreatedAtTick = 1,
+                CreatedAtUtc = DateTime.UtcNow,
+            };
+            db.LoanOffers.Add(loanOffer);
+
+            db.Loans.Add(new Loan
+            {
+                Id = Guid.NewGuid(),
+                LoanOfferId = loanOffer.Id,
+                BorrowerCompanyId = sellerCompanyId,
+                BankBuildingId = bankBuilding.Id,
+                LenderCompanyId = lenderCompany.Id,
+                OriginalPrincipal = 300_000m,
+                RemainingPrincipal = 300_000m,
+                AnnualInterestRatePercent = 8m,
+                DurationTicks = 1440L,
+                StartTick = 0,
+                DueTick = 1440,
+                NextPaymentTick = 1440,
+                PaymentAmount = 10_000m,
+                TotalPayments = 10,
+                Status = LoanStatus.Defaulted,
+                MissedPayments = 3,
+                DefaultedAtTick = 10,
+                CollateralBuildingId = sellerBuildingId,
+                CollateralAppraisedValue = 300_000m,
+                AcceptedAtUtc = DateTime.UtcNow.AddDays(-10),
+            });
+
+            await db.SaveChangesAsync();
+        }
+
+        await ExecAsync(client,
+            "mutation S($input: SetBuildingForSaleInput!) { setBuildingForSale(input: $input) { id } }",
+            new { input = new { buildingId = sellerBuildingId, isForSale = true, askingPrice = 200_000m } },
+            sellerToken);
+
+        var offerResult = await ExecAsync(client,
+            "mutation O($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id offerVersion } }",
+            new { input = new { buildingId = sellerBuildingId, buyerCompanyId, offeredPrice = 200_000m } },
+            buyerToken);
+        var offerId = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("id").GetString()!);
+        var offerVersion = Guid.Parse(offerResult.GetProperty("data").GetProperty("makeOfferOnBuilding").GetProperty("offerVersion").GetString()!);
+
+        var acceptResult = await ExecAsync(client,
+            "mutation A($input: AcceptBuildingOfferInput!) { acceptBuildingOffer(input: $input) { building { id } } }",
+            new { input = new { offerId, offerVersion } },
+            sellerToken);
+
+        var errors = acceptResult.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0);
+        Assert.Equal("COLLATERAL_LIEN_UNDERFUNDED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+
+        await using var verifyScope = factory.Services.CreateAsyncScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var loanAfter = await verifyDb.Loans.FirstAsync(l => l.BorrowerCompanyId == sellerCompanyId);
+        Assert.Equal(300_000m, loanAfter.RemainingPrincipal);
+        Assert.Equal(sellerBuildingId, loanAfter.CollateralBuildingId);
+        Assert.Equal(LoanStatus.Defaulted, loanAfter.Status);
+    }
+
+    [Fact]
     public async Task AcceptBuildingOffer_DefaultedCollateral_SettlesDebtWithFx_AndReturnsSurplusToSeller()
     {
         await using var factory = new ApiWebApplicationFactory();
@@ -2034,7 +2279,7 @@ public sealed class BuildingSecondaryMarketTests
         {
             var db = preScope.ServiceProvider.GetRequiredService<AppDbContext>();
             var buyer2AccountBefore = await db.BankAccounts.FirstAsync(a => a.CompanyId == buyer2CompanyId && a.CurrencyCode == "EUR");
-            Assert.Equal(5_000_000m, buyer2AccountBefore.Balance);
+            Assert.Equal(3_950_000m, buyer2AccountBefore.Balance);
         }
 
         await ExecAsync(client,

@@ -35,6 +35,16 @@ public sealed class BuildingSaleOffer
     public decimal OfferedPrice { get; set; }
 
     /// <summary>
+    /// Amount currently reserved in escrow for this offer.
+    /// This is debited when the offer is placed and released when the offer is rejected/cancelled.
+    /// </summary>
+    public decimal EscrowAmount { get; set; }
+
+    /// <summary>ISO 4217 currency code for <see cref="EscrowAmount"/>.</summary>
+    [MaxLength(3)]
+    public string EscrowCurrencyCode { get; set; } = "EUR";
+
+    /// <summary>
     /// Optional note from the buyer (for negotiation context).
     /// Allowed when the listing has <c>AllowNegotiation = true</c>.
     /// </summary>
