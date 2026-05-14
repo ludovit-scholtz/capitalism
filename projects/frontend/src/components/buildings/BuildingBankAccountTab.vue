@@ -12,13 +12,7 @@ const { building, loading, cityCurrencyCode } = bd
 <template>
   <div class="unit-insight-card building-bank-account-card">
     <h5>{{ t('buildingBankAccount.panelTitle') }}</h5>
-    <BuildingBankAccountPanel
-      :building-id="building?.id ?? ''"
-      :company-id="building?.companyId ?? ''"
-      :currency-code="cityCurrencyCode"
-      :loading="loading"
-      @updated="bd.loadBuilding()"
-    />
+    <BuildingBankAccountPanel :building-id="building?.id ?? ''" :company-id="building?.companyId ?? ''" :currency-code="cityCurrencyCode" :loading="loading" @updated="bd.loadBuilding()" />
   </div>
 </template>
 

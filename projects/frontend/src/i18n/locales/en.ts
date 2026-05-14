@@ -270,8 +270,7 @@ export default {
     noAccount: "Don't have an account?",
     loginFailed: 'Login failed. Please check your credentials and try again.',
     invalidCredentials: 'Invalid credentials.',
-    registrationNeutral:
-      'If this email is not already registered, you will receive a confirmation.',
+    registrationNeutral: 'If this email is not already registered, you will receive a confirmation.',
     loginToAccess: 'Log in to access',
     loginRequired: 'Please log in to continue.',
     loginThrottledTitle: 'Too many failed attempts',

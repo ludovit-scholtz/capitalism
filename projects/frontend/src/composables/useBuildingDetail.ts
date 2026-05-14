@@ -69,18 +69,18 @@ import type {
   PowerPlantAnalytics,
   ProcurementPreview,
   ProductType,
-   PublicSalesAnalytics,
-   MarketEventView,
-   RankedProductResult,
+  PublicSalesAnalytics,
+  MarketEventView,
+  RankedProductResult,
   ResearchBrandState,
   ResourceType,
-   CityMediaHouseInfo,
-   MediaHouseAnalyticsResult,
-    MediaHouseStatsResult,
-    SourcingCandidate,
-    UnitProductAnalytics,
-    ApartmentBuildingDetail,
-  } from '@/types'
+  CityMediaHouseInfo,
+  MediaHouseAnalyticsResult,
+  MediaHouseStatsResult,
+  SourcingCandidate,
+  UnitProductAnalytics,
+  ApartmentBuildingDetail,
+} from '@/types'
 import type { HorizontalLinkState, VerticalLinkState } from '@/lib/linkHelpers'
 
 export type GridUnit = BuildingUnit | BuildingConfigurationPlanUnit | EditableGridUnit
@@ -401,28 +401,10 @@ export function useBuildingDetail() {
       defaultedAtTick: number | null
     }>
   >([])
-  const isBuildingUsedAsCollateral = computed(() =>
-    myLoans.value.some(
-      (l) =>
-        l.collateralBuildingId === building.value?.id &&
-        (l.status === 'ACTIVE' || l.status === 'OVERDUE'),
-    ),
-  )
-  const collateralLoanCount = computed(
-    () =>
-      myLoans.value.filter(
-        (l) =>
-          l.collateralBuildingId === building.value?.id &&
-          (l.status === 'ACTIVE' || l.status === 'OVERDUE'),
-      ).length,
-  )
+  const isBuildingUsedAsCollateral = computed(() => myLoans.value.some((l) => l.collateralBuildingId === building.value?.id && (l.status === 'ACTIVE' || l.status === 'OVERDUE')))
+  const collateralLoanCount = computed(() => myLoans.value.filter((l) => l.collateralBuildingId === building.value?.id && (l.status === 'ACTIVE' || l.status === 'OVERDUE')).length)
   /** The first defaulted loan that has this building as collateral, or null. */
-  const defaultedCollateralLoan = computed(
-    () =>
-      myLoans.value.find(
-        (l) => l.collateralBuildingId === building.value?.id && l.status === 'DEFAULTED',
-      ) ?? null,
-  )
+  const defaultedCollateralLoan = computed(() => myLoans.value.find((l) => l.collateralBuildingId === building.value?.id && l.status === 'DEFAULTED') ?? null)
   /** True when any loan backed by this building is in DEFAULTED status. */
   const isLoanDefaulted = computed(() => defaultedCollateralLoan.value !== null)
   /**
@@ -2279,7 +2261,7 @@ export function useBuildingDetail() {
     const levelMultiplier = Math.pow(EMV_LEVEL_MULTIPLIER_BASE, b.level - 1)
     const unitValue = (b.units?.length ?? 0) * EMV_UNIT_BASE_VALUE
     const locationMultiplier = 1 + (b.populationIndex ?? EMV_DEFAULT_POPULATION_INDEX) * 0.5
-    return Math.round((EMV_BASE_LOT_VALUE * levelMultiplier + unitValue) * locationMultiplier / 1000) * 1000
+    return Math.round(((EMV_BASE_LOT_VALUE * levelMultiplier + unitValue) * locationMultiplier) / 1000) * 1000
   })
 
   // ── Rent management (APARTMENT / COMMERCIAL) ──
@@ -2450,7 +2432,7 @@ export function useBuildingDetail() {
 
     mediaHouseUnitId.value = null
     mediaHouseTargetCompanyId.value = building.value?.companyId ?? null
-    mediaHouseUnitMediaType.value = ((building.value?.mediaType as 'NEWSPAPER' | 'RADIO' | 'TV') ?? 'NEWSPAPER')
+    mediaHouseUnitMediaType.value = (building.value?.mediaType as 'NEWSPAPER' | 'RADIO' | 'TV') ?? 'NEWSPAPER'
     mediaHouseCampaignBudgetPerTick.value = 0
     mediaHouseUnitActive.value = true
   }
@@ -3528,12 +3510,7 @@ export function useBuildingDetail() {
           }
           const fromLabel = sourceUnitType ? t(`buildingDetail.unitTypes.${sourceUnitType}`) : ''
           const toLabel = t(`buildingDetail.unitTypes.${targetUnit.unitType}`)
-          showClipboardMessage(
-            fromLabel
-              ? t('buildingDetail.clipboard.incompatibleType', { from: fromLabel, to: toLabel })
-              : t('buildingDetail.clipboard.schemaMismatch'),
-            'error',
-          )
+          showClipboardMessage(fromLabel ? t('buildingDetail.clipboard.incompatibleType', { from: fromLabel, to: toLabel }) : t('buildingDetail.clipboard.schemaMismatch'), 'error')
           break
         }
       }
@@ -4920,20 +4897,18 @@ export function useBuildingDetail() {
             status: string
             defaultedAtTick: number | null
           }>
-        }>(`{ myLoans { id collateralBuildingId originalPrincipal status defaultedAtTick } }`).catch(
-          (err: unknown) => {
-            console.warn('[useBuildingDetail] Failed to load loans for collateral check:', err)
-            return {
-              myLoans: [] as Array<{
-                id: string
-                collateralBuildingId: string | null
-                originalPrincipal: number
-                status: string
-                defaultedAtTick: number | null
-              }>,
-            }
-          },
-        ),
+        }>(`{ myLoans { id collateralBuildingId originalPrincipal status defaultedAtTick } }`).catch((err: unknown) => {
+          console.warn('[useBuildingDetail] Failed to load loans for collateral check:', err)
+          return {
+            myLoans: [] as Array<{
+              id: string
+              collateralBuildingId: string | null
+              originalPrincipal: number
+              status: string
+              defaultedAtTick: number | null
+            }>,
+          }
+        }),
       ])
 
       if (requestId !== activeBuildingLoadRequest) {
