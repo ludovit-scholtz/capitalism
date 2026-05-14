@@ -44,6 +44,10 @@ const router = createRouter({
     { path: '/encyclopedia/resources/:slug', name: 'encyclopedia-detail', component: () => import('@/views/ResourceDetailView.vue') },
     { path: '/buy-building/:companyId', name: 'buy-building', component: () => import('@/views/BuyBuildingView.vue') },
     {
+      path: '/building/:id/edit',
+      redirect: (to) => ({ name: 'building-detail-edit', params: { id: to.params.id, tab: 'basic-data' }, query: to.query }),
+    },
+    {
       path: '/building/:id/edit/:tab',
       name: 'building-detail-edit',
       component: () => import('@/views/BuildingDetailView.vue'),

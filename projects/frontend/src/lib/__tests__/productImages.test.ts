@@ -58,10 +58,7 @@ describe('productImages mapping', () => {
 
   it('keeps the fallback image URL distinct from every dedicated catalog image', () => {
     const fallback = getCatalogFallbackImageUrl()
-    const dedicatedUrls = [
-      ...RESOURCE_IMAGE_SLUGS.map((slug) => getResourceCatalogImageUrl(slug, null)),
-      ...PRODUCT_IMAGE_SLUGS.map((slug) => getProductCatalogImageUrl(slug)),
-    ]
+    const dedicatedUrls = [...RESOURCE_IMAGE_SLUGS.map((slug) => getResourceCatalogImageUrl(slug, null)), ...PRODUCT_IMAGE_SLUGS.map((slug) => getProductCatalogImageUrl(slug))]
 
     expect(dedicatedUrls).not.toContain(fallback)
     expect(new Set([...dedicatedUrls, fallback]).size).toBe(dedicatedUrls.length + 1)
@@ -107,33 +104,27 @@ describe('productImages mapping', () => {
   })
 
   it('keeps dedicated subject files for the specifically reported product regressions', () => {
+    expect(existsSync(new URL('allergy-tablets.svg', assetDir))).toBe(true)
     expect(existsSync(new URL('analgesic-syrup.svg', assetDir))).toBe(true)
+    expect(existsSync(new URL('antiseptic.svg', assetDir))).toBe(true)
     expect(existsSync(new URL('antibiotic.svg', assetDir))).toBe(true)
     expect(existsSync(new URL('antiseptic-gel.svg', assetDir))).toBe(true)
     expect(existsSync(new URL('aspirin.svg', assetDir))).toBe(true)
     expect(existsSync(new URL('assembly-pallet.svg', assetDir))).toBe(true)
+    expect(existsSync(new URL('cold-pack.svg', assetDir))).toBe(true)
     expect(existsSync(new URL('wooden-bed.svg', assetDir))).toBe(true)
   })
 
   it('keeps every seeded catalog SVG source unique and distinct from fallback artwork', () => {
     const fallbackSource = readFileSync(new URL('fallback.svg', assetDir), 'utf8').trim()
-    const mappedSources = [...RESOURCE_IMAGE_SLUGS, ...PRODUCT_IMAGE_SLUGS].map((slug) =>
-      readFileSync(new URL(`${slug}.svg`, assetDir), 'utf8').trim(),
-    )
+    const mappedSources = [...RESOURCE_IMAGE_SLUGS, ...PRODUCT_IMAGE_SLUGS].map((slug) => readFileSync(new URL(`${slug}.svg`, assetDir), 'utf8').trim())
 
     expect(mappedSources).not.toContain(fallbackSource)
     expect(new Set(mappedSources).size).toBe(mappedSources.length)
   })
 
   it('keeps the specifically reported regressions classified as product-only mappings', () => {
-    const reportedProductSlugs = [
-      'analgesic-syrup',
-      'antibiotic',
-      'antiseptic-gel',
-      'aspirin',
-      'assembly-pallet',
-      'wooden-bed',
-    ]
+    const reportedProductSlugs = ['allergy-tablets', 'analgesic-syrup', 'antiseptic', 'antibiotic', 'antiseptic-gel', 'aspirin', 'assembly-pallet', 'cold-pack', 'wooden-bed']
 
     for (const slug of reportedProductSlugs) {
       expect(PRODUCT_IMAGE_SLUGS).toContain(slug)
@@ -143,14 +134,7 @@ describe('productImages mapping', () => {
   })
 
   it('keeps the specifically reported product regressions out of resource classification while preserving slug asset resolution', () => {
-    const reportedProductSlugs = [
-      'analgesic-syrup',
-      'antibiotic',
-      'antiseptic-gel',
-      'aspirin',
-      'assembly-pallet',
-      'wooden-bed',
-    ]
+    const reportedProductSlugs = ['allergy-tablets', 'analgesic-syrup', 'antiseptic', 'antibiotic', 'antiseptic-gel', 'aspirin', 'assembly-pallet', 'cold-pack', 'wooden-bed']
 
     for (const slug of reportedProductSlugs) {
       expect(hasResourceCatalogImage(slug)).toBe(false)
@@ -185,9 +169,7 @@ describe('productImages mapping', () => {
     const files = readdirSync(assetDir)
     const svgFiles = files.filter((file) => file.endsWith('.svg')).sort()
     const legacyWebpFiles = files.filter((file) => file.endsWith('.webp'))
-    const expectedSvgFiles = [...RESOURCE_IMAGE_SLUGS, ...PRODUCT_IMAGE_SLUGS, 'fallback']
-      .map((slug) => `${slug}.svg`)
-      .sort()
+    const expectedSvgFiles = [...RESOURCE_IMAGE_SLUGS, ...PRODUCT_IMAGE_SLUGS, 'fallback'].map((slug) => `${slug}.svg`).sort()
 
     expect(legacyWebpFiles).toEqual([])
     expect(svgFiles).toEqual(expectedSvgFiles)

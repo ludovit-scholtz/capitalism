@@ -14,13 +14,14 @@ import {
   forexGuideTopics,
   stockExchangeGuideCards,
   stockExchangeGuideTopics,
+  localizeGuideImageUrl,
 } from '@/lib/encyclopediaGuideData'
 import EncyclopediaResourcesCatalog from '@/components/encyclopedia/EncyclopediaResourcesCatalog.vue'
 import type { ProductType, ResourceType } from '@/types'
 
 type EncyclopediaTopicSlug = 'onboarding-help' | 'factory-layout-help' | 'sales-shop-help' | 'forex-trading-help' | 'stock-exchange-help' | 'resources-definition'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
@@ -103,7 +104,7 @@ onMounted(async () => {
 
 function getGuideCardImage(card: { resourceSlug?: string; productSlug?: string; imageUrl?: string }) {
   if (card.imageUrl) {
-    return card.imageUrl
+    return localizeGuideImageUrl(card.imageUrl, locale.value)
   }
 
   if (card.resourceSlug) {
@@ -340,12 +341,7 @@ function navigateToEntry(slug: string) {
         </section>
       </div>
 
-      <EncyclopediaResourcesCatalog
-        v-if="selectedTopic === 'resources-definition'"
-        :resources="resources"
-        :products="products"
-        @navigate="navigateToEntry"
-      />
+      <EncyclopediaResourcesCatalog v-if="selectedTopic === 'resources-definition'" :resources="resources" :products="products" @navigate="navigateToEntry" />
     </section>
 
     <div

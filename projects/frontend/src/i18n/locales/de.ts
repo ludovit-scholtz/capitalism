@@ -270,8 +270,7 @@ export default {
     loginToAccess: 'Anmelden für Zugriff',
     loginFailed: 'Anmeldung fehlgeschlagen. Bitte überprüfen Sie Ihre Zugangsdaten und versuchen Sie es erneut.',
     invalidCredentials: 'Ungültige Zugangsdaten.',
-    registrationNeutral:
-      'Wenn diese E-Mail noch nicht registriert ist, erhalten Sie eine Bestätigung.',
+    registrationNeutral: 'Wenn diese E-Mail noch nicht registriert ist, erhalten Sie eine Bestätigung.',
     loginRequired: 'Bitte melden Sie sich an, um fortzufahren.',
     loginThrottledTitle: 'Zu viele fehlgeschlagene Versuche',
     loginThrottledMessage: 'Zu viele fehlgeschlagene Anmeldeversuche. Bitte warten Sie 15 Minuten und versuchen Sie es erneut.',
@@ -1682,6 +1681,11 @@ export default {
     editTabBasicEdit: 'Grundbearbeitung', // Reserved for future building edit mode top-level tabs
     editTabFinance: 'Finanzen', // Reserved for future building edit mode top-level tabs
     editTabLayouts: 'Layouts', // Reserved for future building edit mode top-level tabs
+    editBuildingTabBasicData: 'Basisdaten',
+    editBuildingTabEnergy: 'Energieeinstellungen',
+    editBuildingTabBankAccount: 'Bankkonto',
+    editBuildingTabLayouts: 'Gebäudelayouts',
+    editBuildingBasicDataBody: 'Prüfen Sie Entwurfskosten, Finanzierungsauswirkung und Hinweise zur Einheitenauswahl, bevor Sie einen konkreten Gebäudebereich bearbeiten.',
     editTabGeneralSettings: 'Allgemein',
     editTabProduction: 'Produktion',
     editTabInventory: 'Inventar',

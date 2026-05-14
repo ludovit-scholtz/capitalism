@@ -270,8 +270,7 @@ export default {
     noAccount: "Don't have an account?",
     loginFailed: 'Login failed. Please check your credentials and try again.',
     invalidCredentials: 'Invalid credentials.',
-    registrationNeutral:
-      'If this email is not already registered, you will receive a confirmation.',
+    registrationNeutral: 'If this email is not already registered, you will receive a confirmation.',
     loginToAccess: 'Log in to access',
     loginRequired: 'Please log in to continue.',
     loginThrottledTitle: 'Too many failed attempts',
@@ -1678,6 +1677,11 @@ export default {
     editTabBasicEdit: 'Basic Edit', // Reserved for future building edit mode top-level tabs
     editTabFinance: 'Finance', // Reserved for future building edit mode top-level tabs
     editTabLayouts: 'Layouts', // Reserved for future building edit mode top-level tabs
+    editBuildingTabBasicData: 'Basic Data',
+    editBuildingTabEnergy: 'Energy Settings',
+    editBuildingTabBankAccount: 'Bank Account',
+    editBuildingTabLayouts: 'Building Layouts',
+    editBuildingBasicDataBody: 'Review draft costs, financing impact, and unit-selection guidance before choosing a specific building system to edit.',
     editTabGeneralSettings: 'General',
     editTabProduction: 'Production',
     editTabInventory: 'Inventory',

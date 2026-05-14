@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { makePlayer, setupMockApi } from '../../helpers/mock-api'
 
 test.describe('Building edit route tabs', () => {
-  test('syncs edit tabs into URL and restores tab on refresh', async ({ page }) => {
+  test('syncs building edit tabs into URL and restores the selected building tab on refresh', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({
       id: 'company-edit-route',
@@ -86,7 +86,20 @@ test.describe('Building edit route tabs', () => {
     await expect(page.getByRole('heading', { name: 'Routing Factory' })).toBeVisible()
 
     await page.getByRole('button', { name: 'Edit Building' }).click()
-    await expect(page).toHaveURL(/\/building\/building-edit-route$/)
+    await expect(page).toHaveURL(/\/building\/building-edit-route\/edit\/basic-data(?:\?.*)?$/)
+    await expect(page.getByRole('tab', { name: 'Basic Data', exact: true })).toHaveAttribute('aria-selected', 'true')
+
+    await page.getByRole('tab', { name: 'Energy Settings', exact: true }).click()
+    await expect(page).toHaveURL(/\/building\/building-edit-route\/edit\/energy(?:\?.*)?$/)
+    await expect(page.locator('[aria-label="Energy Settings"]')).toBeVisible()
+
+    await page.getByRole('tab', { name: 'Bank Account', exact: true }).click()
+    await expect(page).toHaveURL(/\/building\/building-edit-route\/edit\/bank-account(?:\?.*)?$/)
+    await expect(page.locator('.building-bank-account-panel')).toBeVisible()
+
+    await page.getByRole('tab', { name: 'Building Layouts', exact: true }).click()
+    await expect(page).toHaveURL(/\/building\/building-edit-route\/edit\/layouts(?:\?.*)?$/)
+    await expect(page.locator('[aria-label="Building Layouts"]')).toBeVisible()
 
     const plannedSection = page
       .locator('.grid-section')
@@ -94,26 +107,26 @@ test.describe('Building edit route tabs', () => {
       .first()
     await plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
 
-    await expect(page.getByRole('button', { name: 'Config' })).toHaveClass(/unit-tab-btn--active/)
-    await expect(page.getByText('Energy Settings')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Configuration' })).toHaveClass(/unit-tab-btn--active/)
 
     await page.getByRole('button', { name: 'Performance' }).click()
-    await expect(page).toHaveURL(/\/building\/building-edit-route\/edit\/performance$/)
+    await expect(page).toHaveURL(/\/building\/building-edit-route\/edit\/layouts(?:\?.*editUnitTab=performance.*)?$/)
 
     await page.getByRole('button', { name: 'Maintenance' }).click()
-    await expect(page).toHaveURL(/\/building\/building-edit-route\/edit\/maintenance$/)
+    await expect(page).toHaveURL(/\/building\/building-edit-route\/edit\/layouts(?:\?.*editUnitTab=maintenance.*)?$/)
     await expect(page.locator('.unit-upgrade-panel')).toBeVisible()
 
     await page.reload()
-    await expect(page).toHaveURL(/\/building\/building-edit-route\/edit\/maintenance$/)
-    await plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
-    await expect(page.getByRole('button', { name: 'Maintenance' })).toHaveClass(/unit-tab-btn--active/)
+    await expect(page).toHaveURL(/\/building\/building-edit-route\/edit\/layouts(?:\?.*editUnitTab=maintenance.*)?$/)
+    await expect(page.getByRole('tab', { name: 'Building Layouts', exact: true })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.locator('[aria-label="Building Layouts"]')).toBeVisible()
 
     await page.goto('/building/building-edit-route')
-    await expect(page.getByText('Energy Settings')).toHaveCount(0)
+    await expect(page.locator('[aria-label="Energy Settings"]')).toHaveCount(0)
+    await expect(page.locator('[aria-label="Building Layouts"]')).toHaveCount(0)
   })
 
-  test('deep-link edit config shows energy settings even without selected unit', async ({ page }) => {
+  test('deep-link edit energy shows energy settings even without selected unit', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({
       id: 'company-edit-energy',
@@ -160,9 +173,9 @@ test.describe('Building edit route tabs', () => {
       },
     ])
 
-    await page.goto('/building/building-edit-energy/edit/config')
-    await expect(page).toHaveURL(/\/building\/building-edit-energy\/edit\/config$/)
-    await expect(page.getByRole('heading', { name: 'Planned Upgrade' })).toBeVisible()
+    await page.goto('/building/building-edit-energy/edit/energy')
+    await expect(page).toHaveURL(/\/building\/building-edit-energy\/edit\/energy$/)
     await expect(page.locator('[aria-label="Energy Settings"]')).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Energy Settings', exact: true })).toHaveAttribute('aria-selected', 'true')
   })
 })

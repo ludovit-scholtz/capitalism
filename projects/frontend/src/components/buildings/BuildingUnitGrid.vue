@@ -53,8 +53,6 @@ const {
   getHorizontalLinkFlowHint,
   getVerticalLinkFlowHint,
   getDisplayedTicks,
-  startEditing,
-  cancelEditing,
   storeConfiguration,
   isUnitReverting,
   getUnitPrimaryMetric,
@@ -88,12 +86,7 @@ function handleKeydown(event: KeyboardEvent) {
 
   // Do not capture shortcuts when the user is typing in a form field
   const target = event.target as HTMLElement
-  if (
-    target.tagName === 'INPUT' ||
-    target.tagName === 'TEXTAREA' ||
-    target.tagName === 'SELECT' ||
-    (target as HTMLElement).isContentEditable
-  ) {
+  if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || (target as HTMLElement).isContentEditable) {
     return
   }
 
@@ -113,11 +106,13 @@ onMounted(() => document.addEventListener('keydown', handleKeydown))
 onUnmounted(() => document.removeEventListener('keydown', handleKeydown))
 
 function openEditMode() {
-  startEditing()
+  void router.replace({
+    path: `/building/${route.params.id as string}/edit/basic-data`,
+    query: route.query,
+  })
 }
 
 function closeEditMode() {
-  cancelEditing()
   void router.replace({
     path: `/building/${route.params.id as string}`,
     query: route.query,
@@ -319,13 +314,7 @@ function closeEditMode() {
       </div>
 
       <!-- Unit copy/paste clipboard feedback -->
-      <div
-        v-if="clipboardMessage"
-        class="clipboard-message"
-        :class="clipboardMessageType === 'success' ? 'clipboard-message-success' : 'clipboard-message-error'"
-        role="status"
-        aria-live="polite"
-      >
+      <div v-if="clipboardMessage" class="clipboard-message" :class="clipboardMessageType === 'success' ? 'clipboard-message-success' : 'clipboard-message-error'" role="status" aria-live="polite">
         <span class="clipboard-message-icon" aria-hidden="true">{{ clipboardMessageType === 'success' ? '✓' : '⚠' }}</span>
         {{ clipboardMessage }}
       </div>

@@ -270,8 +270,7 @@ export default {
     loginToAccess: 'Prihláste sa pre prístup',
     loginFailed: 'Prihl\u00e1senie zlyhalo. Skontrolujte prihlasovacie \u00fadaje a sk\u00faste znova.',
     invalidCredentials: 'Neplatn\u00e9 prihlasovacie \u00fadaje.',
-    registrationNeutral:
-      'Ak tento e-mail e\u0161te nie je registrovan\u00fd, dostanete potvrdenie.',
+    registrationNeutral: 'Ak tento e-mail e\u0161te nie je registrovan\u00fd, dostanete potvrdenie.',
     loginRequired: 'Pred pokračovaním sa prihláste.',
     loginThrottledTitle: 'Príliš veľa neúspešných pokusov',
     loginThrottledMessage: 'Príliš veľa neúspešných pokusov o prihlásenie. Skúste to znova o 15 minút.',
@@ -1678,6 +1677,11 @@ export default {
     editTabBasicEdit: 'Základná úprava', // Reserved for future building edit mode top-level tabs
     editTabFinance: 'Financie', // Reserved for future building edit mode top-level tabs
     editTabLayouts: 'Rozloženia', // Reserved for future building edit mode top-level tabs
+    editBuildingTabBasicData: 'Základné údaje',
+    editBuildingTabEnergy: 'Nastavenia energie',
+    editBuildingTabBankAccount: 'Bankový účet',
+    editBuildingTabLayouts: 'Rozloženia budovy',
+    editBuildingBasicDataBody: 'Skontrolujte náklady draftu, dopad na financovanie a pokyny pre výber jednotiek pred úpravou konkrétnej časti budovy.',
     editTabGeneralSettings: 'Všeobecné',
     editTabProduction: 'Produkcia',
     editTabInventory: 'Inventár',
