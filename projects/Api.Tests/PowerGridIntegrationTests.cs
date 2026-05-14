@@ -2233,7 +2233,7 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
     }
 
     /// <summary>
-    /// setPlantDispatch must enforce ownership checks and return NOT_FOUND_OR_NOT_OWNED for foreign plants.
+    /// setPlantDispatch must enforce ownership checks and return FORBIDDEN for foreign plants.
     /// </summary>
     [Fact]
     public async Task SetPlantDispatch_ForeignPlant_ReturnsNotFoundOrNotOwned()
@@ -2277,7 +2277,7 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
             foreignToken);
 
         var errorCode = result.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString();
-        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", errorCode);
+        Assert.Equal("FORBIDDEN", errorCode);
 
         await db.Entry(plant).ReloadAsync();
         Assert.Equal(100, plant.DispatchTargetPercent);

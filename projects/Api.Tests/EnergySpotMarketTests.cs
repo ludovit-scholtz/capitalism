@@ -115,7 +115,7 @@ public sealed class EnergySpotMarketTests
             new { i = new { buildingId = plant.Id.ToString(), pricePerKwhLocal = 0.05m, capacityKw = 100m } }, token);
 
         Assert.True(result.TryGetProperty("errors", out var errors));
-        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal("FORBIDDEN", errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
     [Fact]
@@ -189,7 +189,7 @@ public sealed class EnergySpotMarketTests
             "mutation C($i:CancelEnergyListingInput!){cancelEnergyListing(input:$i){id}}",
             new { i = new { listingId = listing.Id.ToString() } }, token);
         Assert.True(result.TryGetProperty("errors", out var errors));
-        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal("FORBIDDEN", errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
     // ---- setMaxEnergyBidPrice ---------------------------------------------------

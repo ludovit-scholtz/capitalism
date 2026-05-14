@@ -314,7 +314,7 @@ public sealed class BankAccountTransferTests
             ownerToken);
 
         var error = result.GetProperty("errors")[0];
-        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", error.GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal("FORBIDDEN", error.GetProperty("extensions").GetProperty("code").GetString());
 
         // Verify owner balance untouched.
         await using var verifyScope = factory.Services.CreateAsyncScope();

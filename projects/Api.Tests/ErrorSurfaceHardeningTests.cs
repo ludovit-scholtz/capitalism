@@ -12,12 +12,12 @@ namespace Api.Tests;
 
 /// <summary>
 /// Integration tests verifying that unauthorized probes across building, banking, lending,
-/// and stock mutations return the uniform <c>NOT_FOUND_OR_NOT_OWNED</c> error code
+/// and stock mutations return the uniform <c>FORBIDDEN</c> error code
 /// rather than domain-specific codes that would leak existence, listing state, or balance details.
 /// </summary>
 /// <remarks>
 /// Acceptance criteria addressed:
-/// - All building, banking, lending, and stock mutations return NOT_FOUND_OR_NOT_OWNED when a caller
+/// - All building, banking, lending, and stock mutations return FORBIDDEN when a caller
 ///   probes an object they do not own, regardless of whether the object exists or its state.
 /// - No mutation error response includes precise balance figures, listing prices, or existence flags
 ///   for foreign-owned objects.

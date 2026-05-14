@@ -345,16 +345,16 @@ public sealed class StockLimitOrderIntegrationTests
         var missingError = missingCancel.GetProperty("errors")[0];
 
         Assert.Equal(
-            "NOT_FOUND_OR_NOT_OWNED",
+            "FORBIDDEN",
             foreignError.GetProperty("extensions").GetProperty("code").GetString());
         Assert.Equal(
-            "NOT_FOUND_OR_NOT_OWNED",
+            "FORBIDDEN",
             missingError.GetProperty("extensions").GetProperty("code").GetString());
         Assert.Equal(
-            "This item could not be found or you don't have permission to access it.",
+            "You don't have permission to perform this action.",
             foreignError.GetProperty("message").GetString());
         Assert.Equal(
-            "This item could not be found or you don't have permission to access it.",
+            "You don't have permission to perform this action.",
             missingError.GetProperty("message").GetString());
 
         await using var assertScope = factory.Services.CreateAsyncScope();

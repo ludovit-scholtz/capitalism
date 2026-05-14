@@ -116,4 +116,4 @@ Create a fun game in the style of Capitalism II, where players experience realis
 - [x] (100%) Normalize duplicate registration errors so message, extension code, and timing do not reveal whether an email already exists in either API.
 - [x] (100%) Move the game API seed admin password out of committed defaults (`__SET_IN_ENV__` + `.env.example`/README guidance), and block non-Development startup when `Auth:PasswordAuthEnabled=true` and `SeedData:AdminPassword` is missing/placeholder while keeping Development warning-only.
 - [x] (100%) Move game-frontend browser sessions to HttpOnly SameSite cookie auth (`credentials: include`) and stop persisting JWT session tokens in `localStorage`/`sessionStorage` for normal gameplay requests.
-- [ ] Finish canonical object-authorization error normalization in legacy economy CRUD paths and keep the GraphQL surface inventory gate aligned with the normalized contract.
+- [x] (100%) Finish canonical object-authorization error normalization in legacy economy CRUD paths and keep the GraphQL surface inventory gate aligned with the normalized contract.

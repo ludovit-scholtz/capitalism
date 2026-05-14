@@ -10,10 +10,10 @@ public sealed class ObjectAuthorizationService(
     private readonly ILogger<ObjectAuthorizationService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor ?? throw new ArgumentNullException(nameof(httpContextAccessor));
 
-    public const string NotFoundOrNotOwnedCode = "NOT_FOUND_OR_NOT_OWNED";
+    public const string NotFoundOrNotOwnedCode = "FORBIDDEN";
     public const string NotFoundReason = "not_found";
     public const string NotOwnedReason = "not_owned";
-    public const string FriendlyMessage = "This item could not be found or you don't have permission to access it.";
+    public const string FriendlyMessage = "You don't have permission to perform this action.";
 
     public async Task<TEntity> RequireOwnedAsync<TEntity>(
         Guid actorUserId,

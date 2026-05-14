@@ -1328,7 +1328,7 @@ public sealed class GlobalCitiesAndFxRatesTests
         var errors = result.GetProperty("errors");
         Assert.Equal(JsonValueKind.Array, errors.ValueKind);
         var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
-        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", code);
+        Assert.Equal("FORBIDDEN", code);
     }
 
     [Fact]
@@ -1414,7 +1414,7 @@ public sealed class GlobalCitiesAndFxRatesTests
         var errors = result.GetProperty("errors");
         Assert.Equal(JsonValueKind.Array, errors.ValueKind);
         var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
-        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", code);
+        Assert.Equal("FORBIDDEN", code);
     }
 
     [Fact]
@@ -1491,7 +1491,7 @@ public sealed class GlobalCitiesAndFxRatesTests
         var errors = result.GetProperty("errors");
         Assert.Equal(JsonValueKind.Array, errors.ValueKind);
         var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
-        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", code);
+        Assert.Equal("FORBIDDEN", code);
     }
 
     // ── Quote nonce lifecycle & slippage guard ────────────────────────────────

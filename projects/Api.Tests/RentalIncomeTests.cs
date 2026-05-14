@@ -279,7 +279,7 @@ public sealed class RentalIncomeTests
         var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
         var errors = doc.RootElement.GetProperty("errors");
         Assert.True(errors.GetArrayLength() > 0);
-        Assert.Equal("NOT_FOUND_OR_NOT_OWNED",
+        Assert.Equal("FORBIDDEN",
             errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
