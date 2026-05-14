@@ -376,24 +376,26 @@ describe('getLocalizedProductDescription', () => {
 // ── getResourceImageUrl ───────────────────────────────────────────────────────
 
 describe('getResourceImageUrl', () => {
-  it('returns a mapped webp URL for known resources', () => {
-    expect(getResourceImageUrl(makeResource({ slug: 'wood', imageUrl: null }))).toContain('.webp')
+  it('returns a mapped SVG URL for known resources', () => {
+    expect(getResourceImageUrl(makeResource({ slug: 'wood', imageUrl: null }))).toMatch(
+      /\.svg|data:image\/svg\+xml/i,
+    )
   })
 })
 
 // ── getProductImageUrl ────────────────────────────────────────────────────────
 
 describe('getProductImageUrl', () => {
-  it('returns a mapped webp URL for a product', () => {
+  it('returns a mapped SVG URL for a product', () => {
     const url = getProductImageUrl(makeProduct({ slug: 'wooden-chair', industry: 'FURNITURE' }))
-    expect(url).toContain('.webp')
+    expect(url).toMatch(/\.svg|data:image\/svg\+xml/i)
   })
 
-  it('returns a mapped webp URL for different industries', () => {
+  it('returns a mapped SVG URL for different industries', () => {
     const industries = ['FURNITURE', 'FOOD_PROCESSING', 'HEALTHCARE', 'ELECTRONICS', 'CONSTRUCTION']
     for (const industry of industries) {
       const url = getProductImageUrl(makeProduct({ slug: 'generic-item', industry }))
-      expect(url).toContain('.webp')
+      expect(url).toMatch(/\.svg|data:image\/svg\+xml/i)
     }
   })
 

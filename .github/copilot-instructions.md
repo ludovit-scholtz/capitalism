@@ -1740,13 +1740,14 @@ Root-cause of a quality failure (May 2026, PR #499 follow-up):
 - The code/tests only proved mapping completeness and fallback behavior; they did not prove the human review step that the artwork itself matched the actual resource or product.
 
 Rules to prevent recurrence:
-1. **For catalog-asset PRs, manually review the generated image files against their slugs before pushing.** A valid mapping is not enough if `wooden-bed.webp` does not visibly depict a bed.
+1. **For catalog-asset PRs, manually review the generated image files against their slugs before pushing.** A valid mapping is not enough if `wooden-bed.webp` or `wooden-bed.svg` does not visibly depict a bed.
 2. **Use subject-matching visuals only.** Product and resource assets must show the actual object/material (for example bed, chair, pill bottle, wafer, pallet), not generic scenery or unrelated stock imagery.
-3. **Keep a one-file-per-slug contract and cover it with tests.** Seeded slug URLs should resolve to their own `<slug>.webp` asset so reviewers can audit the mapping directly.
+3. **Keep a one-file-per-slug contract and cover it with tests.** Seeded slug URLs should resolve to their own `<slug>` asset so reviewers can audit the mapping directly.
 4. **Include fresh UI proof for image-only changes that shows the corrected assets rendered in the product/resource UI, not just the raw files.**
 5. **When a review comment names specific bad asset slugs, add an explicit regression test for those exact slugs** in addition to broad loop coverage. A generic “all seeded slugs map” test is not enough to prove the reported regressions were addressed.
 6. **For repeated catalog-image follow-up comments, add net-new helper coverage for the named slugs as well** (for example proving they stay in `PRODUCT_IMAGE_SLUGS`, are not misclassified as resources, and still resolve via `hasProductCatalogImage`). Do not reply with CI-status context alone.
 7. **For named product-slug regressions, also add the inverse helper assertion**: `hasResourceCatalogImage(slug) === false`, while the generic slug resolver still returns the same slug asset (`getResourceCatalogImageUrl(slug, null) === getProductCatalogImageUrl(slug)`). This guards classification without mis-stating the shared slug-resolution contract.
+8. **Catalog images must not contain embedded visible text.** The game is localized, so English labels inside artwork are a product bug. If photorealistic source images are not efficient to obtain and verify, use textless SVG illustrations and add a unit test that rejects `<text>`, `<textPath>`, and `<title>` elements in catalog SVGs.
 
 ## Repeated review-loop quality gate — each follow-up must add net-new proof
 

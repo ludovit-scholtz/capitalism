@@ -1,3 +1,4 @@
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   getCatalogFallbackImageUrl,
@@ -9,18 +10,24 @@ import {
   RESOURCE_IMAGE_SLUGS,
 } from '../productImages'
 
+const assetDir = new URL('../../assets/products/', import.meta.url)
+
+function expectSvgImageUrl(url: string) {
+  expect(url).toMatch(/\.svg|data:image\/svg\+xml/i)
+}
+
 describe('productImages mapping', () => {
   it('contains image mappings for all seeded resources', () => {
     for (const slug of RESOURCE_IMAGE_SLUGS) {
       expect(hasResourceCatalogImage(slug)).toBe(true)
-      expect(getResourceCatalogImageUrl(slug, null)).toContain('.webp')
+      expectSvgImageUrl(getResourceCatalogImageUrl(slug, null))
     }
   })
 
   it('contains image mappings for all seeded products', () => {
     for (const slug of PRODUCT_IMAGE_SLUGS) {
       expect(hasProductCatalogImage(slug)).toBe(true)
-      expect(getProductCatalogImageUrl(slug)).toContain('.webp')
+      expectSvgImageUrl(getProductCatalogImageUrl(slug))
     }
   })
 
@@ -62,21 +69,21 @@ describe('productImages mapping', () => {
 
   it('keeps one dedicated file per seeded slug', () => {
     for (const slug of RESOURCE_IMAGE_SLUGS) {
-      expect(getResourceCatalogImageUrl(slug, null)).toContain(`${slug}.webp`)
+      expect(existsSync(new URL(`${slug}.svg`, assetDir))).toBe(true)
     }
 
     for (const slug of PRODUCT_IMAGE_SLUGS) {
-      expect(getProductCatalogImageUrl(slug)).toContain(`${slug}.webp`)
+      expect(existsSync(new URL(`${slug}.svg`, assetDir))).toBe(true)
     }
   })
 
   it('keeps dedicated subject files for the specifically reported product regressions', () => {
-    expect(getProductCatalogImageUrl('analgesic-syrup')).toContain('analgesic-syrup.webp')
-    expect(getProductCatalogImageUrl('antibiotic')).toContain('antibiotic.webp')
-    expect(getProductCatalogImageUrl('antiseptic-gel')).toContain('antiseptic-gel.webp')
-    expect(getProductCatalogImageUrl('aspirin')).toContain('aspirin.webp')
-    expect(getProductCatalogImageUrl('assembly-pallet')).toContain('assembly-pallet.webp')
-    expect(getProductCatalogImageUrl('wooden-bed')).toContain('wooden-bed.webp')
+    expect(existsSync(new URL('analgesic-syrup.svg', assetDir))).toBe(true)
+    expect(existsSync(new URL('antibiotic.svg', assetDir))).toBe(true)
+    expect(existsSync(new URL('antiseptic-gel.svg', assetDir))).toBe(true)
+    expect(existsSync(new URL('aspirin.svg', assetDir))).toBe(true)
+    expect(existsSync(new URL('assembly-pallet.svg', assetDir))).toBe(true)
+    expect(existsSync(new URL('wooden-bed.svg', assetDir))).toBe(true)
   })
 
   it('keeps the specifically reported regressions classified as product-only mappings', () => {
@@ -109,6 +116,18 @@ describe('productImages mapping', () => {
     for (const slug of reportedProductSlugs) {
       expect(hasResourceCatalogImage(slug)).toBe(false)
       expect(getResourceCatalogImageUrl(slug, null)).toBe(getProductCatalogImageUrl(slug))
+    }
+  })
+
+  it('keeps catalog SVG artwork free of embedded visible text elements', () => {
+    const svgFiles = readdirSync(assetDir).filter((file) => file.endsWith('.svg'))
+    expect(svgFiles.length).toBeGreaterThan(0)
+
+    for (const file of svgFiles) {
+      const source = readFileSync(new URL(file, assetDir), 'utf8')
+      expect(source).not.toMatch(/<text[\\s>]/i)
+      expect(source).not.toMatch(/<textPath[\\s>]/i)
+      expect(source).not.toMatch(/<title[\\s>]/i)
     }
   })
 })

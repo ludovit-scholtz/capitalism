@@ -92,7 +92,7 @@ describe('ResourceProductGrid', () => {
 
     const image = container.querySelector('img.product-image') as HTMLImageElement | null
     expect(image).not.toBeNull()
-    expect(image?.getAttribute('src')).toContain('.webp')
+    expect(image?.getAttribute('src')).toMatch(/\.svg|data:image\/svg\+xml/i)
     expect(image?.getAttribute('alt')).toBe('Wooden Chair')
   })
 })
