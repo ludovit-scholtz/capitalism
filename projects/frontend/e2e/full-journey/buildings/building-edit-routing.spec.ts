@@ -103,7 +103,6 @@ test.describe('Building edit route tabs', () => {
     await page.getByRole('button', { name: 'Maintenance' }).click()
     await expect(page).toHaveURL(/\/building\/building-edit-route\/edit\/maintenance$/)
     await expect(page.locator('.unit-upgrade-panel')).toBeVisible()
-    await page.screenshot({ path: '/tmp/building-edit-routing-maintenance.png', fullPage: true })
 
     await page.reload()
     await expect(page).toHaveURL(/\/building\/building-edit-route\/edit\/maintenance$/)
