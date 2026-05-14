@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { onCatalogImageError } from '@/lib/catalogImageFallback'
 
 type SelectorItem = {
   kind: 'resource' | 'product'
@@ -83,6 +84,7 @@ function selectItem(item: SelectorItem) {
         alt=""
         class="selected-chip-img"
         aria-hidden="true"
+        @error="onCatalogImageError"
       />
       <div class="selected-copy">
         <strong>{{ selectedItem.name }}</strong>
@@ -106,7 +108,7 @@ function selectItem(item: SelectorItem) {
             @click="selectItem(item)"
           >
             <span v-if="item.imageUrl" class="option-visual">
-              <img :src="item.imageUrl" alt="" class="selector-option-img" aria-hidden="true" />
+              <img :src="item.imageUrl" alt="" class="selector-option-img" aria-hidden="true" @error="onCatalogImageError" />
             </span>
             <span class="option-copy">
               <span class="option-title-row">

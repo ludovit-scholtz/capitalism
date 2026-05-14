@@ -22,7 +22,7 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 ### Products definition
 
-- [ ] Make sure every product and resource has different picture. Please use high quality photographic pictures for each resource
+- [x] (100%) Make sure every product and resource has different picture. Added distinct high-quality photographic WebP images and frontend slug mapping for every seeded resource and product.
 
 ### Onboarding
 

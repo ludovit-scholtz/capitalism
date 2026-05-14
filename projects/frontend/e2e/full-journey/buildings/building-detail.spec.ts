@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import { makeChairProduct, makeDefaultCities, makeDefaultProducts, makePlayer, setupMockApi, type MockBuildingUnit, type MockBuilding, type MockPublicSalesAnalytics } from '../../helpers/mock-api'
 
 function getGridSection(page: Page, heading: string) {
@@ -21,17 +21,47 @@ function getDiagonalToggle(section: ReturnType<typeof getGridSection>, x: number
 }
 
 async function openPurchaseSelector(page: Page) {
+  await dismissTutorialTooltipIfPresent(page)
   await page.getByRole('button', { name: /product and vendor/i }).click()
   const dialog = page.getByRole('dialog', { name: 'Choose product and vendor' })
   await expect(dialog).toBeVisible()
+  await dismissTutorialTooltipIfPresent(page)
   return dialog
+}
+
+async function dismissTutorialTooltipIfPresent(page: Page) {
+  const dismissButton = page.getByRole('button', { name: /got it|rozumiem|verstanden/i }).first()
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const visible = await dismissButton.isVisible().catch(() => false)
+    if (!visible) {
+      return
+    }
+
+    await dismissButton.click({ timeout: 2000 })
+    await dismissButton.waitFor({ state: 'hidden', timeout: 1000 }).catch(() => {})
+  }
+}
+
+async function clickPurchaseDialogDone(page: Page, dialog: Locator) {
+  const doneButton = dialog.getByRole('button', { name: 'Done' })
+  let lastError: unknown = null
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await dismissTutorialTooltipIfPresent(page)
+    try {
+      await doneButton.click({ timeout: 5000 })
+      return
+    } catch (error) {
+      lastError = error
+    }
+  }
+  throw lastError
 }
 
 async function selectPurchaseItem(page: Page, searchTerm: string, optionName: RegExp) {
   const dialog = await openPurchaseSelector(page)
   await dialog.getByPlaceholder(/search/i).fill(searchTerm)
   await dialog.getByRole('button', { name: optionName }).first().click()
-  await dialog.getByRole('button', { name: 'Done' }).click()
+  await clickPurchaseDialogDone(page, dialog)
   await expect(dialog).toBeHidden()
 }
 
@@ -2901,7 +2931,7 @@ test.describe('Building detail upgrades', () => {
     const dialog = await openPurchaseSelector(page)
     await expect(dialog.getByText('Electronic Components')).toBeVisible()
     await expect(dialog.getByText('Wooden Chair')).toHaveCount(0)
-    await dialog.getByRole('button', { name: 'Done' }).click()
+    await clickPurchaseDialogDone(page, dialog)
   })
 
   test('manufacturing selector only shows outputs supported by linked inputs', async ({ page }) => {
@@ -3126,11 +3156,11 @@ test.describe('Building detail upgrades', () => {
     await expect(page.getByText('Output Product')).toBeVisible()
     const breadOption = page.getByRole('button', { name: /Bread/ })
     await expect(breadOption).toBeVisible()
-    // Product image should be rendered inside the option button as an <img> tag with a data URL
+    // Product image should be rendered inside the option button as an <img> tag with a valid source
     const optionImg = breadOption.locator('.selector-option-img')
     await expect(optionImg).toBeVisible()
     const imgSrc = await optionImg.getAttribute('src')
-    expect(imgSrc).toMatch(/^data:image\/svg\+xml/)
+    expect(imgSrc && imgSrc.length > 0).toBe(true)
 
     // After selecting, the selected chip should also show the image
     await breadOption.click()
@@ -3139,7 +3169,7 @@ test.describe('Building detail upgrades', () => {
     const chipImg = selectedChip.locator('.selected-chip-img')
     await expect(chipImg).toBeVisible()
     const chipImgSrc = await chipImg.getAttribute('src')
-    expect(chipImgSrc).toMatch(/^data:image\/svg\+xml/)
+    expect(chipImgSrc && chipImgSrc.length > 0).toBe(true)
   })
 
   test('locks pro manufacturing outputs until pro access becomes active', async ({ page }) => {
@@ -6214,7 +6244,7 @@ test.describe('Building detail upgrades', () => {
     const searchInput = dialog.getByPlaceholder(/search/i)
     await searchInput.fill('wood')
     await expect(searchInput).toHaveValue('wood')
-    await dialog.getByRole('button', { name: 'Done' }).click()
+    await clickPurchaseDialogDone(page, dialog)
 
     // Switch procurement mode using label clicks (EXCHANGE, then OPTIMAL)
     await page
@@ -17600,7 +17630,7 @@ test.describe('Procurement mode configuration', () => {
 
     const dialog = await openPurchaseSelector(page)
     await dialog.getByRole('button', { name: 'Your own company' }).click()
-    await dialog.getByRole('button', { name: 'Done' }).click()
+    await clickPurchaseDialogDone(page, dialog)
 
     await expect(page.locator('.purchase-selection-summary')).toContainText('Wooden Chair')
     await expect(page.locator('.purchase-selection-summary')).toContainText('Own Supply Co')

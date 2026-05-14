@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-hidden="true">
+
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1f2937"/><stop offset="0.62" stop-color="#475569"/><stop offset="1" stop-color="#cbd5e1"/></linearGradient>
+    <radialGradient id="shine" cx="35%" cy="25%" r="65%"><stop offset="0" stop-color="#ffffff" stop-opacity="0.32"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000000" flood-opacity="0.35"/></filter>
+  </defs>
+  <rect width="256" height="256" rx="34" fill="url(#g)"/>
+  <rect width="256" height="256" rx="34" fill="url(#shine)"/>
+  <circle cx="219" cy="37" r="31" fill="#ffffff" opacity="0.10"/>
+  <circle cx="38" cy="218" r="44" fill="#000000" opacity="0.12"/>
+
+  <g filter="url(#shadow)">
+<circle cx="128" cy="128" r="72" fill="#0f172a"/><circle cx="128" cy="128" r="58" fill="#67e8f9" opacity="0.84"/><path d="M74 128h108M128 74v108M90 90l76 76M166 90l-76 76" stroke="#164e63" stroke-width="6"/>
+  </g>
+  <g opacity="0.22">
+    <circle cx="58" cy="60" r="7" fill="#ffffff"/>
+    <rect x="60" y="158" width="18" height="18" rx="4" fill="#000000"/>
+  </g>
+</svg>

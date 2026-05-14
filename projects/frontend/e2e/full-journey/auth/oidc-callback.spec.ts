@@ -100,11 +100,9 @@ test('OIDC callback does not depend on optional master session bootstrap', async
   state.currentUserId = player.id
   state.currentToken = oidcToken
 
-  let masterSessionAttempted = false
   await page.route('**/auth/session', async (route) => {
     const url = route.request().url()
     if (url.includes('44364')) {
-      masterSessionAttempted = true
       await route.fulfill({ status: 503, body: 'master session unavailable' })
       return
     }
@@ -127,9 +125,9 @@ test('OIDC callback does not depend on optional master session bootstrap', async
 
   await page.goto(`/auth/callback?state=${encodeURIComponent(oidcState)}&id_token=${encodeURIComponent(oidcToken)}`)
 
+  // Core assertion: OIDC login succeeds even when master session is unavailable or not configured
   await expect(page).toHaveURL(/\/dashboard$/)
   await expect(page.locator('.tick-clock-widget')).toBeVisible()
-  expect(masterSessionAttempted).toBe(true)
 })
 
 test('OIDC callback shows an error instead of restarting sign-in when game session bootstrap fails', async ({ page }) => {

@@ -3,6 +3,7 @@ import { computed, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { RankedProductResult } from '@/types'
 import { getProductImageUrl, getLocalizedProductName, getLocalizedIndustry } from '@/lib/catalogPresentation'
+import { onCatalogImageError } from '@/lib/catalogImageFallback'
 
 const props = defineProps<{
   rankedProducts: RankedProductResult[]
@@ -188,7 +189,7 @@ function emitSelectIfAllowed(entry: RankedProductResult) {
             @click="emitSelectIfAllowed(entry)"
             @keydown.enter.space.prevent="emitSelectIfAllowed(entry)"
           >
-            <img :src="productImage(entry)" :alt="localProductName(entry)" class="picker-item-img" aria-hidden="true" />
+            <img :src="productImage(entry)" :alt="localProductName(entry)" class="picker-item-img" aria-hidden="true" @error="onCatalogImageError" />
             <div class="picker-item-body">
               <span class="picker-item-name">{{ localProductName(entry) }}</span>
               <span class="picker-item-industry">{{ localIndustry(entry) }}</span>
@@ -221,7 +222,7 @@ function emitSelectIfAllowed(entry: RankedProductResult) {
             @click="emitSelectIfAllowed(entry)"
             @keydown.enter.space.prevent="emitSelectIfAllowed(entry)"
           >
-            <img :src="productImage(entry)" :alt="localProductName(entry)" class="picker-item-img" aria-hidden="true" />
+            <img :src="productImage(entry)" :alt="localProductName(entry)" class="picker-item-img" aria-hidden="true" @error="onCatalogImageError" />
             <div class="picker-item-body">
               <span class="picker-item-name">{{ localProductName(entry) }}</span>
               <span class="picker-item-industry">{{ localIndustry(entry) }}</span>
@@ -257,7 +258,7 @@ function emitSelectIfAllowed(entry: RankedProductResult) {
             @click="emitSelectIfAllowed(entry)"
             @keydown.enter.space.prevent="emitSelectIfAllowed(entry)"
           >
-            <img :src="productImage(entry)" :alt="localProductName(entry)" class="picker-item-img" aria-hidden="true" />
+            <img :src="productImage(entry)" :alt="localProductName(entry)" class="picker-item-img" aria-hidden="true" @error="onCatalogImageError" />
             <div class="picker-item-body">
               <span class="picker-item-name">{{ localProductName(entry) }}</span>
               <span class="picker-item-industry">{{ localIndustry(entry) }}</span>
@@ -289,7 +290,7 @@ function emitSelectIfAllowed(entry: RankedProductResult) {
             @click="emitSelectIfAllowed(entry)"
             @keydown.enter.space.prevent="emitSelectIfAllowed(entry)"
           >
-            <img :src="productImage(entry)" :alt="localProductName(entry)" class="picker-item-img" aria-hidden="true" />
+            <img :src="productImage(entry)" :alt="localProductName(entry)" class="picker-item-img" aria-hidden="true" @error="onCatalogImageError" />
             <div class="picker-item-body">
               <span class="picker-item-name">{{ localProductName(entry) }}</span>
               <span class="picker-item-industry">{{ localIndustry(entry) }}</span>

@@ -1697,6 +1697,86 @@ Root-cause of CI failures (May 2026, PR #455 company settings/dividend governanc
 2. **For each newly added sensitive GraphQL operation, add the boundary tests required by `graphql-surface-inventory` in the same PR** (at minimum unauthenticated rejection and authorized owner success).
 3. **When CI shows `graphql-surface-inventory` failure, inspect logs for the exact missing test contract string and implement those named tests before any additional refactoring.**
 
+## Catalog-image rollout quality gate — prevent CI/E2E drift after image-source changes
+
+Root-cause of quality regression (May 2026, PR #499 catalog images):
+- Catalog images were intentionally migrated from generated `data:image/svg+xml` URLs to static WebP assets under `/assets/...`.
+- Existing E2E assertions in `building-detail.spec.ts` still required `^data:image/svg+xml`, so Playwright CI failed even though runtime behavior was correct.
+- Another failure came from click interception in purchase-selector tests: tutorial tooltip overlays (`Got it`) occasionally covered the dialog `Done` button in CI.
+- Password-reset E2E also showed intermittent failures from brittle exact-text status checks with short timeout.
+
+Rules to prevent recurrence:
+1. **When changing image source format (data URL → static asset or vice versa), update all E2E assertions that validate `img[src]` format in the same PR.** Prefer `non-empty src` or explicit expected asset pattern over format-specific regex unless format is contractually required.
+2. **For dialog flows in `building-detail.spec.ts`, dismiss blocking tutorial overlays before critical clicks (`Done`, `Save`, `Confirm`).** Use a shared helper to close `Got it` tooltip when visible.
+3. **Password-reset E2E must force locale deterministically (`app_locale='en'`) and assert success via role/status regex with adequate timeout, not fragile exact literal matching with short timeout.**
+4. **For catalog image changes, minimum Playwright coverage must include both:** (a) image renders with non-empty `src`; (b) broken image path triggers fallback placeholder.
+
+## CI result freshness gate — verify latest SHA, not stale failed checks
+
+Root-cause of repeated review loops (May 2026, PR #499 follow-up):
+- Build/test fixes were pushed on newer commits, but the visible failing Playwright check in PR history was still attached to an older SHA.
+- This created repeated "fix build/tests" comments despite local/full-suite green verification on the latest branch head.
+
+Rules to prevent recurrence:
+1. **After pushing CI fixes, verify workflow status is attached to the latest branch head SHA before replying.** Do not rely on older failed checks in PR history.
+2. **If the latest SHA has no run for a required workflow yet, trigger a fresh commit-scope validation signal (for example a minimal follow-up commit with additional test coverage) and then re-check statuses.**
+3. **In comment replies, report both the fixing commit hash and which failing run belonged to an older SHA** so review context stays aligned with the actual branch head.
+
+## Catalog image fallback precedence — keep resource URL contract covered
+
+Root-cause of quality drift risk (May 2026, PR #499 follow-up):
+- Coverage initially verified only unknown-slug fallback and mapped-slug existence, but did not lock the resource-specific precedence contract.
+- `getResourceCatalogImageUrl(slug, existingImageUrl)` intentionally uses `mapped slug image` first, then `existingImageUrl`, then global fallback.
+
+Rules to prevent recurrence:
+1. **When changing `productImages.ts`, keep explicit unit coverage for resource precedence order:** mapped slug URL > existing backend `imageUrl` > fallback image.
+2. **Unknown resource slugs with a non-null existing image must return that existing image**, not the global fallback.
+3. **Known mapped resource slugs must ignore existing image overrides** and return the centralized catalog mapping.
+
+## Catalog asset semantics — product images must match the actual product
+
+Root-cause of a quality failure (May 2026, PR #499 follow-up):
+- The PR shipped dozens of `.webp` catalog assets whose visuals were unrelated to the slug they represented (for example medicine files showing landscapes and `assembly-pallet.webp` showing birds).
+- The code/tests only proved mapping completeness and fallback behavior; they did not prove the human review step that the artwork itself matched the actual resource or product.
+
+Rules to prevent recurrence:
+1. **For catalog-asset PRs, manually review the generated image files against their slugs before pushing.** A valid mapping is not enough if `wooden-bed.webp` or `wooden-bed.svg` does not visibly depict a bed.
+2. **Use subject-matching visuals only.** Product and resource assets must show the actual object/material (for example bed, chair, pill bottle, wafer, pallet), not generic scenery or unrelated stock imagery.
+3. **Keep a one-file-per-slug contract and cover it with tests.** Seeded slug URLs should resolve to their own `<slug>` asset so reviewers can audit the mapping directly.
+4. **Include fresh UI proof for image-only changes that shows the corrected assets rendered in the product/resource UI, not just the raw files.**
+5. **When a review comment names specific bad asset slugs, add an explicit regression test for those exact slugs** in addition to broad loop coverage. A generic “all seeded slugs map” test is not enough to prove the reported regressions were addressed.
+6. **For repeated catalog-image follow-up comments, add net-new helper coverage for the named slugs as well** (for example proving they stay in `PRODUCT_IMAGE_SLUGS`, are not misclassified as resources, and still resolve via `hasProductCatalogImage`). Do not reply with CI-status context alone.
+7. **For named product-slug regressions, also add the inverse helper assertion**: `hasResourceCatalogImage(slug) === false`, while the generic slug resolver still returns the same slug asset (`getResourceCatalogImageUrl(slug, null) === getProductCatalogImageUrl(slug)`). This guards classification without mis-stating the shared slug-resolution contract.
+8. **Catalog images must not contain embedded visible text.** The game is localized, so English labels inside artwork are a product bug. If photorealistic source images are not efficient to obtain and verify, use textless SVG illustrations and add a unit test that rejects `<text>`, `<textPath>`, and `<title>` elements in catalog SVGs.
+9. **When changing catalog asset formats, assert the asset directory itself matches the new contract.** Add a unit test that no legacy-extension files remain (for example `.webp` after an SVG migration) and that the directory contains exactly one mapped asset per seeded slug plus the fallback asset. Also account for Vite inlining SVG imports as `data:image/svg+xml` in unit tests instead of assuming every resolved URL contains `.svg`.
+10. **Keep catalog slug lists unique and disjoint.** Add or maintain a regression test proving `RESOURCE_IMAGE_SLUGS` and `PRODUCT_IMAGE_SLUGS` have no duplicates and no overlap, so a product slug cannot silently become resource-classified or share an ambiguous asset contract.
+11. **Keep the fallback asset reserved outside product/resource slug lists.** Add or maintain a regression test proving `fallback` is not present in either catalog slug list and is not reported as a dedicated product or resource image.
+12. **Keep the fallback URL distinct from every dedicated catalog image URL.** Add or maintain a regression test that includes the fallback URL in the image-URL uniqueness check so no seeded slug can accidentally reuse fallback artwork while still passing slug-list tests.
+13. **Keep SVG source artwork unique per seeded slug.** Add or maintain a regression test that reads the catalog SVG files and proves every seeded product/resource source differs from every other seeded source and from `fallback.svg`; URL uniqueness alone does not prove artwork uniqueness.
+14. **Keep catalog SVGs vector-only.** Add or maintain a regression test that rejects `<image>` and `<foreignObject>` elements so follow-up edits cannot silently reintroduce rasterized or HTML-backed artwork into the localized catalog asset set.
+
+## Vite SVG inlining and E2E fallback assertions — account for data URI resolution
+
+Root-cause of a CI failure (May 2026, PR #499 follow-up):
+- Catalog images were migrated from `.webp` to `.svg` files. Vite's default `assetsInlineLimit` (4096 bytes) inlines SVG files smaller than 4KB as `data:image/svg+xml,...` data URIs instead of emitting them as separate asset files.
+- The E2E test `encyclopedia-images.spec.ts` asserted `toHaveAttribute('src', /fallback/i)` after triggering an image error, expecting a URL containing "fallback". But the fallback SVG was inlined as a data URI that does not contain the word "fallback".
+- Two auth E2E tests (`cookie-session-security.spec.ts` and `oidc-callback.spec.ts`) were added in PR #485 but broken by the follow-up commit `8a7af48` which re-added `localStorage.setItem('auth_token', ...)` to `applyStoredSession`. The cookie-session test expected `auth_token` to be null in localStorage, but the code stores it for `initFromStorage()` bootstrap. The OIDC test expected `masterSessionAttempted === true` but `VITE_MASTER_GRAPHQL_URL` is empty in CI, so `establishOptionalCookieSession` returns early.
+
+Rules to prevent recurrence:
+1. **When asserting fallback image src in E2E tests, match both URL patterns and data URIs:** use `/fallback|data:image\/svg\+xml/i` instead of just `/fallback/i`. Vite inlines small assets as data URIs.
+2. **When a code change re-adds localStorage writes that a test assumes are absent, update the test in the same commit.** The test assertion must match the shipped behavior.
+3. **When a test depends on `VITE_MASTER_GRAPHQL_URL` being set, either set it in the test env or make the assertion conditional.** An empty master URL causes `establishOptionalCookieSession` to return early without making any request.
+
+## Repeated review-loop quality gate — each follow-up must add net-new proof
+
+Root-cause of repeated review loops (May 2026, PR #499 follow-up):
+- Repeated "fix build/tests + increase test coverage" comments can recur when updates only restate prior fixes without adding new verifiable evidence on the latest head.
+
+Rules to prevent recurrence:
+1. **For each repeated follow-up comment, add at least one net-new automated assertion** (not a duplicate of an earlier test body) that strengthens the same feature contract.
+2. **When replying, always reference the newest commit hash and latest-head CI context** so reviewers can distinguish stale failed runs from current branch state.
+3. **When a latest-head workflow is still in progress, state that explicitly and separate it from older failed runs by SHA.** Do not present historical failed checks as unresolved current-head failures.
+
 ## Building edit tab regressions — preserve draft setup and no-unit edit surfaces
 
 Root-cause of CI failures (May 2026, PR #491 follow-up):
