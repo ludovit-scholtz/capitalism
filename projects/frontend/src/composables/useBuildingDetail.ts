@@ -1255,6 +1255,7 @@ export function useBuildingDetail() {
   }
 
   function applyStarterLayout() {
+    startEditing()
     // Pre-populate the draft with a PURCHASE → MANUFACTURING → STORAGE → B2B_SALES chain at y=0
     const starterUnits: EditableGridUnit[] = [
       {
@@ -1372,10 +1373,10 @@ export function useBuildingDetail() {
     ]
     setDraftUnitsFrom(starterUnits)
     setEditBaselineFrom([])
-    startEditing()
   }
 
   function applyShopStarterLayout() {
+    startEditing()
     const shopStarterUnits: EditableGridUnit[] = [
       {
         id: 'draft-shop-starter-0-0',
@@ -1436,7 +1437,6 @@ export function useBuildingDetail() {
     ]
     setDraftUnitsFrom(shopStarterUnits)
     setEditBaselineFrom([])
-    startEditing()
   }
 
   function clickDraftCell(x: number, y: number) {

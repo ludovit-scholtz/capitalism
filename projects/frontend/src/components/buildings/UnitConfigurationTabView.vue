@@ -422,79 +422,104 @@ watch(
 
       <!-- ── Tab: Sales / Upgrade ── -->
       <template v-else-if="selectedConfigTab === 'maintenance'">
-        <section
+        <div
           v-if="isEditing && selectedCellUpgradeInfo !== null"
-          class="unit-insight-card unit-upgrade-panel mt-3 space-y-4 border border-divider bg-card p-4"
+          class="unit-insight-card unit-upgrade-panel mt-3 rounded-xl border border-divider bg-card p-4"
           :aria-label="t('buildingDetail.accessibility.unitUpgrade')"
         >
-          <header class="rounded-xl border border-divider bg-surface/80 p-4">
-            <h5 class="text-sm font-semibold uppercase tracking-wide text-muted">{{ t('buildingDetail.unitUpgrade.sectionTitle') }}</h5>
-            <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div class="rounded-lg border border-divider bg-card px-3 py-2">
-                <p class="text-xs font-semibold uppercase tracking-wide text-muted">{{ t('buildingDetail.unitUpgrade.laborCost') }}</p>
-                <p class="mt-1 text-sm font-semibold text-foreground">{{ formatCurrency(selectedCellUpgradeInfo.nextLaborCostPerTick) }}</p>
-              </div>
-              <div class="rounded-lg border border-divider bg-card px-3 py-2">
-                <p class="text-xs font-semibold uppercase tracking-wide text-muted">{{ t('buildingDetail.unitUpgrade.energyCost') }}</p>
-                <p class="mt-1 text-sm font-semibold text-foreground">{{ formatCurrency(selectedCellUpgradeInfo.nextEnergyCostPerTick) }}</p>
-              </div>
-            </div>
-          </header>
+          <h5 class="mb-4 text-sm font-semibold uppercase tracking-wide text-muted">{{ t('buildingDetail.unitUpgrade.sectionTitle') }}</h5>
 
-          <div class="rounded-xl border border-divider bg-surface/70 p-4">
-            <h6 class="text-xs font-semibold uppercase tracking-wide text-muted">{{ t('buildingDetail.unitUpgrade.pendingTitle') }}</h6>
-            <ul class="mt-3 space-y-2 text-sm text-foreground">
-              <li v-if="selectedCellPendingUpgrade" class="rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-amber-100">
+          <!-- Upgrade in progress -->
+          <div v-if="selectedCellPendingUpgrade" class="unit-upgrade-in-progress rounded-xl border border-amber-400/30 bg-amber-500/10 p-3">
+            <div class="unit-upgrade-progress-badge">⏳</div>
+            <div class="unit-upgrade-progress-body">
+              <strong>{{ t('buildingDetail.unitUpgrade.pendingTitle') }}</strong>
+              <p class="unit-upgrade-progress-desc" :title="selectedCellPendingUpgrade.ticksRemaining + ' ticks remaining'">
                 {{
                   t('buildingDetail.unitUpgrade.pendingBody', {
                     level: selectedCellPendingUpgrade.level,
                     time: formatTickDuration(selectedCellPendingUpgrade.ticksRemaining, locale),
                   })
                 }}
-              </li>
-              <li v-if="isSelectedCellStaged" class="rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-emerald-100">
-                {{ t('buildingDetail.unitUpgrade.stagedBadge') }}
-              </li>
-              <li v-if="!selectedCellPendingUpgrade && !isSelectedCellStaged" class="rounded-lg border border-divider bg-card px-3 py-2 text-muted">
-                {{ t('buildingDetail.unitUpgrade.stageInfo') }}
-              </li>
-            </ul>
-          </div>
-
-          <div v-if="selectedCellUpgradeInfo.isMaxLevel" class="rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
-            <p class="font-semibold">{{ t('buildingDetail.unitUpgrade.maxLevel') }}</p>
-            <p class="mt-1 text-xs text-emerald-200">{{ t('buildingDetail.unitUpgrade.maxLevelNote') }}</p>
-          </div>
-
-          <div v-else-if="!selectedCellUpgradeInfo.isUpgradable" class="rounded-lg border border-divider bg-surface px-4 py-3 text-sm text-muted">
-            {{ t('buildingDetail.unitUpgrade.notUpgradable') }}
-          </div>
-
-          <div v-else class="space-y-3">
-            <div class="rounded-xl border border-divider bg-card p-4">
-              <div class="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
-                <span>{{ t('buildingDetail.unitUpgrade.currentLevel', { level: selectedCellUpgradeInfo.currentLevel }) }}</span>
-                <span class="text-muted">→</span>
-                <span>{{ t('buildingDetail.unitUpgrade.nextLevel', { level: selectedCellUpgradeInfo.nextLevel }) }}</span>
-              </div>
-              <p class="mt-2 text-sm text-muted">{{ selectedCellUpgradeInfo.statLabel }}: {{ selectedCellUpgradeInfo.currentStat.toFixed(1) }} → {{ selectedCellUpgradeInfo.nextStat.toFixed(1) }}</p>
-              <p class="mt-1 text-sm text-muted">
-                {{ t('buildingDetail.unitUpgrade.cost', { cost: formatCurrency(selectedCellUpgradeInfo.upgradeCost) }) }}
               </p>
-              <p class="mt-1 text-sm text-muted">
-                {{ t('buildingDetail.unitUpgrade.duration', { time: formatTickDuration(selectedCellUpgradeInfo.upgradeTicks, locale) }) }}
-              </p>
+              <p class="unit-upgrade-downtime-notice">{{ t('buildingDetail.unitUpgrade.pendingDowntimeNotice') }}</p>
             </div>
+          </div>
 
-            <p v-if="unitUpgradeError" class="rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">{{ unitUpgradeError }}</p>
+          <!-- Max level -->
+          <div v-else-if="selectedCellUpgradeInfo.isMaxLevel" class="unit-upgrade-max-level rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-3">
+            <span class="unit-upgrade-max-badge">✅</span>
+            <span>{{ t('buildingDetail.unitUpgrade.maxLevel') }}</span>
+            <p class="unit-upgrade-max-note">{{ t('buildingDetail.unitUpgrade.maxLevelNote') }}</p>
+          </div>
 
-            <div v-if="isSelectedCellStaged" class="rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-4 py-3">
-              <p class="text-sm font-semibold text-emerald-100">✅ {{ t('buildingDetail.unitUpgrade.stagedBadge') }}</p>
-              <button class="btn btn-ghost btn-sm mt-2" @click="toggleStagedUpgrade(selectedCellUpgradeInfo.unitId)">
+          <!-- Not upgradable -->
+          <div v-else-if="!selectedCellUpgradeInfo.isUpgradable" class="unit-upgrade-not-available rounded-xl border border-divider bg-surface p-3">
+            <p>{{ t('buildingDetail.unitUpgrade.notUpgradable') }}</p>
+          </div>
+
+          <!-- Upgrade available -->
+          <div v-else class="unit-upgrade-available space-y-3">
+            <div class="unit-upgrade-levels">
+              <span class="unit-upgrade-level current-level">{{ t('buildingDetail.unitUpgrade.currentLevel', { level: selectedCellUpgradeInfo.currentLevel }) }}</span>
+              <span class="unit-upgrade-arrow">→</span>
+              <span class="unit-upgrade-level next-level">{{ t('buildingDetail.unitUpgrade.nextLevel', { level: selectedCellUpgradeInfo.nextLevel }) }}</span>
+            </div>
+            <div class="unit-upgrade-stats rounded-xl border border-divider bg-surface p-3" :aria-label="t('buildingDetail.accessibility.upgradeImpact')">
+              <div class="unit-upgrade-stat-row">
+                <span class="unit-upgrade-stat-label">{{ selectedCellUpgradeInfo.statLabel }}</span>
+                <span class="unit-upgrade-stat-values">
+                  <span class="stat-current">{{ selectedCellUpgradeInfo.currentStat.toFixed(1) }}</span>
+                  <span class="stat-arrow"> → </span>
+                  <span class="stat-next">{{ selectedCellUpgradeInfo.nextStat.toFixed(1) }}</span>
+                </span>
+              </div>
+              <div class="unit-upgrade-stat-row" :aria-label="t('buildingDetail.accessibility.storageCapacityDelta')">
+                <span class="unit-upgrade-stat-label">{{ t('buildingDetail.unitUpgrade.storageCapacity') }}</span>
+                <span class="unit-upgrade-stat-values">
+                  <span class="stat-current">{{ selectedCellUpgradeInfo.currentStorageCapacity.toFixed(0) }}</span>
+                  <span class="stat-arrow"> → </span>
+                  <span class="stat-next">{{ selectedCellUpgradeInfo.nextStorageCapacity.toFixed(0) }}</span>
+                  <span class="stat-delta stat-delta-positive">+{{ (selectedCellUpgradeInfo.nextStorageCapacity - selectedCellUpgradeInfo.currentStorageCapacity).toFixed(0) }}</span>
+                </span>
+              </div>
+              <div class="unit-upgrade-stat-row" :aria-label="t('buildingDetail.accessibility.laborCostDelta')">
+                <span class="unit-upgrade-stat-label">{{ t('buildingDetail.unitUpgrade.laborCost') }}</span>
+                <span class="unit-upgrade-stat-values">
+                  <span class="stat-current">{{ formatCurrency(selectedCellUpgradeInfo.currentLaborCostPerTick) }}</span>
+                  <span class="stat-arrow"> → </span>
+                  <span class="stat-next">{{ formatCurrency(selectedCellUpgradeInfo.nextLaborCostPerTick) }}</span>
+                  <span class="stat-delta stat-delta-negative">+{{ formatCurrency(selectedCellUpgradeInfo.nextLaborCostPerTick - selectedCellUpgradeInfo.currentLaborCostPerTick) }}</span>
+                </span>
+              </div>
+              <div class="unit-upgrade-stat-row" :aria-label="t('buildingDetail.accessibility.energyCostDelta')">
+                <span class="unit-upgrade-stat-label">{{ t('buildingDetail.unitUpgrade.energyCost') }}</span>
+                <span class="unit-upgrade-stat-values">
+                  <span class="stat-current">{{ formatCurrency(selectedCellUpgradeInfo.currentEnergyCostPerTick) }}</span>
+                  <span class="stat-arrow"> → </span>
+                  <span class="stat-next">{{ formatCurrency(selectedCellUpgradeInfo.nextEnergyCostPerTick) }}</span>
+                  <span class="stat-delta stat-delta-negative">+{{ formatCurrency(selectedCellUpgradeInfo.nextEnergyCostPerTick - selectedCellUpgradeInfo.currentEnergyCostPerTick) }}</span>
+                </span>
+              </div>
+            </div>
+            <p class="unit-upgrade-downtime-notice available" :title="selectedCellUpgradeInfo.upgradeTicks + ' ticks'">
+              {{ t('buildingDetail.unitUpgrade.availableDowntimeNotice', { time: formatTickDuration(selectedCellUpgradeInfo.upgradeTicks, locale) }) }}
+            </p>
+            <div class="unit-upgrade-meta">
+              <span class="unit-upgrade-cost">{{ t('buildingDetail.unitUpgrade.cost', { cost: formatCurrency(selectedCellUpgradeInfo.upgradeCost) }) }}</span>
+              <span class="unit-upgrade-duration" :title="t('buildingDetail.unitUpgrade.durationTicks', { ticks: selectedCellUpgradeInfo.upgradeTicks })">
+                {{ t('buildingDetail.unitUpgrade.duration', { time: formatTickDuration(selectedCellUpgradeInfo.upgradeTicks, locale) }) }}
+              </span>
+            </div>
+            <p v-if="unitUpgradeError" class="form-error rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">{{ unitUpgradeError }}</p>
+            <div v-if="isSelectedCellStaged" class="unit-upgrade-staged rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-3">
+              <span class="unit-upgrade-staged-badge">✅ {{ t('buildingDetail.unitUpgrade.stagedBadge') }}</span>
+              <p class="unit-upgrade-stage-info">{{ t('buildingDetail.unitUpgrade.stageInfo') }}</p>
+              <button class="btn btn-ghost btn-sm" @click="toggleStagedUpgrade(selectedCellUpgradeInfo.unitId)">
                 {{ t('buildingDetail.unitUpgrade.removeStagedUpgrade') }}
               </button>
             </div>
-            <div v-else class="flex flex-wrap gap-2">
+            <div v-else class="unit-upgrade-actions">
               <button class="btn btn-primary btn-sm unit-upgrade-stage-btn" @click="toggleStagedUpgrade(selectedCellUpgradeInfo.unitId)">
                 {{ t('buildingDetail.unitUpgrade.stageButton') }}
               </button>
@@ -506,7 +531,7 @@ watch(
 
           <div
             v-if="confirmScheduleRepairUnitId"
-            class="rounded-xl border border-primary/40 bg-primary/10 p-4"
+            class="mt-3 rounded-xl border border-primary/40 bg-primary/10 p-4"
             role="dialog"
             aria-modal="true"
             :aria-label="t('buildingDetail.unitUpgrade.confirmButton')"
@@ -521,7 +546,7 @@ watch(
               </button>
             </div>
           </div>
-        </section>
+        </div>
         <p v-else class="unit-desc">{{ t('buildingDetail.unitUpgrade.notUpgradable') }}</p>
       </template>
 

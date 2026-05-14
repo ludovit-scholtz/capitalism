@@ -6468,6 +6468,7 @@ test.describe('Building detail upgrades', () => {
 
     // Attempt to upgrade — mock returns MAX_CONCURRENT_UPGRADES
     await upgradePanel.getByRole('button', { name: 'Upgrade Now' }).click()
+    await upgradePanel.getByRole('button', { name: 'Confirm' }).click()
 
     // Error message is shown
     await expect(upgradePanel.locator('.form-error')).toContainText('already has 2 unit upgrades in progress')
@@ -18415,6 +18416,7 @@ test.describe('Unit upgrade panel', () => {
     await expect(upgradePanel).toBeVisible()
 
     await upgradePanel.getByRole('button', { name: 'Upgrade Now' }).click()
+    await upgradePanel.getByRole('button', { name: 'Confirm' }).click()
 
     // Error message should appear
     await expect(upgradePanel.locator('.form-error')).toContainText('Not enough cash')
@@ -24155,6 +24157,7 @@ test.describe('energy status badge and power settings', () => {
     }, `token-${player.id}`)
 
     await page.goto('/building/energy-bld-1')
+    await page.getByRole('button', { name: 'Edit Building' }).click()
 
     const energyPanel = page.locator('[aria-label="Energy Settings"]')
     await expect(energyPanel).toBeVisible()

@@ -112,4 +112,57 @@ test.describe('Building edit route tabs', () => {
     await page.goto('/building/building-edit-route')
     await expect(page.getByText('Energy Settings')).toHaveCount(0)
   })
+
+  test('deep-link edit config shows energy settings even without selected unit', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-edit-energy',
+      playerId: player.id,
+      name: 'Energy Routing Ltd',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-edit-energy',
+          companyId: 'company-edit-energy',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Energy Routing Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
+    }, `token-${player.id}`)
+
+    await page.context().addCookies([
+      {
+        name: 'auth_token',
+        value: `token-${player.id}`,
+        url: process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173',
+        httpOnly: true,
+        sameSite: 'Strict',
+      },
+    ])
+
+    await page.goto('/building/building-edit-energy/edit/config')
+    await expect(page).toHaveURL(/\/building\/building-edit-energy\/edit\/config$/)
+    await expect(page.getByRole('heading', { name: 'Planned Upgrade' })).toBeVisible()
+    await expect(page.locator('[aria-label="Energy Settings"]')).toBeVisible()
+  })
 })
