@@ -21,17 +21,34 @@ public sealed class PlayerNotification
     [Required, MaxLength(1000)]
     public string Message { get; set; } = string.Empty;
 
+    [Required, MaxLength(16)]
+    public string Severity { get; set; } = PlayerNotificationSeverity.Info;
+
+    [MaxLength(200)]
+    public string? TitleKey { get; set; }
+
+    [MaxLength(200)]
+    public string? BodyKey { get; set; }
+
+    [MaxLength(4000)]
+    public string? BodyParamsJson { get; set; }
+
     public bool IsRead { get; set; }
     public DateTime? ReadAtUtc { get; set; }
 
     public long CreatedAtTick { get; set; }
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+    public DateTime? ExpiresAtUtc { get; set; }
 
     public Guid? CompanyId { get; set; }
     public Guid? BuildingId { get; set; }
     public Guid? BuildingUnitId { get; set; }
     public Guid? BankAccountId { get; set; }
     public Guid? LoanId { get; set; }
+
+    [MaxLength(60)]
+    public string? RelatedEntityType { get; set; }
+    public Guid? RelatedEntityId { get; set; }
 }
 
 public static class PlayerNotificationType
@@ -58,4 +75,18 @@ public static class PlayerNotificationType
     public const string DividendProposalOpened = "DIVIDEND_PROPOSAL_OPENED";
     public const string DividendProposalSettled = "DIVIDEND_PROPOSAL_SETTLED";
     public const string EconomicAlert = "ECONOMIC_ALERT";
+    public const string ProductionHalted = "PRODUCTION_HALTED";
+    public const string LoanPaymentDue = "LOAN_PAYMENT_DUE";
+    public const string LoanDefault = "LOAN_DEFAULT";
+    public const string PriceSpike = "PRICE_SPIKE";
+    public const string OversupplyWarning = "OVERSUPPLY_WARNING";
+    public const string TakeoverAlert = "TAKEOVER_ALERT";
+    public const string MineDepleting = "MINE_DEPLETING";
+}
+
+public static class PlayerNotificationSeverity
+{
+    public const string Info = "INFO";
+    public const string Warning = "WARNING";
+    public const string Critical = "CRITICAL";
 }

@@ -137,6 +137,9 @@ public sealed partial class Mutation
             Message = $"{buyerCompany.Name} offered {input.OfferedPrice.ToString("N2", CultureInfo.InvariantCulture)} {currencyCode} for {building.Name}.",
             BuildingId = building.Id,
             CreatedAtTick = gameState?.CurrentTick ?? 0,
+            Severity = PlayerNotificationSeverity.Info,
+            RelatedEntityType = "BUILDING",
+            RelatedEntityId = building.Id,
         });
 
         await db.SaveChangesAsync();

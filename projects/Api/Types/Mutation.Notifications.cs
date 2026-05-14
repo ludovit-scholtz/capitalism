@@ -38,6 +38,23 @@ public sealed partial class Mutation
     }
 
     [Authorize]
+    public async Task<bool> MarkNotificationsRead(
+        List<Guid> ids,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        if (ids.Count == 0)
+        {
+            return true;
+        }
+
+        return await MarkPlayerNotificationsRead(
+            new MarkPlayerNotificationsReadInput { NotificationIds = ids },
+            db,
+            httpContextAccessor);
+    }
+
+    [Authorize]
     public async Task<int> MarkAllPlayerNotificationsRead(
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor)
@@ -55,6 +72,15 @@ public sealed partial class Mutation
 
         await db.SaveChangesAsync();
         return notifications.Count;
+    }
+
+    [Authorize]
+    public async Task<bool> MarkAllNotificationsRead(
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        await MarkAllPlayerNotificationsRead(db, httpContextAccessor);
+        return true;
     }
 
     [Authorize]

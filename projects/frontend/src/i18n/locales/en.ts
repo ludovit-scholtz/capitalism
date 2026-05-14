@@ -107,6 +107,10 @@ export default {
     subtitle: 'Latest alerts and events from your companies.',
     empty: 'No notifications yet.',
     markAllRead: 'Mark all read',
+    justNow: 'Just now',
+    minutesAgo: '{count} min ago',
+    hoursAgo: '{count} h ago',
+    daysAgo: '{count} d ago',
   },
   admin: {
     eyebrow: 'Game administration',

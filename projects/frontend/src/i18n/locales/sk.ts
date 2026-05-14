@@ -106,6 +106,10 @@ export default {
     subtitle: 'Najnovšie alerty a udalosti z vašich spoločností.',
     empty: 'Zatiaľ žiadne notifikácie.',
     markAllRead: 'Označiť všetko ako prečítané',
+    justNow: 'Práve teraz',
+    minutesAgo: 'pred {count} min',
+    hoursAgo: 'pred {count} h',
+    daysAgo: 'pred {count} d',
   },
   admin: {
     eyebrow: 'Správa hry',

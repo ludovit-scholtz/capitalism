@@ -122,12 +122,18 @@ public sealed partial class AppDbContext
             e.Property(notification => notification.Type).HasMaxLength(60);
             e.Property(notification => notification.Title).HasMaxLength(160);
             e.Property(notification => notification.Message).HasMaxLength(1000);
+            e.Property(notification => notification.Severity).HasMaxLength(16);
+            e.Property(notification => notification.TitleKey).HasMaxLength(200);
+            e.Property(notification => notification.BodyKey).HasMaxLength(200);
+            e.Property(notification => notification.BodyParamsJson).HasMaxLength(4000);
+            e.Property(notification => notification.RelatedEntityType).HasMaxLength(60);
             e.HasOne(notification => notification.Player)
                 .WithMany(player => player.Notifications)
                 .HasForeignKey(notification => notification.PlayerId)
                 .OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(notification => new { notification.PlayerId, notification.IsRead, notification.CreatedAtTick });
             e.HasIndex(notification => notification.CreatedAtUtc);
+            e.HasIndex(notification => new { notification.PlayerId, notification.ExpiresAtUtc });
         });
 
         modelBuilder.Entity<PersonTradeRecord>(e =>
