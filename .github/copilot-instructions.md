@@ -1751,6 +1751,7 @@ Rules to prevent recurrence:
 9. **When changing catalog asset formats, assert the asset directory itself matches the new contract.** Add a unit test that no legacy-extension files remain (for example `.webp` after an SVG migration) and that the directory contains exactly one mapped asset per seeded slug plus the fallback asset. Also account for Vite inlining SVG imports as `data:image/svg+xml` in unit tests instead of assuming every resolved URL contains `.svg`.
 10. **Keep catalog slug lists unique and disjoint.** Add or maintain a regression test proving `RESOURCE_IMAGE_SLUGS` and `PRODUCT_IMAGE_SLUGS` have no duplicates and no overlap, so a product slug cannot silently become resource-classified or share an ambiguous asset contract.
 11. **Keep the fallback asset reserved outside product/resource slug lists.** Add or maintain a regression test proving `fallback` is not present in either catalog slug list and is not reported as a dedicated product or resource image.
+12. **Keep the fallback URL distinct from every dedicated catalog image URL.** Add or maintain a regression test that includes the fallback URL in the image-URL uniqueness check so no seeded slug can accidentally reuse fallback artwork while still passing slug-list tests.
 
 ## Repeated review-loop quality gate — each follow-up must add net-new proof
 

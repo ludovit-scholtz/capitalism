@@ -56,6 +56,17 @@ describe('productImages mapping', () => {
     expectSvgImageUrl(getCatalogFallbackImageUrl())
   })
 
+  it('keeps the fallback image URL distinct from every dedicated catalog image', () => {
+    const fallback = getCatalogFallbackImageUrl()
+    const dedicatedUrls = [
+      ...RESOURCE_IMAGE_SLUGS.map((slug) => getResourceCatalogImageUrl(slug, null)),
+      ...PRODUCT_IMAGE_SLUGS.map((slug) => getProductCatalogImageUrl(slug)),
+    ]
+
+    expect(dedicatedUrls).not.toContain(fallback)
+    expect(new Set([...dedicatedUrls, fallback]).size).toBe(dedicatedUrls.length + 1)
+  })
+
   it('returns fallback image for unknown slugs', () => {
     const fallback = getCatalogFallbackImageUrl()
     expect(hasProductCatalogImage('missing-product-slug')).toBe(false)
