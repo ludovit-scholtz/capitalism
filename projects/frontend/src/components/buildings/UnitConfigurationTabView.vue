@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import { computed, inject, ref } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
 import type { ExchangeSortBy } from '@/lib/globalExchange'
 import BuildingUnitConfigFields from '@/components/buildings/BuildingUnitConfigFields.vue'
 import UnitResourceHistoryPanel from '@/components/buildings/UnitResourceHistoryPanel.vue'
+import BuildingEnergyPanel from '@/components/buildings/BuildingEnergyPanel.vue'
 
 const { t, locale } = useI18n()
+const route = useRoute()
+const router = useRouter()
 const bd = inject(BUILDING_DETAIL_KEY)!
 const {
   building,
@@ -41,7 +45,6 @@ const {
   getInventoryItemMonogram,
   getInventoryItemName,
   getInventoryItemSourcingCostLabel,
-  getInventoryItemSourcingCostPerUnitLabel,
   getUnitInventoryCostLabel,
   getDisplayedTicks,
   removeDraftUnit,
@@ -51,16 +54,32 @@ const {
   formatTickDuration,
   formatPercent,
   formatUnitQuantity,
-  productTypes,
 } = bd
 
-const selectedConfigTab = ref<'config' | 'performance' | 'maintenance'>('config')
+type EditConfigTab = 'config' | 'performance' | 'maintenance'
+const selectedConfigTab = ref<EditConfigTab>('config')
 
 const editTabs = computed(() => [
   { key: 'config', label: t('buildingDetail.editTabConfig') },
   { key: 'performance', label: t('buildingDetail.editTabPerformance') },
   { key: 'maintenance', label: t('buildingDetail.editTabMaintenance') },
 ])
+
+function normalizeEditTab(value: unknown): EditConfigTab {
+  if (value === 'performance' || value === 'maintenance') {
+    return value
+  }
+  return 'config'
+}
+
+function selectConfigTab(tab: EditConfigTab) {
+  selectedConfigTab.value = tab
+  if (!isEditing.value) return
+  void router.replace({
+    path: `/building/${route.params.id as string}/edit/${tab}`,
+    query: route.query,
+  })
+}
 
 const currentUnit = computed(() => {
   if (!selectedCell.value) return null
@@ -78,24 +97,53 @@ const purchaseSourcingHistory = computed(() => {
     .slice(0, 8)
 })
 
-/** Returns true when the inventory item belongs to a perishable product. */
-function isPerishableInventory(inventory: { productTypeId: string | null }): boolean {
-  if (!inventory.productTypeId) return false
-  return productTypes.value.find((p) => p.id === inventory.productTypeId)?.isPerishable ?? false
-}
-
 /** Returns the freshness percentage (0–100) for an inventory item based on quality. */
 function freshnessPercent(quality: number): number {
   return Math.round(Math.max(0, Math.min(1, quality)) * 100)
 }
 
-/** Returns the CSS class for the freshness bar colour tier. */
-function freshnessTierClass(quality: number): string {
+function qualityBadgeClass(quality: number): string {
   const pct = freshnessPercent(quality)
-  if (pct > 66) return 'freshness-bar--green'
-  if (pct > 33) return 'freshness-bar--amber'
-  return 'freshness-bar--red'
+  if (pct > 66) return 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+  if (pct > 33) return 'border-amber-400/30 bg-amber-500/10 text-amber-200'
+  return 'border-rose-400/30 bg-rose-500/10 text-rose-200'
 }
+
+function fillHealthBadgeClass(quantity: number, capacity: number): string {
+  const ratio = capacity > 0 ? quantity / capacity : 0
+  if (ratio <= 0.5) return 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+  if (ratio <= 0.85) return 'border-amber-400/30 bg-amber-500/10 text-amber-200'
+  return 'border-rose-400/30 bg-rose-500/10 text-rose-200'
+}
+
+const currentInventorySummary = computed(() => {
+  if (!currentUnit.value) return null
+  return getUnitInventorySummary(currentUnit.value)
+})
+
+const confirmScheduleRepairUnitId = ref<string | null>(null)
+
+function openScheduleRepairConfirm(unitId: string) {
+  confirmScheduleRepairUnitId.value = unitId
+}
+
+function closeScheduleRepairConfirm() {
+  confirmScheduleRepairUnitId.value = null
+}
+
+async function confirmScheduleRepair() {
+  if (!confirmScheduleRepairUnitId.value) return
+  await submitUnitUpgrade(confirmScheduleRepairUnitId.value)
+  confirmScheduleRepairUnitId.value = null
+}
+
+watch(
+  () => route.params.tab,
+  (routeTab) => {
+    selectedConfigTab.value = normalizeEditTab(routeTab)
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -110,7 +158,7 @@ function freshnessTierClass(quality: number): string {
         :key="tab.key"
         class="unit-tab-btn inline-flex shrink-0 items-center rounded-md border border-transparent px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted transition-colors hover:text-foreground"
         :class="selectedConfigTab === tab.key ? 'unit-tab-btn--active border-primary/40 bg-primary/10 text-primary' : 'hover:border-divider hover:bg-surface'"
-        @click="selectedConfigTab = tab.key as 'config' | 'performance' | 'maintenance'"
+        @click="selectConfigTab(tab.key as EditConfigTab)"
       >
         {{ tab.label }}
       </button>
@@ -185,6 +233,7 @@ function freshnessTierClass(quality: number): string {
           borderless
           @update:selected-item-key="selectedHistoryItemKey = $event"
         />
+        <BuildingEnergyPanel v-if="isEditing" />
         </div>
 
         <!-- Exchange offers panel — shown on General tab when PURCHASE unit has EXCHANGE/OPTIMAL source -->
@@ -268,108 +317,120 @@ function freshnessTierClass(quality: number): string {
       <!-- ── Tab: Production (future use) ── -->
       <!-- ── Tab: Inventory ── -->
       <template v-else-if="selectedConfigTab === 'performance'">
-        <div v-if="getUnitInventorySummary(currentUnit)" class="unit-insight-card mt-0 border-0 pt-0">
-          <h5>{{ t('buildingDetail.inventory.title') }}</h5>
-          <div class="inventory-summary-grid">
-            <div class="inventory-summary-stat">
-              <span class="inventory-summary-label">{{ t('buildingDetail.inventory.load') }}</span>
-              <strong>
+        <section class="mt-3 space-y-4" :aria-label="t('buildingDetail.inventory.title')">
+          <div v-if="currentInventorySummary" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <article class="rounded-xl border border-divider bg-card p-4">
+              <p class="text-xs font-semibold uppercase tracking-wide text-muted">{{ t('buildingDetail.inventory.load') }}</p>
+              <p class="mt-2 text-lg font-semibold text-foreground">
                 {{
                   t('buildingDetail.inventory.quantity', {
-                    quantity: formatUnitQuantity(getUnitInventorySummary(currentUnit)!.quantity),
-                    capacity: formatUnitQuantity(getUnitInventorySummary(currentUnit)!.capacity),
+                    quantity: formatUnitQuantity(currentInventorySummary.quantity),
+                    capacity: formatUnitQuantity(currentInventorySummary.capacity),
                   })
                 }}
-              </strong>
-            </div>
-            <div class="inventory-summary-stat">
-              <span class="inventory-summary-label">{{ t('buildingDetail.inventory.distinctItems') }}</span>
-              <strong>{{ getUnitInventoryItemCount(currentUnit) }}</strong>
-            </div>
-            <div class="inventory-summary-stat" v-if="getUnitInventorySummary(currentUnit)!.averageQuality != null">
-              <span class="inventory-summary-label">{{ t('buildingDetail.inventory.averageQuality') }}</span>
-              <strong>{{ formatPercent(getUnitInventorySummary(currentUnit)!.averageQuality) }}</strong>
-            </div>
-            <div class="inventory-summary-stat" v-if="getUnitInventoryCostLabel(currentUnit)">
-              <span class="inventory-summary-label">{{ t('buildingDetail.inventory.sourcingCosts') }}</span>
-              <strong>{{ getUnitInventoryCostLabel(currentUnit) }}</strong>
-            </div>
-          </div>
-          <div v-if="getUnitInventories(currentUnit).length > 0" class="inventory-table">
-            <div class="inventory-table-header">
-              <span class="inventory-col-item">{{ t('buildingDetail.inventory.item') }}</span>
-              <span class="inventory-col-quantity">{{ t('buildingDetail.inventory.amount') }}</span>
-              <span class="inventory-col-quality">{{ t('buildingDetail.inventory.quality') }}</span>
-              <span class="inventory-col-cost">{{ t('buildingDetail.inventory.sourcingCost') }}</span>
-            </div>
-            <div v-for="inventory in getUnitInventories(currentUnit)" :key="inventory.id" class="inventory-table-row">
-              <div class="inventory-col-item">
-                <img v-if="getInventoryItemImageUrl(inventory)" class="inventory-item-image" :src="getInventoryItemImageUrl(inventory)!" :alt="getInventoryItemName(inventory)" />
-                <span v-else class="inventory-item-avatar">{{ getInventoryItemMonogram(inventory) }}</span>
-                <div class="inventory-item-stack">
-                  <span class="inventory-item-name">{{ getInventoryItemName(inventory) }}</span>
-                </div>
-              </div>
-              <div class="inventory-col-quantity">
-                <span class="inventory-item-quantity">{{ formatUnitQuantity(inventory.quantity) }}</span>
-              </div>
-              <div class="inventory-col-quality">
-                <span class="inventory-item-quality">{{ formatPercent(inventory.quality) }}</span>
-                <span
-                  v-if="isPerishableInventory(inventory)"
-                  class="freshness-bar"
-                  :class="freshnessTierClass(inventory.quality)"
-                  :title="t('storage.freshness.tooltip', { pct: freshnessPercent(inventory.quality) })"
-                  role="progressbar"
-                  :aria-valuenow="freshnessPercent(inventory.quality)"
-                  aria-valuemin="0"
-                  aria-valuemax="100"
-                  :aria-label="t('storage.freshness.label')"
-                >
-                  <span class="freshness-bar__fill" :style="{ width: `${freshnessPercent(inventory.quality)}%` }"></span>
-                </span>
-              </div>
-              <div class="inventory-col-cost">
-                <span class="inventory-item-cost">{{ getInventoryItemSourcingCostLabel(inventory) }}</span>
-                <span v-if="getInventoryItemSourcingCostPerUnitLabel(inventory)" class="inventory-item-secondary">
-                  {{ getInventoryItemSourcingCostPerUnitLabel(inventory) }}
-                </span>
-              </div>
-            </div>
-          </div>
-          <p v-else class="inventory-empty">{{ t('buildingDetail.inventory.empty') }}</p>
-          <div class="detail-capacity">
-            <span class="detail-capacity-fill" :style="{ width: `${selectedPlannedUnitFlowSegments.fillWidth}%` }"></span>
-            <span
-              v-if="selectedPlannedUnitFlowSegments.inflowWidth > 0"
-              class="detail-capacity-inflow"
-              :style="{ left: `${selectedPlannedUnitFlowSegments.inflowLeft}%`, width: `${selectedPlannedUnitFlowSegments.inflowWidth}%` }"
-            ></span>
-            <span
-              v-if="selectedPlannedUnitFlowSegments.outflowWidth > 0"
-              class="detail-capacity-outflow"
-              :style="{ left: `${selectedPlannedUnitFlowSegments.outflowLeft}%`, width: `${selectedPlannedUnitFlowSegments.outflowWidth}%` }"
-            ></span>
-          </div>
-        </div>
+              </p>
+              <span
+                class="mt-2 inline-flex rounded-full border px-2 py-1 text-xs font-semibold"
+                :class="fillHealthBadgeClass(currentInventorySummary.quantity, currentInventorySummary.capacity)"
+              >
+                {{ formatPercent(Math.min(1, currentInventorySummary.quantity / Math.max(1, currentInventorySummary.capacity))) }}
+              </span>
+            </article>
 
-        <UnitResourceHistoryPanel
-          v-if="selectedHistoryItemOptions.length > 0"
-          :items="selectedHistoryItemOptions"
-          :selected-item-key="selectedHistoryItemKey"
-          :history="selectedUnitResourceHistory"
-          borderless
-          @update:selected-item-key="selectedHistoryItemKey = $event"
-        />
+            <article class="rounded-xl border border-divider bg-card p-4">
+              <p class="text-xs font-semibold uppercase tracking-wide text-muted">{{ t('buildingDetail.inventory.distinctItems') }}</p>
+              <p class="mt-2 text-lg font-semibold text-foreground">{{ getUnitInventoryItemCount(currentUnit) }}</p>
+              <p v-if="getUnitInventoryCostLabel(currentUnit)" class="mt-2 text-sm text-muted">
+                {{ t('buildingDetail.inventory.sourcingCosts') }}: <span class="font-semibold text-foreground">{{ getUnitInventoryCostLabel(currentUnit) }}</span>
+              </p>
+            </article>
+
+            <article
+              v-if="currentInventorySummary.averageQuality != null"
+              class="rounded-xl border border-divider bg-card p-4"
+            >
+              <p class="text-xs font-semibold uppercase tracking-wide text-muted">{{ t('buildingDetail.inventory.averageQuality') }}</p>
+              <div class="mt-2 flex items-center gap-2">
+                <p class="text-lg font-semibold text-foreground">{{ formatPercent(currentInventorySummary.averageQuality) }}</p>
+                <span class="inline-flex rounded-full border px-2 py-1 text-xs font-semibold" :class="qualityBadgeClass(currentInventorySummary.averageQuality)">
+                  {{ freshnessPercent(currentInventorySummary.averageQuality) }}%
+                </span>
+              </div>
+            </article>
+
+            <article class="rounded-xl border border-divider bg-card p-4">
+              <p class="text-xs font-semibold uppercase tracking-wide text-muted">{{ t('buildingDetail.unitFlow') }}</p>
+              <p class="mt-2 text-sm text-muted">
+                {{ t('buildingDetail.inventory.load') }}: <span class="font-semibold text-foreground">{{ selectedPlannedUnitFlowSegments.fillWidth.toFixed(0) }}%</span>
+              </p>
+              <p class="mt-1 text-sm text-muted">
+                {{ t('buildingDetail.inventory.history.inflow') }}: <span class="font-semibold text-foreground">{{ selectedPlannedUnitFlowSegments.inflowWidth.toFixed(0) }}%</span>
+              </p>
+              <p class="mt-1 text-sm text-muted">
+                {{ t('buildingDetail.inventory.history.outflow') }}: <span class="font-semibold text-foreground">{{ selectedPlannedUnitFlowSegments.outflowWidth.toFixed(0) }}%</span>
+              </p>
+            </article>
+          </div>
+
+          <div v-if="getUnitInventories(currentUnit).length > 0" class="inventory-table rounded-xl border border-divider bg-card">
+            <div class="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2 border-b border-divider px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted max-sm:hidden">
+              <span>{{ t('buildingDetail.inventory.item') }}</span>
+              <span>{{ t('buildingDetail.inventory.amount') }}</span>
+              <span>{{ t('buildingDetail.inventory.quality') }}</span>
+              <span>{{ t('buildingDetail.inventory.sourcingCost') }}</span>
+            </div>
+            <ul class="divide-y divide-divider">
+              <li
+                v-for="inventory in getUnitInventories(currentUnit)"
+                :key="inventory.id"
+                class="grid gap-3 px-4 py-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] sm:items-center"
+              >
+                <div class="flex items-center gap-2">
+                  <img v-if="getInventoryItemImageUrl(inventory)" class="inventory-item-image h-8 w-8 rounded-md object-cover" :src="getInventoryItemImageUrl(inventory)!" :alt="getInventoryItemName(inventory)" />
+                  <span v-else class="inventory-item-avatar inline-flex h-8 w-8 items-center justify-center rounded-md border border-divider bg-surface text-xs font-semibold text-muted">{{ getInventoryItemMonogram(inventory) }}</span>
+                  <span class="inventory-item-name text-sm font-semibold text-foreground">{{ getInventoryItemName(inventory) }}</span>
+                </div>
+                <div class="text-sm text-foreground">
+                  <span class="mr-2 text-xs font-semibold uppercase tracking-wide text-muted sm:hidden">{{ t('buildingDetail.inventory.amount') }}:</span>
+                  {{ formatUnitQuantity(inventory.quantity) }}
+                </div>
+                <div class="text-sm text-foreground">
+                  <span class="mr-2 text-xs font-semibold uppercase tracking-wide text-muted sm:hidden">{{ t('buildingDetail.inventory.quality') }}:</span>
+                  <span class="inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold" :class="qualityBadgeClass(inventory.quality)">
+                    {{ formatPercent(inventory.quality) }}
+                  </span>
+                </div>
+                <div class="text-sm text-foreground">
+                  <span class="mr-2 text-xs font-semibold uppercase tracking-wide text-muted sm:hidden">{{ t('buildingDetail.inventory.sourcingCost') }}:</span>
+                  {{ getInventoryItemSourcingCostLabel(inventory) }}
+                </div>
+              </li>
+            </ul>
+          </div>
+          <p v-else class="rounded-xl border border-dashed border-divider bg-surface/60 px-4 py-3 text-sm text-muted">{{ t('buildingDetail.inventory.empty') }}</p>
+
+          <UnitResourceHistoryPanel
+            v-if="selectedHistoryItemOptions.length > 0"
+            :items="selectedHistoryItemOptions"
+            :selected-item-key="selectedHistoryItemKey"
+            :history="selectedUnitResourceHistory"
+            borderless
+            @update:selected-item-key="selectedHistoryItemKey = $event"
+          />
+        </section>
       </template>
 
       <!-- ── Tab: Sales / Upgrade ── -->
       <template v-else-if="selectedConfigTab === 'maintenance'">
-        <div v-if="isEditing && selectedCellUpgradeInfo !== null" class="unit-insight-card unit-upgrade-panel mt-0 border-0 pt-0" :aria-label="t('buildingDetail.accessibility.unitUpgrade')">
-          <h5>{{ t('buildingDetail.unitUpgrade.sectionTitle') }}</h5>
+        <div
+          v-if="isEditing && selectedCellUpgradeInfo !== null"
+          class="unit-insight-card unit-upgrade-panel mt-3 rounded-xl border border-divider bg-card p-4"
+          :aria-label="t('buildingDetail.accessibility.unitUpgrade')"
+        >
+          <h5 class="mb-4 text-sm font-semibold uppercase tracking-wide text-muted">{{ t('buildingDetail.unitUpgrade.sectionTitle') }}</h5>
 
           <!-- Upgrade in progress -->
-          <div v-if="selectedCellPendingUpgrade" class="unit-upgrade-in-progress">
+          <div v-if="selectedCellPendingUpgrade" class="unit-upgrade-in-progress rounded-xl border border-amber-400/30 bg-amber-500/10 p-3">
             <div class="unit-upgrade-progress-badge">⏳</div>
             <div class="unit-upgrade-progress-body">
               <strong>{{ t('buildingDetail.unitUpgrade.pendingTitle') }}</strong>
@@ -386,25 +447,25 @@ function freshnessTierClass(quality: number): string {
           </div>
 
           <!-- Max level -->
-          <div v-else-if="selectedCellUpgradeInfo.isMaxLevel" class="unit-upgrade-max-level">
+          <div v-else-if="selectedCellUpgradeInfo.isMaxLevel" class="unit-upgrade-max-level rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-3">
             <span class="unit-upgrade-max-badge">✅</span>
             <span>{{ t('buildingDetail.unitUpgrade.maxLevel') }}</span>
             <p class="unit-upgrade-max-note">{{ t('buildingDetail.unitUpgrade.maxLevelNote') }}</p>
           </div>
 
           <!-- Not upgradable -->
-          <div v-else-if="!selectedCellUpgradeInfo.isUpgradable" class="unit-upgrade-not-available">
+          <div v-else-if="!selectedCellUpgradeInfo.isUpgradable" class="unit-upgrade-not-available rounded-xl border border-divider bg-surface p-3">
             <p>{{ t('buildingDetail.unitUpgrade.notUpgradable') }}</p>
           </div>
 
           <!-- Upgrade available -->
-          <div v-else class="unit-upgrade-available">
+          <div v-else class="unit-upgrade-available space-y-3">
             <div class="unit-upgrade-levels">
               <span class="unit-upgrade-level current-level">{{ t('buildingDetail.unitUpgrade.currentLevel', { level: selectedCellUpgradeInfo.currentLevel }) }}</span>
               <span class="unit-upgrade-arrow">→</span>
               <span class="unit-upgrade-level next-level">{{ t('buildingDetail.unitUpgrade.nextLevel', { level: selectedCellUpgradeInfo.nextLevel }) }}</span>
             </div>
-            <div class="unit-upgrade-stats" :aria-label="t('buildingDetail.accessibility.upgradeImpact')">
+            <div class="unit-upgrade-stats rounded-xl border border-divider bg-surface p-3" :aria-label="t('buildingDetail.accessibility.upgradeImpact')">
               <div class="unit-upgrade-stat-row">
                 <span class="unit-upgrade-stat-label">{{ selectedCellUpgradeInfo.statLabel }}</span>
                 <span class="unit-upgrade-stat-values">
@@ -450,20 +511,38 @@ function freshnessTierClass(quality: number): string {
                 {{ t('buildingDetail.unitUpgrade.duration', { time: formatTickDuration(selectedCellUpgradeInfo.upgradeTicks, locale) }) }}
               </span>
             </div>
-            <p v-if="unitUpgradeError" class="form-error">{{ unitUpgradeError }}</p>
-            <div v-if="isSelectedCellStaged" class="unit-upgrade-staged">
+            <p v-if="unitUpgradeError" class="form-error rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">{{ unitUpgradeError }}</p>
+            <div v-if="isSelectedCellStaged" class="unit-upgrade-staged rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-3">
               <span class="unit-upgrade-staged-badge">✅ {{ t('buildingDetail.unitUpgrade.stagedBadge') }}</span>
               <p class="unit-upgrade-stage-info">{{ t('buildingDetail.unitUpgrade.stageInfo') }}</p>
-              <button class="btn btn-ghost btn-sm" @click="toggleStagedUpgrade(selectedCellUpgradeInfo!.unitId)">
+              <button class="btn btn-ghost btn-sm" @click="toggleStagedUpgrade(selectedCellUpgradeInfo.unitId)">
                 {{ t('buildingDetail.unitUpgrade.removeStagedUpgrade') }}
               </button>
             </div>
             <div v-else class="unit-upgrade-actions">
-              <button class="btn btn-primary btn-sm unit-upgrade-stage-btn" @click="toggleStagedUpgrade(selectedCellUpgradeInfo!.unitId)">
+              <button class="btn btn-primary btn-sm unit-upgrade-stage-btn" @click="toggleStagedUpgrade(selectedCellUpgradeInfo.unitId)">
                 {{ t('buildingDetail.unitUpgrade.stageButton') }}
               </button>
-              <button class="btn btn-ghost btn-sm unit-upgrade-confirm-btn" :disabled="schedulingUpgrade" @click="submitUnitUpgrade(selectedCellUpgradeInfo!.unitId)">
+              <button class="btn btn-ghost btn-sm unit-upgrade-confirm-btn" :disabled="schedulingUpgrade" @click="openScheduleRepairConfirm(selectedCellUpgradeInfo.unitId)">
                 {{ schedulingUpgrade ? t('buildingDetail.unitUpgrade.confirmingButton') : t('buildingDetail.unitUpgrade.confirmButton') }}
+              </button>
+            </div>
+          </div>
+
+          <div
+            v-if="confirmScheduleRepairUnitId"
+            class="mt-3 rounded-xl border border-primary/40 bg-primary/10 p-4"
+            role="dialog"
+            aria-modal="true"
+            :aria-label="t('buildingDetail.unitUpgrade.confirmButton')"
+          >
+            <p class="text-sm text-foreground">{{ t('buildingDetail.unitUpgrade.availableDowntimeNotice', { time: formatTickDuration(selectedCellUpgradeInfo.upgradeTicks, locale) }) }}</p>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <button class="btn btn-primary btn-sm" :disabled="schedulingUpgrade" @click="confirmScheduleRepair">
+                {{ schedulingUpgrade ? t('buildingDetail.unitUpgrade.confirmingButton') : t('common.confirm') }}
+              </button>
+              <button class="btn btn-ghost btn-sm" @click="closeScheduleRepairConfirm">
+                {{ t('common.cancel') }}
               </button>
             </div>
           </div>
@@ -478,25 +557,3 @@ function freshnessTierClass(quality: number): string {
 <style scoped src="./BuildingSidebar.shared.css"></style>
 <style scoped src="./BuildingSidebar.analytics.css"></style>
 <style scoped src="./BuildingSidebar.exchange.css"></style>
-<style scoped>
-/* Freshness bar for perishable storage inventory items */
-.freshness-bar {
-  display: block;
-  width: 100%;
-  height: 4px;
-  border-radius: 2px;
-  background: var(--color-surface-2);
-  overflow: hidden;
-  margin-top: 3px;
-  cursor: default;
-}
-.freshness-bar__fill {
-  display: block;
-  height: 100%;
-  border-radius: 2px;
-  transition: width 0.3s ease;
-}
-.freshness-bar--green .freshness-bar__fill { background: #22c55e; }
-.freshness-bar--amber .freshness-bar__fill { background: #f59e0b; }
-.freshness-bar--red   .freshness-bar__fill { background: #ef4444; }
-</style>

@@ -6,6 +6,7 @@ import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
 import BuildingBankAccountPanel from '@/components/buildings/BuildingBankAccountPanel.vue'
 import BuildingOverviewTab from '@/components/buildings/BuildingOverviewTab.vue'
 import BuildingBankAccountTab from '@/components/buildings/BuildingBankAccountTab.vue'
+import BuildingEnergyPanel from '@/components/buildings/BuildingEnergyPanel.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -78,6 +79,8 @@ function selectOverviewTab(key: string) {
             </span>
           </div>
         </div>
+
+        <BuildingEnergyPanel />
 
         <div class="unit-insight-card building-bank-account-card">
           <h5>{{ t('buildingBankAccount.assignmentTitle') }}</h5>
@@ -235,4 +238,3 @@ function selectOverviewTab(key: string) {
 <style scoped src="./BuildingSidebar.shared.css"></style>
 <style scoped src="./BuildingSidebar.analytics.css"></style>
 <style scoped src="./BuildingSidebar.exchange.css"></style>
-

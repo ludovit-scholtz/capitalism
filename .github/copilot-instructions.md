@@ -1696,3 +1696,16 @@ Root-cause of CI failures (May 2026, PR #455 company settings/dividend governanc
 1. **When moving existing content behind tabs (`v-show`/`v-if`), update all existing E2E tests to click the target tab before asserting tab-local elements.**
 2. **For each newly added sensitive GraphQL operation, add the boundary tests required by `graphql-surface-inventory` in the same PR** (at minimum unauthenticated rejection and authorized owner success).
 3. **When CI shows `graphql-surface-inventory` failure, inspect logs for the exact missing test contract string and implement those named tests before any additional refactoring.**
+
+## Building edit tab regressions — preserve draft setup and no-unit edit surfaces
+
+Root-cause of CI failures (May 2026, PR #491 follow-up):
+- `applyStarterLayout` and `applyShopStarterLayout` populated draft units and then called `startEditing()`. Since `startEditing()` reloaded draft units from the current building state, starter units were immediately discarded and `Store Upgrade` stayed disabled.
+- The maintenance tab redesign removed several legacy DOM hooks (`.unit-upgrade-staged-badge`, `.form-error`, `.current-level`, `.next-level`, and upgrade-impact ARIA labels), breaking existing full-journey tests.
+- Moving Energy Settings into edit-only flow unintentionally hid it when no unit was selected; deep-link `/building/:id/edit/config` must still show energy controls.
+
+Rules to prevent recurrence:
+1. **When calling `startEditing()` from starter-layout helpers, call it BEFORE writing starter draft units** (or provide a no-reset mode). Never populate draft first and then invoke `startEditing()`.
+2. **When redesigning upgrade/maintenance UI with Tailwind, keep existing E2E hook classes and ARIA labels** unless all dependent tests are updated in the same PR.
+3. **Energy Settings moved to edit mode must remain accessible in the no-unit-selected edit state** (overview sidebar) in addition to unit-config context.
+4. **If Upgrade Now introduces a confirmation dialog, update affected E2E tests to click Confirm** before asserting backend error/success messages.

@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { inject, onMounted, onUnmounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
 import DiagonalConnector from '@/components/buildings/DiagonalConnector.vue'
 
 const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
 const bd = inject(BUILDING_DETAIL_KEY)!
 const {
   locale,
@@ -108,6 +111,18 @@ function handleKeydown(event: KeyboardEvent) {
 
 onMounted(() => document.addEventListener('keydown', handleKeydown))
 onUnmounted(() => document.removeEventListener('keydown', handleKeydown))
+
+function openEditMode() {
+  startEditing()
+}
+
+function closeEditMode() {
+  cancelEditing()
+  void router.replace({
+    path: `/building/${route.params.id as string}`,
+    query: route.query,
+  })
+}
 </script>
 
 <template>
@@ -118,7 +133,7 @@ onUnmounted(() => document.removeEventListener('keydown', handleKeydown))
           <h2>{{ t('buildingDetail.activeConfiguration') }}</h2>
           <p class="section-subtitle">{{ t('buildingDetail.activeConfigurationHelp') }}</p>
         </div>
-        <button v-if="!isEditing" class="btn btn-secondary" @click="startEditing">
+        <button v-if="!isEditing" class="btn btn-secondary" @click="openEditMode">
           {{ t('buildingDetail.editConfiguration') }}
         </button>
       </div>
@@ -280,7 +295,7 @@ onUnmounted(() => document.removeEventListener('keydown', handleKeydown))
           </p>
         </div>
         <div class="grid-actions">
-          <button class="btn btn-danger btn-sm inline-flex items-center gap-2" @click="cancelEditing">
+          <button class="btn btn-danger btn-sm inline-flex items-center gap-2" @click="closeEditMode">
             <font-awesome-icon :icon="['fas', 'xmark']" aria-hidden="true" />
             {{ t('buildingDetail.cancelEditing') }}
           </button>

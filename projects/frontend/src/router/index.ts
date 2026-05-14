@@ -42,6 +42,11 @@ const router = createRouter({
     { path: '/forex', name: 'forex', component: () => import('@/views/ForexExchangeView.vue') },
     { path: '/encyclopedia/resources/:slug', name: 'encyclopedia-detail', component: () => import('@/views/ResourceDetailView.vue') },
     { path: '/buy-building/:companyId', name: 'buy-building', component: () => import('@/views/BuyBuildingView.vue') },
+    {
+      path: '/building/:id/edit/:tab',
+      name: 'building-detail-edit',
+      component: () => import('@/views/BuildingDetailView.vue'),
+    },
     { path: '/building/:id', name: 'building-detail', component: () => import('@/views/BuildingDetailView.vue') },
     { path: '/building/:id/sell', name: 'sell-building', component: () => import('@/views/SellBuildingView.vue') },
     {

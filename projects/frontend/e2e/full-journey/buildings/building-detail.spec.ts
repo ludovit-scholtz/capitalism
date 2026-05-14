@@ -259,6 +259,7 @@ test.describe('Building detail upgrades', () => {
     await expect(page.getByRole('button', { name: 'Store Upgrade' })).toBeEnabled()
 
     await page.getByRole('button', { name: 'Store Upgrade' }).click()
+    await expect(page).toHaveURL(/\/building\/building-1(\?.*)?$/)
 
     await expect(page.getByRole('status')).toContainText('The current building keeps running until the queued layout activates in 3 hours.')
     await expect(page.getByRole('heading', { name: 'Queued Upgrade' })).toHaveCount(0)
@@ -277,6 +278,7 @@ test.describe('Building detail upgrades', () => {
     await expect(queuedSection.getByText('Upgrade time: 3 hours')).toBeVisible()
 
     await page.getByRole('button', { name: 'Store Upgrade' }).click()
+    await expect(page).toHaveURL(/\/building\/building-1(\?.*)?$/)
 
     await expect(page.getByRole('status')).toContainText('The current building keeps running until the queued layout activates in 3 hours.')
 
@@ -6466,6 +6468,7 @@ test.describe('Building detail upgrades', () => {
 
     // Attempt to upgrade — mock returns MAX_CONCURRENT_UPGRADES
     await upgradePanel.getByRole('button', { name: 'Upgrade Now' }).click()
+    await upgradePanel.getByRole('button', { name: 'Confirm' }).click()
 
     // Error message is shown
     await expect(upgradePanel.locator('.form-error')).toContainText('already has 2 unit upgrades in progress')
@@ -18413,6 +18416,7 @@ test.describe('Unit upgrade panel', () => {
     await expect(upgradePanel).toBeVisible()
 
     await upgradePanel.getByRole('button', { name: 'Upgrade Now' }).click()
+    await upgradePanel.getByRole('button', { name: 'Confirm' }).click()
 
     // Error message should appear
     await expect(upgradePanel.locator('.form-error')).toContainText('Not enough cash')
@@ -24153,6 +24157,7 @@ test.describe('energy status badge and power settings', () => {
     }, `token-${player.id}`)
 
     await page.goto('/building/energy-bld-1')
+    await page.getByRole('button', { name: 'Edit Building' }).click()
 
     const energyPanel = page.locator('[aria-label="Energy Settings"]')
     await expect(energyPanel).toBeVisible()
