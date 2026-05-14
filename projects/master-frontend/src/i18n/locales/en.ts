@@ -144,6 +144,9 @@ export default {
     register: 'Register',
     noAccount: "Don't have an account?",
     haveAccount: 'Already have an account?',
+    invalidCredentials: 'Invalid credentials.',
+    registrationNeutral:
+      'If this email is not already registered, you will receive a confirmation.',
     backToDirectory: 'Back to server directory',
     genericError: 'Something went wrong. Please try again.',
     redirectingToSignIn: 'Redirecting to sign-in…',

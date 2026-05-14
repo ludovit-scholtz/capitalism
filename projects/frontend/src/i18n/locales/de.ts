@@ -265,6 +265,9 @@ export default {
     passwordTooShort: 'Das Passwort muss mindestens 8 Zeichen lang sein.',
     loginToAccess: 'Anmelden für Zugriff',
     loginFailed: 'Anmeldung fehlgeschlagen. Bitte überprüfen Sie Ihre Zugangsdaten und versuchen Sie es erneut.',
+    invalidCredentials: 'Ungültige Zugangsdaten.',
+    registrationNeutral:
+      'Wenn diese E-Mail noch nicht registriert ist, erhalten Sie eine Bestätigung.',
     loginRequired: 'Bitte melden Sie sich an, um fortzufahren.',
     loginThrottledTitle: 'Zu viele fehlgeschlagene Versuche',
     loginThrottledMessage: 'Zu viele fehlgeschlagene Anmeldeversuche. Bitte warten Sie 15 Minuten und versuchen Sie es erneut.',

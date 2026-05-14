@@ -3532,7 +3532,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ errors: [{ message: 'A player with this email already exists.', extensions: { code: 'DUPLICATE_EMAIL' } }] }),
+          body: JSON.stringify({ errors: [{ message: 'Registration failed.', extensions: { code: 'REGISTRATION_FAILED' } }] }),
         })
       }
       const newPlayer: MockPlayer = {
@@ -3585,7 +3585,13 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const input = body.variables?.input
       const player = state.players.find((p) => p.email === input?.email && p.password === input?.password)
       if (!player) {
-        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Invalid email or password.' }] }) })
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [{ message: 'Invalid credentials.', extensions: { code: 'INVALID_CREDENTIALS' } }],
+          }),
+        })
       }
       player.lastLoginAtUtc = new Date().toISOString()
       state.currentUserId = player.id

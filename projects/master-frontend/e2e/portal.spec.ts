@@ -128,6 +128,41 @@ test.describe('Login page', () => {
     await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 
     await expect(page.getByRole('alert')).toBeVisible()
+    await expect(page.getByRole('alert')).toContainText('Invalid credentials.')
+  })
+
+  test('shows neutral registration message for duplicate email failures', async ({ page }) => {
+    setupMockApi(page, { servers: [] })
+    await page.route('**/graphql', async (route) => {
+      const body = route.request().postDataJSON() as { query: string }
+      if (body.query?.includes('mutation') && body.query?.includes('register')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              {
+                message: 'Registration failed.',
+                extensions: { code: 'REGISTRATION_FAILED' },
+              },
+            ],
+          }),
+        })
+        return
+      }
+      await route.fallback()
+    })
+
+    await page.goto('/login?oidc_retry=consent')
+    await page.getByRole('button', { name: 'Register' }).click()
+    await page.getByLabel('Email').fill('existing@example.com')
+    await page.getByLabel('Display name').fill('Another Player')
+    await page.getByLabel('Password').fill('password123')
+    await page.getByRole('button', { name: 'Create account' }).click()
+
+    await expect(page.getByRole('alert')).toContainText(
+      'If this email is not already registered, you will receive a confirmation.',
+    )
   })
 
   test('redirects to Biatec authorize endpoint with required OIDC params', async ({ page }) => {

@@ -61,6 +61,10 @@ async function handleSubmit() {
   } catch (e: unknown) {
     if (e instanceof GraphQLError && e.code === 'LOGIN_THROTTLED') {
       isThrottled.value = true
+    } else if (e instanceof GraphQLError && e.code === 'INVALID_CREDENTIALS') {
+      formError.value = t('auth.invalidCredentials')
+    } else if (e instanceof GraphQLError && e.code === 'REGISTRATION_FAILED') {
+      formError.value = t('auth.registrationNeutral')
     } else {
       formError.value = e instanceof Error ? e.message : 'An error occurred'
     }

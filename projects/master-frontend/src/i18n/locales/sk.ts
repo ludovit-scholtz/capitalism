@@ -144,6 +144,9 @@ export default {
     register: 'Registrovať',
     noAccount: 'Nemáš účet?',
     haveAccount: 'Už máš účet?',
+    invalidCredentials: 'Neplatné prihlasovacie údaje.',
+    registrationNeutral:
+      'Ak tento e-mail ešte nie je registrovaný, dostanete potvrdenie.',
     backToDirectory: 'Späť na zoznam serverov',
     genericError: 'Nastala chyba. Skús to znova.',
     redirectingToSignIn: 'Presmerovávanie na prihlásenie…',

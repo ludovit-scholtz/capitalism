@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Diagnostics;
 using MasterApi.Configuration;
 using MasterApi.Data;
 using MasterApi.Data.Entities;
@@ -13,6 +14,11 @@ namespace MasterApi.Types;
 
 public sealed partial class Mutation
 {
+    private const string RegistrationFailedCode = "REGISTRATION_FAILED";
+    private const string RegistrationFailedMessage = "Registration failed.";
+    private static readonly TimeSpan RegistrationMinimumDuration = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan InvalidCredentialsMinimumDuration = TimeSpan.FromMilliseconds(250);
+
     /// <summary>Registers a new master-portal account.</summary>
     public async Task<MasterAuthPayload> Register(
         RegisterInput input,
@@ -24,6 +30,7 @@ public sealed partial class Mutation
         [Service] ILoginThrottleService throttle,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
+        var startedAt = Stopwatch.GetTimestamp();
         if (!authOptions.Value.PasswordAuthEnabled)
         {
             throw new GraphQLException(
@@ -65,11 +72,12 @@ public sealed partial class Mutation
         if (existingPlayer is not null
             && !MasterRankingService.IsShadowProvisionedPasswordHash(existingPlayer.PasswordHash))
         {
-            // Return a neutral message so callers cannot enumerate registered email addresses.
+            ExecuteDummyPasswordWork(input.Password);
+            await DelayToMinimumDurationAsync(startedAt, RegistrationMinimumDuration);
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("An account with that email may already exist. Please check your inbox or try signing in.")
-                    .SetCode("DUPLICATE_EMAIL")
+                    .SetMessage(RegistrationFailedMessage)
+                    .SetCode(RegistrationFailedCode)
                     .Build());
         }
 
@@ -153,6 +161,7 @@ public sealed partial class Mutation
             httpContextAccessor.HttpContext,
             httpContextAccessor.HttpContext?.RequestAborted ?? CancellationToken.None);
         AuthSessionCookieService.SetSessionCookies(httpContextAccessor.HttpContext, hostEnvironment, session.Token, session.ExpiresAtUtc);
+        await DelayToMinimumDurationAsync(startedAt, RegistrationMinimumDuration);
 
         return new MasterAuthPayload
         {
@@ -172,6 +181,7 @@ public sealed partial class Mutation
         [Service] ILoginThrottleService throttle,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
+        var startedAt = Stopwatch.GetTimestamp();
         if (!authOptions.Value.PasswordAuthEnabled)
         {
             throw new GraphQLException(
@@ -196,11 +206,12 @@ public sealed partial class Mutation
         var player = await db.PlayerAccounts.FirstOrDefaultAsync(p => p.Email == email);
         if (player is null)
         {
-            // Record failure even for unknown emails to prevent timing-based enumeration.
+            ExecuteDummyPasswordWork(input.Password);
             throttle.RecordFailure(email);
+            await DelayToMinimumDurationAsync(startedAt, InvalidCredentialsMinimumDuration);
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("Invalid email or password.")
+                    .SetMessage("Invalid credentials.")
                     .SetCode("INVALID_CREDENTIALS")
                     .Build());
         }
@@ -210,9 +221,10 @@ public sealed partial class Mutation
         if (result == PasswordVerificationResult.Failed)
         {
             throttle.RecordFailure(email);
+            await DelayToMinimumDurationAsync(startedAt, InvalidCredentialsMinimumDuration);
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("Invalid email or password.")
+                    .SetMessage("Invalid credentials.")
                     .SetCode("INVALID_CREDENTIALS")
                     .Build());
         }
@@ -239,6 +251,31 @@ public sealed partial class Mutation
             ExpiresAtUtc = session.ExpiresAtUtc,
             Player = Query.ToProfile(player),
         };
+    }
+
+    private static void ExecuteDummyPasswordWork(string? password)
+    {
+        var candidate = string.IsNullOrWhiteSpace(password) ? "dummy-password-123!" : password;
+        var hasher = new PasswordHasher<PlayerAccount>();
+        var dummyPlayer = new PlayerAccount
+        {
+            Id = Guid.Empty,
+            Email = "dummy@example.com",
+            DisplayName = "dummy",
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        var hash = hasher.HashPassword(dummyPlayer, candidate);
+        _ = hasher.VerifyHashedPassword(dummyPlayer, hash, candidate);
+    }
+
+    private static async Task DelayToMinimumDurationAsync(long startedAtTimestamp, TimeSpan minimumDuration)
+    {
+        var elapsed = Stopwatch.GetElapsedTime(startedAtTimestamp);
+        var remaining = minimumDuration - elapsed;
+        if (remaining > TimeSpan.Zero)
+        {
+            await Task.Delay(remaining);
+        }
     }
 
     [HotChocolate.Authorization.Authorize]

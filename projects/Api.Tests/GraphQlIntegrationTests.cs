@@ -1417,7 +1417,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             new { input });
 
         Assert.True(result.TryGetProperty("errors", out var errors));
-        Assert.Equal("DUPLICATE_EMAIL", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal("REGISTRATION_FAILED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
     [Fact]
@@ -1432,7 +1432,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             new { input = new { email = "case.dupe@test.com", displayName = "Second", password = "Password1!" } });
 
         Assert.True(result.TryGetProperty("errors", out var errors));
-        Assert.Equal("DUPLICATE_EMAIL", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal("REGISTRATION_FAILED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
     [Fact]
