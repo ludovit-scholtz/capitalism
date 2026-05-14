@@ -1749,6 +1749,7 @@ Rules to prevent recurrence:
 7. **For named product-slug regressions, also add the inverse helper assertion**: `hasResourceCatalogImage(slug) === false`, while the generic slug resolver still returns the same slug asset (`getResourceCatalogImageUrl(slug, null) === getProductCatalogImageUrl(slug)`). This guards classification without mis-stating the shared slug-resolution contract.
 8. **Catalog images must not contain embedded visible text.** The game is localized, so English labels inside artwork are a product bug. If photorealistic source images are not efficient to obtain and verify, use textless SVG illustrations and add a unit test that rejects `<text>`, `<textPath>`, and `<title>` elements in catalog SVGs.
 9. **When changing catalog asset formats, assert the asset directory itself matches the new contract.** Add a unit test that no legacy-extension files remain (for example `.webp` after an SVG migration) and that the directory contains exactly one mapped asset per seeded slug plus the fallback asset. Also account for Vite inlining SVG imports as `data:image/svg+xml` in unit tests instead of assuming every resolved URL contains `.svg`.
+10. **Keep catalog slug lists unique and disjoint.** Add or maintain a regression test proving `RESOURCE_IMAGE_SLUGS` and `PRODUCT_IMAGE_SLUGS` have no duplicates and no overlap, so a product slug cannot silently become resource-classified or share an ambiguous asset contract.
 
 ## Repeated review-loop quality gate — each follow-up must add net-new proof
 

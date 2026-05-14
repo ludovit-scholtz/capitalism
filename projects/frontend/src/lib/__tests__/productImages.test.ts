@@ -38,6 +38,16 @@ describe('productImages mapping', () => {
     expect(new Set(allUrls).size).toBe(allUrls.length)
   })
 
+  it('keeps resource and product catalog slug lists unique and non-overlapping', () => {
+    const resourceSlugs = [...RESOURCE_IMAGE_SLUGS]
+    const productSlugs = [...PRODUCT_IMAGE_SLUGS]
+    const allSlugs = [...resourceSlugs, ...productSlugs]
+
+    expect(new Set(resourceSlugs).size).toBe(resourceSlugs.length)
+    expect(new Set(productSlugs).size).toBe(productSlugs.length)
+    expect(new Set(allSlugs).size).toBe(allSlugs.length)
+  })
+
   it('returns fallback image for unknown slugs', () => {
     const fallback = getCatalogFallbackImageUrl()
     expect(hasProductCatalogImage('missing-product-slug')).toBe(false)
