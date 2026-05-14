@@ -36,4 +36,13 @@ describe('productImages mapping', () => {
     expect(getProductCatalogImageUrl('missing-product-slug')).toBe(fallback)
     expect(getResourceCatalogImageUrl('missing-resource-slug', null)).toBe(fallback)
   })
+
+  it('uses existing resource image when slug is unknown and keeps mapped image precedence when known', () => {
+    const existing = 'https://example.com/existing-resource-image.webp'
+    const knownSlug = RESOURCE_IMAGE_SLUGS[0]
+    const knownMappedImage = getResourceCatalogImageUrl(knownSlug, null)
+
+    expect(getResourceCatalogImageUrl('missing-resource-slug', existing)).toBe(existing)
+    expect(getResourceCatalogImageUrl(knownSlug, existing)).toBe(knownMappedImage)
+  })
 })

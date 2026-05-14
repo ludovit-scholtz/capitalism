@@ -1722,6 +1722,17 @@ Rules to prevent recurrence:
 2. **If the latest SHA has no run for a required workflow yet, trigger a fresh commit-scope validation signal (for example a minimal follow-up commit with additional test coverage) and then re-check statuses.**
 3. **In comment replies, report both the fixing commit hash and which failing run belonged to an older SHA** so review context stays aligned with the actual branch head.
 
+## Catalog image fallback precedence — keep resource URL contract covered
+
+Root-cause of quality drift risk (May 2026, PR #499 follow-up):
+- Coverage initially verified only unknown-slug fallback and mapped-slug existence, but did not lock the resource-specific precedence contract.
+- `getResourceCatalogImageUrl(slug, existingImageUrl)` intentionally uses `mapped slug image` first, then `existingImageUrl`, then global fallback.
+
+Rules to prevent recurrence:
+1. **When changing `productImages.ts`, keep explicit unit coverage for resource precedence order:** mapped slug URL > existing backend `imageUrl` > fallback image.
+2. **Unknown resource slugs with a non-null existing image must return that existing image**, not the global fallback.
+3. **Known mapped resource slugs must ignore existing image overrides** and return the centralized catalog mapping.
+
 ## Building edit tab regressions — preserve draft setup and no-unit edit surfaces
 
 Root-cause of CI failures (May 2026, PR #491 follow-up):
