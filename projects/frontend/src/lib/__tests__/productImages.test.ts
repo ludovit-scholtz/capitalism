@@ -33,6 +33,8 @@ describe('productImages mapping', () => {
 
   it('returns fallback image for unknown slugs', () => {
     const fallback = getCatalogFallbackImageUrl()
+    expect(hasProductCatalogImage('missing-product-slug')).toBe(false)
+    expect(hasResourceCatalogImage('missing-resource-slug')).toBe(false)
     expect(getProductCatalogImageUrl('missing-product-slug')).toBe(fallback)
     expect(getResourceCatalogImageUrl('missing-resource-slug', null)).toBe(fallback)
   })

@@ -1733,6 +1733,15 @@ Rules to prevent recurrence:
 2. **Unknown resource slugs with a non-null existing image must return that existing image**, not the global fallback.
 3. **Known mapped resource slugs must ignore existing image overrides** and return the centralized catalog mapping.
 
+## Repeated review-loop quality gate — each follow-up must add net-new proof
+
+Root-cause of repeated review loops (May 2026, PR #499 follow-up):
+- Repeated "fix build/tests + increase test coverage" comments can recur when updates only restate prior fixes without adding new verifiable evidence on the latest head.
+
+Rules to prevent recurrence:
+1. **For each repeated follow-up comment, add at least one net-new automated assertion** (not a duplicate of an earlier test body) that strengthens the same feature contract.
+2. **When replying, always reference the newest commit hash and latest-head CI context** so reviewers can distinguish stale failed runs from current branch state.
+
 ## Building edit tab regressions — preserve draft setup and no-unit edit surfaces
 
 Root-cause of CI failures (May 2026, PR #491 follow-up):
