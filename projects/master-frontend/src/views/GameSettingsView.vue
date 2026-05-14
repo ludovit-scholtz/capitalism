@@ -4,6 +4,8 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import ViewJumbotron from '@/components/layout/ViewJumbotron.vue'
 import ViewSubnav from '@/components/layout/ViewSubnav.vue'
+import GenderPicker from '@/components/profile/GenderPicker.vue'
+import { generatePersonalAccountName, type PlayerGender } from '@/lib/personalAccountName'
 import { updatePersonalAccountName } from '@/lib/masterApi'
 import { useAuthStore } from '@/stores/auth'
 
@@ -12,6 +14,7 @@ const router = useRouter()
 const { t } = useI18n()
 
 const draftName = ref('')
+const selectedGender = ref<PlayerGender>('UNSPECIFIED')
 const saving = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
@@ -40,12 +43,32 @@ watch(
   { immediate: true },
 )
 
+watch(
+  () => auth.player?.gender,
+  (value) => {
+    if (value === 'MALE' || value === 'FEMALE' || value === 'UNSPECIFIED') {
+      selectedGender.value = value
+    }
+  },
+  { immediate: true },
+)
+
 const trimmedDraftName = computed(() => draftName.value.trim())
 const canSave = computed(
   () =>
     trimmedDraftName.value.length > 0 &&
-    trimmedDraftName.value !== currentPersonalAccountName.value,
+    (trimmedDraftName.value !== currentPersonalAccountName.value
+      || selectedGender.value !== (auth.player?.gender ?? 'UNSPECIFIED')),
 )
+
+function handleGenderSelect(gender: PlayerGender) {
+  selectedGender.value = gender
+  draftName.value = generatePersonalAccountName(gender)
+}
+
+function regeneratePersonalName() {
+  draftName.value = generatePersonalAccountName(selectedGender.value)
+}
 
 onMounted(async () => {
   if (!auth.isAuthenticated) {
@@ -68,10 +91,15 @@ async function savePersonalAccountNameSetting() {
   successMessage.value = ''
 
   try {
-    const personalAccountName = await updatePersonalAccountName(auth.token, trimmedDraftName.value)
+    const personalAccountName = await updatePersonalAccountName(
+      auth.token,
+      trimmedDraftName.value,
+      selectedGender.value,
+    )
     if (auth.player) {
       auth.player.displayName = personalAccountName
       auth.player.personalAccountName = personalAccountName
+      auth.player.gender = selectedGender.value
     }
 
     await auth.fetchProfile()
@@ -110,6 +138,15 @@ async function savePersonalAccountNameSetting() {
         <form class="mt-5 flex flex-col gap-4" @submit.prevent="savePersonalAccountNameSetting">
           <label class="flex flex-col gap-1.5">
             <span class="text-sm font-semibold text-body">{{ t('gameSettings.nameLabel') }}</span>
+            <GenderPicker
+              v-model="selectedGender"
+              :female-label="t('gameSettings.selectFemale')"
+              :male-label="t('gameSettings.selectMale')"
+              @update:model-value="handleGenderSelect"
+            />
+          </label>
+          <label class="flex flex-col gap-1.5">
+            <span class="text-sm font-semibold text-body">{{ t('gameSettings.generatedNameLabel') }}</span>
             <input
               v-model="draftName"
               type="text"
@@ -118,6 +155,15 @@ async function savePersonalAccountNameSetting() {
               class="rounded-xl border border-divider bg-page px-4 py-3 text-body transition-colors focus:border-brand focus:outline-none"
             />
           </label>
+
+          <button
+            class="btn btn-secondary w-fit"
+            type="button"
+            :title="t('gameSettings.regenerateName')"
+            @click="regeneratePersonalName"
+          >
+            🎲
+          </button>
 
           <button class="btn btn-primary w-fit" type="submit" :disabled="saving || !canSave">
             {{ saving ? t('home.processing') : t('gameSettings.save') }}

@@ -4,6 +4,7 @@ import type { Company } from './company'
 export type PlayerRole = 'PLAYER' | 'ADMIN'
 
 export type AccountContextType = 'PERSON' | 'COMPANY'
+export type PlayerGender = 'MALE' | 'FEMALE' | 'UNSPECIFIED'
 
 /** Matches backend Player entity */
 export interface Player {
@@ -11,6 +12,7 @@ export interface Player {
   email: string
   displayName: string
   personalAccountName?: string
+  gender?: PlayerGender
   role: PlayerRole
   createdAtUtc: string
   lastLoginAtUtc: string | null

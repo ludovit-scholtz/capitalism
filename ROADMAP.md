@@ -26,7 +26,7 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 ### Onboarding
 
-- [ ] In onboarding and in the personal account name configuration in game frontend and also in the master frontend add an icons to select a gender - male or female (using icons). When user clicks on the icon generate either female or generate male make sure to generate friendly personal account name in specified gender.
+- [x] (100%) In onboarding and in the personal account name configuration in game frontend and also in the master frontend add an icons to select a gender - male or female (using icons). When user clicks on the icon generate either female or generate male make sure to generate friendly personal account name in specified gender.
 
 ### Stock exchange
 

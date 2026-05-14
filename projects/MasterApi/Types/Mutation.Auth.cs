@@ -4,6 +4,7 @@ using MasterApi.Data;
 using MasterApi.Data.Entities;
 using MasterApi.Security;
 using MasterApi.Utilities;
+using Capitalism.Shared.Security;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -275,6 +276,22 @@ public sealed partial class Mutation
                     .Build());
         }
 
+        string? normalizedGender = null;
+        if (input.Gender is not null)
+        {
+            var trimmedGender = input.Gender.Trim().ToUpperInvariant();
+            if (!PlayerGender.IsValid(trimmedGender))
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("Gender must be MALE, FEMALE, or UNSPECIFIED.")
+                        .SetCode("INVALID_GENDER")
+                        .Build());
+            }
+
+            normalizedGender = trimmedGender;
+        }
+
         var duplicateExists = await db.PlayerAccounts
             .AsNoTracking()
             .AnyAsync(candidate =>
@@ -290,13 +307,18 @@ public sealed partial class Mutation
         }
 
         player.DisplayName = personalAccountName;
+        if (normalizedGender is not null)
+        {
+            player.Gender = normalizedGender;
+        }
         await db.SaveChangesAsync(ct);
-        await propagationService.PropagateAsync(player.Email, player.DisplayName, ct);
+        await propagationService.PropagateAsync(player.Email, player.DisplayName, player.Gender, ct);
 
         return new UpdatePersonalAccountNamePayload
         {
             PlayerId = player.Id,
             PersonalAccountName = player.DisplayName,
+            Gender = player.Gender,
         };
     }
 

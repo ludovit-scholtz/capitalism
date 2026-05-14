@@ -37,6 +37,7 @@ export interface MockPlayer {
   email: string
   displayName: string
   personalAccountName?: string
+  gender?: 'MALE' | 'FEMALE' | 'UNSPECIFIED'
   createdAtUtc: string
   startupPackClaimedAtUtc: string | null
   canClaimStartupPack: boolean
@@ -327,6 +328,7 @@ export function makePlayer(overrides: Partial<MockPlayer> = {}): MockPlayer {
     email: 'alice@example.com',
     displayName: overrides.displayName ?? 'Alice',
     personalAccountName: overrides.personalAccountName ?? overrides.displayName ?? 'Alice',
+    gender: overrides.gender ?? 'UNSPECIFIED',
     createdAtUtc: '2026-01-01T00:00:00.000Z',
     startupPackClaimedAtUtc: null,
     canClaimStartupPack: true,
@@ -503,6 +505,7 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
         email: vars?.input?.email ?? 'test@example.com',
         displayName: vars?.input?.displayName ?? 'Test Player',
         personalAccountName: vars?.input?.displayName ?? 'Test Player',
+        gender: 'UNSPECIFIED',
         createdAtUtc: new Date().toISOString(),
         startupPackClaimedAtUtc: null,
         canClaimStartupPack: true,
@@ -1358,8 +1361,11 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
         return
       }
 
-      const vars = body.variables as { input?: { personalAccountName?: string } } | undefined
+      const vars = body.variables as {
+        input?: { personalAccountName?: string; gender?: 'MALE' | 'FEMALE' | 'UNSPECIFIED' }
+      } | undefined
       const personalAccountName = vars?.input?.personalAccountName?.trim() ?? ''
+      const gender = vars?.input?.gender ?? state.currentPlayer.gender ?? 'UNSPECIFIED'
       if (!personalAccountName) {
         await route.fulfill({
           status: 200,
@@ -1402,6 +1408,7 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
         ...state.currentPlayer,
         displayName: personalAccountName,
         personalAccountName,
+        gender,
       }
       state.rankingLeaderboard = state.rankingLeaderboard.map((entry) =>
         entry.playerId === state.currentPlayer?.id
@@ -1420,6 +1427,7 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           data: {
             updatePersonalAccountName: {
               personalAccountName,
+              gender,
             },
           },
         }),

@@ -22,12 +22,13 @@ import {
 import OnboardingLotSelector from '@/components/onboarding/OnboardingLotSelector.vue'
 import OnboardingProgressTracker from '@/components/onboarding/OnboardingProgressTracker.vue'
 import OnboardingUnitChain from '@/components/onboarding/OnboardingUnitChain.vue'
+import GenderPicker from '@/components/profile/GenderPicker.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useReferralStore } from '@/stores/referral'
 import { useTickCountdown } from '@/composables/useTickCountdown'
 import { formatMoney } from '@/lib/currencyFormat'
 import { generateOnboardingCompanyName, resetNameSession } from '@/lib/onboardingCompanyName'
-import { generatePersonalAccountName } from '@/lib/personalAccountName'
+import { generatePersonalAccountName, type PlayerGender } from '@/lib/personalAccountName'
 import type { BuildingLot, City, EurFxRate, FirstSaleMission, GameState, OnboardingResult, OnboardingStartResult, ProductType } from '@/types'
 
 const { t, locale } = useI18n()
@@ -236,6 +237,7 @@ const selectedShopLot = computed(() => cityLots.value.find((lot) => lot.id === s
 /** The current company name — starts as a generated suggestion, can be edited by the player. */
 const companyName = ref('')
 const personalAccountName = ref('')
+const selectedPersonalGender = ref<PlayerGender>('UNSPECIFIED')
 
 /** Derives a fresh suggested name from the current industry. */
 function refreshSuggestedName() {
@@ -254,17 +256,27 @@ function refreshSuggestedPersonalAccountName() {
     return
   }
 
+  const currentGender = auth.player?.gender as PlayerGender | undefined
+  if (currentGender === 'FEMALE' || currentGender === 'MALE' || currentGender === 'UNSPECIFIED') {
+    selectedPersonalGender.value = currentGender
+  }
+
   const existingAlias = (auth.player?.personalAccountName ?? auth.player?.displayName ?? '').trim()
   if (existingAlias && !existingAlias.includes('@')) {
     personalAccountName.value = existingAlias
     return
   }
 
-  personalAccountName.value = generatePersonalAccountName()
+  personalAccountName.value = generatePersonalAccountName(selectedPersonalGender.value)
 }
 
 function regeneratePersonalAccountName() {
-  personalAccountName.value = generatePersonalAccountName()
+  personalAccountName.value = generatePersonalAccountName(selectedPersonalGender.value)
+}
+
+function selectPersonalGender(gender: PlayerGender) {
+  selectedPersonalGender.value = gender
+  personalAccountName.value = generatePersonalAccountName(gender)
 }
 
 // Auto-refresh the suggested name whenever industry or city changes so the
@@ -924,23 +936,26 @@ async function persistPersonalAccountNameIfNeeded() {
     `mutation UpdatePersonalAccountName($input: UpdatePersonalAccountNameInput!) {
       updatePersonalAccountName(input: $input) {
         personalAccountName
+        gender
       }
     }`,
-    { input: { personalAccountName: trimmedAlias } },
+    { input: { personalAccountName: trimmedAlias, gender: selectedPersonalGender.value } },
   )
 
-  await gqlRequest<{ updateDisplayName: { displayName: string } }>(
-    `mutation UpdateDisplayName($displayName: String!) {
-      updateDisplayName(input: { displayName: $displayName }) {
+  await gqlRequest<{ updateDisplayName: { displayName: string; gender: string } }>(
+    `mutation UpdateDisplayName($displayName: String!, $gender: String) {
+      updateDisplayName(input: { displayName: $displayName, gender: $gender }) {
         displayName
+        gender
       }
     }`,
-    { displayName: trimmedAlias },
+    { displayName: trimmedAlias, gender: selectedPersonalGender.value },
   )
 
   if (auth.player) {
     auth.player.displayName = trimmedAlias
     auth.player.personalAccountName = trimmedAlias
+    auth.player.gender = selectedPersonalGender.value
   }
 }
 
@@ -1441,6 +1456,12 @@ watch(visibleIndustries, () => {
         </div>
         <div class="personal-account-name-editor flex flex-col gap-2 p-4 rounded-lg bg-page border border-divider">
           <label class="text-xs font-semibold text-muted" for="onboarding-personal-account-name">{{ t('onboarding.personalAccountNameLabel') }}</label>
+          <GenderPicker
+            v-model="selectedPersonalGender"
+            :female-label="t('onboarding.selectFemale')"
+            :male-label="t('onboarding.selectMale')"
+            @update:model-value="selectPersonalGender"
+          />
           <div class="flex gap-2 flex-wrap">
             <input
               id="onboarding-personal-account-name"

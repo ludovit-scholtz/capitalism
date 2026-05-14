@@ -64,6 +64,7 @@ const PLAYER_SELECTION = `
   id
   displayName
   personalAccountName
+  gender
   email
   role
   createdAtUtc
@@ -514,6 +515,9 @@ export const useAuthStore = defineStore('auth', () => {
     const data = await gqlRequest<{ me: Player }>(`{ me {${PLAYER_SELECTION}} }`)
     if (!data.me.personalAccountName) {
       data.me.personalAccountName = data.me.displayName
+    }
+    if (!data.me.gender) {
+      data.me.gender = 'UNSPECIFIED'
     }
     if (options.reconcileCityContext) {
       await reconcileCityContext(data.me)

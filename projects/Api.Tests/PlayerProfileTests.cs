@@ -53,6 +53,7 @@ public sealed class PlayerProfileTests
           playerProfile(playerId: $playerId) {
             playerId
             displayName
+            gender
             bio
             createdAtUtc
             joinGameYear
@@ -97,6 +98,7 @@ public sealed class PlayerProfileTests
 
         Assert.Equal(playerId.ToString(), profile.GetProperty("playerId").GetString());
         Assert.Equal("Profile Basic Player", profile.GetProperty("displayName").GetString());
+        Assert.Equal("UNSPECIFIED", profile.GetProperty("gender").GetString());
         Assert.Equal(JsonValueKind.Null, profile.GetProperty("bio").ValueKind); // no bio yet
         Assert.Equal(0, profile.GetProperty("companyCount").GetInt32());
         Assert.Equal(0m, profile.GetProperty("totalProductsSold").GetDecimal());
@@ -403,5 +405,46 @@ public sealed class PlayerProfileTests
 
         var payload = result.GetProperty("data").GetProperty("updateDisplayName");
         Assert.Equal("Trimmed Name", payload.GetProperty("displayName").GetString());
+    }
+
+    [Fact]
+    public async Task UpdateDisplayName_WithGender_PersistsGenderOnMeAndProfile()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "dn-gender@test.com", "Starter Name");
+        var playerId = await GetPlayerIdAsync(client, token);
+
+        var result = await ExecAsync(client,
+            "mutation UDN($dn: String!, $gender: String) { updateDisplayName(input: { displayName: $dn, gender: $gender }) { displayName gender } }",
+            new { dn = "Astra Nova Vale", gender = "FEMALE" },
+            token);
+
+        var payload = result.GetProperty("data").GetProperty("updateDisplayName");
+        Assert.Equal("Astra Nova Vale", payload.GetProperty("displayName").GetString());
+        Assert.Equal("FEMALE", payload.GetProperty("gender").GetString());
+
+        var meResult = await ExecAsync(client, "{ me { gender } }", token: token);
+        Assert.Equal("FEMALE", meResult.GetProperty("data").GetProperty("me").GetProperty("gender").GetString());
+
+        var profileResult = await ExecAsync(client, ProfileQuery, new { playerId });
+        Assert.Equal("FEMALE", profileResult.GetProperty("data").GetProperty("playerProfile").GetProperty("gender").GetString());
+    }
+
+    [Fact]
+    public async Task UpdateDisplayName_InvalidGender_ReturnsInvalidGenderError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAsync(client, "dn-invalid-gender@test.com", "Starter Name");
+
+        var result = await ExecAsync(client,
+            "mutation UDN($dn: String!, $gender: String) { updateDisplayName(input: { displayName: $dn, gender: $gender }) { displayName gender } }",
+            new { dn = "Astra Nova Vale", gender = "ROBOT" },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors), "Expected an error for invalid gender.");
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("INVALID_GENDER", code);
     }
 }

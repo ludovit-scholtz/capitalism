@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Capitalism.Shared.Security;
 
 namespace Api.Data.Entities;
 
@@ -18,6 +19,10 @@ public sealed class Player
     /// <summary>Display name shown in the game UI and rankings.</summary>
     [Required, MaxLength(100)]
     public string DisplayName { get; set; } = string.Empty;
+
+    /// <summary>Selected profile gender used for personal-name generation UX.</summary>
+    [Required, MaxLength(20)]
+    public string Gender { get; set; } = PlayerGender.Unspecified;
 
     /// <summary>Hashed password for authentication.</summary>
     [Required]

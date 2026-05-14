@@ -518,20 +518,23 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
               updatePersonalAccountName(input: $input) {
                 playerId
                 personalAccountName
+                gender
               }
             }
             """,
-            new { input = new { personalAccountName = "Orion Cassian Vale" } },
+            new { input = new { personalAccountName = "Orion Cassian Vale", gender = "MALE" } },
             token);
 
         Assert.False(updateResult.TryGetProperty("errors", out _));
         Assert.Equal("Orion Cassian Vale", updateResult.GetProperty("data").GetProperty("updatePersonalAccountName").GetProperty("personalAccountName").GetString());
+        Assert.Equal("MALE", updateResult.GetProperty("data").GetProperty("updatePersonalAccountName").GetProperty("gender").GetString());
 
         var meResult = await GraphQlAsync("""
             query {
               me {
                 displayName
                 personalAccountName
+                gender
               }
             }
             """, token: token);
@@ -540,6 +543,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
         var me = meResult.GetProperty("data").GetProperty("me");
         Assert.Equal("Orion Cassian Vale", me.GetProperty("displayName").GetString());
         Assert.Equal("Orion Cassian Vale", me.GetProperty("personalAccountName").GetString());
+        Assert.Equal("MALE", me.GetProperty("gender").GetString());
     }
 
     [Fact]
@@ -742,6 +746,28 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
         Assert.True(result.TryGetProperty("errors", out _));
     }
 
+    [Fact]
+    public async Task UpdatePersonalAccountName_InvalidGender_ReturnsValidationError()
+    {
+        var (token, _) = await RegisterAndGetTokenAsync(
+            email: $"alias-gender-invalid-{Guid.NewGuid():N}@example.com",
+            displayName: "Initial Alias");
+
+        var result = await GraphQlAsync("""
+            mutation UpdatePersonalAccountName($input: UpdatePersonalAccountNameInput!) {
+              updatePersonalAccountName(input: $input) {
+                personalAccountName
+                gender
+              }
+            }
+            """,
+            new { input = new { personalAccountName = "Orion Cassian Vale", gender = "ROBOT" } },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Equal("INVALID_GENDER", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
     #endregion
 
     #region Authenticated queries
@@ -753,13 +779,14 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
         var (token, _) = await RegisterAndGetTokenAsync(email, "My Name");
 
         var result = await GraphQlAsync("""
-            query { me { id email displayName createdAtUtc startupPackClaimedAtUtc canClaimStartupPack } }
+            query { me { id email displayName gender createdAtUtc startupPackClaimedAtUtc canClaimStartupPack } }
             """, token: token);
 
         Assert.False(result.TryGetProperty("errors", out _));
         var me = result.GetProperty("data").GetProperty("me");
         Assert.Equal(email, me.GetProperty("email").GetString());
         Assert.Equal("My Name", me.GetProperty("displayName").GetString());
+        Assert.Equal("UNSPECIFIED", me.GetProperty("gender").GetString());
         Assert.Equal(JsonValueKind.Null, me.GetProperty("startupPackClaimedAtUtc").ValueKind);
         Assert.True(me.GetProperty("canClaimStartupPack").GetBoolean());
     }

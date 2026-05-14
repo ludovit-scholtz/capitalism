@@ -5,6 +5,8 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
 import { gqlRequest as gqlMasterRequest } from '@/lib/graphqlMasterServer'
+import GenderPicker from '@/components/profile/GenderPicker.vue'
+import { generatePersonalAccountName, type PlayerGender } from '@/lib/personalAccountName'
 import PlayerProfileTabsContent from '@/components/profile/PlayerProfileTabsContent.vue'
 import type { PlayerProfile } from '@/components/profile/PlayerProfileTabsContent.vue'
 
@@ -30,6 +32,7 @@ const bioError = ref<string | null>(null)
 const editingDisplayName = ref(false)
 const displayNameSuccessTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 const displayNameInput = ref('')
+const selectedGender = ref<PlayerGender>('UNSPECIFIED')
 const displayNameSaving = ref(false)
 const displayNameError = ref<string | null>(null)
 const displayNameSuccess = ref(false)
@@ -63,6 +66,7 @@ const PLAYER_PROFILE_QUERY = `
     playerProfile(playerId: $playerId) {
       playerId
       displayName
+      gender
       bio
       createdAtUtc
       joinGameYear
@@ -97,10 +101,11 @@ const UPDATE_BIO_MUTATION = `
 `
 
 const UPDATE_DISPLAY_NAME_MUTATION = `
-  mutation UpdateDisplayName($displayName: String!) {
-    updateDisplayName(input: { displayName: $displayName }) {
+  mutation UpdateDisplayName($displayName: String!, $gender: String) {
+    updateDisplayName(input: { displayName: $displayName, gender: $gender }) {
       playerId
       displayName
+      gender
     }
   }
 `
@@ -110,6 +115,7 @@ const UPDATE_PERSONAL_ACCOUNT_NAME_MASTER_MUTATION = `
     updatePersonalAccountName(input: $input) {
       playerId
       personalAccountName
+      gender
     }
   }
 `
@@ -128,6 +134,7 @@ async function fetchProfile() {
     if (profile.value) {
       bioInput.value = profile.value.bio ?? ''
       displayNameInput.value = profile.value.displayName
+      selectedGender.value = (auth.player?.gender as PlayerGender | undefined) ?? 'UNSPECIFIED'
     }
   } catch (e) {
     error.value = e instanceof Error ? e.message : t('playerProfile.loadFailed')
@@ -170,20 +177,21 @@ async function saveDisplayName() {
   displayNameSuccess.value = false
   try {
     await gqlMasterRequest<{
-      updatePersonalAccountName: { playerId: string; personalAccountName: string }
+      updatePersonalAccountName: { playerId: string; personalAccountName: string; gender: string }
     }>(UPDATE_PERSONAL_ACCOUNT_NAME_MASTER_MUTATION, {
-      input: { personalAccountName: trimmed },
+      input: { personalAccountName: trimmed, gender: selectedGender.value },
     })
 
     const data = await gqlRequest<{
-      updateDisplayName: { playerId: string; displayName: string }
-    }>(UPDATE_DISPLAY_NAME_MUTATION, { displayName: trimmed })
+      updateDisplayName: { playerId: string; displayName: string; gender: string }
+    }>(UPDATE_DISPLAY_NAME_MUTATION, { displayName: trimmed, gender: selectedGender.value })
     if (profile.value) {
       profile.value.displayName = data.updateDisplayName.displayName
     }
     if (auth.player) {
       auth.player.displayName = data.updateDisplayName.displayName
       auth.player.personalAccountName = data.updateDisplayName.displayName
+      auth.player.gender = selectedGender.value
     }
     editingDisplayName.value = false
     displayNameSuccess.value = true
@@ -199,7 +207,17 @@ async function saveDisplayName() {
 function cancelDisplayNameEdit() {
   editingDisplayName.value = false
   displayNameInput.value = profile.value?.displayName ?? ''
+  selectedGender.value = (auth.player?.gender as PlayerGender | undefined) ?? 'UNSPECIFIED'
   displayNameError.value = null
+}
+
+function handleGenderSelect(gender: PlayerGender) {
+  selectedGender.value = gender
+  displayNameInput.value = generatePersonalAccountName(gender)
+}
+
+function regenerateDisplayName() {
+  displayNameInput.value = generatePersonalAccountName(selectedGender.value)
 }
 
 function rankBadge(rank: number): string {
@@ -334,7 +352,7 @@ onUnmounted(() => {
             <div v-if="!editingDisplayName" class="flex items-center justify-center gap-2">
               <button
                 class="edit-display-name-btn text-xs text-brand hover:underline"
-                @click="() => { editingDisplayName = true; displayNameInput = profile?.displayName ?? '' }"
+                @click="() => { editingDisplayName = true; displayNameInput = profile?.displayName ?? ''; selectedGender = (auth.player?.gender as PlayerGender | undefined) ?? 'UNSPECIFIED' }"
               >
                 {{ t('playerProfile.editDisplayName') }}
               </button>
@@ -342,6 +360,12 @@ onUnmounted(() => {
             </div>
             <div v-else class="flex flex-col gap-2">
               <label class="text-xs text-muted font-medium">{{ t('playerProfile.displayNameLabel') }}</label>
+              <GenderPicker
+                v-model="selectedGender"
+                :female-label="t('playerProfile.selectFemale')"
+                :male-label="t('playerProfile.selectMale')"
+                @update:model-value="handleGenderSelect"
+              />
               <div class="flex gap-2">
                 <input
                   v-model="displayNameInput"
@@ -351,6 +375,14 @@ onUnmounted(() => {
                   :placeholder="t('auth.displayNamePlaceholder')"
                 />
               </div>
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm w-fit mx-auto"
+                :title="t('playerProfile.regeneratePersonalName')"
+                @click="regenerateDisplayName"
+              >
+                🎲
+              </button>
               <p class="display-name-real-name-warning text-xs text-amber-400">
                 {{ t('playerProfile.displayNameRealNameWarning') }}
               </p>

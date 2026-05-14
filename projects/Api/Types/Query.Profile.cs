@@ -270,6 +270,7 @@ public sealed partial class Query
         {
             PlayerId = player.Id,
             DisplayName = publicDisplayName,
+            Gender = player.Gender,
             Bio = player.Bio,
             CreatedAtUtc = player.CreatedAtUtc,
             JoinGameYear = gameJoinYear,
