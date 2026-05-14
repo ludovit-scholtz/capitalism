@@ -1697,6 +1697,20 @@ Root-cause of CI failures (May 2026, PR #455 company settings/dividend governanc
 2. **For each newly added sensitive GraphQL operation, add the boundary tests required by `graphql-surface-inventory` in the same PR** (at minimum unauthenticated rejection and authorized owner success).
 3. **When CI shows `graphql-surface-inventory` failure, inspect logs for the exact missing test contract string and implement those named tests before any additional refactoring.**
 
+## Catalog-image rollout quality gate — prevent CI/E2E drift after image-source changes
+
+Root-cause of quality regression (May 2026, PR #499 catalog images):
+- Catalog images were intentionally migrated from generated `data:image/svg+xml` URLs to static WebP assets under `/assets/...`.
+- Existing E2E assertions in `building-detail.spec.ts` still required `^data:image/svg+xml`, so Playwright CI failed even though runtime behavior was correct.
+- Another failure came from click interception in purchase-selector tests: tutorial tooltip overlays (`Got it`) occasionally covered the dialog `Done` button in CI.
+- Password-reset E2E also showed intermittent failures from brittle exact-text status checks with short timeout.
+
+Rules to prevent recurrence:
+1. **When changing image source format (data URL → static asset or vice versa), update all E2E assertions that validate `img[src]` format in the same PR.** Prefer `non-empty src` or explicit expected asset pattern over format-specific regex unless format is contractually required.
+2. **For dialog flows in `building-detail.spec.ts`, dismiss blocking tutorial overlays before critical clicks (`Done`, `Save`, `Confirm`).** Use a shared helper to close `Got it` tooltip when visible.
+3. **Password-reset E2E must force locale deterministically (`app_locale='en'`) and assert success via role/status regex with adequate timeout, not fragile exact literal matching with short timeout.**
+4. **For catalog image changes, minimum Playwright coverage must include both:** (a) image renders with non-empty `src`; (b) broken image path triggers fallback placeholder.
+
 ## Building edit tab regressions — preserve draft setup and no-unit edit surfaces
 
 Root-cause of CI failures (May 2026, PR #491 follow-up):

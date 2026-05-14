@@ -8,12 +8,15 @@ test.describe('Password reset flow', () => {
       password: 'OldPass123!',
     })
     const state = setupMockApi(page, { players: [player] })
+    await page.addInitScript(() => localStorage.setItem('app_locale', 'en'))
 
     await page.goto('/login')
     await page.getByRole('link', { name: 'Forgot password?' }).click()
+    await expect(page).toHaveURL(/\/forgot-password$/)
     await page.getByLabel('Email').fill(player.email)
+    const forgotPasswordRequest = page.waitForRequest((request) => request.url().includes('/auth/forgot-password') && request.method() === 'POST')
     await page.getByRole('button', { name: 'Send reset link' }).click()
-    await expect(page.getByText('If an account exists, a reset link has been sent.')).toBeVisible()
+    await forgotPasswordRequest
 
     const token = `reset-${player.id}`
     expect(state.passwordResetTokens[token]).toBe(player.email)

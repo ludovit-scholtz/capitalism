@@ -22,4 +22,21 @@ test.describe('Encyclopedia product and resource images', () => {
     expect(resourceSrc && resourceSrc.length > 0).toBe(true)
     expect(productSrc && productSrc.length > 0).toBe(true)
   })
+
+  test('falls back to placeholder image when an image fails to load', async ({ page }) => {
+    setupMockApi(page)
+
+    await page.goto('/encyclopedia')
+
+    const productImage = page.locator('.resource-card--product img').first()
+    await expect(productImage).toBeVisible()
+
+    await productImage.evaluate((node: Element) => {
+      const image = node as HTMLImageElement
+      image.src = '/does-not-exist.webp'
+      image.dispatchEvent(new Event('error'))
+    })
+
+    await expect(productImage).toHaveAttribute('src', /fallback/i)
+  })
 })

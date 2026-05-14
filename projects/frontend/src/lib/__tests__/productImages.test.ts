@@ -24,6 +24,13 @@ describe('productImages mapping', () => {
     }
   })
 
+  it('assigns distinct images to each seeded resource and product slug', () => {
+    const resourceUrls = RESOURCE_IMAGE_SLUGS.map((slug) => getResourceCatalogImageUrl(slug, null))
+    const productUrls = PRODUCT_IMAGE_SLUGS.map((slug) => getProductCatalogImageUrl(slug))
+    const allUrls = [...resourceUrls, ...productUrls]
+    expect(new Set(allUrls).size).toBe(allUrls.length)
+  })
+
   it('returns fallback image for unknown slugs', () => {
     const fallback = getCatalogFallbackImageUrl()
     expect(getProductCatalogImageUrl('missing-product-slug')).toBe(fallback)
