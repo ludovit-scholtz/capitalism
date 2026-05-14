@@ -95,4 +95,20 @@ describe('productImages mapping', () => {
       expect(hasProductCatalogImage(slug)).toBe(true)
     }
   })
+
+  it('keeps the specifically reported product regressions out of resource classification while preserving slug asset resolution', () => {
+    const reportedProductSlugs = [
+      'analgesic-syrup',
+      'antibiotic',
+      'antiseptic-gel',
+      'aspirin',
+      'assembly-pallet',
+      'wooden-bed',
+    ]
+
+    for (const slug of reportedProductSlugs) {
+      expect(hasResourceCatalogImage(slug)).toBe(false)
+      expect(getResourceCatalogImageUrl(slug, null)).toBe(getProductCatalogImageUrl(slug))
+    }
+  })
 })
