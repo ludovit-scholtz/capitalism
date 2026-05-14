@@ -131,6 +131,8 @@ export default {
     heartbeat: 'Heartbeat',
     playOnServer: 'Play on server',
     unableToLoadServers: 'Unable to load game servers.',
+    viewAllServers: 'View all servers →',
+    noActiveServers: 'No active servers right now — check back soon.',
     featuresTitle: 'Why Capitalism?',
     featuresSubtitle:
       'A fully simulated market economy where every price, every wage, and every trade reflects real in-game activity — no scripted outcomes.',

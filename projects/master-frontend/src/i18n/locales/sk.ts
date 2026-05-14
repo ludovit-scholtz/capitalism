@@ -131,6 +131,8 @@ export default {
     heartbeat: 'Heartbeat',
     playOnServer: 'Hrať na serveri',
     unableToLoadServers: 'Nepodarilo sa načítať herné servery.',
+    viewAllServers: 'Zobraziť všetky servery →',
+    noActiveServers: 'Momentálne žiadne aktívne servery — skús neskôr.',
     featuresTitle: 'Prečo Capitalism?',
     featuresSubtitle:
       'Plne simulovaná trhová ekonomika, kde každá cena, každá mzda a každý obchod odráža skutočnú hernú aktivitu.',

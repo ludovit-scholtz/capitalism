@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import { fetchRankingLeaderboard, type RankingLeaderboardEntryInfo } from '@/lib/masterApi'
+import { fetchRankingLeaderboard, fetchGameServers, type RankingLeaderboardEntryInfo, type GameServerSummary } from '@/lib/masterApi'
 import heroVideo from '@/assets/hero-video.webm'
 import ViewSubnav from '@/components/layout/ViewSubnav.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -14,7 +14,12 @@ const ranking = ref<RankingLeaderboardEntryInfo[]>([])
 const rankingLoading = ref(true)
 const rankingError = ref('')
 
+const servers = ref<GameServerSummary[]>([])
+
 const rankingTop = computed(() => ranking.value.slice(0, 10))
+const teaserServers = computed(() =>
+  servers.value.filter((s) => s.isOnline).slice(0, 3),
+)
 const navItems = computed(() => {
   const items = [
     { label: t('nav.gameServers'), to: '/game-servers' },
@@ -52,6 +57,14 @@ async function loadRanking() {
 
 onMounted(() => {
   void loadRanking()
+  void fetchGameServers()
+    .then((data) => {
+      servers.value = data
+    })
+    .catch((err) => {
+      // Teaser section silently skips if servers can't load — non-critical widget
+      console.debug('[HomeView] Active Servers teaser failed to load:', err)
+    })
 })
 </script>
 
@@ -155,6 +168,62 @@ onMounted(() => {
             </tbody>
           </table>
         </div>
+      </section>
+
+      <!-- Active Servers teaser -->
+      <section class="mt-10 lg:mt-12" aria-labelledby="servers-teaser-heading">
+        <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+              {{ t('home.liveRegistry') }}
+            </p>
+            <h2 id="servers-teaser-heading" class="mt-2 text-2xl font-semibold">
+              {{ t('home.activeServers') }}
+            </h2>
+          </div>
+          <RouterLink class="btn btn-secondary" to="/game-servers">
+            {{ t('home.viewAllServers') }}
+          </RouterLink>
+        </div>
+
+        <p v-if="teaserServers.length === 0" class="state-message servers-teaser-empty">
+          {{ t('home.noActiveServers') }}
+        </p>
+
+        <ul v-else class="servers-teaser-list grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <li
+            v-for="server in teaserServers"
+            :key="server.id"
+            class="server-teaser-card rounded-xl border border-divider bg-card p-4"
+          >
+            <div class="flex items-start justify-between gap-2">
+              <p class="font-semibold">{{ server.displayName }}</p>
+              <span class="server-online-dot" aria-label="Online" />
+            </div>
+            <dl class="mt-3 grid grid-cols-3 gap-2 text-sm">
+              <div>
+                <dt class="text-xs text-muted">👥 {{ t('home.players') }}</dt>
+                <dd class="font-semibold">{{ server.playerCount }}</dd>
+              </div>
+              <div>
+                <dt class="text-xs text-muted">⏱ {{ t('home.tick') }}</dt>
+                <dd class="font-semibold">{{ server.currentTick }}</dd>
+              </div>
+              <div>
+                <dt class="text-xs text-muted">🏢 {{ t('home.companies') }}</dt>
+                <dd class="font-semibold">{{ server.companyCount }}</dd>
+              </div>
+            </dl>
+            <a
+              class="btn btn-primary mt-4 w-full text-center text-xs"
+              :href="server.frontendUrl"
+              target="_blank"
+              rel="noreferrer"
+            >
+              {{ t('home.playOnServer') }}
+            </a>
+          </li>
+        </ul>
       </section>
 
       <!-- Feature highlights -->
@@ -263,5 +332,21 @@ onMounted(() => {
   font-size: 0.875rem;
   line-height: 1.65;
   color: var(--color-muted);
+}
+
+.server-online-dot {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  background: var(--color-good);
+  animation: pulse-dot 2s ease-in-out infinite;
+  margin-top: 0.35rem;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(1.25); }
 }
 </style>
