@@ -3,6 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useGameAdminStore } from '@/stores/gameAdmin'
+import { gqlRequest } from '@/lib/graphql'
+import type { NpcCompanySummary } from '@/types'
 
 const { t, locale } = useI18n()
 const auth = useAuthStore()
@@ -16,6 +18,9 @@ const globalAdminEmail = ref('')
 const endShardReason = ref('')
 const endShardPending = ref(false)
 const endShardConfirmOpen = ref(false)
+const npcCompanies = ref<NpcCompanySummary[]>([])
+const npcLogs = ref<Array<{ id: string; npcCompanyName: string; tick: number; actionType: string; outcome: string }>>([])
+const npcLoading = ref(false)
 
 const canManageRootFeatures = computed(() => adminStore.session?.isRootAdministrator ?? false)
 
@@ -38,10 +43,80 @@ async function loadOverview() {
 
   try {
     await adminStore.fetchDashboard()
+    await loadNpcPanel()
   } catch (caughtError) {
     error.value = caughtError instanceof Error ? caughtError.message : t('common.unknownError')
   } finally {
     loading.value = false
+  }
+}
+
+async function loadNpcPanel() {
+  npcLoading.value = true
+  try {
+    const [companiesResult, logsResult] = await Promise.all([
+      gqlRequest<{ npcCompanies: NpcCompanySummary[] }>(
+        `{
+          npcCompanies {
+            id
+            companyId
+            name
+            archetype
+            difficultyLevel
+            homeCityId
+            homeCityName
+            isActive
+            createdAtUtc
+            buildingCount
+          }
+        }`,
+      ),
+      gqlRequest<{ npcDecisionLogs: Array<{ id: string; npcCompanyName: string; tick: number; actionType: string; outcome: string }> }>(
+        `{
+          npcDecisionLogs(limit: 10) {
+            id
+            npcCompanyName
+            tick
+            actionType
+            outcome
+          }
+        }`,
+      ),
+    ])
+    npcCompanies.value = companiesResult.npcCompanies ?? []
+    npcLogs.value = logsResult.npcDecisionLogs ?? []
+  } catch {
+    npcCompanies.value = []
+    npcLogs.value = []
+  } finally {
+    npcLoading.value = false
+  }
+}
+
+async function toggleNpc(npcCompanyId: string, isActive: boolean) {
+  actionError.value = null
+  actionMessage.value = null
+  try {
+    if (isActive) {
+      await gqlRequest(
+        `mutation PauseNpc($input: ManageNpcCompanyActivityInput!) {
+          pauseNpcCompany(input: $input) { id }
+        }`,
+        { input: { npcCompanyId } },
+      )
+      actionMessage.value = t('competitors.pauseSuccess')
+    } else {
+      await gqlRequest(
+        `mutation ResumeNpc($input: ManageNpcCompanyActivityInput!) {
+          resumeNpcCompany(input: $input) { id }
+        }`,
+        { input: { npcCompanyId } },
+      )
+      actionMessage.value = t('competitors.resumeSuccess')
+    }
+    await loadNpcPanel()
+  } catch (caughtError) {
+    actionError.value = caughtError instanceof Error ? caughtError.message : t('common.unknownError')
   }
 }
 
@@ -300,6 +375,44 @@ onMounted(loadOverview)
       </section>
 
       <section class="ops-grid ops-grid-wide">
+        <article class="card ops-panel">
+          <div class="ops-panel-header">
+            <div>
+              <h3>{{ t('competitors.title') }}</h3>
+              <p>{{ t('competitors.subtitle') }}</p>
+            </div>
+          </div>
+          <div v-if="npcLoading" class="ops-loading">{{ t('common.loading') }}</div>
+          <div v-else class="ops-list">
+            <div v-for="npc in npcCompanies" :key="npc.id" class="ops-list-item">
+              <div>
+                <strong>{{ npc.name }}</strong>
+                <p>{{ npc.archetype }} · {{ npc.homeCityName }} · {{ npc.buildingCount }}</p>
+              </div>
+              <button type="button" class="btn btn-secondary" @click="toggleNpc(npc.id, npc.isActive)">
+                {{ npc.isActive ? t('competitors.pauseNpc') : t('competitors.resumeNpc') }}
+              </button>
+            </div>
+            <div v-if="npcCompanies.length === 0" class="ops-empty-state">
+              {{ t('competitors.empty') }}
+            </div>
+          </div>
+          <div class="ops-subsection">
+            <div class="ops-subsection-header">
+              <h4>{{ t('competitors.decisionLog') }}</h4>
+            </div>
+            <div class="ops-list">
+              <div v-for="log in npcLogs" :key="log.id" class="ops-list-item">
+                <div>
+                  <strong>{{ log.npcCompanyName }}</strong>
+                  <p>{{ log.actionType }} — {{ log.outcome }}</p>
+                </div>
+                <span>#{{ log.tick }}</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
         <article class="card ops-panel">
           <div class="ops-panel-header">
             <div>

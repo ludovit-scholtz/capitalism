@@ -141,3 +141,34 @@ export interface CityEconomicReportResult {
   latest: CityEconomicReport | null
   history: CityEconomicReport[]
 }
+
+export interface NpcCompanySummary {
+  id: string
+  companyId: string
+  name: string
+  archetype: string
+  difficultyLevel: number
+  homeCityId: string
+  homeCityName: string
+  isActive: boolean
+  createdAtUtc: string
+  buildingCount: number
+}
+
+export interface CompetitorMarketShareByCategory {
+  category: string
+  sharePercent: number
+}
+
+export interface CityCompetitorEntry {
+  companyId: string
+  companyName: string
+  isNpc: boolean
+  npcCompanyId: string | null
+  archetype: string | null
+  buildingCount: number
+  estimatedRevenueLastTicks: number
+  marketSharePercent: number
+  marketShareByCategory: CompetitorMarketShareByCategory[]
+  trend: 'UP' | 'DOWN' | 'STABLE'
+}

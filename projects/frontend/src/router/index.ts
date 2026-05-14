@@ -82,6 +82,11 @@ const router = createRouter({
           name: 'city-market',
           component: () => import('@/components/cityTabs/CityMarketTab.vue'),
         },
+        {
+          path: 'competitors',
+          name: 'city-competitors',
+          component: () => import('@/components/cityTabs/CityCompetitorsTab.vue'),
+        },
       ],
     },
     { path: '/ledger/:companyId', name: 'ledger', alias: '/company/:companyId/ledger', component: () => import('@/views/LedgerView.vue') },

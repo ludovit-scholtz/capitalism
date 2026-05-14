@@ -470,6 +470,7 @@ public class Program
         builder.Services.AddScoped<ITickPhase, ResearchPhase>();
         builder.Services.AddScoped<ITickPhase, QualityDecayPhase>();
         builder.Services.AddScoped<ITickPhase, RentPhase>();
+        builder.Services.AddScoped<ITickPhase, NpcCompanyPhase>();
         builder.Services.AddScoped<ITickPhase, StockLimitOrderMatchingPhase>();
         builder.Services.AddScoped<ITickPhase, LoanRepaymentPhase>();
         builder.Services.AddScoped<ITickPhase, BuildingDestructionPhase>();

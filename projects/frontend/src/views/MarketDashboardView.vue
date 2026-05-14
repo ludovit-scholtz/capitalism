@@ -69,6 +69,8 @@ const MARKET_OVERVIEW_QUERY = `
         averageClearingPrice
         totalRevenue
         sellerCount
+        topCompetitorCompanyName
+        topCompetitorMarketSharePercent
       }
     }
   }
@@ -214,7 +216,13 @@ useTickRefresh(() => loadData(true))
           @keydown.enter="selectProduct(product)"
           @keydown.space.prevent="selectProduct(product)"
         >
-          <span class="product-name" role="cell">{{ product.productName }}</span>
+          <span class="product-name" role="cell">
+            {{ product.productName }}
+            <small v-if="product.topCompetitorCompanyName" class="top-competitor-badge">
+              {{ t('marketDashboard.topCompetitor') }}: {{ product.topCompetitorCompanyName }}
+              ({{ product.topCompetitorMarketSharePercent.toFixed(1) }}%)
+            </small>
+          </span>
           <span class="product-industry" role="cell">{{ product.industry }}</span>
           <span class="product-price col-right" role="cell">
             {{ formatMoney(product.averageClearingPrice, activeCityData.currencyCode) }}
@@ -462,6 +470,15 @@ useTickRefresh(() => loadData(true))
 .product-name {
   font-weight: 600;
   color: var(--color-text-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.top-competitor-badge {
+  font-size: 0.67rem;
+  font-weight: 600;
+  color: #f97316;
 }
 
 .product-industry {

@@ -7,16 +7,19 @@
 export function getLotStatus(
   ownerCompanyId: string | null | undefined,
   playerCompanyIds: string[],
-): 'available' | 'owned' | 'yours' {
+  npcCompanyIds: string[] = [],
+): 'available' | 'owned' | 'yours' | 'npc' {
   if (!ownerCompanyId) return 'available'
   if (playerCompanyIds.includes(ownerCompanyId)) return 'yours'
+  if (npcCompanyIds.includes(ownerCompanyId)) return 'npc'
   return 'owned'
 }
 
 /** Maps a lot status to its marker color for the Leaflet map. */
-export function getLotMarkerColor(status: 'available' | 'owned' | 'yours'): string {
+export function getLotMarkerColor(status: 'available' | 'owned' | 'yours' | 'npc'): string {
   if (status === 'available') return '#00C853'
   if (status === 'yours') return '#0047FF'
+  if (status === 'npc') return '#F97316'
   return '#6B7280'
 }
 

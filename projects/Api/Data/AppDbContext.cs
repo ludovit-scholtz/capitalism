@@ -29,6 +29,10 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
 
     /// <summary>Companies owned by players.</summary>
     public DbSet<Company> Companies => Set<Company>();
+    /// <summary>AI-controlled autonomous competitor companies.</summary>
+    public DbSet<NpcCompany> NpcCompanies => Set<NpcCompany>();
+    /// <summary>Per-tick decision logs emitted by NPC AI.</summary>
+    public DbSet<NpcDecisionLog> NpcDecisionLogs => Set<NpcDecisionLog>();
 
     /// <summary>Issued share positions held by players or companies.</summary>
     public DbSet<Shareholding> Shareholdings => Set<Shareholding>();
@@ -232,5 +236,6 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
         ConfigureBuildingEntities(modelBuilder);
         ConfigureEconomyEntities(modelBuilder);
         ConfigureWeatherEntities(modelBuilder);
+        ConfigureNpcEntities(modelBuilder);
     }
 }

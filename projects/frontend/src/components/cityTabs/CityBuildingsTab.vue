@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import CityMapContent from '@/components/cityMap/CityMapContent.vue'
-import type { City, BuildingLot, Company, PurchaseLotResult, CityWeatherForecast } from '@/types'
+import type { City, BuildingLot, Company, PurchaseLotResult, CityWeatherForecast, NpcCompanySummary } from '@/types'
 
 const { t } = useI18n()
 
@@ -10,6 +10,7 @@ const props = defineProps<{
   city: City
   lots: BuildingLot[]
   companies: Company[]
+  npcCompanies: NpcCompanySummary[]
   cityWeather: CityWeatherForecast | null
   highlightedBuildingId: string | null
 }>()
@@ -62,6 +63,7 @@ watch(
       :filtered-lots="filteredLots"
       :lots="lots"
       :companies="companies"
+      :npc-companies="npcCompanies"
       :view-mode="viewMode"
       :city-weather="cityWeather"
       :highlighted-building-id="highlightedBuildingId"

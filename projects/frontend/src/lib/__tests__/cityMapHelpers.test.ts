@@ -30,6 +30,10 @@ describe('getLotStatus', () => {
   it('returns owned when player has no companies', () => {
     expect(getLotStatus('other-company', [])).toBe('owned')
   })
+
+  it('returns npc when owner company is in npcCompanyIds', () => {
+    expect(getLotStatus('npc-company', ['company-1'], ['npc-company'])).toBe('npc')
+  })
 })
 
 describe('getLotMarkerColor', () => {
@@ -43,6 +47,10 @@ describe('getLotMarkerColor', () => {
 
   it('returns gray for owned (by other)', () => {
     expect(getLotMarkerColor('owned')).toBe('#6B7280')
+  })
+
+  it('returns orange for npc-owned lots', () => {
+    expect(getLotMarkerColor('npc')).toBe('#F97316')
   })
 })
 
