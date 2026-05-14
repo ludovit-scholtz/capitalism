@@ -29,9 +29,10 @@ const API_BASE_URL = (import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:4435
   /\/graphql\/?$/,
   '',
 )
-const MASTER_API_BASE_URL = (
-  import.meta.env.VITE_MASTER_GRAPHQL_URL || 'http://localhost:44364/graphql'
-).replace(/\/graphql\/?$/, '')
+const MASTER_SESSION_API_BASE_URL = (import.meta.env.VITE_MASTER_GRAPHQL_URL || '').replace(
+  /\/graphql\/?$/,
+  '',
+)
 
 interface OidcPendingState {
   state: string
@@ -494,6 +495,10 @@ export const useAuthStore = defineStore('auth', () => {
 
   function applyStoredSession(tokenValue: string, expiresAtUtc: string, provider = AUTH_PROVIDER_LOCAL) {
     token.value = tokenValue
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('auth_token', tokenValue)
+      localStorage.setItem('auth_expires', expiresAtUtc)
+    }
     setStoredAuthProvider(provider)
     scheduleTokenRenewal(expiresAtUtc)
   }
@@ -508,6 +513,18 @@ export const useAuthStore = defineStore('auth', () => {
     })
     if (!response.ok) {
       throw new Error('Failed to establish secure session.')
+    }
+  }
+
+  async function establishOptionalCookieSession(apiBaseUrl: string, tokenValue: string) {
+    if (!apiBaseUrl) {
+      return
+    }
+
+    try {
+      await establishCookieSession(apiBaseUrl, tokenValue)
+    } catch {
+      return
     }
   }
 
@@ -538,7 +555,7 @@ export const useAuthStore = defineStore('auth', () => {
       const data = await gqlMasterRequest<{ register: MasterSessionPayload }>(MASTER_REGISTER_MUTATION, { input })
       await Promise.all([
         establishCookieSession(API_BASE_URL, data.register.token),
-        establishCookieSession(MASTER_API_BASE_URL, data.register.token),
+        establishOptionalCookieSession(MASTER_SESSION_API_BASE_URL, data.register.token),
       ])
       player.value = null
       applyStoredSession(data.register.token, data.register.expiresAtUtc)
@@ -558,7 +575,7 @@ export const useAuthStore = defineStore('auth', () => {
       const data = await gqlMasterRequest<{ login: MasterSessionPayload }>(MASTER_LOGIN_MUTATION, { input: { email, password } })
       await Promise.all([
         establishCookieSession(API_BASE_URL, data.login.token),
-        establishCookieSession(MASTER_API_BASE_URL, data.login.token),
+        establishOptionalCookieSession(MASTER_SESSION_API_BASE_URL, data.login.token),
       ])
       player.value = null
       applyStoredSession(data.login.token, data.login.expiresAtUtc)
@@ -610,7 +627,7 @@ export const useAuthStore = defineStore('auth', () => {
     const callbackSession = getTokenFromCallback()
     await Promise.all([
       establishCookieSession(API_BASE_URL, callbackSession.token),
-      establishCookieSession(MASTER_API_BASE_URL, callbackSession.token),
+      establishOptionalCookieSession(MASTER_SESSION_API_BASE_URL, callbackSession.token),
     ])
     applyStoredSession(callbackSession.token, callbackSession.expiresAtUtc, AUTH_PROVIDER_BIATEC)
 

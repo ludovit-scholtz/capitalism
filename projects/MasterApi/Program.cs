@@ -164,19 +164,16 @@ public class Program
             {
                 var allowedOrigins = CorsPolicyHelper.ResolveAllowedOrigins(builder.Configuration);
 
-                if (CorsPolicyHelper.IsDevelopmentOpenPolicy(builder.Environment))
-                {
-                    policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
-                    return;
-                }
-
                 if (allowedOrigins.Length == 0)
                 {
                     policy.SetIsOriginAllowed(static _ => false).AllowAnyHeader().AllowAnyMethod();
                     return;
                 }
 
-                policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod();
+                policy.WithOrigins(allowedOrigins)
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials();
             });
         });
 

@@ -19,11 +19,6 @@ public static class CorsPolicyHelper
             ?? [];
     }
 
-    public static bool IsDevelopmentOpenPolicy(IHostEnvironment environment)
-    {
-        return environment.IsDevelopment();
-    }
-
     public static bool IsNonDevelopmentMisconfigured(IHostEnvironment environment, IReadOnlyCollection<string> allowedOrigins)
     {
         return !environment.IsDevelopment() && allowedOrigins.Count == 0;
