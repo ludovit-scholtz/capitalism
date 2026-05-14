@@ -7,6 +7,7 @@ import {
   getLocalizedUnitName,
   getProductImageUrl,
 } from '@/lib/catalogPresentation'
+import { onCatalogImageError } from '@/lib/catalogImageFallback'
 import type { ProductType, ResourceType } from '@/types'
 
 const { t } = useI18n()
@@ -66,7 +67,7 @@ function getIngredientUnitForSelectedEntry(): string {
         @keydown.enter="emit('navigate-to-entry', product.slug)"
         @keydown.space.prevent="emit('navigate-to-entry', product.slug)"
       >
-        <img :src="getProductImage(product)" :alt="getLocalizedProductName(product, locale)" class="product-image" />
+        <img :src="getProductImage(product)" :alt="getLocalizedProductName(product, locale)" class="product-image" @error="onCatalogImageError" />
         <div class="product-body">
           <div class="product-heading">
             <div>

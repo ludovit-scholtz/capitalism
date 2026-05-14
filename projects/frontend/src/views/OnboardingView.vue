@@ -6,6 +6,7 @@ import { gqlRequest, GraphQLError } from '@/lib/graphql'
 import { gqlRequest as gqlMasterRequest } from '@/lib/graphqlMasterServer'
 import { computeSimulatedProfit, trackOnboardingEvent } from '@/lib/onboardingAnalytics'
 import { getLocalizedProductDescription, getLocalizedProductName, getLocalizedRecipeIngredientName, getLocalizedResourceName, getProductImageUrl } from '@/lib/catalogPresentation'
+import { onCatalogImageError } from '@/lib/catalogImageFallback'
 import { formatGameTickTime } from '@/lib/gameTime'
 import { useTickRefresh } from '@/composables/useTickRefresh'
 import {
@@ -1417,7 +1418,7 @@ watch(visibleIndustries, () => {
             :class="{ 'border-brand bg-brand/10 shadow-[0_0_0_1px_var(--color-primary),0_4px_16px_rgba(0,71,255,0.15)]': selectedProductId === prod.id, 'pick-hint': !selectedProductId }"
             @click="selectProduct(prod.id)"
           >
-            <img :src="getProductImage(prod)" :alt="getProductName(prod)" class="w-full aspect-video object-cover rounded bg-card-raised" /><span class="font-bold text-base">{{
+            <img :src="getProductImage(prod)" :alt="getProductName(prod)" class="w-full aspect-video object-cover rounded bg-card-raised" @error="onCatalogImageError" /><span class="font-bold text-base">{{
               getProductName(prod)
             }}</span
             ><span class="text-[1rem] font-bold text-[var(--color-secondary)]">{{ getProductPriceSummary(prod) }}</span

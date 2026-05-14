@@ -14,6 +14,7 @@ import {
   getProductImageUrl,
   getResourceImageUrl,
 } from '@/lib/catalogPresentation'
+import { onCatalogImageError } from '@/lib/catalogImageFallback'
 import { isProductLocked } from '@/lib/productAccess'
 import ResourceProductGrid from '@/components/resource/ResourceProductGrid.vue'
 import type { ProductType, ResourceType } from '@/types'
@@ -83,7 +84,7 @@ function navigateToIngredient(recipe: ProductType['recipes'][number]) {
 
 <template>
   <header class="resource-hero">
-    <img v-if="getSelectedImageUrl()" :src="getSelectedImageUrl() ?? undefined" :alt="getSelectedTitle()" class="resource-hero-image" />
+    <img v-if="getSelectedImageUrl()" :src="getSelectedImageUrl() ?? undefined" :alt="getSelectedTitle()" class="resource-hero-image" @error="onCatalogImageError" />
     <div class="resource-hero-body">
       <div class="resource-badges">
         <span v-if="selectedResource" class="badge badge--category">{{ getLocalizedCategory(selectedResource.category, locale) }}</span>
@@ -147,7 +148,7 @@ function navigateToIngredient(recipe: ProductType['recipes'][number]) {
         @keydown.enter="navigateToIngredient(recipe)"
         @keydown.space.prevent="navigateToIngredient(recipe)"
       >
-        <img v-if="getIngredientImage(recipe)" :src="getIngredientImage(recipe) ?? undefined" :alt="getLocalizedRecipeIngredientName(recipe, locale)" class="composition-image" />
+        <img v-if="getIngredientImage(recipe)" :src="getIngredientImage(recipe) ?? undefined" :alt="getLocalizedRecipeIngredientName(recipe, locale)" class="composition-image" @error="onCatalogImageError" />
         <strong>{{ recipe.quantity }} {{ recipe.resourceType?.unitSymbol ?? recipe.inputProductType?.unitSymbol }}</strong>
         <span>{{ getLocalizedRecipeIngredientName(recipe, locale) }}</span>
       </div>
@@ -161,7 +162,7 @@ function navigateToIngredient(recipe: ProductType['recipes'][number]) {
         @keydown.enter="emit('navigate-to-entry', selectedProduct.slug)"
         @keydown.space.prevent="emit('navigate-to-entry', selectedProduct.slug)"
       >
-        <img :src="getProductImage(selectedProduct)" :alt="getLocalizedProductName(selectedProduct, locale)" class="composition-image" />
+        <img :src="getProductImage(selectedProduct)" :alt="getLocalizedProductName(selectedProduct, locale)" class="composition-image" @error="onCatalogImageError" />
         <strong>{{ selectedProduct.outputQuantity }} {{ selectedProduct.unitSymbol }}</strong>
         <span>{{ getLocalizedProductName(selectedProduct, locale) }}</span>
       </div>

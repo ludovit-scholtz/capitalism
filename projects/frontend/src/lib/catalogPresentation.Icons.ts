@@ -317,14 +317,7 @@ const tokenTranslations: Record<Exclude<SupportedLocale, 'en'>, Record<string, s
   },
 }
 
-const visualsByIndustry: Record<string, { background: string; accent: string }> = {
-  FURNITURE: { background: '#8B5A2B', accent: '#D4A373' },
-  FOOD_PROCESSING: { background: '#B45309', accent: '#F59E0B' },
-  HEALTHCARE: { background: '#7C3AED', accent: '#A78BFA' },
-  ELECTRONICS: { background: '#0EA5E9', accent: '#67E8F9' },
-  CONSTRUCTION: { background: '#374151', accent: '#9CA3AF' },
-}
-const defaultProductVisual = { background: '#8B5A2B', accent: '#D4A373' }
+import { getProductCatalogImageUrl } from '@/lib/productImages'
 
 // Full-slug overrides for cases where word-by-word translation breaks grammatical gender agreement.
 const slugTranslationOverrides: Record<Exclude<SupportedLocale, 'en'>, Record<string, string>> = {
@@ -346,86 +339,5 @@ export function translateSlug(slug: string, locale: Exclude<SupportedLocale, 'en
 }
 
 export function getProductImageUrl(product: Pick<ProductType, 'slug' | 'industry' | 'name'>): string {
-  const { icon, background, accent } = getProductVisual(product.slug, product.industry)
-  return createEmojiImageDataUrl(icon, background, accent)
-}
-
-function getProductVisual(slug: string, industry: string): { icon: string; background: string; accent: string } {
-  const base = visualsByIndustry[industry] ?? defaultProductVisual
-
-  if (/(chair|bench|stool)/.test(slug)) return { icon: '🪑', ...base }
-  if (/(bed|crib|bunk)/.test(slug)) return { icon: '🛏️', ...base }
-  if (/(table|desk|stand)/.test(slug)) return { icon: '🛋️', ...base }
-  if (/(bread|toast|sandwich)/.test(slug)) return { icon: '🍞', ...base }
-  if (/(pasta|noodles)/.test(slug)) return { icon: '🍝', ...base }
-  if (/(flour|semolina|premix|mix)/.test(slug)) return { icon: '🥣', ...base }
-  if (/(medicine|tablet|vitamin|supplement)/.test(slug)) return { icon: '💊', ...base }
-  if (/(bandages|gauze|wipes|tape|wrap)/.test(slug)) return { icon: '🩹', ...base }
-  if (/(wafer|circuit|module|router|calculator|relay|display|hub)/.test(slug)) return { icon: '💻', ...base }
-  if (/(lamp|bulb)/.test(slug)) return { icon: '💡', ...base }
-  if (/(battery)/.test(slug)) return { icon: '🔋', ...base }
-  if (/(beam|panel|sheet|column|railing|rack|door|duct|pipe|window|tile|frame)/.test(slug)) return { icon: '🏗️', ...base }
-  if (/(nails|screws|fasteners)/.test(slug)) return { icon: '🔩', ...base }
-  if (/(pallet|planks|wood)/.test(slug)) return { icon: '🪵', ...base }
-  if (/(gloves|masks)/.test(slug)) return { icon: '🧤', ...base }
-  if (/(antiseptic|ointment|syrup|saline)/.test(slug)) return { icon: '🧴', ...base }
-  if (/(speaker|radio|signal|adapter|power)/.test(slug)) return { icon: '🔌', ...base }
-  if (/(solar)/.test(slug)) return { icon: '☀️', ...base }
-
-  return { icon: industryIcon(industry), ...base }
-}
-
-function industryIcon(industry: string): string {
-  switch (industry) {
-    case 'FOOD_PROCESSING':
-      return '🍽️'
-    case 'HEALTHCARE':
-      return '💉'
-    case 'ELECTRONICS':
-      return '🧠'
-    case 'CONSTRUCTION':
-      return '🧱'
-    default:
-      return '🏭'
-  }
-}
-
-function createEmojiImageDataUrl(icon: string, backgroundColor: string, accentColor: string): string {
-  const safeIcon = escapeSvgText(icon)
-  const safeBackgroundColor = sanitizeHexColor(backgroundColor)
-  const safeAccentColor = sanitizeHexColor(accentColor)
-  const gradientId = `g-${hashValue(`${safeIcon}-${safeBackgroundColor}-${safeAccentColor}`)}`
-  const svg = `
-    <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'>
-      <defs>
-        <linearGradient id='${gradientId}' x1='0' y1='0' x2='1' y2='1'>
-          <stop offset='0%' stop-color='${safeBackgroundColor}'/>
-          <stop offset='100%' stop-color='${safeAccentColor}'/>
-        </linearGradient>
-      </defs>
-      <rect width='160' height='160' rx='28' fill='url(#${gradientId})'/>
-      <circle cx='80' cy='80' r='48' fill='rgba(255,255,255,0.18)'/>
-      <text x='80' y='96' text-anchor='middle' font-size='56'>${safeIcon}</text>
-    </svg>
-  `
-
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
-}
-
-function sanitizeHexColor(value: string): string {
-  return /^#[0-9a-f]{6}$/i.test(value) ? value : '#4B5563'
-}
-
-function escapeSvgText(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}
-
-function hashValue(value: string): string {
-  let hash = 0
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash << 5) - hash + value.charCodeAt(index)
-    hash |= 0
-  }
-
-  return Math.abs(hash).toString(36)
+  return getProductCatalogImageUrl(product.slug)
 }

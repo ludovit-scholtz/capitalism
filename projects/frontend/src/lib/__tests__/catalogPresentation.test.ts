@@ -14,6 +14,7 @@ import {
   normalizeCatalogLocale,
 } from '../catalogPresentation'
 import { translateSlug } from '../catalogPresentation.Icons'
+import { hasProductCatalogImage, hasResourceCatalogImage, PRODUCT_IMAGE_SLUGS, RESOURCE_IMAGE_SLUGS } from '../productImages'
 import type { ProductType, Recipe, ResourceType } from '@/types'
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -375,29 +376,24 @@ describe('getLocalizedProductDescription', () => {
 // ── getResourceImageUrl ───────────────────────────────────────────────────────
 
 describe('getResourceImageUrl', () => {
-  it('returns the imageUrl from the resource', () => {
-    const url = 'data:image/svg+xml;utf8,<svg/>'
-    expect(getResourceImageUrl(makeResource({ imageUrl: url }))).toBe(url)
-  })
-
-  it('returns null when imageUrl is null', () => {
-    expect(getResourceImageUrl(makeResource({ imageUrl: null }))).toBeNull()
+  it('returns a mapped webp URL for known resources', () => {
+    expect(getResourceImageUrl(makeResource({ slug: 'wood', imageUrl: null }))).toContain('.webp')
   })
 })
 
 // ── getProductImageUrl ────────────────────────────────────────────────────────
 
 describe('getProductImageUrl', () => {
-  it('returns a data URL for a product', () => {
+  it('returns a mapped webp URL for a product', () => {
     const url = getProductImageUrl(makeProduct({ slug: 'wooden-chair', industry: 'FURNITURE' }))
-    expect(url).toMatch(/^data:image\/svg\+xml/)
+    expect(url).toContain('.webp')
   })
 
-  it('returns a data URL containing an SVG for different industries', () => {
+  it('returns a mapped webp URL for different industries', () => {
     const industries = ['FURNITURE', 'FOOD_PROCESSING', 'HEALTHCARE', 'ELECTRONICS', 'CONSTRUCTION']
     for (const industry of industries) {
       const url = getProductImageUrl(makeProduct({ slug: 'generic-item', industry }))
-      expect(url).toMatch(/^data:image\/svg\+xml/)
+      expect(url).toContain('.webp')
     }
   })
 
@@ -407,11 +403,13 @@ describe('getProductImageUrl', () => {
     expect(chairUrl).not.toBe(tableUrl)
   })
 
-  it('produces valid SVG content in the URL', () => {
-    const url = getProductImageUrl(makeProduct({ slug: 'wooden-chair', industry: 'FURNITURE' }))
-    const decoded = decodeURIComponent(url.replace('data:image/svg+xml;utf8,', ''))
-    expect(decoded).toContain('<svg')
-    expect(decoded).toContain('</svg>')
+  it('has mapped images for all seeded resources and products', () => {
+    for (const slug of RESOURCE_IMAGE_SLUGS) {
+      expect(hasResourceCatalogImage(slug)).toBe(true)
+    }
+    for (const slug of PRODUCT_IMAGE_SLUGS) {
+      expect(hasProductCatalogImage(slug)).toBe(true)
+    }
   })
 })
 

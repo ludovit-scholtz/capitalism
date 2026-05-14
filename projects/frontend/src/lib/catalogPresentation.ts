@@ -1,5 +1,6 @@
 import type { ProductType, Recipe, ResourceType } from '@/types'
 import { translateSlug, getProductImageUrl } from '@/lib/catalogPresentation.Icons'
+import { getResourceCatalogImageUrl } from '@/lib/productImages'
 
 export { getProductImageUrl }
 
@@ -237,8 +238,8 @@ export function getLocalizedProductDescription(product: ProductLike, locale: str
   return `${name} ist ein Produkt der Branche ${industry}. Eine Charge erzeugt ${product.outputQuantity} ${unitName} und verbraucht ${product.energyConsumptionMwh} MW Energie aus ${inputPhrase}.`
 }
 
-export function getResourceImageUrl(resource: ResourceLike): string | null {
-  return resource.imageUrl
+export function getResourceImageUrl(resource: ResourceLike): string {
+  return getResourceCatalogImageUrl(resource.slug, resource.imageUrl)
 }
 
 function humanizeIdentifier(value: string): string {

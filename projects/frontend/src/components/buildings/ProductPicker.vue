@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import ProductPickerPanel from '@/components/buildings/ProductPickerPanel.vue'
 import type { RankedProductResult } from '@/types'
 import { getProductImageUrl, getLocalizedProductName, getLocalizedIndustry } from '@/lib/catalogPresentation'
+import { onCatalogImageError } from '@/lib/catalogImageFallback'
 
 const { t, locale } = useI18n()
 
@@ -167,7 +168,7 @@ watch(
         <span class="picker-trigger-label picker-trigger-loading">{{ t('productPicker.loading') }}</span>
       </template>
       <template v-else-if="selectedProduct">
-        <img :src="productImage(selectedProduct)" :alt="localProductName(selectedProduct)" class="picker-trigger-img" aria-hidden="true" />
+        <img :src="productImage(selectedProduct)" :alt="localProductName(selectedProduct)" class="picker-trigger-img" aria-hidden="true" @error="onCatalogImageError" />
         <span class="picker-trigger-label picker-trigger-selected-name">{{ localProductName(selectedProduct) }}</span>
         <span class="picker-trigger-industry">{{ localIndustry(selectedProduct) }}</span>
       </template>

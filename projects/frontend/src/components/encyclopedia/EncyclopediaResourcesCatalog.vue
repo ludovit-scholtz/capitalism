@@ -15,6 +15,7 @@ import {
   getProductImageUrl,
   getResourceImageUrl,
 } from '@/lib/catalogPresentation'
+import { onCatalogImageError } from '@/lib/catalogImageFallback'
 import type { ProductType, ResourceType } from '@/types'
 
 type CatalogEntry = {
@@ -196,7 +197,7 @@ function navigateToEntry(slug: string) {
         @keydown.enter="navigateToEntry(entry.slug)"
         @keydown.space.prevent="navigateToEntry(entry.slug)"
       >
-        <img v-if="entry.imageUrl" :src="entry.imageUrl ?? undefined" :alt="entry.title" class="w-full h-32 object-cover bg-page" />
+        <img v-if="entry.imageUrl" :src="entry.imageUrl ?? undefined" :alt="entry.title" class="w-full h-32 object-cover bg-page" @error="onCatalogImageError" />
         <div class="p-4 flex flex-col gap-3">
           <!-- Heading row -->
           <div class="flex justify-between items-start gap-4">
