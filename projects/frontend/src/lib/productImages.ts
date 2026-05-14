@@ -2,7 +2,10 @@ const catalogImageModules = import.meta.glob('../assets/products/*.svg', { eager
 
 const catalogImagesBySlug = Object.fromEntries(
   Object.entries(catalogImageModules).map(([path, url]) => [
-    path.split('/').pop()?.replace(/\.svg$/i, '') ?? path,
+    path
+      .split('/')
+      .pop()
+      ?.replace(/\.svg$/i, '') ?? path,
     url,
   ]),
 ) as Record<string, string>
@@ -10,16 +13,7 @@ const catalogImagesBySlug = Object.fromEntries(
 const INLINE_FALLBACK_IMAGE = `data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Crect width='256' height='256' rx='34' fill='%231f2937'/%3E%3Cpath d='M62 91l66-38 66 38v74l-66 38-66-38z' fill='%23e5e7eb'/%3E%3Cpath d='M62 91l66 38 66-38M128 129v74' stroke='%2364748b' stroke-width='9' fill='none'/%3E%3Ccircle cx='128' cy='129' r='18' fill='%2394a3b8'/%3E%3C/svg%3E`
 const CATALOG_FALLBACK_IMAGE = catalogImagesBySlug.fallback ?? INLINE_FALLBACK_IMAGE
 
-export const RESOURCE_IMAGE_SLUGS = [
-  'chemical-minerals',
-  'coal',
-  'cotton',
-  'gold',
-  'grain',
-  'iron-ore',
-  'silicon',
-  'wood',
-] as const
+export const RESOURCE_IMAGE_SLUGS = ['chemical-minerals', 'coal', 'cotton', 'gold', 'grain', 'iron-ore', 'silicon', 'wood'] as const
 
 export const PRODUCT_IMAGE_SLUGS = [
   'allergy-tablets',
@@ -171,7 +165,6 @@ export const PRODUCT_IMAGE_SLUGS = [
   'wooden-table',
   'wound-dressing-kit',
 ] as const
-
 
 const RESOURCE_IMAGE_SLUG_SET = new Set<string>(RESOURCE_IMAGE_SLUGS)
 const PRODUCT_IMAGE_SLUG_SET = new Set<string>(PRODUCT_IMAGE_SLUGS)
