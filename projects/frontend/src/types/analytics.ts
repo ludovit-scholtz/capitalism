@@ -506,6 +506,8 @@ export interface ProductDemandEntry {
   averageClearingPrice: number
   totalRevenue: number
   sellerCount: number
+  topCompetitorCompanyName: string | null
+  topCompetitorMarketSharePercent: number
 }
 
 export interface CityDemandSummaryResult {

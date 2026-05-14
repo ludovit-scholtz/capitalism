@@ -1358,6 +1358,12 @@ export type MockState = {
   marketPriceHistoryByProductId: Record<string, MockMarketPriceHistoryPoint[]>
   /** Mock competitorQualityIntelligence data, keyed by `${cityId}:${productTypeId}`. Returns an empty array when not set. */
   competitorIntelligenceByKey: Record<string, MockCompetitorQualityEntry[]>
+  /** Mock NPC companies returned by npcCompanies query. */
+  npcCompanies: MockNpcCompanySummary[]
+  /** Mock city competitor rows keyed by cityId. */
+  cityCompetitorsByCityId: Record<string, MockCityCompetitorEntry[]>
+  /** Mock NPC decision logs returned by npcDecisionLogs query. */
+  npcDecisionLogs: MockNpcDecisionLog[]
   /** Rental revenue history per building for apartmentBuildingDetail query. */
   rentalHistory?: Array<{
     buildingId: string
@@ -1386,6 +1392,8 @@ export interface MockMarketDemandSummary {
     averageClearingPrice: number
     totalRevenue: number
     sellerCount: number
+    topCompetitorCompanyName?: string | null
+    topCompetitorMarketSharePercent?: number
   }>
 }
 
@@ -1403,6 +1411,42 @@ export interface MockCompetitorQualityEntry {
   qualityLevel: number
   pricePremiumPct: number
   isOwnCompany: boolean
+}
+
+export interface MockNpcCompanySummary {
+  id: string
+  companyId: string
+  name: string
+  archetype: string
+  difficultyLevel: number
+  homeCityId: string
+  homeCityName: string
+  isActive: boolean
+  createdAtUtc: string
+  buildingCount: number
+}
+
+export interface MockCityCompetitorEntry {
+  companyId: string
+  companyName: string
+  isNpc: boolean
+  npcCompanyId: string | null
+  archetype: string | null
+  buildingCount: number
+  estimatedRevenueLastTicks: number
+  marketSharePercent: number
+  marketShareByCategory: Array<{ category: string; sharePercent: number }>
+  trend: 'UP' | 'DOWN' | 'STABLE'
+}
+
+export interface MockNpcDecisionLog {
+  id: string
+  npcCompanyId: string
+  npcCompanyName: string
+  tick: number
+  actionType: string
+  outcome: string
+  createdAtUtc: string
 }
 
 export interface MockBuildingMarketListing {
@@ -3181,6 +3225,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     marketOverviewByCityId: {},
     marketPriceHistoryByProductId: {},
     competitorIntelligenceByKey: {},
+    npcCompanies: [],
+    cityCompetitorsByCityId: {},
+    npcDecisionLogs: [],
     rentalHistory: [],
     cityAverageRentPerSqm: 10,
     buildingMarketListings: [],
@@ -8026,6 +8073,26 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    if (query.includes('npcCompanies')) {
+      const cityId = body.variables?.cityId
+      const npcCompanies = cityId ? state.npcCompanies.filter((npc) => npc.homeCityId === cityId) : state.npcCompanies
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { npcCompanies } }),
+      })
+    }
+
+    if (query.includes('cityCompetitors')) {
+      const cityId = body.variables?.cityId
+      const cityCompetitors = cityId ? (state.cityCompetitorsByCityId[cityId] ?? []) : []
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { cityCompetitors } }),
+      })
+    }
+
     if (query.includes('cityWeatherForecast')) {
       const cityId = body.variables?.cityId
       const cityWeatherForecast = cityId ? (state.cityWeatherForecasts[cityId] ?? buildDefaultCityWeatherForecast(cityId, state.gameState.currentTick)) : null
@@ -9201,6 +9268,49 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    if (query.includes('npcDecisionLogs')) {
+      const logs = [...state.npcDecisionLogs].sort((left, right) => right.tick - left.tick)
+      return routeJson({ npcDecisionLogs: logs })
+    }
+
+    if (query.includes('pauseNpcCompany')) {
+      const npcCompanyId = body.variables?.input?.npcCompanyId ?? body.variables?.npcCompanyId
+      const npc = state.npcCompanies.find((item) => item.id === npcCompanyId)
+      if (!npc) {
+        return routeJsonError('NPC company not found.', 'NPC_COMPANY_NOT_FOUND')
+      }
+      npc.isActive = false
+      state.npcDecisionLogs.unshift({
+        id: crypto.randomUUID(),
+        npcCompanyId: npc.id,
+        npcCompanyName: npc.name,
+        tick: state.gameState.currentTick,
+        actionType: 'PAUSE',
+        outcome: 'NPC activity paused by admin.',
+        createdAtUtc: new Date().toISOString(),
+      })
+      return routeJson({ pauseNpcCompany: { ...npc } })
+    }
+
+    if (query.includes('resumeNpcCompany')) {
+      const npcCompanyId = body.variables?.input?.npcCompanyId ?? body.variables?.npcCompanyId
+      const npc = state.npcCompanies.find((item) => item.id === npcCompanyId)
+      if (!npc) {
+        return routeJsonError('NPC company not found.', 'NPC_COMPANY_NOT_FOUND')
+      }
+      npc.isActive = true
+      state.npcDecisionLogs.unshift({
+        id: crypto.randomUUID(),
+        npcCompanyId: npc.id,
+        npcCompanyName: npc.name,
+        tick: state.gameState.currentTick,
+        actionType: 'RESUME',
+        outcome: 'NPC activity resumed by admin.',
+        createdAtUtc: new Date().toISOString(),
+      })
+      return routeJson({ resumeNpcCompany: { ...npc } })
+    }
+
     if (query.includes('operationsStatistics')) {
       const accessFailure = getAdminAccessFailure(false)
       if (accessFailure) {
@@ -9913,6 +10023,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               averageClearingPrice: pt.basePrice ?? (10 + idx * 5),
               totalRevenue: (pt.basePrice ?? 15) * (400 + idx * 40),
               sellerCount: 1 + idx,
+              topCompetitorCompanyName: idx % 2 === 0 ? 'NPC Manufacturing Co.' : null,
+              topCompetitorMarketSharePercent: idx % 2 === 0 ? 42.5 : 0,
             })),
         }
       })
@@ -9939,6 +10051,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         averageClearingPrice: pt.basePrice ?? (10 + idx * 5),
         totalRevenue: (pt.basePrice ?? 15) * (400 + idx * 40),
         sellerCount: 1 + idx,
+        topCompetitorCompanyName: idx % 2 === 0 ? 'NPC Manufacturing Co.' : null,
+        topCompetitorMarketSharePercent: idx % 2 === 0 ? 42.5 : 0,
       }))).slice(0, topN)
       const result = {
         cityId,

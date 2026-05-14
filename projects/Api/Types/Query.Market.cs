@@ -128,6 +128,7 @@ public sealed partial class Query
             .AsNoTracking()
             .Where(r => r.CityId == cityId && r.ProductTypeId != null && r.Tick > fromTick)
             .Include(r => r.ProductType)
+            .Include(r => r.Company)
             .ToListAsync(cancellationToken);
 
         if (records.Count == 0)
@@ -153,6 +154,18 @@ public sealed partial class Query
                 var satisfactionRate = totalDemand > 0 ? Math.Clamp(totalSold / totalDemand, 0m, 1m) : 0m;
                 var avgPrice = totalSold > 0 ? totalRevenue / totalSold : 0m;
                 var sellerCount = g.Select(r => r.CompanyId).Distinct().Count();
+                var topCompetitor = g
+                    .GroupBy(record => record.CompanyId)
+                    .Select(group => new
+                    {
+                        CompanyName = group.Select(record => record.Company != null ? record.Company.Name : "Unknown").FirstOrDefault() ?? "Unknown",
+                        Revenue = group.Sum(record => record.Revenue)
+                    })
+                    .OrderByDescending(item => item.Revenue)
+                    .FirstOrDefault();
+                var topCompetitorShare = totalRevenue > 0m && topCompetitor is not null
+                    ? decimal.Round((topCompetitor.Revenue / totalRevenue) * 100m, 2, MidpointRounding.AwayFromZero)
+                    : 0m;
 
                 return new ProductDemandEntry
                 {
@@ -165,6 +178,8 @@ public sealed partial class Query
                     AverageClearingPrice = Math.Round(avgPrice, 4),
                     TotalRevenue = totalRevenue,
                     SellerCount = sellerCount,
+                    TopCompetitorCompanyName = topCompetitor?.CompanyName,
+                    TopCompetitorMarketSharePercent = topCompetitorShare,
                 };
             })
             .OrderByDescending(p => p.TotalDemand)
@@ -208,6 +223,7 @@ public sealed partial class Query
             .AsNoTracking()
             .Where(r => r.ProductTypeId != null && r.Tick > fromTick)
             .Include(r => r.ProductType)
+            .Include(r => r.Company)
             .ToListAsync(cancellationToken);
 
         var recordsByCity = allRecords.GroupBy(r => r.CityId).ToDictionary(g => g.Key, g => g.ToList());
@@ -226,6 +242,18 @@ public sealed partial class Query
                     var totalRevenue = g.Sum(r => r.Revenue);
                     var satisfactionRate = totalDemand > 0 ? Math.Clamp(totalSold / totalDemand, 0m, 1m) : 0m;
                     var avgPrice = totalSold > 0 ? totalRevenue / totalSold : 0m;
+                    var topCompetitor = g
+                        .GroupBy(record => record.CompanyId)
+                        .Select(group => new
+                        {
+                            CompanyName = group.Select(record => record.Company != null ? record.Company.Name : "Unknown").FirstOrDefault() ?? "Unknown",
+                            Revenue = group.Sum(record => record.Revenue)
+                        })
+                        .OrderByDescending(item => item.Revenue)
+                        .FirstOrDefault();
+                    var topCompetitorShare = totalRevenue > 0m && topCompetitor is not null
+                        ? decimal.Round((topCompetitor.Revenue / totalRevenue) * 100m, 2, MidpointRounding.AwayFromZero)
+                        : 0m;
 
                     return new ProductDemandEntry
                     {
@@ -238,6 +266,8 @@ public sealed partial class Query
                         AverageClearingPrice = Math.Round(avgPrice, 4),
                         TotalRevenue = totalRevenue,
                         SellerCount = g.Select(r => r.CompanyId).Distinct().Count(),
+                        TopCompetitorCompanyName = topCompetitor?.CompanyName,
+                        TopCompetitorMarketSharePercent = topCompetitorShare,
                     };
                 })
                 .OrderByDescending(p => p.TotalDemand)
@@ -303,4 +333,6 @@ public sealed class ProductDemandEntry
     public decimal AverageClearingPrice { get; set; }
     public decimal TotalRevenue { get; set; }
     public int SellerCount { get; set; }
+    public string? TopCompetitorCompanyName { get; set; }
+    public decimal TopCompetitorMarketSharePercent { get; set; }
 }

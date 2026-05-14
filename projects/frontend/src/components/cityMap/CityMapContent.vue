@@ -6,7 +6,7 @@ import { formatMoney } from '@/lib/currencyFormat'
 import { getLotStatus as lotStatusFromOwnership, getLotMarkerColor as markerColorFromStatus, getResourceLayerMarkerColor } from '@/lib/cityMapHelpers'
 import { getActiveCompany } from '@/lib/accountContext'
 import CityLotDetailPanel from '@/components/cityMap/CityLotDetailPanel.vue'
-import type { City, BuildingLot, Company, PurchaseLotResult, CityWeatherForecast } from '@/types'
+import type { City, BuildingLot, Company, PurchaseLotResult, CityWeatherForecast, NpcCompanySummary } from '@/types'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -18,6 +18,7 @@ const props = defineProps<{
   filteredLots: BuildingLot[]
   lots: BuildingLot[]
   companies: Company[]
+  npcCompanies: NpcCompanySummary[]
   viewMode: 'map' | 'list'
   cityWeather: CityWeatherForecast | null
   highlightedBuildingId: string | null
@@ -38,10 +39,11 @@ let markers: L.Marker[] = []
 const activeCompany = computed(() => getActiveCompany(auth.player, props.companies))
 const isCompanyAccountActive = computed(() => auth.player?.activeAccountType === 'COMPANY' && !!activeCompany.value)
 
-function getLotStatus(lot: BuildingLot): 'available' | 'owned' | 'yours' {
+function getLotStatus(lot: BuildingLot): 'available' | 'owned' | 'yours' | 'npc' {
   return lotStatusFromOwnership(
     lot.ownerCompanyId,
     props.companies.map((c) => c.id),
+    props.npcCompanies.map((npc) => npc.companyId),
   )
 }
 
@@ -104,7 +106,12 @@ function updateMarkers() {
 
     const marker = L.marker([lot.latitude, lot.longitude], { icon }).addTo(map)
 
-    marker.bindTooltip(lot.name, {
+    const lotOwnerNpc = props.npcCompanies.find((npc) => npc.companyId === lot.ownerCompanyId)
+    const tooltipText = lotOwnerNpc && lot.building
+      ? `NPC: ${lotOwnerNpc.name} (${lotOwnerNpc.archetype}) — ${lot.building.type}`
+      : lot.name
+
+    marker.bindTooltip(tooltipText, {
       direction: 'top',
       offset: [0, -10],
     })
@@ -226,7 +233,7 @@ onUnmounted(() => {
           v-for="lot in filteredLots"
           :key="lot.id"
           class="lot-list-item"
-          :class="{ selected: selectedLot?.id === lot.id, available: getLotStatus(lot) === 'available', owned: getLotStatus(lot) === 'owned', yours: getLotStatus(lot) === 'yours' }"
+          :class="{ selected: selectedLot?.id === lot.id, available: getLotStatus(lot) === 'available', owned: getLotStatus(lot) === 'owned', yours: getLotStatus(lot) === 'yours', npc: getLotStatus(lot) === 'npc' }"
           @click="selectLot(lot)"
         >
           <div class="lot-status-dot" :style="{ background: getLotMarkerColor(lot) }"></div>
@@ -239,7 +246,7 @@ onUnmounted(() => {
           <div class="lot-list-meta">
             <span class="lot-list-price">{{ formatCurrency(lot.price) }}</span>
             <span class="lot-list-status" :class="getLotStatus(lot)">
-              {{ getLotStatus(lot) === 'available' ? t('cityMap.available') : getLotStatus(lot) === 'yours' ? t('cityMap.yourProperty') : t('cityMap.owned') }}
+              {{ getLotStatus(lot) === 'available' ? t('cityMap.available') : getLotStatus(lot) === 'yours' ? t('cityMap.yourProperty') : getLotStatus(lot) === 'npc' ? t('cityMap.npcProperty') : t('cityMap.owned') }}
             </span>
           </div>
         </button>
@@ -401,6 +408,10 @@ onUnmounted(() => {
 
 .lot-list-status.yours {
   color: var(--color-primary);
+}
+
+.lot-list-status.npc {
+  color: #f97316;
 }
 
 .empty-panel {

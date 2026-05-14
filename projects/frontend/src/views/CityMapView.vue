@@ -39,6 +39,7 @@
         :city-id="cityId"
         :lots="lots"
         :companies="companies"
+        :npc-companies="npcCompanies"
         :city-weather="cityWeather"
         :city-power-balance="cityPowerBalance"
         :city-economic-report="cityEconomicReport"
@@ -63,7 +64,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
-import type { City, BuildingLot, Company, PurchaseLotResult, CityMediaHouseInfo, CityWeatherForecast, CityPowerBalance, CityEconomicReportResult, EconomicCycleView, MarketEventView, EconomicCycleHistoryPoint } from '@/types'
+import type { City, BuildingLot, Company, PurchaseLotResult, CityMediaHouseInfo, CityWeatherForecast, CityPowerBalance, CityEconomicReportResult, EconomicCycleView, MarketEventView, EconomicCycleHistoryPoint, NpcCompanySummary } from '@/types'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -76,10 +77,21 @@ const tabs = [
   { key: 'economy', name: 'city-economy', icon: '📈', labelKey: 'cityMap.tabs.economy' },
   { key: 'buildings', name: 'city-buildings', icon: '🏗️', labelKey: 'cityMap.tabs.buildings' },
   { key: 'market', name: 'city-market', icon: '🛒', labelKey: 'cityMap.tabs.market' },
+  { key: 'competitors', name: 'city-competitors', icon: '🏁', labelKey: 'cityMap.tabs.competitors' },
 ] as const
 
 const cityId = computed(() => route.params.cityId as string)
-const activeTab = computed(() => (route.name === 'city-economy' ? 'economy' : route.name === 'city-buildings' ? 'buildings' : route.name === 'city-market' ? 'market' : 'overview'))
+const activeTab = computed(() =>
+  route.name === 'city-economy'
+    ? 'economy'
+    : route.name === 'city-buildings'
+      ? 'buildings'
+      : route.name === 'city-market'
+        ? 'market'
+        : route.name === 'city-competitors'
+          ? 'competitors'
+          : 'overview',
+)
 const highlightedBuildingId = computed(() => (typeof route.query.building === 'string' ? route.query.building : null))
 
 const loading = ref(true)
@@ -87,6 +99,7 @@ const error = ref<string | null>(null)
 const city = ref<City | null>(null)
 const lots = ref<BuildingLot[]>([])
 const companies = ref<Company[]>([])
+const npcCompanies = ref<NpcCompanySummary[]>([])
 
 const cityWeather = ref<CityWeatherForecast | null>(null)
 const cityPowerBalance = ref<CityPowerBalance | null>(null)
@@ -108,7 +121,7 @@ async function fetchData() {
       await auth.fetchMe()
     }
 
-    const [cityData, lotsData, companiesData] = await Promise.all([
+    const [cityData, lotsData, companiesData, npcData] = await Promise.all([
       gqlRequest<{ city: City }>(
         `query GetCity($id: UUID!) {
           city(id: $id) {
@@ -133,11 +146,29 @@ async function fetchData() {
         { cityId: cityId.value },
       ),
       auth.isAuthenticated ? gqlRequest<{ myCompanies: Company[] }>(`{ myCompanies { id name cash foundedAtUtc buildings { id } } }`) : Promise.resolve({ myCompanies: [] as Company[] }),
+      gqlRequest<{ npcCompanies: NpcCompanySummary[] }>(
+        `query NpcCompanies($cityId: UUID) {
+          npcCompanies(cityId: $cityId) {
+            id
+            companyId
+            name
+            archetype
+            difficultyLevel
+            homeCityId
+            homeCityName
+            isActive
+            createdAtUtc
+            buildingCount
+          }
+        }`,
+        { cityId: cityId.value },
+      ),
     ])
 
     city.value = cityData.city
     lots.value = lotsData.cityLots
     companies.value = companiesData.myCompanies
+    npcCompanies.value = npcData.npcCompanies ?? []
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Failed to load city data'
   } finally {
@@ -298,6 +329,7 @@ watch(cityId, async () => {
   cityPowerBalance.value = null
   cityEconomicReport.value = null
   cityMediaHouses.value = []
+  npcCompanies.value = []
   economyCycle.value = null
   activeMarketEvents.value = []
   economicHistory.value = []

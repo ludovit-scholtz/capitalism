@@ -217,6 +217,10 @@ public sealed partial class AppDbInitializer(
 
         // Idempotent: ensure FoodProcessing and Healthcare products are flagged as perishable.
         await EnsurePerishableProductsAsync();
+
+        // Seed baseline autonomous competitors for each city (idempotent).
+        await EnsureNpcCompaniesSeedAsync();
+        await dbContext.SaveChangesAsync();
     }
 
     private async Task SeedFxRatesAsync()
