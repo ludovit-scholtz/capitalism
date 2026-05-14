@@ -171,13 +171,7 @@ public class Program
         {
             options.AddPolicy("frontend", policy =>
             {
-                var allowedOrigins = CorsPolicyHelper.ResolveAllowedOrigins(builder.Configuration);
-
-                if (CorsPolicyHelper.IsDevelopmentOpenPolicy(builder.Environment))
-                {
-                    policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
-                    return;
-                }
+                var allowedOrigins = CorsPolicyHelper.ResolveEffectiveAllowedOrigins(builder.Configuration, builder.Environment);
 
                 if (allowedOrigins.Length == 0)
                 {
@@ -185,7 +179,7 @@ public class Program
                     return;
                 }
 
-                policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod();
+                policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
             });
         });
 

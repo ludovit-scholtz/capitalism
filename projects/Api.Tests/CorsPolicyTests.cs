@@ -28,10 +28,15 @@ public sealed class CorsPolicyTests
     }
 
     [Fact]
-    public void IsDevelopmentOpenPolicy_ReturnsTrueInDevelopment()
+    public void ResolveEffectiveAllowedOrigins_UsesDevelopmentDefaultsWhenUnset()
     {
+        var configuration = new ConfigurationBuilder().Build();
         var environment = new TestHostEnvironment("Development");
-        Assert.True(CorsPolicyHelper.IsDevelopmentOpenPolicy(environment));
+
+        var origins = CorsPolicyHelper.ResolveEffectiveAllowedOrigins(configuration, environment);
+
+        Assert.Contains("http://localhost:5173", origins);
+        Assert.Contains("http://127.0.0.1:5173", origins);
     }
 
     [Fact]
@@ -59,6 +64,8 @@ public sealed class CorsPolicyTests
         Assert.Equal(HttpStatusCode.NoContent, allowedResponse.StatusCode);
         Assert.True(allowedResponse.Headers.TryGetValues("Access-Control-Allow-Origin", out var allowedValues));
         Assert.Equal("https://app.example.com", allowedValues.Single());
+        Assert.True(allowedResponse.Headers.TryGetValues("Access-Control-Allow-Credentials", out var allowCredentialsValues));
+        Assert.Equal("true", allowCredentialsValues.Single());
 
         using var blockedRequest = CreatePreflightRequest("https://evil.com");
         using var blockedResponse = await client.SendAsync(blockedRequest);
