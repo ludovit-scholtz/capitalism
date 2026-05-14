@@ -170,6 +170,17 @@ describe('productImages mapping', () => {
     }
   })
 
+  it('keeps catalog SVG artwork free of embedded raster or foreignObject content', () => {
+    const svgFiles = readdirSync(assetDir).filter((file) => file.endsWith('.svg'))
+    expect(svgFiles.length).toBeGreaterThan(0)
+
+    for (const file of svgFiles) {
+      const source = readFileSync(new URL(file, assetDir), 'utf8')
+      expect(source).not.toMatch(/<image[\\s>]/i)
+      expect(source).not.toMatch(/<foreignObject[\\s>]/i)
+    }
+  })
+
   it('keeps the catalog asset directory SVG-only with one mapped asset plus fallback', () => {
     const files = readdirSync(assetDir)
     const svgFiles = files.filter((file) => file.endsWith('.svg')).sort()
