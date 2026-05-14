@@ -106,6 +106,10 @@ export default {
     subtitle: 'Aktuelle Alerts und Ereignisse aus Ihren Unternehmen.',
     empty: 'Noch keine Benachrichtigungen.',
     markAllRead: 'Alle als gelesen markieren',
+    justNow: 'Gerade eben',
+    minutesAgo: 'vor {count} Min',
+    hoursAgo: 'vor {count} Std',
+    daysAgo: 'vor {count} T',
   },
   admin: {
     eyebrow: 'Spieladministration',

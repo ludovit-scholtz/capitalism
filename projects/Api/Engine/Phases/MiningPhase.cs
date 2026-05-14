@@ -177,6 +177,29 @@ public sealed class MiningPhase : ITickPhase
                 building.Id);
         }
 
+        if (MiningScarcityCalculator.CrossedDownThreshold(previousRatio, currentRatio, 0.15m)
+            && !PlayerNotificationService.HasUnreadDuplicate(
+                context.Db,
+                company.PlayerId,
+                PlayerNotificationType.MineDepleting,
+                relatedEntityId: building.Id,
+                companyId: company.Id,
+                buildingId: building.Id))
+        {
+            PlayerNotificationService.Add(
+                context.Db,
+                company.PlayerId,
+                PlayerNotificationType.MineDepleting,
+                $"Mine depleting: {resourceName}",
+                $"Your mine {building.Name} dropped below 15% reserves ({decimal.Round(currentRatio * 100m, 1):0.#}% remaining).",
+                context.CurrentTick,
+                company.Id,
+                building.Id,
+                severity: PlayerNotificationSeverity.Warning,
+                relatedEntityType: "BUILDING",
+                relatedEntityId: building.Id);
+        }
+
         if (MiningScarcityCalculator.CrossedDownThreshold(previousRatio, currentRatio, 0.05m))
         {
             PlayerNotificationService.Add(

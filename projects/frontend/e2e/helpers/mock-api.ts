@@ -1169,16 +1169,20 @@ export type MockState = {
   playerNotifications: Array<{
     id: string
     type: string
+    severity?: 'INFO' | 'WARNING' | 'CRITICAL'
     title: string
     message: string
     isRead: boolean
     createdAtTick: number
     createdAtUtc: string
+    expiresAtUtc?: string | null
     companyId?: string | null
     buildingId?: string | null
     buildingUnitId?: string | null
     bankAccountId?: string | null
     loanId?: string | null
+    relatedEntityType?: string | null
+    relatedEntityId?: string | null
   }>
   /** Player's company bank accounts returned by the myBankAccounts query. */
   myBankAccounts: Array<{
@@ -8771,15 +8775,35 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
-    if (query.includes('playerNotificationInbox')) {
+    if (query.includes('myNotifications') || query.includes('playerNotificationInbox')) {
       if (!state.currentUserId) {
         return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
       }
 
-      const limit = Math.max(1, Math.min(200, Number(body.variables?.limit ?? 20)))
+      const limit = Math.max(1, Math.min(200, Number(body.variables?.first ?? body.variables?.limit ?? 20)))
       const sorted = [...state.playerNotifications].sort((left, right) => right.createdAtUtc.localeCompare(left.createdAtUtc))
-      const items = sorted.slice(0, limit)
+      const onlyUnread = Boolean(body.variables?.onlyUnread)
+      const filtered = onlyUnread ? sorted.filter((item) => !item.isRead) : sorted
+      const items = filtered.slice(0, limit).map((item) => ({
+        severity: 'INFO',
+        ...item,
+      }))
       const unreadCount = sorted.filter((item) => !item.isRead).length
+      if (query.includes('myNotifications')) {
+        return routeJson({
+          myNotifications: {
+            totalCount: filtered.length,
+            edges: items.map((item) => ({
+              cursor: `${item.createdAtTick}:${item.id}`,
+              node: item,
+            })),
+            pageInfo: {
+              hasNextPage: filtered.length > limit,
+              endCursor: items.length > 0 ? `${items[items.length - 1].createdAtTick}:${items[items.length - 1].id}` : null,
+            },
+          },
+        })
+      }
       return routeJson({
         playerNotificationInbox: {
           unreadCount,
@@ -8788,27 +8812,34 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
-    if (query.includes('playerNotificationUnreadCount')) {
+    if (query.includes('notificationCount') || query.includes('playerNotificationUnreadCount')) {
       if (!state.currentUserId) {
         return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
       }
 
-      return routeJson({ playerNotificationUnreadCount: state.playerNotifications.filter((item) => !item.isRead).length })
+      const count = state.playerNotifications.filter((item) => !item.isRead).length
+      if (query.includes('notificationCount')) {
+        return routeJson({ notificationCount: count })
+      }
+      return routeJson({ playerNotificationUnreadCount: count })
     }
 
-    if (query.includes('markPlayerNotificationsRead')) {
+    if (query.includes('markNotificationsRead') || query.includes('markPlayerNotificationsRead')) {
       if (!state.currentUserId) {
         return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
       }
 
-      const notificationIds: string[] = body.variables?.input?.notificationIds ?? []
+      const notificationIds: string[] = body.variables?.ids ?? body.variables?.input?.notificationIds ?? []
       if (notificationIds.length > 0) {
         state.playerNotifications = state.playerNotifications.map((item) => (notificationIds.includes(item.id) ? { ...item, isRead: true } : item))
+      }
+      if (query.includes('markNotificationsRead')) {
+        return routeJson({ markNotificationsRead: true })
       }
       return routeJson({ markPlayerNotificationsRead: true })
     }
 
-    if (query.includes('markAllPlayerNotificationsRead')) {
+    if (query.includes('markAllNotificationsRead') || query.includes('markAllPlayerNotificationsRead')) {
       if (!state.currentUserId) {
         return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
       }
@@ -8816,6 +8847,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const changed = state.playerNotifications.filter((item) => !item.isRead).length
       if (changed > 0) {
         state.playerNotifications = state.playerNotifications.map((item) => ({ ...item, isRead: true }))
+      }
+      if (query.includes('markAllNotificationsRead')) {
+        return routeJson({ markAllNotificationsRead: true })
       }
       return routeJson({ markAllPlayerNotificationsRead: changed })
     }

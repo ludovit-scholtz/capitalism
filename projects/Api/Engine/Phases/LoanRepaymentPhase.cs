@@ -258,6 +258,7 @@ public sealed class LoanRepaymentPhase : ITickPhase
             }
 
             // Update status.
+            var previousStatus = loan.Status;
             loan.Status = loan.MissedPayments >= DefaultedMissedPaymentThreshold
                 ? LoanStatus.Defaulted
                 : LoanStatus.Overdue;
@@ -328,7 +329,37 @@ public sealed class LoanRepaymentPhase : ITickPhase
                 borrower.Id,
                 loan.CollateralBuildingId,
                 loanId: loan.Id,
-                bankAccountId: loan.BorrowerBankAccountId);
+                bankAccountId: loan.BorrowerBankAccountId,
+                severity: PlayerNotificationSeverity.Warning,
+                relatedEntityType: "LOAN",
+                relatedEntityId: loan.Id);
+
+            if (loan.Status == LoanStatus.Defaulted
+                && previousStatus != LoanStatus.Defaulted
+                && !PlayerNotificationService.HasUnreadDuplicate(
+                    context.Db,
+                    borrower.PlayerId,
+                    PlayerNotificationType.LoanDefault,
+                    relatedEntityId: loan.Id,
+                    companyId: borrower.Id,
+                    buildingId: loan.CollateralBuildingId,
+                    loanId: loan.Id))
+            {
+                PlayerNotificationService.Add(
+                    context.Db,
+                    borrower.PlayerId,
+                    PlayerNotificationType.LoanDefault,
+                    "Loan default",
+                    $"{borrower.Name} defaulted on the loan at {bankBuildingName}. Collateral at {collateralBuildingName} is now in foreclosure.",
+                    context.CurrentTick,
+                    borrower.Id,
+                    loan.CollateralBuildingId,
+                    loanId: loan.Id,
+                    bankAccountId: loan.BorrowerBankAccountId,
+                    severity: PlayerNotificationSeverity.Critical,
+                    relatedEntityType: "LOAN",
+                    relatedEntityId: loan.Id);
+            }
         }
     }
 }

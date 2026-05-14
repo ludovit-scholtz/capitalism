@@ -21,7 +21,6 @@
     <Compile Remove="MasterRankingTelemetryTests.cs" />
     <Compile Remove="SupplyChainTests.cs" />
 
-    <Compile Remove="PlayerNotificationAndAlertThresholdTests.cs" />
   </ItemGroup>
 
   <ItemGroup>

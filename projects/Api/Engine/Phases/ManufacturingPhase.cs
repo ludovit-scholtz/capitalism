@@ -118,7 +118,11 @@ public sealed class ManufacturingPhase : ITickPhase
             possibleBatches = Math.Min(possibleBatches, canMake);
         }
 
-        if (possibleBatches <= 0) return;
+        if (possibleBatches <= 0)
+        {
+            NotifyInputHalt(context, building, unit, productType.Name);
+            return;
+        }
 
         // Check output space.
         var outputQuantity = possibleBatches * productType.OutputQuantity;
@@ -271,5 +275,38 @@ public sealed class ManufacturingPhase : ITickPhase
             null,
             productType.Id,
             producedQuantity: outputQuantity);
+    }
+
+    private static void NotifyInputHalt(TickContext context, Building building, BuildingUnit unit, string productName)
+    {
+        if (!context.CompaniesById.TryGetValue(building.CompanyId, out var company))
+        {
+            return;
+        }
+
+        if (PlayerNotificationService.HasUnreadDuplicate(
+            context.Db,
+            company.PlayerId,
+            PlayerNotificationType.ProductionHalted,
+            relatedEntityId: unit.Id,
+            companyId: company.Id,
+            buildingId: building.Id))
+        {
+            return;
+        }
+
+        PlayerNotificationService.Add(
+            context.Db,
+            company.PlayerId,
+            PlayerNotificationType.ProductionHalted,
+            "Production halted",
+            $"{building.Name} cannot manufacture {productName} due to missing inputs.",
+            context.CurrentTick,
+            company.Id,
+            building.Id,
+            buildingUnitId: unit.Id,
+            severity: PlayerNotificationSeverity.Warning,
+            relatedEntityType: "BUILDING_UNIT",
+            relatedEntityId: unit.Id);
     }
 }

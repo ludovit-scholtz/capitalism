@@ -181,6 +181,30 @@ public sealed partial class Mutation
             account.Company?.Id);
         holding.ShareCount = decimal.Round(holding.ShareCount + shareCount, 4, MidpointRounding.AwayFromZero);
 
+        var controlledOwnershipRatio = ComputeControlledOwnershipRatio(userId, targetCompany, companies, shareholdings);
+        if (targetCompany.PlayerId != userId
+            && controlledOwnershipRatio > 0.3m
+            && !PlayerNotificationService.HasUnreadDuplicate(
+                db,
+                targetCompany.PlayerId,
+                PlayerNotificationType.TakeoverAlert,
+                relatedEntityId: targetCompany.Id,
+                companyId: targetCompany.Id))
+        {
+            PlayerNotificationService.Add(
+                db,
+                targetCompany.PlayerId,
+                PlayerNotificationType.TakeoverAlert,
+                "Takeover alert",
+                $"{player.DisplayName} reached {decimal.Round(controlledOwnershipRatio * 100m, 1):0.#}% ownership in {targetCompany.Name}.",
+                currentTick,
+                targetCompany.Id,
+                severity: PlayerNotificationSeverity.Critical,
+                relatedEntityType: "COMPANY",
+                relatedEntityId: targetCompany.Id,
+                expiresAtUtc: DateTime.UtcNow.AddDays(14));
+        }
+
         await RecordSharePriceHistoryAsync(db, targetCompany.Id, askPrice, currentTick);
         await db.SaveChangesAsync();
 

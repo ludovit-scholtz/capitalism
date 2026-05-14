@@ -150,13 +150,16 @@ public sealed class PlayerAlertPhase : ITickPhase
             PlayerNotificationService.Add(
                 context.Db,
                 borrower.PlayerId,
-                PlayerNotificationType.LoanRepaymentDueSoon,
+                PlayerNotificationType.LoanPaymentDue,
                 "Loan repayment due soon",
                 $"{borrower.Name} has a scheduled repayment due in {ticksLeft} ticks.",
                 context.CurrentTick,
                 borrower.Id,
                 loanId: loan.Id,
-                bankAccountId: loan.BorrowerBankAccountId);
+                bankAccountId: loan.BorrowerBankAccountId,
+                severity: PlayerNotificationSeverity.Warning,
+                relatedEntityType: "LOAN",
+                relatedEntityId: loan.Id);
 
             loan.DueSoonAlertForPaymentTick = loan.NextPaymentTick;
         }

@@ -3,7 +3,7 @@ import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { usesStore } from '@/stores/news'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useGameAdminStore } from '@/stores/gameAdmin'
@@ -73,6 +73,10 @@ async function toggleNotificationsPanel() {
   isNotificationsOpen.value = !isNotificationsOpen.value
   if (isNotificationsOpen.value) {
     await notificationsStore.fetchInbox(20)
+    const unreadIds = notificationsInbox.value?.items.filter((item) => !item.isRead).map((item) => item.id) ?? []
+    if (unreadIds.length > 0) {
+      await notificationsStore.markRead(unreadIds)
+    }
   }
 }
 
@@ -80,21 +84,27 @@ function closeNotificationsPanel() {
   isNotificationsOpen.value = false
 }
 
-async function handleNotificationClick(notificationId: string, isRead: boolean, buildingId: string | null, type: string) {
+async function handleNotificationClick(notificationId: string, isRead: boolean, item: {
+  buildingId: string | null
+  companyId: string | null
+  loanId: string | null
+  bankAccountId: string | null
+  type: string
+}) {
   if (!isRead) {
     await notificationsStore.markRead([notificationId])
   }
 
-  if (buildingId) {
-    await router.push(`/building/${buildingId}`)
-  } else if (type === 'SHIPMENT_ARRIVED' || type === 'LOGISTICS_MARGIN_EROSION') {
+  if (item.buildingId) {
+    await router.push(`/building/${item.buildingId}`)
+  } else if (item.type === 'SHIPMENT_ARRIVED' || item.type === 'LOGISTICS_MARGIN_EROSION') {
     await router.push('/trade-routes')
-  } else if (type === 'LOAN_REPAYMENT_DUE_SOON') {
+  } else if (item.type === 'LOAN_REPAYMENT_DUE_SOON' || item.type === 'LOAN_PAYMENT_DUE' || item.type === 'LOAN_DEFAULT' || item.loanId) {
     await router.push('/banking')
-  } else if (type === 'LOAN_PAYMENT_MISSED') {
-    await router.push('/banking')
-  } else if (type === 'BANK_ACCOUNT_LOW_BALANCE') {
+  } else if (item.type === 'BANK_ACCOUNT_LOW_BALANCE' || item.bankAccountId) {
     await router.push('/bank-statement')
+  } else if (item.type === 'TAKEOVER_ALERT' || item.companyId) {
+    await router.push('/stocks')
   } else {
     await router.push('/dashboard')
   }
@@ -118,6 +128,46 @@ function getNotificationIcon(type: string) {
   return {
     symbol: '🔔',
     className: 'notification-icon-default',
+  }
+}
+
+function getNotificationSeverityClass(severity: string) {
+  if (severity === 'CRITICAL') {
+    return 'notification-severity-critical'
+  }
+  if (severity === 'WARNING') {
+    return 'notification-severity-warning'
+  }
+  return 'notification-severity-info'
+}
+
+function formatNotificationAge(createdAtUtc: string) {
+  const createdAt = new Date(createdAtUtc).getTime()
+  const diffMs = Math.max(0, Date.now() - createdAt)
+  const diffMinutes = Math.floor(diffMs / 60000)
+  if (diffMinutes < 1) return t('notifications.justNow')
+  if (diffMinutes < 60) return t('notifications.minutesAgo', { count: diffMinutes })
+  const diffHours = Math.floor(diffMinutes / 60)
+  if (diffHours < 24) return t('notifications.hoursAgo', { count: diffHours })
+  const diffDays = Math.floor(diffHours / 24)
+  return t('notifications.daysAgo', { count: diffDays })
+}
+
+const groupedNotifications = computed(() => {
+  const items = notificationsInbox.value?.items ?? []
+  const groups = new Map<string, typeof items>()
+  for (const item of items) {
+    const day = new Date(item.createdAtUtc).toLocaleDateString()
+    const existing = groups.get(day) ?? []
+    existing.push(item)
+    groups.set(day, existing)
+  }
+  return Array.from(groups.entries()).map(([day, itemsForDay]) => ({ day, items: itemsForDay }))
+})
+
+function handleNotificationsEsc(event: KeyboardEvent) {
+  if (event.key === 'Escape' && isNotificationsOpen.value) {
+    closeNotificationsPanel()
   }
 }
 
@@ -225,6 +275,11 @@ const mobileNavSections = computed(() => {
 onMounted(() => {
   void refreshStockProposalBadgeCount()
   endgameStore.startPolling()
+  window.addEventListener('keydown', handleNotificationsEsc)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleNotificationsEsc)
 })
 
 useTickRefresh(async () => {
@@ -420,18 +475,36 @@ useTickRefresh(async () => {
       <div v-else-if="!notificationsInbox || notificationsInbox.items.length === 0" class="notification-panel-state">
         {{ t('notifications.empty') }}
       </div>
-      <ul v-else class="notification-list">
-        <li v-for="item in notificationsInbox.items" :key="item.id" class="notification-item" :class="{ 'notification-item-unread': !item.isRead }">
-          <button class="notification-item-btn" @click="handleNotificationClick(item.id, item.isRead, item.buildingId, item.type)">
-            <div class="notification-item-top">
-              <span class="notification-item-icon" :class="getNotificationIcon(item.type).className">{{ getNotificationIcon(item.type).symbol }}</span>
-              <span class="notification-item-title">{{ item.title }}</span>
-            </div>
-            <span class="notification-item-message">{{ item.message }}</span>
-            <span class="notification-item-time">{{ new Date(item.createdAtUtc).toLocaleString() }}</span>
-          </button>
-        </li>
-      </ul>
+      <div v-else class="notification-groups">
+        <section v-for="group in groupedNotifications" :key="group.day" class="notification-group">
+          <h4 class="notification-group-day">{{ group.day }}</h4>
+          <ul class="notification-list">
+            <li v-for="item in group.items" :key="item.id" class="notification-item" :class="{ 'notification-item-unread': !item.isRead }">
+              <button
+                class="notification-item-btn"
+                @click="
+                  handleNotificationClick(item.id, item.isRead, {
+                    buildingId: item.buildingId,
+                    companyId: item.companyId,
+                    loanId: item.loanId,
+                    bankAccountId: item.bankAccountId,
+                    type: item.type,
+                  })
+                "
+              >
+                <div class="notification-item-top">
+                  <span class="notification-item-icon" :class="[getNotificationIcon(item.type).className, getNotificationSeverityClass(item.severity)]">
+                    {{ getNotificationIcon(item.type).symbol }}
+                  </span>
+                  <span class="notification-item-title">{{ item.title }}</span>
+                </div>
+                <span class="notification-item-message">{{ item.message }}</span>
+                <span class="notification-item-time">{{ formatNotificationAge(item.createdAtUtc) }}</span>
+              </button>
+            </li>
+          </ul>
+        </section>
+      </div>
     </aside>
   </header>
 </template>
@@ -590,6 +663,18 @@ useTickRefresh(async () => {
   color: var(--color-text-secondary);
 }
 
+.notification-severity-critical {
+  color: #ef4444;
+}
+
+.notification-severity-warning {
+  color: #f59e0b;
+}
+
+.notification-severity-info {
+  color: #3b82f6;
+}
+
 .notification-overlay {
   position: fixed;
   inset: 0;
@@ -638,6 +723,20 @@ useTickRefresh(async () => {
   padding: 1rem;
   color: var(--color-text-secondary);
   text-align: center;
+}
+
+.notification-groups {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.notification-group-day {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin: 0;
 }
 
 .notification-list {
@@ -815,6 +914,18 @@ useTickRefresh(async () => {
 
   .header-actions {
     order: 3;
+  }
+}
+
+@media (max-width: 767px) {
+  .notification-panel {
+    right: 0.5rem;
+    left: 0.5rem;
+    top: auto;
+    bottom: 0.5rem;
+    width: auto;
+    max-height: 75vh;
+    border-radius: 1rem;
   }
 }
 

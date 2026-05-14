@@ -428,8 +428,7 @@ test.describe('Header navigation', () => {
     await expect(panel).toBeVisible()
     await expect(panel.locator('.notification-item')).toHaveCount(2)
     await expect(panel).toContainText('Construction complete')
-
-    await panel.getByRole('button', { name: 'Mark all read' }).click()
+    await expect(panel.getByRole('button', { name: 'Mark all read' })).toBeDisabled()
 
     await expect(page.locator('.notification-badge')).toHaveCount(0)
     await expect(panel.locator('.notification-item-unread')).toHaveCount(0)
@@ -480,5 +479,94 @@ test.describe('Header navigation', () => {
     await page.getByRole('button', { name: 'Notifications' }).click()
     await panel.getByRole('button', { name: /logistics cost warning/i }).click()
     await expect(page).toHaveURL('/trade-routes')
+  })
+
+  test('shows severity colours and empty state in notification panel', async ({ page }) => {
+    const player = makePlayer()
+    const now = new Date().toISOString()
+    const state = setupMockApi(page, {
+      players: [player],
+      currentUserId: player.id,
+      currentToken: `token-${player.id}`,
+      playerNotifications: [
+        {
+          id: 'notif-critical',
+          type: 'LOAN_DEFAULT',
+          severity: 'CRITICAL',
+          title: 'Loan default',
+          message: 'A loan default happened.',
+          isRead: false,
+          createdAtTick: 99,
+          createdAtUtc: now,
+        },
+        {
+          id: 'notif-warning',
+          type: 'OVERSUPPLY_WARNING',
+          severity: 'WARNING',
+          title: 'Oversupply warning',
+          message: 'Demand fell below threshold.',
+          isRead: false,
+          createdAtTick: 98,
+          createdAtUtc: now,
+        },
+        {
+          id: 'notif-info',
+          type: 'BUILDING_OFFER_RECEIVED',
+          severity: 'INFO',
+          title: 'Offer received',
+          message: 'New building offer arrived.',
+          isRead: false,
+          createdAtTick: 97,
+          createdAtUtc: now,
+        },
+      ],
+    })
+    await authenticate(page, `token-${player.id}`)
+
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Notifications' }).click()
+    const panel = page.locator('.notification-panel')
+    await expect(panel.locator('.notification-severity-critical')).toHaveCount(1)
+    await expect(panel.locator('.notification-severity-warning')).toHaveCount(1)
+    await expect(panel.locator('.notification-severity-info')).toHaveCount(1)
+
+    state.playerNotifications = []
+    await page.getByRole('button', { name: 'Notifications' }).click()
+    await page.getByRole('button', { name: 'Notifications' }).click()
+    await expect(panel).toContainText('No notifications yet.')
+  })
+
+  test('notification panel closes on backdrop click and ESC', async ({ page }) => {
+    const player = makePlayer()
+    const now = new Date().toISOString()
+    setupMockApi(page, {
+      players: [player],
+      currentUserId: player.id,
+      currentToken: `token-${player.id}`,
+      playerNotifications: [
+        {
+          id: 'notif-1',
+          type: 'BUILDING_CONSTRUCTION_COMPLETED',
+          title: 'Construction complete',
+          message: 'Factory finished.',
+          isRead: false,
+          createdAtTick: 10,
+          createdAtUtc: now,
+        },
+      ],
+    })
+    await authenticate(page, `token-${player.id}`)
+
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Notifications' }).click()
+    await expect(page.locator('.notification-panel')).toBeVisible()
+
+    await page.locator('.notification-overlay').click()
+    await expect(page.locator('.notification-panel')).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Notifications' }).click()
+    await expect(page.locator('.notification-panel')).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(page.locator('.notification-panel')).toHaveCount(0)
   })
 })

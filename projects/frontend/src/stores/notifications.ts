@@ -7,16 +7,23 @@ import type { PlayerNotificationInbox, PlayerNotificationItem } from '@/types'
 const NOTIFICATION_FIELDS = `
   id
   type
+  severity
   title
   message
+  titleKey
+  bodyKey
+  bodyParamsJson
   isRead
   createdAtTick
   createdAtUtc
+  expiresAtUtc
   companyId
   buildingId
   buildingUnitId
   bankAccountId
   loanId
+  relatedEntityType
+  relatedEntityId
 `
 
 export const useNotificationsStore = defineStore('notifications', () => {
@@ -30,19 +37,31 @@ export const useNotificationsStore = defineStore('notifications', () => {
     error.value = null
 
     try {
-      const data = await gqlRequest<{ playerNotificationInbox: PlayerNotificationInbox }>(
-        `query PlayerNotificationInbox($limit: Int!) {
-          playerNotificationInbox(limit: $limit) {
-            unreadCount
-            items {
-              ${NOTIFICATION_FIELDS}
+      const [itemsData, countData] = await Promise.all([
+        gqlRequest<{ myNotifications: { edges: Array<{ node: PlayerNotificationItem }> } }>(
+          `query MyNotifications($first: Int!, $onlyUnread: Boolean!) {
+            myNotifications(first: $first, onlyUnread: $onlyUnread) {
+              edges {
+                node {
+                  ${NOTIFICATION_FIELDS}
+                }
+              }
             }
           }
         }`,
-        { limit },
-      )
+          { first: limit, onlyUnread: false },
+        ),
+        gqlRequest<{ notificationCount: number }>(
+          `query NotificationCount {
+            notificationCount
+          }`,
+        ),
+      ])
 
-      inbox.value = data.playerNotificationInbox ?? { unreadCount: 0, items: [] }
+      inbox.value = {
+        unreadCount: countData.notificationCount ?? 0,
+        items: itemsData.myNotifications?.edges?.map((edge) => edge.node) ?? [],
+      }
       unreadCount.value = inbox.value.unreadCount
       return inbox.value
     } catch (caughtError) {
@@ -55,13 +74,13 @@ export const useNotificationsStore = defineStore('notifications', () => {
 
   async function fetchUnreadCount() {
     try {
-      const data = await gqlRequest<{ playerNotificationUnreadCount: number }>(
-        `query PlayerNotificationUnreadCount {
-          playerNotificationUnreadCount
+      const data = await gqlRequest<{ notificationCount: number }>(
+        `query NotificationCount {
+          notificationCount
         }`,
       )
 
-      unreadCount.value = data.playerNotificationUnreadCount ?? 0
+      unreadCount.value = data.notificationCount ?? 0
       return unreadCount.value
     } catch (caughtError) {
       error.value = caughtError instanceof Error ? caughtError.message : 'Failed to load unread notifications.'
@@ -74,11 +93,11 @@ export const useNotificationsStore = defineStore('notifications', () => {
       return true
     }
 
-    await gqlRequest<{ markPlayerNotificationsRead: boolean }>(
-      `mutation MarkPlayerNotificationsRead($input: MarkPlayerNotificationsReadInput!) {
-        markPlayerNotificationsRead(input: $input)
+    await gqlRequest<{ markNotificationsRead: boolean }>(
+      `mutation MarkNotificationsRead($ids: [ID!]!) {
+        markNotificationsRead(ids: $ids)
       }`,
-      { input: { notificationIds } },
+      { ids: notificationIds },
     )
 
     if (inbox.value) {
@@ -101,13 +120,13 @@ export const useNotificationsStore = defineStore('notifications', () => {
   }
 
   async function markAllRead() {
-    const data = await gqlRequest<{ markAllPlayerNotificationsRead: number }>(
-      `mutation MarkAllPlayerNotificationsRead {
-        markAllPlayerNotificationsRead
+    const data = await gqlRequest<{ markAllNotificationsRead: boolean }>(
+      `mutation MarkAllNotificationsRead {
+        markAllNotificationsRead
       }`,
     )
 
-    const changed = data.markAllPlayerNotificationsRead ?? 0
+    const changed = data.markAllNotificationsRead ? unreadCount.value : 0
 
     if (inbox.value) {
       inbox.value = {

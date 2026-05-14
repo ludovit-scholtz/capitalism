@@ -1,4 +1,5 @@
 using Api.Data.Entities;
+using Api.Utilities;
 
 namespace Api.Engine.Phases;
 
@@ -93,6 +94,7 @@ public sealed class PowerDistributionPhase : ITickPhase
                 if (remainingSupply <= 0m)
                 {
                     consumer.PowerStatus = PowerStatus.Offline;
+                    TryNotifyProductionHalt(context, consumer, "power grid offline");
                     continue;
                 }
 
@@ -109,5 +111,37 @@ public sealed class PowerDistributionPhase : ITickPhase
         }
 
         return Task.CompletedTask;
+    }
+
+    private static void TryNotifyProductionHalt(TickContext context, Building building, string reason)
+    {
+        if (!context.CompaniesById.TryGetValue(building.CompanyId, out var company))
+        {
+            return;
+        }
+
+        if (PlayerNotificationService.HasUnreadDuplicate(
+            context.Db,
+            company.PlayerId,
+            PlayerNotificationType.ProductionHalted,
+            relatedEntityId: building.Id,
+            companyId: company.Id,
+            buildingId: building.Id))
+        {
+            return;
+        }
+
+        PlayerNotificationService.Add(
+            context.Db,
+            company.PlayerId,
+            PlayerNotificationType.ProductionHalted,
+            "Production halted",
+            $"{building.Name} is offline due to {reason}. Restore power to resume operations.",
+            context.CurrentTick,
+            company.Id,
+            building.Id,
+            severity: PlayerNotificationSeverity.Critical,
+            relatedEntityType: "BUILDING",
+            relatedEntityId: building.Id);
     }
 }
