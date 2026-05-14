@@ -44,15 +44,18 @@ test('OIDC callback stores the token and survives a reload on the redirected rou
   state.currentUserId = player.id
   state.currentToken = oidcToken
 
-  await page.addInitScript(({ pendingState }) => {
-    window.sessionStorage.setItem('biatec_oidc_state', JSON.stringify(pendingState))
-  }, {
-    pendingState: {
-      state: oidcState,
-      nonce: oidcNonce,
-      redirectPath: '/dashboard',
+  await page.addInitScript(
+    ({ pendingState }) => {
+      window.sessionStorage.setItem('biatec_oidc_state', JSON.stringify(pendingState))
     },
-  })
+    {
+      pendingState: {
+        state: oidcState,
+        nonce: oidcNonce,
+        redirectPath: '/dashboard',
+      },
+    },
+  )
 
   await page.goto(`/auth/callback?state=${encodeURIComponent(oidcState)}&id_token=${encodeURIComponent(oidcToken)}`)
 
@@ -109,15 +112,18 @@ test('OIDC callback does not depend on optional master session bootstrap', async
     await route.fallback()
   })
 
-  await page.addInitScript(({ pendingState }) => {
-    window.sessionStorage.setItem('biatec_oidc_state', JSON.stringify(pendingState))
-  }, {
-    pendingState: {
-      state: oidcState,
-      nonce: oidcNonce,
-      redirectPath: '/dashboard',
+  await page.addInitScript(
+    ({ pendingState }) => {
+      window.sessionStorage.setItem('biatec_oidc_state', JSON.stringify(pendingState))
     },
-  })
+    {
+      pendingState: {
+        state: oidcState,
+        nonce: oidcNonce,
+        redirectPath: '/dashboard',
+      },
+    },
+  )
 
   await page.goto(`/auth/callback?state=${encodeURIComponent(oidcState)}&id_token=${encodeURIComponent(oidcToken)}`)
 
@@ -157,15 +163,18 @@ test('OIDC callback shows an error instead of restarting sign-in when game sessi
     await route.fulfill({ status: 401, body: 'unauthorized' })
   })
 
-  await page.addInitScript(({ pendingState }) => {
-    window.sessionStorage.setItem('biatec_oidc_state', JSON.stringify(pendingState))
-  }, {
-    pendingState: {
-      state: oidcState,
-      nonce: oidcNonce,
-      redirectPath: '/dashboard',
+  await page.addInitScript(
+    ({ pendingState }) => {
+      window.sessionStorage.setItem('biatec_oidc_state', JSON.stringify(pendingState))
     },
-  })
+    {
+      pendingState: {
+        state: oidcState,
+        nonce: oidcNonce,
+        redirectPath: '/dashboard',
+      },
+    },
+  )
 
   await page.goto(`/auth/callback?state=${encodeURIComponent(oidcState)}&id_token=${encodeURIComponent(oidcToken)}`)
 

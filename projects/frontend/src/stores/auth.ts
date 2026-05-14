@@ -25,14 +25,8 @@ const AUTH_PROVIDER_KEY = 'auth_provider'
 const AUTH_PROVIDER_LOCAL = 'local'
 const AUTH_PROVIDER_BIATEC = 'biatec_oidc'
 const COOKIE_SESSION_SENTINEL = 'cookie-session'
-const API_BASE_URL = (import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:44356/graphql').replace(
-  /\/graphql\/?$/,
-  '',
-)
-const MASTER_SESSION_API_BASE_URL = (import.meta.env.VITE_MASTER_GRAPHQL_URL || '').replace(
-  /\/graphql\/?$/,
-  '',
-)
+const API_BASE_URL = (import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:44356/graphql').replace(/\/graphql\/?$/, '')
+const MASTER_SESSION_API_BASE_URL = (import.meta.env.VITE_MASTER_GRAPHQL_URL || '').replace(/\/graphql\/?$/, '')
 
 interface OidcPendingState {
   state: string
@@ -451,18 +445,14 @@ export const useAuthStore = defineStore('auth', () => {
           return
         }
 
-        const hasValidCurrentCity =
-          !!selectedCityId.value && cities.some((city) => city.id === selectedCityId.value)
+        const hasValidCurrentCity = !!selectedCityId.value && cities.some((city) => city.id === selectedCityId.value)
         if (!hasValidCurrentCity) {
           switchCity(mainCity.id)
         }
         return
       }
 
-      const fallbackCity =
-        (playerValue.onboardingCityId
-          ? cities.find((city) => city.id === playerValue.onboardingCityId)
-          : null) ?? cities[0] ?? null
+      const fallbackCity = (playerValue.onboardingCityId ? cities.find((city) => city.id === playerValue.onboardingCityId) : null) ?? cities[0] ?? null
 
       if (fallbackCity && selectedCityId.value !== fallbackCity.id) {
         switchCity(fallbackCity.id)
@@ -553,10 +543,7 @@ export const useAuthStore = defineStore('auth', () => {
         input.referralCode = referralCode
       }
       const data = await gqlMasterRequest<{ register: MasterSessionPayload }>(MASTER_REGISTER_MUTATION, { input })
-      await Promise.all([
-        establishCookieSession(API_BASE_URL, data.register.token),
-        establishOptionalCookieSession(MASTER_SESSION_API_BASE_URL, data.register.token),
-      ])
+      await Promise.all([establishCookieSession(API_BASE_URL, data.register.token), establishOptionalCookieSession(MASTER_SESSION_API_BASE_URL, data.register.token)])
       player.value = null
       applyStoredSession(data.register.token, data.register.expiresAtUtc)
       await fetchCurrentPlayer({ reconcileCityContext: true })
@@ -573,10 +560,7 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
     try {
       const data = await gqlMasterRequest<{ login: MasterSessionPayload }>(MASTER_LOGIN_MUTATION, { input: { email, password } })
-      await Promise.all([
-        establishCookieSession(API_BASE_URL, data.login.token),
-        establishOptionalCookieSession(MASTER_SESSION_API_BASE_URL, data.login.token),
-      ])
+      await Promise.all([establishCookieSession(API_BASE_URL, data.login.token), establishOptionalCookieSession(MASTER_SESSION_API_BASE_URL, data.login.token)])
       player.value = null
       applyStoredSession(data.login.token, data.login.expiresAtUtc)
       await fetchCurrentPlayer({ reconcileCityContext: true })
@@ -625,10 +609,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function completeBiatecOidcSignIn() {
     const callbackSession = getTokenFromCallback()
-    await Promise.all([
-      establishCookieSession(API_BASE_URL, callbackSession.token),
-      establishOptionalCookieSession(MASTER_SESSION_API_BASE_URL, callbackSession.token),
-    ])
+    await Promise.all([establishCookieSession(API_BASE_URL, callbackSession.token), establishOptionalCookieSession(MASTER_SESSION_API_BASE_URL, callbackSession.token)])
     applyStoredSession(callbackSession.token, callbackSession.expiresAtUtc, AUTH_PROVIDER_BIATEC)
 
     try {
