@@ -75,10 +75,14 @@ function normalizeEditTab(value: unknown): EditConfigTab {
 function selectConfigTab(tab: EditConfigTab) {
   selectedConfigTab.value = tab
   if (!isEditing.value) return
-  void router.replace({
-    path: `/building/${route.params.id as string}/edit/${tab}`,
-    query: route.query,
-  })
+  const nextQuery = { ...route.query }
+  if (tab === 'config') {
+    delete nextQuery.editUnitTab
+  } else {
+    nextQuery.editUnitTab = tab
+  }
+
+  void router.replace({ query: nextQuery })
 }
 
 const currentUnit = computed(() => {
@@ -138,7 +142,7 @@ async function confirmScheduleRepair() {
 }
 
 watch(
-  () => route.params.tab,
+  () => route.query.editUnitTab,
   (routeTab) => {
     selectedConfigTab.value = normalizeEditTab(routeTab)
   },

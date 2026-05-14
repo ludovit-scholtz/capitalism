@@ -168,6 +168,7 @@ export const BUILDING_DETAIL_KEY = Symbol('buildingDetail') as InjectionKey<Retu
 export function useBuildingDetail() {
   const LINK_CHANGE_TICKS = 1
   const UNIT_PLAN_CHANGE_TICKS = 3
+  const DEFAULT_BUILDING_EDIT_TAB = 'basic-data'
   const gridIndexes = [0, 1, 2, 3] as const
   const SUPPORTED_INDUSTRIES = ['FURNITURE', 'FOOD_PROCESSING', 'HEALTHCARE', 'ELECTRONICS', 'CONSTRUCTION'] as const
 
@@ -227,6 +228,34 @@ export function useBuildingDetail() {
 
   function isEditRouteName(routeName: unknown): boolean {
     return routeName === 'building-detail-edit'
+  }
+
+  function enterEditRoute(tab = DEFAULT_BUILDING_EDIT_TAB) {
+    if (!buildingId.value) return
+    const currentRoute = router.currentRoute.value
+    if (currentRoute.name === 'building-detail-edit' && currentRoute.params.id === buildingId.value && currentRoute.params.tab === tab) {
+      return
+    }
+
+    void router.replace({
+      name: 'building-detail-edit',
+      params: { id: buildingId.value, tab },
+      query: currentRoute.query,
+    })
+  }
+
+  async function leaveEditRoute() {
+    if (!buildingId.value) return
+    const currentRoute = router.currentRoute.value
+    if (currentRoute.name === 'building-detail' && currentRoute.params.id === buildingId.value) {
+      return
+    }
+
+    await router.replace({
+      name: 'building-detail',
+      params: { id: buildingId.value },
+      query: currentRoute.query,
+    })
   }
 
   function syncSelectedCellQuery(cell: GridCellSelection | null) {
@@ -1256,6 +1285,7 @@ export function useBuildingDetail() {
 
   function applyStarterLayout() {
     startEditing()
+    enterEditRoute()
     // Pre-populate the draft with a PURCHASE → MANUFACTURING → STORAGE → B2B_SALES chain at y=0
     const starterUnits: EditableGridUnit[] = [
       {
@@ -1377,6 +1407,7 @@ export function useBuildingDetail() {
 
   function applyShopStarterLayout() {
     startEditing()
+    enterEditRoute()
     const shopStarterUnits: EditableGridUnit[] = [
       {
         id: 'draft-shop-starter-0-0',
@@ -1995,10 +2026,7 @@ export function useBuildingDetail() {
       }
 
       if (isEditRouteName(route.name)) {
-        await router.replace({
-          path: `/building/${building.value.id}`,
-          query: router.currentRoute.value.query,
-        })
+        await leaveEditRoute()
       }
       isEditing.value = false
       await loadBuilding()
@@ -5037,6 +5065,22 @@ export function useBuildingDetail() {
       startEditing()
     }
   })
+
+  watch(
+    () => route.name,
+    (routeName) => {
+      if (isEditRouteName(routeName)) {
+        if (!isEditing.value) {
+          startEditing()
+        }
+        return
+      }
+
+      if (isEditing.value) {
+        cancelEditing()
+      }
+    },
+  )
 
   async function fetchRankedProducts(unitType: string) {
     if (!buildingId.value) return

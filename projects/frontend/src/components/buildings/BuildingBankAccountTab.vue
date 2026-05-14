@@ -21,3 +21,5 @@ const { building, loading, cityCurrencyCode } = bd
     />
   </div>
 </template>
+
+<style scoped src="./BuildingSidebar.shared.css"></style>

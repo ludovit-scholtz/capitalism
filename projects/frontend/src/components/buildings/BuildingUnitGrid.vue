@@ -53,8 +53,6 @@ const {
   getHorizontalLinkFlowHint,
   getVerticalLinkFlowHint,
   getDisplayedTicks,
-  startEditing,
-  cancelEditing,
   storeConfiguration,
   isUnitReverting,
   getUnitPrimaryMetric,
@@ -113,11 +111,13 @@ onMounted(() => document.addEventListener('keydown', handleKeydown))
 onUnmounted(() => document.removeEventListener('keydown', handleKeydown))
 
 function openEditMode() {
-  startEditing()
+  void router.replace({
+    path: `/building/${route.params.id as string}/edit/basic-data`,
+    query: route.query,
+  })
 }
 
 function closeEditMode() {
-  cancelEditing()
   void router.replace({
     path: `/building/${route.params.id as string}`,
     query: route.query,

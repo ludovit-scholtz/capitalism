@@ -1682,6 +1682,11 @@ export default {
     editTabBasicEdit: 'Grundbearbeitung', // Reserved for future building edit mode top-level tabs
     editTabFinance: 'Finanzen', // Reserved for future building edit mode top-level tabs
     editTabLayouts: 'Layouts', // Reserved for future building edit mode top-level tabs
+    editBuildingTabBasicData: 'Basisdaten',
+    editBuildingTabEnergy: 'Energieeinstellungen',
+    editBuildingTabBankAccount: 'Bankkonto',
+    editBuildingTabLayouts: 'Gebäudelayouts',
+    editBuildingBasicDataBody: 'Prüfen Sie Entwurfskosten, Finanzierungsauswirkung und Hinweise zur Einheitenauswahl, bevor Sie einen konkreten Gebäudebereich bearbeiten.',
     editTabGeneralSettings: 'Allgemein',
     editTabProduction: 'Produktion',
     editTabInventory: 'Inventar',

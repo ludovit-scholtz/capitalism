@@ -20,6 +20,38 @@ function getDiagonalToggle(section: ReturnType<typeof getGridSection>, x: number
   return section.locator(`.link-toggle.diagonal[data-diagonal-root="${x},${y}"][data-diagonal-axis="${axis}"]`)
 }
 
+async function openBuildingEditTab(page: Page, tabKey: string, tabLabel: string, panelLabel: string) {
+  const tab = page.getByRole('tab', { name: tabLabel, exact: true })
+
+  if (await tab.count()) {
+    await tab.click()
+  } else {
+    const buildingMatch = new URL(page.url()).pathname.match(/^\/building\/([^/]+)/)
+    const buildingId = buildingMatch?.[1]
+
+    if (!buildingId) {
+      throw new Error(`Could not determine building id from URL: ${page.url()}`)
+    }
+
+    await page.goto(`/building/${buildingId}/edit/${tabKey}`)
+  }
+
+  await expect(page.getByRole('tab', { name: tabLabel, exact: true })).toHaveAttribute('aria-selected', 'true')
+
+  const panel = page.locator(`[aria-label="${panelLabel}"]`)
+  await expect(panel).toBeVisible()
+  return panel
+}
+
+async function ensureBuildingEditMode(page: Page) {
+  const editButton = page.getByRole('button', { name: 'Edit Building', exact: true })
+  if (await editButton.count()) {
+    await editButton.click()
+  }
+
+  await expect(page.getByRole('heading', { name: 'Planned Upgrade' })).toBeVisible()
+}
+
 async function openPurchaseSelector(page: Page) {
   await dismissTutorialTooltipIfPresent(page)
   await page.getByRole('button', { name: /product and vendor/i }).click()
@@ -325,13 +357,12 @@ test.describe('Building detail upgrades', () => {
     await expect(getDiagonalToggle(refreshedQueuedSection, 0, 0, 'secondary')).toHaveClass(/link-state-forward/)
 
     state.gameState.currentTick += 2
-    await page.reload()
+    await page.goto('/building/building-1')
 
     await expect(page.getByText('Building upgrade in progress')).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'Planned Upgrade' })).toHaveCount(0)
-    await expect(getDiagonalToggle(refreshedCurrentSection, 0, 0, 'secondary')).toHaveClass(/link-state-forward/)
-
     const finalCurrentSection = getGridSection(page, 'Current Configuration')
+    await expect(getDiagonalToggle(finalCurrentSection, 0, 0, 'secondary')).toHaveClass(/link-state-forward/)
     await expect(getGridCell(finalCurrentSection, 0, 0)).toContainText('Branding')
 
     await page.getByRole('button', { name: 'Edit Building' }).click()
@@ -3289,7 +3320,7 @@ test.describe('Building detail upgrades', () => {
 
     player.proSubscriptionEndsAtUtc = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
     await page.reload()
-    await page.getByRole('button', { name: 'Edit Building' }).click()
+    await ensureBuildingEditMode(page)
     await getGridCell(getGridSection(page, 'Planned Upgrade'), 1, 0).click()
 
     await expect(page.getByRole('button', { name: /Premium Chair/ })).toBeEnabled()
@@ -19943,6 +19974,10 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     return player
   }
 
+  async function openLayoutsPanel(page: Page) {
+    return openBuildingEditTab(page, 'layouts', 'Building Layouts', 'Building Layouts')
+  }
+
   test('layout panel is hidden in read-only (non-edit) mode', async ({ page }) => {
     const player = makeLayoutTestPlayer()
     const state = setupMockApi(page, { players: [player] })
@@ -19972,9 +20007,9 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     }, `token-${player.id}`)
 
     await page.goto('/building/building-lt')
-    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const panel = await openLayoutsPanel(page)
     // Enter edit mode — placeholder sidebar should show the layout panel
-    await expect(page.locator('[aria-label="Building Layouts"]')).toBeVisible()
+    await expect(panel).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Building Layouts' })).toBeVisible()
   })
 
@@ -19990,10 +20025,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     }, `token-${player.id}`)
 
     await page.goto('/building/building-lt')
-    await page.getByRole('button', { name: 'Edit Building' }).click()
-
-    const panel = page.locator('[aria-label="Building Layouts"]')
-    await expect(panel).toBeVisible()
+    const panel = await openLayoutsPanel(page)
     await expect(panel.locator('.layout-connected-email')).toContainText(player.email)
     await expect(panel.locator('.layout-connect-body')).toHaveCount(0)
     await expect(panel.locator('input[type="email"]')).toHaveCount(0)
@@ -20016,9 +20048,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     // Use "Apply Starter Layout" to get a non-empty draft
     await page.getByRole('button', { name: /Apply Starter Layout/i }).click()
     // Now in edit mode with a non-empty draft; no cell selected → layout panel visible
-    await expect(page.locator('[aria-label="Building Layouts"]')).toBeVisible()
-
-    const panel = page.locator('[aria-label="Building Layouts"]')
+    const panel = await openLayoutsPanel(page)
     await panel.locator('[aria-label="Layout name"]').fill('My Production Layout')
     await panel.getByRole('button', { name: 'Save Layout' }).click()
 
@@ -20076,10 +20106,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     }, `token-${player.id}`)
 
     await page.goto('/building/building-lt')
-    await page.getByRole('button', { name: 'Edit Building' }).click()
-
-    const panel = page.locator('[aria-label="Building Layouts"]')
-    await expect(panel).toBeVisible()
+    const panel = await openLayoutsPanel(page)
     await expect(panel.locator('.layout-item').filter({ hasText: 'Starter Chain' })).toBeVisible()
 
     // Draft is empty → load directly, no overwrite confirm
@@ -20145,8 +20172,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     // Use starter layout to get a non-empty draft
     await page.getByRole('button', { name: /Apply Starter Layout/i }).click()
     // Wait for layout panel to be visible
-    const panel = page.locator('[aria-label="Building Layouts"]')
-    await expect(panel).toBeVisible()
+    const panel = await openLayoutsPanel(page)
     await expect(panel.locator('.layout-item').filter({ hasText: 'Overwrite Me' })).toBeVisible()
 
     // Draft is non-empty → load should show overwrite confirm
@@ -20180,8 +20206,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     // Get a non-empty draft via starter layout
     await page.getByRole('button', { name: /Apply Starter Layout/i }).click()
 
-    const panel = page.locator('[aria-label="Building Layouts"]')
-    await expect(panel).toBeVisible()
+    const panel = await openLayoutsPanel(page)
     await panel.locator('.layout-item').filter({ hasText: 'Cancel Test' }).getByRole('button', { name: 'Load' }).click()
     await expect(page.locator('.layout-overwrite-confirm')).toBeVisible()
 
@@ -20228,9 +20253,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     }, `token-${player.id}`)
 
     await page.goto('/building/building-lt')
-    await page.getByRole('button', { name: 'Edit Building' }).click()
-
-    const panel = page.locator('[aria-label="Building Layouts"]')
+    const panel = await openLayoutsPanel(page)
     await expect(panel.locator('.layout-item').filter({ hasText: 'Delete Me' })).toBeVisible()
     await expect(panel.locator('.layout-item').filter({ hasText: 'Keep Me' })).toBeVisible()
 
@@ -20302,10 +20325,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     }, `token-${player.id}`)
 
     await page.goto('/building/building-mine')
-    await page.getByRole('button', { name: 'Edit Building' }).click()
-
-    const panel = page.locator('[aria-label="Building Layouts"]')
-    await expect(panel).toBeVisible()
+    const panel = await openLayoutsPanel(page)
 
     // Only the MINE-type layout should be shown (AC7: clear communication of compatibility)
     await expect(panel.locator('.layout-item').filter({ hasText: 'Mining Chain' })).toBeVisible()
@@ -20372,8 +20392,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     await page.goto('/building/building-cross-a')
     await page.getByRole('button', { name: /Apply Starter Layout/i }).click()
     // Now in edit mode with the starter layout draft
-    const panelA = page.locator('[aria-label="Building Layouts"]')
-    await expect(panelA).toBeVisible()
+    const panelA = await openLayoutsPanel(page)
     await panelA.locator('[aria-label="Layout name"]').fill('Cross-Game Blueprint')
     await panelA.getByRole('button', { name: 'Save Layout' }).click()
     await expect(panelA.locator('.layout-save-success')).toBeVisible()
@@ -20384,11 +20403,9 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     await expect(page.getByRole('heading', { name: 'Building Overview' })).toBeVisible()
 
     // ── Step 3: Enter edit mode in Factory B ──
-    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const panelB = await openLayoutsPanel(page)
 
     // ── Step 4: Layout saved from Factory A should appear in the panel ──
-    const panelB = page.locator('[aria-label="Building Layouts"]')
-    await expect(panelB).toBeVisible()
     await expect(panelB.locator('.layout-item').filter({ hasText: 'Cross-Game Blueprint' })).toBeVisible()
 
     // ── Step 5: Load the layout — draft is empty so no overwrite confirm ──
@@ -20432,10 +20449,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     ])
 
     await page.goto('/building/building-lt')
-    await page.getByRole('button', { name: 'Edit Building' }).click()
-
-    const panel = page.locator('[aria-label="Building Layouts"]')
-    await expect(panel).toBeVisible()
+    const panel = await openLayoutsPanel(page)
 
     // Connect prompt should be visible since cloud auth uses same token
     // The cloud section title should still be visible
@@ -20520,10 +20534,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     }, `token-${player.id}`)
 
     await page.goto('/building/building-lt')
-    await page.getByRole('button', { name: 'Edit Building' }).click()
-
-    const panel = page.locator('[aria-label="Building Layouts"]')
-    await expect(panel).toBeVisible()
+    const panel = await openLayoutsPanel(page)
     await expect(panel.locator('.layout-item').filter({ hasText: 'Linked Chain' })).toBeVisible()
 
     // Load the linked template — draft is empty, no overwrite confirm
@@ -20667,10 +20678,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     }, `token-${player.id}`)
 
     await page.goto('/building/building-lt')
-    await page.getByRole('button', { name: 'Edit Building' }).click()
-
-    const panel = page.locator('[aria-label="Building Layouts"]')
-    await expect(panel).toBeVisible()
+    const panel = await openLayoutsPanel(page)
     await expect(panel.locator('.layout-item').filter({ hasText: 'Diagonal Chain Template' })).toBeVisible()
 
     // Load the diagonal template — draft is empty, no overwrite confirm needed
@@ -20716,10 +20724,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     }, `token-${player.id}`)
 
     await page.goto('/building/building-lt')
-    await page.getByRole('button', { name: 'Edit Building' }).click()
-
-    const panel = page.locator('[aria-label="Building Layouts"]')
-    await expect(panel).toBeVisible()
+    const panel = await openLayoutsPanel(page)
 
     const layoutItem = panel.locator('.layout-item').filter({ hasText: 'Three Unit Layout' })
     await expect(layoutItem).toBeVisible()
@@ -20751,10 +20756,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     }, `token-${player.id}`)
 
     await page.goto('/building/building-lt')
-    await page.getByRole('button', { name: 'Edit Building' }).click()
-
-    const panel = page.locator('[aria-label="Building Layouts"]')
-    await expect(panel).toBeVisible()
+    const panel = await openLayoutsPanel(page)
 
     // Empty state message should be visible with specific educational copy
     const emptyMsg = panel.locator('.layout-empty')
@@ -20817,8 +20819,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     // Apply starter layout to get a non-empty draft (4 units: PURCHASE+MFG+STORAGE+B2B_SALES)
     await page.getByRole('button', { name: /Apply Starter Layout/i }).click()
 
-    const panel = page.locator('[aria-label="Building Layouts"]')
-    await expect(panel).toBeVisible()
+    const panel = await openLayoutsPanel(page)
     await expect(panel.locator('.layout-item').filter({ hasText: 'Single Unit Template' })).toBeVisible()
 
     // Draft is non-empty → click Load should trigger overwrite confirm
@@ -20921,11 +20922,9 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
 
     await page.goto('/building/building-lt')
     // Enter edit mode — building is empty so the "Edit Building" button is visible
-    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const panel = await openLayoutsPanel(page)
 
     // ── Step 1: Load template from the library ──
-    const panel = page.locator('[aria-label="Building Layouts"]')
-    await expect(panel).toBeVisible()
     await expect(panel.locator('.layout-item').filter({ hasText: 'AC4 Blueprint' })).toBeVisible()
 
     // Draft is empty → Load directly (no overwrite confirm)
@@ -24195,10 +24194,7 @@ test.describe('energy status badge and power settings', () => {
     }, `token-${player.id}`)
 
     await page.goto('/building/energy-bld-1')
-    await page.getByRole('button', { name: 'Edit Building' }).click()
-
-    const energyPanel = page.locator('[aria-label="Energy Settings"]')
-    await expect(energyPanel).toBeVisible()
+    const energyPanel = await openBuildingEditTab(page, 'energy', 'Energy Settings', 'Energy Settings')
 
     // Change priority to 8
     const prioritySelect = energyPanel.locator('.power-priority-select')
