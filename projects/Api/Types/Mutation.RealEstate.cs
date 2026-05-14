@@ -255,6 +255,14 @@ public sealed partial class Mutation
             && (loan.Status == LoanStatus.Active || loan.Status == LoanStatus.Overdue));
     }
 
+    private static async Task<bool> IsPledgedCollateralWithUnpaidLoanAsync(AppDbContext db, Guid buildingId)
+    {
+        return await db.Loans.AnyAsync(loan =>
+            loan.CollateralBuildingId == buildingId
+            && loan.RemainingPrincipal > 0m
+            && (loan.Status == LoanStatus.Active || loan.Status == LoanStatus.Overdue || loan.Status == LoanStatus.Defaulted));
+    }
+
     /// <summary>
     /// Schedules a new rent per m² for an apartment or commercial building.
     /// The change is stored as pending and activates after one in-game day (24 ticks).

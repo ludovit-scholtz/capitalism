@@ -97,6 +97,18 @@ public sealed partial class Mutation
         }
 
         var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync();
+        var escrowReserved = CompanyBankingService.TryDebit(
+            buyerCompany.BankAccounts,
+            input.OfferedPrice,
+            currencyCode);
+        if (!escrowReserved)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Insufficient funds.")
+                    .SetCode("INSUFFICIENT_FUNDS")
+                    .Build());
+        }
 
         var offer = new BuildingSaleOffer
         {
@@ -106,6 +118,8 @@ public sealed partial class Mutation
             BuyerPlayerId = userId,
             BuyerCompanyId = buyerCompany.Id,
             OfferedPrice = input.OfferedPrice,
+            EscrowAmount = input.OfferedPrice,
+            EscrowCurrencyCode = currencyCode,
             NegotiationNote = input.NegotiationNote?.Trim(),
             Status = BuildingSaleOfferStatus.Pending,
             CreatedAtUtc = DateTime.UtcNow,
@@ -242,16 +256,35 @@ public sealed partial class Mutation
         var currencyCode = city.CurrencyCode;
         var salePrice = offer.OfferedPrice;
 
-        // Validate buyer funds
-        var buyerBalance = CompanyBankingService.GetCurrencyBalance(
-            offer.BuyerCompany.BankAccounts, currencyCode);
-        if (buyerBalance < salePrice)
+        var marketValuation = await BuildingMarketValuationCalculator.CalculateAsync(
+            db,
+            building,
+            httpContextAccessor.HttpContext!.RequestAborted);
+        if (salePrice < marketValuation.MinimumSalePrice)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("Buyer does not have sufficient funds to complete this purchase.")
-                    .SetCode("INSUFFICIENT_FUNDS")
+                    .SetMessage($"Offer is below the minimum sale floor ({marketValuation.MinimumSalePrice:F2} {marketValuation.CurrencyCode}).")
+                    .SetCode("OFFER_BELOW_FLOOR")
+                    .SetExtension("minimumSaleFloor", marketValuation.MinimumSalePrice)
+                    .SetExtension("currencyCode", marketValuation.CurrencyCode)
                     .Build());
+        }
+
+        var escrowAvailable = string.Equals(offer.EscrowCurrencyCode, currencyCode, StringComparison.OrdinalIgnoreCase)
+            && offer.EscrowAmount >= salePrice;
+        if (!escrowAvailable)
+        {
+            var buyerBalance = CompanyBankingService.GetCurrencyBalance(
+                offer.BuyerCompany.BankAccounts, currencyCode);
+            if (buyerBalance < salePrice)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("Buyer does not have sufficient funds to complete this purchase.")
+                        .SetCode("INSUFFICIENT_FUNDS")
+                        .Build());
+            }
         }
 
         var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync();
@@ -304,6 +337,18 @@ public sealed partial class Mutation
                 2,
                 MidpointRounding.AwayFromZero);
 
+            if (salePrice < remainingDebtInSaleCurrency)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage(
+                            $"Sale proceeds are below the outstanding collateral lien. Required minimum is {remainingDebtInSaleCurrency:F2} {currencyCode}.")
+                        .SetCode("COLLATERAL_LIEN_UNDERFUNDED")
+                        .SetExtension("requiredLienSettlementAmount", remainingDebtInSaleCurrency)
+                        .SetExtension("currencyCode", currencyCode)
+                        .Build());
+            }
+
             debtPaidFromSale = Math.Min(salePrice, remainingDebtInSaleCurrency);
             usesForcedSaleFx = !string.Equals(debtCurrencyCode, currencyCode, StringComparison.OrdinalIgnoreCase);
             debtPaidInLoanCurrency = debtPaidFromSale >= remainingDebtInSaleCurrency
@@ -331,27 +376,18 @@ public sealed partial class Mutation
             collateralLoan.RemainingPrincipal = Math.Max(0m, collateralLoan.RemainingPrincipal - debtPaidInLoanCurrency);
             collateralLoan.CollateralBuildingId = null;
             collateralLoan.ConcurrencyToken = Guid.NewGuid();
-            if (collateralLoan.RemainingPrincipal <= 0m)
-            {
-                collateralLoan.RemainingPrincipal = 0m;
-                collateralLoan.Status = LoanStatus.Repaid;
-                collateralLoan.DefaultedAtTick = null;
-                collateralLoan.ClosedAtUtc = nowUtc;
-                collateralLoan.MissedPayments = 0;
-                collateralLoan.AccumulatedPenalty = 0m;
-                collateralLoan.LoanOffer.UsedCapacity = Math.Max(0m, collateralLoan.LoanOffer.UsedCapacity - collateralLoan.OriginalPrincipal);
-            }
-            else
-            {
-                collateralLoan.Status = LoanStatus.Defaulted;
-                collateralLoan.ClosedAtUtc = nowUtc;
-            }
+            collateralLoan.RemainingPrincipal = 0m;
+            collateralLoan.Status = LoanStatus.Repaid;
+            collateralLoan.DefaultedAtTick = null;
+            collateralLoan.ClosedAtUtc = nowUtc;
+            collateralLoan.MissedPayments = 0;
+            collateralLoan.AccumulatedPenalty = 0m;
+            collateralLoan.LoanOffer.UsedCapacity = Math.Max(0m, collateralLoan.LoanOffer.UsedCapacity - collateralLoan.OriginalPrincipal);
 
             sellerNetProceeds = Math.Max(0m, salePrice - debtPaidFromSale);
         }
 
-        // Debit buyer
-        if (!CompanyBankingService.TryDebit(offer.BuyerCompany.BankAccounts, salePrice, currencyCode))
+        if (!escrowAvailable && !CompanyBankingService.TryDebit(offer.BuyerCompany.BankAccounts, salePrice, currencyCode))
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -359,7 +395,6 @@ public sealed partial class Mutation
                     .SetCode("INSUFFICIENT_FUNDS")
                     .Build());
         }
-
         // Credit seller – find or create preferred account in the building currency
         var sellerAccount = await CompanyBankingService.EnsurePreferredAccountAsync(db, sellerCompany.Id, currencyCode);
         sellerAccount.Balance += sellerNetProceeds;
@@ -390,7 +425,8 @@ public sealed partial class Mutation
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(o => o.Status, BuildingSaleOfferStatus.Accepted)
                     .SetProperty(o => o.ResolvedAtUtc, nowUtc)
-                    .SetProperty(o => o.OfferVersion, acceptedOfferVersion));
+                    .SetProperty(o => o.OfferVersion, acceptedOfferVersion)
+                    .SetProperty(o => o.EscrowAmount, 0m));
         }
         else
         {
@@ -404,6 +440,7 @@ public sealed partial class Mutation
                 matchingOffer.Status = BuildingSaleOfferStatus.Accepted;
                 matchingOffer.ResolvedAtUtc = nowUtc;
                 matchingOffer.OfferVersion = acceptedOfferVersion;
+                matchingOffer.EscrowAmount = 0m;
                 acceptedRows = 1;
             }
         }
@@ -449,6 +486,8 @@ public sealed partial class Mutation
 
         foreach (var rejected in otherOffers)
         {
+            await ReleaseOfferEscrowAsync(db, rejected.BuyerCompanyId, rejected.EscrowAmount, rejected.EscrowCurrencyCode);
+            rejected.EscrowAmount = 0m;
             rejected.Status = BuildingSaleOfferStatus.Rejected;
             rejected.ResolvedAtUtc = nowUtc;
             rejected.OfferVersion = Guid.NewGuid();
@@ -660,6 +699,9 @@ public sealed partial class Mutation
         var city = offer.Building.City;
         var currencyCode = city.CurrencyCode;
         var nowUtc = DateTime.UtcNow;
+        var escrowAmountToRelease = offer.EscrowAmount;
+        var escrowCurrencyToRelease = offer.EscrowCurrencyCode;
+        var escrowBuyerCompanyId = offer.BuyerCompanyId;
 
         await using var tx = db.Database.IsRelational()
             ? await db.Database.BeginTransactionAsync()
@@ -677,7 +719,8 @@ public sealed partial class Mutation
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(o => o.Status, BuildingSaleOfferStatus.Rejected)
                     .SetProperty(o => o.ResolvedAtUtc, nowUtc)
-                    .SetProperty(o => o.OfferVersion, cancelledOfferVersion));
+                    .SetProperty(o => o.OfferVersion, cancelledOfferVersion)
+                    .SetProperty(o => o.EscrowAmount, 0m));
         }
         else
         {
@@ -691,6 +734,7 @@ public sealed partial class Mutation
                 matchingOffer.Status = BuildingSaleOfferStatus.Rejected;
                 matchingOffer.ResolvedAtUtc = nowUtc;
                 matchingOffer.OfferVersion = cancelledOfferVersion;
+                matchingOffer.EscrowAmount = 0m;
                 cancelledRows = 1;
             }
         }
@@ -716,6 +760,7 @@ public sealed partial class Mutation
             }
             throw BuildOfferVersionConflictException();
         }
+        await ReleaseOfferEscrowAsync(db, escrowBuyerCompanyId, escrowAmountToRelease, escrowCurrencyToRelease);
 
         db.PlayerNotifications.Add(new PlayerNotification
         {
@@ -807,6 +852,28 @@ public sealed partial class Mutation
             OccurredAtUtc = DateTime.UtcNow,
         });
         await db.SaveChangesAsync();
+    }
+
+    private static async Task ReleaseOfferEscrowAsync(
+        AppDbContext db,
+        Guid buyerCompanyId,
+        decimal escrowAmount,
+        string? escrowCurrencyCode)
+    {
+        if (escrowAmount <= 0m)
+        {
+            return;
+        }
+
+        var escrowCurrency = string.IsNullOrWhiteSpace(escrowCurrencyCode)
+            ? "EUR"
+            : escrowCurrencyCode;
+        var buyerEscrowAccount = await CompanyBankingService.EnsurePreferredAccountAsync(
+            db,
+            buyerCompanyId,
+            escrowCurrency);
+        buyerEscrowAccount.Balance += escrowAmount;
+        buyerEscrowAccount.ConcurrencyToken = Guid.NewGuid();
     }
 }
 

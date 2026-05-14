@@ -429,6 +429,48 @@ test('shows collateral lock warning when accepting an offer fails with collatera
   )
 })
 
+test('shows below-floor rejection message when accepted offer violates settlement floor', async ({ page }) => {
+  const player = makePlayerWithCompany()
+  const listing = makeMyListing({ offers: [makePendingOffer('offer-floor', 275000)] })
+  const state = setupMockApi(page, {
+    players: [player],
+    myBuildingListings: [listing],
+  })
+  state.currentUserId = player.id
+  state.currentToken = `token-${player.id}`
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${player.id}`)
+
+  await page.route('**/graphql', async (route) => {
+    const body = route.request().postDataJSON() as { query?: string }
+    if (body.query?.includes('acceptBuildingOffer')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          errors: [
+            {
+              message: 'Offer is below the minimum sale floor (350000.00 EUR).',
+              extensions: { code: 'OFFER_BELOW_FLOOR', minimumSaleFloor: 350000, currencyCode: 'EUR' },
+            },
+          ],
+          data: null,
+        }),
+      })
+      return
+    }
+    await route.fallback()
+  })
+
+  await page.goto('/buildings/market')
+  await page.getByRole('tab', { name: 'My Listings' }).click()
+  await page.getByRole('button', { name: 'Accept' }).click()
+
+  await expect(page.locator('.alert-error')).toContainText('minimum sale floor')
+})
+
 test('accept button is disabled during offer submission', async ({ page }) => {
   const player = makePlayerWithCompany()
   const listing = makeMyListing({ offers: [makePendingOffer('offer-slow', 290000)] })

@@ -121,7 +121,9 @@ public sealed partial class Mutation
         }
 
         var outstandingPrincipal = await db.Loans
-            .Where(l => l.BankBuildingId == bank.Id && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue))
+            .Where(l => l.BankBuildingId == bank.Id
+                && l.RemainingPrincipal > 0m
+                && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue || l.Status == LoanStatus.Defaulted))
             .SumAsync(l => (decimal?)l.RemainingPrincipal) ?? 0m;
         var availableLendingCapacity = Math.Max(0m, (bank.TotalDeposits * 0.90m) - outstandingPrincipal);
 
@@ -134,12 +136,13 @@ public sealed partial class Mutation
                     .Build());
         }
 
+        var bankCurrencyCode = bank.City?.CurrencyCode ?? "EUR";
         var lenderAccounts = await LoadActiveCompanyBankAccountsAsync(
             db,
             bank.CompanyId,
             httpContextAccessor.HttpContext!.RequestAborted);
 
-        if (CompanyBankingService.GetTotalBalance(lenderAccounts) < input.PrincipalAmount)
+        if (CompanyBankingService.GetCurrencyBalance(lenderAccounts, bankCurrencyCode) < input.PrincipalAmount)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -160,7 +163,8 @@ public sealed partial class Mutation
 
         var alreadyPledged = await db.Loans
             .AnyAsync(l => l.CollateralBuildingId == input.CollateralBuildingId.Value
-                && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue));
+                && l.RemainingPrincipal > 0m
+                && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue || l.Status == LoanStatus.Defaulted));
         if (alreadyPledged)
         {
             throw new GraphQLException(
@@ -193,7 +197,6 @@ public sealed partial class Mutation
         }
 
         var collateralCityCurrencyCode = collateralBuilding.City?.CurrencyCode ?? "EUR";
-        var bankCurrencyCode = bank.City?.CurrencyCode ?? "EUR";
         var collateralFxRates = await FxRateHelper.BuildEurRatesLookupAsync(
             db,
             [collateralCityCurrencyCode, bankCurrencyCode]);
@@ -247,8 +250,8 @@ public sealed partial class Mutation
         // If a concurrent request already debited the same account and persisted first, SaveChangesAsync
         // below will detect the ConcurrencyToken mismatch and throw DbUpdateConcurrencyException,
         // which we catch and surface as CONCURRENT_MODIFICATION.
-        var lenderDebitedAccount = CompanyBankingService.FindAnyPreferredAccount(lenderAccounts);
-        var debitSucceeded = CompanyBankingService.TryDebit(lenderAccounts, input.PrincipalAmount);
+        var lenderDebitedAccount = CompanyBankingService.FindPreferredAccount(lenderAccounts, bankCurrencyCode);
+        var debitSucceeded = CompanyBankingService.TryDebit(lenderAccounts, input.PrincipalAmount, bankCurrencyCode);
         if (!debitSucceeded)
         {
             LoanCollateralSecurityAuditLogger.Add(
@@ -422,6 +425,7 @@ public sealed partial class Mutation
             .Include(l => l.BorrowerCompany).ThenInclude(c => c.BankAccounts)
             .Include(l => l.LenderCompany).ThenInclude(c => c.BankAccounts)
             .Include(l => l.LoanOffer)
+            .Include(l => l.BankBuilding).ThenInclude(b => b.City)
             .Include(l => l.CollateralBuilding)
             .FirstOrDefaultAsync(l => l.Id == input.LoanId)
             ?? throw new GraphQLException(
@@ -470,10 +474,25 @@ public sealed partial class Mutation
             }
         }
 
+        var loanCurrencyCode = loan.BankBuilding.City?.CurrencyCode ?? "EUR";
         var borrowerSettlementAccount = loan.BorrowerBankAccountId.HasValue
-            ? loan.BorrowerCompany.BankAccounts.FirstOrDefault(a => a.Id == loan.BorrowerBankAccountId.Value && a.ClosedAtUtc == null)
+            ? loan.BorrowerCompany.BankAccounts.FirstOrDefault(a =>
+                a.Id == loan.BorrowerBankAccountId.Value
+                && a.ClosedAtUtc == null
+                && string.Equals(a.CurrencyCode, loanCurrencyCode, StringComparison.OrdinalIgnoreCase))
             : null;
-        var availableBalance = borrowerSettlementAccount?.Balance ?? CompanyBankingService.GetTotalBalance(loan.BorrowerCompany.BankAccounts);
+        borrowerSettlementAccount ??= CompanyBankingService.FindPreferredAccount(
+            loan.BorrowerCompany.BankAccounts,
+            loanCurrencyCode);
+        if (borrowerSettlementAccount is null)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage($"No active repayment account available in {loanCurrencyCode} for this loan.")
+                    .SetCode("REPAYMENT_ACCOUNT_NOT_FOUND")
+                    .Build());
+        }
+        var availableBalance = borrowerSettlementAccount.Balance;
         var payoffAmount = decimal.Round(Math.Max(0m, loan.RemainingPrincipal), 2, MidpointRounding.AwayFromZero);
 
         if (availableBalance < payoffAmount)
@@ -485,17 +504,15 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        if (borrowerSettlementAccount is not null)
-        {
-            borrowerSettlementAccount.Balance -= payoffAmount;
-            borrowerSettlementAccount.ConcurrencyToken = Guid.NewGuid();
-        }
-        else
-        {
-            CompanyBankingService.TryDebit(loan.BorrowerCompany.BankAccounts, payoffAmount);
-        }
+        borrowerSettlementAccount.Balance -= payoffAmount;
+        borrowerSettlementAccount.ConcurrencyToken = Guid.NewGuid();
 
-        CompanyBankingService.TryCredit(loan.LenderCompany.BankAccounts, payoffAmount, null, out var lenderCreditedAccount);
+        var lenderCreditedAccount = await CompanyBankingService.EnsurePreferredAccountAsync(
+            db,
+            loan.LenderCompanyId,
+            loanCurrencyCode);
+        lenderCreditedAccount.Balance += payoffAmount;
+        lenderCreditedAccount.ConcurrencyToken = Guid.NewGuid();
 
         var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync();
         var currentTick = gameState?.CurrentTick ?? 0L;

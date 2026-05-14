@@ -160,17 +160,25 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        // Block closure if any active or overdue loan still uses this account for scheduled repayments.
-        var hasActiveLoan = await db.Loans
-            .AnyAsync(l => l.BorrowerBankAccountId == account.Id
-                && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue));
+        // Block closure if any unpaid loan still uses this account for scheduled repayments.
+        var blockingLoans = await db.Loans
+            .Where(l => l.BorrowerBankAccountId == account.Id
+                && l.RemainingPrincipal > 0m
+                && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue || l.Status == LoanStatus.Defaulted))
+            .Select(l => new { l.Id, l.Status })
+            .ToListAsync();
 
-        if (hasActiveLoan)
+        if (blockingLoans.Count > 0)
         {
+            var blockingDetails = string.Join(
+                ", ",
+                blockingLoans
+                    .Take(5)
+                    .Select(loan => $"{loan.Id} ({loan.Status})"));
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("This account is still the scheduled repayment account for an active loan. Reassign the repayment account or fully repay the loan before closing this account.")
-                    .SetCode("ACTIVE_LOAN_REPAYMENT_ACCOUNT")
+                    .SetMessage($"This account is still the scheduled repayment account for unpaid loans: {blockingDetails}. Reassign the repayment account or fully repay these loans before closing the account.")
+                    .SetCode("REPAYMENT_ACCOUNT_HAS_UNPAID_LOANS")
                     .Build());
         }
 

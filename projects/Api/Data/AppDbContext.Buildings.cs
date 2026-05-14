@@ -237,6 +237,8 @@ public sealed partial class AppDbContext
         {
             e.HasKey(o => o.Id);
             e.Property(o => o.OfferedPrice).HasPrecision(18, 2);
+            e.Property(o => o.EscrowAmount).HasPrecision(18, 2);
+            e.Property(o => o.EscrowCurrencyCode).HasMaxLength(3);
             e.Property(o => o.Status).HasMaxLength(20);
             e.Property(o => o.OfferVersion).IsConcurrencyToken();
             e.Property(o => o.NegotiationNote).HasMaxLength(500);

@@ -47,6 +47,15 @@ public sealed partial class Mutation
                     .Build());
         }
 
+        if (await IsPledgedCollateralWithUnpaidLoanAsync(db, building.Id))
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("This building is pledged as collateral. Edits are frozen until the lender re-appraises the collateral.")
+                    .SetCode("BUILDING_IS_PLEDGED_COLLATERAL")
+                    .Build());
+        }
+
         if (!BuildingConfigurationService.GetAllowedUnitTypes(building.Type).Any())
         {
             throw new GraphQLException(
