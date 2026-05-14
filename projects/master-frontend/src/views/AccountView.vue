@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { fetchMyGoldAccount, type PlayerGoldAccountInfo } from '@/lib/masterApi'
@@ -14,6 +14,31 @@ const { t } = useI18n()
 const account = ref<PlayerGoldAccountInfo | null>(null)
 const loading = ref(false)
 const errorMessage = ref('')
+
+// Subscription prolong form
+const prolongMonths = ref(1)
+const prolonging = ref(false)
+const prolongError = ref('')
+const prolongSuccess = ref(false)
+
+const subscription = computed(() => auth.subscription)
+
+function subscriptionStatusLabel(): string {
+  const sub = subscription.value
+  if (!sub || sub.status === 'NONE') return t('subscription.statusNoActive')
+  if (sub.status === 'EXPIRED') return t('subscription.statusExpired')
+  if (sub.isActive) return t('subscription.statusActive')
+  return t('subscription.statusInactive')
+}
+
+function subscriptionExpiryLabel(): string {
+  const sub = subscription.value
+  if (!sub?.expiresAtUtc) return ''
+  const days = sub.daysRemaining ?? 0
+  if (days === 0) return t('subscription.expiresToday')
+  if (days === 1) return t('subscription.expiresTomorrow')
+  return t('subscription.expiresInDays', { days })
+}
 
 function formatGold(value: number): string {
   return new Intl.NumberFormat(undefined, {
@@ -47,6 +72,20 @@ async function loadAccount() {
     errorMessage.value = e instanceof Error ? e.message : t('account.loadError')
   } finally {
     loading.value = false
+  }
+}
+
+async function prolongSubscription() {
+  prolonging.value = true
+  prolongError.value = ''
+  prolongSuccess.value = false
+  try {
+    await auth.prolong(prolongMonths.value)
+    prolongSuccess.value = true
+  } catch (e: unknown) {
+    prolongError.value = e instanceof Error ? e.message : t('home.prolongError')
+  } finally {
+    prolonging.value = false
   }
 }
 
@@ -114,6 +153,69 @@ onMounted(() => {
               {{ t('account.zeroCopy') }}
             </p>
           </aside>
+        </section>
+
+        <!-- Subscription status panel -->
+        <section class="subscription-card" aria-label="Pro subscription status">
+          <div class="sub-header">
+            <div>
+              <p class="sub-kicker">{{ t('account.subscriptionKicker') }}</p>
+              <h2 class="sub-title">{{ t('account.subscriptionTitle') }}</h2>
+            </div>
+            <span
+              class="sub-tier-badge"
+              :class="subscription?.tier === 'PRO' ? 'badge-pro' : 'badge-free'"
+            >
+              {{ subscription?.tier === 'PRO' ? t('subscription.tierPro') : t('subscription.tierFree') }}
+            </span>
+          </div>
+
+          <div class="sub-status-row">
+            <span class="sub-status-dot" :class="subscription?.isActive ? 'dot-active' : 'dot-inactive'" />
+            <span class="sub-status-label">{{ subscriptionStatusLabel() }}</span>
+            <span v-if="subscription?.isActive && subscription.expiresAtUtc" class="sub-expiry">
+              {{ subscriptionExpiryLabel() }}
+            </span>
+          </div>
+
+          <!-- Upgrade prompt for free users -->
+          <template v-if="!subscription?.isActive">
+            <p class="sub-upgrade-copy">{{ t('account.subscriptionUpgradeCopy') }}</p>
+            <a href="/login" class="sub-upgrade-btn">{{ t('subscription.subscribeToPro') }}</a>
+          </template>
+
+          <!-- Pro subscription controls -->
+          <template v-else>
+            <p class="sub-active-copy">{{ t('account.subscriptionActiveCopy') }}</p>
+
+            <div v-if="subscription?.canProlong" class="sub-prolong-form">
+              <label class="sub-prolong-label" for="prolong-months">
+                {{ t('account.subscriptionProlongLabel') }}
+              </label>
+              <div class="sub-prolong-controls">
+                <input
+                  id="prolong-months"
+                  v-model.number="prolongMonths"
+                  type="number"
+                  min="1"
+                  max="12"
+                  class="sub-months-input"
+                  :disabled="prolonging"
+                />
+                <span class="sub-months-unit">{{ t('home.monthsPlural') }}</span>
+                <button
+                  type="button"
+                  class="sub-prolong-btn"
+                  :disabled="prolonging"
+                  @click="prolongSubscription"
+                >
+                  {{ prolonging ? t('home.processing') : t('subscription.extendSubscription') }}
+                </button>
+              </div>
+              <p v-if="prolongError" class="sub-error" role="alert">{{ prolongError }}</p>
+              <p v-if="prolongSuccess" class="sub-success">{{ t('home.prolongSuccess') }}</p>
+            </div>
+          </template>
         </section>
 
         <!-- What is gold section -->
@@ -509,5 +611,187 @@ h1 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ── Subscription card ─────────────────────────────────────────────── */
+.subscription-card {
+  background: #12121e;
+  border: 1px solid #1e1e30;
+  border-radius: 12px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sub-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.sub-kicker {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #606078;
+  margin: 0 0 0.2rem;
+}
+
+.sub-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e8e8f0;
+  margin: 0;
+}
+
+.sub-tier-badge {
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.badge-pro {
+  background: rgba(255, 215, 0, 0.15);
+  border: 1px solid rgba(255, 215, 0, 0.4);
+  color: #ffd700;
+}
+
+.badge-free {
+  background: rgba(96, 96, 120, 0.2);
+  border: 1px solid #2e2e4a;
+  color: #808098;
+}
+
+.sub-status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.sub-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dot-active {
+  background: #4ade80;
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.5);
+}
+
+.dot-inactive {
+  background: #606078;
+}
+
+.sub-status-label {
+  color: #c0c0d0;
+}
+
+.sub-expiry {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: #808098;
+}
+
+.sub-upgrade-copy,
+.sub-active-copy {
+  font-size: 0.875rem;
+  color: #a0a0b8;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.sub-upgrade-btn {
+  display: inline-block;
+  padding: 0.6rem 1.25rem;
+  background: rgba(255, 215, 0, 0.12);
+  border: 1px solid rgba(255, 215, 0, 0.35);
+  border-radius: 8px;
+  color: #ffd700;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  align-self: flex-start;
+  transition: background 0.15s;
+}
+
+.sub-upgrade-btn:hover {
+  background: rgba(255, 215, 0, 0.2);
+}
+
+.sub-prolong-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sub-prolong-label {
+  font-size: 0.8rem;
+  color: #808098;
+}
+
+.sub-prolong-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.sub-months-input {
+  width: 64px;
+  padding: 0.4rem 0.6rem;
+  background: #0a0a1a;
+  border: 1px solid #2e2e4a;
+  border-radius: 6px;
+  color: #e8e8f0;
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.sub-months-unit {
+  font-size: 0.85rem;
+  color: #808098;
+}
+
+.sub-prolong-btn {
+  padding: 0.4rem 1rem;
+  background: rgba(255, 215, 0, 0.1);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  border-radius: 6px;
+  color: #ffd700;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.sub-prolong-btn:hover:not(:disabled) {
+  background: rgba(255, 215, 0, 0.18);
+}
+
+.sub-prolong-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sub-error {
+  font-size: 0.825rem;
+  color: #f87171;
+  margin: 0;
+}
+
+.sub-success {
+  font-size: 0.825rem;
+  color: #4ade80;
+  margin: 0;
 }
 </style>

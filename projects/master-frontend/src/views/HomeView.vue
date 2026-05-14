@@ -156,6 +156,45 @@ onMounted(() => {
           </table>
         </div>
       </section>
+
+      <!-- Feature highlights -->
+      <section class="mt-10 lg:mt-12" aria-labelledby="features-heading">
+        <div class="mb-6 text-center">
+          <h2 id="features-heading" class="text-2xl font-bold text-body lg:text-3xl">
+            {{ t('home.featuresTitle') }}
+          </h2>
+          <p class="mt-2 text-sm text-muted">{{ t('home.featuresSubtitle') }}</p>
+        </div>
+
+        <div class="feature-grid">
+          <article class="feature-card" aria-label="Economic Simulation feature">
+            <div class="feature-icon" aria-hidden="true">📈</div>
+            <h3 class="feature-title">{{ t('home.feat1Title') }}</h3>
+            <p class="feature-desc">{{ t('home.feat1Desc') }}</p>
+          </article>
+          <article class="feature-card" aria-label="Stock Exchange feature">
+            <div class="feature-icon" aria-hidden="true">🏛️</div>
+            <h3 class="feature-title">{{ t('home.feat2Title') }}</h3>
+            <p class="feature-desc">{{ t('home.feat2Desc') }}</p>
+          </article>
+          <article class="feature-card" aria-label="Power Grid feature">
+            <div class="feature-icon" aria-hidden="true">⚡</div>
+            <h3 class="feature-title">{{ t('home.feat3Title') }}</h3>
+            <p class="feature-desc">{{ t('home.feat3Desc') }}</p>
+          </article>
+          <article class="feature-card" aria-label="Research and Development feature">
+            <div class="feature-icon" aria-hidden="true">🔬</div>
+            <h3 class="feature-title">{{ t('home.feat4Title') }}</h3>
+            <p class="feature-desc">{{ t('home.feat4Desc') }}</p>
+          </article>
+        </div>
+
+        <div class="mt-6 text-center">
+          <RouterLink class="btn btn-secondary" to="/docs">
+            {{ t('home.learnMoreDocs') }}
+          </RouterLink>
+        </div>
+      </section>
     </main>
   </div>
 </template>
@@ -185,5 +224,44 @@ onMounted(() => {
   background:
     linear-gradient(140deg, rgba(240, 244, 248, 0.88), rgba(240, 244, 248, 0.62)),
     radial-gradient(circle at 75% 20%, rgba(0, 71, 255, 0.12), transparent 45%);
+}
+
+.feature-grid {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (max-width: 640px) {
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.feature-card {
+  border-radius: 1rem;
+  border: 1px solid var(--color-divider);
+  background: var(--color-card);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.feature-icon {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.feature-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-body);
+}
+
+.feature-desc {
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: var(--color-muted);
 }
 </style>

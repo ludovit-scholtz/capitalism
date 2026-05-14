@@ -225,3 +225,67 @@ test.describe('Home page — account link for authenticated users', () => {
     await expect(link).toHaveAttribute('href', '/account')
   })
 })
+
+// ── Account page — Pro subscription panel ────────────────────────────────
+
+test.describe('Account page — subscription panel', () => {
+  test('shows Free tier badge and upgrade prompt for free user', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, {
+      currentPlayer: player,
+      subscription: {
+        tier: 'FREE',
+        status: 'NONE',
+        isActive: false,
+        daysRemaining: null,
+        canProlong: false,
+        expiresAtUtc: null,
+        startsAtUtc: null,
+      },
+      playerGoldAccount: {
+        goldTokenBalance: 0,
+        lastUpdatedAtUtc: null,
+        recentTransactions: [],
+      },
+    })
+    state.currentToken = 'token-free'
+
+    await loginAs(page, state, player, 'token-free')
+    await page.goto('/account')
+
+    await expect(page.locator('.subscription-card')).toBeVisible()
+    await expect(page.locator('.badge-free')).toBeVisible()
+    await expect(page.locator('.sub-upgrade-btn')).toBeVisible()
+  })
+
+  test('shows Active Pro badge and expiry for Pro user', async ({ page }) => {
+    const player = makePlayer()
+    const futureExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+    const state = setupMockApi(page, {
+      currentPlayer: player,
+      subscription: {
+        tier: 'PRO',
+        status: 'ACTIVE',
+        isActive: true,
+        daysRemaining: 30,
+        canProlong: true,
+        expiresAtUtc: futureExpiry,
+        startsAtUtc: new Date().toISOString(),
+      },
+      playerGoldAccount: {
+        goldTokenBalance: 5,
+        lastUpdatedAtUtc: null,
+        recentTransactions: [],
+      },
+    })
+    state.currentToken = 'token-pro'
+
+    await loginAs(page, state, player, 'token-pro')
+    await page.goto('/account')
+
+    await expect(page.locator('.subscription-card')).toBeVisible()
+    await expect(page.locator('.badge-pro')).toBeVisible()
+    await expect(page.locator('.sub-status-dot.dot-active')).toBeVisible()
+    await expect(page.locator('.sub-expiry')).toContainText('Expires in')
+  })
+})

@@ -35,6 +35,7 @@ export default {
     home: 'Home',
     gameServers: 'Game servers',
     ranking: 'Ranking',
+    docs: 'Docs',
     supportDashboard: 'Support dashboard',
     gameAdminDashboard: 'Game admin dashboard',
     bounties: 'Bounties',
@@ -42,6 +43,7 @@ export default {
     tokenizedGold: 'Tokenized gold',
     gameSettings: 'Game settings',
     apiKeys: 'API Keys',
+    account: 'Account',
   },
   themeSwitcher: {
     switchToLight: 'Switch to light mode',
@@ -129,6 +131,22 @@ export default {
     heartbeat: 'Heartbeat',
     playOnServer: 'Play on server',
     unableToLoadServers: 'Unable to load game servers.',
+    featuresTitle: 'Why Capitalism?',
+    featuresSubtitle:
+      'A fully simulated market economy where every price, every wage, and every trade reflects real in-game activity — no scripted outcomes.',
+    feat1Title: 'Economic Simulation',
+    feat1Desc:
+      'Supply and demand are computed every tick from real building output and consumer behaviour. Price your goods competitively or lose market share.',
+    feat2Title: 'Stock Exchange',
+    feat2Desc:
+      'List your company on the exchange, attract shareholders, pay dividends, and attempt hostile takeovers of rival corporations.',
+    feat3Title: 'Power Grid',
+    feat3Desc:
+      'Build coal, gas, nuclear, solar, and wind power plants. Cities with energy shortages suffer reduced output — own the grid and charge for it.',
+    feat4Title: 'Research & Development',
+    feat4Desc:
+      'Invest in R&D units to unlock superior product quality and production efficiency, giving your goods a lasting edge on the public market.',
+    learnMoreDocs: 'Read the docs →',
   },
   login: {
     signIn: 'Sign in',
@@ -187,6 +205,13 @@ export default {
     balanceAfter: 'Balance after',
     note: 'Note',
     dash: '-',
+    subscriptionKicker: 'Pro subscription',
+    subscriptionTitle: 'Subscription Status',
+    subscriptionUpgradeCopy:
+      'Upgrade to Pro to unlock advanced analytics, unlimited company creation, and priority server access.',
+    subscriptionActiveCopy:
+      'Your Pro subscription is active. Extend it at any time to keep your benefits running.',
+    subscriptionProlongLabel: 'Extend by',
   },
   gameSettings: {
     kicker: 'Cross-server identity',
@@ -579,8 +604,8 @@ export default {
     expiresTomorrow: 'Expires tomorrow',
     expiresInDays: 'Expires in {days} days',
     renewsOn: 'Renews on {date}',
-    subscribeToPro: 'Subscribe to Pro',
-    extendSubscription: 'Extend subscription',
+    subscribeToPro: 'Upgrade to Pro →',
+    extendSubscription: 'Extend',
     prolongSubscription: 'Prolong subscription',
   },
   apiKeys: {
@@ -683,5 +708,85 @@ export default {
     colSource: 'Source',
     loadError:
       'Failed to load security board data. The report file may not have been generated yet.',
+  },
+  docs: {
+    kicker: 'Documentation',
+    title: 'Game Docs',
+    subtitle: 'Learn how to play Capitalism, understand the economy, and master buildings.',
+    topicsLabel: 'Topics',
+    topicGettingStarted: 'Getting Started',
+    topicBuildingsGuide: 'Buildings Guide',
+    topicEconomyOverview: 'Economy Overview',
+    gs: {
+      welcomeTitle: 'Welcome to Capitalism',
+      welcomeBody:
+        'Capitalism is a multiplayer economic strategy game where you build businesses, manage supply chains, trade on real markets, and compete to become the wealthiest tycoon across multiple game servers.',
+      accountTitle: 'Creating Your Account',
+      accountBody: 'Follow these steps to start playing:',
+      step1: 'Register a free account on the master portal.',
+      step2: 'Join an active game server from the server list.',
+      step3: 'Complete the onboarding wizard to set up your first company and factory.',
+      step4: 'Start producing goods and selling to the public market.',
+      firstStepsTitle: 'Your First Steps',
+      firstStepsBody:
+        'After onboarding you will have a factory producing goods and a sales shop selling to the public. Here are tips to grow quickly:',
+      tip1: 'Check the market price of your product and set a competitive price.',
+      tip2: 'Upgrade your factory units to increase production capacity.',
+      tip3: 'Open a bank account in your city to manage liquidity.',
+      tip4: 'Monitor the tick cycle — the economy advances every few minutes.',
+      proTitle: 'Pro Subscription',
+      proBody:
+        'A free account gives you access to all core gameplay. Upgrading to Pro unlocks advanced analytics, unlimited company creation, and priority server access. You can manage your subscription from the Account page.',
+    },
+    bg: {
+      overviewTitle: 'Overview',
+      overviewBody:
+        'Buildings are the foundation of your economic empire. Each building sits on a land parcel in a city and contains a 4×4 grid of units that perform specific economic functions.',
+      typesTitle: 'Building Types',
+      mine: 'Mine',
+      mineDesc:
+        'Extracts raw materials (wood, iron ore, coal, gold, cotton, grain, silicon, chemical minerals) from a resource deposit on the land parcel. Output is stored in on-site storage units.',
+      factory: 'Factory',
+      factoryDesc:
+        'Transforms raw materials into finished goods using manufacturing units. Connect purchase units to buy inputs and B2B sales units to sell outputs to other factories.',
+      salesShop: 'Sales Shop',
+      salesShopDesc:
+        'Sells finished goods directly to the public. Public sales units compute demand each tick based on price elasticity, city population, and brand awareness.',
+      bank: 'Bank',
+      bankDesc:
+        'Accepts player deposits and issues collateralised loans to companies. Bank owners earn the spread between deposit and lending rates.',
+      powerPlant: 'Power Plant',
+      powerPlantDesc:
+        'Generates energy for the city grid. Without sufficient city-wide power, buildings enter reduced-output or offline states. Power plants earn revenue from the energy spot market.',
+      mediaHouse: 'Media House',
+      mediaHouseDesc:
+        'Produces advertising content that boosts brand awareness for marketing units city-wide. Spending budget drives content output which decays each tick.',
+      unitsTitle: 'Building Units',
+      unitsBody:
+        'Each building has a 4×4 grid of unit slots. Units can be linked left→right or top→bottom to form production chains. Common unit types include: Mining, Storage, Purchase, Manufacturing, Public Sales, B2B Sales, Branding, and Marketing.',
+      upgradeTitle: 'Upgrading Units',
+      upgradeBody:
+        'Units can be upgraded to higher levels to increase their capacity and efficiency. Upgrades take a number of ticks to apply and are queued in a pending plan. You can view the remaining ticks in the building detail panel.',
+    },
+    eo: {
+      introTitle: 'How the Economy Works',
+      introBody:
+        'The Capitalism economy is a fully simulated market. Supply and demand are computed every tick from real building output and consumer preferences. No numbers are fabricated — every price reflects actual in-game activity.',
+      tickTitle: 'The Tick Cycle',
+      tickBody:
+        'The game advances in discrete time steps called ticks. Each tick the engine runs: mining extraction, factory manufacturing, public sales, tax collection, FX rate updates, and energy dispatch. The tick interval is shown on the home page.',
+      supplyTitle: 'Supply and Demand',
+      supplyBody:
+        'Consumer demand for a product depends on city population, salary spending, brand awareness, and price elasticity. When your price is below the market average you attract more buyers; above it you lose market share.',
+      currencyTitle: 'City Currencies',
+      currencyBody:
+        'Each city uses its own currency (Bratislava: EUR, Prague: CZK, Vienna: EUR). All bank accounts, lot prices, and revenues are denominated in the city currency. The FX exchange lets you swap between currencies at live rates.',
+      goldTitle: 'Tokenized Gold',
+      goldBody:
+        'Gold is a cross-server hard asset backed by real-world bullion. You can mine gold ore in-game, trade it on the commodity exchange, and transfer the gold token balance to your master account. 1 gold token = 1 gram of physical gold.',
+      stocksTitle: 'Stock Exchange',
+      stocksBody:
+        'Companies can list shares on the stock exchange. Players buy and sell at limit-order prices. Owning 50% of combined shares triggers a hostile takeover option; 90% enables a full company merge.',
+    },
   },
 } as const
