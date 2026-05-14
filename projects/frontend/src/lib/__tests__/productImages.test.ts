@@ -48,6 +48,14 @@ describe('productImages mapping', () => {
     expect(new Set(allSlugs).size).toBe(allSlugs.length)
   })
 
+  it('keeps the fallback asset reserved outside catalog slug mappings', () => {
+    expect(RESOURCE_IMAGE_SLUGS).not.toContain('fallback')
+    expect(PRODUCT_IMAGE_SLUGS).not.toContain('fallback')
+    expect(hasResourceCatalogImage('fallback')).toBe(false)
+    expect(hasProductCatalogImage('fallback')).toBe(false)
+    expectSvgImageUrl(getCatalogFallbackImageUrl())
+  })
+
   it('returns fallback image for unknown slugs', () => {
     const fallback = getCatalogFallbackImageUrl()
     expect(hasProductCatalogImage('missing-product-slug')).toBe(false)
