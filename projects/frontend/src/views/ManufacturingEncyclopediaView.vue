@@ -341,12 +341,7 @@ function navigateToEntry(slug: string) {
         </section>
       </div>
 
-      <EncyclopediaResourcesCatalog
-        v-if="selectedTopic === 'resources-definition'"
-        :resources="resources"
-        :products="products"
-        @navigate="navigateToEntry"
-      />
+      <EncyclopediaResourcesCatalog v-if="selectedTopic === 'resources-definition'" :resources="resources" :products="products" @navigate="navigateToEntry" />
     </section>
 
     <div

@@ -112,72 +112,72 @@ test.describe('Forex help screenshots', () => {
         ]
 
         state.forexTradeHistory = [
-      {
-        id: 'fx-1',
-        fromCurrencyCode: 'EUR',
-        fromCurrencySymbol: '€',
-        fromAmount: 10000,
-        toCurrencyCode: 'USD',
-        toCurrencySymbol: '$',
-        toAmount: 10890,
-        rate: 1.1,
-        feeAmount: 100,
-        feeRate: 0.01,
-        executedAtTick: 9302,
-      },
-      {
-        id: 'fx-2',
-        fromCurrencyCode: 'USD',
-        fromCurrencySymbol: '$',
-        fromAmount: 5000,
-        toCurrencyCode: 'EUR',
-        toCurrencySymbol: '€',
-        toAmount: 4450,
-        rate: 0.9,
-        feeAmount: 50,
-        feeRate: 0.01,
-        executedAtTick: 9271,
-      },
-    ]
+          {
+            id: 'fx-1',
+            fromCurrencyCode: 'EUR',
+            fromCurrencySymbol: '€',
+            fromAmount: 10000,
+            toCurrencyCode: 'USD',
+            toCurrencySymbol: '$',
+            toAmount: 10890,
+            rate: 1.1,
+            feeAmount: 100,
+            feeRate: 0.01,
+            executedAtTick: 9302,
+          },
+          {
+            id: 'fx-2',
+            fromCurrencyCode: 'USD',
+            fromCurrencySymbol: '$',
+            fromAmount: 5000,
+            toCurrencyCode: 'EUR',
+            toCurrencySymbol: '€',
+            toAmount: 4450,
+            rate: 0.9,
+            feeAmount: 50,
+            feeRate: 0.01,
+            executedAtTick: 9271,
+          },
+        ]
 
         state.goldBalance = {
-      balance: 82.75,
-      blockedInPools: 11.5,
-      availableBalance: 71.25,
-    }
+          balance: 82.75,
+          blockedInPools: 11.5,
+          availableBalance: 71.25,
+        }
 
         state.goldAmmPools = [
-      {
-        id: 'pool-usd',
-        currencyCode: 'USD',
-        currencySymbol: '$',
-        fiatReserve: 1_500_000,
-        goldReserve: 750,
-        totalLiquidityShares: 8_500,
-        impliedGoldPrice: 2000,
-        myPosition: {
-          id: 'pos-usd-1',
-          poolId: 'pool-usd',
-          currencyCode: 'USD',
-          liquidityShares: 620,
-          sharePercent: 7.29,
-          claimableFiat: 109350,
-          claimableGold: 54.75,
-          fiatProvided: 100000,
-          goldProvided: 50,
-        },
-      },
-      {
-        id: 'pool-eur',
-        currencyCode: 'EUR',
-        currencySymbol: '€',
-        fiatReserve: 1_300_000,
-        goldReserve: 700,
-        totalLiquidityShares: 7_900,
-        impliedGoldPrice: 1857.14,
-        myPosition: null,
-      },
-    ]
+          {
+            id: 'pool-usd',
+            currencyCode: 'USD',
+            currencySymbol: '$',
+            fiatReserve: 1_500_000,
+            goldReserve: 750,
+            totalLiquidityShares: 8_500,
+            impliedGoldPrice: 2000,
+            myPosition: {
+              id: 'pos-usd-1',
+              poolId: 'pool-usd',
+              currencyCode: 'USD',
+              liquidityShares: 620,
+              sharePercent: 7.29,
+              claimableFiat: 109350,
+              claimableGold: 54.75,
+              fiatProvided: 100000,
+              goldProvided: 50,
+            },
+          },
+          {
+            id: 'pool-eur',
+            currencyCode: 'EUR',
+            currencySymbol: '€',
+            fiatReserve: 1_300_000,
+            goldReserve: 700,
+            totalLiquidityShares: 7_900,
+            impliedGoldPrice: 1857.14,
+            myPosition: null,
+          },
+        ]
 
         await localizedPage.goto('/forex')
         await expect(localizedPage.locator('.forex-hero h1')).toBeVisible()
@@ -186,7 +186,10 @@ test.describe('Forex help screenshots', () => {
         await localizedPage.locator('#from-bank-account').selectOption('bank-company-eur-primary')
         await localizedPage.locator('#to-bank-account').selectOption('bank-company-usd')
         await localizedPage.locator('#swap-amount').fill('15000')
-        await localizedPage.getByRole('button', { name: /Get Quote|Získať|Angebot|Kurs abrufen/i }).first().click()
+        await localizedPage
+          .getByRole('button', { name: /Get Quote|Získať|Angebot|Kurs abrufen/i })
+          .first()
+          .click()
         await expect(localizedPage.getByRole('region', { name: 'Exchange Quote' })).toBeVisible()
         await saveScreenshot(localizedPage, locale, 'step-2-quote-and-confirm-1920x1080.png')
 
@@ -208,7 +211,10 @@ test.describe('Forex help screenshots', () => {
         await localizedPage.locator('[role="tab"]').nth(4).click()
         await expect(localizedPage.getByRole('region', { name: 'Gold AMM Exchange' })).toBeVisible()
         await localizedPage.getByRole('spinbutton').first().fill('1000')
-        await localizedPage.getByRole('button', { name: /Get Quote|Získať|Angebot|Kurs abrufen/i }).first().click()
+        await localizedPage
+          .getByRole('button', { name: /Get Quote|Získať|Angebot|Kurs abrufen/i })
+          .first()
+          .click()
         await expect(localizedPage.getByRole('region', { name: 'Swap Quote' })).toBeVisible()
         await saveScreenshot(localizedPage, locale, 'step-6-gold-amm-swap-1920x1080.png')
 

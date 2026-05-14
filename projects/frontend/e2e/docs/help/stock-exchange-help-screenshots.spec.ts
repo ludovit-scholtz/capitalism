@@ -32,82 +32,82 @@ test.describe('Stock exchange help screenshots', () => {
   for (const locale of SCREENSHOT_LOCALES) {
     test(`captures real FullHD walkthrough screenshots for IPO, trading, forex, tax ledger, and dividend flow (${locale})`, async ({ page }) => {
       const player = makePlayer({
-      displayName: 'Founder Alex',
-      onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
-      personalCash: 350_000,
-      personalTaxReserve: 24_500,
-      dividendPayments: [
-        {
-          id: 'div-1',
-          companyId: 'company-rival',
-          companyName: 'Rival Dynamics',
-          shareCount: 320,
-          amountPerShare: 2.8,
-          totalAmount: 896,
-          gameYear: 2001,
-          recordedAtTick: 9042,
-          recordedAtUtc: '2026-01-03T10:00:00Z',
-          description: 'Annual dividend payout',
-        },
-      ],
-      stockTrades: [
-        {
-          id: 'trade-1',
-          companyId: 'company-rival',
-          companyName: 'Rival Dynamics',
-          direction: 'SELL',
-          shareCount: 120,
-          pricePerShare: 94,
-          totalValue: 11280,
-          recordedAtTick: 9051,
-          recordedAtUtc: '2026-01-03T12:00:00Z',
-        },
-        {
-          id: 'trade-2',
-          companyId: 'company-rival',
-          companyName: 'Rival Dynamics',
-          direction: 'BUY',
-          shareCount: 200,
-          pricePerShare: 88,
-          totalValue: 17600,
-          recordedAtTick: 9002,
-          recordedAtUtc: '2026-01-03T08:00:00Z',
-        },
-      ],
-      companies: [
-        {
-          id: 'company-home',
-          playerId: 'player-1',
-          name: 'Home Holdings',
-          cash: 1_250_000,
-          totalSharesIssued: 10000,
-          dividendPayoutRatio: 0.2,
-          foundedAtUtc: '2026-01-01T00:00:00Z',
-          foundedAtTick: 42,
-          buildings: [],
-        },
-      ],
-    })
+        displayName: 'Founder Alex',
+        onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
+        personalCash: 350_000,
+        personalTaxReserve: 24_500,
+        dividendPayments: [
+          {
+            id: 'div-1',
+            companyId: 'company-rival',
+            companyName: 'Rival Dynamics',
+            shareCount: 320,
+            amountPerShare: 2.8,
+            totalAmount: 896,
+            gameYear: 2001,
+            recordedAtTick: 9042,
+            recordedAtUtc: '2026-01-03T10:00:00Z',
+            description: 'Annual dividend payout',
+          },
+        ],
+        stockTrades: [
+          {
+            id: 'trade-1',
+            companyId: 'company-rival',
+            companyName: 'Rival Dynamics',
+            direction: 'SELL',
+            shareCount: 120,
+            pricePerShare: 94,
+            totalValue: 11280,
+            recordedAtTick: 9051,
+            recordedAtUtc: '2026-01-03T12:00:00Z',
+          },
+          {
+            id: 'trade-2',
+            companyId: 'company-rival',
+            companyName: 'Rival Dynamics',
+            direction: 'BUY',
+            shareCount: 200,
+            pricePerShare: 88,
+            totalValue: 17600,
+            recordedAtTick: 9002,
+            recordedAtUtc: '2026-01-03T08:00:00Z',
+          },
+        ],
+        companies: [
+          {
+            id: 'company-home',
+            playerId: 'player-1',
+            name: 'Home Holdings',
+            cash: 1_250_000,
+            totalSharesIssued: 10000,
+            dividendPayoutRatio: 0.2,
+            foundedAtUtc: '2026-01-01T00:00:00Z',
+            foundedAtTick: 42,
+            buildings: [],
+          },
+        ],
+      })
 
       const rival = makePlayer({
-      id: 'player-2',
-      email: 'rival@test.com',
-      displayName: 'Rival Owner',
-      onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
-      companies: [
-        {
-          id: 'company-rival',
-          playerId: 'player-2',
-          name: 'Rival Dynamics',
-          cash: 1_500_000,
-          totalSharesIssued: 10000,
-          dividendPayoutRatio: 0.35,
-          foundedAtUtc: '2026-01-01T00:00:00Z',
-          foundedAtTick: 42,
-          buildings: [],
-        },
-      ],
-    })
+        id: 'player-2',
+        email: 'rival@test.com',
+        displayName: 'Rival Owner',
+        onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
+        companies: [
+          {
+            id: 'company-rival',
+            playerId: 'player-2',
+            name: 'Rival Dynamics',
+            cash: 1_500_000,
+            totalSharesIssued: 10000,
+            dividendPayoutRatio: 0.35,
+            foundedAtUtc: '2026-01-01T00:00:00Z',
+            foundedAtTick: 42,
+            buildings: [],
+          },
+        ],
+      })
 
       const localizedPage = await openLocalizedScreenshotPage(page.context(), locale)
 
@@ -115,55 +115,55 @@ test.describe('Stock exchange help screenshots', () => {
         const state = setupMockApi(localizedPage, {
           players: [player, rival],
           shareholdings: [
-        { companyId: 'company-home', ownerPlayerId: 'player-1', ownerCompanyId: null, shareCount: 9000 },
-        { companyId: 'company-rival', ownerPlayerId: 'player-2', ownerCompanyId: null, shareCount: 7600 },
-        { companyId: 'company-rival', ownerPlayerId: 'player-1', ownerCompanyId: null, shareCount: 320 },
-        { companyId: 'company-rival', ownerPlayerId: null, ownerCompanyId: 'company-home', shareCount: 600 },
+            { companyId: 'company-home', ownerPlayerId: 'player-1', ownerCompanyId: null, shareCount: 9000 },
+            { companyId: 'company-rival', ownerPlayerId: 'player-2', ownerCompanyId: null, shareCount: 7600 },
+            { companyId: 'company-rival', ownerPlayerId: 'player-1', ownerCompanyId: null, shareCount: 320 },
+            { companyId: 'company-rival', ownerPlayerId: null, ownerCompanyId: 'company-home', shareCount: 600 },
           ],
         })
 
         state.myBankAccounts = [
-      {
-        id: 'bank-person-eur',
-        accountNumber: '1000000000000001',
-        currencyCode: 'EUR',
-        currencySymbol: '€',
-        balance: 150_000,
-        ownerType: 'PERSON',
-        ownerDisplayName: player.displayName,
-      },
-      {
-        id: 'bank-person-usd',
-        accountNumber: '1000000000000002',
-        currencyCode: 'USD',
-        currencySymbol: '$',
-        balance: 80_000,
-        ownerType: 'PERSON',
-        ownerDisplayName: player.displayName,
-      },
-      {
-        id: 'bank-company-eur',
-        accountNumber: '2000000000000001',
-        currencyCode: 'EUR',
-        currencySymbol: '€',
-        balance: 340_000,
-        ownerType: 'COMPANY',
-        ownerDisplayName: 'Home Holdings',
-        companyId: 'company-home',
-        companyName: 'Home Holdings',
-      },
-      {
-        id: 'bank-company-usd',
-        accountNumber: '2000000000000002',
-        currencyCode: 'USD',
-        currencySymbol: '$',
-        balance: 420_000,
-        ownerType: 'COMPANY',
-        ownerDisplayName: 'Home Holdings',
-        companyId: 'company-home',
-        companyName: 'Home Holdings',
-      },
-    ]
+          {
+            id: 'bank-person-eur',
+            accountNumber: '1000000000000001',
+            currencyCode: 'EUR',
+            currencySymbol: '€',
+            balance: 150_000,
+            ownerType: 'PERSON',
+            ownerDisplayName: player.displayName,
+          },
+          {
+            id: 'bank-person-usd',
+            accountNumber: '1000000000000002',
+            currencyCode: 'USD',
+            currencySymbol: '$',
+            balance: 80_000,
+            ownerType: 'PERSON',
+            ownerDisplayName: player.displayName,
+          },
+          {
+            id: 'bank-company-eur',
+            accountNumber: '2000000000000001',
+            currencyCode: 'EUR',
+            currencySymbol: '€',
+            balance: 340_000,
+            ownerType: 'COMPANY',
+            ownerDisplayName: 'Home Holdings',
+            companyId: 'company-home',
+            companyName: 'Home Holdings',
+          },
+          {
+            id: 'bank-company-usd',
+            accountNumber: '2000000000000002',
+            currencyCode: 'USD',
+            currencySymbol: '$',
+            balance: 420_000,
+            ownerType: 'COMPANY',
+            ownerDisplayName: 'Home Holdings',
+            companyId: 'company-home',
+            companyName: 'Home Holdings',
+          },
+        ]
 
         await localizedPage.goto('/onboarding')
         await expect(localizedPage.locator('.city-card').first()).toBeVisible()
@@ -203,7 +203,10 @@ test.describe('Stock exchange help screenshots', () => {
         await localizedPage.locator('#from-bank-account').selectOption('bank-person-eur')
         await localizedPage.locator('#to-bank-account').selectOption('bank-person-usd')
         await localizedPage.locator('#swap-amount').fill('15000')
-        await localizedPage.getByRole('button', { name: /Get Quote|Získať|Angebot/i }).first().click()
+        await localizedPage
+          .getByRole('button', { name: /Get Quote|Získať|Angebot/i })
+          .first()
+          .click()
         await expect(localizedPage.getByRole('region', { name: 'Exchange Quote' })).toBeVisible()
         await saveScreenshot(localizedPage, locale, 'step-5-usd-forex-swap-1920x1080.png')
 
@@ -216,7 +219,10 @@ test.describe('Stock exchange help screenshots', () => {
         await saveScreenshot(localizedPage, locale, 'step-7-dividend-config-company-settings-1920x1080.png')
 
         await localizedPage.goto('/personal-ledger')
-        const dividendTable = localizedPage.locator('table').filter({ has: localizedPage.locator('tr', { hasText: '2001' }) }).first()
+        const dividendTable = localizedPage
+          .locator('table')
+          .filter({ has: localizedPage.locator('tr', { hasText: '2001' }) })
+          .first()
         await expect(dividendTable).toBeVisible()
         await dividendTable.scrollIntoViewIfNeeded()
         await saveScreenshot(localizedPage, locale, 'step-8-dividend-effects-personal-account-1920x1080.png')

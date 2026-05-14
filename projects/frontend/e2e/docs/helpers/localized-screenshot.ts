@@ -18,14 +18,7 @@ function ensureDirectory(dirPath: string) {
   fs.mkdirSync(dirPath, { recursive: true })
 }
 
-export async function saveLocalizedScreenshot(
-  page: Page,
-  locale: ScreenshotLocale,
-  fileName: string,
-  primaryBaseDir: string,
-  copyBaseDirs: string[] = [],
-  legacyEnglishBaseDirs: string[] = [],
-) {
+export async function saveLocalizedScreenshot(page: Page, locale: ScreenshotLocale, fileName: string, primaryBaseDir: string, copyBaseDirs: string[] = [], legacyEnglishBaseDirs: string[] = []) {
   const savedPaths: string[] = []
   const primaryDir = path.join(primaryBaseDir, locale)
   ensureDirectory(primaryDir)
