@@ -11,7 +11,7 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 ### Map selection at /buy-building/
 
-- [ ] In /buy-building/ make sure the map is visible when player chooses the land to buy. He should optimize the distance to his own other buildings. Make it similar as it is in the onboarding now.
+- [x] (100%) In /buy-building/ make sure the map is visible when player chooses the land to buy. He should optimize the distance to his own other buildings. Make it similar as it is in the onboarding now.
 
 ### Building Unit Grid Configuration System (Core Production Chain)
 
