@@ -15,10 +15,10 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 ### Building Unit Grid Configuration System (Core Production Chain)
 
-- [ ] Move Energy Settings to building editation tab
-- [ ] When building is in editation mode, make sure the tabs are properly used in routing
-- [ ] Unit configuration - the performance tab is not styled properly. Make sure to use the best practices, use tailwind and redisign the whole tab.
-- [ ] Unit configuration - the maintanance tab is not styled properly. Make sure to use the best practices, use tailwind and redisign the whole tab.
+- [x] (100%) Move Energy Settings to building editation tab
+- [x] (100%) When building is in editation mode, make sure the tabs are properly used in routing
+- [x] (100%) Unit configuration - the performance tab is not styled properly. Make sure to use the best practices, use tailwind and redisign the whole tab.
+- [x] (100%) Unit configuration - the maintanance tab is not styled properly. Make sure to use the best practices, use tailwind and redisign the whole tab.
 
 ### Products definition
 

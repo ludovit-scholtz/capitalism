@@ -225,6 +225,10 @@ export function useBuildingDetail() {
     return value
   }
 
+  function isEditRouteName(routeName: unknown): boolean {
+    return routeName === 'building-detail-edit'
+  }
+
   function syncSelectedCellQuery(cell: GridCellSelection | null) {
     const currentQuery = router.currentRoute.value.query
     const nextUnit = cell ? `${cell.x},${cell.y}` : undefined
@@ -257,11 +261,14 @@ export function useBuildingDetail() {
     })
   }
 
-  function setReadOnlySelectedCell(cell: GridCellSelection | null) {
+  function setReadOnlySelectedCell(cell: GridCellSelection | null, options: { syncRoute?: boolean } = {}) {
+    const syncRoute = options.syncRoute ?? true
     selectedCell.value = cell
-    syncSelectedCellQuery(cell)
-    if (!cell) {
-      syncSelectedUnitTabQuery(null)
+    if (syncRoute) {
+      syncSelectedCellQuery(cell)
+      if (!cell) {
+        syncSelectedUnitTabQuery(null)
+      }
     }
   }
 
@@ -1230,7 +1237,7 @@ export function useBuildingDetail() {
     setDraftUnitsFrom(sourceUnits)
     setEditBaselineFrom(sourceUnits)
     isEditing.value = true
-    setReadOnlySelectedCell(null)
+    setReadOnlySelectedCell(null, { syncRoute: false })
     showUnitPicker.value = false
     refreshLocalLayouts()
     refreshMasterLayouts()
@@ -1241,7 +1248,7 @@ export function useBuildingDetail() {
     setDraftUnitsFrom(sourceUnits)
     setEditBaselineFrom(sourceUnits)
     isEditing.value = false
-    setReadOnlySelectedCell(null)
+    setReadOnlySelectedCell(null, { syncRoute: false })
     showUnitPicker.value = false
     saveError.value = null
     draftUpgradeUnitIds.value = new Set()
@@ -1365,11 +1372,7 @@ export function useBuildingDetail() {
     ]
     setDraftUnitsFrom(starterUnits)
     setEditBaselineFrom([])
-    isEditing.value = true
-    setReadOnlySelectedCell(null)
-    showUnitPicker.value = false
-    refreshLocalLayouts()
-    refreshMasterLayouts()
+    startEditing()
   }
 
   function applyShopStarterLayout() {
@@ -1433,11 +1436,7 @@ export function useBuildingDetail() {
     ]
     setDraftUnitsFrom(shopStarterUnits)
     setEditBaselineFrom([])
-    isEditing.value = true
-    setReadOnlySelectedCell(null)
-    showUnitPicker.value = false
-    refreshLocalLayouts()
-    refreshMasterLayouts()
+    startEditing()
   }
 
   function clickDraftCell(x: number, y: number) {
@@ -1995,6 +1994,12 @@ export function useBuildingDetail() {
         )
       }
 
+      if (isEditRouteName(route.name)) {
+        await router.replace({
+          path: `/building/${building.value.id}`,
+          query: router.currentRoute.value.query,
+        })
+      }
       isEditing.value = false
       await loadBuilding()
     } catch (reason: unknown) {
@@ -4970,8 +4975,13 @@ export function useBuildingDetail() {
         const sourceUnits = pendingConfiguration.value?.units ?? building.value.units
         setDraftUnitsFrom(sourceUnits)
         setEditBaselineFrom(sourceUnits)
-        isEditing.value = false
-        restoreReadOnlySelectedCell(building.value.units)
+        const shouldStayInEditMode = isEditRouteName(route.name)
+        isEditing.value = shouldStayInEditMode
+        if (shouldStayInEditMode) {
+          selectedCell.value = null
+        } else {
+          restoreReadOnlySelectedCell(building.value.units)
+        }
         showUnitPicker.value = false
       }
 
@@ -5023,6 +5033,9 @@ export function useBuildingDetail() {
     }
 
     await loadBuilding()
+    if (isEditRouteName(route.name)) {
+      startEditing()
+    }
   })
 
   async function fetchRankedProducts(unitType: string) {

@@ -259,6 +259,7 @@ test.describe('Building detail upgrades', () => {
     await expect(page.getByRole('button', { name: 'Store Upgrade' })).toBeEnabled()
 
     await page.getByRole('button', { name: 'Store Upgrade' }).click()
+    await expect(page).toHaveURL(/\/building\/building-1(\?.*)?$/)
 
     await expect(page.getByRole('status')).toContainText('The current building keeps running until the queued layout activates in 3 hours.')
     await expect(page.getByRole('heading', { name: 'Queued Upgrade' })).toHaveCount(0)
@@ -277,6 +278,7 @@ test.describe('Building detail upgrades', () => {
     await expect(queuedSection.getByText('Upgrade time: 3 hours')).toBeVisible()
 
     await page.getByRole('button', { name: 'Store Upgrade' }).click()
+    await expect(page).toHaveURL(/\/building\/building-1(\?.*)?$/)
 
     await expect(page.getByRole('status')).toContainText('The current building keeps running until the queued layout activates in 3 hours.')
 
