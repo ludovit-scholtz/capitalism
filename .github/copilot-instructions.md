@@ -1741,6 +1741,7 @@ Root-cause of repeated review loops (May 2026, PR #499 follow-up):
 Rules to prevent recurrence:
 1. **For each repeated follow-up comment, add at least one net-new automated assertion** (not a duplicate of an earlier test body) that strengthens the same feature contract.
 2. **When replying, always reference the newest commit hash and latest-head CI context** so reviewers can distinguish stale failed runs from current branch state.
+3. **When a latest-head workflow is still in progress, state that explicitly and separate it from older failed runs by SHA.** Do not present historical failed checks as unresolved current-head failures.
 
 ## Building edit tab regressions — preserve draft setup and no-unit edit surfaces
 

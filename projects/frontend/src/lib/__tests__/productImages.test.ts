@@ -47,4 +47,16 @@ describe('productImages mapping', () => {
     expect(getResourceCatalogImageUrl('missing-resource-slug', existing)).toBe(existing)
     expect(getResourceCatalogImageUrl(knownSlug, existing)).toBe(knownMappedImage)
   })
+
+  it('never returns global fallback for seeded slugs', () => {
+    const fallback = getCatalogFallbackImageUrl()
+
+    for (const slug of RESOURCE_IMAGE_SLUGS) {
+      expect(getResourceCatalogImageUrl(slug, null)).not.toBe(fallback)
+    }
+
+    for (const slug of PRODUCT_IMAGE_SLUGS) {
+      expect(getProductCatalogImageUrl(slug)).not.toBe(fallback)
+    }
+  })
 })
