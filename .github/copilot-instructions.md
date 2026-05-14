@@ -1745,6 +1745,7 @@ Rules to prevent recurrence:
 3. **Keep a one-file-per-slug contract and cover it with tests.** Seeded slug URLs should resolve to their own `<slug>.webp` asset so reviewers can audit the mapping directly.
 4. **Include fresh UI proof for image-only changes that shows the corrected assets rendered in the product/resource UI, not just the raw files.**
 5. **When a review comment names specific bad asset slugs, add an explicit regression test for those exact slugs** in addition to broad loop coverage. A generic “all seeded slugs map” test is not enough to prove the reported regressions were addressed.
+6. **For repeated catalog-image follow-up comments, add net-new helper coverage for the named slugs as well** (for example proving they stay in `PRODUCT_IMAGE_SLUGS`, are not misclassified as resources, and still resolve via `hasProductCatalogImage`). Do not reply with CI-status context alone.
 
 ## Repeated review-loop quality gate — each follow-up must add net-new proof
 

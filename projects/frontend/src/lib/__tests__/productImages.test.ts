@@ -78,4 +78,21 @@ describe('productImages mapping', () => {
     expect(getProductCatalogImageUrl('assembly-pallet')).toContain('assembly-pallet.webp')
     expect(getProductCatalogImageUrl('wooden-bed')).toContain('wooden-bed.webp')
   })
+
+  it('keeps the specifically reported regressions classified as product-only mappings', () => {
+    const reportedProductSlugs = [
+      'analgesic-syrup',
+      'antibiotic',
+      'antiseptic-gel',
+      'aspirin',
+      'assembly-pallet',
+      'wooden-bed',
+    ]
+
+    for (const slug of reportedProductSlugs) {
+      expect(PRODUCT_IMAGE_SLUGS).toContain(slug)
+      expect(RESOURCE_IMAGE_SLUGS).not.toContain(slug)
+      expect(hasProductCatalogImage(slug)).toBe(true)
+    }
+  })
 })
