@@ -1711,6 +1711,17 @@ Rules to prevent recurrence:
 3. **Password-reset E2E must force locale deterministically (`app_locale='en'`) and assert success via role/status regex with adequate timeout, not fragile exact literal matching with short timeout.**
 4. **For catalog image changes, minimum Playwright coverage must include both:** (a) image renders with non-empty `src`; (b) broken image path triggers fallback placeholder.
 
+## CI result freshness gate — verify latest SHA, not stale failed checks
+
+Root-cause of repeated review loops (May 2026, PR #499 follow-up):
+- Build/test fixes were pushed on newer commits, but the visible failing Playwright check in PR history was still attached to an older SHA.
+- This created repeated "fix build/tests" comments despite local/full-suite green verification on the latest branch head.
+
+Rules to prevent recurrence:
+1. **After pushing CI fixes, verify workflow status is attached to the latest branch head SHA before replying.** Do not rely on older failed checks in PR history.
+2. **If the latest SHA has no run for a required workflow yet, trigger a fresh commit-scope validation signal (for example a minimal follow-up commit with additional test coverage) and then re-check statuses.**
+3. **In comment replies, report both the fixing commit hash and which failing run belonged to an older SHA** so review context stays aligned with the actual branch head.
+
 ## Building edit tab regressions — preserve draft setup and no-unit edit surfaces
 
 Root-cause of CI failures (May 2026, PR #491 follow-up):
