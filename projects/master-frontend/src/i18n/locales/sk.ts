@@ -195,6 +195,10 @@ export default {
     warning:
       'Nepoužívajte svoju skutočnú právnu identitu. Zvoľte si fiktívny alias pre verejné rebríčky a hráčske povrchy.',
     nameLabel: 'Meno osobného účtu',
+    generatedNameLabel: 'Vygenerované osobné meno',
+    selectFemale: 'Vybrať ženu',
+    selectMale: 'Vybrať muža',
+    regenerateName: 'Vygenerovať ďalšie osobné meno',
     namePlaceholder: 'Zadajte meno osobného účtu',
     save: 'Uložiť zmeny',
     saved: 'Meno osobného účtu bolo aktualizované.',

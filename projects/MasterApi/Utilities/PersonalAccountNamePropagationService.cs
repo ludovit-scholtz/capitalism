@@ -16,6 +16,7 @@ public sealed class PersonalAccountNamePropagationService
             playerFound
             wasUpdated
             personalAccountName
+            gender
           }
         }
         """;
@@ -39,7 +40,7 @@ public sealed class PersonalAccountNamePropagationService
         _logger = logger;
     }
 
-    public async Task PropagateAsync(string playerEmail, string personalAccountName, CancellationToken cancellationToken)
+    public async Task PropagateAsync(string playerEmail, string personalAccountName, string gender, CancellationToken cancellationToken)
     {
         var registrationKey = _options.RegistrationKey.Trim();
         if (string.IsNullOrWhiteSpace(registrationKey))
@@ -67,9 +68,10 @@ public sealed class PersonalAccountNamePropagationService
         await Task.WhenAll(targets.Select(server => PropagateToServerAsync(
             server,
             registrationKey,
-            playerEmail,
-            personalAccountName,
-            cancellationToken)));
+                playerEmail,
+                personalAccountName,
+                gender,
+                cancellationToken)));
     }
 
     private async Task PropagateToServerAsync(
@@ -77,6 +79,7 @@ public sealed class PersonalAccountNamePropagationService
         string registrationKey,
         string playerEmail,
         string personalAccountName,
+        string gender,
         CancellationToken cancellationToken)
     {
         try
@@ -92,6 +95,7 @@ public sealed class PersonalAccountNamePropagationService
                         serverKey = server.ServerKey,
                         playerEmail,
                         personalAccountName,
+                        gender,
                     },
                 },
             }, SerializerOptions);

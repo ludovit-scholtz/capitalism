@@ -9,7 +9,7 @@ test.describe('Game settings', () => {
     await expect(page).toHaveURL('/login')
   })
 
-  test('authenticated player can rename personal account name from the menu and see it in the master ranking', async ({
+  test('authenticated player can set gender, regenerate name, and save account name', async ({
     page,
   }) => {
     const player = makePlayer({
@@ -36,7 +36,11 @@ test.describe('Game settings', () => {
     await page.getByRole('link', { name: 'Game settings' }).click()
     await expect(page).toHaveURL('/settings/game')
 
-    await page.getByLabel('Personal account name').fill('Nova Alias')
+    await page.getByRole('radio', { name: 'Select female' }).click()
+    const regenerateButton = page.getByRole('button', { name: '🎲' })
+    await regenerateButton.click()
+    await expect(page.getByRole('radio', { name: 'Select female' })).toHaveAttribute('aria-checked', 'true')
+    await page.getByLabel('Generated personal name').fill('Nova Alias')
     await page.getByRole('button', { name: 'Save changes' }).click()
     await expect(page.getByRole('status')).toContainText('Personal account name updated.')
 

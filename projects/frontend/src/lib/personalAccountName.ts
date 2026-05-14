@@ -15,7 +15,21 @@
  * - Surnames span diverse origins to reflect the global player base.
  */
 
-import { uniqueNamesGenerator, names } from 'unique-names-generator'
+export type PlayerGender = 'MALE' | 'FEMALE' | 'UNSPECIFIED'
+
+const femaleFirstNames = [
+  'Alice', 'Amelia', 'Aria', 'Ava', 'Beatrice', 'Camila', 'Charlotte', 'Chloe',
+  'Clara', 'Diana', 'Eleanor', 'Elise', 'Emma', 'Eva', 'Freya', 'Grace',
+  'Hannah', 'Hazel', 'Iris', 'Isla', 'Jasmine', 'Lena', 'Lily', 'Luna',
+  'Maya', 'Mia', 'Nora', 'Olivia', 'Ruby', 'Sofia',
+]
+
+const maleFirstNames = [
+  'Adrian', 'Alexander', 'Benjamin', 'Caleb', 'Charles', 'Daniel', 'Dominic', 'Edward',
+  'Elias', 'Ethan', 'Felix', 'Finn', 'Gabriel', 'Henry', 'Isaac', 'James',
+  'Julian', 'Leo', 'Liam', 'Lucas', 'Marcus', 'Mason', 'Nathan', 'Noah',
+  'Oliver', 'Oscar', 'Samuel', 'Theo', 'Thomas', 'William',
+]
 
 /**
  * Curated list of international surnames covering diverse origins.
@@ -53,9 +67,15 @@ function pickSurname(): string {
  * Generates a single three-part personal account name.
  * Does NOT check for session uniqueness; use `generatePersonalAccountName` for that.
  */
-function generateRawName(): string {
-  const firstName = uniqueNamesGenerator({ dictionaries: [names], style: 'capital' })
-  const middleName = uniqueNamesGenerator({ dictionaries: [names], style: 'capital' })
+function pickGivenName(gender: PlayerGender): string {
+  const source = gender === 'FEMALE' ? femaleFirstNames : maleFirstNames
+  const idx = Math.floor(Math.random() * source.length)
+  return source[idx] ?? source[0]!
+}
+
+function generateRawName(gender: PlayerGender): string {
+  const firstName = pickGivenName(gender)
+  const middleName = pickGivenName(gender)
   const lastName = pickSurname()
   return `${firstName} ${middleName} ${lastName}`
 }
@@ -69,11 +89,20 @@ function generateRawName(): string {
  *
  * @returns A string of the form "Firstname Middlename Lastname".
  */
-export function generatePersonalAccountName(): string {
+function normalizeGender(gender?: PlayerGender): PlayerGender {
+  if (gender === 'MALE' || gender === 'FEMALE') {
+    return gender
+  }
+
+  return Math.random() < 0.5 ? 'FEMALE' : 'MALE'
+}
+
+export function generatePersonalAccountName(gender?: PlayerGender): string {
   const maxAttempts = 50
+  const resolvedGender = normalizeGender(gender)
 
   for (let i = 0; i < maxAttempts; i++) {
-    const name = generateRawName()
+    const name = generateRawName(resolvedGender)
     if (!usedPersonalNames.has(name)) {
       usedPersonalNames.add(name)
       return name
@@ -82,7 +111,7 @@ export function generatePersonalAccountName(): string {
 
   // Exhaustion fallback: clear session and return a fresh name.
   usedPersonalNames.clear()
-  const name = generateRawName()
+  const name = generateRawName(resolvedGender)
   usedPersonalNames.add(name)
   return name
 }

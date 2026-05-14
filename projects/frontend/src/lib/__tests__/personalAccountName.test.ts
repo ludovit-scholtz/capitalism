@@ -18,6 +18,22 @@ describe('personalAccountName', () => {
     expect(name.length).toBeGreaterThan(0)
   })
 
+  it('returns a non-empty string for MALE', () => {
+    const name = generatePersonalAccountName('MALE')
+    expect(name.length).toBeGreaterThan(0)
+  })
+
+  it('returns a non-empty string for FEMALE', () => {
+    const name = generatePersonalAccountName('FEMALE')
+    expect(name.length).toBeGreaterThan(0)
+  })
+
+  it('can generate two different names for the same gender', () => {
+    const first = generatePersonalAccountName('FEMALE')
+    const second = generatePersonalAccountName('FEMALE')
+    expect(first).not.toBe(second)
+  })
+
   it('returns exactly three words', () => {
     const name = generatePersonalAccountName()
     const parts = name.split(' ')

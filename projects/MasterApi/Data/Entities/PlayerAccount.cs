@@ -8,6 +8,8 @@ public sealed class PlayerAccount
 
     public string DisplayName { get; set; } = string.Empty;
 
+    public string Gender { get; set; } = Capitalism.Shared.Security.PlayerGender.Unspecified;
+
     public string PasswordHash { get; set; } = string.Empty;
 
     public DateTime CreatedAtUtc { get; set; }

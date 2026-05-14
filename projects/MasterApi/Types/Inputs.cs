@@ -114,6 +114,8 @@ public sealed class MasterPlayerProfile
 
     public string PersonalAccountName { get; set; } = string.Empty;
 
+    public string Gender { get; set; } = "UNSPECIFIED";
+
     public DateTime CreatedAtUtc { get; set; }
 
     public DateTime? StartupPackClaimedAtUtc { get; set; }
@@ -124,6 +126,8 @@ public sealed class MasterPlayerProfile
 public sealed class UpdatePersonalAccountNameInput
 {
     public string PersonalAccountName { get; set; } = string.Empty;
+
+    public string? Gender { get; set; }
 }
 
 public sealed class UpdatePersonalAccountNamePayload
@@ -131,6 +135,8 @@ public sealed class UpdatePersonalAccountNamePayload
     public Guid PlayerId { get; set; }
 
     public string PersonalAccountName { get; set; } = string.Empty;
+
+    public string Gender { get; set; } = "UNSPECIFIED";
 }
 
 public sealed class SubscriptionInfo

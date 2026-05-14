@@ -196,6 +196,10 @@ export default {
     warning:
       "Don't use your real legal identity. Choose a fictional alias for public rankings and player-facing surfaces.",
     nameLabel: 'Personal account name',
+    generatedNameLabel: 'Generated personal name',
+    selectFemale: 'Select female',
+    selectMale: 'Select male',
+    regenerateName: 'Generate another personal name',
     namePlaceholder: 'Enter your personal account name',
     save: 'Save changes',
     saved: 'Personal account name updated.',

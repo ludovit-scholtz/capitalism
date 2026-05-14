@@ -21,6 +21,7 @@ export type MockPlayer = {
   password: string
   displayName: string
   personalAccountName?: string
+  gender?: 'MALE' | 'FEMALE' | 'UNSPECIFIED'
   role: 'PLAYER' | 'ADMIN'
   isInvisibleInChat: boolean
   createdAtUtc: string
@@ -2205,6 +2206,7 @@ export function makePlayer(overrides?: Partial<MockPlayer>): MockPlayer {
     email: 'player@test.com',
     password: 'TestPass1!',
     displayName: 'Test Player',
+    gender: 'UNSPECIFIED',
     role: 'PLAYER',
     isInvisibleInChat: false,
     createdAtUtc: '2026-01-01T00:00:00Z',
@@ -7535,10 +7537,11 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         contentType: 'application/json',
         body: JSON.stringify({
           data: {
-            playerProfile: {
-              playerId: targetPlayer.id,
-              displayName: targetPlayer.displayName,
-              bio: null,
+              playerProfile: {
+                playerId: targetPlayer.id,
+                displayName: targetPlayer.displayName,
+                gender: targetPlayer.gender ?? 'UNSPECIFIED',
+                bio: null,
               createdAtUtc: '2024-01-01T00:00:00Z',
               joinGameYear: 2024,
               hasProSubscription: targetPlayer.hasProSubscription ?? false,
@@ -7716,6 +7719,12 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       }
 
       const personalAccountName = (body.variables?.input?.personalAccountName as string | undefined)?.trim() ?? ''
+      const existingPlayer = state.players.find((p) => p.id === state.currentUserId)
+      const gender = (body.variables?.input?.gender as
+        | 'MALE'
+        | 'FEMALE'
+        | 'UNSPECIFIED'
+        | undefined) ?? existingPlayer?.gender ?? 'UNSPECIFIED'
       if (!personalAccountName) {
         return route.fulfill({
           status: 200,
@@ -7741,6 +7750,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       if (player) {
         player.displayName = personalAccountName
         player.personalAccountName = personalAccountName
+        player.gender = gender
       }
 
       return route.fulfill({
@@ -7751,6 +7761,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             updatePersonalAccountName: {
               playerId: state.currentUserId,
               personalAccountName,
+              gender,
             },
           },
         }),
@@ -7767,6 +7778,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         })
       }
       const displayName = (body.variables?.displayName as string | undefined)?.trim() ?? ''
+      const gender = (body.variables?.gender as 'MALE' | 'FEMALE' | 'UNSPECIFIED' | undefined) ?? 'UNSPECIFIED'
       if (!displayName) {
         return route.fulfill({
           status: 200,
@@ -7780,6 +7792,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const player = state.players.find((p) => p.id === state.currentUserId)
       if (player) {
         player.displayName = displayName
+        player.gender = gender
       }
       return route.fulfill({
         status: 200,
@@ -7789,6 +7802,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             updateDisplayName: {
               playerId: state.currentUserId,
               displayName,
+              gender,
             },
           },
         }),

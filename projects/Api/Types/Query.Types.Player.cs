@@ -11,6 +11,9 @@ public sealed class PlayerProfileResult
     /// <summary>Player display name.</summary>
     public string DisplayName { get; set; } = string.Empty;
 
+    /// <summary>Player profile gender.</summary>
+    public string Gender { get; set; } = "UNSPECIFIED";
+
     /// <summary>Optional bio set by the player (max 160 chars).</summary>
     public string? Bio { get; set; }
 

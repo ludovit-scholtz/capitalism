@@ -198,6 +198,10 @@ export default {
     warning:
       'Verwenden Sie nicht Ihre echte rechtliche Identität. Wählen Sie einen fiktiven Alias für öffentliche Ranglisten und Spieleroberflächen.',
     nameLabel: 'Name des persönlichen Kontos',
+    generatedNameLabel: 'Generierter persönlicher Name',
+    selectFemale: 'Frau auswählen',
+    selectMale: 'Mann auswählen',
+    regenerateName: 'Anderen persönlichen Namen generieren',
     namePlaceholder: 'Geben Sie den Namen Ihres persönlichen Kontos ein',
     save: 'Änderungen speichern',
     saved: 'Der Name des persönlichen Kontos wurde aktualisiert.',

@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Api.Configuration;
 using Api.Data;
+using Capitalism.Shared.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -77,6 +78,22 @@ public sealed partial class Mutation
                     .Build());
         }
 
+        string? normalizedGender = null;
+        if (input.Gender is not null)
+        {
+            var trimmedGender = input.Gender.Trim().ToUpperInvariant();
+            if (!PlayerGender.IsValid(trimmedGender))
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("Gender must be MALE, FEMALE, or UNSPECIFIED.")
+                        .SetCode("INVALID_GENDER")
+                        .Build());
+            }
+
+            normalizedGender = trimmedGender;
+        }
+
         var player = await db.Players.FirstOrDefaultAsync(candidate => candidate.Email.ToLower() == playerEmail, ct);
         if (player is null)
         {
@@ -89,10 +106,15 @@ public sealed partial class Mutation
             };
         }
 
-        var wasUpdated = !string.Equals(player.DisplayName, personalAccountName, StringComparison.Ordinal);
+        var wasUpdated = !string.Equals(player.DisplayName, personalAccountName, StringComparison.Ordinal)
+            || (normalizedGender is not null && !string.Equals(player.Gender, normalizedGender, StringComparison.Ordinal));
         if (wasUpdated)
         {
             player.DisplayName = personalAccountName;
+            if (normalizedGender is not null)
+            {
+                player.Gender = normalizedGender;
+            }
             await db.SaveChangesAsync(ct);
         }
 
@@ -101,6 +123,7 @@ public sealed partial class Mutation
             PlayerId = player.Id,
             PlayerEmail = player.Email,
             PersonalAccountName = player.DisplayName,
+            Gender = player.Gender,
             PlayerFound = true,
             WasUpdated = wasUpdated,
         };
@@ -122,6 +145,8 @@ public sealed class SyncPersonalAccountNameFromMasterInput
     [Required]
     [MaxLength(40)]
     public string PersonalAccountName { get; set; } = string.Empty;
+
+    public string? Gender { get; set; }
 }
 
 public sealed class SyncPersonalAccountNameFromMasterPayload
@@ -131,6 +156,8 @@ public sealed class SyncPersonalAccountNameFromMasterPayload
     public string PlayerEmail { get; set; } = string.Empty;
 
     public string PersonalAccountName { get; set; } = string.Empty;
+
+    public string Gender { get; set; } = PlayerGender.Unspecified;
 
     public bool PlayerFound { get; set; }
 

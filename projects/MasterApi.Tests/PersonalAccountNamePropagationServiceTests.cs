@@ -23,6 +23,7 @@ public sealed class PersonalAccountNamePropagationServiceTests
                 playerFound = true,
                 wasUpdated = true,
                 personalAccountName = "Nova Ledger",
+                gender = "FEMALE",
             },
         },
     });
@@ -98,7 +99,7 @@ public sealed class PersonalAccountNamePropagationServiceTests
         var handler = new RecordingHandler();
         var service = CreateService(db, handler);
 
-        await service.PropagateAsync("player@example.com", "Nova Ledger", CancellationToken.None);
+        await service.PropagateAsync("player@example.com", "Nova Ledger", "FEMALE", CancellationToken.None);
 
         var request = Assert.Single(handler.Requests);
         Assert.Equal("https://capitalism-eu.example.com/graphql", request.RequestUri?.ToString());
@@ -109,6 +110,7 @@ public sealed class PersonalAccountNamePropagationServiceTests
         Assert.Equal("capitalism-eu", input.GetProperty("serverKey").GetString());
         Assert.Equal("player@example.com", input.GetProperty("playerEmail").GetString());
         Assert.Equal("Nova Ledger", input.GetProperty("personalAccountName").GetString());
+        Assert.Equal("FEMALE", input.GetProperty("gender").GetString());
     }
 
     [Fact]
@@ -138,7 +140,7 @@ public sealed class PersonalAccountNamePropagationServiceTests
         };
         var service = CreateService(db, handler);
 
-        await service.PropagateAsync("player@example.com", "Nova Ledger", CancellationToken.None);
+        await service.PropagateAsync("player@example.com", "Nova Ledger", "FEMALE", CancellationToken.None);
 
         Assert.Equal(2, handler.Requests.Count);
         Assert.Contains(handler.Requests, request => request.RequestUri?.Host == "capitalism-eu.example.com");

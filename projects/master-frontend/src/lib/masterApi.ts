@@ -28,6 +28,7 @@ export interface MasterPlayerProfile {
   email: string
   displayName: string
   personalAccountName?: string
+  gender?: 'MALE' | 'FEMALE' | 'UNSPECIFIED'
   createdAtUtc: string
   startupPackClaimedAtUtc: string | null
   canClaimStartupPack: boolean
@@ -86,6 +87,7 @@ const REGISTER_MUTATION = `
         email
         displayName
         personalAccountName
+        gender
         createdAtUtc
         startupPackClaimedAtUtc
         canClaimStartupPack
@@ -104,6 +106,7 @@ const LOGIN_MUTATION = `
         email
         displayName
         personalAccountName
+        gender
         createdAtUtc
         startupPackClaimedAtUtc
         canClaimStartupPack
@@ -119,6 +122,7 @@ const ME_QUERY = `
       email
       displayName
       personalAccountName
+      gender
       createdAtUtc
       startupPackClaimedAtUtc
       canClaimStartupPack
@@ -172,6 +176,7 @@ const UPDATE_PERSONAL_ACCOUNT_NAME_MUTATION = `
   mutation UpdatePersonalAccountName($input: UpdatePersonalAccountNameInput!) {
     updatePersonalAccountName(input: $input) {
       personalAccountName
+      gender
     }
   }
 `
@@ -237,16 +242,19 @@ export async function claimStartupPack(token: string): Promise<SubscriptionInfo>
 export async function updatePersonalAccountName(
   token: string,
   personalAccountName: string,
+  gender?: 'MALE' | 'FEMALE' | 'UNSPECIFIED',
 ): Promise<string> {
   const data = await gqlRequest<{
     updatePersonalAccountName: {
       personalAccountName: string
+      gender: string
     }
   }>(
     UPDATE_PERSONAL_ACCOUNT_NAME_MUTATION,
     {
       input: {
         personalAccountName,
+        gender,
       },
     },
     token,

@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Api.Data;
 using Api.Security;
+using Capitalism.Shared.Security;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
 
@@ -86,6 +87,22 @@ public sealed partial class Mutation
                     .Build());
         }
 
+        string? normalizedGender = null;
+        if (input.Gender is not null)
+        {
+            var trimmedGender = input.Gender.Trim().ToUpperInvariant();
+            if (!PlayerGender.IsValid(trimmedGender))
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("Gender must be MALE, FEMALE, or UNSPECIFIED.")
+                        .SetCode("INVALID_GENDER")
+                        .Build());
+            }
+
+            normalizedGender = trimmedGender;
+        }
+
         var player = await db.Players.FirstOrDefaultAsync(p => p.Id == userId, ct);
         if (player is null)
         {
@@ -97,12 +114,17 @@ public sealed partial class Mutation
         }
 
         player.DisplayName = displayName;
+        if (normalizedGender is not null)
+        {
+            player.Gender = normalizedGender;
+        }
         await db.SaveChangesAsync(ct);
 
         return new UpdateDisplayNamePayload
         {
             PlayerId = player.Id,
             DisplayName = player.DisplayName,
+            Gender = player.Gender,
         };
     }
 }
@@ -137,6 +159,12 @@ public sealed class UpdateDisplayNameInput
     [Required]
     [MaxLength(40)]
     public string DisplayName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Optional profile gender value persisted on the player profile.
+    /// Accepted values: MALE, FEMALE, UNSPECIFIED.
+    /// </summary>
+    public string? Gender { get; set; }
 }
 
 /// <summary>Payload returned by the updateDisplayName mutation.</summary>
@@ -147,4 +175,7 @@ public sealed class UpdateDisplayNamePayload
 
     /// <summary>The updated display name.</summary>
     public string DisplayName { get; set; } = string.Empty;
+
+    /// <summary>The updated player gender.</summary>
+    public string Gender { get; set; } = PlayerGender.Unspecified;
 }

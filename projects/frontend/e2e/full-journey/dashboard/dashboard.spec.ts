@@ -2832,11 +2832,11 @@ test.describe('Dashboard — personal account panel', () => {
     await page.goto('/dashboard')
 
     await page.getByRole('tab', { name: 'Settings' }).click()
-    await page.getByLabel('Personal account name').fill('Nova Alias')
+    await page.getByLabel('Generated personal name').fill('Nova Alias')
     await page.getByRole('button', { name: 'Save changes' }).click()
 
     await expect(page.getByRole('status')).toContainText('Personal account name updated.')
-    await expect(page.getByLabel('Personal account name')).toHaveValue('Nova Alias')
+    await expect(page.getByLabel('Generated personal name')).toHaveValue('Nova Alias')
 
     await page.goto('/leaderboard')
     await expect(page.locator('.rank-card').getByText('Nova Alias')).toBeVisible()

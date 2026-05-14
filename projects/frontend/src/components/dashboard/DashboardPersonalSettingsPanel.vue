@@ -3,6 +3,8 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest as gqlGameRequest } from '@/lib/graphql'
 import { gqlRequest as gqlMasterRequest } from '@/lib/graphqlMasterServer'
+import GenderPicker from '@/components/profile/GenderPicker.vue'
+import { generatePersonalAccountName, type PlayerGender } from '@/lib/personalAccountName'
 import { useAuthStore } from '@/stores/auth'
 import DashboardApiKeysPanel from '@/components/dashboard/DashboardApiKeysPanel.vue'
 
@@ -14,7 +16,13 @@ const auth = useAuthStore()
 const { t } = useI18n()
 
 const currentPersonalAccountName = computed(() => auth.player?.personalAccountName ?? auth.player?.displayName ?? '')
+const currentGender = computed<PlayerGender>(() => {
+  const value = auth.player?.gender
+  if (value === 'MALE' || value === 'FEMALE' || value === 'UNSPECIFIED') return value
+  return 'UNSPECIFIED'
+})
 const draftName = ref('')
+const selectedGender = ref<PlayerGender>('UNSPECIFIED')
 const saving = ref(false)
 const errorMessage = ref<string | null>(null)
 const successMessage = ref<string | null>(null)
@@ -27,8 +35,30 @@ watch(
   { immediate: true },
 )
 
+watch(
+  currentGender,
+  (value) => {
+    selectedGender.value = value
+  },
+  { immediate: true },
+)
+
 const trimmedDraftName = computed(() => draftName.value.trim())
-const canSave = computed(() => trimmedDraftName.value.length > 0 && trimmedDraftName.value !== currentPersonalAccountName.value)
+const canSave = computed(
+  () =>
+    trimmedDraftName.value.length > 0
+    && (trimmedDraftName.value !== currentPersonalAccountName.value
+      || selectedGender.value !== currentGender.value),
+)
+
+function handleGenderSelect(gender: PlayerGender) {
+  selectedGender.value = gender
+  draftName.value = generatePersonalAccountName(gender)
+}
+
+function regeneratePersonalName() {
+  draftName.value = generatePersonalAccountName(selectedGender.value)
+}
 
 async function savePersonalAccountName() {
   if (!canSave.value) {
@@ -43,16 +73,19 @@ async function savePersonalAccountName() {
     await gqlMasterRequest<{
       updatePersonalAccountName: {
         personalAccountName: string
+        gender: string
       }
     }>(
       `mutation UpdatePersonalAccountName($input: UpdatePersonalAccountNameInput!) {
         updatePersonalAccountName(input: $input) {
           personalAccountName
+          gender
         }
       }`,
       {
         input: {
           personalAccountName: trimmedDraftName.value,
+          gender: selectedGender.value,
         },
       },
     )
@@ -60,15 +93,18 @@ async function savePersonalAccountName() {
     const data = await gqlGameRequest<{
       updateDisplayName: {
         displayName: string
+        gender: string
       }
     }>(
-      `mutation UpdateDisplayName($displayName: String!) {
-        updateDisplayName(input: { displayName: $displayName }) {
+      `mutation UpdateDisplayName($displayName: String!, $gender: String) {
+        updateDisplayName(input: { displayName: $displayName, gender: $gender }) {
           displayName
+          gender
         }
       }`,
       {
         displayName: trimmedDraftName.value,
+        gender: selectedGender.value,
       },
     )
 
@@ -76,6 +112,7 @@ async function savePersonalAccountName() {
     if (auth.player) {
       auth.player.displayName = personalAccountName
       auth.player.personalAccountName = personalAccountName
+      auth.player.gender = selectedGender.value
     }
 
     draftName.value = personalAccountName
@@ -103,6 +140,15 @@ async function savePersonalAccountName() {
     <form class="flex flex-col gap-3" @submit.prevent="savePersonalAccountName">
       <label class="flex flex-col gap-1.5">
         <span class="text-sm font-semibold">{{ t('dashboard.personalSettingsLabel') }}</span>
+        <GenderPicker
+          v-model="selectedGender"
+          :female-label="t('dashboard.selectFemale')"
+          :male-label="t('dashboard.selectMale')"
+          @update:model-value="handleGenderSelect"
+        />
+      </label>
+      <label class="flex flex-col gap-1.5">
+        <span class="text-sm font-semibold">{{ t('dashboard.personalSettingsNameLabel') }}</span>
         <input
           v-model="draftName"
           type="text"
@@ -113,6 +159,14 @@ async function savePersonalAccountName() {
       </label>
 
       <div class="flex flex-wrap gap-3">
+        <button
+          class="btn btn-secondary"
+          type="button"
+          :title="t('dashboard.personalSettingsRegenerate')"
+          @click="regeneratePersonalName"
+        >
+          🎲
+        </button>
         <button class="btn btn-primary" type="submit" :disabled="saving || !canSave">
           {{ saving ? t('common.loading') : t('dashboard.personalSettingsSave') }}
         </button>

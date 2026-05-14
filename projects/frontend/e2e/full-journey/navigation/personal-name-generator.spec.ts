@@ -124,9 +124,10 @@ test.describe('Player profile – display name editing', () => {
     await expect(page.locator('.display-name-real-name-warning')).toBeVisible()
   })
 
-  test('saving updated display name reflects on the profile page', async ({ page }) => {
+  test('profile edit allows selecting gender, regenerating name, and saving', async ({ page }) => {
     const player = makePlayer()
     player.displayName = 'Aurelius Victor Fontaine'
+    player.gender = 'UNSPECIFIED'
     player.onboardingCompletedAtUtc = '2024-01-01T00:00:00Z'
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -134,6 +135,10 @@ test.describe('Player profile – display name editing', () => {
     await authenticate(page, `token-${player.id}`)
     await page.goto(`/player/${player.id}`)
     await page.locator('.edit-display-name-btn').click()
+    await page.getByRole('radio', { name: 'Select female' }).click()
+    const regenerateButton = page.getByRole('button', { name: '🎲' })
+    await regenerateButton.click()
+    await expect(page.getByRole('radio', { name: 'Select female' })).toHaveAttribute('aria-checked', 'true')
     const input = page.locator('.display-name-input')
     await input.fill('Quintus Hadrian Wolfe')
     await page.getByRole('button', { name: 'Save' }).click()
@@ -251,7 +256,7 @@ test.describe('Rankings – display name shown', () => {
 })
 
 test.describe('Onboarding IPO – personal account name generator', () => {
-  test('ipo step shows generated personal account name and regenerate button', async ({ page }) => {
+  test('ipo step shows gender picker, generates gendered name, and supports regenerate', async ({ page }) => {
     const player = makePlayer({
       id: 'player-onboarding-personal-alias',
       email: 'alias-onboarding@example.com',
@@ -274,10 +279,27 @@ test.describe('Onboarding IPO – personal account name generator', () => {
     const generated = await personalNameInput.inputValue()
     expect(generated.trim().split(' ')).toHaveLength(3)
 
+    const femaleButton = page.getByRole('radio', { name: 'Select female' })
+    const maleButton = page.getByRole('radio', { name: 'Select male' })
+    await expect(femaleButton).toBeVisible()
+    await expect(maleButton).toBeVisible()
+
+    await femaleButton.click()
+    await expect(femaleButton).toHaveAttribute('aria-checked', 'true')
+    const femaleGenerated = await personalNameInput.inputValue()
+    await expect(personalNameInput).not.toHaveValue(generated)
+
+    await maleButton.click()
+    await expect(maleButton).toHaveAttribute('aria-checked', 'true')
+    await expect(femaleButton).toHaveAttribute('aria-checked', 'false')
+    const maleGenerated = await personalNameInput.inputValue()
+    await expect(personalNameInput).not.toHaveValue(femaleGenerated)
+
     const regenerateButton = page.locator('.regenerate-personal-name-btn')
     await expect(regenerateButton).toBeVisible()
     await regenerateButton.click()
     await expect(personalNameInput).toHaveValue(/^\S+\s+\S+\s+\S+$/)
-    await expect(personalNameInput).not.toHaveValue(generated)
+    await expect(personalNameInput).not.toHaveValue(maleGenerated)
+    await expect(maleButton).toHaveAttribute('aria-checked', 'true')
   })
 })
