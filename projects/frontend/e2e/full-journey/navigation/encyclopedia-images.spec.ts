@@ -25,6 +25,7 @@ test.describe('Encyclopedia product and resource images', () => {
 
   test('falls back to placeholder image when an image fails to load', async ({ page }) => {
     setupMockApi(page)
+    await page.route('**/does-not-exist.webp', async (route) => route.abort())
 
     await page.goto('/encyclopedia')
 
@@ -34,7 +35,6 @@ test.describe('Encyclopedia product and resource images', () => {
     await productImage.evaluate((node: Element) => {
       const image = node as HTMLImageElement
       image.src = '/does-not-exist.webp'
-      image.dispatchEvent(new Event('error'))
     })
 
     await expect(productImage).toHaveAttribute('src', /fallback/i)

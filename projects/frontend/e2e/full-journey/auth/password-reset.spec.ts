@@ -14,7 +14,7 @@ test.describe('Password reset flow', () => {
     await page.getByRole('link', { name: 'Forgot password?' }).click()
     await expect(page).toHaveURL(/\/forgot-password$/)
     await page.getByLabel('Email').fill(player.email)
-    const forgotPasswordRequest = page.waitForRequest((request) => request.url().includes('/auth/forgot-password') && request.method() === 'POST')
+    const forgotPasswordRequest = page.waitForRequest((request) => request.url().includes('/auth/forgot-password') && request.method() === 'POST', { timeout: 10000 })
     await page.getByRole('button', { name: 'Send reset link' }).click()
     await forgotPasswordRequest
 

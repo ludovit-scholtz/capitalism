@@ -38,20 +38,23 @@ async function dismissTutorialTooltipIfPresent(page: Page) {
     }
 
     await dismissButton.click({ timeout: 2000 })
+    await dismissButton.waitFor({ state: 'hidden', timeout: 1000 }).catch(() => {})
   }
 }
 
 async function clickPurchaseDialogDone(page: Page, dialog: Locator) {
   const doneButton = dialog.getByRole('button', { name: 'Done' })
+  let lastError: unknown = null
   for (let attempt = 0; attempt < 2; attempt += 1) {
     await dismissTutorialTooltipIfPresent(page)
     try {
       await doneButton.click({ timeout: 5000 })
       return
     } catch (error) {
-      if (attempt === 1) throw error
+      lastError = error
     }
   }
+  throw lastError
 }
 
 async function selectPurchaseItem(page: Page, searchTerm: string, optionName: RegExp) {
