@@ -216,7 +216,7 @@ public sealed class PowerPriorityEnergyTests
             foreignToken);
 
         Assert.True(result.TryGetProperty("errors", out var errors));
-        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal("FORBIDDEN", errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
     [Fact]
@@ -372,7 +372,7 @@ public sealed class PowerPriorityEnergyTests
             otherToken);
 
         Assert.True(foreignResult.TryGetProperty("errors", out var foreignErrors));
-        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", foreignErrors[0].GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal("FORBIDDEN", foreignErrors[0].GetProperty("extensions").GetProperty("code").GetString());
 
         var unauthResult = await ExecuteAsync(
             client,

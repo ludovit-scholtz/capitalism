@@ -914,7 +914,7 @@ public sealed class BuildingUnitGridTests
     }
 
     /// <summary>
-    /// AC: storeBuildingConfiguration for a non-owned building returns NOT_FOUND_OR_NOT_OWNED.
+    /// AC: storeBuildingConfiguration for a non-owned building returns FORBIDDEN.
     /// This prevents foreign-object enumeration.
     /// </summary>
     [Fact]
@@ -952,7 +952,7 @@ public sealed class BuildingUnitGridTests
             attackerToken);
 
         var code = GetErrorCode(result);
-        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", code);
+        Assert.Equal("FORBIDDEN", code);
     }
 
     /// <summary>

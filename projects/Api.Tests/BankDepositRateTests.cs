@@ -256,7 +256,7 @@ public sealed class BankDepositRateTests
     // ── Owner-only enforcement ─────────────────────────────────────────────────
 
     /// <summary>
-    /// Non-owner cannot call UpdateBankDepositRate — must return NOT_FOUND_OR_NOT_OWNED.
+    /// Non-owner cannot call UpdateBankDepositRate — must return FORBIDDEN.
     /// </summary>
     [Fact]
     public async Task UpdateBankDepositRate_NonOwner_ReturnsNotFoundOrNotOwnedError()
@@ -635,7 +635,7 @@ public sealed class BankDepositRateTests
 
     /// <summary>
     /// Non-owners cannot read another bank's deposit-rate history.
-    /// The query must return the same opaque NOT_FOUND_OR_NOT_OWNED code used elsewhere.
+    /// The query must return the same opaque FORBIDDEN code used elsewhere.
     /// </summary>
     [Fact]
     public async Task BankDepositRateHistory_NonOwner_ReturnsNotFoundOrNotOwnedError()

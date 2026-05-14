@@ -12,7 +12,7 @@ namespace Api.Security;
 /// </summary>
 public sealed class BotOwnershipGuard(AppDbContext db)
 {
-    public const string NotFoundOrNotOwnedCode = "NOT_FOUND_OR_NOT_OWNED";
+    public const string NotFoundOrNotOwnedCode = "FORBIDDEN";
     public const string AuthorizationReasonNotFound = "NOT_FOUND";
     public const string AuthorizationReasonNotOwned = "NOT_OWNED";
 
@@ -433,7 +433,7 @@ public sealed class BotOwnershipGuard(AppDbContext db)
     private static GraphQLException CreateNotOwnedOrNotFoundException(string reason, Guid? attemptedObjectId)
         => new(
             ErrorBuilder.New()
-                .SetMessage("The requested company, account, loan, or offer was not found for the authenticated API-key owner.")
+                .SetMessage("You don't have permission to perform this action.")
                 .SetCode(NotFoundOrNotOwnedCode)
                 .SetExtension("authorizationReason", reason)
                 .SetExtension("attemptedObjectId", attemptedObjectId?.ToString())

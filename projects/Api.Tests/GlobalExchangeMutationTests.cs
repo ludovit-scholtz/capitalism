@@ -380,7 +380,7 @@ public sealed class GlobalExchangeMutationTests
 
         var payload = result.GetProperty("data").GetProperty("buyFromExchange");
         Assert.False(payload.GetProperty("success").GetBoolean());
-        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", payload.GetProperty("errorCode").GetString());
+        Assert.Equal("FORBIDDEN", payload.GetProperty("errorCode").GetString());
     }
 
     [Fact]
@@ -431,7 +431,7 @@ public sealed class GlobalExchangeMutationTests
 
         var payload = result.GetProperty("data").GetProperty("buyFromExchange");
         Assert.False(payload.GetProperty("success").GetBoolean());
-        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", payload.GetProperty("errorCode").GetString());
+        Assert.Equal("FORBIDDEN", payload.GetProperty("errorCode").GetString());
     }
 
     // ── SellToExchange tests ───────────────────────────────────────────────────
@@ -687,6 +687,6 @@ public sealed class GlobalExchangeMutationTests
 
         var payload = result.GetProperty("data").GetProperty("sellToExchange");
         Assert.False(payload.GetProperty("success").GetBoolean());
-        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", payload.GetProperty("errorCode").GetString());
+        Assert.Equal("FORBIDDEN", payload.GetProperty("errorCode").GetString());
     }
 }

@@ -7,20 +7,20 @@ describe('gqlRequest ownership error handling', () => {
     vi.unstubAllGlobals()
   })
 
-  it('maps NOT_FOUND_OR_NOT_OWNED to friendly generic message', async () => {
+  it('maps FORBIDDEN to friendly generic message', async () => {
     vi.stubGlobal('localStorage', { getItem: () => null })
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({
         json: async () => ({
-          errors: [{ message: 'raw internal detail', extensions: { code: 'NOT_FOUND_OR_NOT_OWNED' } }],
+          errors: [{ message: 'raw internal detail', extensions: { code: 'FORBIDDEN' } }],
         }),
       })),
     )
 
     await expect(gqlRequest('{ me { id } }')).rejects.toMatchObject({
-      code: 'NOT_FOUND_OR_NOT_OWNED',
-      message: "This item could not be found or you don't have permission to access it.",
+      code: 'FORBIDDEN',
+      message: "You don't have permission to perform this action.",
     })
   })
 
@@ -37,7 +37,7 @@ describe('gqlRequest ownership error handling', () => {
 
     await expect(gqlRequest('{ me { id } }')).rejects.toMatchObject({
       code: 'NOT_OWNED_OR_NOT_FOUND',
-      message: "This item could not be found or you don't have permission to access it.",
+      message: "You don't have permission to perform this action.",
     })
   })
 

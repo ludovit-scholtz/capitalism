@@ -6284,7 +6284,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             token2);
 
         Assert.True(result.TryGetProperty("errors", out var errors));
-        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal("FORBIDDEN", errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
     [Fact]
@@ -6789,7 +6789,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             intruderToken);
 
         Assert.True(result.TryGetProperty("errors", out var errors));
-        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal("FORBIDDEN", errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
     [Fact]
@@ -7355,7 +7355,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             token2);
 
         Assert.True(cancelResult.TryGetProperty("errors", out var errors));
-        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal("FORBIDDEN", errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
     [Fact]
@@ -24644,7 +24644,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             otherToken);
 
         Assert.True(result.TryGetProperty("errors", out var errors));
-        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal("FORBIDDEN", errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
     [Fact]
@@ -30601,8 +30601,8 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         var errors = result.GetProperty("errors");
         Assert.True(errors.GetArrayLength() > 0, "Should reject pledge of a building not owned by borrower.");
-        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
-        Assert.Equal("This item could not be found or you don't have permission to access it.", errors[0].GetProperty("message").GetString());
+        Assert.Equal("FORBIDDEN", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal("You don't have permission to perform this action.", errors[0].GetProperty("message").GetString());
 
         var missingResult = await ExecuteGraphQlAsync(
             """
@@ -30624,9 +30624,9 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         var missingErrors = missingResult.GetProperty("errors");
         Assert.True(missingErrors.GetArrayLength() > 0, "Should hide whether missing collateral exists.");
-        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", missingErrors[0].GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal("FORBIDDEN", missingErrors[0].GetProperty("extensions").GetProperty("code").GetString());
         Assert.Equal(
-            "This item could not be found or you don't have permission to access it.",
+            "You don't have permission to perform this action.",
             missingErrors[0].GetProperty("message").GetString());
     }
 
@@ -38345,7 +38345,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var errors = result.GetProperty("errors");
         Assert.True(errors.GetArrayLength() > 0, "Wrong owner should get an error.");
         var errorCode = errors[0].GetProperty("extensions").GetProperty("code").GetString();
-        Assert.Equal("NOT_FOUND_OR_NOT_OWNED", errorCode);
+        Assert.Equal("FORBIDDEN", errorCode);
     }
 
     [Fact]
