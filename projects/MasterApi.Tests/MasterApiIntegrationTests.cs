@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.IdentityModel.Tokens.Jwt;
+using System.Diagnostics;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
@@ -388,7 +389,8 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
             new { input = new { email, displayName = "Another", password = "password123" } });
 
         Assert.True(result.TryGetProperty("errors", out var errors));
-        Assert.Contains("DUPLICATE_EMAIL", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Contains("REGISTRATION_FAILED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal("Registration failed.", errors[0].GetProperty("message").GetString());
     }
 
     [Fact]
@@ -500,6 +502,90 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
 
         Assert.True(result.TryGetProperty("errors", out var errors));
         Assert.Contains("INVALID_CREDENTIALS", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal("Invalid credentials.", errors[0].GetProperty("message").GetString());
+    }
+
+    [Fact]
+    public async Task Register_DuplicateAndNewEmail_AverageTimingDifference_IsWithinFiftyMilliseconds()
+    {
+        var email = $"timing-register-existing-{Guid.NewGuid():N}@example.com";
+        await RegisterAndGetTokenAsync(email, password: "password123");
+
+        var duplicateDurations = new List<long>();
+        var newDurations = new List<long>();
+
+        for (var i = 0; i < 10; i++)
+        {
+            var duplicateStart = Stopwatch.GetTimestamp();
+            var duplicate = await GraphQlAsync("""
+                mutation Register($input: RegisterInput!) {
+                  register(input: $input) { token }
+                }
+                """,
+                new { input = new { email, displayName = $"Duplicate{i}", password = "password123" } });
+            duplicateDurations.Add((long)Stopwatch.GetElapsedTime(duplicateStart).TotalMilliseconds);
+            Assert.True(duplicate.TryGetProperty("errors", out var duplicateErrors));
+            Assert.Equal("Registration failed.", duplicateErrors[0].GetProperty("message").GetString());
+            Assert.Equal("REGISTRATION_FAILED", duplicateErrors[0].GetProperty("extensions").GetProperty("code").GetString());
+
+            var freshEmail = $"timing-register-new-{i}-{Guid.NewGuid():N}@example.com";
+            var newStart = Stopwatch.GetTimestamp();
+            var fresh = await GraphQlAsync("""
+                mutation Register($input: RegisterInput!) {
+                  register(input: $input) { token }
+                }
+                """,
+                new { input = new { email = freshEmail, displayName = $"Fresh{i}", password = "password123" } });
+            newDurations.Add((long)Stopwatch.GetElapsedTime(newStart).TotalMilliseconds);
+            Assert.False(fresh.TryGetProperty("errors", out _));
+        }
+
+        var duplicateAvg = duplicateDurations.Average();
+        var newAvg = newDurations.Average();
+        var variance = Math.Abs(duplicateAvg - newAvg);
+        Assert.True(variance <= 50, $"Expected duplicate/new registration average timing variance <= 50ms, actual {variance:F2}ms.");
+    }
+
+    [Fact]
+    public async Task Login_WrongPasswordAndUnknownEmail_AverageTimingDifference_IsWithinFiftyMilliseconds()
+    {
+        var wrongPasswordDurations = new List<long>();
+        var unknownEmailDurations = new List<long>();
+
+        for (var i = 0; i < 10; i++)
+        {
+            var email = $"timing-login-existing-{i}-{Guid.NewGuid():N}@example.com";
+            await RegisterAndGetTokenAsync(email, password: "password123");
+
+            var wrongStart = Stopwatch.GetTimestamp();
+            var wrong = await GraphQlAsync("""
+                mutation Login($input: LoginInput!) {
+                  login(input: $input) { token }
+                }
+                """,
+                new { input = new { email, password = $"wrong-{i}" } });
+            wrongPasswordDurations.Add((long)Stopwatch.GetElapsedTime(wrongStart).TotalMilliseconds);
+            Assert.True(wrong.TryGetProperty("errors", out var wrongErrors));
+            Assert.Equal("Invalid credentials.", wrongErrors[0].GetProperty("message").GetString());
+            Assert.Equal("INVALID_CREDENTIALS", wrongErrors[0].GetProperty("extensions").GetProperty("code").GetString());
+
+            var unknownStart = Stopwatch.GetTimestamp();
+            var unknown = await GraphQlAsync("""
+                mutation Login($input: LoginInput!) {
+                  login(input: $input) { token }
+                }
+                """,
+                new { input = new { email = $"timing-login-unknown-{i}-{Guid.NewGuid():N}@example.com", password = "whatever" } });
+            unknownEmailDurations.Add((long)Stopwatch.GetElapsedTime(unknownStart).TotalMilliseconds);
+            Assert.True(unknown.TryGetProperty("errors", out var unknownErrors));
+            Assert.Equal("Invalid credentials.", unknownErrors[0].GetProperty("message").GetString());
+            Assert.Equal("INVALID_CREDENTIALS", unknownErrors[0].GetProperty("extensions").GetProperty("code").GetString());
+        }
+
+        var wrongAvg = wrongPasswordDurations.Average();
+        var unknownAvg = unknownEmailDurations.Average();
+        var variance = Math.Abs(wrongAvg - unknownAvg);
+        Assert.True(variance <= 50, $"Expected wrong-password/unknown-email average timing variance <= 50ms, actual {variance:F2}ms.");
     }
 
     #endregion

@@ -7,7 +7,10 @@ export interface GraphQLResponse<T> {
 }
 
 export class GraphQLError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    public readonly code?: string,
+  ) {
     super(message)
     this.name = 'GraphQLError'
   }
@@ -37,7 +40,9 @@ export async function gqlRequest<T>(
   const json: GraphQLResponse<T> = await res.json()
 
   if (json.errors?.length) {
-    throw new GraphQLError(json.errors[0]?.message || 'Master API error')
+    const firstError = json.errors[0]
+    const code = firstError?.extensions?.code as string | undefined
+    throw new GraphQLError(firstError?.message || 'Master API error', code)
   }
 
   if (!json.data) {

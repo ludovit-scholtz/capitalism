@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Cryptography;
 using System.Security.Claims;
@@ -23,6 +24,10 @@ public sealed partial class Mutation
     private const int ReferralCodeLength = 8;
     private const int MaxReferralCodeGenerationAttempts = 20;
     private const string ReferralCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    private const string RegistrationFailedCode = "REGISTRATION_FAILED";
+    private const string RegistrationFailedMessage = "Registration failed.";
+    private static readonly TimeSpan RegistrationMinimumDuration = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan InvalidCredentialsMinimumDuration = TimeSpan.FromMilliseconds(250);
 
     /// <summary>Compiled regex for validating alphanumeric referral codes.</summary>
     private static readonly Regex ReferralCodePattern = new(@"^[A-Z0-9]+$", RegexOptions.Compiled);
@@ -38,6 +43,7 @@ public sealed partial class Mutation
         [Service] ILoginThrottleService throttle,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
+        var startedAt = Stopwatch.GetTimestamp();
         if (!authOptions.Value.PasswordAuthEnabled)
         {
             throw new GraphQLException(
@@ -51,11 +57,12 @@ public sealed partial class Mutation
 
         if (await db.Players.AnyAsync(p => p.Email.ToLower() == normalizedEmail))
         {
-            // Return a neutral message so callers cannot enumerate registered email addresses.
+            ExecuteDummyPasswordWork(input.Password);
+            await DelayToMinimumDurationAsync(startedAt, RegistrationMinimumDuration);
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("An account with that email may already exist. Please check your inbox or try signing in.")
-                    .SetCode("DUPLICATE_EMAIL")
+                    .SetMessage(RegistrationFailedMessage)
+                    .SetCode(RegistrationFailedCode)
                     .Build());
         }
 
@@ -81,6 +88,7 @@ public sealed partial class Mutation
         var session = GenerateToken(player, jwtOptions.Value);
         await TrackIssuedSessionAsync(db, player.Id, session, httpContextAccessor.HttpContext, httpContextAccessor.HttpContext?.RequestAborted ?? CancellationToken.None);
         AuthSessionCookieService.SetSessionCookies(httpContextAccessor.HttpContext, hostEnvironment, session.Token, session.ExpiresAtUtc);
+        await DelayToMinimumDurationAsync(startedAt, RegistrationMinimumDuration);
         return new AuthPayload
         {
             Token = session.Token,
@@ -101,6 +109,7 @@ public sealed partial class Mutation
         [Service] ILoginThrottleService throttle,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
+        var startedAt = Stopwatch.GetTimestamp();
         if (!authOptions.Value.PasswordAuthEnabled)
         {
             throw new GraphQLException(
@@ -125,11 +134,12 @@ public sealed partial class Mutation
         var player = await db.Players.FirstOrDefaultAsync(p => p.Email.ToLower() == normalizedEmail);
         if (player is null)
         {
-            // Record failure even for unknown emails to prevent timing-based enumeration.
+            ExecuteDummyPasswordWork(input.Password);
             throttle.RecordFailure(normalizedEmail);
+            await DelayToMinimumDurationAsync(startedAt, InvalidCredentialsMinimumDuration);
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("Invalid email or password.")
+                    .SetMessage("Invalid credentials.")
                     .SetCode("INVALID_CREDENTIALS")
                     .Build());
         }
@@ -140,9 +150,10 @@ public sealed partial class Mutation
         if (result == PasswordVerificationResult.Failed)
         {
             throttle.RecordFailure(normalizedEmail);
+            await DelayToMinimumDurationAsync(startedAt, InvalidCredentialsMinimumDuration);
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("Invalid email or password.")
+                    .SetMessage("Invalid credentials.")
                     .SetCode("INVALID_CREDENTIALS")
                     .Build());
         }
@@ -285,6 +296,33 @@ public sealed partial class Mutation
             MasterRankingBountyCodes.LoginToGame,
             playerEmail,
             uniqueScopeKey: $"{MasterRankingBountyCodes.LoginToGame}:{playerEmail}:{today}:{normalizedServerKey}");
+    }
+
+    private static void ExecuteDummyPasswordWork(string? password)
+    {
+        var candidate = string.IsNullOrWhiteSpace(password) ? "dummy-password-123!" : password;
+        var hasher = new PasswordHasher<Player>();
+        var dummyPlayer = new Player
+        {
+            Id = Guid.Empty,
+            Email = "dummy@example.com",
+            DisplayName = "dummy",
+            Role = PlayerRole.Player,
+            ActiveAccountType = AccountContextType.Person,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        var hash = hasher.HashPassword(dummyPlayer, candidate);
+        _ = hasher.VerifyHashedPassword(dummyPlayer, hash, candidate);
+    }
+
+    private static async Task DelayToMinimumDurationAsync(long startedAtTimestamp, TimeSpan minimumDuration)
+    {
+        var elapsed = Stopwatch.GetElapsedTime(startedAtTimestamp);
+        var remaining = minimumDuration - elapsed;
+        if (remaining > TimeSpan.Zero)
+        {
+            await Task.Delay(remaining);
+        }
     }
 
     /// <summary>Normalizes and validates a referral code from user input.</summary>

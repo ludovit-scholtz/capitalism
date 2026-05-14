@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Diagnostics;
 using Api.Configuration;
 using Api.Security;
 using Api.Tests.Infrastructure;
@@ -205,11 +206,8 @@ public sealed class LoginThrottleTests
         var message = errors[0].GetProperty("message").GetString()!;
         var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
 
-        Assert.Equal("DUPLICATE_EMAIL", code);
-        // Message should be neutral — must NOT say "A player with this email already exists" (the old message
-        // that confirmed account existence). The new message uses intentionally ambiguous phrasing.
-        Assert.DoesNotContain("A player with", message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("may already exist", message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("REGISTRATION_FAILED", code);
+        Assert.Equal("Registration failed.", message);
     }
 
     [Fact]
@@ -226,5 +224,89 @@ public sealed class LoginThrottleTests
         Assert.True(result.TryGetProperty("errors", out var errors));
         // Must return generic INVALID_CREDENTIALS, not a message confirming the email is unknown.
         Assert.Equal("INVALID_CREDENTIALS", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Register_DuplicateAndNewEmail_AverageTimingDifference_IsWithinFiftyMilliseconds()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        const string existingEmail = "timing-register-existing@example.com";
+        const string password = "Pass123!";
+        await PostGraphQlAsync(client,
+            "mutation Register($input: RegisterInput!) { register(input: $input) { token } }",
+            new { input = new { email = existingEmail, displayName = "Existing", password } });
+
+        var duplicateDurations = new List<long>();
+        var newDurations = new List<long>();
+
+        for (var i = 0; i < 10; i++)
+        {
+            var duplicateStart = Stopwatch.GetTimestamp();
+            var duplicate = await PostGraphQlAsync(client,
+                "mutation Register($input: RegisterInput!) { register(input: $input) { token } }",
+                new { input = new { email = existingEmail, displayName = $"Duplicate{i}", password } });
+            duplicateDurations.Add((long)Stopwatch.GetElapsedTime(duplicateStart).TotalMilliseconds);
+            Assert.True(duplicate.TryGetProperty("errors", out var duplicateErrors));
+            Assert.Equal("Registration failed.", duplicateErrors[0].GetProperty("message").GetString());
+            Assert.Equal("REGISTRATION_FAILED", duplicateErrors[0].GetProperty("extensions").GetProperty("code").GetString());
+
+            var freshEmail = $"timing-register-new-{i}-{Guid.NewGuid():N}@example.com";
+            var newStart = Stopwatch.GetTimestamp();
+            var fresh = await PostGraphQlAsync(client,
+                "mutation Register($input: RegisterInput!) { register(input: $input) { token } }",
+                new { input = new { email = freshEmail, displayName = $"Fresh{i}", password } });
+            newDurations.Add((long)Stopwatch.GetElapsedTime(newStart).TotalMilliseconds);
+            Assert.False(fresh.TryGetProperty("errors", out _));
+        }
+
+        var duplicateAvg = duplicateDurations.Average();
+        var newAvg = newDurations.Average();
+        var variance = Math.Abs(duplicateAvg - newAvg);
+        Assert.True(variance <= 50, $"Expected duplicate/new registration average timing variance <= 50ms, actual {variance:F2}ms.");
+    }
+
+    [Fact]
+    public async Task Login_WrongPasswordAndUnknownEmail_AverageTimingDifference_IsWithinFiftyMilliseconds()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        const string password = "Pass123!";
+
+        var wrongPasswordDurations = new List<long>();
+        var unknownEmailDurations = new List<long>();
+
+        for (var i = 0; i < 10; i++)
+        {
+            var existingEmail = $"timing-login-existing-{i}-{Guid.NewGuid():N}@example.com";
+            await PostGraphQlAsync(client,
+                "mutation Register($input: RegisterInput!) { register(input: $input) { token } }",
+                new { input = new { email = existingEmail, displayName = $"Existing{i}", password } });
+
+            var wrongStart = Stopwatch.GetTimestamp();
+            var wrong = await PostGraphQlAsync(client,
+                "mutation Login($input: LoginInput!) { login(input: $input) { token } }",
+                new { input = new { email = existingEmail, password = $"Wrong{i}!" } });
+            wrongPasswordDurations.Add((long)Stopwatch.GetElapsedTime(wrongStart).TotalMilliseconds);
+            Assert.True(wrong.TryGetProperty("errors", out var wrongErrors));
+            Assert.Equal("Invalid credentials.", wrongErrors[0].GetProperty("message").GetString());
+            Assert.Equal("INVALID_CREDENTIALS", wrongErrors[0].GetProperty("extensions").GetProperty("code").GetString());
+
+            var unknownStart = Stopwatch.GetTimestamp();
+            var unknown = await PostGraphQlAsync(client,
+                "mutation Login($input: LoginInput!) { login(input: $input) { token } }",
+                new { input = new { email = $"timing-login-unknown-{i}@example.com", password = "AnyPassword1!" } });
+            unknownEmailDurations.Add((long)Stopwatch.GetElapsedTime(unknownStart).TotalMilliseconds);
+            Assert.True(unknown.TryGetProperty("errors", out var unknownErrors));
+            Assert.Equal("Invalid credentials.", unknownErrors[0].GetProperty("message").GetString());
+            Assert.Equal("INVALID_CREDENTIALS", unknownErrors[0].GetProperty("extensions").GetProperty("code").GetString());
+        }
+
+        var wrongAvg = wrongPasswordDurations.Average();
+        var unknownAvg = unknownEmailDurations.Average();
+        var variance = Math.Abs(wrongAvg - unknownAvg);
+        Assert.True(variance <= 50, $"Expected wrong-password/unknown-email average timing variance <= 50ms, actual {variance:F2}ms.");
     }
 }

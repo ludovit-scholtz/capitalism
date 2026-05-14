@@ -145,6 +145,9 @@ export default {
     register: 'Registrieren',
     noAccount: 'Noch kein Konto?',
     haveAccount: 'Bereits ein Konto?',
+    invalidCredentials: 'Ungültige Zugangsdaten.',
+    registrationNeutral:
+      'Wenn diese E-Mail noch nicht registriert ist, erhalten Sie eine Bestätigung.',
     backToDirectory: 'Zurück zur Serverübersicht',
     genericError: 'Etwas ist schiefgelaufen. Bitte versuche es erneut.',
     redirectingToSignIn: 'Weiterleitung zur Anmeldung…',

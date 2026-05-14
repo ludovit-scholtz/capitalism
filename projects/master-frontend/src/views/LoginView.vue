@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import ViewJumbotron from '@/components/layout/ViewJumbotron.vue'
 import ViewSubnav from '@/components/layout/ViewSubnav.vue'
 import { isPasswordAuthEnabled, shouldAutoStartOidc } from '@/lib/authMode'
+import { GraphQLError } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -41,6 +42,16 @@ async function handleSubmit() {
     await auth.fetchSubscription()
     await router.push('/')
   } catch (error: unknown) {
+    if (error instanceof GraphQLError && error.code === 'INVALID_CREDENTIALS') {
+      formError.value = t('login.invalidCredentials')
+      return
+    }
+
+    if (error instanceof GraphQLError && error.code === 'REGISTRATION_FAILED') {
+      formError.value = t('login.registrationNeutral')
+      return
+    }
+
     formError.value = error instanceof Error ? error.message : t('login.genericError')
   }
 }

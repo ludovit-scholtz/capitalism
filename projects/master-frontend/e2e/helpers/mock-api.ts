@@ -1337,7 +1337,7 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           body: JSON.stringify({
             errors: [
               {
-                message: 'Invalid email or password.',
+                message: 'Invalid credentials.',
                 extensions: { code: 'INVALID_CREDENTIALS' },
               },
             ],

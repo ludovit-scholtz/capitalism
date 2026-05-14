@@ -265,6 +265,9 @@ export default {
     passwordTooShort: 'Heslo mus\u00ed ma\u0165 aspo\u0148 8 znakov.',
     loginToAccess: 'Prihláste sa pre prístup',
     loginFailed: 'Prihl\u00e1senie zlyhalo. Skontrolujte prihlasovacie \u00fadaje a sk\u00faste znova.',
+    invalidCredentials: 'Neplatn\u00e9 prihlasovacie \u00fadaje.',
+    registrationNeutral:
+      'Ak tento e-mail e\u0161te nie je registrovan\u00fd, dostanete potvrdenie.',
     loginRequired: 'Pred pokračovaním sa prihláste.',
     loginThrottledTitle: 'Príliš veľa neúspešných pokusov',
     loginThrottledMessage: 'Príliš veľa neúspešných pokusov o prihlásenie. Skúste to znova o 15 minút.',
