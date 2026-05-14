@@ -107,11 +107,14 @@ describe('productImages mapping', () => {
   })
 
   it('keeps dedicated subject files for the specifically reported product regressions', () => {
+    expect(existsSync(new URL('allergy-tablets.svg', assetDir))).toBe(true)
     expect(existsSync(new URL('analgesic-syrup.svg', assetDir))).toBe(true)
+    expect(existsSync(new URL('antiseptic.svg', assetDir))).toBe(true)
     expect(existsSync(new URL('antibiotic.svg', assetDir))).toBe(true)
     expect(existsSync(new URL('antiseptic-gel.svg', assetDir))).toBe(true)
     expect(existsSync(new URL('aspirin.svg', assetDir))).toBe(true)
     expect(existsSync(new URL('assembly-pallet.svg', assetDir))).toBe(true)
+    expect(existsSync(new URL('cold-pack.svg', assetDir))).toBe(true)
     expect(existsSync(new URL('wooden-bed.svg', assetDir))).toBe(true)
   })
 
@@ -127,11 +130,14 @@ describe('productImages mapping', () => {
 
   it('keeps the specifically reported regressions classified as product-only mappings', () => {
     const reportedProductSlugs = [
+      'allergy-tablets',
       'analgesic-syrup',
+      'antiseptic',
       'antibiotic',
       'antiseptic-gel',
       'aspirin',
       'assembly-pallet',
+      'cold-pack',
       'wooden-bed',
     ]
 
@@ -144,11 +150,14 @@ describe('productImages mapping', () => {
 
   it('keeps the specifically reported product regressions out of resource classification while preserving slug asset resolution', () => {
     const reportedProductSlugs = [
+      'allergy-tablets',
       'analgesic-syrup',
+      'antiseptic',
       'antibiotic',
       'antiseptic-gel',
       'aspirin',
       'assembly-pallet',
+      'cold-pack',
       'wooden-bed',
     ]
 
