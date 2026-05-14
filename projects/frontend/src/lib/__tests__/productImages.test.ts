@@ -59,4 +59,14 @@ describe('productImages mapping', () => {
       expect(getProductCatalogImageUrl(slug)).not.toBe(fallback)
     }
   })
+
+  it('keeps one dedicated file per seeded slug', () => {
+    for (const slug of RESOURCE_IMAGE_SLUGS) {
+      expect(getResourceCatalogImageUrl(slug, null)).toContain(`${slug}.webp`)
+    }
+
+    for (const slug of PRODUCT_IMAGE_SLUGS) {
+      expect(getProductCatalogImageUrl(slug)).toContain(`${slug}.webp`)
+    }
+  })
 })

@@ -1733,6 +1733,18 @@ Rules to prevent recurrence:
 2. **Unknown resource slugs with a non-null existing image must return that existing image**, not the global fallback.
 3. **Known mapped resource slugs must ignore existing image overrides** and return the centralized catalog mapping.
 
+## Catalog asset semantics — product images must match the actual product
+
+Root-cause of a quality failure (May 2026, PR #499 follow-up):
+- The PR shipped dozens of `.webp` catalog assets whose visuals were unrelated to the slug they represented (for example medicine files showing landscapes and `assembly-pallet.webp` showing birds).
+- The code/tests only proved mapping completeness and fallback behavior; they did not prove the human review step that the artwork itself matched the actual resource or product.
+
+Rules to prevent recurrence:
+1. **For catalog-asset PRs, manually review the generated image files against their slugs before pushing.** A valid mapping is not enough if `wooden-bed.webp` does not visibly depict a bed.
+2. **Use subject-matching visuals only.** Product and resource assets must show the actual object/material (for example bed, chair, pill bottle, wafer, pallet), not generic scenery or unrelated stock imagery.
+3. **Keep a one-file-per-slug contract and cover it with tests.** Seeded slug URLs should resolve to their own `<slug>.webp` asset so reviewers can audit the mapping directly.
+4. **Include fresh UI proof for image-only changes that shows the corrected assets rendered in the product/resource UI, not just the raw files.**
+
 ## Repeated review-loop quality gate — each follow-up must add net-new proof
 
 Root-cause of repeated review loops (May 2026, PR #499 follow-up):
