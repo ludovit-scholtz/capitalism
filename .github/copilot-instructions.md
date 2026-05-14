@@ -1789,3 +1789,21 @@ Rules to prevent recurrence:
 2. **When redesigning upgrade/maintenance UI with Tailwind, keep existing E2E hook classes and ARIA labels** unless all dependent tests are updated in the same PR.
 3. **Energy Settings moved to edit mode must remain accessible in the no-unit-selected edit state** (overview sidebar) in addition to unit-config context.
 4. **If Upgrade Now introduces a confirmation dialog, update affected E2E tests to click Confirm** before asserting backend error/success messages.
+
+## NPC competitors repeated feedback — all-city seeding and boundary test completeness
+
+Root-cause of 13+ repeated "fix build and tests" comments (May 2026, PR #513 NPC competitors):
+- The NPC backend tests covered only happy-path scenarios (seeder, archetype expansion, balance debit, building limit). The required boundary triad was missing: unauthenticated rejection, non-admin rejection for admin-gated operations, and paused-NPC no-action proof.
+- `Seeder_CreatesAtLeastThreeNpcCompaniesPerCity` verified counts per city but never confirmed ALL THREE seeded cities (Bratislava, Prague, Vienna) were named explicitly.
+- `CityCompetitors` query had no backend test despite being a key new GraphQL surface.
+- `NpcCompanyDetail` query had no backend test at all.
+- E2E tests covered 8 happy-path scenarios but lacked: empty state, human competitor rendering, trend symbols, mobile viewport, and edge-case flows.
+- The previous session failures were infrastructure rate-limit errors (HTTP 429), not code failures — but the agent did not investigate what coverage was still missing vs what was already green.
+
+**Rules to prevent recurrence:**
+1. **For every new GraphQL query or mutation, always add the boundary triad before closing the PR:** (a) unauthenticated rejection, (b) non-admin/non-owner rejection if admin-gated, (c) authorized success. A feature is not fully covered until all three pass.
+2. **For seeder tests that verify "at least N per city", also add an explicit city-name assertion** (`Assert.Contains("Prague", cityNames)`, `Assert.Contains("Vienna", cityNames)`) to prove all three seeded cities are covered — not just the first city in the DB result.
+3. **For every new GraphQL query exposed on the public surface, add at minimum: success with data, success with no data (empty/null result), and boundary-value test** (e.g., unknown ID returns null).
+4. **When a PR creates a new "paused/active" toggle on a domain entity, add a backend test that proves the paused state is respected by the tick engine** — not just that the toggle persists in the DB.
+5. **E2E tests for competitor/intelligence UI surfaces must include**: happy-path table render, empty state text, mobile viewport scrollability, at least one edge-case (e.g., human competitor vs NPC competitor rendering).
+6. **Infrastructure CI failures (HTTP 429 rate limit) must be classified as infrastructure issues immediately**, not as code failures. When prior runs failed with `429 Sorry, you've exceeded your weekly rate limit`, investigate whether the current HEAD has code failures SEPARATELY before reporting "no code failures".

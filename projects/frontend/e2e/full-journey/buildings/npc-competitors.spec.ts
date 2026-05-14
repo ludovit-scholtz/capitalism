@@ -219,4 +219,59 @@ test.describe('NPC competitors surfaces', () => {
     await page.getByRole('button', { name: 'Resume NPC' }).first().click()
     await expect(page.getByText('NPC resumed.')).toBeVisible()
   })
+
+  test('competitors tab shows empty state when no competitors in city', async ({ page }) => {
+    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    // Do NOT seed NPC state so city-pr has no competitors
+    await bootstrapAuth(page, `token-${player.id}`)
+
+    await page.goto('/city/city-pr/competitors')
+    await expect(page.getByRole('heading', { name: 'Competitor Intelligence' })).toBeVisible()
+    await expect(page.locator('.competitors-empty')).toBeVisible()
+  })
+
+  test('competitors tab shows human competitor without archetype badge', async ({ page }) => {
+    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    seedNpcState(state)
+    await bootstrapAuth(page, `token-${player.id}`)
+
+    await page.goto('/city/city-ba/competitors')
+    await expect(page.locator('.competitors-table')).toContainText('Player Foods')
+    // Human competitor should have .arch-human badge
+    await expect(page.locator('.arch-badge.arch-human').first()).toBeVisible()
+  })
+
+  test('competitors tab shows trend symbols', async ({ page }) => {
+    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    seedNpcState(state)
+    await bootstrapAuth(page, `token-${player.id}`)
+
+    await page.goto('/city/city-ba/competitors')
+    // UP trend NPC should show upward arrow
+    await expect(page.locator('.trend-cell').first()).toContainText('↗')
+  })
+
+  test('competitors tab renders on mobile viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
+    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    seedNpcState(state)
+    await bootstrapAuth(page, `token-${player.id}`)
+
+    await page.goto('/city/city-ba/competitors')
+    await expect(page.getByRole('heading', { name: 'Competitor Intelligence' })).toBeVisible()
+    // Table should be in a scroll container on mobile
+    await expect(page.locator('.competitors-table-wrap')).toBeVisible()
+  })
 })

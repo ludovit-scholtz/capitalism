@@ -460,4 +460,403 @@ public sealed class NpcCompanyIntegrationTests
         var buildingCount = await db.Buildings.CountAsync(building => building.CompanyId == company.Id && building.DestroyedAtUtc == null);
         Assert.True(buildingCount <= 6);
     }
+
+    [Fact]
+    public async Task PauseNpcCompany_UnauthenticatedRequest_ReturnsAuthError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var npc = await db.NpcCompanies.AsNoTracking().FirstAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            mutation PauseNpc($input: ManageNpcCompanyActivityInput!) {
+              pauseNpcCompany(input: $input) { id isActive }
+            }
+            """,
+            new { input = new { npcCompanyId = npc.Id } });
+
+        Assert.True(result.TryGetProperty("errors", out var errors), "Expected auth errors.");
+        Assert.True(errors.GetArrayLength() > 0);
+    }
+
+    [Fact]
+    public async Task ResumeNpcCompany_UnauthenticatedRequest_ReturnsAuthError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var npc = await db.NpcCompanies.AsNoTracking().FirstAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            mutation ResumeNpc($input: ManageNpcCompanyActivityInput!) {
+              resumeNpcCompany(input: $input) { id isActive }
+            }
+            """,
+            new { input = new { npcCompanyId = npc.Id } });
+
+        Assert.True(result.TryGetProperty("errors", out var errors), "Expected auth errors.");
+        Assert.True(errors.GetArrayLength() > 0);
+    }
+
+    [Fact]
+    public async Task NpcDecisionLogs_NonAdminRequest_ReturnsAuthError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var nonAdminToken = await RegisterAndGetTokenAsync(client, email: "nonadmin-npc@test.example");
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            { npcDecisionLogs(limit: 10) { id actionType } }
+            """,
+            token: nonAdminToken);
+
+        Assert.True(result.TryGetProperty("errors", out var errors), "Expected auth errors for non-admin.");
+        Assert.True(errors.GetArrayLength() > 0);
+    }
+
+    [Fact]
+    public async Task PauseNpcCompany_NonAdminRequest_ReturnsAuthError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var nonAdminToken = await RegisterAndGetTokenAsync(client, email: "nonadmin-pause@test.example");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var npc = await db.NpcCompanies.AsNoTracking().FirstAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            mutation PauseNpc($input: ManageNpcCompanyActivityInput!) {
+              pauseNpcCompany(input: $input) { id isActive }
+            }
+            """,
+            new { input = new { npcCompanyId = npc.Id } },
+            nonAdminToken);
+
+        Assert.True(result.TryGetProperty("errors", out var errors), "Expected auth errors for non-admin.");
+        Assert.True(errors.GetArrayLength() > 0);
+    }
+
+    [Fact]
+    public async Task NpcCompanyDetail_ReturnsDetailedProfile()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var npc = await db.NpcCompanies.AsNoTracking().FirstAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            query NpcDetail($id: UUID!) {
+              npcCompanyDetail(id: $id) {
+                id
+                name
+                archetype
+                isActive
+                bankBalance
+                buildings { id type }
+              }
+            }
+            """,
+            new { id = npc.Id });
+
+        Assert.False(result.TryGetProperty("errors", out _), "Expected no GraphQL errors.");
+        var detail = result.GetProperty("data").GetProperty("npcCompanyDetail");
+        Assert.Equal(npc.Id.ToString(), detail.GetProperty("id").GetString());
+        Assert.False(string.IsNullOrWhiteSpace(detail.GetProperty("name").GetString()));
+        Assert.False(string.IsNullOrWhiteSpace(detail.GetProperty("archetype").GetString()));
+        Assert.True(detail.GetProperty("bankBalance").GetDecimal() >= 0m);
+    }
+
+    [Fact]
+    public async Task NpcCompanyDetail_UnknownId_ReturnsNull()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            query NpcDetail($id: UUID!) {
+              npcCompanyDetail(id: $id) { id }
+            }
+            """,
+            new { id = Guid.NewGuid() });
+
+        Assert.False(result.TryGetProperty("errors", out _), "Expected no GraphQL errors.");
+        Assert.Equal(JsonValueKind.Null, result.GetProperty("data").GetProperty("npcCompanyDetail").ValueKind);
+    }
+
+    [Fact]
+    public async Task CityCompetitors_EmptyCity_ReturnsEmptyList()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var newCityId = Guid.NewGuid();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            query Competitors($cityId: UUID!, $lastNTicks: Int!) {
+              cityCompetitors(cityId: $cityId, lastNTicks: $lastNTicks) {
+                companyId companyName isNpc
+              }
+            }
+            """,
+            new { cityId = newCityId, lastNTicks = 50 });
+
+        Assert.False(result.TryGetProperty("errors", out _), "Expected no GraphQL errors.");
+        var entries = result.GetProperty("data").GetProperty("cityCompetitors");
+        Assert.Equal(0, entries.GetArrayLength());
+    }
+
+    [Fact]
+    public async Task CityCompetitors_WithNpcInCity_IncludesNpcFlag()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var client = factory.CreateClient();
+        var tickProcessor = scope.ServiceProvider.GetRequiredService<TickProcessor>();
+
+        var testCity = new City
+        {
+            Id = Guid.NewGuid(),
+            Name = "NPC Competitors Test City",
+            CountryCode = "TS",
+            CurrencyCode = "EUR",
+            Latitude = 48.4,
+            Longitude = 17.4,
+            Population = 60_000,
+            AverageRentPerSqm = 15m,
+            BaseSalaryPerManhour = 8m,
+        };
+        db.Cities.Add(testCity);
+        await db.SaveChangesAsync();
+
+        var (npc, company, _) = await CreateControlledNpcAsync(db, NpcArchetype.Retailer, 400_000m, testCity);
+        db.BuildingLots.Add(new BuildingLot
+        {
+            Id = Guid.NewGuid(),
+            CityId = testCity.Id,
+            Name = "Comp Test Lot",
+            Description = "Test lot",
+            District = "Downtown",
+            Latitude = testCity.Latitude + 0.001,
+            Longitude = testCity.Longitude + 0.001,
+            PopulationIndex = 1m,
+            BasePrice = 30_000m,
+            Price = 30_000m,
+            SuitableTypes = "SALES_SHOP,COMMERCIAL",
+        });
+        await db.SaveChangesAsync();
+
+        _ = await tickProcessor.ProcessTickAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            query Competitors($cityId: UUID!, $lastNTicks: Int!) {
+              cityCompetitors(cityId: $cityId, lastNTicks: $lastNTicks) {
+                companyId companyName isNpc archetype trend buildingCount
+              }
+            }
+            """,
+            new { cityId = testCity.Id, lastNTicks = 100 });
+
+        Assert.False(result.TryGetProperty("errors", out _), "Expected no GraphQL errors.");
+        var entries = result.GetProperty("data").GetProperty("cityCompetitors");
+        Assert.True(entries.GetArrayLength() >= 1);
+
+        var npcEntry = entries.EnumerateArray()
+            .FirstOrDefault(entry => entry.GetProperty("companyId").GetString() == company.Id.ToString());
+        Assert.True(npcEntry.ValueKind != JsonValueKind.Undefined, "Expected NPC company in results.");
+        Assert.True(npcEntry.GetProperty("isNpc").GetBoolean());
+        Assert.Equal("RETAILER", npcEntry.GetProperty("archetype").GetString());
+    }
+
+    [Fact]
+    public async Task Seeder_CreatesSeedNpcsForAllThreeCities()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var cities = await db.Cities.AsNoTracking().OrderBy(city => city.Name).ToListAsync();
+        Assert.True(cities.Count >= 3, "Expected at least 3 seeded cities.");
+
+        var cityNames = cities.Select(city => city.Name).ToList();
+        Assert.Contains("Bratislava", cityNames);
+        Assert.Contains("Prague", cityNames);
+        Assert.Contains("Vienna", cityNames);
+
+        foreach (var city in cities)
+        {
+            var npcCount = await db.NpcCompanies.CountAsync(npc => npc.HomeCityId == city.Id);
+            Assert.True(npcCount >= 3, $"Expected at least 3 NPC companies in {city.Name}, found {npcCount}.");
+        }
+    }
+
+    [Fact]
+    public async Task NpcCompanies_QueryWithoutCityFilter_ReturnsAllCities()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var cityCount = await db.Cities.CountAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            { npcCompanies { id homeCityId name archetype isActive } }
+            """);
+
+        Assert.False(result.TryGetProperty("errors", out _), "Expected no GraphQL errors.");
+        var entries = result.GetProperty("data").GetProperty("npcCompanies");
+        var cityIds = entries.EnumerateArray()
+            .Select(entry => entry.GetProperty("homeCityId").GetString())
+            .Distinct()
+            .Count();
+        Assert.True(cityIds >= cityCount, $"Expected results from all {cityCount} cities.");
+    }
+
+    [Fact]
+    public async Task PausedNpc_TickDoesNotCreateNewDecisionLog()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var tickProcessor = scope.ServiceProvider.GetRequiredService<TickProcessor>();
+
+        var testCity = new City
+        {
+            Id = Guid.NewGuid(),
+            Name = "NPC Paused Test City",
+            CountryCode = "TS",
+            CurrencyCode = "EUR",
+            Latitude = 48.5,
+            Longitude = 17.5,
+            Population = 40_000,
+            AverageRentPerSqm = 12m,
+            BaseSalaryPerManhour = 7m,
+        };
+        db.Cities.Add(testCity);
+
+        var (npc, _, _) = await CreateControlledNpcAsync(db, NpcArchetype.Conglomerate, 500_000m, testCity);
+        db.BuildingLots.Add(new BuildingLot
+        {
+            Id = Guid.NewGuid(),
+            CityId = testCity.Id,
+            Name = "Paused NPC Lot",
+            Description = "Test lot",
+            District = "Zone",
+            Latitude = testCity.Latitude + 0.001,
+            Longitude = testCity.Longitude + 0.001,
+            PopulationIndex = 1m,
+            BasePrice = 20_000m,
+            Price = 20_000m,
+            SuitableTypes = "MINE,FACTORY,SALES_SHOP",
+        });
+
+        // Pause the NPC before running ticks
+        var npcEntry = await db.NpcCompanies.FindAsync(npc.Id);
+        Assert.NotNull(npcEntry);
+        npcEntry!.IsActive = false;
+        await db.SaveChangesAsync();
+
+        var logsBefore = await db.NpcDecisionLogs.CountAsync(log => log.NpcCompanyId == npc.Id);
+
+        _ = await tickProcessor.ProcessTickAsync();
+
+        var logsAfter = await db.NpcDecisionLogs.CountAsync(log => log.NpcCompanyId == npc.Id);
+        Assert.Equal(logsBefore, logsAfter);
+    }
+
+    [Fact]
+    public async Task CreateNpcCompany_UnauthenticatedRequest_ReturnsAuthError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.AsNoTracking().FirstAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            mutation CreateNpc($input: CreateNpcCompanyInput!) {
+              createNpcCompany(input: $input) { id name }
+            }
+            """,
+            new { input = new { name = "Test NPC", archetype = "CONGLOMERATE", difficultyLevel = 2, homeCityId = city.Id, startingCash = 100_000m } });
+
+        Assert.True(result.TryGetProperty("errors", out var errors), "Expected auth errors.");
+        Assert.True(errors.GetArrayLength() > 0);
+    }
+
+    [Fact]
+    public async Task Admin_CreateNpcCompany_CreatesWithCorrectArchetype()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await LoginAsSeedAdminAsync(client);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.AsNoTracking().FirstAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            mutation CreateNpc($input: CreateNpcCompanyInput!) {
+              createNpcCompany(input: $input) { id name archetype isActive homeCityId }
+            }
+            """,
+            new { input = new { name = "Admin Created NPC", archetype = "RAW_MATERIALS", difficultyLevel = 3, homeCityId = city.Id, startingCash = 200_000m } },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _), "Expected no GraphQL errors.");
+        var created = result.GetProperty("data").GetProperty("createNpcCompany");
+        Assert.Equal("Admin Created NPC", created.GetProperty("name").GetString());
+        Assert.Equal("RAW_MATERIALS", created.GetProperty("archetype").GetString());
+        Assert.True(created.GetProperty("isActive").GetBoolean());
+        Assert.Equal(city.Id.ToString(), created.GetProperty("homeCityId").GetString());
+    }
+
+    private static async Task<string> RegisterAndGetTokenAsync(HttpClient client, string email = "test@example.com", string displayName = "Tester", string password = "TestPass123!")
+    {
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            mutation Register($input: RegisterInput!) {
+              register(input: $input) {
+                token
+                player { id displayName email role }
+              }
+            }
+            """,
+            new { input = new { email, displayName, password } });
+
+        return result.GetProperty("data").GetProperty("register").GetProperty("token").GetString()!;
+    }
 }
