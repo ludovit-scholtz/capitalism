@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using MasterApi;
 using MasterApi.Data;
 using Microsoft.EntityFrameworkCore;
@@ -358,6 +359,185 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
 
         Assert.True(result.TryGetProperty("errors", out var errors));
         Assert.Contains("INVALID_REGISTRATION_KEY", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task RegisterGameServer_HeartbeatUpdatesServer_ReturnsUpdatedStats()
+    {
+        var serverKey = $"hb-server-{Guid.NewGuid():N}";
+
+        // Register the server first
+        var first = await GraphQlAsync("""
+            mutation RegisterServer($input: RegisterGameServerInput!) {
+              registerGameServer(input: $input) {
+                id displayName playerCount currentTick isOnline
+              }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey,
+                    displayName = "Heartbeat Test Server",
+                    description = "Testing heartbeat updates",
+                    region = "EU",
+                    environment = "production",
+                    backendUrl = "https://hb.example.com",
+                    graphqlUrl = "https://hb.example.com/graphql",
+                    frontendUrl = "https://hb.example.com/app",
+                    version = "1.0.0",
+                    playerCount = 3,
+                    companyCount = 7,
+                    currentTick = 50,
+                }
+            });
+
+        Assert.False(first.TryGetProperty("errors", out _));
+
+        // Send another registration (acting as a heartbeat) with updated stats
+        var second = await GraphQlAsync("""
+            mutation RegisterServer($input: RegisterGameServerInput!) {
+              registerGameServer(input: $input) {
+                id displayName playerCount currentTick isOnline
+              }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey,
+                    displayName = "Heartbeat Test Server",
+                    description = "Testing heartbeat updates",
+                    region = "EU",
+                    environment = "production",
+                    backendUrl = "https://hb.example.com",
+                    graphqlUrl = "https://hb.example.com/graphql",
+                    frontendUrl = "https://hb.example.com/app",
+                    version = "1.0.0",
+                    playerCount = 15,
+                    companyCount = 22,
+                    currentTick = 200,
+                }
+            });
+
+        Assert.False(second.TryGetProperty("errors", out _));
+        var updated = second.GetProperty("data").GetProperty("registerGameServer");
+        Assert.Equal(15, updated.GetProperty("playerCount").GetInt32());
+        Assert.Equal(200, updated.GetProperty("currentTick").GetInt64());
+        Assert.True(updated.GetProperty("isOnline").GetBoolean());
+    }
+
+    [Fact]
+    public async Task GameServers_StaleServer_ExcludedFromActiveList()
+    {
+        var serverKey = $"stale-{Guid.NewGuid():N}";
+
+        // Register and then manually backdate the heartbeat via the database
+        await GraphQlAsync("""
+            mutation RegisterServer($input: RegisterGameServerInput!) {
+              registerGameServer(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey,
+                    displayName = "Stale Server",
+                    description = "Will become stale",
+                    region = "EU",
+                    environment = "production",
+                    backendUrl = "https://stale.example.com",
+                    graphqlUrl = "https://stale.example.com/graphql",
+                    frontendUrl = "https://stale.example.com/app",
+                    version = "1.0",
+                    playerCount = 1,
+                    companyCount = 1,
+                    currentTick = 1,
+                }
+            });
+
+        // Backdate the heartbeat to simulate a stale server
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
+        var server = await db.GameServers.FirstAsync(s => s.ServerKey == serverKey);
+        server.LastHeartbeatAtUtc = DateTime.UtcNow.AddHours(-2);
+        await db.SaveChangesAsync();
+
+        // Query the server list and verify the stale server shows as offline
+        var result = await GraphQlAsync("""
+            query { gameServers {
+              id displayName isOnline lastHeartbeatAtUtc
+            }}
+            """);
+
+        var servers = result.GetProperty("data").GetProperty("gameServers");
+        var found = servers.EnumerateArray()
+            .FirstOrDefault(s => s.GetProperty("displayName").GetString() == "Stale Server");
+
+        Assert.NotEqual(default, found);
+        Assert.False(found.GetProperty("isOnline").GetBoolean());
+    }
+
+    [Fact]
+    public async Task GameServerEviction_MarksStaleServersInactive()
+    {
+        var serverKey = $"evict-{Guid.NewGuid():N}";
+
+        await GraphQlAsync("""
+            mutation RegisterServer($input: RegisterGameServerInput!) {
+              registerGameServer(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey,
+                    displayName = "Eviction Test Server",
+                    description = "Will be evicted",
+                    region = "US",
+                    environment = "production",
+                    backendUrl = "https://evict.example.com",
+                    graphqlUrl = "https://evict.example.com/graphql",
+                    frontendUrl = "https://evict.example.com/app",
+                    version = "1.0",
+                    playerCount = 0,
+                    companyCount = 0,
+                    currentTick = 0,
+                }
+            });
+
+        // Backdate the heartbeat so it falls outside the active threshold
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
+        var server = await db.GameServers.FirstAsync(s => s.ServerKey == serverKey);
+        server.LastHeartbeatAtUtc = DateTime.UtcNow.AddHours(-3);
+        await db.SaveChangesAsync();
+
+        // Run the eviction service directly
+        var evictionService = new MasterApi.Utilities.GameServerEvictionHostedService(
+            scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>(),
+            scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<MasterApi.Configuration.MasterServerOptions>>(),
+            scope.ServiceProvider.GetRequiredService<ILogger<MasterApi.Utilities.GameServerEvictionHostedService>>());
+
+        // Use a short-lived CancellationToken to run one eviction cycle
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await evictionService.StartAsync(cts.Token);
+
+        // Allow eviction to run
+        await Task.Delay(500, CancellationToken.None);
+        await evictionService.StopAsync(CancellationToken.None);
+
+        // Verify the server is now marked inactive
+        await db.Entry(server).ReloadAsync();
+        Assert.False(server.IsActive);
     }
 
     #endregion

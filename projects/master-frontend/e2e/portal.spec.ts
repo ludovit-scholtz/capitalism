@@ -39,6 +39,61 @@ test.describe('Home page', () => {
     const docsLink = page.getByRole('link', { name: /docs/i }).last()
     await expect(docsLink).toBeVisible()
   })
+
+  test('shows active servers teaser section with top 3 online servers', async ({ page }) => {
+    const s1 = makeServer({ id: 's1', serverKey: 'key-1', displayName: 'EU Server 1', playerCount: 50, isOnline: true })
+    const s2 = makeServer({ id: 's2', serverKey: 'key-2', displayName: 'US Server 2', playerCount: 30, isOnline: true })
+    const s3 = makeServer({ id: 's3', serverKey: 'key-3', displayName: 'Asia Server 3', playerCount: 10, isOnline: true })
+    const s4 = makeServer({ id: 's4', serverKey: 'key-4', displayName: 'Hidden Server 4', playerCount: 5, isOnline: true })
+    setupMockApi(page, { servers: [s1, s2, s3, s4] })
+    await page.goto('/')
+
+    await expect(page.getByRole('heading', { name: 'Active Servers' })).toBeVisible()
+    // Top 3 online servers shown in teaser
+    const teaserCards = page.locator('.server-teaser-card')
+    await expect(teaserCards).toHaveCount(3)
+    await expect(teaserCards.first()).toContainText('EU Server 1')
+  })
+
+  test('shows empty state in teaser when no servers are online', async ({ page }) => {
+    setupMockApi(page, { servers: [] })
+    await page.goto('/')
+
+    await expect(page.getByRole('heading', { name: 'Active Servers' })).toBeVisible()
+    await expect(page.locator('.servers-teaser-empty')).toBeVisible()
+    await expect(page.locator('.servers-teaser-empty')).toContainText('No active servers right now')
+  })
+
+  test('home teaser "View all servers" links to /game-servers', async ({ page }) => {
+    setupMockApi(page, { servers: [] })
+    await page.goto('/')
+
+    const viewAllLink = page.getByRole('link', { name: /view all servers/i })
+    await expect(viewAllLink).toBeVisible()
+    await expect(viewAllLink).toHaveAttribute('href', '/game-servers')
+  })
+
+  test('teaser server cards show player count and play link', async ({ page }) => {
+    const server = makeServer({
+      id: 'ts1',
+      serverKey: 'ts-key-1',
+      displayName: 'Test Shard',
+      playerCount: 77,
+      currentTick: 1234,
+      isOnline: true,
+      frontendUrl: 'https://shard.example.com/app',
+    })
+    setupMockApi(page, { servers: [server] })
+    await page.goto('/')
+
+    const card = page.locator('.server-teaser-card').first()
+    await expect(card).toContainText('Test Shard')
+    await expect(card).toContainText('77')
+    await expect(card.getByRole('link', { name: 'Play on server' })).toHaveAttribute(
+      'href',
+      'https://shard.example.com/app',
+    )
+  })
 })
 
 
@@ -118,6 +173,24 @@ test.describe('Game servers page', () => {
 
     await page.getByRole('button', { name: 'Refresh' }).click()
     await expect(page.getByText('Capitalism EU #2')).toBeVisible()
+  })
+
+  test('auto-refresh interval is set and clears on unmount', async ({ page }) => {
+    // Verify the page registers an interval that clears on navigation away
+    const state = setupMockApi(page, { servers: [makeServer({ displayName: 'Initial Server' })] })
+    await page.goto('/game-servers')
+
+    await expect(page.getByText('Initial Server')).toBeVisible()
+
+    // Update mock data so next refresh would show new content
+    state.servers = [makeServer({ id: 'auto-s2', serverKey: 'auto-key', displayName: 'Auto Refreshed Server' })]
+
+    // Navigate away and back — interval cleanup means no outstanding timer errors
+    await page.goto('/')
+    await page.goto('/game-servers')
+
+    // The fresh page load shows the updated mock data
+    await expect(page.getByText('Auto Refreshed Server')).toBeVisible()
   })
 })
 

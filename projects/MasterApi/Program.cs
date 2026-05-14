@@ -391,6 +391,7 @@ public class Program
         builder.Services.AddScoped<PasswordResetService>();
         builder.Services.AddScoped<IPasswordResetEmailSender, PasswordResetEmailSender>();
         builder.Services.AddHostedService<MasterRankingSchedulerHostedService>();
+        builder.Services.AddHostedService<GameServerEvictionHostedService>();
         builder.Services.AddMemoryCache();
         builder.Services.AddSingleton<ILoginThrottleService, LoginThrottleService>();
         builder.Services.AddSingleton<IPasswordResetThrottleService, PasswordResetThrottleService>();

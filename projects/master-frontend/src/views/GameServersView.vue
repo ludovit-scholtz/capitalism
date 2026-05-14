@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { fetchGameServers, type GameServerSummary } from '@/lib/masterApi'
 import { formatHeartbeatDistance } from '@/lib/time'
@@ -11,6 +11,8 @@ const { t } = useI18n()
 const servers = ref<GameServerSummary[]>([])
 const loading = ref(true)
 const errorMessage = ref('')
+
+const AUTO_REFRESH_MS = 30_000
 
 const onlineCount = computed(() => servers.value.filter((server) => server.isOnline).length)
 const navItems = computed(() => [
@@ -36,8 +38,27 @@ async function loadServers() {
   }
 }
 
+async function refreshServers() {
+  errorMessage.value = ''
+  try {
+    servers.value = await fetchGameServers()
+  } catch {
+    // Silently ignore background refresh errors
+  }
+}
+
+let refreshInterval: ReturnType<typeof setInterval> | null = null
+
 onMounted(() => {
   void loadServers()
+  refreshInterval = setInterval(() => void refreshServers(), AUTO_REFRESH_MS)
+})
+
+onUnmounted(() => {
+  if (refreshInterval !== null) {
+    clearInterval(refreshInterval)
+    refreshInterval = null
+  }
 })
 </script>
 
