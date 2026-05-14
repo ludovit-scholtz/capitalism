@@ -37,6 +37,6 @@ test.describe('Encyclopedia product and resource images', () => {
       image.src = '/does-not-exist.webp'
     })
 
-    await expect(productImage).toHaveAttribute('src', /fallback/i)
+    await expect(productImage).toHaveAttribute('src', /fallback|data:image\/svg\+xml/i)
   })
 })

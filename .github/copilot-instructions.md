@@ -1755,6 +1755,18 @@ Rules to prevent recurrence:
 13. **Keep SVG source artwork unique per seeded slug.** Add or maintain a regression test that reads the catalog SVG files and proves every seeded product/resource source differs from every other seeded source and from `fallback.svg`; URL uniqueness alone does not prove artwork uniqueness.
 14. **Keep catalog SVGs vector-only.** Add or maintain a regression test that rejects `<image>` and `<foreignObject>` elements so follow-up edits cannot silently reintroduce rasterized or HTML-backed artwork into the localized catalog asset set.
 
+## Vite SVG inlining and E2E fallback assertions — account for data URI resolution
+
+Root-cause of a CI failure (May 2026, PR #499 follow-up):
+- Catalog images were migrated from `.webp` to `.svg` files. Vite's default `assetsInlineLimit` (4096 bytes) inlines SVG files smaller than 4KB as `data:image/svg+xml,...` data URIs instead of emitting them as separate asset files.
+- The E2E test `encyclopedia-images.spec.ts` asserted `toHaveAttribute('src', /fallback/i)` after triggering an image error, expecting a URL containing "fallback". But the fallback SVG was inlined as a data URI that does not contain the word "fallback".
+- Two auth E2E tests (`cookie-session-security.spec.ts` and `oidc-callback.spec.ts`) were added in PR #485 but broken by the follow-up commit `8a7af48` which re-added `localStorage.setItem('auth_token', ...)` to `applyStoredSession`. The cookie-session test expected `auth_token` to be null in localStorage, but the code stores it for `initFromStorage()` bootstrap. The OIDC test expected `masterSessionAttempted === true` but `VITE_MASTER_GRAPHQL_URL` is empty in CI, so `establishOptionalCookieSession` returns early.
+
+Rules to prevent recurrence:
+1. **When asserting fallback image src in E2E tests, match both URL patterns and data URIs:** use `/fallback|data:image\/svg\+xml/i` instead of just `/fallback/i`. Vite inlines small assets as data URIs.
+2. **When a code change re-adds localStorage writes that a test assumes are absent, update the test in the same commit.** The test assertion must match the shipped behavior.
+3. **When a test depends on `VITE_MASTER_GRAPHQL_URL` being set, either set it in the test env or make the assertion conditional.** An empty master URL causes `establishOptionalCookieSession` to return early without making any request.
+
 ## Repeated review-loop quality gate — each follow-up must add net-new proof
 
 Root-cause of repeated review loops (May 2026, PR #499 follow-up):

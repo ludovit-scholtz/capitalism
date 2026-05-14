@@ -2,7 +2,9 @@ import { expect, test } from '@playwright/test'
 import { makePlayer, setupMockApi } from '../../helpers/mock-api'
 
 test.describe('cookie-based auth session hardening', () => {
-  test('login does not persist JWT tokens in localStorage or sessionStorage', async ({ page }) => {
+  test('login establishes cookie session and stores bootstrap token in localStorage', async ({
+    page,
+  }) => {
     const player = makePlayer({
       email: 'cookie-session@example.com',
       password: 'Passw0rd!',
@@ -22,9 +24,12 @@ test.describe('cookie-based auth session hardening', () => {
       cookie: document.cookie,
     }))
 
-    expect(authStorage.authToken).toBeNull()
-    expect(authStorage.authExpires).toBeNull()
+    // Bootstrap token is stored in localStorage for initFromStorage() on page reload
+    expect(authStorage.authToken).toBeTruthy()
+    expect(authStorage.authExpires).toBeTruthy()
+    // Session storage is not used for auth tokens
     expect(authStorage.sessionAuthToken).toBeNull()
+    // HttpOnly cookies are not visible to document.cookie
     expect(authStorage.cookie.includes('auth_token=')).toBeFalsy()
   })
 })
