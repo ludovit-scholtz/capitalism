@@ -35,6 +35,7 @@ export default {
     home: 'Domov',
     gameServers: 'Herné servery',
     ranking: 'Rebríček',
+    docs: 'Dokumentácia',
     supportDashboard: 'Podpora',
     gameAdminDashboard: 'Dashboard herného admina',
     bounties: 'Odmeny',
@@ -42,6 +43,7 @@ export default {
     tokenizedGold: 'Tokenizované zlato',
     gameSettings: 'Nastavenia hry',
     apiKeys: 'API kľúče',
+    account: 'Konto',
   },
   themeSwitcher: {
     switchToLight: 'Prepnúť na svetlý režim',
@@ -129,6 +131,22 @@ export default {
     heartbeat: 'Heartbeat',
     playOnServer: 'Hrať na serveri',
     unableToLoadServers: 'Nepodarilo sa načítať herné servery.',
+    featuresTitle: 'Prečo Capitalism?',
+    featuresSubtitle:
+      'Plne simulovaná trhová ekonomika, kde každá cena, každá mzda a každý obchod odráža skutočnú hernú aktivitu.',
+    feat1Title: 'Ekonomická simulácia',
+    feat1Desc:
+      'Ponuka a dopyt sa vypočítavajú každý tick z reálneho výstupu budov. Nastavte cenu konkurencieschopne alebo stratte trhový podiel.',
+    feat2Title: 'Burza cenných papierov',
+    feat2Desc:
+      'Kotujte svoju spoločnosť na burze, získajte akcionárov, vyplácajte dividendy a skúste nepriateľské prevzatie rivalov.',
+    feat3Title: 'Elektrická sieť',
+    feat3Desc:
+      'Stavajte elektrárne na uhlie, plyn, jadro, slnečnú a veternú energiu. Mestá s nedostatkom energie majú znížený výstup.',
+    feat4Title: 'Výskum a vývoj',
+    feat4Desc:
+      'Investujte do R&D jednotiek na odomknutie vyššej kvality produktov a efektivity výroby.',
+    learnMoreDocs: 'Prečítajte dokumentáciu →',
   },
   login: {
     signIn: 'Prihlásiť sa',
@@ -186,6 +204,13 @@ export default {
     balanceAfter: 'Zostatok po',
     note: 'Poznámka',
     dash: '-',
+    subscriptionKicker: 'Pro predplatné',
+    subscriptionTitle: 'Stav predplatného',
+    subscriptionUpgradeCopy:
+      'Prejdite na Pro a odomknite pokročilú analytiku, neobmedzené zakladanie spoločností a prioritný prístup na servery.',
+    subscriptionActiveCopy:
+      'Vaše Pro predplatné je aktívne. Predĺžte ho kedykoľvek, aby výhody zostali aktívne.',
+    subscriptionProlongLabel: 'Predĺžiť o',
   },
   gameSettings: {
     kicker: 'Identita naprieč servermi',
@@ -569,17 +594,17 @@ export default {
   },
   subscription: {
     tierPro: 'Pro',
-    tierFree: 'Free',
+    tierFree: 'Bezplatné',
     statusNoActive: 'Žiadne aktívne predplatné',
-    statusExpired: 'Expirované',
+    statusExpired: 'Vypršané',
     statusActive: 'Aktívne',
     statusInactive: 'Neaktívne',
-    expiresToday: 'Končí dnes',
-    expiresTomorrow: 'Končí zajtra',
-    expiresInDays: 'Končí o {days} dní',
+    expiresToday: 'Vyprší dnes',
+    expiresTomorrow: 'Vyprší zajtra',
+    expiresInDays: 'Vyprší o {days} dní',
     renewsOn: 'Obnoví sa {date}',
-    subscribeToPro: 'Predplatiť Pro',
-    extendSubscription: 'Predĺžiť predplatné',
+    subscribeToPro: 'Prejsť na Pro →',
+    extendSubscription: 'Predĺžiť',
     prolongSubscription: 'Predĺžiť predplatné',
   },
   apiKeys: {
@@ -683,5 +708,76 @@ export default {
     colSource: 'Zdroj',
     loadError:
       'Nepodarilo sa načítať dáta bezpečnostnej tabule. Súbor reportu nemusel byť ešte vygenerovaný.',
+  },
+  docs: {
+    kicker: 'Dokumentácia',
+    title: 'Herná dokumentácia',
+    subtitle: 'Naučte sa hrať Capitalism, pochopte ekonomiku a ovládnite budovy.',
+    topicsLabel: 'Témy',
+    topicGettingStarted: 'Začíname',
+    topicBuildingsGuide: 'Sprievodca budovami',
+    topicEconomyOverview: 'Prehľad ekonomiky',
+    gs: {
+      welcomeTitle: 'Vitajte v Capitalism',
+      welcomeBody:
+        'Capitalism je viachrá ekonomická strategická hra, kde budujete podniky, spravujete zásobovacie reťazce, obchodujete na skutočných trhoch a súťažíte o to, aby ste sa stali najbohatším magnátom.',
+      accountTitle: 'Vytvorenie účtu',
+      accountBody: 'Postupujte podľa týchto krokov a začnite hrať:',
+      step1: 'Zaregistrujte si bezplatný účet na hlavnom portáli.',
+      step2: 'Pripojte sa k aktívnemu hernému serveru zo zoznamu serverov.',
+      step3: 'Dokončite sprievodcu onboardingom a nastavte svoju prvú spoločnosť a závod.',
+      step4: 'Začnite vyrábať tovar a predávať na verejnom trhu.',
+      firstStepsTitle: 'Prvé kroky',
+      firstStepsBody: 'Po onboardingu budete mať závod vyrábajúci tovar. Tu sú tipy na rýchly rast:',
+      tip1: 'Skontrolujte trhovú cenu vášho produktu a nastavte konkurencieschopnú cenu.',
+      tip2: 'Vylepšujte jednotky závodov na zvýšenie výrobnej kapacity.',
+      tip3: 'Otvorte si bankový účet vo svojom meste na správu likvidity.',
+      tip4: 'Sledujte tick cyklus — ekonomika sa posúva každých niekoľko minút.',
+      proTitle: 'Pro predplatné',
+      proBody:
+        'Bezplatný účet vám dáva prístup ku všetkým základným funkciám. Upgrade na Pro odomkne pokročilú analytiku a neobmedzené zakladanie spoločností.',
+    },
+    bg: {
+      overviewTitle: 'Prehľad',
+      overviewBody:
+        'Budovy sú základom vašej ekonomickej ríše. Každá budova stojí na pozemku v meste a obsahuje mriežku 4×4 jednotiek.',
+      typesTitle: 'Typy budov',
+      mine: 'Baňa',
+      mineDesc: 'Ťaží suroviny z ložiska na pozemku.',
+      factory: 'Závod',
+      factoryDesc: 'Premieňa suroviny na hotové výrobky pomocou výrobných jednotiek.',
+      salesShop: 'Predajňa',
+      salesShopDesc: 'Predáva hotové výrobky priamo verejnosti.',
+      bank: 'Banka',
+      bankDesc: 'Prijíma vklady a poskytuje zabezpečené pôžičky spoločnostiam.',
+      powerPlant: 'Elektráreň',
+      powerPlantDesc: 'Generuje energiu pre mestskú sieť.',
+      mediaHouse: 'Mediálna agentúra',
+      mediaHouseDesc: 'Produkuje reklamu, ktorá zvyšuje povedomie o značke.',
+      unitsTitle: 'Jednotky budov',
+      unitsBody:
+        'Každá budova má mriežku 4×4 slotov pre jednotky. Jednotky možno prepojiť a vytvoriť výrobné reťazce.',
+      upgradeTitle: 'Vylepšovanie jednotiek',
+      upgradeBody:
+        'Jednotky možno vylepšiť na vyššiu úroveň, čím sa zvýši ich kapacita a efektivita. Vylepšenia trvajú niekoľko tickov.',
+    },
+    eo: {
+      introTitle: 'Ako funguje ekonomika',
+      introBody:
+        'Ekonomika Capitalism je plne simulovaný trh. Ponuka a dopyt sa vypočítavajú každý tick z reálneho výstupu budov a preferencií spotrebiteľov.',
+      tickTitle: 'Tick cyklus',
+      tickBody:
+        'Hra sa posúva v diskrétnych časových krokoch nazývaných tickmi. Každý tick motor spúšťa ťažbu, výrobu, predaj, výber daní a aktualizácie kurzov.',
+      supplyTitle: 'Ponuka a dopyt',
+      supplyBody:
+        'Dopyt spotrebiteľov závisí od populácie mesta, miezd, povedomia o značke a cenovej elasticity.',
+      currencyTitle: 'Mestské meny',
+      currencyBody:
+        'Každé mesto používa vlastnú menu. FX burza umožňuje výmenu mien za aktuálne kurzy.',
+      goldTitle: 'Tokenizované zlato',
+      goldBody: '1 zlatý token = 1 gram fyzického zlata. Zostatok je uložený na master serveri.',
+      stocksTitle: 'Burza cenných papierov',
+      stocksBody: 'Spoločnosti môžu kotovať akcie na burze. Hráči nakupujú a predávajú za limitné ceny.',
+    },
   },
 } as const

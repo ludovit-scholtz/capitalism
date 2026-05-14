@@ -113,6 +113,11 @@ const router = createRouter({
       name: 'security-board',
       component: () => import('@/views/SecurityBoardView.vue'),
     },
+    {
+      path: '/docs',
+      name: 'docs',
+      component: () => import('@/views/DocsView.vue'),
+    },
   ],
   scrollBehavior(to) {
     if (to.hash) {

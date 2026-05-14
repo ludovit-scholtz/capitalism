@@ -35,6 +35,7 @@ export default {
     home: 'Startseite',
     gameServers: 'Spielserver',
     ranking: 'Rangliste',
+    docs: 'Dokumentation',
     supportDashboard: 'Support-Dashboard',
     gameAdminDashboard: 'Game-Admin-Dashboard',
     bounties: 'Belohnungen',
@@ -42,6 +43,7 @@ export default {
     tokenizedGold: 'Tokenisiertes Gold',
     gameSettings: 'Spieleinstellungen',
     apiKeys: 'API-Schlüssel',
+    account: 'Konto',
   },
   themeSwitcher: {
     switchToLight: 'Zum hellen Modus wechseln',
@@ -130,6 +132,22 @@ export default {
     heartbeat: 'Heartbeat',
     playOnServer: 'Auf Server spielen',
     unableToLoadServers: 'Spielserver konnten nicht geladen werden.',
+    featuresTitle: 'Warum Capitalism?',
+    featuresSubtitle:
+      'Eine vollständig simulierte Marktwirtschaft, bei der jeder Preis, jeder Lohn und jeder Handel echte In-Game-Aktivität widerspiegelt.',
+    feat1Title: 'Wirtschaftssimulation',
+    feat1Desc:
+      'Angebot und Nachfrage werden jeden Tick aus realem Gebäudeoutput berechnet. Setze wettbewerbsfähige Preise oder verliere Marktanteile.',
+    feat2Title: 'Börse',
+    feat2Desc:
+      'Notiere dein Unternehmen an der Börse, gewinne Aktionäre, zahle Dividenden und versuche feindliche Übernahmen.',
+    feat3Title: 'Stromnetz',
+    feat3Desc:
+      'Baue Kohle-, Gas-, Kern-, Solar- und Windkraftwerke. Städte mit Energiemangel haben reduzierten Output.',
+    feat4Title: 'Forschung & Entwicklung',
+    feat4Desc:
+      'Investiere in F&E-Einheiten, um überlegene Produktqualität und Produktionseffizienz freizuschalten.',
+    learnMoreDocs: 'Dokumentation lesen →',
   },
   login: {
     signIn: 'Anmelden',
@@ -189,6 +207,13 @@ export default {
     balanceAfter: 'Kontostand danach',
     note: 'Notiz',
     dash: '-',
+    subscriptionKicker: 'Pro-Abonnement',
+    subscriptionTitle: 'Abonnementstatus',
+    subscriptionUpgradeCopy:
+      'Wechseln Sie zu Pro, um erweiterte Analysen, unbegrenzte Unternehmenskreation und bevorzugten Serverzugang freizuschalten.',
+    subscriptionActiveCopy:
+      'Ihr Pro-Abonnement ist aktiv. Verlängern Sie es jederzeit, damit Ihre Vorteile erhalten bleiben.',
+    subscriptionProlongLabel: 'Verlängern um',
   },
   gameSettings: {
     kicker: 'Serverübergreifende Identität',
@@ -578,7 +603,7 @@ export default {
   },
   subscription: {
     tierPro: 'Pro',
-    tierFree: 'Free',
+    tierFree: 'Kostenlos',
     statusNoActive: 'Kein aktives Abonnement',
     statusExpired: 'Abgelaufen',
     statusActive: 'Aktiv',
@@ -587,8 +612,8 @@ export default {
     expiresTomorrow: 'Läuft morgen ab',
     expiresInDays: 'Läuft in {days} Tagen ab',
     renewsOn: 'Verlängert am {date}',
-    subscribeToPro: 'Pro abonnieren',
-    extendSubscription: 'Abonnement verlängern',
+    subscribeToPro: 'Auf Pro upgraden →',
+    extendSubscription: 'Verlängern',
     prolongSubscription: 'Abonnement verlängern',
   },
   apiKeys: {
@@ -696,5 +721,76 @@ export default {
     colSource: 'Quelle',
     loadError:
       'Sicherheitstafel-Daten konnten nicht geladen werden. Die Berichtsdatei wurde möglicherweise noch nicht generiert.',
+  },
+  docs: {
+    kicker: 'Dokumentation',
+    title: 'Spiel-Dokumentation',
+    subtitle: 'Lerne Capitalism zu spielen, verstehe die Wirtschaft und meistere Gebäude.',
+    topicsLabel: 'Themen',
+    topicGettingStarted: 'Erste Schritte',
+    topicBuildingsGuide: 'Gebäudeguide',
+    topicEconomyOverview: 'Wirtschaftsüberblick',
+    gs: {
+      welcomeTitle: 'Willkommen bei Capitalism',
+      welcomeBody:
+        'Capitalism ist ein Multiplayer-Wirtschaftsstrategiespiel, in dem du Unternehmen aufbaust, Lieferketten verwaltest und auf echten Märkten handelst.',
+      accountTitle: 'Konto erstellen',
+      accountBody: 'Folge diesen Schritten, um zu spielen:',
+      step1: 'Registriere ein kostenloses Konto im Master-Portal.',
+      step2: 'Tritt einem aktiven Spielserver aus der Serverliste bei.',
+      step3: 'Schließe den Onboarding-Assistenten ab und richte dein erstes Unternehmen ein.',
+      step4: 'Beginne mit der Produktion von Waren und verkaufe sie auf dem öffentlichen Markt.',
+      firstStepsTitle: 'Erste Schritte',
+      firstStepsBody: 'Nach dem Onboarding hast du eine Fabrik. Hier sind Tipps zum schnellen Wachstum:',
+      tip1: 'Prüfe den Marktpreis deines Produkts und setze einen wettbewerbsfähigen Preis.',
+      tip2: 'Verbessere Fabrikeinheiten, um die Produktionskapazität zu erhöhen.',
+      tip3: 'Eröffne ein Bankkonto in deiner Stadt, um die Liquidität zu verwalten.',
+      tip4: 'Überwache den Tick-Zyklus — die Wirtschaft schreitet alle paar Minuten voran.',
+      proTitle: 'Pro-Abonnement',
+      proBody:
+        'Ein kostenloses Konto bietet Zugriff auf alle Kernfunktionen. Das Upgrade auf Pro schaltet erweiterte Analysen und unbegrenzte Unternehmensgründungen frei.',
+    },
+    bg: {
+      overviewTitle: 'Übersicht',
+      overviewBody:
+        'Gebäude sind die Grundlage deines Wirtschaftsimperiums. Jedes Gebäude steht auf einem Grundstück in einer Stadt.',
+      typesTitle: 'Gebäudetypen',
+      mine: 'Mine',
+      mineDesc: 'Fördert Rohstoffe aus einem Ressourcenvorkommen auf dem Grundstück.',
+      factory: 'Fabrik',
+      factoryDesc: 'Verwandelt Rohstoffe mit Fertigungseinheiten in Fertigwaren.',
+      salesShop: 'Verkaufsgeschäft',
+      salesShopDesc: 'Verkauft Fertigwaren direkt an die Öffentlichkeit.',
+      bank: 'Bank',
+      bankDesc: 'Nimmt Einlagen an und vergibt besicherte Kredite an Unternehmen.',
+      powerPlant: 'Kraftwerk',
+      powerPlantDesc: 'Erzeugt Energie für das städtische Netz.',
+      mediaHouse: 'Medienhaus',
+      mediaHouseDesc: 'Produziert Werbung, die die Markenbekanntheit steigert.',
+      unitsTitle: 'Gebäudeeinheiten',
+      unitsBody:
+        'Jedes Gebäude hat ein 4×4-Raster von Einheitenslots. Einheiten können verknüpft werden, um Produktionsketten zu bilden.',
+      upgradeTitle: 'Einheiten verbessern',
+      upgradeBody:
+        'Einheiten können auf höhere Ebenen verbessert werden, um Kapazität und Effizienz zu steigern. Verbesserungen dauern mehrere Ticks.',
+    },
+    eo: {
+      introTitle: 'Wie die Wirtschaft funktioniert',
+      introBody:
+        'Die Capitalism-Wirtschaft ist ein vollständig simulierter Markt. Angebot und Nachfrage werden jeden Tick berechnet.',
+      tickTitle: 'Der Tick-Zyklus',
+      tickBody:
+        'Das Spiel schreitet in diskreten Zeitschritten, sogenannten Ticks, voran. Jeder Tick läuft: Bergbau, Fertigung, Verkauf, Steuererhebung und FX-Kurs-Updates.',
+      supplyTitle: 'Angebot und Nachfrage',
+      supplyBody:
+        'Die Verbrauchernachfrage hängt von der Stadtbevölkerung, Gehältern, Markenbekanntheit und Preiselastizität ab.',
+      currencyTitle: 'Stadtwährungen',
+      currencyBody:
+        'Jede Stadt verwendet ihre eigene Währung. Die FX-Börse ermöglicht den Tausch zu aktuellen Kursen.',
+      goldTitle: 'Tokenisiertes Gold',
+      goldBody: '1 Gold-Token = 1 Gramm physisches Gold. Der Saldo wird auf dem Master-Server gespeichert.',
+      stocksTitle: 'Börse',
+      stocksBody: 'Unternehmen können Aktien an der Börse notieren. Spieler kaufen und verkaufen zu Limitpreisen.',
+    },
   },
 } as const

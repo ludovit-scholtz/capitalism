@@ -4,6 +4,10 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 ## Active issues to work on
 
+### Master Website & Multiple Game Server Hub
+
+- [x] (100%) Master Website & Multiple Game Server Hub is live: the master portal at `projects/master-frontend` markets the game with a hero section and feature highlights (Economic Simulation, Stock Exchange, Power Grid, R&D), lists active game servers with player counts and tick numbers, shows authenticated players their Pro subscription status with tier badge and expiry date, provides a Pro Renew/Upgrade flow, displays gold token balance with transaction history, and includes a full three-topic Documentation section (Getting Started, Buildings Guide, Economy Overview). All strings use i18n keys in English, Slovak, and German. E2E tests cover the docs view topic switching, feature highlights rendering, subscription panel (Free tier upgrade prompt, Active Pro badge/expiry), and nav link presence.
+
 ### City view
 
 - [x] (100%) Redisign the city view to tab page layout. Make sure the tabs are in the routing /city/:cityId/:tab

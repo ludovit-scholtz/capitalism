@@ -19,7 +19,28 @@ test.describe('Home page', () => {
     await page.goto('/')
     await expect(page.locator('.state-error').first()).toBeVisible()
   })
+
+  test('shows feature highlights section with four cards', async ({ page }) => {
+    setupMockApi(page, { servers: [] })
+    await page.goto('/')
+
+    await expect(page.getByRole('heading', { name: 'Why Capitalism?' })).toBeVisible()
+    await expect(page.locator('.feature-card')).toHaveCount(4)
+    await expect(page.getByRole('heading', { name: 'Economic Simulation' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Stock Exchange' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Power Grid' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Research & Development' })).toBeVisible()
+  })
+
+  test('shows learn more docs link in feature highlights', async ({ page }) => {
+    setupMockApi(page, { servers: [] })
+    await page.goto('/')
+
+    const docsLink = page.getByRole('link', { name: /docs/i }).last()
+    await expect(docsLink).toBeVisible()
+  })
 })
+
 
 test.describe('Game servers page', () => {
   test('shows empty state when no server is registered', async ({ page }) => {
