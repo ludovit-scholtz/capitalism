@@ -130,4 +130,16 @@ describe('productImages mapping', () => {
       expect(source).not.toMatch(/<title[\\s>]/i)
     }
   })
+
+  it('keeps the catalog asset directory SVG-only with one mapped asset plus fallback', () => {
+    const files = readdirSync(assetDir)
+    const svgFiles = files.filter((file) => file.endsWith('.svg')).sort()
+    const legacyWebpFiles = files.filter((file) => file.endsWith('.webp'))
+    const expectedSvgFiles = [...RESOURCE_IMAGE_SLUGS, ...PRODUCT_IMAGE_SLUGS, 'fallback']
+      .map((slug) => `${slug}.svg`)
+      .sort()
+
+    expect(legacyWebpFiles).toEqual([])
+    expect(svgFiles).toEqual(expectedSvgFiles)
+  })
 })
