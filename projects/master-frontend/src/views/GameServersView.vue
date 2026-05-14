@@ -42,8 +42,9 @@ async function refreshServers() {
   errorMessage.value = ''
   try {
     servers.value = await fetchGameServers()
-  } catch {
-    // Silently ignore background refresh errors
+  } catch (err) {
+    // Silently ignore background refresh errors to preserve last good state
+    console.debug('[GameServersView] Auto-refresh failed:', err)
   }
 }
 

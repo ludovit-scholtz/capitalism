@@ -14,9 +14,30 @@ public sealed class GameServerEvictionHostedService(
     IOptions<MasterServerOptions> options,
     ILogger<GameServerEvictionHostedService> logger) : BackgroundService
 {
+    /// <summary>
+    /// The eviction check runs at half the active-threshold interval,
+    /// but no faster than this many seconds.
+    /// </summary>
+    private const int MinimumEvictionIntervalSeconds = 30;
+
+    /// <summary>
+    /// Divisor applied to <see cref="MasterServerOptions.ActiveThresholdSeconds"/>
+    /// to derive the check interval (check twice per threshold window).
+    /// </summary>
+    private const int EvictionIntervalDivisor = 2;
+
+    /// <summary>
+    /// Safety lower-bound on the <see cref="MasterServerOptions.ActiveThresholdSeconds"/>
+    /// value used for cutoff calculation, preventing negative or zero cutoffs on
+    /// misconfigured instances.
+    /// </summary>
+    private const int MinimumThresholdSeconds = 5;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var evictionIntervalSeconds = Math.Max(30, options.Value.ActiveThresholdSeconds / 2);
+        var evictionIntervalSeconds = Math.Max(
+            MinimumEvictionIntervalSeconds,
+            options.Value.ActiveThresholdSeconds / EvictionIntervalDivisor);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -35,7 +56,8 @@ public sealed class GameServerEvictionHostedService(
 
     private async Task EvictStaleServersAsync(CancellationToken cancellationToken)
     {
-        var cutoff = DateTime.UtcNow.AddSeconds(-Math.Max(5, options.Value.ActiveThresholdSeconds));
+        var cutoff = DateTime.UtcNow.AddSeconds(
+            -Math.Max(MinimumThresholdSeconds, options.Value.ActiveThresholdSeconds));
 
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MasterDbContext>();

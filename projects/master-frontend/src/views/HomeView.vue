@@ -61,8 +61,9 @@ onMounted(() => {
     .then((data) => {
       servers.value = data
     })
-    .catch(() => {
-      // Teaser section silently skips if servers can't load
+    .catch((err) => {
+      // Teaser section silently skips if servers can't load — non-critical widget
+      console.debug('[HomeView] Active Servers teaser failed to load:', err)
     })
 })
 </script>
