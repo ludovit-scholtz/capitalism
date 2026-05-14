@@ -1,34 +1,32 @@
 import { expect, test, type Page } from '@playwright/test'
-import { makePlayer, setupMockApi } from '../.../../helpers/mock-api.js'
+import { makePlayer, setupMockApi } from '../../helpers/mock-api.js'
 import path from 'node:path'
-import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { SCREENSHOT_LOCALES, openLocalizedScreenshotPage, saveLocalizedScreenshot, type ScreenshotLocale } from '../helpers/localized-screenshot.js'
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url))
-const PUBLIC_OUTPUT_DIR = path.resolve(currentDir, '../public/sales-shop-help')
-const DOCS_OUTPUT_DIR = path.resolve(currentDir, '../docs/screenshots/encyclopedia-help')
+const PUBLIC_OUTPUT_DIR = path.resolve(currentDir, '../../../public/sales-shop-help')
+const DOCS_OUTPUT_DIR = path.resolve(currentDir, '../../../docs/screenshots/encyclopedia-help')
 
-function imagePaths(fileName: string) {
-  return {
-    publicPath: path.join(PUBLIC_OUTPUT_DIR, fileName),
-    docsPath: path.join(DOCS_OUTPUT_DIR, fileName),
-  }
+async function saveScreenshot(page: Page, locale: ScreenshotLocale, fileName: string) {
+  await saveLocalizedScreenshot(page, locale, fileName, PUBLIC_OUTPUT_DIR, [DOCS_OUTPUT_DIR], [PUBLIC_OUTPUT_DIR, DOCS_OUTPUT_DIR])
 }
 
-async function saveScreenshot(page: Page, fileName: string) {
-  const { publicPath, docsPath } = imagePaths(fileName)
-  await page.screenshot({ path: publicPath })
-  fs.copyFileSync(publicPath, docsPath)
-  expect(fs.existsSync(publicPath)).toBeTruthy()
-  expect(fs.existsSync(docsPath)).toBeTruthy()
+async function dismissTutorialTooltipIfPresent(page: Page) {
+  const dismissButton = page.getByRole('button', { name: /got it|rozumiem|verstanden/i }).first()
+  const visible = await dismissButton.isVisible().catch(() => false)
+  if (!visible) {
+    return
+  }
+
+  await dismissButton.click({ timeout: 2000 })
+  await dismissButton.waitFor({ state: 'hidden', timeout: 1000 }).catch(() => {})
 }
 
 test.describe('Sales shop help screenshots', () => {
-  test('captures real FullHD walkthrough screenshots for buy-building and shop units', async ({ page }) => {
-    fs.mkdirSync(PUBLIC_OUTPUT_DIR, { recursive: true })
-    fs.mkdirSync(DOCS_OUTPUT_DIR, { recursive: true })
-
-    const player = makePlayer({
+  for (const locale of SCREENSHOT_LOCALES) {
+    test(`captures real FullHD walkthrough screenshots for buy-building and shop units (${locale})`, async ({ page }) => {
+      const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
       companies: [
         {
@@ -107,38 +105,44 @@ test.describe('Sales shop help screenshots', () => {
       ],
     })
 
-    const state = setupMockApi(page, { players: [player] })
-    state.currentUserId = player.id
-    state.currentToken = `token-${player.id}`
+      const localizedPage = await openLocalizedScreenshotPage(page.context(), locale)
 
-    await page.addInitScript((token) => {
-      localStorage.setItem('auth_token', token)
-      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
-    }, `token-${player.id}`)
+      try {
+        const state = setupMockApi(localizedPage, { players: [player] })
+        state.currentUserId = player.id
+        state.currentToken = `token-${player.id}`
 
-    await page.setViewportSize({ width: 1920, height: 1080 })
+        await localizedPage.addInitScript((token) => {
+          localStorage.setItem('auth_token', token)
+          localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+        }, `token-${player.id}`)
 
-    await page.goto('/buy-building/company-shop-docs?type=SALES_SHOP')
-    await expect(page.getByRole('heading', { name: /buy building|kúpiť budovu|gebäude kaufen/i })).toBeVisible()
-    await saveScreenshot(page, 'step-1-buy-sales-shop-1920x1080.png')
+        await localizedPage.goto('/buy-building/company-shop-docs?type=SALES_SHOP')
+        await expect(localizedPage.locator('.lot-card, .lot-list-item').first()).toBeVisible()
+        await saveScreenshot(localizedPage, locale, 'step-1-buy-sales-shop-1920x1080.png')
 
-    await page.goto('/building/building-shop-docs')
-    await expect(page.getByRole('heading', { name: 'Retail Docs Shop' })).toBeVisible()
-    await page.getByRole('button', { name: 'Edit Building' }).click()
-    await expect(page.getByRole('heading', { name: 'Planned Upgrade' })).toBeVisible()
+        await localizedPage.goto('/building/building-shop-docs')
+        await expect(localizedPage.getByRole('heading', { name: 'Retail Docs Shop' })).toBeVisible()
+        await localizedPage.getByRole('button', { name: /Edit Building|Upraviť budovu|Gebäude bearbeiten/i }).click()
+        await expect(localizedPage.getByRole('heading', { name: /Planned Upgrade|Plánovaný upgrade|Geplanter Ausbau/i })).toBeVisible()
+        await dismissTutorialTooltipIfPresent(localizedPage)
 
-    const plannedSection = page
-      .locator('.grid-section')
-      .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
-      .first()
+        const plannedSection = localizedPage
+          .locator('.grid-section')
+          .filter({ has: localizedPage.getByRole('heading', { name: /Planned Upgrade|Plánovaný upgrade|Geplanter Ausbau/i }) })
+          .first()
 
-    await plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
-    await saveScreenshot(page, 'step-2-purchase-unit-1920x1080.png')
+        await plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+        await saveScreenshot(localizedPage, locale, 'step-2-purchase-unit-1920x1080.png')
 
-    await plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1).click()
-    await saveScreenshot(page, 'step-3-public-sales-unit-1920x1080.png')
+        await plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1).click()
+        await saveScreenshot(localizedPage, locale, 'step-3-public-sales-unit-1920x1080.png')
 
-    await plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(2).click()
-    await saveScreenshot(page, 'step-4-marketing-unit-1920x1080.png')
-  })
+        await plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(2).click()
+        await saveScreenshot(localizedPage, locale, 'step-4-marketing-unit-1920x1080.png')
+      } finally {
+        await localizedPage.close()
+      }
+    })
+  }
 })

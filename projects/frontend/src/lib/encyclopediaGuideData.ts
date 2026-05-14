@@ -1,3 +1,19 @@
+export type GuideImageLocale = 'en' | 'sk' | 'de'
+
+function normalizeGuideImageLocale(locale: string): GuideImageLocale {
+  return locale === 'sk' || locale === 'de' ? locale : 'en'
+}
+
+export function localizeGuideImageUrl(imageUrl: string, locale: string): string {
+  const pathSegments = imageUrl.split('/').filter(Boolean)
+  if (pathSegments.length < 2) {
+    return imageUrl
+  }
+
+  const [topicFolder, ...fileSegments] = pathSegments
+  return `/${topicFolder}/${normalizeGuideImageLocale(locale)}/${fileSegments.join('/')}`
+}
+
 export const onboardingGuideCards = [
   {
     titleKey: 'encyclopedia.onboardingGuideStep1Title',
