@@ -1,7 +1,9 @@
 <template>
   <tr class="listing-row" :class="{ 'listing-row--expanded': expanded }">
     <td class="company-cell">
-      <span class="company-name">{{ listing.companyName }}</span>
+      <RouterLink class="company-name company-name-link" :to="{ name: 'stock-trade', params: { companyId: listing.companyId } }">
+        {{ listing.companyName }}
+      </RouterLink>
       <span class="company-meta">{{ formatCompanyMeta(listing.primaryCityName, listing.primaryIndustry) }}</span>
       <span v-if="listing.canClaimControl && !isControlledCompany" class="listing-chip listing-chip--control">{{ t('stockExchange.controlReady') }}</span>
       <span v-if="listing.canMerge" class="listing-chip listing-chip--merge">{{ t('stockExchange.mergeReady') }}</span>
@@ -31,6 +33,9 @@
       <span class="dividend-badge">{{ formatPercent(listing.dividendPayoutRatio) }}</span>
     </td>
     <td v-if="showActions" class="actions-cell">
+      <RouterLink class="btn btn-ghost btn-sm" :to="{ name: 'stock-trade', params: { companyId: listing.companyId } }">
+        {{ t('stockExchange.tradeDeskLink') }}
+      </RouterLink>
       <button class="btn btn-primary btn-sm" :class="{ 'btn-active': expanded }" @click="emit('toggle-trade-panel')">
         {{ expanded ? t('stockExchange.closeTrade') : t('stockExchange.openTrade') }}
       </button>
@@ -578,6 +583,16 @@ function buildDonuts(slices: PieSlice[], cx: number, cy: number, r: number, inne
 
 .company-name {
   font-weight: 600;
+}
+
+.company-name-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.company-name-link:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
 }
 
 .company-meta {

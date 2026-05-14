@@ -3224,7 +3224,7 @@ test.describe('Personal Ledger view', () => {
     state.currentToken = `token-${player.id}`
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
-    await page.goto('/stocks')
+    await page.goto('/stock/trade/company-order-rival')
 
     await expect(page.getByRole('heading', { name: 'Limit-order book' })).toBeVisible()
     await page.getByLabel('Limit price').fill('12.5')
@@ -3281,11 +3281,140 @@ test.describe('Personal Ledger view', () => {
     state.currentToken = `token-${player.id}`
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
-    await page.goto('/stocks')
+    await page.goto('/stock/trade/company-cancel-rival')
 
     await expect(page.locator('.open-orders-list')).toContainText('Cancel Rival')
     await page.getByRole('button', { name: 'Cancel' }).first().click()
     await expect(page.getByText('Limit order cancelled.')).toBeVisible()
     await expect(page.getByText('No open limit orders.')).toBeVisible()
+  })
+
+  test('trade desk route renders company trading panels', async ({ page }) => {
+    const player = makePlayer({
+      personalCash: 120_000,
+      companies: [makeControlledCompany()],
+    })
+    const rival = makePlayer({
+      id: 'player-trade-desk',
+      email: 'trade-desk@test.com',
+      displayName: 'Trade Desk Rival',
+      companies: [
+        {
+          id: 'company-trade-desk',
+          playerId: 'player-trade-desk',
+          name: 'Trade Desk Corp',
+          cash: 300_000,
+          totalSharesIssued: 10_000,
+          dividendPayoutRatio: 0.2,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          foundedAtTick: 1,
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player, rival] })
+    seedPersonalUsdSettlementAccount(state, player, 80_000)
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/stock/trade/company-trade-desk')
+
+    await expect(page.getByRole('heading', { name: 'Trade Desk Corp' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Limit-order book' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Order book depth' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Your position' })).toBeVisible()
+  })
+
+  test('stocks table trade desk link opens company route', async ({ page }) => {
+    const player = makePlayer({
+      personalCash: 120_000,
+      companies: [makeControlledCompany()],
+    })
+    const rival = makePlayer({
+      id: 'player-trade-link',
+      email: 'trade-link@test.com',
+      displayName: 'Link Rival',
+      companies: [
+        {
+          id: 'company-trade-link',
+          playerId: 'player-trade-link',
+          name: 'Link Rival Corp',
+          cash: 300_000,
+          totalSharesIssued: 10_000,
+          dividendPayoutRatio: 0.2,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          foundedAtTick: 1,
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player, rival] })
+    seedPersonalUsdSettlementAccount(state, player, 80_000)
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/stocks')
+
+    const row = page.locator('tr.listing-row', { hasText: 'Link Rival Corp' })
+    await row.getByRole('link', { name: 'Trade desk' }).click()
+
+    await expect(page).toHaveURL('/stock/trade/company-trade-link')
+    await expect(page.getByRole('heading', { name: 'Link Rival Corp' })).toBeVisible()
+  })
+
+  test('trade desk shows graceful error for invalid company route', async ({ page }) => {
+    const player = makePlayer({
+      personalCash: 120_000,
+      companies: [makeControlledCompany()],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    seedPersonalUsdSettlementAccount(state, player, 80_000)
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/stock/trade/does-not-exist')
+
+    await expect(page.getByRole('heading', { name: 'Company not found' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Back to stock listings' })).toBeVisible()
+  })
+
+  test('trade desk stacks key panels on mobile viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
+    const player = makePlayer({
+      personalCash: 120_000,
+      companies: [makeControlledCompany()],
+    })
+    const rival = makePlayer({
+      id: 'player-trade-mobile',
+      email: 'trade-mobile@test.com',
+      displayName: 'Mobile Rival',
+      companies: [
+        {
+          id: 'company-trade-mobile',
+          playerId: 'player-trade-mobile',
+          name: 'Mobile Rival Corp',
+          cash: 300_000,
+          totalSharesIssued: 10_000,
+          dividendPayoutRatio: 0.2,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          foundedAtTick: 1,
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player, rival] })
+    seedPersonalUsdSettlementAccount(state, player, 80_000)
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/stock/trade/company-trade-mobile')
+
+    await expect(page.getByRole('heading', { name: 'Order book depth' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Execute trade' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Your position' })).toBeVisible()
   })
 })
