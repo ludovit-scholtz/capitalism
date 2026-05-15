@@ -42,7 +42,7 @@ auth.initFromStorage()
 const masterPortalUrl = import.meta.env.VITE_MASTER_WEB_URL || 'http://localhost:5174'
 
 const hasAuthenticatedSession = computed(() => auth.isAuthenticated || !!auth.player)
-const activeReferralCode = computed(() => auth.player?.appliedReferralCode ?? referralStore.pendingCode)
+const activeReferralCode = computed(() => (hasAuthenticatedSession.value ? null : referralStore.pendingCode))
 
 const PERSONAL_STARTING_CASH = 200_000
 const FOUNDER_CONTRIBUTION = 200_000

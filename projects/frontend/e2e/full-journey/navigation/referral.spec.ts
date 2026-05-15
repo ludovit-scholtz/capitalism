@@ -75,10 +75,21 @@ test.describe('Referral code detection', () => {
     await expect(page.locator('.referral-banner')).toBeHidden()
   })
 
-  test('shows referral discount banner during onboarding for referred players', async ({ page }) => {
+  test('shows referral discount banner during onboarding before login when pending code is present', async ({ page }) => {
+    setupMockApi(page, {})
+    await page.addInitScript(() => {
+      localStorage.setItem('pending_referral_code', 'FRIEND10')
+    })
+    await page.goto('/onboarding')
+    await expect(page.locator('.referral-onboarding-banner')).toBeVisible()
+    await expect(page.locator('.referral-onboarding-banner')).toContainText('FRIEND10')
+    await expect(page.locator('.referral-onboarding-banner')).toContainText('10%')
+  })
+
+  test('does not show referral onboarding banner after authenticated login', async ({ page }) => {
     const player = makePlayer({
-      id: 'player-ref-onboarding',
-      email: 'referred@example.com',
+      id: 'player-ref-onboarding-authenticated',
+      email: 'referred-authenticated@example.com',
       onboardingCompletedAtUtc: null,
       appliedReferralCode: 'FRIEND10',
     })
@@ -88,12 +99,11 @@ test.describe('Referral code detection', () => {
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('pending_referral_code', 'FRIEND10')
     }, `token-${player.id}`)
 
     await page.goto('/onboarding')
-    await expect(page.locator('.referral-onboarding-banner')).toBeVisible()
-    await expect(page.locator('.referral-onboarding-banner')).toContainText('FRIEND10')
-    await expect(page.locator('.referral-onboarding-banner')).toContainText('10%')
+    await expect(page.locator('.referral-onboarding-banner')).toBeHidden()
   })
 
   test('does not show referral login banner when player is already authenticated', async ({ page }) => {
