@@ -14,8 +14,9 @@ import { useGameAdminStore } from '@/stores/gameAdmin'
 import { useChatStore } from '@/stores/chat'
 import { useReferralStore } from '@/stores/referral'
 import { useEndgameStatus } from '@/composables/useEndgameStatus'
+import { resolveNotificationCopy } from '@/lib/notificationText'
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 const { isOffline, updateAvailable, acceptUpdate } = usePwa()
 const auth = useAuthStore()
 const gameStateStore = useGameStateStore()
@@ -89,10 +90,12 @@ async function maybeShowCityUnlockToast() {
       return
     }
 
+    const localizedCopy = resolveNotificationCopy(notification, t, te)
+
     showCityUnlockToast({
       id: notification.id,
-      title: notification.title,
-      message: notification.message,
+      title: localizedCopy.title,
+      message: localizedCopy.message,
     })
   } catch {
     // best effort

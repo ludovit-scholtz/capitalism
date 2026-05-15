@@ -8,68 +8,10 @@ import './assets/styles/main.css'
 
 // Font Awesome
 import { library } from '@fortawesome/fontawesome-svg-core'
-import {
-  faBars,
-  faBookOpen,
-  faChartBar,
-  faGlobe,
-  faHome,
-  faLandmark,
-  faNewspaper,
-  faShieldHalved,
-  faSignInAlt,
-  faSignOutAlt,
-  faTachometerAlt,
-  faTrophy,
-  faCoins,
-  faWallet,
-  faComments,
-  faBullhorn,
-  faBell,
-  faFileInvoiceDollar,
-  faStore,
-  faRoute,
-  faGraduationCap,
-  faXmark,
-  faFloppyDisk,
-  faLock,
-  faSkull,
-  faTriangleExclamation,
-  faChartLine,
-  faChartPie,
-} from '@fortawesome/free-solid-svg-icons'
+import { frontendSolidIcons } from '@/lib/fontAwesomeIcons'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
-library.add(
-  faHome,
-  faTachometerAlt,
-  faTrophy,
-  faGlobe,
-  faCoins,
-  faBookOpen,
-  faSignInAlt,
-  faSignOutAlt,
-  faBars,
-  faChartBar,
-  faLandmark,
-  faWallet,
-  faNewspaper,
-  faShieldHalved,
-  faComments,
-  faBullhorn,
-  faBell,
-  faFileInvoiceDollar,
-  faStore,
-  faRoute,
-  faGraduationCap,
-  faXmark,
-  faFloppyDisk,
-  faLock,
-  faSkull,
-  faTriangleExclamation,
-  faChartLine,
-  faChartPie,
-)
+library.add(...frontendSolidIcons)
 
 export function createApp() {
   const app = createVueApp(App)

@@ -80,7 +80,7 @@ watch(
               :aria-label="t('chat.closeChat')"
               @click="chatStore.closeChat()"
             >
-              <font-awesome-icon :icon="['fas', 'times']" />
+              <font-awesome-icon :icon="['fas', 'xmark']" />
             </button>
           </div>
           <h2 class="panel-title">{{ t('chat.title') }}</h2>

@@ -47,8 +47,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
                 }
               }
             }
-          }
-        }`,
+          }`,
           { first: limit, onlyUnread: false },
         ),
         gqlRequest<{ notificationCount: number }>(
