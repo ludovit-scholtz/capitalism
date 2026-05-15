@@ -55,31 +55,17 @@ watch(
   <Teleport to="body">
     <!-- Backdrop (mobile only) -->
     <Transition name="backdrop">
-      <div
-        v-if="chatStore.isChatOpen"
-        class="chat-backdrop"
-        aria-hidden="true"
-        @click="chatStore.closeChat()"
-      />
+      <div v-if="chatStore.isChatOpen" class="chat-backdrop" aria-hidden="true" @click="chatStore.closeChat()" />
     </Transition>
 
     <!-- Side panel -->
     <Transition name="slide">
-      <aside
-        v-if="chatStore.isChatOpen"
-        class="chat-side-panel"
-        role="complementary"
-        :aria-label="t('chat.title')"
-      >
+      <aside v-if="chatStore.isChatOpen" class="chat-side-panel" role="complementary" :aria-label="t('chat.title')">
         <!-- Panel header -->
         <div class="panel-header">
           <div class="panel-title-row">
             <span class="panel-eyebrow">{{ t('chat.eyebrow') }}</span>
-            <button
-              class="close-btn"
-              :aria-label="t('chat.closeChat')"
-              @click="chatStore.closeChat()"
-            >
+            <button class="close-btn" :aria-label="t('chat.closeChat')" @click="chatStore.closeChat()">
               <font-awesome-icon :icon="['fas', 'xmark']" />
             </button>
           </div>
@@ -88,13 +74,7 @@ watch(
             {{ activeChannel === 'CITY' ? t('chat.cityRoom', { city: activeCityName ?? t('chat.thisCity') }) : t('chat.sharedRoom') }}
           </span>
           <div class="chat-channel-tabs mt-3" role="tablist" :aria-label="t('chat.channels')">
-            <button
-              class="chat-channel-tab"
-              :class="{ 'chat-channel-tab-active': activeChannel === 'GLOBAL' }"
-              role="tab"
-              :aria-selected="activeChannel === 'GLOBAL'"
-              @click="selectGlobalChannel"
-            >
+            <button class="chat-channel-tab" :class="{ 'chat-channel-tab-active': activeChannel === 'GLOBAL' }" role="tab" :aria-selected="activeChannel === 'GLOBAL'" @click="selectGlobalChannel">
               {{ t('chat.globalTab') }}
             </button>
             <button
@@ -118,21 +98,17 @@ watch(
             {{ t('chat.empty') }}
           </div>
           <div v-else class="chat-log" role="log" aria-live="polite">
-            <article
-              v-for="message in messages"
-                :key="message.id"
-                :class="['chat-message', { 'chat-message-own': message.isOwnMessage }]"
-              >
-                <div class="chat-message-meta">
-                  <strong>{{ message.authorDisplayName }}</strong>
-                  <span>{{ formatSentAt(message.createdAtUtc) }}</span>
-                </div>
-                <p class="chat-message-body">
-                  {{ message.isRemovedForViewer ? t('chat.messageRemoved') : message.content }}
-                </p>
-              </article>
-            </div>
+            <article v-for="message in messages" :key="message.id" :class="['chat-message', { 'chat-message-own': message.isOwnMessage }]">
+              <div class="chat-message-meta">
+                <strong>{{ message.authorDisplayName }}</strong>
+                <span>{{ formatSentAt(message.createdAtUtc) }}</span>
+              </div>
+              <p class="chat-message-body">
+                {{ message.isRemovedForViewer ? t('chat.messageRemoved') : message.content }}
+              </p>
+            </article>
           </div>
+        </div>
 
         <!-- Composer pinned at bottom -->
         <div class="panel-footer">
@@ -150,18 +126,11 @@ watch(
                 @keydown.enter.exact.prevent="sendMessage"
               />
             </label>
-            <button
-              class="btn btn-primary chat-send-button"
-              type="submit"
-              :disabled="sending || !trimmedDraft || isOverLimit"
-            >
+            <button class="btn btn-primary chat-send-button" type="submit" :disabled="sending || !trimmedDraft || isOverLimit">
               {{ sending ? t('common.saving') : t('chat.send') }}
             </button>
           </form>
-          <div
-            v-if="showCharCounter"
-            :class="['chat-char-counter', { 'chat-char-counter-over': isOverLimit }]"
-          >
+          <div v-if="showCharCounter" :class="['chat-char-counter', { 'chat-char-counter-over': isOverLimit }]">
             {{ t('chat.charCount', { current: charCount, max: 500 }) }}
           </div>
         </div>

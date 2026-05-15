@@ -83,9 +83,7 @@ function showCityUnlockToast(notification: { id: string; title: string; message:
 async function maybeShowCityUnlockToast() {
   try {
     const inbox = await notificationsStore.fetchInbox(5)
-    const notification = inbox.items.find(
-      (item) => item.type === 'CITY_EXPANSION_UNLOCKED' && !item.isRead && !seenCityUnlockNotificationIds.has(item.id),
-    )
+    const notification = inbox.items.find((item) => item.type === 'CITY_EXPANSION_UNLOCKED' && !item.isRead && !seenCityUnlockNotificationIds.has(item.id))
     if (!notification) {
       return
     }
@@ -128,7 +126,10 @@ onMounted(() => {
         return
       }
       void newsStore.fetchUnreadCount()
-      void notificationsStore.fetchUnreadCount().then(() => initializeNotificationToastBootstrap()).catch(() => undefined)
+      void notificationsStore
+        .fetchUnreadCount()
+        .then(() => initializeNotificationToastBootstrap())
+        .catch(() => undefined)
       void gameAdminStore.fetchSession()
     })
     .catch(() => undefined)
@@ -159,7 +160,10 @@ watch(
 
     if (token !== previousToken) {
       void newsStore.fetchUnreadCount()
-      void notificationsStore.fetchUnreadCount().then(() => initializeNotificationToastBootstrap()).catch(() => undefined)
+      void notificationsStore
+        .fetchUnreadCount()
+        .then(() => initializeNotificationToastBootstrap())
+        .catch(() => undefined)
       void gameAdminStore.fetchSession()
     }
   },
@@ -315,10 +319,7 @@ watch(
     <main class="flex-1">
       <RouterView />
     </main>
-    <div
-      v-if="endgameStatus?.gameEnded && !endgameOverlayDismissed"
-      class="fixed inset-0 z-[230] flex items-center justify-center bg-[rgba(5,10,22,0.86)] p-6"
-    >
+    <div v-if="endgameStatus?.gameEnded && !endgameOverlayDismissed" class="fixed inset-0 z-[230] flex items-center justify-center bg-[rgba(5,10,22,0.86)] p-6">
       <div class="max-w-xl rounded-2xl border border-brand bg-card px-6 py-7 text-center shadow-2xl">
         <p class="text-sm font-bold uppercase tracking-[0.08em] text-brand">{{ t('endgame.overlayEyebrow') }}</p>
         <h2 class="mt-2 text-3xl font-extrabold">{{ t('endgame.overlayTitle') }}</h2>
