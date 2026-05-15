@@ -111,7 +111,9 @@ public sealed class ResearchPhase : ITickPhase
         var totalCostUsd = FxRateHelper.ConvertToUsd(totalCost, city.CurrencyCode, context.EurFxRates);
 
         var conversionRate = GameConstants.ResearchBudgetConversionRate(unit.Level);
-        var budgetGain = decimal.Round(totalCostUsd * conversionRate, 4, MidpointRounding.AwayFromZero);
+        var budgetGain = decimal.Round(
+            totalCostUsd * conversionRate * context.GlobalEventRdMultiplier,
+            4, MidpointRounding.AwayFromZero);
 
         var researchBudget = context.GetOrCreateResearchBudget(building.CompanyId, unit.ProductTypeId.Value);
         researchBudget.AccumulatedBudget += budgetGain;

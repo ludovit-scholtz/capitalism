@@ -231,6 +231,23 @@ public sealed partial class AppDbContext
             e.HasIndex(me => new { me.AffectedResourceTypeId, me.ExpiresAtTick });
         });
 
+        modelBuilder.Entity<GlobalEvent>(e =>
+        {
+            e.HasKey(ge => ge.Id);
+            e.Property(ge => ge.EventType).HasMaxLength(48);
+            e.Property(ge => ge.Severity).HasMaxLength(20);
+            e.Property(ge => ge.Title).HasMaxLength(200);
+            e.Property(ge => ge.Description).HasMaxLength(2000);
+            e.Property(ge => ge.TriggeredByAdminId).HasMaxLength(64);
+            e.Property(ge => ge.OperatingCostMultiplier).HasPrecision(8, 4);
+            e.Property(ge => ge.TradeRouteMultiplier).HasPrecision(8, 4);
+            e.Property(ge => ge.RdMultiplier).HasPrecision(8, 4);
+            e.Property(ge => ge.MineEfficiencyMultiplier).HasPrecision(8, 4);
+            e.HasOne(ge => ge.AffectedCity).WithMany().HasForeignKey(ge => ge.AffectedCityId).OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(ge => new { ge.IsActive, ge.StartTick });
+            e.HasIndex(ge => new { ge.EventType, ge.StartTick });
+        });
+
         modelBuilder.Entity<CityUnlockRequirement>(e =>
         {
             e.HasKey(requirement => requirement.Id);

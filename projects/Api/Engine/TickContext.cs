@@ -132,6 +132,36 @@ public sealed partial class TickContext
     public Dictionary<Guid, decimal> SeasonalDemandMultiplierByCityId { get; init; } = [];
     public decimal GlobalSeasonalDemandMultiplier { get; init; } = 1.0m;
 
+    // ── Global economic shock events ──────────────────────────────────────────────────────────────
+
+    /// <summary>All currently active global shock events loaded at tick start.</summary>
+    public List<GlobalEvent> ActiveGlobalEvents { get; init; } = [];
+
+    /// <summary>
+    /// Aggregate multiplier applied to building operating costs (labor + energy) from active global events.
+    /// Multiplicatively stacked from all active events' <see cref="GlobalEvent.OperatingCostMultiplier"/>.
+    /// </summary>
+    public decimal GlobalEventOperatingCostMultiplier { get; init; } = 1.0m;
+
+    /// <summary>
+    /// Aggregate multiplier applied to trade-route shipping costs from active global events.
+    /// Multiplicatively stacked from all active events' <see cref="GlobalEvent.TradeRouteMultiplier"/>.
+    /// </summary>
+    public decimal GlobalEventTradeRouteMultiplier { get; init; } = 1.0m;
+
+    /// <summary>
+    /// Aggregate multiplier applied to R&amp;D budget accumulation from active global events.
+    /// Multiplicatively stacked from all active events' <see cref="GlobalEvent.RdMultiplier"/>.
+    /// </summary>
+    public decimal GlobalEventRdMultiplier { get; init; } = 1.0m;
+
+    /// <summary>
+    /// Per-city aggregate mine-efficiency multipliers.
+    /// Key: CityId. Value: multiplicatively-stacked <see cref="GlobalEvent.MineEfficiencyMultiplier"/>
+    /// from all events affecting that specific city, combined with any global (city-agnostic) events.
+    /// </summary>
+    public Dictionary<Guid, decimal> GlobalEventMineEfficiencyByCityId { get; init; } = [];
+
     public List<Inventory> NewInventory { get; } = [];
     public List<BuildingUnitResourceHistory> NewUnitResourceHistories { get; } = [];
 
@@ -206,6 +236,16 @@ public sealed partial class TickContext
         if (SeasonalDemandMultiplierByCityId.TryGetValue(cityId, out var cityMultiplier))
             return cityMultiplier;
         return GlobalSeasonalDemandMultiplier;
+    }
+
+    /// <summary>
+    /// Returns the aggregate mine-efficiency multiplier for a given city, derived from active global events.
+    /// If no city-specific multiplier is recorded, returns the global multiplier (product of city-agnostic events)
+    /// or 1.0 if no global events affect mining.
+    /// </summary>
+    public decimal GetGlobalEventMineEfficiency(Guid cityId)
+    {
+        return GlobalEventMineEfficiencyByCityId.TryGetValue(cityId, out var m) ? m : 1.0m;
     }
 
 }

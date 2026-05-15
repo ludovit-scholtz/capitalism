@@ -20,6 +20,18 @@ public sealed class TickProcessor(
     private readonly IReadOnlyList<ITickPhase> orderedPhases = phases.OrderBy(p => p.Order).ToList();
 
     /// <summary>
+    /// Exposed for unit tests: builds and returns the TickContext for the current game state
+    /// without advancing the tick counter or running any phases.
+    /// </summary>
+    internal async Task<TickContext> BuildContextForTestAsync(CancellationToken ct = default)
+    {
+        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync(ct);
+        if (gameState is null)
+            throw new InvalidOperationException("No game state found.");
+        return await BuildContextAsync(gameState, ct);
+    }
+
+    /// <summary>
     /// Advances the game by one tick and returns the configured interval in seconds
     /// so the hosted service knows how long to wait before the next tick.
     /// </summary>
@@ -245,6 +257,57 @@ public sealed class TickProcessor(
             .Where(me => me.StartsAtTick <= gameState.CurrentTick && me.ExpiresAtTick >= gameState.CurrentTick)
             .ToListAsync(ct);
 
+        // ── Load active global shock events ──────────────────────────────────────────────────────
+        // Load ALL events still marked IsActive (including those that may have just expired),
+        // so that GlobalEventPhase can update their IsActive/ResolvedAtUtc flags this tick.
+        var activeGlobalEvents = await db.GlobalEvents
+            .Where(ge => ge.IsActive)
+            .ToListAsync(ct);
+
+        // Events still within their active window for multiplier purposes.
+        var nonExpiredEvents = activeGlobalEvents
+            .Where(ge => ge.StartTick + ge.DurationTicks > gameState.CurrentTick)
+            .ToList();
+
+        var globalEventOperatingCostMultiplier = Math.Clamp(
+            nonExpiredEvents.Aggregate(1m, (acc, next) => acc * next.OperatingCostMultiplier),
+            GameConstants.MarketEventMultiplierMin,
+            GameConstants.MarketEventMultiplierMax);
+
+        var globalEventTradeRouteMultiplier = Math.Clamp(
+            nonExpiredEvents.Aggregate(1m, (acc, next) => acc * next.TradeRouteMultiplier),
+            GameConstants.MarketEventMultiplierMin,
+            GameConstants.MarketEventMultiplierMax);
+
+        var globalEventRdMultiplier = Math.Clamp(
+            nonExpiredEvents.Aggregate(1m, (acc, next) => acc * next.RdMultiplier),
+            GameConstants.MarketEventMultiplierMin,
+            GameConstants.MarketEventMultiplierMax);
+
+        // Mine efficiency is per-city: start with the global base (events without city restriction),
+        // then multiply in any city-scoped events for each city that has one.
+        var globalMineBase = nonExpiredEvents
+            .Where(ge => !ge.AffectedCityId.HasValue)
+            .Aggregate(1m, (acc, next) => acc * next.MineEfficiencyMultiplier);
+
+        var globalEventMineEfficiencyByCityId = new Dictionary<Guid, decimal>();
+        foreach (var city in cities)
+        {
+            var cityMineMultiplier = nonExpiredEvents
+                .Where(ge => ge.AffectedCityId == city.Id)
+                .Aggregate(globalMineBase, (acc, next) => acc * next.MineEfficiencyMultiplier);
+            if (cityMineMultiplier != 1.0m) // only store deviations from neutral
+                globalEventMineEfficiencyByCityId[city.Id] = Math.Clamp(
+                    cityMineMultiplier, GameConstants.MarketEventMultiplierMin, GameConstants.MarketEventMultiplierMax);
+        }
+        // Ensure the global base is applied as default even if no per-city entry was added
+        if (globalMineBase != 1.0m && globalEventMineEfficiencyByCityId.Count == 0)
+        {
+            foreach (var city in cities)
+                globalEventMineEfficiencyByCityId[city.Id] = Math.Clamp(
+                    globalMineBase, GameConstants.MarketEventMultiplierMin, GameConstants.MarketEventMultiplierMax);
+        }
+
         var commodityShockByResource = activeMarketEvents
             .Where(me => me.EventType == MarketEventType.CommodityShock && me.AffectedResourceTypeId.HasValue)
             .GroupBy(me => me.AffectedResourceTypeId!.Value)
@@ -346,6 +409,11 @@ public sealed class TickProcessor(
             GlobalInterestRateMultiplier = globalInterestRateMultiplier,
             SeasonalDemandMultiplierByCityId = seasonalDemandMultiplierByCity,
             GlobalSeasonalDemandMultiplier = globalSeasonalDemandMultiplier,
+            ActiveGlobalEvents = activeGlobalEvents,
+            GlobalEventOperatingCostMultiplier = globalEventOperatingCostMultiplier,
+            GlobalEventTradeRouteMultiplier = globalEventTradeRouteMultiplier,
+            GlobalEventRdMultiplier = globalEventRdMultiplier,
+            GlobalEventMineEfficiencyByCityId = globalEventMineEfficiencyByCityId,
         };
     }
 }

@@ -333,3 +333,25 @@ export interface TutorialMilestoneStatus {
   bountyAwardedAtUtc: string | null
   bountyPoints?: number | null
 }
+
+// ─── Global Events / Market Shocks ────────────────────────────────────────────
+
+export interface GlobalEvent {
+  id: string
+  eventType: string
+  severity: string
+  title: string
+  description: string
+  isActive: boolean
+  startTick: number
+  durationTicks: number
+  affectedCityId: string | null
+  affectedCity: { id: string; name: string } | null
+  operatingCostMultiplier: number
+  tradeRouteMultiplier: number
+  rdMultiplier: number
+  mineEfficiencyMultiplier: number
+  createdAtUtc: string
+  resolvedAtUtc: string | null
+  triggeredByAdminId: string | null
+}

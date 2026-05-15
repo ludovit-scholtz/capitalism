@@ -137,3 +137,17 @@ Create a fun game in the style of Capitalism II, where players experience realis
 - [x] (100%) Move the game API seed admin password out of committed defaults (`__SET_IN_ENV__` + `.env.example`/README guidance), and block non-Development startup when `Auth:PasswordAuthEnabled=true` and `SeedData:AdminPassword` is missing/placeholder while keeping Development warning-only.
 - [x] (100%) Move game-frontend browser sessions to HttpOnly SameSite cookie auth (`credentials: include`) and stop persisting JWT session tokens in `localStorage`/`sessionStorage` for normal gameplay requests.
 - [x] (100%) Finish canonical object-authorization error normalization in legacy economy CRUD paths and keep the GraphQL surface inventory gate aligned with the normalized contract.
+
+### Dynamic Global Events & Market Shocks
+
+- [x] (100%) Dynamic Global Events & Market Shocks system is live: a new `GlobalEvent` entity stores server-wide economic shock events with configurable severity (MINOR/MODERATE/MAJOR/CRITICAL), 8 event types (supply chain disruption, trade war, tech boom, economic boom, economic recession, mining crisis, energy crisis, trade deal), per-tick automatic lifecycle management (activation & expiry in `GlobalEventPhase` at Order=45), and four economy multipliers affecting operating costs, trade routes, R&D output, and mine efficiency.
+  - `GlobalEvent` entity: `EventType`, `Severity`, `Title`, `Description`, `OperatingCostMultiplier`, `TradeRouteMultiplier`, `RdMultiplier`, `MineEfficiencyMultiplier`, `AffectedCityId` (optional city scoping), `StartTick`, `DurationTicks`, `IsActive`, `TriggeredByAdminId`, `CreatedAtUtc`, `ResolvedAtUtc`.
+  - `GlobalEventPhase` (Order=45): runs each tick to expire events past their duration window, auto-triggers a new random event with configurable probability and cooldown, and persists changes via `context.Db`.
+  - `TickContext` carries `ActiveGlobalEvents`, `GlobalEventOperatingCostMultiplier`, `GlobalEventTradeRouteMultiplier`, `GlobalEventRdMultiplier`, `GlobalEventMineEfficiencyByCityId` — pre-computed by `TickProcessor.BuildContextAsync` using non-expired active events for multipliers and all `IsActive=true` events for lifecycle management.
+  - `OperatingCostPhase` applies `GlobalEventOperatingCostMultiplier`; `TradeRoutePhase` applies `GlobalEventTradeRouteMultiplier`; `ResearchPhase` applies `GlobalEventRdMultiplier`; `MiningPhase` applies per-city mine efficiency factor.
+  - GraphQL: `activeGlobalEvents` public query, `globalEventHistory(limit)` query, `triggerGlobalEvent(input)` admin mutation, `resolveGlobalEvent(id)` admin mutation.
+  - Frontend: `GlobalEventsPanel.vue` (active/history tabs, severity badges, multiplier chips), `GlobalEventBanner.vue` (dismissible header banner shown during active shocks), integrated into `AppHeader`. Route: `/market/events`.
+  - i18n: all `globalEvents.*` keys present in English, Slovak, and German.
+  - 18 backend integration tests covering: phase expiry, auto-trigger, multiplier application to operating costs / trade routes / R&D / mining, GraphQL auth boundaries, admin mutation access, history query, city-scoped events.
+  - E2E tests: banner hidden when no events, banner visible with active event, multiple events count, banner dismiss, admin trigger button visibility, history tab.
+

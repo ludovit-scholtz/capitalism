@@ -14,6 +14,7 @@ import type { PlayerNotificationItem } from '@/types'
 import ContextSwitcher from '@/components/layout/ContextSwitcher.vue'
 import GameTimeChip from '@/components/layout/GameTimeChip.vue'
 import ThemeToggle from '@/components/layout/ThemeToggle.vue'
+import GlobalEventBanner from '@/components/market/GlobalEventBanner.vue'
 import { useThemeStore } from '@/stores/theme'
 import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useEndgameStore } from '@/stores/endgame'
@@ -442,6 +443,9 @@ useTickRefresh(async () => {
           {{ impersonationLabel }}
         </div>
 
+        <!-- Global economic event banner -->
+        <GlobalEventBanner class="hidden sm:flex" />
+
         <template v-if="auth.isAuthenticated">
           <button
             class="btn btn-secondary h-11 w-11 p-0 justify-center relative notification-bell-btn tap-target-44"
@@ -551,7 +555,7 @@ useTickRefresh(async () => {
 
 .desktop-nav-links {
   display: flex;
-  gap: 1.25rem;
+  gap: 1rem;
 }
 
 .nav-link {

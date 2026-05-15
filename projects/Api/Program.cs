@@ -458,6 +458,7 @@ public class Program
         builder.Services.AddScoped<ITickPhase, ConstructionPhase>();
         builder.Services.AddScoped<ITickPhase, BuildingUpgradePhase>();
         builder.Services.AddScoped<ITickPhase, LandMarketPhase>();
+        builder.Services.AddScoped<ITickPhase, GlobalEventPhase>();
         builder.Services.AddScoped<ITickPhase, MediaHousePhase>();
         builder.Services.AddScoped<ITickPhase, Api.Engine.Phases.EconomicCyclePhase>();
         builder.Services.AddScoped<ITickPhase, PublicSalesPhase>();
