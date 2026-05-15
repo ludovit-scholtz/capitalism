@@ -475,12 +475,42 @@ public sealed partial class Mutation
         }
 
         var loanCurrencyCode = loan.BankBuilding.City?.CurrencyCode ?? "EUR";
-        var borrowerSettlementAccount = loan.BorrowerBankAccountId.HasValue
+
+        // If the caller explicitly nominated a repayment account, validate it first.
+        if (input.RepaymentBankAccountId.HasValue)
+        {
+            var explicitAccount = loan.BorrowerCompany.BankAccounts.FirstOrDefault(
+                a => a.Id == input.RepaymentBankAccountId.Value && a.ClosedAtUtc == null);
+
+            if (explicitAccount is null)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("The specified repayment account was not found for the borrower company.")
+                        .SetCode("REPAYMENT_ACCOUNT_NOT_FOUND")
+                        .Build());
+            }
+
+            if (!string.Equals(explicitAccount.CurrencyCode, loanCurrencyCode, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage($"The specified repayment account currency ({explicitAccount.CurrencyCode}) does not match the loan currency ({loanCurrencyCode}). Repayment must be made in the loan's origination currency.")
+                        .SetCode("CURRENCY_MISMATCH")
+                        .Build());
+            }
+        }
+
+        var borrowerSettlementAccount = input.RepaymentBankAccountId.HasValue
             ? loan.BorrowerCompany.BankAccounts.FirstOrDefault(a =>
-                a.Id == loan.BorrowerBankAccountId.Value
-                && a.ClosedAtUtc == null
-                && string.Equals(a.CurrencyCode, loanCurrencyCode, StringComparison.OrdinalIgnoreCase))
-            : null;
+                a.Id == input.RepaymentBankAccountId.Value
+                && a.ClosedAtUtc == null)
+            : loan.BorrowerBankAccountId.HasValue
+                ? loan.BorrowerCompany.BankAccounts.FirstOrDefault(a =>
+                    a.Id == loan.BorrowerBankAccountId.Value
+                    && a.ClosedAtUtc == null
+                    && string.Equals(a.CurrencyCode, loanCurrencyCode, StringComparison.OrdinalIgnoreCase))
+                : null;
         borrowerSettlementAccount ??= CompanyBankingService.FindPreferredAccount(
             loan.BorrowerCompany.BankAccounts,
             loanCurrencyCode);

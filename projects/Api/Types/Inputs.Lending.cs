@@ -81,4 +81,13 @@ public sealed class RepayLoanDebtInput
 {
     /// <summary>The loan to repay. Must belong to the authenticated borrower's company.</summary>
     public Guid LoanId { get; set; }
+
+    /// <summary>
+    /// Optional bank account ID to debit for the repayment.
+    /// When provided, the account must belong to the borrower company and its currency must
+    /// match the loan's origination currency; otherwise a <c>CURRENCY_MISMATCH</c> error is returned.
+    /// When omitted, the loan's recorded settlement account is used (falling back to any account
+    /// in the loan currency).
+    /// </summary>
+    public Guid? RepaymentBankAccountId { get; set; }
 }
