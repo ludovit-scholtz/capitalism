@@ -66,7 +66,7 @@ public sealed class GameEndedMutationGuardMiddleware(RequestDelegate next)
                         new
                         {
                             message,
-                            extensions = new { code = "GAME_ENDED" }
+                            extensions = new { code = "SHARD_CONCLUDED" }
                         }
                     }
             },

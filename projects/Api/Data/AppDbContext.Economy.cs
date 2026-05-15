@@ -454,5 +454,21 @@ public sealed partial class AppDbContext
             e.HasIndex(r => new { r.BuildingId, r.RecordedAtTick });
             e.HasIndex(r => new { r.CompanyId, r.RecordedAtTick });
         });
+
+        modelBuilder.Entity<VictoryNewsletter>(e =>
+        {
+            e.HasKey(v => v.Id);
+            e.Property(v => v.WinnerDisplayName).HasMaxLength(100);
+            e.Property(v => v.WinnerCompanyName).HasMaxLength(200);
+            e.Property(v => v.WinnerNetWorthUsd).HasPrecision(28, 2);
+            e.Property(v => v.TotalFxVolumeUsd).HasPrecision(28, 2);
+            e.Property(v => v.TotalProductsSold).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<GameState>(e =>
+        {
+            e.Property(g => g.WinnerNetWorth).HasPrecision(28, 2);
+            e.Property(g => g.ShardState).HasDefaultValue(GameShardState.Active);
+        });
     }
 }

@@ -100,3 +100,12 @@ public sealed class EndShardManuallyInput
     [MaxLength(500)]
     public string? Reason { get; set; }
 }
+
+/// <summary>Input for forcing shard conclusion with a victory newsletter.</summary>
+public sealed class ForceShardConclusionInput
+{
+    /// <summary>Required reason for the forced conclusion (shown in news feed and logs).</summary>
+    [Required]
+    [MaxLength(500)]
+    public string Reason { get; set; } = string.Empty;
+}
