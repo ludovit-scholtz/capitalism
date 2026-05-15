@@ -43,6 +43,65 @@ export interface Recipe {
   quantity: number
 }
 
+export interface EncyclopediaCatalogEntry {
+  id: string
+  kind: 'RESOURCE' | 'PRODUCT'
+  name: string
+  slug: string
+  category: string
+  industry?: string | null
+  description: string | null
+  imageUrl: string | null
+  isPerishable: boolean
+  isProOnly: boolean
+  isUnlockedForCurrentPlayer: boolean
+  basePrice: number
+  weightPerUnit?: number | null
+  baseCraftTicks?: number | null
+  outputQuantity?: number | null
+  energyConsumptionMwh?: number | null
+  basicLaborHours?: number | null
+  unitName: string
+  unitSymbol: string
+}
+
+export interface EncyclopediaResourcePage {
+  page: number
+  totalPages: number
+  totalCount: number
+  items: EncyclopediaCatalogEntry[]
+}
+
+export interface EncyclopediaRecipeIngredient {
+  kind: 'RESOURCE' | 'PRODUCT'
+  name: string
+  slug: string
+  category: string
+  industry?: string | null
+  imageUrl: string | null
+  quantity: number
+  unitName: string
+  unitSymbol: string
+  isPerishable: boolean
+  isProOnly: boolean
+  isUnlockedForCurrentPlayer: boolean
+}
+
+export interface EncyclopediaRecipeCard {
+  id: string
+  recipeName: string
+  buildingType: string
+  outputQuantity: number
+  output: EncyclopediaCatalogEntry
+  inputs: EncyclopediaRecipeIngredient[]
+}
+
+export interface EncyclopediaEntryDetail {
+  entry: EncyclopediaCatalogEntry
+  producedByRecipes: EncyclopediaRecipeCard[]
+  usedInRecipes: EncyclopediaRecipeCard[]
+}
+
 /** Onboarding types */
 export interface City {
   id: string
