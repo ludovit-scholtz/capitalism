@@ -494,9 +494,11 @@ test.describe('Dashboard — chat panel', () => {
       chatMessages: [
         {
           id: 'chat-1',
-          playerId: player.id,
-          message: 'Welcome to the exchange floor.',
-          sentAtUtc: '2026-01-01T00:00:00Z',
+          authorPlayerId: player.id,
+          cityId: null,
+          content: 'Welcome to the exchange floor.',
+          createdAtUtc: '2026-01-01T00:00:00Z',
+          isVisible: true,
         },
       ],
     })

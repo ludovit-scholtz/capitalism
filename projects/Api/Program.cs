@@ -432,6 +432,8 @@ public class Program
             .AddAuthorization()
             .AddQueryType<Query>()
             .AddMutationType<Mutation>()
+            .AddSubscriptionType<Subscription>()
+            .AddInMemorySubscriptions()
             .AddTypeExtension<CompanyTypeExtensions>()
             .AddTypeExtension<BuildingConfigurationPlanTypeExtensions>()
             .AddTypeExtension<BuildingTypeExtensions>()
@@ -519,6 +521,7 @@ public class Program
         }
 
         app.UseCors("frontend");
+        app.UseWebSockets();
         app.UseMiddleware<AuthRateLimitMiddleware>();
         app.UseMiddleware<ApiKeyAuthMiddleware>();
         app.UseAuthentication();

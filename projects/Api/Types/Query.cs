@@ -22,6 +22,6 @@ namespace Api.Types;
 public sealed partial class Query
 {
     private const int MaxRecentStockPriceHistoryPoints = 12;
-    private const int DefaultChatMessageLimit = 50;
+    private const int DefaultChatMessageLimit = 100;
     private const int MaxChatMessageLimit = 100;
 }

@@ -108,12 +108,18 @@ public sealed partial class AppDbContext
         modelBuilder.Entity<ChatMessage>(e =>
         {
             e.HasKey(message => message.Id);
-            e.Property(message => message.Message).HasMaxLength(300);
-            e.HasOne(message => message.Player)
+            e.Property(message => message.Content).HasMaxLength(500);
+            e.Property(message => message.AuthorDisplayName).HasMaxLength(100);
+            e.HasOne(message => message.AuthorPlayer)
                 .WithMany()
-                .HasForeignKey(message => message.PlayerId)
+                .HasForeignKey(message => message.AuthorPlayerId)
                 .OnDelete(DeleteBehavior.Cascade);
-            e.HasIndex(message => message.SentAtUtc);
+            e.HasOne<City>()
+                .WithMany()
+                .HasForeignKey(message => message.CityId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(message => new { message.CityId, message.CreatedAtUtc });
+            e.HasIndex(message => message.CreatedAtUtc);
         });
 
         modelBuilder.Entity<PlayerNotification>(e =>

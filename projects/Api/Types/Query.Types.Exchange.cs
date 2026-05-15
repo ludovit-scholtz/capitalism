@@ -110,9 +110,12 @@ public sealed class GlobalExchangeProductListing
 public sealed class InGameChatMessage
 {
     public Guid Id { get; set; }
-    public Guid PlayerId { get; set; }
-    public string PlayerDisplayName { get; set; } = string.Empty;
-    public string Message { get; set; } = string.Empty;
-    public DateTime SentAtUtc { get; set; }
+    public Guid AuthorPlayerId { get; set; }
+    public string AuthorDisplayName { get; set; } = string.Empty;
+    public Guid? CityId { get; set; }
+    public string Content { get; set; } = string.Empty;
+    public DateTime CreatedAtUtc { get; set; }
+    public bool IsVisible { get; set; }
+    public bool IsRemovedForViewer { get; set; }
     public bool IsOwnMessage { get; set; }
 }
