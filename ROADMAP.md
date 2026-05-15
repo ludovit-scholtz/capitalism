@@ -43,14 +43,14 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 ### Economy integrity hardening
 
-- [ ] Enforce the minimum sale floor on accepted building offers, not only on the public asking price.
-- [ ] Make defaulted-collateral sales lender-safe: do not allow a cheap friendly repurchase to clear the lien while leaving residual principal unsecured.
-- [ ] Make every loan origination, scheduled repayment, and manual debt repayment path currency-scoped to the loan currency.
-- [ ] Block closing the scheduled repayment account for any unpaid loan state, including `Defaulted`, and remove cross-currency fallback repayment behavior.
-- [ ] Freeze pledged-building layout edits, unit upgrades, and other value-changing configuration actions unless the collateral is re-appraised and revalidated.
-- [ ] Reserve or escrow pending building-offer funds so one company cannot spam multiple offers with the same money.
-- [ ] Count defaulted unpaid principal in lending-capacity calculations until the loss is actually absorbed.
-- [ ] Add backend regression coverage for below-floor accepted offers, defaulted-collateral under-recovery sales, mixed-currency lender funding, mixed-currency lender repayment credit, repayment-account closure on defaulted loans, and pledged-building edit denial.
+- [x] Enforce the minimum sale floor on accepted building offers, not only on the public asking price.
+- [x] Make defaulted-collateral sales lender-safe: do not allow a cheap friendly repurchase to clear the lien while leaving residual principal unsecured.
+- [x] Make every loan origination, scheduled repayment, and manual debt repayment path currency-scoped to the loan currency.
+- [x] Block closing the scheduled repayment account for any unpaid loan state, including `Defaulted`, and remove cross-currency fallback repayment behavior.
+- [x] Freeze pledged-building layout edits, unit upgrades, and other value-changing configuration actions unless the collateral is re-appraised and revalidated.
+- [x] Reserve or escrow pending building-offer funds so one company cannot spam multiple offers with the same money.
+- [x] Count defaulted unpaid principal in lending-capacity calculations until the loss is actually absorbed.
+- [x] Add backend regression coverage for below-floor accepted offers, defaulted-collateral under-recovery sales, mixed-currency lender funding, mixed-currency lender repayment credit, repayment-account closure on defaulted loans, and pledged-building edit denial.
 
 ### Buildings & Land Map System (Core Gameplay Loop)
 
