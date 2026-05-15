@@ -14,6 +14,7 @@ export interface CompanyLedgerSummary {
   /** True when the company has buildings in multiple cities with different currencies. */
   hasMixedCurrencies: boolean
   totalRevenue: number
+  totalGovernmentContractRevenue?: number
   totalMediaHouseIncome: number
   totalRentIncome: number
   totalPropertyMaintenance: number

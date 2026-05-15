@@ -196,6 +196,18 @@ function sparklineHeight(summary: CompanyCityFinancialSummary, revenue: number):
               {{ drillCategory === 'REVENUE' ? '▲' : '▼' }}
             </button>
           </div>
+          <div v-if="(ledger.totalGovernmentContractRevenue ?? 0) > 0" class="statement-row">
+            <span class="row-label">🏛️ {{ $t('ledger.governmentContractRevenue') }}</span>
+            <span class="amount-positive">{{ formatAmount(ledger.totalGovernmentContractRevenue ?? 0) }}</span>
+            <button
+              class="drill-btn"
+              :class="{ active: drillCategory === 'GOVERNMENT_CONTRACT_REVENUE' }"
+              :aria-label="$t('ledger.drillDown') + ': ' + $t('ledger.governmentContractRevenue')"
+              @click="emit('drill-toggle', 'GOVERNMENT_CONTRACT_REVENUE')"
+            >
+              {{ drillCategory === 'GOVERNMENT_CONTRACT_REVENUE' ? '▲' : '▼' }}
+            </button>
+          </div>
           <div v-if="(ledger.totalMediaHouseIncome ?? 0) > 0" class="statement-row media-house-income-row">
             <span class="row-label">📺 {{ $t('ledger.mediaHouseIncome') }}</span>
             <span class="amount-positive">{{ formatAmount(ledger.totalMediaHouseIncome ?? 0) }}</span>

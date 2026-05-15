@@ -16,6 +16,7 @@ public sealed class CompanyLedgerSummary
     public bool HasMixedCurrencies { get; set; }
     // Income Statement
     public decimal TotalRevenue { get; set; }
+    public decimal TotalGovernmentContractRevenue { get; set; }
     public decimal TotalMediaHouseIncome { get; set; }
     public decimal TotalRentIncome { get; set; }
     public decimal TotalPropertyMaintenance { get; set; }

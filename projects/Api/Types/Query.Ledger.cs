@@ -69,6 +69,9 @@ public sealed partial class Query
             .ToListAsync();
 
         var totalRevenue = LedgerCalculator.GetTotalRevenue(entries);
+        var totalGovernmentContractRevenue = entries
+            .Where(entry => entry.Category == LedgerCategory.GovernmentContractRevenue && entry.Amount > 0m)
+            .Sum(entry => entry.Amount);
         var totalMediaHouseIncome = LedgerCalculator.GetTotalMediaHouseIncome(entries);
         var totalRentIncome = LedgerCalculator.GetTotalRentIncome(entries);
         var totalPropertyMaintenance = LedgerCalculator.GetTotalPropertyMaintenance(entries);
@@ -170,6 +173,7 @@ public sealed partial class Query
             PrimaryCurrencyCode = primaryCurrencyCode,
             HasMixedCurrencies = buildingCurrencies.Count > 1,
             TotalRevenue = totalRevenue,
+            TotalGovernmentContractRevenue = totalGovernmentContractRevenue,
             TotalMediaHouseIncome = totalMediaHouseIncome,
             TotalRentIncome = totalRentIncome,
             TotalPropertyMaintenance = totalPropertyMaintenance,
@@ -416,7 +420,7 @@ public sealed partial class Query
         decimal taxRate,
         List<(long RecordedAtTick, string Category, decimal Amount)> projections)
     {
-        var totalRevenue = projections.Where(e => e.Category == LedgerCategory.Revenue && e.Amount > 0).Sum(e => e.Amount);
+        var totalRevenue = projections.Where(e => (e.Category == LedgerCategory.Revenue || e.Category == LedgerCategory.GovernmentContractRevenue) && e.Amount > 0).Sum(e => e.Amount);
         var totalMediaHouseIncome = projections.Where(e => e.Category == LedgerCategory.MediaHouseIncome && e.Amount > 0).Sum(e => e.Amount);
         var totalRentIncome = projections.Where(e => e.Category == LedgerCategory.RentIncome && e.Amount > 0).Sum(e => e.Amount);
         var totalPropertyMaintenance = Math.Abs(projections.Where(e => e.Category == LedgerCategory.PropertyMaintenance && e.Amount < 0).Sum(e => e.Amount));

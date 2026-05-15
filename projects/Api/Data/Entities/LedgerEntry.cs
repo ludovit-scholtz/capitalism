@@ -110,4 +110,5 @@ public static class LedgerCategory
     public const string SpotMarketEnergyCost = "SPOT_MARKET_ENERGY_COST";
     /// <summary>Expense recorded when perishable inventory quality reaches zero and the entire stock is written off.</summary>
     public const string SpoilageLoss = "SPOILAGE_LOSS";
+    public const string GovernmentContractRevenue = "GOVERNMENT_CONTRACT_REVENUE";
 }

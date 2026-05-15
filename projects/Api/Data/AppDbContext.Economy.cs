@@ -248,6 +248,42 @@ public sealed partial class AppDbContext
             e.HasIndex(ge => new { ge.EventType, ge.StartTick });
         });
 
+        modelBuilder.Entity<GovernmentContract>(e =>
+        {
+            e.HasKey(c => c.Id);
+            e.Property(c => c.Title).HasMaxLength(200);
+            e.Property(c => c.Description).HasMaxLength(2000);
+            e.Property(c => c.QuantityRequired).HasPrecision(18, 4);
+            e.Property(c => c.MinimumQuality).HasPrecision(5, 2);
+            e.Property(c => c.BudgetCap).HasPrecision(18, 4);
+            e.Property(c => c.Status).HasMaxLength(20);
+            e.HasOne(c => c.City).WithMany().HasForeignKey(c => c.CityId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(c => c.ProductType).WithMany().HasForeignKey(c => c.ProductTypeId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(c => c.WinnerCompany).WithMany().HasForeignKey(c => c.WinnerCompanyId).OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(c => new { c.CityId, c.Status, c.DeadlineTick });
+            e.HasIndex(c => new { c.WinnerCompanyId, c.Status });
+        });
+
+        modelBuilder.Entity<ContractBid>(e =>
+        {
+            e.HasKey(b => b.Id);
+            e.Property(b => b.BidPricePerUnit).HasPrecision(18, 4);
+            e.HasOne(b => b.Contract).WithMany(c => c.Bids).HasForeignKey(b => b.ContractId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(b => b.Company).WithMany().HasForeignKey(b => b.CompanyId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(b => new { b.ContractId, b.CompanyId }).IsUnique();
+            e.HasIndex(b => new { b.ContractId, b.BidPricePerUnit });
+        });
+
+        modelBuilder.Entity<ContractFulfillment>(e =>
+        {
+            e.HasKey(f => f.Id);
+            e.Property(f => f.QuantityDelivered).HasPrecision(18, 4);
+            e.Property(f => f.QuantityRequired).HasPrecision(18, 4);
+            e.HasOne(f => f.Contract).WithOne(c => c.Fulfillment).HasForeignKey<ContractFulfillment>(f => f.ContractId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(f => f.Company).WithMany().HasForeignKey(f => f.CompanyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(f => f.ContractId).IsUnique();
+        });
+
         modelBuilder.Entity<CityUnlockRequirement>(e =>
         {
             e.HasKey(requirement => requirement.Id);
