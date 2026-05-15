@@ -32,6 +32,10 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 - [x] (100%) Make sure every product and resource has different picture. Added distinct high-quality photographic WebP images and frontend slug mapping for every seeded resource and product.
 
+### Manufacturing Encyclopedia
+
+- [x] (100%) Manufacturing Encyclopedia is live: `/encyclopedia` now loads a searchable, debounced in-game production catalog backed by `encyclopediaResources`, supports raw-material and industry filter chips, and opens deep-linked `/encyclopedia/:slug` detail pages backed by `encyclopediaResourceDetail` with upstream/downstream recipe cards, building-type guide links, and multilingual labels in English, Slovak, and German.
+
 ### Onboarding
 
 - [x] (100%) In onboarding and in the personal account name configuration in game frontend and also in the master frontend add an icons to select a gender - male or female (using icons). When user clicks on the icon generate either female or generate male make sure to generate friendly personal account name in specified gender.

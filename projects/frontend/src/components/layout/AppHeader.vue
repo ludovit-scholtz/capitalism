@@ -237,7 +237,7 @@ const mobileNavSections = computed(() => {
       label: t('nav.sectionBuild'),
       links: [
         { key: 'building-market', label: t('nav.buildingMarket'), to: '/buildings/market', icon: ['fas', 'store'], visible: true, badge: 0 },
-        { key: 'encyclopedia', label: t('nav.encyclopedia'), to: '/encyclopedia', icon: ['fas', 'book'], visible: true, badge: 0 },
+        { key: 'encyclopedia', label: t('nav.encyclopedia'), to: '/encyclopedia', icon: ['fas', 'book-open'], visible: true, badge: 0 },
       ],
     },
     {
@@ -319,7 +319,7 @@ useTickRefresh(async () => {
             <font-awesome-icon :icon="['fas', 'store']" class="mr-2" />
           </RouterLink>
           <RouterLink to="/encyclopedia" :title="t('nav.encyclopedia')" class="nav-link" @click="closeMenu">
-            <font-awesome-icon :icon="['fas', 'book']" class="mr-2" />
+            <font-awesome-icon :icon="['fas', 'book-open']" class="mr-2" />
           </RouterLink>
           <RouterLink to="/exchange" :title="t('nav.exchange')" class="nav-link" @click="closeMenu">
             <font-awesome-icon :icon="['fas', 'chart-bar']" class="mr-2" />

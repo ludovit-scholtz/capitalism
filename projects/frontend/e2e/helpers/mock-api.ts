@@ -8818,6 +8818,252 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    if (query.includes('encyclopediaResourceDetail')) {
+      const variables = body.variables as { slug?: string } | undefined
+      const slug = variables?.slug ?? ''
+      const resource = state.resourceTypes.find((candidate) => candidate.slug === slug) ?? null
+      const product = state.productTypes.find((candidate) => candidate.slug === slug) ?? null
+
+      const mapResourceEntry = (resourceType: MockResourceType) => ({
+        id: resourceType.id,
+        kind: 'RESOURCE',
+        name: resourceType.name,
+        slug: resourceType.slug,
+        category: resourceType.category,
+        industry: null,
+        description: resourceType.description,
+        imageUrl: resourceType.imageUrl ?? null,
+        isPerishable: false,
+        isProOnly: false,
+        isUnlockedForCurrentPlayer: true,
+        basePrice: resourceType.basePrice,
+        weightPerUnit: resourceType.weightPerUnit,
+        baseCraftTicks: null,
+        outputQuantity: null,
+        energyConsumptionMwh: null,
+        basicLaborHours: null,
+        unitName: resourceType.unitName,
+        unitSymbol: resourceType.unitSymbol,
+      })
+
+      const mapProductEntry = (productType: MockProductType) => ({
+        id: productType.id,
+        kind: 'PRODUCT',
+        name: productType.name,
+        slug: productType.slug,
+        category: productType.industry,
+        industry: productType.industry,
+        description: productType.description,
+        imageUrl: productType.imageUrl ?? null,
+        isPerishable: Boolean(productType.isPerishable),
+        isProOnly: productType.isProOnly,
+        isUnlockedForCurrentPlayer: productType.isUnlockedForCurrentPlayer ?? !productType.isProOnly,
+        basePrice: productType.basePrice,
+        weightPerUnit: null,
+        baseCraftTicks: productType.baseCraftTicks,
+        outputQuantity: productType.outputQuantity ?? 1,
+        energyConsumptionMwh: productType.energyConsumptionMwh ?? 0,
+        basicLaborHours: productType.basicLaborHours ?? 0,
+        unitName: productType.unitName ?? 'Piece',
+        unitSymbol: productType.unitSymbol ?? 'pcs',
+      })
+
+      const mapRecipeInput = (recipe: MockProductType['recipes'][number]) => {
+        if (recipe.resourceType) {
+          const recipeResource =
+            state.resourceTypes.find((candidate) => candidate.id === recipe.resourceType?.id)
+            ?? ({
+              id: recipe.resourceType.id,
+              name: recipe.resourceType.name,
+              slug: recipe.resourceType.slug ?? recipe.resourceType.name.toLowerCase().replace(/\s+/g, '-'),
+              category: 'RAW_MATERIAL',
+              basePrice: 0,
+              weightPerUnit: 0,
+              unitName: recipe.resourceType.unitName ?? 'Ton',
+              unitSymbol: recipe.resourceType.unitSymbol ?? 't',
+              imageUrl: null,
+              description: null,
+            } satisfies MockResourceType)
+
+          return {
+            kind: 'RESOURCE',
+            name: recipeResource.name,
+            slug: recipeResource.slug,
+            category: recipeResource.category,
+            industry: null,
+            imageUrl: recipeResource.imageUrl ?? null,
+            quantity: recipe.quantity,
+            unitName: recipeResource.unitName,
+            unitSymbol: recipeResource.unitSymbol,
+            isPerishable: false,
+            isProOnly: false,
+            isUnlockedForCurrentPlayer: true,
+          }
+        }
+
+        const recipeProduct =
+          state.productTypes.find((candidate) => candidate.id === recipe.inputProductType?.id)
+          ?? ({
+            id: recipe.inputProductType?.id ?? 'missing-product',
+            name: recipe.inputProductType?.name ?? 'Unknown product',
+            slug: recipe.inputProductType?.slug ?? 'unknown-product',
+            industry: 'FURNITURE',
+            basePrice: 0,
+            baseCraftTicks: 1,
+            outputQuantity: 1,
+            energyConsumptionMwh: 0,
+            basicLaborHours: 0,
+            unitName: recipe.inputProductType?.unitName ?? 'Piece',
+            unitSymbol: recipe.inputProductType?.unitSymbol ?? 'pcs',
+            isProOnly: false,
+            isUnlockedForCurrentPlayer: true,
+            isPerishable: false,
+            imageUrl: null,
+            description: null,
+            recipes: [],
+          } satisfies MockProductType)
+
+        return {
+          kind: 'PRODUCT',
+          name: recipeProduct.name,
+          slug: recipeProduct.slug,
+          category: recipeProduct.industry,
+          industry: recipeProduct.industry,
+          imageUrl: recipeProduct.imageUrl ?? null,
+          quantity: recipe.quantity,
+          unitName: recipeProduct.unitName ?? 'Piece',
+          unitSymbol: recipeProduct.unitSymbol ?? 'pcs',
+          isPerishable: Boolean(recipeProduct.isPerishable),
+          isProOnly: recipeProduct.isProOnly,
+          isUnlockedForCurrentPlayer: recipeProduct.isUnlockedForCurrentPlayer ?? !recipeProduct.isProOnly,
+        }
+      }
+
+      const mapRecipeCard = (productType: MockProductType) => ({
+        id: `product:${productType.slug}`,
+        recipeName: `${productType.name} Recipe`,
+        buildingType: 'FACTORY',
+        outputQuantity: productType.outputQuantity ?? 1,
+        output: mapProductEntry(productType),
+        inputs: productType.recipes.map(mapRecipeInput),
+      })
+
+      const detail = resource
+        ? {
+            entry: mapResourceEntry(resource),
+            producedByRecipes: [
+              {
+                id: `mine:${resource.slug}`,
+                recipeName: `${resource.name} Extraction`,
+                buildingType: 'MINE',
+                outputQuantity: 1,
+                output: mapResourceEntry(resource),
+                inputs: [],
+              },
+            ],
+            usedInRecipes: state.productTypes
+              .filter((candidate) => candidate.recipes.some((recipe) => recipe.resourceType?.slug === resource.slug))
+              .map(mapRecipeCard),
+          }
+        : product
+          ? {
+              entry: mapProductEntry(product),
+              producedByRecipes: [mapRecipeCard(product)],
+              usedInRecipes: state.productTypes
+                .filter((candidate) => candidate.recipes.some((recipe) => recipe.inputProductType?.slug === product.slug))
+                .map(mapRecipeCard),
+            }
+          : null
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { encyclopediaResourceDetail: detail } }),
+      })
+    }
+
+    if (query.includes('encyclopediaResources')) {
+      const variables = body.variables as { search?: string; page?: number } | undefined
+      const normalizedSearch = (variables?.search ?? '').trim().toLowerCase()
+      const page = Math.max(1, Number(variables?.page ?? 1))
+      const pageSize = 24
+
+      const entries = [
+        ...state.resourceTypes.map((resource) => ({
+          id: resource.id,
+          kind: 'RESOURCE',
+          name: resource.name,
+          slug: resource.slug,
+          category: resource.category,
+          industry: null,
+          description: resource.description,
+          imageUrl: resource.imageUrl ?? null,
+          isPerishable: false,
+          isProOnly: false,
+          isUnlockedForCurrentPlayer: true,
+          basePrice: resource.basePrice,
+          weightPerUnit: resource.weightPerUnit,
+          baseCraftTicks: null,
+          outputQuantity: null,
+          energyConsumptionMwh: null,
+          basicLaborHours: null,
+          unitName: resource.unitName,
+          unitSymbol: resource.unitSymbol,
+        })),
+        ...state.productTypes.map((productType) => ({
+          id: productType.id,
+          kind: 'PRODUCT',
+          name: productType.name,
+          slug: productType.slug,
+          category: productType.industry,
+          industry: productType.industry,
+          description: productType.description,
+          imageUrl: productType.imageUrl ?? null,
+          isPerishable: Boolean(productType.isPerishable),
+          isProOnly: productType.isProOnly,
+          isUnlockedForCurrentPlayer: productType.isUnlockedForCurrentPlayer ?? !productType.isProOnly,
+          basePrice: productType.basePrice,
+          weightPerUnit: null,
+          baseCraftTicks: productType.baseCraftTicks,
+          outputQuantity: productType.outputQuantity ?? 1,
+          energyConsumptionMwh: productType.energyConsumptionMwh ?? 0,
+          basicLaborHours: productType.basicLaborHours ?? 0,
+          unitName: productType.unitName ?? 'Piece',
+          unitSymbol: productType.unitSymbol ?? 'pcs',
+        })),
+      ]
+        .filter((entry) => {
+          if (!normalizedSearch) {
+            return true
+          }
+
+          return [entry.name, entry.slug, entry.description ?? '', entry.category, entry.industry ?? '']
+            .join(' ')
+            .toLowerCase()
+            .includes(normalizedSearch)
+        })
+        .sort((left, right) => left.name.localeCompare(right.name))
+
+      const totalPages = Math.max(1, Math.ceil(entries.length / pageSize))
+      const safePage = Math.min(page, totalPages)
+      const items = entries.slice((safePage - 1) * pageSize, safePage * pageSize)
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            encyclopediaResources: {
+              page: safePage,
+              totalPages,
+              totalCount: entries.length,
+              items,
+            },
+          },
+        }),
+      })
+    }
+
     if (query.includes('encyclopediaResource')) {
       const variables = body.variables as { slug?: string } | undefined
       const slug = variables?.slug ?? ''

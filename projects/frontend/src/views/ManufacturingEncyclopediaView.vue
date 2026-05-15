@@ -17,7 +17,7 @@ import {
   localizeGuideImageUrl,
 } from '@/lib/encyclopediaGuideData'
 import EncyclopediaResourcesCatalog from '@/components/encyclopedia/EncyclopediaResourcesCatalog.vue'
-import type { ProductType, ResourceType } from '@/types'
+import type { EncyclopediaCatalogEntry, EncyclopediaResourcePage } from '@/types'
 
 type EncyclopediaTopicSlug = 'onboarding-help' | 'factory-layout-help' | 'sales-shop-help' | 'forex-trading-help' | 'stock-exchange-help' | 'resources-definition'
 
@@ -27,8 +27,7 @@ const router = useRouter()
 
 const loading = ref(true)
 const error = ref<string | null>(null)
-const resources = ref<ResourceType[]>([])
-const products = ref<ProductType[]>([])
+const entries = ref<EncyclopediaCatalogEntry[]>([])
 const fullscreenImage = ref<{ src: string; alt: string } | null>(null)
 
 const topicSlugs: EncyclopediaTopicSlug[] = ['onboarding-help', 'factory-layout-help', 'sales-shop-help', 'forex-trading-help', 'stock-exchange-help', 'resources-definition']
@@ -47,54 +46,12 @@ const topicMenu = computed(() => [
   { slug: 'resources-definition' as const, label: t('encyclopedia.topicResourcesDefinition') },
 ])
 
-const resourcesBySlug = computed(() => new Map(resources.value.map((resource) => [resource.slug, resource])))
-const productsBySlug = computed(() => new Map(products.value.map((product) => [product.slug, product])))
+const entriesBySlug = computed(() => new Map(entries.value.map((entry) => [entry.slug, entry])))
 
 onMounted(async () => {
   try {
     loading.value = true
-    const [resourceData, productData] = await Promise.all([
-      gqlRequest<{ resourceTypes: ResourceType[] }>(`{
-        resourceTypes {
-          id
-          name
-          slug
-          category
-          basePrice
-          weightPerUnit
-          unitName
-          unitSymbol
-          imageUrl
-          description
-        }
-      }`),
-      gqlRequest<{ productTypes: ProductType[] }>(`{
-        productTypes {
-          id
-          name
-          slug
-          industry
-          basePrice
-          baseCraftTicks
-          outputQuantity
-          energyConsumptionMwh
-          basicLaborHours
-          unitName
-          unitSymbol
-          isProOnly
-          isUnlockedForCurrentPlayer
-          description
-          recipes {
-            quantity
-            resourceType { id name slug category basePrice weightPerUnit unitName unitSymbol imageUrl description }
-            inputProductType { id name slug unitName unitSymbol }
-          }
-        }
-      }`),
-    ])
-
-    resources.value = resourceData.resourceTypes
-    products.value = productData.productTypes
+    entries.value = await loadAllEncyclopediaEntries()
   } catch (reason: unknown) {
     error.value = reason instanceof Error ? reason.message : t('encyclopedia.loadFailed')
   } finally {
@@ -108,15 +65,15 @@ function getGuideCardImage(card: { resourceSlug?: string; productSlug?: string; 
   }
 
   if (card.resourceSlug) {
-    const resource = resourcesBySlug.value.get(card.resourceSlug)
-    if (resource) {
+    const resource = entriesBySlug.value.get(card.resourceSlug)
+    if (resource?.kind === 'RESOURCE') {
       return getResourceImageUrl(resource)
     }
   }
 
   if (card.productSlug) {
-    const product = productsBySlug.value.get(card.productSlug)
-    if (product) {
+    const product = entriesBySlug.value.get(card.productSlug)
+    if (product?.kind === 'PRODUCT') {
       return getProductImageUrl(product)
     }
   }
@@ -152,6 +109,57 @@ function navigateToEntry(slug: string) {
     query: showPro ? { showPro: '1' } : {},
   })
 }
+
+async function loadAllEncyclopediaEntries() {
+  const firstPage = await loadEncyclopediaPage(1)
+  if (firstPage.totalPages <= 1) {
+    return firstPage.items
+  }
+
+  const remainingPages = await Promise.all(
+    Array.from({ length: firstPage.totalPages - 1 }, (_, index) => loadEncyclopediaPage(index + 2)),
+  )
+
+  return [firstPage, ...remainingPages].flatMap((page) => page.items)
+}
+
+async function loadEncyclopediaPage(page: number) {
+  const result = await gqlRequest<{ encyclopediaResources: EncyclopediaResourcePage }>(
+    `
+      query EncyclopediaResources($page: Int!) {
+        encyclopediaResources(page: $page) {
+          page
+          totalPages
+          totalCount
+          items {
+            id
+            kind
+            name
+            slug
+            category
+            industry
+            description
+            imageUrl
+            isPerishable
+            isProOnly
+            isUnlockedForCurrentPlayer
+            basePrice
+            weightPerUnit
+            baseCraftTicks
+            outputQuantity
+            energyConsumptionMwh
+            basicLaborHours
+            unitName
+            unitSymbol
+          }
+        }
+      }
+    `,
+    { page },
+  )
+
+  return result.encyclopediaResources
+}
 </script>
 
 <template>
@@ -179,18 +187,28 @@ function navigateToEntry(slug: string) {
       </div>
       <div class="flex flex-wrap gap-4 justify-end max-sm:justify-stretch">
         <div class="stat-card bg-card border border-divider rounded-2xl px-5 py-4 min-w-[120px] grid gap-1 max-sm:flex-1">
-          <strong>{{ resources.length + products.length }}</strong>
+          <strong>{{ entries.length }}</strong>
           <span class="text-muted text-sm">{{ t('encyclopedia.resourcesCount') }}</span>
         </div>
         <div class="stat-card bg-card border border-divider rounded-2xl px-5 py-4 min-w-[120px] grid gap-1 max-sm:flex-1">
-          <strong>{{ products.length }}</strong>
+          <strong>{{ entries.filter((entry) => entry.kind === 'PRODUCT').length }}</strong>
           <span class="text-muted text-sm">{{ t('encyclopedia.productsCount') }}</span>
         </div>
       </div>
     </header>
 
     <!-- Loading / error -->
-    <div v-if="loading" class="text-muted py-12 text-center">{{ t('common.loading') }}</div>
+    <div
+      v-if="loading && selectedTopic === 'resources-definition'"
+      class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
+    >
+      <div
+        v-for="index in 6"
+        :key="index"
+        class="h-64 animate-pulse rounded-2xl border border-divider bg-card"
+      />
+    </div>
+    <div v-else-if="loading" class="text-muted py-12 text-center">{{ t('common.loading') }}</div>
     <div v-else-if="error" class="bg-card border border-divider rounded-2xl p-6 text-center text-muted" role="alert">
       {{ error }}
     </div>
@@ -341,7 +359,11 @@ function navigateToEntry(slug: string) {
         </section>
       </div>
 
-      <EncyclopediaResourcesCatalog v-if="selectedTopic === 'resources-definition'" :resources="resources" :products="products" @navigate="navigateToEntry" />
+      <EncyclopediaResourcesCatalog
+        v-if="selectedTopic === 'resources-definition'"
+        :entries="entries"
+        @navigate="navigateToEntry"
+      />
     </section>
 
     <div

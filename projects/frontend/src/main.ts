@@ -10,7 +10,7 @@ import './assets/styles/main.css'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import {
   faBars,
-  faBook,
+  faBookOpen,
   faChartBar,
   faGlobe,
   faHome,
@@ -46,7 +46,7 @@ library.add(
   faTrophy,
   faGlobe,
   faCoins,
-  faBook,
+  faBookOpen,
   faSignInAlt,
   faSignOutAlt,
   faBars,
