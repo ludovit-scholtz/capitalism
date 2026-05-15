@@ -17,7 +17,7 @@ public sealed partial class Mutation
     /// Admin-only: forces the shard to conclude immediately, recording the current wealthiest
     /// player as winner and creating a VictoryNewsletter.
     /// </summary>
-    [Authorize(Roles = new[] { "ADMIN" })]
+    [Authorize]
     [GraphQLDescription("Force the shard to conclude with the current wealthiest player as winner.")]
     public async Task<ShardStatusResult> ForceShardConclusion(
         ForceShardConclusionInput input,

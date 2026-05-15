@@ -74,6 +74,27 @@ public sealed class VictoryCheckPhaseTests
         Assert.Equal(200_000_000_000m, value);
     }
 
+    /// <summary>
+    /// billionaireBenchmarkUsd is intentionally a public query — unauthenticated callers
+    /// can read the race-to-top target so they know the win condition without logging in.
+    /// </summary>
+    [Fact]
+    public async Task BillionaireBenchmarkUsd_Unauthenticated_ReturnsPublicValue()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        // No token — this query is intentionally public (no [Authorize])
+        var result = await ExecuteGraphQlAsync(client, "{ billionaireBenchmarkUsd }");
+
+        // Should not return errors
+        Assert.False(result.TryGetProperty("errors", out _),
+            "billionaireBenchmarkUsd must be accessible without authentication.");
+
+        var value = result.GetProperty("data").GetProperty("billionaireBenchmarkUsd").GetDecimal();
+        Assert.True(value > 0m, "Public billionaireBenchmarkUsd should be a positive number.");
+    }
+
     // -------------------------------------------------------------------
     // ShardStatus query
 
@@ -481,5 +502,172 @@ public sealed class VictoryCheckPhaseTests
         Assert.True(newsletter.GetProperty("winnerNetWorthUsd").GetDecimal() > 0m);
         Assert.True(newsletter.GetProperty("gameDurationTicks").GetInt64() >= 0);
         Assert.False(string.IsNullOrEmpty(newsletter.GetProperty("top10RankingsJson").GetString()));
+    }
+
+    // -------------------------------------------------------------------
+    // ShardStatus — public query, accessible without auth
+
+    [Fact]
+    public async Task ShardStatus_Unauthenticated_ReturnsPublicActiveState()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        // No token — shardStatus must be a public query so unauthenticated players
+        // can check whether the shard has concluded without logging in.
+        var result = await ExecuteGraphQlAsync(client, """
+            {
+              shardStatus {
+                shardState
+                gameEnded
+              }
+            }
+            """);
+
+        Assert.False(result.TryGetProperty("errors", out _),
+            "shardStatus must be accessible without authentication.");
+
+        var status = result.GetProperty("data").GetProperty("shardStatus");
+        Assert.Equal("ACTIVE", status.GetProperty("shardState").GetString());
+        Assert.False(status.GetProperty("gameEnded").GetBoolean());
+    }
+
+    // -------------------------------------------------------------------
+    // VictoryNewsletter — public query, accessible without auth
+
+    [Fact]
+    public async Task VictoryNewsletter_Unauthenticated_ReturnsNullWhenNotConcluded()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        // No token — victoryNewsletter must be public so any visitor can read it
+        var result = await ExecuteGraphQlAsync(client, """
+            {
+              victoryNewsletter {
+                winnerDisplayName
+              }
+            }
+            """);
+
+        Assert.False(result.TryGetProperty("errors", out _),
+            "victoryNewsletter must be accessible without authentication.");
+
+        Assert.Equal(JsonValueKind.Null,
+            result.GetProperty("data").GetProperty("victoryNewsletter").ValueKind);
+    }
+
+    // -------------------------------------------------------------------
+    // ForceShardConclusion — SHARD_ALREADY_CONCLUDED guard
+
+    [Fact]
+    public async Task ForceShardConclusion_WhenAlreadyConcluded_ReturnsError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var (adminToken, adminId) = await RegisterAndGetTokenAsync(client, "victory-double-admin@victory.test");
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var admin = await db.Players.FirstAsync(p => p.Id == adminId);
+            admin.Role = PlayerRole.Admin;
+            await db.SaveChangesAsync();
+        }
+
+        const string mutBody = """
+            mutation ForceConclusion($input: ForceShardConclusionInput!) {
+              forceShardConclusion(input: $input) {
+                shardState
+                gameEnded
+              }
+            }
+            """;
+        var input = new { input = new { reason = "First conclusion" } };
+
+        // First call succeeds
+        var first = await ExecuteGraphQlAsync(client, mutBody, input, adminToken);
+        Assert.Equal("CONCLUDED",
+            first.GetProperty("data").GetProperty("forceShardConclusion").GetProperty("shardState").GetString());
+
+        // Second call must be rejected — either by the SHARD_CONCLUDED middleware
+        // or by the mutation's own SHARD_ALREADY_CONCLUDED guard
+        var second = await ExecuteGraphQlAsync(client, mutBody, new { input = new { reason = "Duplicate" } }, adminToken);
+        Assert.True(second.TryGetProperty("errors", out var errors),
+            "Second forceShardConclusion must return errors.");
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.True(code is "SHARD_ALREADY_CONCLUDED" or "SHARD_CONCLUDED",
+            $"Expected SHARD_ALREADY_CONCLUDED or SHARD_CONCLUDED but got: {code}");
+    }
+
+    // -------------------------------------------------------------------
+    // ForceShardConclusion — empty reason is rejected
+
+    [Fact]
+    public async Task ForceShardConclusion_EmptyReason_ReturnsReasonRequiredError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var (adminToken, adminId) = await RegisterAndGetTokenAsync(client, "victory-empty-reason@victory.test");
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var admin = await db.Players.FirstAsync(p => p.Id == adminId);
+            admin.Role = PlayerRole.Admin;
+            await db.SaveChangesAsync();
+        }
+
+        var result = await ExecuteGraphQlAsync(client, """
+            mutation ForceConclusion($input: ForceShardConclusionInput!) {
+              forceShardConclusion(input: $input) {
+                shardState
+              }
+            }
+            """, new { input = new { reason = "   " } }, adminToken);
+
+        Assert.True(result.TryGetProperty("errors", out var errors),
+            "Empty-reason forceShardConclusion must return an error.");
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("REASON_REQUIRED", code);
+    }
+
+    // -------------------------------------------------------------------
+    // SHARD_CONCLUDED middleware — mutations blocked after conclusion
+
+    [Fact]
+    public async Task ShardConcluded_RegularMutationsAreBlocked()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var (adminToken, adminId) = await RegisterAndGetTokenAsync(client, "victory-block-admin@victory.test");
+        var (playerToken, _) = await RegisterAndGetTokenAsync(client, "victory-block-player@victory.test");
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var admin = await db.Players.FirstAsync(p => p.Id == adminId);
+            admin.Role = PlayerRole.Admin;
+            await db.SaveChangesAsync();
+        }
+
+        // Conclude the shard
+        await ExecuteGraphQlAsync(client, """
+            mutation ForceConclusion($input: ForceShardConclusionInput!) {
+              forceShardConclusion(input: $input) { shardState }
+            }
+            """, new { input = new { reason = "Block test conclusion" } }, adminToken);
+
+        // Try to create a company — should be blocked
+        var blocked = await ExecuteGraphQlAsync(client, """
+            mutation CreateCompany($input: CreateCompanyInput!) {
+              createCompany(input: $input) { id name }
+            }
+            """, new { input = new { name = "ShouldBeBlocked" } }, playerToken);
+
+        Assert.True(blocked.TryGetProperty("errors", out var errors),
+            "Regular mutations must be blocked after shard conclusion.");
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("SHARD_CONCLUDED", code);
     }
 }
