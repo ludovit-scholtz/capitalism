@@ -163,6 +163,31 @@ test.describe('Forex Exchange page', () => {
     await expect(page.getByLabel('You receive')).toHaveValue('USD')
   })
 
+  test('PLN is available as a destination currency in the swap selector', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.fxRates = [
+      ...state.fxRates.filter((rate) => rate.quoteCurrencyCode !== 'PLN'),
+      {
+        baseCurrencyCode: 'EUR',
+        quoteCurrencyCode: 'PLN',
+        rate: 4.3,
+        rateDate: '2026-04-22',
+        source: 'ECB',
+        quoteCurrencySymbol: 'zł',
+      },
+    ]
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex')
+
+    await expect(page.getByLabel('You receive').locator('option[value="PLN"]')).toHaveCount(1)
+  })
+
   test('shows validation error when same currency is selected', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, { players: [player] })

@@ -103,7 +103,8 @@ public sealed partial class Mutation
         string? powerPlantType = null,
         bool applyConstructionDelay = false,
         bool validateDestinationCurrency = false,
-        decimal purchaseDiscountRate = 0m)
+        decimal purchaseDiscountRate = 0m,
+        bool skipCityUnlockValidation = false)
     {
         var lot = await db.BuildingLots
             .Include(candidate => candidate.City)
@@ -144,6 +145,23 @@ public sealed partial class Mutation
                     .SetMessage($"Invalid building type: {buildingType}")
                     .SetCode("INVALID_BUILDING_TYPE")
                     .Build());
+        }
+
+        if (!skipCityUnlockValidation)
+        {
+            var cityUnlockStatus = await CityUnlockService.GetStatusForCityAsync(db, lot.CityId, company.Id);
+            if (cityUnlockStatus is not null && !cityUnlockStatus.IsUnlocked)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage($"City {lot.City?.Name ?? "Unknown"} is locked for this company.")
+                        .SetCode("CITY_LOCKED")
+                        .SetExtension("cityId", lot.CityId)
+                        .SetExtension("requiredNetWorth", cityUnlockStatus.RequiredNetWorth)
+                        .SetExtension("currentNetWorth", cityUnlockStatus.CurrentNetWorth)
+                        .SetExtension("currency", cityUnlockStatus.Currency)
+                        .Build());
+            }
         }
 
         var suitableTypes = lot.SuitableTypes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);

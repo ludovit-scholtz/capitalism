@@ -20,6 +20,7 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 - [x] (100%) Redisign the city view to tab page layout. Make sure the tabs are in the routing /city/:cityId/:tab
 - [x] (100%) Move the `Economy cycle` from /dashboard to tab in a city. Make sure every city has different economy cycle.
+- [x] (100%) City Expansion Unlock System is live: Berlin (EUR) and Warsaw (PLN) are now fully playable cities, company net-worth thresholds progressively unlock expansion markets, locked city routes/context switchers show requirement progress, the ledger includes a City Expansion progress panel, and tick processing emits in-game city-unlock notifications without regressing onboarding or FX support.
 
 ### Map selection at /buy-building/
 

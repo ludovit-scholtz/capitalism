@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
@@ -9,7 +9,8 @@ import { selectMainCity } from '@/lib/cityContext'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
 import { buildAccountOptions, getActiveAccountName, type AccountOption } from '@/lib/accountContext'
-import type { City } from '@/types'
+import { formatMoney } from '@/lib/currencyFormat'
+import type { City, CityUnlockStatus } from '@/types'
 
 const emit = defineEmits<{ switched: [] }>()
 
@@ -23,12 +24,38 @@ const root = ref<HTMLElement | null>(null)
 const isOpen = ref(false)
 const switchingKey = ref<string | null>(null)
 const cities = ref<City[]>([])
+const cityUnlockById = ref<Record<string, CityUnlockStatus>>({})
 
 // ── City helpers ──────────────────────────────────────────────────────────────
 
 async function loadCities() {
   try {
-    const data = await gqlRequest<{ cities: City[] }>(`{ cities { id name countryCode currencyCode latitude longitude population } }`)
+    const [citiesData, unlockData] = await Promise.all([
+      gqlRequest<{ cities: City[] }>(`{ cities { id name countryCode currencyCode latitude longitude population } }`),
+      auth.isAuthenticated
+        ? gqlRequest<{ cityUnlockStatuses: CityUnlockStatus[] }>(
+            `{
+              cityUnlockStatuses {
+                cityId
+                cityName
+                countryCode
+                isUnlocked
+                requiredNetWorth
+                currentNetWorth
+                currency
+                progressPercent
+                estimatedTicksToUnlock
+                companyId
+              }
+            }`,
+          )
+        : Promise.resolve({ cityUnlockStatuses: [] as CityUnlockStatus[] }),
+    ])
+
+    const unlockStatuses = unlockData.cityUnlockStatuses ?? []
+    cityUnlockById.value = Object.fromEntries(unlockStatuses.map((status) => [status.cityId, status]))
+
+    const data = citiesData
     if (data?.cities) {
       cities.value = data.cities
     }
@@ -49,6 +76,7 @@ async function loadCities() {
 }
 
 const selectedCity = computed(() => cities.value.find((c) => c.id === selectedCityId.value) ?? cities.value[0] ?? null)
+const selectedCityUnlock = computed(() => (selectedCity.value ? cityUnlockById.value[selectedCity.value.id] ?? null : null))
 
 /** Building count in each city for the currently active company (or all companies if PERSON). */
 const buildingCountByCity = computed<Record<string, number>>(() => {
@@ -74,12 +102,8 @@ const accountOptions = computed(() => buildAccountOptions(auth.player, auth.play
 const activeAccountName = computed(() => getActiveAccountName(auth.player, auth.player?.companies ?? []) ?? auth.player?.displayName ?? '')
 const activeAccountBadgeKey = computed(() => (auth.player?.activeAccountType === 'COMPANY' ? 'accountSwitcher.companyBadge' : 'accountSwitcher.personBadge'))
 
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat(locale.value, {
-    style: 'currency',
-    currency: selectedCity.value?.currencyCode ?? 'EUR',
-    maximumFractionDigits: 0,
-  }).format(value)
+function formatAmount(value: number, currencyCode?: string): string {
+  return formatMoney(value, currencyCode ?? selectedCity.value?.currencyCode ?? 'EUR', locale.value)
 }
 
 function getRouteTarget(accountType: 'PERSON' | 'COMPANY', companyId: string | null) {
@@ -143,6 +167,13 @@ onMounted(() => {
   document.addEventListener('keydown', handleEscape)
 })
 
+watch(
+  () => [auth.isAuthenticated, auth.player?.activeCompanyId, auth.player?.activeAccountType] as const,
+  () => {
+    void loadCities()
+  },
+)
+
 onUnmounted(() => {
   document.removeEventListener('mousedown', handlePointerDown)
   document.removeEventListener('keydown', handleEscape)
@@ -166,6 +197,13 @@ defineExpose({ closePanel })
         />
         <span v-else class="ctx-cc-badge" aria-hidden="true">??</span>
         <span class="ctx-city-name">{{ selectedCity?.name ?? '…' }}</span>
+        <font-awesome-icon
+          v-if="selectedCityUnlock && !selectedCityUnlock.isUnlocked"
+          :icon="['fas', 'lock']"
+          class="ctx-city-lock"
+          :title="t('cityExpansion.lockedTooltip', { amount: formatAmount(selectedCityUnlock.requiredNetWorth, selectedCityUnlock.currency) })"
+          aria-hidden="true"
+        />
       </span>
 
       <!-- Divider -->
@@ -187,10 +225,11 @@ defineExpose({ closePanel })
       v-if="isOpen"
       :cities="cities"
       :selected-city-id="selectedCityId"
+      :city-unlock-by-id="cityUnlockById"
       :building-count-by-city="buildingCountByCity"
       :account-options="accountOptions"
       :switching-key="switchingKey"
-      :format-currency="formatCurrency"
+      :format-amount="formatAmount"
       @select-city="selectCity"
       @switch-account="handleSwitchAccount"
     />
@@ -260,6 +299,11 @@ defineExpose({ closePanel })
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.ctx-city-lock {
+  color: var(--color-warning, #d97706);
+  font-size: 0.72rem;
 }
 
 .ctx-sep {

@@ -88,6 +88,9 @@ public sealed partial class AppDbInitializer(
             SeedCities();
         }
 
+        await dbContext.SaveChangesAsync();
+        await EnsureCityUnlockRequirementsAsync();
+
         if (!await dbContext.ProductTypes.AnyAsync())
         {
             SeedProducts();

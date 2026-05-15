@@ -118,6 +118,19 @@ export interface City {
   resources: Resource[]
 }
 
+export interface CityUnlockStatus {
+  cityId: string
+  cityName: string
+  countryCode: string
+  isUnlocked: boolean
+  requiredNetWorth: number
+  currentNetWorth: number
+  currency: string
+  progressPercent: number
+  estimatedTicksToUnlock?: number | null
+  companyId?: string | null
+}
+
 /** Summary of a single power plant in the city power balance view. */
 export interface PowerPlantSummary {
   buildingId: string

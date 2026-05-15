@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import { computeCityUnlockProgress } from '@/lib/cityExpansion'
 import CountryFlag from '@/components/common/CountryFlag.vue'
 import type { AccountOption } from '@/lib/accountContext'
-import type { City } from '@/types'
+import type { City, CityUnlockStatus } from '@/types'
 
 defineProps<{
   cities: City[]
   selectedCityId: string | null
+  cityUnlockById: Record<string, CityUnlockStatus>
   buildingCountByCity: Record<string, number>
   accountOptions: AccountOption[]
   switchingKey: string | null
-  formatCurrency: (value: number) => string
+  formatAmount: (value: number, currencyCode?: string) => string
 }>()
 
 const emit = defineEmits<{
@@ -33,17 +35,28 @@ const { t } = useI18n()
         :key="city.id"
         type="button"
         class="ctx-city-option"
-        :class="{ active: city.id === selectedCityId }"
+        :class="{ active: city.id === selectedCityId, 'ctx-city-option--locked': cityUnlockById[city.id] && !cityUnlockById[city.id]?.isUnlocked }"
         role="menuitemradio"
         :aria-checked="city.id === selectedCityId"
+        :title="
+          cityUnlockById[city.id] && !cityUnlockById[city.id]?.isUnlocked
+            ? t('cityExpansion.lockedTooltip', { amount: formatAmount(cityUnlockById[city.id]!.requiredNetWorth, cityUnlockById[city.id]!.currency) })
+            : city.name
+        "
         @click="emit('selectCity', city.id)"
       >
         <CountryFlag :country-code="city.countryCode" size="sm" :title="city.countryCode" aria-hidden="true" />
         <span class="ctx-city-info">
           <span class="ctx-city-option-name">{{ city.name }}</span>
-          <span class="ctx-city-option-meta">{{ city.currencyCode }}</span>
+          <span class="ctx-city-option-meta">
+            {{ city.currencyCode }}
+            <template v-if="cityUnlockById[city.id] && !cityUnlockById[city.id]?.isUnlocked">
+              · {{ t('cityExpansion.progressShort', { percent: computeCityUnlockProgress(cityUnlockById[city.id]!) }) }}
+            </template>
+          </span>
         </span>
         <span class="ctx-city-right">
+          <span v-if="cityUnlockById[city.id] && !cityUnlockById[city.id]?.isUnlocked" class="ctx-city-lock" aria-hidden="true">🔒</span>
           <span v-if="buildingCountByCity[city.id]" class="ctx-city-building-count" :title="t('dashboard.buildings')">
             <font-awesome-icon :icon="['fas', 'building']" aria-hidden="true" />
             {{ buildingCountByCity[city.id] }}
@@ -79,9 +92,9 @@ const { t } = useI18n()
             {{ option.accountType === 'PERSON' ? t('accountSwitcher.personalAccountHint') : t('accountSwitcher.companyAccountHint') }}
           </span>
         </span>
-        <span class="ctx-acc-meta">
+          <span class="ctx-acc-meta">
           <span v-if="option.cash != null" class="ctx-acc-cash">
-            {{ formatCurrency(option.cash) }}
+            {{ formatAmount(option.cash) }}
           </span>
           <span v-if="option.isActive" class="ctx-active-label">{{ t('accountSwitcher.active') }}</span>
         </span>
@@ -154,6 +167,10 @@ const { t } = useI18n()
   border-color: var(--color-primary);
 }
 
+.ctx-city-option--locked {
+  border-color: color-mix(in srgb, var(--color-warning, #d97706) 28%, transparent);
+}
+
 .ctx-city-info {
   display: flex;
   flex-direction: column;
@@ -180,6 +197,10 @@ const { t } = useI18n()
   align-items: center;
   gap: 0.25rem;
   margin-left: auto;
+}
+
+.ctx-city-lock {
+  font-size: 0.8rem;
 }
 
 .ctx-city-building-count {

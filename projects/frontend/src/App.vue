@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppFooter from '@/components/layout/AppFooter.vue'
@@ -24,12 +25,19 @@ const gameAdminStore = useGameAdminStore()
 const chatStore = useChatStore()
 const referralStore = useReferralStore()
 const { status: endgameStatus } = useEndgameStatus()
+const { gameState } = storeToRefs(gameStateStore)
+const { unreadCount: notificationUnreadCount } = storeToRefs(notificationsStore)
 const endgameOverlayDismissed = ref(false)
 const signedOutNoticeVisible = ref(false)
+const cityUnlockToast = ref<{ id: string; title: string; message: string } | null>(null)
 const SIGNED_OUT_TOAST_DURATION_MS = 4_000
 gameStateStore.start()
 let citySwitchToastTimer: ReturnType<typeof setTimeout> | null = null
 let signedOutToastTimer: ReturnType<typeof setTimeout> | null = null
+let cityUnlockToastTimer: ReturnType<typeof setTimeout> | null = null
+let notificationToastBootstrapReady = false
+let lastNotificationCount = 0
+const seenCityUnlockNotificationIds = new Set<string>()
 
 function clearCitySwitchToastTimer() {
   if (citySwitchToastTimer) {
@@ -42,6 +50,52 @@ function clearSignedOutToastTimer() {
   if (signedOutToastTimer) {
     clearTimeout(signedOutToastTimer)
     signedOutToastTimer = null
+  }
+}
+
+function clearCityUnlockToastTimer() {
+  if (cityUnlockToastTimer) {
+    clearTimeout(cityUnlockToastTimer)
+    cityUnlockToastTimer = null
+  }
+}
+
+function initializeNotificationToastBootstrap() {
+  notificationToastBootstrapReady = true
+  lastNotificationCount = notificationUnreadCount.value
+}
+
+function dismissCityUnlockToast() {
+  cityUnlockToast.value = null
+  clearCityUnlockToastTimer()
+}
+
+function showCityUnlockToast(notification: { id: string; title: string; message: string }) {
+  cityUnlockToast.value = notification
+  seenCityUnlockNotificationIds.add(notification.id)
+  clearCityUnlockToastTimer()
+  cityUnlockToastTimer = setTimeout(() => {
+    cityUnlockToast.value = null
+  }, 6_000)
+}
+
+async function maybeShowCityUnlockToast() {
+  try {
+    const inbox = await notificationsStore.fetchInbox(5)
+    const notification = inbox.items.find(
+      (item) => item.type === 'CITY_EXPANSION_UNLOCKED' && !item.isRead && !seenCityUnlockNotificationIds.has(item.id),
+    )
+    if (!notification) {
+      return
+    }
+
+    showCityUnlockToast({
+      id: notification.id,
+      title: notification.title,
+      message: notification.message,
+    })
+  } catch {
+    // best effort
   }
 }
 
@@ -67,10 +121,11 @@ onMounted(() => {
     .fetchMe({ reconcileCityContext: true })
     .then(() => {
       if (!auth.isAuthenticated) {
+        initializeNotificationToastBootstrap()
         return
       }
       void newsStore.fetchUnreadCount()
-      void notificationsStore.fetchUnreadCount()
+      void notificationsStore.fetchUnreadCount().then(() => initializeNotificationToastBootstrap()).catch(() => undefined)
       void gameAdminStore.fetchSession()
     })
     .catch(() => undefined)
@@ -81,6 +136,7 @@ onMounted(() => {
 onUnmounted(() => {
   clearCitySwitchToastTimer()
   clearSignedOutToastTimer()
+  clearCityUnlockToastTimer()
 })
 
 watch(
@@ -90,17 +146,46 @@ watch(
       newsStore.clear()
       notificationsStore.clear()
       gameAdminStore.clear()
+      notificationToastBootstrapReady = false
+      lastNotificationCount = 0
+      seenCityUnlockNotificationIds.clear()
+      dismissCityUnlockToast()
       showSignedOutToastIfPending()
       return
     }
 
     if (token !== previousToken) {
       void newsStore.fetchUnreadCount()
-      void notificationsStore.fetchUnreadCount()
+      void notificationsStore.fetchUnreadCount().then(() => initializeNotificationToastBootstrap()).catch(() => undefined)
       void gameAdminStore.fetchSession()
     }
   },
 )
+
+watch(
+  () => gameState.value?.currentTick,
+  (tick, previousTick) => {
+    if (!auth.isAuthenticated || tick == null || previousTick == null || tick === previousTick) {
+      return
+    }
+
+    void notificationsStore.fetchUnreadCount().catch(() => undefined)
+  },
+)
+
+watch(notificationUnreadCount, (count) => {
+  if (!auth.isAuthenticated || !notificationToastBootstrapReady) {
+    return
+  }
+
+  if (count > lastNotificationCount) {
+    lastNotificationCount = count
+    void maybeShowCityUnlockToast()
+    return
+  }
+
+  lastNotificationCount = count
+})
 
 watch(
   () => auth.player?.appliedReferralCode,
@@ -185,6 +270,22 @@ watch(
         {{ t('auth.signedOut') }}
       </div>
       <button class="btn btn-ghost btn-sm shrink-0" :aria-label="t('common.close')" @click="signedOutNoticeVisible = false">
+        {{ t('common.close') }}
+      </button>
+    </div>
+
+    <div
+      v-if="cityUnlockToast"
+      class="city-unlock-toast fixed right-4 top-20 z-[221] flex max-w-sm items-start gap-3 rounded-xl border border-success/35 bg-card-raised px-4 py-3 shadow-2xl"
+      role="status"
+      aria-live="polite"
+    >
+      <span aria-hidden="true" class="pt-0.5 text-success">🎉</span>
+      <div class="min-w-0 flex-1 text-sm text-body">
+        <p class="m-0 font-semibold">{{ cityUnlockToast.title }}</p>
+        <p class="m-0 mt-1 text-muted">{{ cityUnlockToast.message }}</p>
+      </div>
+      <button class="btn btn-ghost btn-sm shrink-0" :aria-label="t('common.close')" @click="dismissCityUnlockToast">
         {{ t('common.close') }}
       </button>
     </div>

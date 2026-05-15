@@ -54,6 +54,7 @@ public sealed class PlayerNotification
 public static class PlayerNotificationType
 {
     public const string Generic = "GENERIC";
+    public const string CityExpansionUnlocked = "CITY_EXPANSION_UNLOCKED";
     public const string ShipmentArrived = "SHIPMENT_ARRIVED";
     public const string LogisticsMarginErosion = "LOGISTICS_MARGIN_EROSION";
     public const string LoanPaymentMissed = "LOAN_PAYMENT_MISSED";

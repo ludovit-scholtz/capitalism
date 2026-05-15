@@ -69,15 +69,21 @@
     <div v-if="showExpansionModal && selectedCity && !selectedCity.isUnlocked" class="expansion-modal-backdrop" role="dialog" aria-modal="true">
       <div class="expansion-modal">
         <h2>{{ t('worldMap.expandTitle', { city: selectedCity.name }) }}</h2>
-        <p>{{ t('worldMap.expandBody') }}</p>
+        <p>{{ t('cityExpansion.mapLockedBody', { city: selectedCity.name, amount: formatCurrency(selectedCity.requiredNetWorth ?? 0, selectedCity.currencyCode) }) }}</p>
+        <div class="world-map-progress" aria-hidden="true">
+          <span class="world-map-progress__fill" :style="{ width: `${selectedCity.progressPercent ?? 0}%` }"></span>
+        </div>
+        <p class="world-map-progress__label">{{ t('cityExpansion.progressLabel', { percent: selectedCity.progressPercent ?? 0 }) }}</p>
         <ul>
           <li>{{ t('worldMap.currency') }}: {{ selectedCity.currencyCode }}</li>
           <li>{{ t('worldMap.population') }}: {{ selectedCity.population.toLocaleString() }}</li>
+          <li>{{ t('cityExpansion.currentNetWorth') }}: {{ formatCurrency(selectedCity.currentNetWorth ?? 0, selectedCity.currencyCode) }}</li>
+          <li>{{ t('cityExpansion.requiredNetWorth') }}: {{ formatCurrency(selectedCity.requiredNetWorth ?? 0, selectedCity.currencyCode) }}</li>
           <li v-if="selectedCity.topResourceName">{{ t('worldMap.featuredResource') }}: {{ selectedCity.topResourceName }}</li>
         </ul>
         <div class="expansion-actions">
-          <button class="btn btn-primary btn-sm" type="button" @click="startExpanding(selectedCity)">
-            {{ t('worldMap.startExpanding') }}
+          <button class="btn btn-primary btn-sm" type="button" @click="startExpanding">
+            {{ t('cityExpansion.growToUnlockCta') }}
           </button>
           <button class="btn btn-secondary btn-sm" type="button" @click="showExpansionModal = false">
             {{ t('common.close') }}
@@ -96,6 +102,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { gqlRequest } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
+import { formatMoney } from '@/lib/currencyFormat'
 
 interface ExpansionCity {
   id: string
@@ -109,9 +116,13 @@ interface ExpansionCity {
   availableLandPlots?: number
   activeCompanyCount?: number
   topResourceName?: string | null
+  requiredNetWorth?: number
+  currentNetWorth?: number
+  progressPercent?: number
+  estimatedTicksToUnlock?: number | null
 }
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const router = useRouter()
 const auth = useAuthStore()
 
@@ -176,24 +187,23 @@ async function goToCity(city: ExpansionCity) {
   await router.push(`/city/${city.id}`)
 }
 
-async function startExpanding(city: ExpansionCity) {
+async function startExpanding() {
   showExpansionModal.value = false
   if (!auth.isAuthenticated) {
     await router.push('/login')
     return
   }
 
-  await gqlRequest<{ unlockCity: { isSuccess: boolean } }>(
-    `mutation UnlockCity($cityId: UUID!) { unlockCity(cityId: $cityId) { isSuccess } }`,
-    { cityId: city.id },
-  ).catch(() => null)
-
-  const companyId = auth.player?.companies?.[0]?.id
+  const companyId = auth.player?.activeCompanyId ?? auth.player?.companies?.[0]?.id
   if (companyId) {
-    await router.push(`/buy-building/${companyId}?cityId=${city.id}`)
+    await router.push(`/ledger/${companyId}`)
   } else {
     await router.push('/dashboard')
   }
+}
+
+function formatCurrency(amount: number, currencyCode: string): string {
+  return formatMoney(amount, currencyCode, locale.value)
 }
 
 async function fetchWorldMap() {
@@ -221,6 +231,10 @@ async function fetchWorldMap() {
               availableLandPlots
               activeCompanyCount
               topResourceName
+              requiredNetWorth
+              currentNetWorth
+              progressPercent
+              estimatedTicksToUnlock
             }
           }
         `,
@@ -255,12 +269,26 @@ async function fetchWorldMap() {
     )
 
     const normalizedCities = rawCities.length > 0 ? rawCities : fallbackCities
-    cities.value = normalizedCities.map((city) => ({
-      ...city,
-      isUnlocked: city.isUnlocked || unlockedIds.has(city.id),
-      availableLandPlots: city.availableLandPlots ?? 0,
-      activeCompanyCount: city.activeCompanyCount ?? 0,
-    }))
+    cities.value = normalizedCities.map((city) => {
+      const requiredNetWorth = city.requiredNetWorth ?? 0
+      const isUnlocked = city.isUnlocked ?? requiredNetWorth <= 0
+
+      return {
+        ...city,
+        isUnlocked: isUnlocked || unlockedIds.has(city.id),
+        requiredNetWorth,
+        currentNetWorth: city.currentNetWorth ?? (isUnlocked ? requiredNetWorth : 0),
+        progressPercent:
+          city.progressPercent ??
+          (isUnlocked
+            ? 100
+            : requiredNetWorth > 0
+              ? Math.max(0, Math.min(100, Math.round(((city.currentNetWorth ?? 0) / requiredNetWorth) * 100)))
+              : 0),
+        availableLandPlots: city.availableLandPlots ?? 0,
+        activeCompanyCount: city.activeCompanyCount ?? 0,
+      }
+    })
 
     selectedCityId.value = cities.value[0]?.id ?? null
     await nextTick()
@@ -451,6 +479,26 @@ onBeforeUnmount(() => {
   display: flex;
   gap: 0.5rem;
   justify-content: flex-end;
+}
+
+.world-map-progress {
+  width: 100%;
+  height: 0.75rem;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.18);
+  overflow: hidden;
+}
+
+.world-map-progress__fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
+}
+
+.world-map-progress__label {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
 }
 
 @media (max-width: 960px) {

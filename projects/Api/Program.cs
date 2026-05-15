@@ -484,6 +484,7 @@ public class Program
         builder.Services.AddScoped<ITickPhase, TelemetryBountyPhase>();
         builder.Services.AddScoped<ITickPhase, EconomicReportPhase>();
         builder.Services.AddScoped<ITickPhase, MarketReportPhase>();
+        builder.Services.AddScoped<ITickPhase, CityExpansionUnlockPhase>();
         builder.Services.AddScoped<ITickPhase, RankHistoryPhase>();
         builder.Services.AddScoped<ITickPhase, EndgamePhase>();
         builder.Services.AddScoped<ITickPhase, FxRateHistoryPhase>();

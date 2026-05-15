@@ -8,9 +8,6 @@ namespace Api.Types;
 
 public sealed partial class Mutation
 {
-    /// <summary>
-    /// Marks/returns whether the city is already unlocked by owning at least one building there.
-    /// </summary>
     [Authorize]
     [GraphQLName("unlockCity")]
     public async Task<UnlockCityPayload> UnlockCity(
@@ -18,11 +15,10 @@ public sealed partial class Mutation
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
-        var city = await db.Cities
-            .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.Id == cityId);
-
-        if (city is null)
+        var playerId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+        var activeCompanyId = await CityUnlockService.ResolvePlayerActiveCompanyIdAsync(db, playerId);
+        var status = await CityUnlockService.GetStatusForCityAsync(db, cityId, activeCompanyId);
+        if (status is null)
         {
             return new UnlockCityPayload(
                 IsSuccess: false,
@@ -30,13 +26,13 @@ public sealed partial class Mutation
                 ErrorMessage: "City not found.",
                 CityId: cityId,
                 IsUnlocked: false,
-                AvailableLandPlots: 0);
+                AvailableLandPlots: 0,
+                RequiredNetWorth: 0m,
+                CurrentNetWorth: 0m,
+                Currency: "EUR",
+                ProgressPercent: 0,
+                EstimatedTicksToUnlock: null);
         }
-
-        var playerId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
-        var isUnlocked = await db.Buildings
-            .AsNoTracking()
-            .AnyAsync(b => b.Company.PlayerId == playerId && b.CityId == cityId && b.DestroyedAtUtc == null);
 
         var availableLandPlots = await db.BuildingLots
             .AsNoTracking()
@@ -47,8 +43,13 @@ public sealed partial class Mutation
             ErrorCode: null,
             ErrorMessage: null,
             CityId: cityId,
-            IsUnlocked: isUnlocked,
-            AvailableLandPlots: availableLandPlots);
+            IsUnlocked: status.IsUnlocked,
+            AvailableLandPlots: availableLandPlots,
+            RequiredNetWorth: status.RequiredNetWorth,
+            CurrentNetWorth: status.CurrentNetWorth,
+            Currency: status.Currency,
+            ProgressPercent: status.ProgressPercent,
+            EstimatedTicksToUnlock: status.EstimatedTicksToUnlock);
     }
 }
 
@@ -58,4 +59,9 @@ public record UnlockCityPayload(
     string? ErrorMessage,
     Guid CityId,
     bool IsUnlocked,
-    int AvailableLandPlots);
+    int AvailableLandPlots,
+    decimal RequiredNetWorth,
+    decimal CurrentNetWorth,
+    string Currency,
+    int ProgressPercent,
+    long? EstimatedTicksToUnlock);

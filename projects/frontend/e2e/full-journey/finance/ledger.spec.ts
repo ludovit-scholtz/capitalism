@@ -210,6 +210,39 @@ test('ledger shows Income Tax Schedule banner', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Income Tax Schedule' })).toBeVisible()
 })
 
+test('ledger shows City Expansion panel with locked and unlocked city cards', async ({ page }) => {
+  const player = makePlayerWithLedger()
+  const state = setupMockApi(page, { players: [player] })
+  state.currentUserId = player.id
+  state.currentToken = `token-${player.id}`
+  state.gameState.currentTick = 100
+  state.cities = state.cities.map((city) => {
+    if (city.id === 'city-be') {
+      return { ...city, isUnlocked: false, requiredNetWorth: 460000, currentNetWorth: 230000, progressPercent: 50, estimatedTicksToUnlock: 32 }
+    }
+    if (city.id === 'city-wa') {
+      return { ...city, isUnlocked: true, requiredNetWorth: 1275000, currentNetWorth: 1450000, progressPercent: 100, estimatedTicksToUnlock: null }
+    }
+    return city
+  })
+
+  seedLedgerData(state, COMPANY_ID)
+
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${player.id}`)
+
+  await page.goto(`/ledger/${COMPANY_ID}`)
+
+  await expect(page.getByRole('heading', { name: 'City Expansion' })).toBeVisible()
+  const berlinCard = page.locator('.city-expansion-card', { hasText: 'Berlin' })
+  await expect(berlinCard).toContainText('Locked')
+  await expect(berlinCard).toContainText('50% progress')
+  const warsawCard = page.locator('.city-expansion-card', { hasText: 'Warsaw' })
+  await expect(warsawCard).toContainText('Unlocked')
+})
+
 test('ledger drilldown shows entries when line item is clicked', async ({ page }) => {
   const player = makePlayerWithLedger()
   const state = setupMockApi(page, { players: [player] })
