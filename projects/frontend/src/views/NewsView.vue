@@ -52,7 +52,7 @@ const pageTo = computed(() => Math.min(currentPage.value * pageSize, filteredEnt
 
 const canGoPrev = computed(() => currentPage.value > 1)
 const canGoNext = computed(() => currentPage.value < totalPages.value)
-const hasUnreadEntries = computed(() => (newsStore.feed?.items ?? []).some((entry) => entry.status === 'PUBLISHED' && !entry.isRead))
+const hasUnreadEntries = computed(() => initiallyUnreadIds.value.size > 0)
 
 function goToPrevPage() {
   if (!canGoPrev.value) {
@@ -132,6 +132,13 @@ async function loadFeed() {
     if (auth.isAuthenticated) {
       const unreadEntryIds = feed.items.filter((entry) => entry.status === 'PUBLISHED' && !entry.isRead).map((entry) => entry.id)
       initiallyUnreadIds.value = new Set(unreadEntryIds)
+      // Auto-mark all visible entries as read per acceptance criteria:
+      // "Navigating to /news marks all visible articles as read and the navbar badge resets to 0."
+      if (unreadEntryIds.length > 0) {
+        newsStore.markAllRead().catch(() => {
+          // Silently swallow mark-read errors; the visual state is already updated
+        })
+      }
     } else {
       initiallyUnreadIds.value = new Set()
     }
