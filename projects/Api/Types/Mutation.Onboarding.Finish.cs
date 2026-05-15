@@ -121,7 +121,8 @@ public sealed partial class Mutation
             Engine.GameConstants.PowerDemandMw(BuildingType.SalesShop, 1),
             nowUtc,
             onboardingCityId,
-            purchaseDiscountRate: referralDiscountRate);
+            purchaseDiscountRate: referralDiscountRate,
+            skipCityUnlockValidation: true);
 
         ConfigureStarterFactory(db, factory, product, starterResourceId.Value, finishFxRate);
         AddStarterShop(db, company.Id, shop.Id, product, finishFxRate);

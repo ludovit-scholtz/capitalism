@@ -231,6 +231,31 @@ public sealed partial class AppDbContext
             e.HasIndex(me => new { me.AffectedResourceTypeId, me.ExpiresAtTick });
         });
 
+        modelBuilder.Entity<CityUnlockRequirement>(e =>
+        {
+            e.HasKey(requirement => requirement.Id);
+            e.Property(requirement => requirement.RequiredNetWorthUsd).HasPrecision(18, 2);
+            e.HasOne(requirement => requirement.City)
+                .WithMany()
+                .HasForeignKey(requirement => requirement.CityId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(requirement => requirement.CityId).IsUnique();
+        });
+
+        modelBuilder.Entity<CompanyCityUnlock>(e =>
+        {
+            e.HasKey(unlock => unlock.Id);
+            e.HasOne(unlock => unlock.Company)
+                .WithMany()
+                .HasForeignKey(unlock => unlock.CompanyId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(unlock => unlock.City)
+                .WithMany()
+                .HasForeignKey(unlock => unlock.CityId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(unlock => new { unlock.CompanyId, unlock.CityId }).IsUnique();
+        });
+
         modelBuilder.Entity<LoanOffer>(e =>
         {
             e.HasKey(o => o.Id);

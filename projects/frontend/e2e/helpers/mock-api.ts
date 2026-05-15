@@ -437,6 +437,11 @@ export type MockCity = {
   averageRentPerSqm: number
   baseSalaryPerManhour: number
   resources: { resourceType: { id: string; name: string; slug: string; category: string }; abundance: number }[]
+  isUnlocked?: boolean
+  requiredNetWorth?: number
+  currentNetWorth?: number
+  progressPercent?: number
+  estimatedTicksToUnlock?: number | null
 }
 
 export type MockFxRate = {
@@ -2510,6 +2515,31 @@ export function makeDefaultCities(): MockCity[] {
       ],
     },
   ]
+}
+
+function buildMockCityUnlockStatuses(state: MockApiState, companyId?: string | null) {
+  const player = state.players.find((candidate) => candidate.id === state.currentUserId)
+  const resolvedCompanyId = companyId ?? player?.activeCompanyId ?? player?.companies[0]?.id ?? null
+
+  return state.cities.map((city) => {
+    const requiredNetWorth = city.requiredNetWorth ?? 0
+    const isUnlocked = city.isUnlocked ?? requiredNetWorth <= 0
+    const currentNetWorth = city.currentNetWorth ?? (isUnlocked ? requiredNetWorth : 0)
+    const progressPercent = city.progressPercent ?? (isUnlocked ? 100 : requiredNetWorth > 0 ? Math.max(0, Math.min(99, Math.round((currentNetWorth / requiredNetWorth) * 100))) : 0)
+
+    return {
+      cityId: city.id,
+      cityName: city.name,
+      countryCode: city.countryCode,
+      isUnlocked,
+      requiredNetWorth,
+      currentNetWorth,
+      currency: city.currencyCode ?? 'EUR',
+      progressPercent,
+      estimatedTicksToUnlock: city.estimatedTicksToUnlock ?? null,
+      companyId: resolvedCompanyId,
+    }
+  })
 }
 
 export function makeDefaultBuildingLots(): MockBuildingLot[] {
@@ -7144,6 +7174,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       if (query.includes('cities')) {
         responseData.cities = state.cities ?? []
       }
+      if (query.includes('cityUnlockStatuses')) {
+        responseData.cityUnlockStatuses = buildMockCityUnlockStatuses(state, body.variables?.companyId)
+      }
       if (query.includes('getCurrentEconomicCycle')) {
         responseData.getCurrentEconomicCycle = state.economicCycle
       }
@@ -8326,6 +8359,26 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { city: city ?? null } }),
+      })
+    }
+
+    if (query.includes('cityUnlockStatus') && !query.includes('cityUnlockStatuses') && !query.includes('companyLedger')) {
+      const cityId = body.variables?.cityId
+      const companyId = body.variables?.companyId
+      const status = buildMockCityUnlockStatuses(state, companyId).find((item) => item.cityId === cityId) ?? null
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { cityUnlockStatus: status } }),
+      })
+    }
+
+    if (query.includes('cityUnlockStatuses') && !query.includes('companyLedger')) {
+      const companyId = body.variables?.companyId
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { cityUnlockStatuses: buildMockCityUnlockStatuses(state, companyId) } }),
       })
     }
 
@@ -10151,6 +10204,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         if (query.includes('gameState')) {
           responseData.gameState = buildMockGameStatePayload(state.gameState)
         }
+        if (query.includes('cityUnlockStatuses')) {
+          responseData.cityUnlockStatuses = buildMockCityUnlockStatuses(state, companyId)
+        }
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -10194,6 +10250,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           ...entry,
           profit: entry.revenue - entry.costs,
         }))
+      }
+      if (query.includes('cityUnlockStatuses')) {
+        responseData.cityUnlockStatuses = buildMockCityUnlockStatuses(state, companyId)
       }
       if (query.includes('getCrossCityShipments')) {
         responseData.logisticsShipments = state.tradeRoutes

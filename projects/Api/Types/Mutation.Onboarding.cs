@@ -200,7 +200,8 @@ public sealed partial class Mutation
             Engine.GameConstants.PowerDemandMw(BuildingType.Factory, 1),
             nowUtc,
             city.Id,
-            purchaseDiscountRate: referralDiscountRate);
+            purchaseDiscountRate: referralDiscountRate,
+            skipCityUnlockValidation: true);
         ConfigureStarterFactory(db, factory, product, starterResourceId.Value, fxRate);
 
         var shopLotId = await FindCompatibleAvailableLotIdAsync(db, city.Id, BuildingType.SalesShop);
@@ -213,7 +214,8 @@ public sealed partial class Mutation
             Engine.GameConstants.PowerDemandMw(BuildingType.SalesShop, 1),
             nowUtc,
             city.Id,
-            purchaseDiscountRate: referralDiscountRate);
+            purchaseDiscountRate: referralDiscountRate,
+            skipCityUnlockValidation: true);
         AddStarterShop(db, company.Id, shop.Id, product, fxRate);
 
         // Mark onboarding as completed for this player
@@ -406,7 +408,8 @@ public sealed partial class Mutation
             Engine.GameConstants.PowerDemandMw(BuildingType.Factory, 1),
             nowUtc,
             input.CityId,
-            purchaseDiscountRate: referralDiscountRate);
+            purchaseDiscountRate: referralDiscountRate,
+            skipCityUnlockValidation: true);
 
         AddStarterFactoryShell(db, factory.Id);
 

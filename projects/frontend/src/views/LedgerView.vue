@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { gqlRequest } from '@/lib/graphql'
-import type { CompanyCityFinancialSummary, CompanyLedgerSummary, LedgerEntryResult, TradeRouteResult } from '@/types'
+import type { CityUnlockStatus, CompanyCityFinancialSummary, CompanyLedgerSummary, LedgerEntryResult, TradeRouteResult } from '@/types'
 import LedgerMainContent from '@/components/ledger/LedgerMainContent.vue'
 
 const { t } = useI18n()
@@ -17,6 +17,7 @@ const companyId = computed(() => route.params.companyId as string)
 const ledger = ref<CompanyLedgerSummary | null>(null)
 const cityFinancialBreakdown = ref<CompanyCityFinancialSummary[]>([])
 const logisticsShipments = ref<TradeRouteResult[]>([])
+const cityUnlockStatuses = ref<CityUnlockStatus[]>([])
 const currentTick = ref<number | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
@@ -72,6 +73,18 @@ const LEDGER_QUERY = `
       status
       failureReason
     }
+    cityUnlockStatuses(companyId: $companyId) {
+      cityId
+      cityName
+      countryCode
+      isUnlocked
+      requiredNetWorth
+      currentNetWorth
+      currency
+      progressPercent
+      estimatedTicksToUnlock
+      companyId
+    }
   }
 `
 
@@ -96,6 +109,7 @@ async function fetchLedger(isRefresh = false) {
       companyLedger: CompanyLedgerSummary | null
       companyCityFinancialBreakdown: CompanyCityFinancialSummary[]
       logisticsShipments: TradeRouteResult[]
+      cityUnlockStatuses: CityUnlockStatus[]
     }>(LEDGER_QUERY, {
       companyId: companyId.value,
       gameYear: selectedGameYear.value,
@@ -103,6 +117,7 @@ async function fetchLedger(isRefresh = false) {
     currentTick.value = data.gameState?.currentTick ?? null
     cityFinancialBreakdown.value = data.companyCityFinancialBreakdown ?? []
     logisticsShipments.value = data.logisticsShipments ?? []
+    cityUnlockStatuses.value = data.cityUnlockStatuses ?? []
     if (!data.companyLedger) {
       error.value = t('ledger.notFound')
       return
@@ -196,6 +211,7 @@ useTickRefresh(async () => {
       :ledger="ledger"
       :city-financial-breakdown="cityFinancialBreakdown"
       :logistics-shipments="logisticsShipments"
+      :city-unlock-statuses="cityUnlockStatuses"
       :current-tick="currentTick"
       :drill-category="drillCategory"
       :drill-entries="drillEntries"

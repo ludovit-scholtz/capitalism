@@ -219,7 +219,7 @@ public sealed class MultiCityExpansionGraphQlTests
     }
 
     [Fact]
-    public async Task UnlockCity_ReturnsFalseWhenPlayerHasNoBuildingInCity()
+    public async Task UnlockCity_ReturnsFalseWhenThresholdCityIsStillLocked()
     {
         await using var factory = new ApiWebApplicationFactory();
         var client = factory.CreateClient();
@@ -229,7 +229,7 @@ public sealed class MultiCityExpansionGraphQlTests
         await using (var scope = factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            cityId = db.Cities.First(c => c.Name == "Prague").Id;
+            cityId = db.Cities.First(c => c.Name == "Berlin").Id;
         }
 
         var result = await ExecuteGraphQlAsync(
@@ -241,6 +241,9 @@ public sealed class MultiCityExpansionGraphQlTests
                 cityId
                 isUnlocked
                 availableLandPlots
+                requiredNetWorth
+                currentNetWorth
+                currency
               }
             }
             """,
@@ -252,6 +255,9 @@ public sealed class MultiCityExpansionGraphQlTests
         Assert.True(payload.GetProperty("isSuccess").GetBoolean());
         Assert.Equal(cityId.ToString(), payload.GetProperty("cityId").GetString());
         Assert.False(payload.GetProperty("isUnlocked").GetBoolean());
+        Assert.Equal("EUR", payload.GetProperty("currency").GetString());
+        Assert.True(payload.GetProperty("requiredNetWorth").GetDecimal() > 0m);
+        Assert.True(payload.GetProperty("currentNetWorth").GetDecimal() < payload.GetProperty("requiredNetWorth").GetDecimal());
     }
 
     private static async Task<(Guid companyId, Guid routeId)> SeedRouteAsync(

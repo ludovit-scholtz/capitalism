@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { setupMockApi, makeDefaultCities } from '../../helpers/mock-api'
+import { makePlayer, setupMockApi, makeDefaultCities } from '../../helpers/mock-api'
 
 test.describe('Cities page', () => {
   test('shows all seeded cities including Berlin and Warsaw', async ({ page }) => {
@@ -121,5 +121,44 @@ test.describe('Cities page', () => {
     await page.getByRole('link', { name: 'Cities' }).first().click()
     await expect(page).toHaveURL('/cities')
   })
-})
 
+  test('context switcher shows lock icon and tooltip for locked cities', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-cities-lock',
+          playerId: 'player-cities-lock',
+          name: 'Expansion Tracker',
+          cash: 220000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    player.activeAccountType = 'COMPANY'
+    player.activeCompanyId = 'company-cities-lock'
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.cities = makeDefaultCities().map((city) =>
+      city.id === 'city-be'
+        ? { ...city, isUnlocked: false, requiredNetWorth: 460000, currentNetWorth: 110000, progressPercent: 24 }
+        : city,
+    )
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/cities')
+    await page.locator('.ctx-trigger').click()
+
+    const berlinOption = page.locator('.ctx-city-option', { hasText: 'Berlin' })
+    await expect(berlinOption).toBeVisible()
+    await expect(berlinOption).toHaveAttribute('title', /Requires/i)
+    await expect(berlinOption.locator('.ctx-city-lock')).toBeVisible()
+  })
+})

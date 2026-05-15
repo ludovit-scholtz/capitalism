@@ -3,8 +3,9 @@ import { useI18n } from 'vue-i18n'
 import { formatInGameTime, formatGameTickTime } from '@/lib/gameTime'
 import { formatMoney } from '@/lib/currencyFormat'
 import CurrencyAmount from '@/components/numbers/CurrencyAmount.vue'
+import CityExpansionPanel from '@/components/ledger/CityExpansionPanel.vue'
 import { computed } from 'vue'
-import type { CompanyCityFinancialSummary, CompanyLedgerSummary, LedgerEntryResult, TradeRouteResult } from '@/types'
+import type { CityUnlockStatus, CompanyCityFinancialSummary, CompanyLedgerSummary, LedgerEntryResult, TradeRouteResult } from '@/types'
 
 const { locale, t } = useI18n()
 
@@ -12,6 +13,7 @@ const props = defineProps<{
   ledger: CompanyLedgerSummary
   cityFinancialBreakdown: CompanyCityFinancialSummary[]
   logisticsShipments: TradeRouteResult[]
+  cityUnlockStatuses: CityUnlockStatus[]
   currentTick: number | null
   drillCategory: string | null
   drillEntries: LedgerEntryResult[]
@@ -175,6 +177,8 @@ function sparklineHeight(summary: CompanyCityFinancialSummary, revenue: number):
         </div>
       </div>
     </div>
+
+    <CityExpansionPanel :statuses="cityUnlockStatuses" />
 
     <div v-if="!ledger.isCurrentGameYear" class="info-banner historical-note">
       <span>🕰️</span>

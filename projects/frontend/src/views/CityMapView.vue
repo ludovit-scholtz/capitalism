@@ -32,6 +32,57 @@
       <button class="btn btn-secondary" @click="fetchAll()">{{ t('common.tryAgain') }}</button>
     </div>
 
+    <section v-else-if="city && isCityLocked" class="city-lock-shell">
+      <div class="city-lock-backdrop" aria-hidden="true">
+        <div class="city-lock-backdrop__panel">
+          <p>{{ t('cityExpansion.mapBackdropTitle', { city: city.name }) }}</p>
+          <div class="city-lock-backdrop__chips">
+            <span class="context-chip">{{ city.currencyCode }}</span>
+            <span class="context-chip">{{ city.population.toLocaleString() }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="city-lock-overlay">
+        <CountryFlag :country-code="city.countryCode" size="lg" :title="city.countryCode" class="city-lock-overlay__flag" />
+        <p class="city-lock-overlay__eyebrow">{{ t('cityExpansion.lockedBadge') }}</p>
+        <h2 class="city-lock-overlay__title">{{ city.name }}</h2>
+        <p class="city-lock-overlay__copy">
+          {{ t('cityExpansion.mapLockedBody', { city: city.name, amount: formatUnlockAmount(cityUnlockStatus?.requiredNetWorth ?? 0, cityUnlockStatus?.currency ?? city.currencyCode) }) }}
+        </p>
+
+        <div class="city-lock-overlay__progress" aria-hidden="true">
+          <span class="city-lock-overlay__progress-fill" :style="{ width: `${cityUnlockProgress}%` }"></span>
+        </div>
+        <p class="city-lock-overlay__progress-label">{{ t('cityExpansion.progressLabel', { percent: cityUnlockProgress }) }}</p>
+
+        <dl class="city-lock-overlay__metrics">
+          <div>
+            <dt>{{ t('cityExpansion.currentNetWorth') }}</dt>
+            <dd>{{ formatUnlockAmount(cityUnlockStatus?.currentNetWorth ?? 0, cityUnlockStatus?.currency ?? city.currencyCode) }}</dd>
+          </div>
+          <div>
+            <dt>{{ t('cityExpansion.requiredNetWorth') }}</dt>
+            <dd>{{ formatUnlockAmount(cityUnlockStatus?.requiredNetWorth ?? 0, cityUnlockStatus?.currency ?? city.currencyCode) }}</dd>
+          </div>
+          <div>
+            <dt>{{ t('cityExpansion.estimatedTicks') }}</dt>
+            <dd>
+              {{
+                cityUnlockStatus?.estimatedTicksToUnlock != null
+                  ? t('cityExpansion.estimatedTicksValue', { ticks: formatEstimatedTicksLabel(cityUnlockStatus.estimatedTicksToUnlock) })
+                  : t('cityExpansion.estimateUnavailable')
+              }}
+            </dd>
+          </div>
+        </dl>
+
+        <button class="btn btn-primary city-lock-overlay__cta" @click="goToExpansionProgress">
+          {{ t('cityExpansion.growToUnlockCta') }}
+        </button>
+      </div>
+    </section>
+
     <RouterView v-else-if="city" v-slot="{ Component }">
       <component
         :is="Component"
@@ -64,9 +115,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
-import type { City, BuildingLot, Company, PurchaseLotResult, CityMediaHouseInfo, CityWeatherForecast, CityPowerBalance, CityEconomicReportResult, EconomicCycleView, MarketEventView, EconomicCycleHistoryPoint, NpcCompanySummary } from '@/types'
+import CountryFlag from '@/components/common/CountryFlag.vue'
+import { computeCityUnlockProgress, formatEstimatedTicksLabel } from '@/lib/cityExpansion'
+import { formatMoney } from '@/lib/currencyFormat'
+import type { City, CityUnlockStatus, BuildingLot, Company, PurchaseLotResult, CityMediaHouseInfo, CityWeatherForecast, CityPowerBalance, CityEconomicReportResult, EconomicCycleView, MarketEventView, EconomicCycleHistoryPoint, NpcCompanySummary } from '@/types'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
@@ -97,6 +151,7 @@ const highlightedBuildingId = computed(() => (typeof route.query.building === 's
 const loading = ref(true)
 const error = ref<string | null>(null)
 const city = ref<City | null>(null)
+const cityUnlockStatus = ref<CityUnlockStatus | null>(null)
 const lots = ref<BuildingLot[]>([])
 const companies = ref<Company[]>([])
 const npcCompanies = ref<NpcCompanySummary[]>([])
@@ -112,6 +167,47 @@ const mediaHousesLoading = ref(false)
 const economyCycle = ref<EconomicCycleView | null>(null)
 const activeMarketEvents = ref<MarketEventView[]>([])
 const economicHistory = ref<EconomicCycleHistoryPoint[]>([])
+const activeCompanyId = computed(() => auth.player?.activeCompanyId ?? auth.player?.companies?.[0]?.id ?? null)
+const isCityLocked = computed(() => auth.isAuthenticated && cityUnlockStatus.value != null && !cityUnlockStatus.value.isUnlocked)
+const cityUnlockProgress = computed(() =>
+  cityUnlockStatus.value
+    ? computeCityUnlockProgress(cityUnlockStatus.value)
+    : 0,
+)
+
+function formatUnlockAmount(amount: number, currencyCode: string): string {
+  return formatMoney(amount, currencyCode, locale.value)
+}
+
+async function fetchCityUnlockStatus() {
+  if (!auth.isAuthenticated) {
+    cityUnlockStatus.value = null
+    return
+  }
+
+  try {
+    const data = await gqlRequest<{ cityUnlockStatus: CityUnlockStatus | null }>(
+      `query CityUnlockStatus($cityId: UUID!) {
+        cityUnlockStatus(cityId: $cityId) {
+          cityId
+          cityName
+          countryCode
+          isUnlocked
+          requiredNetWorth
+          currentNetWorth
+          currency
+          progressPercent
+          estimatedTicksToUnlock
+          companyId
+        }
+      }`,
+      { cityId: cityId.value },
+    )
+    cityUnlockStatus.value = data.cityUnlockStatus ?? null
+  } catch {
+    cityUnlockStatus.value = null
+  }
+}
 
 async function fetchData() {
   loading.value = true
@@ -121,7 +217,7 @@ async function fetchData() {
       await auth.fetchMe()
     }
 
-    const [cityData, lotsData, companiesData, npcData] = await Promise.all([
+    const [cityData, companiesData, npcData] = await Promise.all([
       gqlRequest<{ city: City }>(
         `query GetCity($id: UUID!) {
           city(id: $id) {
@@ -130,20 +226,6 @@ async function fetchData() {
           }
         }`,
         { id: cityId.value },
-      ),
-      gqlRequest<{ cityLots: BuildingLot[] }>(
-        `query CityLots($cityId: UUID!) {
-          cityLots(cityId: $cityId) {
-            id cityId name description district latitude longitude
-            populationIndex basePrice price suitableTypes
-            ownerCompanyId buildingId
-            ownerCompany { id name }
-             building { id name type isUnderConstruction constructionCompletesAtTick constructionCost isForSale askingPrice destroyedAtUtc }
-             resourceType { id name slug }
-             materialQuality materialQuantity originalMaterialQuantity
-           }
-         }`,
-        { cityId: cityId.value },
       ),
       auth.isAuthenticated ? gqlRequest<{ myCompanies: Company[] }>(`{ myCompanies { id name cash foundedAtUtc buildings { id } } }`) : Promise.resolve({ myCompanies: [] as Company[] }),
       gqlRequest<{ npcCompanies: NpcCompanySummary[] }>(
@@ -166,9 +248,38 @@ async function fetchData() {
     ])
 
     city.value = cityData.city
-    lots.value = lotsData.cityLots
     companies.value = companiesData.myCompanies
     npcCompanies.value = npcData.npcCompanies ?? []
+
+    await fetchCityUnlockStatus()
+    if (isCityLocked.value) {
+      lots.value = []
+      cityWeather.value = null
+      cityPowerBalance.value = null
+      cityEconomicReport.value = null
+      cityMediaHouses.value = []
+      economyCycle.value = null
+      activeMarketEvents.value = []
+      economicHistory.value = []
+      return
+    }
+
+    const lotsData = await gqlRequest<{ cityLots: BuildingLot[] }>(
+      `query CityLots($cityId: UUID!) {
+        cityLots(cityId: $cityId) {
+          id cityId name description district latitude longitude
+          populationIndex basePrice price suitableTypes
+          ownerCompanyId buildingId
+          ownerCompany { id name }
+           building { id name type isUnderConstruction constructionCompletesAtTick constructionCost isForSale askingPrice destroyedAtUtc }
+           resourceType { id name slug }
+           materialQuality materialQuantity originalMaterialQuantity
+         }
+       }`,
+      { cityId: cityId.value },
+    )
+
+    lots.value = lotsData.cityLots
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Failed to load city data'
   } finally {
@@ -298,6 +409,10 @@ async function fetchEconomyData() {
 
 async function fetchAll() {
   await fetchData()
+  if (isCityLocked.value) {
+    return
+  }
+
   await Promise.all([fetchMediaHouses(), fetchWeatherForecast(), fetchCityPowerBalance(), fetchCityEconomicReport(), fetchEconomyData()])
 }
 
@@ -318,6 +433,16 @@ function handleLotRefreshed(lot: BuildingLot) {
   if (lotIdx >= 0) {
     lots.value[lotIdx] = lot
   }
+}
+
+async function goToExpansionProgress() {
+  const targetCompanyId = cityUnlockStatus.value?.companyId ?? activeCompanyId.value
+  if (targetCompanyId) {
+    await router.push(`/ledger/${targetCompanyId}`)
+    return
+  }
+
+  await router.push('/dashboard')
 }
 
 watch(cityId, async () => {
@@ -438,5 +563,119 @@ onMounted(async () => {
   display: flex;
   gap: 1rem;
   align-items: center;
+}
+
+.city-lock-shell {
+  position: relative;
+  min-height: 28rem;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(30, 41, 59, 0.82));
+}
+
+.city-lock-backdrop {
+  position: absolute;
+  inset: 0;
+  padding: 2rem;
+  filter: blur(12px);
+  opacity: 0.55;
+}
+
+.city-lock-backdrop__panel {
+  height: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1.5rem;
+}
+
+.city-lock-backdrop__chips {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.city-lock-overlay {
+  position: relative;
+  z-index: 1;
+  margin: 2rem auto;
+  max-width: 38rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 1.25rem;
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(18px);
+  padding: 2rem;
+  color: #f8fafc;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.35);
+}
+
+.city-lock-overlay__flag {
+  margin-bottom: 0.75rem;
+}
+
+.city-lock-overlay__eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fbbf24;
+}
+
+.city-lock-overlay__title {
+  margin: 0;
+  font-size: 1.75rem;
+}
+
+.city-lock-overlay__copy {
+  margin: 0.9rem 0 1rem;
+  color: rgba(248, 250, 252, 0.86);
+}
+
+.city-lock-overlay__progress {
+  width: 100%;
+  height: 0.8rem;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.18);
+  overflow: hidden;
+}
+
+.city-lock-overlay__progress-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary), #22c55e);
+}
+
+.city-lock-overlay__progress-label {
+  margin: 0.55rem 0 1rem;
+  color: rgba(248, 250, 252, 0.76);
+  font-size: 0.84rem;
+}
+
+.city-lock-overlay__metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 1rem;
+  margin: 0 0 1.25rem;
+}
+
+.city-lock-overlay__metrics dt {
+  margin-bottom: 0.25rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(248, 250, 252, 0.68);
+}
+
+.city-lock-overlay__metrics dd {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.city-lock-overlay__cta {
+  width: 100%;
+  justify-content: center;
 }
 </style>

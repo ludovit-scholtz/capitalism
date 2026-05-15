@@ -79,6 +79,8 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
 
     /// <summary>Cities on the game map.</summary>
     public DbSet<City> Cities => Set<City>();
+    public DbSet<CityUnlockRequirement> CityUnlockRequirements => Set<CityUnlockRequirement>();
+    public DbSet<CompanyCityUnlock> CompanyCityUnlocks => Set<CompanyCityUnlock>();
 
     /// <summary>Natural resources available near cities.</summary>
     public DbSet<CityResource> CityResources => Set<CityResource>();

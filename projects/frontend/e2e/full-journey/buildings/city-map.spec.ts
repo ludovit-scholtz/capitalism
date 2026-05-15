@@ -57,6 +57,24 @@ test.describe('Real-world Map Integration', () => {
     await expect(page.locator('.page-header h1')).toContainText('Bratislava')
   })
 
+  test('locked city route shows unlock overlay with progress details', async ({ page }) => {
+    const { state, player } = setupAuthenticatedPlayer(page)
+    await authenticateViaLocalStorage(page, player.id)
+
+    state.cities = state.cities.map((city) =>
+      city.id === 'city-be'
+        ? { ...city, isUnlocked: false, requiredNetWorth: 460000, currentNetWorth: 125000, progressPercent: 27, estimatedTicksToUnlock: 48 }
+        : city,
+    )
+
+    await page.goto('/city/city-be')
+
+    await expect(page.locator('.city-lock-overlay__title')).toHaveText('Berlin')
+    await expect(page.locator('.city-lock-overlay__copy')).toContainText('Unlock Berlin')
+    await expect(page.locator('.city-lock-overlay__progress-fill')).toHaveAttribute('style', /width:\s*27%/)
+    await expect(page.getByRole('button', { name: /Grow your company to unlock/i })).toBeVisible()
+  })
+
   test('resource layer toggle enables resource-based lot coloring', async ({ page }) => {
     const { state, player } = setupAuthenticatedPlayer(page)
     await authenticateViaLocalStorage(page, player.id)
