@@ -26,10 +26,10 @@ public sealed class ChatRateLimitService(
     ILogger<ChatRateLimitService> logger) : IChatRateLimitService
 {
     /// <summary>Maximum number of chat messages a single player may send per window.</summary>
-    public const int MaxMessagesPerWindow = 20;
+    public const int MaxMessagesPerWindow = 5;
 
     /// <summary>Duration of the rate-limit window.</summary>
-    public static readonly TimeSpan WindowSize = TimeSpan.FromSeconds(60);
+    public static readonly TimeSpan WindowSize = TimeSpan.FromSeconds(10);
 
     private static string CounterKey(Guid playerId) => $"chat_rate:{playerId:N}";
 

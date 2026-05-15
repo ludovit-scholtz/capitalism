@@ -12,15 +12,17 @@ import type { MockChatMessage } from '../../helpers/mock-api'
 
 function makeChatMessage(
   id: string,
-  playerId: string,
-  message: string,
+  authorPlayerId: string,
+  content: string,
   offset = 0,
 ): MockChatMessage {
   return {
     id,
-    playerId,
-    message,
-    sentAtUtc: new Date(Date.now() - offset).toISOString(),
+    authorPlayerId,
+    cityId: null,
+    content,
+    createdAtUtc: new Date(Date.now() - offset).toISOString(),
+    isVisible: true,
   }
 }
 

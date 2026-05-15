@@ -16,17 +16,33 @@ public sealed class ChatMessage
     public Guid Id { get; set; }
 
     /// <summary>The player who sent the message.</summary>
-    public Guid PlayerId { get; set; }
+    public Guid AuthorPlayerId { get; set; }
 
     /// <summary>Navigation property to the author.</summary>
-    public Player Player { get; set; } = null!;
+    public Player AuthorPlayer { get; set; } = null!;
+
+    /// <summary>
+    /// Optional city scope. Null means the global channel.
+    /// </summary>
+    public Guid? CityId { get; set; }
+
+    /// <summary>
+    /// Denormalized author display name for immutable history.
+    /// </summary>
+    [Required, MaxLength(100)]
+    public string AuthorDisplayName { get; set; } = string.Empty;
 
     /// <summary>
     /// The text content of the message.  Maximum 500 characters.
     /// </summary>
     [Required, MaxLength(500)]
-    public string Message { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
 
     /// <summary>UTC timestamp when the message was recorded.</summary>
-    public DateTime SentAtUtc { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Soft-visibility moderation flag.
+    /// </summary>
+    public bool IsVisible { get; set; } = true;
 }

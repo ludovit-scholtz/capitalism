@@ -409,26 +409,26 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             mutation SendChatMessage($input: SendChatMessageInput!) {
               sendChatMessage(input: $input) {
                 id
-                playerDisplayName
-                message
+                authorDisplayName
+                content
                 isOwnMessage
               }
             }
             """,
-            new { input = new { message = "Hello market" } },
+            new { input = new { content = "Hello market" } },
             token);
 
         var payload = sendResult.GetProperty("data").GetProperty("sendChatMessage");
-        Assert.Equal("Chatty Trader", payload.GetProperty("playerDisplayName").GetString());
-        Assert.Equal("Hello market", payload.GetProperty("message").GetString());
+        Assert.Equal("Chatty Trader", payload.GetProperty("authorDisplayName").GetString());
+        Assert.Equal("Hello market", payload.GetProperty("content").GetString());
         Assert.True(payload.GetProperty("isOwnMessage").GetBoolean());
 
         var queryResult = await ExecuteGraphQlAsync(
             """
             query ChatMessages {
-              chatMessages(limit: 10) {
-                playerDisplayName
-                message
+              chatMessages(lastN: 10) {
+                authorDisplayName
+                content
               }
             }
             """,
@@ -436,8 +436,8 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         var messages = queryResult.GetProperty("data").GetProperty("chatMessages");
         Assert.Contains(messages.EnumerateArray(), message =>
-            message.GetProperty("playerDisplayName").GetString() == "Chatty Trader"
-            && message.GetProperty("message").GetString() == "Hello market");
+            message.GetProperty("authorDisplayName").GetString() == "Chatty Trader"
+            && message.GetProperty("content").GetString() == "Hello market");
     }
 
     [Fact]
@@ -451,7 +451,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
               }
             }
             """,
-            new { input = new { message = "Hello without token" } });
+            new { input = new { content = "Hello without token" } });
 
         Assert.True(result.TryGetProperty("errors", out var errors));
         Assert.NotEqual(0, errors.GetArrayLength());
@@ -473,7 +473,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
               }
             }
             """,
-            new { input = new { message = "Invisible support note" } },
+            new { input = new { content = "Invisible support note" } },
             hiddenToken);
 
         await using (var scope = _factory.Services.CreateAsyncScope())
@@ -487,28 +487,141 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var viewerResult = await ExecuteGraphQlAsync(
             """
             query ChatMessages {
-              chatMessages(limit: 10) {
-                playerDisplayName
-                message
+              chatMessages(lastN: 10) {
+                authorDisplayName
+                content
               }
             }
             """,
             token: viewerToken);
         Assert.DoesNotContain(viewerResult.GetProperty("data").GetProperty("chatMessages").EnumerateArray(), message =>
-            message.GetProperty("playerDisplayName").GetString() == "Hidden Trader");
+            message.GetProperty("authorDisplayName").GetString() == "Hidden Trader");
 
         var hiddenResult = await ExecuteGraphQlAsync(
             """
             query ChatMessages {
-              chatMessages(limit: 10) {
-                playerDisplayName
-                message
+              chatMessages(lastN: 10) {
+                authorDisplayName
+                content
               }
             }
             """,
             token: hiddenToken);
         Assert.Contains(hiddenResult.GetProperty("data").GetProperty("chatMessages").EnumerateArray(), message =>
-            message.GetProperty("playerDisplayName").GetString() == "Hidden Trader");
+            message.GetProperty("authorDisplayName").GetString() == "Hidden Trader");
+    }
+
+    [Fact]
+    public async Task ChatMessages_CityChannel_ReturnsOnlyMessagesForRequestedCity()
+    {
+        var token = await RegisterAndGetTokenAsync($"city-chat-{Guid.NewGuid():N}@test.com", "City Trader");
+        var cityResult = await ExecuteGraphQlAsync("{ cities { id } }", token: token);
+        var firstCityId = cityResult.GetProperty("data").GetProperty("cities")[0].GetProperty("id").GetString()!;
+
+        await ExecuteGraphQlAsync(
+            """
+            mutation SendChatMessage($input: SendChatMessageInput!) {
+              sendChatMessage(input: $input) { id }
+            }
+            """,
+            new { input = new { content = "Global notice" } },
+            token);
+
+        await ExecuteGraphQlAsync(
+            """
+            mutation SendChatMessage($input: SendChatMessageInput!) {
+              sendChatMessage(input: $input) { id }
+            }
+            """,
+            new { input = new { cityId = firstCityId, content = "City notice" } },
+            token);
+
+        var globalResult = await ExecuteGraphQlAsync(
+            """
+            query ChatMessages {
+              chatMessages(lastN: 10) { content cityId }
+            }
+            """,
+            token: token);
+
+        Assert.Contains(
+            globalResult.GetProperty("data").GetProperty("chatMessages").EnumerateArray(),
+            message => message.GetProperty("content").GetString() == "Global notice");
+        Assert.DoesNotContain(
+            globalResult.GetProperty("data").GetProperty("chatMessages").EnumerateArray(),
+            message => message.GetProperty("content").GetString() == "City notice");
+
+        var cityResultQuery = await ExecuteGraphQlAsync(
+            """
+            query ChatMessages($cityId: ID) {
+              chatMessages(cityId: $cityId, lastN: 10) { content cityId }
+            }
+            """,
+            new { cityId = firstCityId },
+            token);
+
+        Assert.Contains(
+            cityResultQuery.GetProperty("data").GetProperty("chatMessages").EnumerateArray(),
+            message => message.GetProperty("content").GetString() == "City notice");
+        Assert.DoesNotContain(
+            cityResultQuery.GetProperty("data").GetProperty("chatMessages").EnumerateArray(),
+            message => message.GetProperty("content").GetString() == "Global notice");
+    }
+
+    [Fact]
+    public async Task SetChatMessageVisible_HidesMessageFromNonAuthorButShowsPlaceholderToAuthor()
+    {
+        var authorEmail = $"chat-author-{Guid.NewGuid():N}@test.com";
+        var adminEmail = $"chat-admin-{Guid.NewGuid():N}@test.com";
+        var viewerEmail = $"chat-viewer-{Guid.NewGuid():N}@test.com";
+        var authorToken = await RegisterAndGetTokenAsync(authorEmail, "Author");
+        var adminToken = await RegisterAndGetTokenAsync(adminEmail, "Admin");
+        var viewerToken = await RegisterAndGetTokenAsync(viewerEmail, "Viewer");
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var adminPlayer = await db.Players.SingleAsync(player => player.Email == adminEmail);
+            adminPlayer.Role = PlayerRole.Admin;
+            await db.SaveChangesAsync();
+        }
+
+        var sent = await ExecuteGraphQlAsync(
+            """
+            mutation SendChatMessage($input: SendChatMessageInput!) {
+              sendChatMessage(input: $input) { id }
+            }
+            """,
+            new { input = new { content = "Moderate me" } },
+            authorToken);
+
+        var messageId = sent.GetProperty("data").GetProperty("sendChatMessage").GetProperty("id").GetString()!;
+
+        var moderationResult = await ExecuteGraphQlAsync(
+            """
+            mutation SetChatMessageVisible($input: SetChatMessageVisibleInput!) {
+              setChatMessageVisible(input: $input) { id isVisible }
+            }
+            """,
+            new { input = new { messageId, visible = false } },
+            adminToken);
+        Assert.False(moderationResult.GetProperty("data").GetProperty("setChatMessageVisible").GetProperty("isVisible").GetBoolean());
+
+        var viewerResult = await ExecuteGraphQlAsync(
+            "query { chatMessages(lastN: 10) { id content } }",
+            token: viewerToken);
+        Assert.DoesNotContain(
+            viewerResult.GetProperty("data").GetProperty("chatMessages").EnumerateArray(),
+            message => message.GetProperty("id").GetString() == messageId);
+
+        var authorResult = await ExecuteGraphQlAsync(
+            "query { chatMessages(lastN: 10) { id isVisible isRemovedForViewer } }",
+            token: authorToken);
+        Assert.Contains(
+            authorResult.GetProperty("data").GetProperty("chatMessages").EnumerateArray(),
+            message => message.GetProperty("id").GetString() == messageId
+                && !message.GetProperty("isVisible").GetBoolean()
+                && message.GetProperty("isRemovedForViewer").GetBoolean());
     }
 
     [Fact]
@@ -1881,24 +1994,24 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             """
             mutation SendChatMessage($input: SendChatMessageInput!) {
               sendChatMessage(input: $input) {
-                playerDisplayName
-                message
+                authorDisplayName
+                content
               }
             }
             """,
-            new { input = new { message = "Alias only please" } },
+            new { input = new { content = "Alias only please" } },
             token);
 
         Assert.Equal(
             expectedAlias,
-            sendResult.GetProperty("data").GetProperty("sendChatMessage").GetProperty("playerDisplayName").GetString());
+            sendResult.GetProperty("data").GetProperty("sendChatMessage").GetProperty("authorDisplayName").GetString());
 
         var chatResult = await ExecuteGraphQlAsync(
             """
             {
-              chatMessages(limit: 10) {
-                playerDisplayName
-                message
+              chatMessages(lastN: 10) {
+                authorDisplayName
+                content
               }
             }
             """,
@@ -1907,8 +2020,8 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.Contains(
             chatResult.GetProperty("data").GetProperty("chatMessages").EnumerateArray(),
             message =>
-                message.GetProperty("playerDisplayName").GetString() == expectedAlias
-                && message.GetProperty("message").GetString() == "Alias only please");
+                message.GetProperty("authorDisplayName").GetString() == expectedAlias
+                && message.GetProperty("content").GetString() == "Alias only please");
     }
 
     [Fact]

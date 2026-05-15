@@ -3,6 +3,7 @@ using Api.Data.Entities;
 using Api.Security;
 using Api.Utilities;
 using HotChocolate.Authorization;
+using HotChocolate.Subscriptions;
 using Microsoft.EntityFrameworkCore;
 
 namespace Api.Types;
@@ -40,7 +41,8 @@ public sealed partial class Mutation
         SendChatMessageInput input,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor,
-        [Service] IChatRateLimitService rateLimitService)
+        [Service] IChatRateLimitService rateLimitService,
+        [Service] ITopicEventSender topicEventSender)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
         var player = await db.Players.FirstOrDefaultAsync(candidate => candidate.Id == userId);
@@ -53,8 +55,8 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        var message = input.Message.Trim();
-        if (string.IsNullOrWhiteSpace(message))
+        var content = input.Content.Trim();
+        if (string.IsNullOrWhiteSpace(content))
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -63,13 +65,23 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        if (message.Length > MaxChatMessageLength)
+        if (content.Length > MaxChatMessageLength)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
                     .SetMessage($"Chat message is too long. Maximum length is {MaxChatMessageLength} characters.")
                     .SetCode("MESSAGE_TOO_LONG")
                     .SetExtension("maxLength", MaxChatMessageLength)
+                    .Build());
+        }
+
+        if (input.CityId is not null
+            && !await db.Cities.AsNoTracking().AnyAsync(city => city.Id == input.CityId.Value))
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("City not found.")
+                    .SetCode("CITY_NOT_FOUND")
                     .Build());
         }
 
@@ -89,22 +101,75 @@ public sealed partial class Mutation
         var chatMessage = new ChatMessage
         {
             Id = Guid.NewGuid(),
-            PlayerId = player.Id,
-            Message = message,
-            SentAtUtc = DateTime.UtcNow
+            AuthorPlayerId = player.Id,
+            CityId = input.CityId,
+            AuthorDisplayName = PublicPlayerDisplayName.Resolve(player),
+            Content = content,
+            CreatedAtUtc = DateTime.UtcNow,
+            IsVisible = true
         };
 
         db.ChatMessages.Add(chatMessage);
         await db.SaveChangesAsync();
 
-        return new InGameChatMessage
+        var payload = new InGameChatMessage
         {
             Id = chatMessage.Id,
-            PlayerId = player.Id,
-            PlayerDisplayName = PublicPlayerDisplayName.Resolve(player),
-            Message = chatMessage.Message,
-            SentAtUtc = chatMessage.SentAtUtc,
+            AuthorPlayerId = player.Id,
+            AuthorDisplayName = chatMessage.AuthorDisplayName,
+            CityId = chatMessage.CityId,
+            Content = chatMessage.Content,
+            CreatedAtUtc = chatMessage.CreatedAtUtc,
+            IsVisible = chatMessage.IsVisible,
+            IsRemovedForViewer = false,
             IsOwnMessage = true
         };
+
+        // Invisible players should still see their own mutation response but are hidden from others.
+        if (!player.IsInvisibleInChat)
+        {
+            await topicEventSender.SendAsync(nameof(Subscription.ChatMessageSent), payload);
+        }
+
+        return payload;
+    }
+
+    [Authorize(Policy = Policies.Admin)]
+    public async Task<InGameChatMessage> SetChatMessageVisible(
+        SetChatMessageVisibleInput input,
+        [Service] AppDbContext db,
+        [Service] ITopicEventSender topicEventSender)
+    {
+        var message = await db.ChatMessages
+            .AsTracking()
+            .FirstOrDefaultAsync(candidate => candidate.Id == input.MessageId);
+
+        if (message is null)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Chat message not found.")
+                    .SetCode("CHAT_MESSAGE_NOT_FOUND")
+                    .Build());
+        }
+
+        message.IsVisible = input.Visible;
+        await db.SaveChangesAsync();
+
+        var payload = new InGameChatMessage
+        {
+            Id = message.Id,
+            AuthorPlayerId = message.AuthorPlayerId,
+            AuthorDisplayName = message.AuthorDisplayName,
+            CityId = message.CityId,
+            Content = message.Content,
+            CreatedAtUtc = message.CreatedAtUtc,
+            IsVisible = message.IsVisible,
+            IsRemovedForViewer = false,
+            IsOwnMessage = false
+        };
+
+        await topicEventSender.SendAsync(nameof(Subscription.ChatMessageSent), payload);
+        return payload;
     }
 }

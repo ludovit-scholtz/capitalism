@@ -18,8 +18,14 @@ const {
   charCount,
   isOverLimit,
   showCharCounter,
+  activeChannel,
+  activeCityId,
+  activeCityName,
+  inputPlaceholder,
   formatSentAt,
   sendMessage,
+  selectGlobalChannel,
+  selectCityChannel,
 } = useChat()
 
 // When new messages arrive, update the unread count in the store
@@ -78,7 +84,30 @@ watch(
             </button>
           </div>
           <h2 class="panel-title">{{ t('chat.title') }}</h2>
-          <span class="panel-subtitle">{{ t('chat.sharedRoom') }}</span>
+          <span class="panel-subtitle">
+            {{ activeChannel === 'CITY' ? t('chat.cityRoom', { city: activeCityName ?? t('chat.thisCity') }) : t('chat.sharedRoom') }}
+          </span>
+          <div class="chat-channel-tabs mt-3" role="tablist" :aria-label="t('chat.channels')">
+            <button
+              class="chat-channel-tab"
+              :class="{ 'chat-channel-tab-active': activeChannel === 'GLOBAL' }"
+              role="tab"
+              :aria-selected="activeChannel === 'GLOBAL'"
+              @click="selectGlobalChannel"
+            >
+              {{ t('chat.globalTab') }}
+            </button>
+            <button
+              class="chat-channel-tab"
+              :class="{ 'chat-channel-tab-active': activeChannel === 'CITY' }"
+              role="tab"
+              :aria-selected="activeChannel === 'CITY'"
+              :disabled="!activeCityId"
+              @click="selectCityChannel"
+            >
+              {{ activeCityName ?? t('chat.cityTab') }}
+            </button>
+          </div>
         </div>
 
         <!-- Message log -->
@@ -91,17 +120,19 @@ watch(
           <div v-else class="chat-log" role="log" aria-live="polite">
             <article
               v-for="message in messages"
-              :key="message.id"
-              :class="['chat-message', { 'chat-message-own': message.isOwnMessage }]"
-            >
-              <div class="chat-message-meta">
-                <strong>{{ message.playerDisplayName }}</strong>
-                <span>{{ formatSentAt(message.sentAtUtc) }}</span>
-              </div>
-              <p class="chat-message-body">{{ message.message }}</p>
-            </article>
+                :key="message.id"
+                :class="['chat-message', { 'chat-message-own': message.isOwnMessage }]"
+              >
+                <div class="chat-message-meta">
+                  <strong>{{ message.authorDisplayName }}</strong>
+                  <span>{{ formatSentAt(message.createdAtUtc) }}</span>
+                </div>
+                <p class="chat-message-body">
+                  {{ message.isRemovedForViewer ? t('chat.messageRemoved') : message.content }}
+                </p>
+              </article>
+            </div>
           </div>
-        </div>
 
         <!-- Composer pinned at bottom -->
         <div class="panel-footer">
@@ -114,8 +145,9 @@ watch(
                 :class="['chat-input', { 'chat-input-over-limit': isOverLimit }]"
                 type="text"
                 maxlength="500"
-                :placeholder="t('chat.placeholder')"
+                :placeholder="inputPlaceholder"
                 :aria-label="t('chat.inputLabel')"
+                @keydown.enter.exact.prevent="sendMessage"
               />
             </label>
             <button
@@ -239,6 +271,32 @@ watch(
 .panel-subtitle {
   font-size: 0.8rem;
   color: var(--color-text-secondary);
+}
+
+.chat-channel-tabs {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.chat-channel-tab {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-sm);
+  padding: 0.25rem 0.6rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.chat-channel-tab-active {
+  color: var(--color-text);
+  border-color: var(--color-primary);
+  background: color-mix(in oklab, var(--color-primary) 20%, transparent);
+}
+
+.chat-channel-tab:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .close-btn {

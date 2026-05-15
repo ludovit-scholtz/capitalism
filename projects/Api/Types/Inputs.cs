@@ -38,9 +38,19 @@ public sealed class LoginInput
 /// <summary>Input for sending a shared in-game chat message.</summary>
 public sealed class SendChatMessageInput
 {
+    /// <summary>Optional city scope. Null means global channel.</summary>
+    public Guid? CityId { get; set; }
+
     /// <summary>Plain-text message body shown in the shared chat feed.</summary>
-    [Required, MaxLength(300)]
-    public string Message { get; set; } = string.Empty;
+    [Required, MaxLength(500)]
+    public string Content { get; set; } = string.Empty;
+}
+
+/// <summary>Input for admin chat moderation visibility toggle.</summary>
+public sealed class SetChatMessageVisibleInput
+{
+    public Guid MessageId { get; set; }
+    public bool Visible { get; set; }
 }
 
 /// <summary>Input for creating a new company.</summary>

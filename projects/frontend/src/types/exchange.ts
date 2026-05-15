@@ -66,9 +66,12 @@ export interface GlobalExchangeProductQuote {
 
 export interface InGameChatMessage {
   id: string
-  playerId: string
-  playerDisplayName: string
-  message: string
-  sentAtUtc: string
+  authorPlayerId: string
+  authorDisplayName: string
+  cityId: string | null
+  content: string
+  createdAtUtc: string
+  isVisible: boolean
+  isRemovedForViewer: boolean
   isOwnMessage: boolean
 }

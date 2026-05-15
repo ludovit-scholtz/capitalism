@@ -13,28 +13,18 @@ namespace Api.Types;
 public sealed partial class Query
 {
     /// <summary>
-    /// Returns the latest shared in-game chat messages visible to the authenticated player.
-    /// <para>
-    /// Visibility rules:
-    /// <list type="bullet">
-    /// <item>Normal players see all messages from non-invisible players.</item>
-    /// <item>Players marked as <see cref="Player.IsInvisibleInChat"/> are hidden from normal
-    ///   players but still see their own messages.</item>
-    /// <item>Administrators always see every message, including those from invisible players.</item>
-    /// </list>
-    /// </para>
+    /// Returns the latest in-game chat messages visible to the authenticated player in a channel.
     /// </summary>
     /// <param name="db">The game database context.</param>
     /// <param name="httpContextAccessor">Used to identify the currently authenticated player.</param>
-    /// <param name="limit">
-    /// Maximum number of messages to return. Clamped to [1, <c>MaxChatMessageLimit</c>].
-    /// Defaults to <c>DefaultChatMessageLimit</c> when null.
-    /// </param>
+    /// <param name="cityId">Optional city scope. Null means the global channel.</param>
+    /// <param name="lastN">Maximum number of messages to return.</param>
     [Authorize]
     public async Task<List<InGameChatMessage>> GetChatMessages(
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor,
-        int? limit)
+        Guid? cityId,
+        int? lastN)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
         var viewer = await db.Players
@@ -46,29 +36,36 @@ public sealed partial class Query
             return [];
         }
 
-        var safeLimit = Math.Clamp(limit ?? DefaultChatMessageLimit, 1, MaxChatMessageLimit);
-        var canSeeInvisible = viewer.Role == PlayerRole.Admin;
+        var safeLimit = Math.Clamp(lastN ?? DefaultChatMessageLimit, 1, MaxChatMessageLimit);
+        var canSeeInvisiblePlayers = viewer.Role == PlayerRole.Admin;
 
         var messages = await db.ChatMessages
             .AsNoTracking()
-            .Include(message => message.Player)
-            .Where(message => !message.Player.IsInvisibleInChat
-                              || message.PlayerId == userId
-                              || canSeeInvisible)
-            .OrderByDescending(message => message.SentAtUtc)
+            .Include(message => message.AuthorPlayer)
+            .Where(message => message.CityId == cityId)
+            .Where(message => message.IsVisible || message.AuthorPlayerId == userId || canSeeInvisiblePlayers)
+            .Where(message => !message.AuthorPlayer.IsInvisibleInChat
+                              || message.AuthorPlayerId == userId
+                              || canSeeInvisiblePlayers)
+            .OrderByDescending(message => message.CreatedAtUtc)
             .Take(safeLimit)
-            .OrderBy(message => message.SentAtUtc)
+            .OrderBy(message => message.CreatedAtUtc)
             .ToListAsync();
 
         return messages
             .Select(message => new InGameChatMessage
             {
                 Id = message.Id,
-                PlayerId = message.PlayerId,
-                PlayerDisplayName = PublicPlayerDisplayName.Resolve(message.Player),
-                Message = message.Message,
-                SentAtUtc = message.SentAtUtc,
-                IsOwnMessage = message.PlayerId == userId
+                AuthorPlayerId = message.AuthorPlayerId,
+                AuthorDisplayName = message.AuthorDisplayName,
+                CityId = message.CityId,
+                Content = message.IsVisible
+                    ? message.Content
+                    : (message.AuthorPlayerId == userId ? string.Empty : message.Content),
+                CreatedAtUtc = message.CreatedAtUtc,
+                IsVisible = message.IsVisible,
+                IsRemovedForViewer = !message.IsVisible && message.AuthorPlayerId == userId,
+                IsOwnMessage = message.AuthorPlayerId == userId
             })
             .ToList();
     }

@@ -51,27 +51,21 @@ public sealed class ChatRateLimitTests
     }
 
     [Fact]
-    public void ChatRateLimitService_19thMessagePasses_20thPasses_21stRejected()
+    public void ChatRateLimitService_BoundaryMessages_WithinWindowFollowConfiguredLimit()
     {
         using var cache = new MemoryCache(new MemoryCacheOptions());
         var svc = new ChatRateLimitService(cache, NullLogger<ChatRateLimitService>.Instance);
         var playerId = Guid.NewGuid();
 
-        // 1–18: allowed, no assertion needed for each
-        for (var i = 0; i < 18; i++) svc.TryRecord(playerId);
+        var penultimateIndex = ChatRateLimitService.MaxMessagesPerWindow - 1;
+        for (var i = 0; i < penultimateIndex; i++) svc.TryRecord(playerId);
 
-        // 19th: allowed
-        var (allow19, _) = svc.TryRecord(playerId);
-        Assert.True(allow19, "19th message should be allowed.");
+        var (allowPenultimate, _) = svc.TryRecord(playerId);
+        Assert.True(allowPenultimate, $"{ChatRateLimitService.MaxMessagesPerWindow}th message should be allowed.");
 
-        // 20th: allowed
-        var (allow20, _) = svc.TryRecord(playerId);
-        Assert.True(allow20, "20th message should be allowed.");
-
-        // 21st: rejected
-        var (allow21, retry21) = svc.TryRecord(playerId);
-        Assert.False(allow21, "21st message should be rejected.");
-        Assert.True(retry21 > 0, "retryAfter must be positive.");
+        var (allowFirstRejected, retryAfter) = svc.TryRecord(playerId);
+        Assert.False(allowFirstRejected, $"{ChatRateLimitService.MaxMessagesPerWindow + 1}th message should be rejected.");
+        Assert.True(retryAfter > 0, "retryAfter must be positive.");
     }
 
     [Fact]
@@ -119,8 +113,8 @@ public sealed class ChatRateLimitTests
         mutation SendChatMessage($input: SendChatMessageInput!) {
           sendChatMessage(input: $input) {
             id
-            playerDisplayName
-            message
+            authorDisplayName
+            content
           }
         }
         """;
@@ -168,7 +162,7 @@ public sealed class ChatRateLimitTests
         // 501-character message.
         var longMessage = new string('A', 501);
         var result = await PostGraphQlAsync(client, SendChatMutation,
-            new { input = new { message = longMessage } }, token);
+            new { input = new { content = longMessage } }, token);
 
         Assert.True(result.TryGetProperty("errors", out var errors), "Expected errors for too-long message.");
         Assert.Equal("MESSAGE_TOO_LONG",
@@ -185,11 +179,11 @@ public sealed class ChatRateLimitTests
         // Exactly 500 characters — should succeed.
         var exactMessage = new string('B', 500);
         var result = await PostGraphQlAsync(client, SendChatMutation,
-            new { input = new { message = exactMessage } }, token);
+            new { input = new { content = exactMessage } }, token);
 
         Assert.False(result.TryGetProperty("errors", out _), "500-char message should be accepted.");
         Assert.Equal(exactMessage,
-            result.GetProperty("data").GetProperty("sendChatMessage").GetProperty("message").GetString());
+            result.GetProperty("data").GetProperty("sendChatMessage").GetProperty("content").GetString());
     }
 
     [Fact]
@@ -201,14 +195,14 @@ public sealed class ChatRateLimitTests
 
         var longMessage = new string('C', 501);
         await PostGraphQlAsync(client, SendChatMutation,
-            new { input = new { message = longMessage } }, token);
+            new { input = new { content = longMessage } }, token);
 
         // Verify the message is absent from the chat feed.
         var feedResult = await PostGraphQlAsync(client,
-            "query { chatMessages(limit: 50) { message } }", token: token);
+            "query { chatMessages(lastN: 50) { content } }", token: token);
 
         var messages = feedResult.GetProperty("data").GetProperty("chatMessages").EnumerateArray()
-            .Select(m => m.GetProperty("message").GetString())
+            .Select(m => m.GetProperty("content").GetString())
             .ToList();
 
         Assert.DoesNotContain(longMessage, messages);
@@ -222,7 +216,7 @@ public sealed class ChatRateLimitTests
 
         // No token — should be rejected with auth error.
         var result = await PostGraphQlAsync(client, SendChatMutation,
-            new { input = new { message = "Hello" } });
+            new { input = new { content = "Hello" } });
 
         Assert.True(result.TryGetProperty("errors", out _), "Unauthenticated send must fail.");
     }
@@ -237,7 +231,7 @@ public sealed class ChatRateLimitTests
         for (var i = 0; i < ChatRateLimitService.MaxMessagesPerWindow; i++)
         {
             var result = await PostGraphQlAsync(client, SendChatMutation,
-                new { input = new { message = $"Message {i + 1}" } }, token);
+                new { input = new { content = $"Message {i + 1}" } }, token);
 
             Assert.False(result.TryGetProperty("errors", out _),
                 $"Message {i + 1} should succeed within the rate limit.");
@@ -255,12 +249,12 @@ public sealed class ChatRateLimitTests
         for (var i = 0; i < ChatRateLimitService.MaxMessagesPerWindow; i++)
         {
             await PostGraphQlAsync(client, SendChatMutation,
-                new { input = new { message = $"Message {i + 1}" } }, token);
+                new { input = new { content = $"Message {i + 1}" } }, token);
         }
 
         // The 21st message must be rate-limited.
         var rateLimitedResult = await PostGraphQlAsync(client, SendChatMutation,
-            new { input = new { message = "Exceeds limit" } }, token);
+            new { input = new { content = "Exceeds limit" } }, token);
 
         Assert.True(rateLimitedResult.TryGetProperty("errors", out var errors),
             "21st message should return a rate-limit error.");

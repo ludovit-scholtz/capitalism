@@ -14,6 +14,7 @@ const {
   charCount,
   isOverLimit,
   showCharCounter,
+  inputPlaceholder,
   formatSentAt,
   sendMessage,
 } = useChat()
@@ -41,10 +42,12 @@ const {
         :class="['chat-message rounded-md border border-divider bg-panel-secondary p-3', { 'chat-message-own border-brand': message.isOwnMessage }]"
       >
         <div class="chat-message-meta mb-1.5 flex justify-between gap-4 text-[0.8rem] text-muted">
-          <strong>{{ message.playerDisplayName }}</strong>
-          <span>{{ formatSentAt(message.sentAtUtc) }}</span>
+          <strong>{{ message.authorDisplayName }}</strong>
+          <span>{{ formatSentAt(message.createdAtUtc) }}</span>
         </div>
-        <p class="chat-message-body m-0 break-words whitespace-pre-wrap">{{ message.message }}</p>
+        <p class="chat-message-body m-0 break-words whitespace-pre-wrap">
+          {{ message.isRemovedForViewer ? t('chat.messageRemoved') : message.content }}
+        </p>
       </article>
     </div>
 
@@ -57,8 +60,9 @@ const {
             :class="['chat-input min-w-0 w-full', { 'chat-input-over-limit': isOverLimit }]"
             type="text"
             maxlength="500"
-            :placeholder="t('chat.placeholder')"
+            :placeholder="inputPlaceholder"
             :aria-label="t('chat.inputLabel')"
+            @keydown.enter.exact.prevent="sendMessage"
           />
         </label>
         <button

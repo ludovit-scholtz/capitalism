@@ -579,9 +579,11 @@ export type MockProductExchangeListing = {
 
 export type MockChatMessage = {
   id: string
-  playerId: string
-  message: string
-  sentAtUtc: string
+  authorPlayerId: string
+  cityId: string | null
+  content: string
+  createdAtUtc: string
+  isVisible: boolean
 }
 
 export type MockResearchBrandState = {
@@ -3535,6 +3537,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       body: '',
     })
   })
+
+  const chatSendTimestampsByPlayer = new Map<string, number[]>()
 
   page.route('**/graphql', async (route) => {
     const routeJson = (data: unknown) =>
@@ -6957,25 +6961,31 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       }
 
       const currentPlayer = state.players.find((player) => player.id === state.currentUserId)
-      const limit = Math.min(Math.max(Number(body.variables?.limit ?? 50), 1), 100)
+      const limit = Math.min(Math.max(Number(body.variables?.lastN ?? 100), 1), 100)
+      const cityId = body.variables?.cityId ?? null
       const canSeeInvisible = currentPlayer?.role === 'ADMIN'
 
       const messages = state.chatMessages
         .filter((message) => {
-          const author = state.players.find((player) => player.id === message.playerId)
+          const author = state.players.find((player) => player.id === message.authorPlayerId)
           if (!author) return false
+          if (message.cityId !== cityId) return false
+          if (!message.isVisible && message.authorPlayerId !== state.currentUserId) return false
           return !author.isInvisibleInChat || author.id === state.currentUserId || canSeeInvisible
         })
         .slice(-limit)
         .map((message) => {
-          const author = state.players.find((player) => player.id === message.playerId)!
+          const author = state.players.find((player) => player.id === message.authorPlayerId)!
           return {
             id: message.id,
-            playerId: message.playerId,
-            playerDisplayName: author.displayName,
-            message: message.message,
-            sentAtUtc: message.sentAtUtc,
-            isOwnMessage: message.playerId === state.currentUserId,
+            authorPlayerId: message.authorPlayerId,
+            authorDisplayName: author.displayName,
+            cityId: message.cityId,
+            content: message.isVisible || message.authorPlayerId !== state.currentUserId ? message.content : '',
+            createdAtUtc: message.createdAtUtc,
+            isVisible: message.isVisible,
+            isRemovedForViewer: !message.isVisible && message.authorPlayerId === state.currentUserId,
+            isOwnMessage: message.authorPlayerId === state.currentUserId,
           }
         })
 
@@ -6996,20 +7006,44 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       }
 
       const currentPlayer = state.players.find((player) => player.id === state.currentUserId)
-      const message = String(body.variables?.input?.message ?? '').trim()
-      if (!currentPlayer || !message) {
+      const content = String(body.variables?.input?.content ?? '').trim()
+      if (!currentPlayer || !content) {
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({ errors: [{ message: 'Chat message cannot be empty.' }] }),
         })
       }
+      if (content.length > 500) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Chat message is too long.', extensions: { code: 'MESSAGE_TOO_LONG' } }] }),
+        })
+      }
+
+      const now = Date.now()
+      const windowStart = now - 10_000
+      const playerKey = currentPlayer.id
+      const recent = (chatSendTimestampsByPlayer.get(playerKey) ?? []).filter((stamp) => stamp >= windowStart)
+      if (recent.length >= 5) {
+        chatSendTimestampsByPlayer.set(playerKey, recent)
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'You are sending messages too fast. Please wait a moment.', extensions: { code: 'RATE_LIMITED' } }] }),
+        })
+      }
+      recent.push(now)
+      chatSendTimestampsByPlayer.set(playerKey, recent)
 
       const chatMessage = {
         id: `chat-${state.chatMessages.length + 1}`,
-        playerId: currentPlayer.id,
-        message,
-        sentAtUtc: new Date().toISOString(),
+        authorPlayerId: currentPlayer.id,
+        cityId: body.variables?.input?.cityId ?? null,
+        content,
+        createdAtUtc: new Date().toISOString(),
+        isVisible: true,
       }
       state.chatMessages.push(chatMessage)
 
@@ -7020,11 +7054,56 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           data: {
             sendChatMessage: {
               id: chatMessage.id,
-              playerId: currentPlayer.id,
-              playerDisplayName: currentPlayer.displayName,
-              message: chatMessage.message,
-              sentAtUtc: chatMessage.sentAtUtc,
+              authorPlayerId: currentPlayer.id,
+              authorDisplayName: currentPlayer.displayName,
+              cityId: chatMessage.cityId,
+              content: chatMessage.content,
+              createdAtUtc: chatMessage.createdAtUtc,
+              isVisible: true,
+              isRemovedForViewer: false,
               isOwnMessage: true,
+            },
+          },
+        }),
+      })
+    }
+
+    if (query.includes('setChatMessageVisible')) {
+      const currentPlayer = state.players.find((player) => player.id === state.currentUserId)
+      if (!currentPlayer || currentPlayer.role !== 'ADMIN') {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'You do not have permission to perform this action.' }] }),
+        })
+      }
+
+      const input = body.variables?.input as { messageId?: string; visible?: boolean } | undefined
+      const target = state.chatMessages.find((message) => message.id === input?.messageId)
+      if (!target) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Chat message not found.' }] }),
+        })
+      }
+
+      target.isVisible = Boolean(input?.visible)
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            setChatMessageVisible: {
+              id: target.id,
+              authorPlayerId: target.authorPlayerId,
+              authorDisplayName: state.players.find((player) => player.id === target.authorPlayerId)?.displayName ?? 'Unknown',
+              cityId: target.cityId,
+              content: target.content,
+              createdAtUtc: target.createdAtUtc,
+              isVisible: target.isVisible,
+              isRemovedForViewer: false,
+              isOwnMessage: false,
             },
           },
         }),
