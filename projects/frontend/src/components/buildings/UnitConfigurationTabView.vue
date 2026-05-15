@@ -6,7 +6,7 @@ import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
 import type { ExchangeSortBy } from '@/lib/globalExchange'
 import BuildingUnitConfigFields from '@/components/buildings/BuildingUnitConfigFields.vue'
 import UnitResourceHistoryPanel from '@/components/buildings/UnitResourceHistoryPanel.vue'
-import BuildingEnergyPanel from '@/components/buildings/BuildingEnergyPanel.vue'
+import BuildingEnergySettingsTab from '@/components/buildings/BuildingEnergySettingsTab.vue'
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -56,17 +56,18 @@ const {
   formatUnitQuantity,
 } = bd
 
-type EditConfigTab = 'config' | 'performance' | 'maintenance'
+type EditConfigTab = 'config' | 'energy' | 'performance' | 'maintenance'
 const selectedConfigTab = ref<EditConfigTab>('config')
 
 const editTabs = computed(() => [
   { key: 'config', label: t('buildingDetail.editTabConfig') },
+  { key: 'energy', label: t('buildingDetail.editBuildingTabEnergy') },
   { key: 'performance', label: t('buildingDetail.editTabPerformance') },
   { key: 'maintenance', label: t('buildingDetail.editTabMaintenance') },
 ])
 
 function normalizeEditTab(value: unknown): EditConfigTab {
-  if (value === 'performance' || value === 'maintenance') {
+  if (value === 'energy' || value === 'performance' || value === 'maintenance') {
     return value
   }
   return 'config'
@@ -232,7 +233,6 @@ watch(
             borderless
             @update:selected-item-key="selectedHistoryItemKey = $event"
           />
-          <BuildingEnergyPanel v-if="isEditing" />
         </div>
 
         <!-- Exchange offers panel — shown on General tab when PURCHASE unit has EXCHANGE/OPTIMAL source -->
@@ -311,6 +311,10 @@ watch(
             {{ t('buildingDetail.removeUnit') }}
           </button>
         </div>
+      </template>
+
+      <template v-else-if="selectedConfigTab === 'energy'">
+        <BuildingEnergySettingsTab />
       </template>
 
       <!-- ── Tab: Production (future use) ── -->

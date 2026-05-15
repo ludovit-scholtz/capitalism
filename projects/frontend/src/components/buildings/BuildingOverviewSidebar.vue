@@ -7,7 +7,7 @@ import BuildingEditBasicDataTab from '@/components/buildings/BuildingEditBasicDa
 import BuildingLayoutsTab from '@/components/buildings/BuildingLayoutsTab.vue'
 import BuildingOverviewTab from '@/components/buildings/BuildingOverviewTab.vue'
 import BuildingBankAccountTab from '@/components/buildings/BuildingBankAccountTab.vue'
-import BuildingEnergyPanel from '@/components/buildings/BuildingEnergyPanel.vue'
+import BuildingEnergySettingsTab from '@/components/buildings/BuildingEnergySettingsTab.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -94,7 +94,7 @@ function selectEditTab(key: BuildingEditTab) {
         </nav>
 
         <BuildingEditBasicDataTab v-if="selectedEditTab === 'basic-data'" />
-        <BuildingEnergyPanel v-else-if="selectedEditTab === 'energy'" />
+        <BuildingEnergySettingsTab v-else-if="selectedEditTab === 'energy'" />
         <BuildingBankAccountTab v-else-if="selectedEditTab === 'bank-account'" />
         <BuildingLayoutsTab v-else />
       </div>
