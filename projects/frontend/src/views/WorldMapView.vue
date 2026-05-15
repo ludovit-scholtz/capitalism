@@ -269,12 +269,26 @@ async function fetchWorldMap() {
     )
 
     const normalizedCities = rawCities.length > 0 ? rawCities : fallbackCities
-    cities.value = normalizedCities.map((city) => ({
-      ...city,
-      isUnlocked: city.isUnlocked || unlockedIds.has(city.id),
-      availableLandPlots: city.availableLandPlots ?? 0,
-      activeCompanyCount: city.activeCompanyCount ?? 0,
-    }))
+    cities.value = normalizedCities.map((city) => {
+      const requiredNetWorth = city.requiredNetWorth ?? 0
+      const isUnlocked = city.isUnlocked ?? requiredNetWorth <= 0
+
+      return {
+        ...city,
+        isUnlocked: isUnlocked || unlockedIds.has(city.id),
+        requiredNetWorth,
+        currentNetWorth: city.currentNetWorth ?? (isUnlocked ? requiredNetWorth : 0),
+        progressPercent:
+          city.progressPercent ??
+          (isUnlocked
+            ? 100
+            : requiredNetWorth > 0
+              ? Math.max(0, Math.min(99, Math.round(((city.currentNetWorth ?? 0) / requiredNetWorth) * 100)))
+              : 0),
+        availableLandPlots: city.availableLandPlots ?? 0,
+        activeCompanyCount: city.activeCompanyCount ?? 0,
+      }
+    })
 
     selectedCityId.value = cities.value[0]?.id ?? null
     await nextTick()

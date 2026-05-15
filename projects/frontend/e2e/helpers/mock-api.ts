@@ -2496,6 +2496,11 @@ export function makeDefaultCities(): MockCity[] {
         { resourceType: { id: 'res-silicon', name: 'Silicon', slug: 'silicon', category: 'MINERAL' }, abundance: 0.6 },
         { resourceType: { id: 'res-grain', name: 'Grain', slug: 'grain', category: 'ORGANIC' }, abundance: 0.6 },
       ],
+      isUnlocked: false,
+      requiredNetWorth: 460000,
+      currentNetWorth: 0,
+      progressPercent: 0,
+      estimatedTicksToUnlock: 48,
     },
     {
       id: 'city-wa',
@@ -2513,6 +2518,11 @@ export function makeDefaultCities(): MockCity[] {
         { resourceType: { id: 'res-coal', name: 'Coal', slug: 'coal', category: 'MINERAL' }, abundance: 0.6 },
         { resourceType: { id: 'res-iron-ore', name: 'Iron Ore', slug: 'iron-ore', category: 'MINERAL' }, abundance: 0.5 },
       ],
+      isUnlocked: false,
+      requiredNetWorth: 1275000,
+      currentNetWorth: 0,
+      progressPercent: 0,
+      estimatedTicksToUnlock: 36,
     },
   ]
 }
@@ -8379,6 +8389,37 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { cityUnlockStatuses: buildMockCityUnlockStatuses(state, companyId) } }),
+      })
+    }
+
+    if (query.includes('getCities')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            getCities: buildMockCityUnlockStatuses(state).map((status) => {
+              const city = state.cities.find((candidate) => candidate.id === status.cityId)
+              return {
+                id: status.cityId,
+                name: status.cityName,
+                countryCode: status.countryCode,
+                currencyCode: status.currency,
+                latitude: city?.latitude ?? 0,
+                longitude: city?.longitude ?? 0,
+                population: city?.population ?? 0,
+                isUnlocked: status.isUnlocked,
+                availableLandPlots: 0,
+                activeCompanyCount: 0,
+                topResourceName: city?.resources[0]?.resourceType.name ?? null,
+                requiredNetWorth: status.requiredNetWorth,
+                currentNetWorth: status.currentNetWorth,
+                progressPercent: status.progressPercent,
+                estimatedTicksToUnlock: status.estimatedTicksToUnlock,
+              }
+            }),
+          },
+        }),
       })
     }
 

@@ -1807,3 +1807,16 @@ Root-cause of 13+ repeated "fix build and tests" comments (May 2026, PR #513 NPC
 4. **When a PR creates a new "paused/active" toggle on a domain entity, add a backend test that proves the paused state is respected by the tick engine** — not just that the toggle persists in the DB.
 5. **E2E tests for competitor/intelligence UI surfaces must include**: happy-path table render, empty state text, mobile viewport scrollability, at least one edge-case (e.g., human competitor vs NPC competitor rendering).
 6. **Infrastructure CI failures (HTTP 429 rate limit) must be classified as infrastructure issues immediately**, not as code failures. When prior runs failed with `429 Sorry, you've exceeded your weekly rate limit`, investigate whether the current HEAD has code failures SEPARATELY before reporting "no code failures".
+
+## World-map city unlock mock parity — do not let `getCities` silently fall back to `cities`
+
+Root-cause of a CI failure (May 2026, PR #523 city expansion unlocks):
+- `WorldMapView.vue` first requests `getCities` (with unlock fields) and only falls back to `cities` if that richer query fails.
+- The Playwright mock supported `cities` and `cityUnlockStatuses` but not `getCities`, so the page silently fell back to the older query shape during E2E.
+- Because the fallback payload omitted `isUnlocked`, the world map treated even starter cities as locked and the spec asserted the stale sidebar CTA text instead of the modal CTA.
+
+**Rules to prevent recurrence:**
+1. **Whenever shipped UI starts querying `getCities` (or any richer replacement for an older query), add mock-api support for that exact GraphQL field in the same PR.** Do not rely on fallback queries in E2E.
+2. **Default city fixtures must encode the real progression contract.** Berlin and Warsaw should be locked by default in Playwright fixtures with their unlock thresholds, while starter cities remain unlocked.
+3. **World-map expansion tests must click the named locked city they are validating** (for example Berlin), not `cityButtons.first()`, because list order plus starter cities make first-item assertions brittle.
+4. **When a view has both a sidebar CTA and a modal CTA, verify the exact currently rendered i18n string before writing the Playwright selector.** In the world-map modal the correct text is `Grow your company to unlock`, not `Start expanding here`.

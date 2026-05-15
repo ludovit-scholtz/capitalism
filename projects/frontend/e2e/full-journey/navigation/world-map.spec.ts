@@ -11,10 +11,22 @@ test.describe('World map expansion view', () => {
     const cityButtons = page.locator('.city-item')
     await expect(cityButtons).not.toHaveCount(0)
 
-    await cityButtons.first().click()
+    await page.locator('.city-item', { hasText: 'Berlin' }).click()
     const modal = page.locator('.expansion-modal')
-    await expect(page.getByRole('heading', { name: /Expand to/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Expand to Berlin' })).toBeVisible()
     await expect(modal).toContainText('Population')
-    await expect(modal.getByRole('button', { name: 'Start expanding here' })).toBeVisible()
+    await expect(modal).toContainText('Unlock Berlin')
+    await expect(modal.getByRole('button', { name: 'Grow your company to unlock' })).toBeVisible()
+  })
+
+  test('keeps starter cities directly accessible on /map while expansion cities stay locked', async ({ page }) => {
+    setupMockApi(page, {})
+
+    await page.goto('/map')
+
+    await page.locator('.city-item', { hasText: 'Bratislava' }).click()
+    await expect(page.locator('.city-detail')).toContainText('Bratislava')
+    await expect(page.getByRole('button', { name: 'Go to City' })).toBeVisible()
+    await expect(page.locator('.expansion-modal')).toHaveCount(0)
   })
 })
