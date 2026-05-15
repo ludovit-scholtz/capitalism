@@ -92,4 +92,85 @@ describe('useNotificationsStore', () => {
     })
     expect(store.unreadCount).toBe(1)
   })
+
+  it('markRead sends a UUID-based mutation and updates matching notifications locally', async () => {
+    gqlRequestMock.mockResolvedValueOnce({
+      markNotificationsRead: true,
+    })
+
+    const store = useNotificationsStore()
+
+    store.inbox = {
+      unreadCount: 2,
+      items: [
+        {
+          id: 'f2fe5518-5a3e-461c-ae94-84452de60ac2',
+          type: 'CITY_EXPANSION_UNLOCKED',
+          severity: 'INFO',
+          title: '',
+          message: '',
+          titleKey: 'cityExpansion.notificationTitle',
+          bodyKey: 'cityExpansion.notificationMessage',
+          bodyParamsJson: JSON.stringify({ city: 'Berlin', company: 'Northwind Holdings' }),
+          isRead: false,
+          createdAtTick: 120,
+          createdAtUtc: '2026-05-15T00:00:00Z',
+          expiresAtUtc: null,
+          companyId: 'company-1',
+          buildingId: null,
+          buildingUnitId: null,
+          bankAccountId: null,
+          loanId: null,
+          relatedEntityType: 'CITY',
+          relatedEntityId: 'city-ber',
+        },
+        {
+          id: '2d7f8c87-0c4b-4d2b-97dd-a74e21d6b3fb',
+          type: 'CITY_EXPANSION_UNLOCKED',
+          severity: 'INFO',
+          title: '',
+          message: '',
+          titleKey: 'cityExpansion.notificationTitle',
+          bodyKey: 'cityExpansion.notificationMessage',
+          bodyParamsJson: JSON.stringify({ city: 'Prague', company: 'Northwind Holdings' }),
+          isRead: false,
+          createdAtTick: 121,
+          createdAtUtc: '2026-05-15T00:01:00Z',
+          expiresAtUtc: null,
+          companyId: 'company-1',
+          buildingId: null,
+          buildingUnitId: null,
+          bankAccountId: null,
+          loanId: null,
+          relatedEntityType: 'CITY',
+          relatedEntityId: 'city-prg',
+        },
+      ],
+    }
+    store.unreadCount = 2
+
+    await store.markRead(['f2fe5518-5a3e-461c-ae94-84452de60ac2'])
+
+    const mutation = gqlRequestMock.mock.calls[0]?.[0]
+
+    expect(typeof mutation).toBe('string')
+    expect(mutation).toContain('mutation MarkNotificationsRead($ids: [UUID!]!)')
+    expect(gqlRequestMock).toHaveBeenCalledWith(expect.any(String), {
+      ids: ['f2fe5518-5a3e-461c-ae94-84452de60ac2'],
+    })
+    expect(store.inbox).toEqual({
+      unreadCount: 1,
+      items: [
+        expect.objectContaining({
+          id: 'f2fe5518-5a3e-461c-ae94-84452de60ac2',
+          isRead: true,
+        }),
+        expect.objectContaining({
+          id: '2d7f8c87-0c4b-4d2b-97dd-a74e21d6b3fb',
+          isRead: false,
+        }),
+      ],
+    })
+    expect(store.unreadCount).toBe(1)
+  })
 })

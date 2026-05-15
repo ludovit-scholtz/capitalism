@@ -93,7 +93,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
     }
 
     await gqlRequest<{ markNotificationsRead: boolean }>(
-      `mutation MarkNotificationsRead($ids: [ID!]!) {
+      `mutation MarkNotificationsRead($ids: [UUID!]!) {
         markNotificationsRead(ids: $ids)
       }`,
       { ids: notificationIds },
