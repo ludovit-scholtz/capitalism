@@ -51,7 +51,11 @@ describe('resolveNotificationCopy', () => {
   it('falls back to stored text when keys are missing', () => {
     const item = makeNotification()
 
-    const result = resolveNotificationCopy(item, () => 'translated', () => false)
+    const result = resolveNotificationCopy(
+      item,
+      () => 'translated',
+      () => false,
+    )
 
     expect(result).toEqual({
       title: 'Fallback title',
@@ -66,7 +70,11 @@ describe('resolveNotificationCopy', () => {
       bodyParamsJson: '{bad json',
     })
 
-    const result = resolveNotificationCopy(item, () => 'translated', () => true)
+    const result = resolveNotificationCopy(
+      item,
+      () => 'translated',
+      () => true,
+    )
 
     expect(result).toEqual({
       title: 'Fallback title',

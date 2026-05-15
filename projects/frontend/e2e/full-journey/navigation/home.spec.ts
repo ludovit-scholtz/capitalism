@@ -77,10 +77,7 @@ function makeMixedCityPlayer() {
         name: 'Mixed City Holdings',
         cash: 500000,
         foundedAtUtc: '2026-01-01T00:00:00Z',
-        buildings: [
-          makeBuilding('factory-ba-1', 'comp-mixed', 'city-ba', 'FACTORY', 'Bratislava Factory'),
-          makeBuilding('shop-pr-1', 'comp-mixed', 'city-pr', 'SALES_SHOP', 'Prague Shop'),
-        ],
+        buildings: [makeBuilding('factory-ba-1', 'comp-mixed', 'city-ba', 'FACTORY', 'Bratislava Factory'), makeBuilding('shop-pr-1', 'comp-mixed', 'city-pr', 'SALES_SHOP', 'Prague Shop')],
       },
     ],
   })
@@ -344,9 +341,7 @@ test.describe('Header navigation', () => {
     await expect(page.locator('.city-auto-switch-toast')).toHaveCount(0)
   })
 
-  test('oidc callback keeps the stored city when the player already has a building there', async ({
-    page,
-  }) => {
+  test('oidc callback keeps the stored city when the player already has a building there', async ({ page }) => {
     const player = makeMixedCityPlayer()
     setupMockApi(page, { players: [player] })
 

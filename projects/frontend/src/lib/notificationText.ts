@@ -20,13 +20,7 @@ function parseNotificationParams(bodyParamsJson?: string | null): Record<string,
   return null
 }
 
-function resolveNotificationField(
-  fallbackValue: string,
-  key: string | null | undefined,
-  bodyParamsJson: string | null | undefined,
-  translate: TranslateFn,
-  hasKey: HasKeyFn,
-): string {
+function resolveNotificationField(fallbackValue: string, key: string | null | undefined, bodyParamsJson: string | null | undefined, translate: TranslateFn, hasKey: HasKeyFn): string {
   const fallback = fallbackValue.trim()
   if (!key || !hasKey(key)) {
     return fallback
@@ -40,11 +34,7 @@ function resolveNotificationField(
   return translate(key, params)
 }
 
-export function resolveNotificationCopy(
-  item: PlayerNotificationItem,
-  translate: TranslateFn,
-  hasKey: HasKeyFn,
-): { title: string; message: string } {
+export function resolveNotificationCopy(item: PlayerNotificationItem, translate: TranslateFn, hasKey: HasKeyFn): { title: string; message: string } {
   return {
     title: resolveNotificationField(item.title, item.titleKey, item.bodyParamsJson, translate, hasKey),
     message: resolveNotificationField(item.message, item.bodyKey, item.bodyParamsJson, translate, hasKey),

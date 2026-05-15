@@ -91,13 +91,17 @@ function closeNotificationsPanel() {
   isNotificationsOpen.value = false
 }
 
-async function handleNotificationClick(notificationId: string, isRead: boolean, item: {
-  buildingId: string | null
-  companyId: string | null
-  loanId: string | null
-  bankAccountId: string | null
-  type: string
-}) {
+async function handleNotificationClick(
+  notificationId: string,
+  isRead: boolean,
+  item: {
+    buildingId: string | null
+    companyId: string | null
+    loanId: string | null
+    bankAccountId: string | null
+    type: string
+  },
+) {
   if (!isRead) {
     await notificationsStore.markRead([notificationId])
   }
@@ -272,9 +276,7 @@ const mobileNavSections = computed(() => {
     {
       key: 'admin' as const,
       label: t('nav.sectionAdmin'),
-      links: [
-        { key: 'operations', label: t('nav.operations'), to: '/operations/statistics', icon: ['fas', 'chart-line'], visible: !!session.value?.canAccessAdminDashboard, badge: 0 },
-      ],
+      links: [{ key: 'operations', label: t('nav.operations'), to: '/operations/statistics', icon: ['fas', 'chart-line'], visible: !!session.value?.canAccessAdminDashboard, badge: 0 }],
     },
   ]
 
@@ -310,7 +312,12 @@ useTickRefresh(async () => {
       </RouterLink>
 
       <!-- Mobile menu toggle -->
-      <button class="menu-toggle ml-auto lg:hidden text-muted hover:text-body p-2 rounded-md transition-colors tap-target-44" @click="toggleMenu" :aria-expanded="isMenuOpen" aria-label="Toggle navigation menu">
+      <button
+        class="menu-toggle ml-auto lg:hidden text-muted hover:text-body p-2 rounded-md transition-colors tap-target-44"
+        @click="toggleMenu"
+        :aria-expanded="isMenuOpen"
+        aria-label="Toggle navigation menu"
+      >
         <font-awesome-icon :icon="['fas', 'bars']" />
       </button>
 
@@ -389,11 +396,7 @@ useTickRefresh(async () => {
 
         <div v-if="isMenuOpen" class="mobile-nav-sections" :aria-label="t('nav.mobileMenuLabel')" role="navigation">
           <section v-for="section in mobileNavSections" :key="section.key" class="mobile-nav-section">
-            <button
-              class="mobile-section-toggle tap-target-44"
-              :aria-expanded="openMobileSection === section.key"
-              @click="toggleMobileSection(section.key)"
-            >
+            <button class="mobile-section-toggle tap-target-44" :aria-expanded="openMobileSection === section.key" @click="toggleMobileSection(section.key)">
               <span>{{ section.label }}</span>
               <font-awesome-icon :icon="['fas', openMobileSection === section.key ? 'chevron-up' : 'chevron-down']" />
             </button>
@@ -404,12 +407,7 @@ useTickRefresh(async () => {
                   <span>{{ link.label }}</span>
                   <span v-if="link.badge && link.badge > 0" class="mobile-sub-badge">{{ link.badge }}</span>
                 </RouterLink>
-                <button
-                  v-else
-                  class="mobile-sub-link mobile-sub-button tap-target-44"
-                  :class="{ 'mobile-sub-link-active': link.active }"
-                  @click="link.action"
-                >
+                <button v-else class="mobile-sub-link mobile-sub-button tap-target-44" :class="{ 'mobile-sub-link-active': link.active }" @click="link.action">
                   <font-awesome-icon :icon="link.icon" />
                   <span>{{ link.label }}</span>
                   <span v-if="link.badge && link.badge > 0" class="mobile-sub-badge">{{ link.badge }}</span>
@@ -456,11 +454,7 @@ useTickRefresh(async () => {
             <span v-if="showNotificationBadge" class="notification-badge">{{ notificationUnreadCount }}</span>
           </button>
           <ContextSwitcher @switched="closeMenu" />
-          <button
-            class="btn btn-secondary h-11 w-11 p-0 justify-center tap-target-44"
-            @click="handleLogout"
-            :title="t('common.logout')"
-          >
+          <button class="btn btn-secondary h-11 w-11 p-0 justify-center tap-target-44" @click="handleLogout" :title="t('common.logout')">
             <font-awesome-icon :icon="['fas', 'sign-out-alt']" />
           </button>
         </template>

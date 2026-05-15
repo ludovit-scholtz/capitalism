@@ -4566,7 +4566,14 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ errors: [{ message: 'You need at least 50% combined ownership through your person account and controlled companies to take control of this company.', extensions: { code: 'COMPANY_CONTROL_REQUIRED' } }] }),
+          body: JSON.stringify({
+            errors: [
+              {
+                message: 'You need at least 50% combined ownership through your person account and controlled companies to take control of this company.',
+                extensions: { code: 'COMPANY_CONTROL_REQUIRED' },
+              },
+            ],
+          }),
         })
       }
 
@@ -4838,19 +4845,23 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       if (input?.dividendPercent != null) {
         const policyDividendPercent = Number(input.dividendPercent)
         if (company.playerId !== player.id) {
-          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ extensions: { code: 'NOT_CEO' }, message: 'Only the acting CEO can propose dividend changes.' }] }) })
+          return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ errors: [{ extensions: { code: 'NOT_CEO' }, message: 'Only the acting CEO can propose dividend changes.' }] }),
+          })
         }
 
         const currentTick = state.gameState.currentTick
         const hasOpenPolicy = state.dividendProposals.some(
-          (candidate) =>
-            candidate.companyId === company.id &&
-            candidate.status === 'VOTING' &&
-            candidate.totalPayout <= 0 &&
-            candidate.votingCloseTick >= currentTick,
+          (candidate) => candidate.companyId === company.id && candidate.status === 'VOTING' && candidate.totalPayout <= 0 && candidate.votingCloseTick >= currentTick,
         )
         if (hasOpenPolicy) {
-          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ extensions: { code: 'PROPOSAL_ALREADY_PENDING' }, message: 'There is already a pending dividend proposal.' }] }) })
+          return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ errors: [{ extensions: { code: 'PROPOSAL_ALREADY_PENDING' }, message: 'There is already a pending dividend proposal.' }] }),
+          })
         }
 
         const proposalId = `proposal-${Math.random().toString(36).slice(2)}`
@@ -4943,18 +4954,18 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const input = body.variables?.input
       const player = state.players.find((candidate) => candidate.id === state.currentUserId)
       const companyId = String(input?.companyId ?? '')
-      const proposal = state.dividendProposals.find(
-        (candidate) => candidate.companyId === companyId && candidate.status === 'VOTING' && candidate.totalPayout <= 0,
-      )
+      const proposal = state.dividendProposals.find((candidate) => candidate.companyId === companyId && candidate.status === 'VOTING' && candidate.totalPayout <= 0)
       if (!player || !proposal) {
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'No pending dividend proposal found.' }] }) })
       }
 
-      const existingVote = state.dividendVotes.find(
-        (candidate) => candidate.proposalId === proposal.id && candidate.voterAccountId === player.id && candidate.voterAccountType === 'PERSON',
-      )
+      const existingVote = state.dividendVotes.find((candidate) => candidate.proposalId === proposal.id && candidate.voterAccountId === player.id && candidate.voterAccountType === 'PERSON')
       if (existingVote) {
-        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ extensions: { code: 'ALREADY_VOTED' }, message: 'You have already voted on this proposal.' }] }) })
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ extensions: { code: 'ALREADY_VOTED' }, message: 'You have already voted on this proposal.' }] }),
+        })
       }
 
       const sharesVoted = state.shareholdings
@@ -7252,54 +7263,42 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               assetFactor,
               assetValue: companyAssetValue,
               currencyCode: primaryCurrencyCode,
-                citySalarySettings: state.cities.map((city) => {
-                  const salaryMultiplier = company.citySalaryMultipliers?.[city.id] ?? 1
-                  return {
+              citySalarySettings: state.cities.map((city) => {
+                const salaryMultiplier = company.citySalaryMultipliers?.[city.id] ?? 1
+                return {
                   cityId: city.id,
                   cityName: city.name,
                   currencyCode: city.currencyCode ?? 'EUR',
                   baseSalaryPerManhour: city.baseSalaryPerManhour,
                   salaryMultiplier,
-                    effectiveSalaryPerManhour: Number((city.baseSalaryPerManhour * salaryMultiplier).toFixed(2)),
-                  }
-                }),
-                pendingDividendProposal: (() => {
-                  const proposal = state.dividendProposals.find(
-                    (candidate) =>
-                      candidate.companyId === company.id &&
-                      candidate.status === 'VOTING' &&
-                      candidate.totalPayout <= 0 &&
-                      candidate.votingCloseTick >= state.gameState.currentTick,
-                  )
-                  if (!proposal) {
-                    return null
-                  }
+                  effectiveSalaryPerManhour: Number((city.baseSalaryPerManhour * salaryMultiplier).toFixed(2)),
+                }
+              }),
+              pendingDividendProposal: (() => {
+                const proposal = state.dividendProposals.find(
+                  (candidate) => candidate.companyId === company.id && candidate.status === 'VOTING' && candidate.totalPayout <= 0 && candidate.votingCloseTick >= state.gameState.currentTick,
+                )
+                if (!proposal) {
+                  return null
+                }
 
-                  const votes = state.dividendVotes.filter((candidate) => candidate.proposalId === proposal.id)
-                  const forVotes = votes
-                    .filter((candidate) => candidate.voteChoice === 'FOR')
-                    .reduce((sum, candidate) => sum + candidate.sharesVoted, 0)
-                  const againstVotes = votes
-                    .filter((candidate) => candidate.voteChoice === 'AGAINST')
-                    .reduce((sum, candidate) => sum + candidate.sharesVoted, 0)
-                  const myVote = votes.find(
-                    (candidate) =>
-                      candidate.voterAccountId === player.id &&
-                      candidate.voterAccountType === 'PERSON',
-                  )
-                  return {
-                    id: proposal.id,
-                    dividendPercent: Number((proposal.dividendPerShare * 100).toFixed(2)),
-                    votingCloseTick: proposal.votingCloseTick,
-                    ticksRemaining: Math.max(0, proposal.votingCloseTick - state.gameState.currentTick),
-                    forVotes,
-                    againstVotes,
-                    myVoteChoice: myVote?.voteChoice ?? null,
-                  }
-                })(),
-              },
+                const votes = state.dividendVotes.filter((candidate) => candidate.proposalId === proposal.id)
+                const forVotes = votes.filter((candidate) => candidate.voteChoice === 'FOR').reduce((sum, candidate) => sum + candidate.sharesVoted, 0)
+                const againstVotes = votes.filter((candidate) => candidate.voteChoice === 'AGAINST').reduce((sum, candidate) => sum + candidate.sharesVoted, 0)
+                const myVote = votes.find((candidate) => candidate.voterAccountId === player.id && candidate.voterAccountType === 'PERSON')
+                return {
+                  id: proposal.id,
+                  dividendPercent: Number((proposal.dividendPerShare * 100).toFixed(2)),
+                  votingCloseTick: proposal.votingCloseTick,
+                  ticksRemaining: Math.max(0, proposal.votingCloseTick - state.gameState.currentTick),
+                  forVotes,
+                  againstVotes,
+                  myVoteChoice: myVote?.voteChoice ?? null,
+                }
+              })(),
             },
-          }),
+          },
+        }),
       })
     }
 
@@ -7719,11 +7718,11 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         contentType: 'application/json',
         body: JSON.stringify({
           data: {
-              playerProfile: {
-                playerId: targetPlayer.id,
-                displayName: targetPlayer.displayName,
-                gender: targetPlayer.gender ?? 'UNSPECIFIED',
-                bio: null,
+            playerProfile: {
+              playerId: targetPlayer.id,
+              displayName: targetPlayer.displayName,
+              gender: targetPlayer.gender ?? 'UNSPECIFIED',
+              bio: null,
               createdAtUtc: '2024-01-01T00:00:00Z',
               joinGameYear: 2024,
               hasProSubscription: targetPlayer.hasProSubscription ?? false,
@@ -7902,11 +7901,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
       const personalAccountName = (body.variables?.input?.personalAccountName as string | undefined)?.trim() ?? ''
       const existingPlayer = state.players.find((p) => p.id === state.currentUserId)
-      const gender = (body.variables?.input?.gender as
-        | 'MALE'
-        | 'FEMALE'
-        | 'UNSPECIFIED'
-        | undefined) ?? existingPlayer?.gender ?? 'UNSPECIFIED'
+      const gender = (body.variables?.input?.gender as 'MALE' | 'FEMALE' | 'UNSPECIFIED' | undefined) ?? existingPlayer?.gender ?? 'UNSPECIFIED'
       if (!personalAccountName) {
         return route.fulfill({
           status: 200,
@@ -9047,8 +9042,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const mapRecipeInput = (recipe: MockProductType['recipes'][number]) => {
         if (recipe.resourceType) {
           const recipeResource =
-            state.resourceTypes.find((candidate) => candidate.id === recipe.resourceType?.id)
-            ?? ({
+            state.resourceTypes.find((candidate) => candidate.id === recipe.resourceType?.id) ??
+            ({
               id: recipe.resourceType.id,
               name: recipe.resourceType.name,
               slug: recipe.resourceType.slug ?? recipe.resourceType.name.toLowerCase().replace(/\s+/g, '-'),
@@ -9078,8 +9073,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         }
 
         const recipeProduct =
-          state.productTypes.find((candidate) => candidate.id === recipe.inputProductType?.id)
-          ?? ({
+          state.productTypes.find((candidate) => candidate.id === recipe.inputProductType?.id) ??
+          ({
             id: recipe.inputProductType?.id ?? 'missing-product',
             name: recipe.inputProductType?.name ?? 'Unknown product',
             slug: recipe.inputProductType?.slug ?? 'unknown-product',
@@ -9137,17 +9132,13 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
                 inputs: [],
               },
             ],
-            usedInRecipes: state.productTypes
-              .filter((candidate) => candidate.recipes.some((recipe) => recipe.resourceType?.slug === resource.slug))
-              .map(mapRecipeCard),
+            usedInRecipes: state.productTypes.filter((candidate) => candidate.recipes.some((recipe) => recipe.resourceType?.slug === resource.slug)).map(mapRecipeCard),
           }
         : product
           ? {
               entry: mapProductEntry(product),
               producedByRecipes: [mapRecipeCard(product)],
-              usedInRecipes: state.productTypes
-                .filter((candidate) => candidate.recipes.some((recipe) => recipe.inputProductType?.slug === product.slug))
-                .map(mapRecipeCard),
+              usedInRecipes: state.productTypes.filter((candidate) => candidate.recipes.some((recipe) => recipe.inputProductType?.slug === product.slug)).map(mapRecipeCard),
             }
           : null
 
@@ -9213,10 +9204,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             return true
           }
 
-          return [entry.name, entry.slug, entry.description ?? '', entry.category, entry.industry ?? '']
-            .join(' ')
-            .toLowerCase()
-            .includes(normalizedSearch)
+          return [entry.name, entry.slug, entry.description ?? '', entry.category, entry.industry ?? ''].join(' ').toLowerCase().includes(normalizedSearch)
         })
         .sort((left, right) => left.name.localeCompare(right.name))
 
@@ -10439,21 +10427,19 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           currencyCode: city.currencyCode ?? 'EUR',
           fromTick: Math.max(0, tick - 99),
           toTick: tick,
-          products: (state.productTypes ?? [])
-            .slice(0, topN)
-            .map((pt, idx) => ({
-              productTypeId: pt.id,
-              productName: pt.name,
-              industry: pt.industry,
-              totalDemand: 500 + idx * 50,
-              totalQuantitySold: 400 + idx * 40,
-              satisfactionRate: 0.5 + idx * 0.05,
-              averageClearingPrice: pt.basePrice ?? (10 + idx * 5),
-              totalRevenue: (pt.basePrice ?? 15) * (400 + idx * 40),
-              sellerCount: 1 + idx,
-              topCompetitorCompanyName: idx % 2 === 0 ? 'NPC Manufacturing Co.' : null,
-              topCompetitorMarketSharePercent: idx % 2 === 0 ? 42.5 : 0,
-            })),
+          products: (state.productTypes ?? []).slice(0, topN).map((pt, idx) => ({
+            productTypeId: pt.id,
+            productName: pt.name,
+            industry: pt.industry,
+            totalDemand: 500 + idx * 50,
+            totalQuantitySold: 400 + idx * 40,
+            satisfactionRate: 0.5 + idx * 0.05,
+            averageClearingPrice: pt.basePrice ?? 10 + idx * 5,
+            totalRevenue: (pt.basePrice ?? 15) * (400 + idx * 40),
+            sellerCount: 1 + idx,
+            topCompetitorCompanyName: idx % 2 === 0 ? 'NPC Manufacturing Co.' : null,
+            topCompetitorMarketSharePercent: idx % 2 === 0 ? 42.5 : 0,
+          })),
         }
       })
       return route.fulfill({
@@ -10469,19 +10455,22 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const tick = state.gameState.currentTick
       const city = state.cities.find((c) => c.id === cityId)
       const overridden = state.marketOverviewByCityId[cityId]
-      const products = (overridden?.products ?? (state.productTypes ?? []).slice(0, topN).map((pt, idx) => ({
-        productTypeId: pt.id,
-        productName: pt.name,
-        industry: pt.industry,
-        totalDemand: 500 + idx * 50,
-        totalQuantitySold: 400 + idx * 40,
-        satisfactionRate: 0.5 + idx * 0.05,
-        averageClearingPrice: pt.basePrice ?? (10 + idx * 5),
-        totalRevenue: (pt.basePrice ?? 15) * (400 + idx * 40),
-        sellerCount: 1 + idx,
-        topCompetitorCompanyName: idx % 2 === 0 ? 'NPC Manufacturing Co.' : null,
-        topCompetitorMarketSharePercent: idx % 2 === 0 ? 42.5 : 0,
-      }))).slice(0, topN)
+      const products = (
+        overridden?.products ??
+        (state.productTypes ?? []).slice(0, topN).map((pt, idx) => ({
+          productTypeId: pt.id,
+          productName: pt.name,
+          industry: pt.industry,
+          totalDemand: 500 + idx * 50,
+          totalQuantitySold: 400 + idx * 40,
+          satisfactionRate: 0.5 + idx * 0.05,
+          averageClearingPrice: pt.basePrice ?? 10 + idx * 5,
+          totalRevenue: (pt.basePrice ?? 15) * (400 + idx * 40),
+          sellerCount: 1 + idx,
+          topCompetitorCompanyName: idx % 2 === 0 ? 'NPC Manufacturing Co.' : null,
+          topCompetitorMarketSharePercent: idx % 2 === 0 ? 42.5 : 0,
+        }))
+      ).slice(0, topN)
       const result = {
         cityId,
         cityName: city?.name ?? 'Unknown City',

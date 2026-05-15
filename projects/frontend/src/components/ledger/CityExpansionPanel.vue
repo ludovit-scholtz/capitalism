@@ -33,10 +33,7 @@ function formatAmount(amount: number, currency: string): string {
             <h3 class="city-expansion-card__title">{{ status.cityName }}</h3>
             <p class="city-expansion-card__currency">{{ status.countryCode }} · {{ status.currency }}</p>
           </div>
-          <span
-            class="city-expansion-card__badge"
-            :class="status.isUnlocked ? 'city-expansion-card__badge--unlocked' : 'city-expansion-card__badge--locked'"
-          >
+          <span class="city-expansion-card__badge" :class="status.isUnlocked ? 'city-expansion-card__badge--unlocked' : 'city-expansion-card__badge--locked'">
             {{ status.isUnlocked ? t('cityExpansion.unlockedBadge') : t('cityExpansion.lockedBadge') }}
           </span>
         </div>
@@ -46,11 +43,7 @@ function formatAmount(amount: number, currency: string): string {
             <span class="city-expansion-progress__fill" :style="{ width: `${computeCityUnlockProgress(status)}%` }"></span>
           </div>
           <span class="city-expansion-progress__label">
-            {{
-              status.isUnlocked
-                ? t('cityExpansion.progressComplete')
-                : t('cityExpansion.progressLabel', { percent: computeCityUnlockProgress(status) })
-            }}
+            {{ status.isUnlocked ? t('cityExpansion.progressComplete') : t('cityExpansion.progressLabel', { percent: computeCityUnlockProgress(status) }) }}
           </span>
         </div>
 

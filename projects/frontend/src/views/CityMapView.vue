@@ -13,13 +13,7 @@
     </div>
 
     <nav class="city-tabs" aria-label="City tabs">
-      <RouterLink
-        v-for="tab in tabs"
-        :key="tab.name"
-        :to="{ name: tab.name, params: { cityId } }"
-        class="city-tab"
-        :class="{ 'city-tab--active': activeTab === tab.key }"
-      >
+      <RouterLink v-for="tab in tabs" :key="tab.name" :to="{ name: tab.name, params: { cityId } }" class="city-tab" :class="{ 'city-tab--active': activeTab === tab.key }">
         <span>{{ tab.icon }}</span>
         <span>{{ t(tab.labelKey) }}</span>
       </RouterLink>
@@ -118,7 +112,21 @@ import { gqlRequest } from '@/lib/graphql'
 import CountryFlag from '@/components/common/CountryFlag.vue'
 import { computeCityUnlockProgress, formatEstimatedTicksLabel } from '@/lib/cityExpansion'
 import { formatMoney } from '@/lib/currencyFormat'
-import type { City, CityUnlockStatus, BuildingLot, Company, PurchaseLotResult, CityMediaHouseInfo, CityWeatherForecast, CityPowerBalance, CityEconomicReportResult, EconomicCycleView, MarketEventView, EconomicCycleHistoryPoint, NpcCompanySummary } from '@/types'
+import type {
+  City,
+  CityUnlockStatus,
+  BuildingLot,
+  Company,
+  PurchaseLotResult,
+  CityMediaHouseInfo,
+  CityWeatherForecast,
+  CityPowerBalance,
+  CityEconomicReportResult,
+  EconomicCycleView,
+  MarketEventView,
+  EconomicCycleHistoryPoint,
+  NpcCompanySummary,
+} from '@/types'
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -136,15 +144,7 @@ const tabs = [
 
 const cityId = computed(() => route.params.cityId as string)
 const activeTab = computed(() =>
-  route.name === 'city-economy'
-    ? 'economy'
-    : route.name === 'city-buildings'
-      ? 'buildings'
-      : route.name === 'city-market'
-        ? 'market'
-        : route.name === 'city-competitors'
-          ? 'competitors'
-          : 'overview',
+  route.name === 'city-economy' ? 'economy' : route.name === 'city-buildings' ? 'buildings' : route.name === 'city-market' ? 'market' : route.name === 'city-competitors' ? 'competitors' : 'overview',
 )
 const highlightedBuildingId = computed(() => (typeof route.query.building === 'string' ? route.query.building : null))
 
@@ -169,11 +169,7 @@ const activeMarketEvents = ref<MarketEventView[]>([])
 const economicHistory = ref<EconomicCycleHistoryPoint[]>([])
 const activeCompanyId = computed(() => auth.player?.activeCompanyId ?? auth.player?.companies?.[0]?.id ?? null)
 const isCityLocked = computed(() => auth.isAuthenticated && cityUnlockStatus.value != null && !cityUnlockStatus.value.isUnlocked)
-const cityUnlockProgress = computed(() =>
-  cityUnlockStatus.value
-    ? computeCityUnlockProgress(cityUnlockStatus.value)
-    : 0,
-)
+const cityUnlockProgress = computed(() => (cityUnlockStatus.value ? computeCityUnlockProgress(cityUnlockStatus.value) : 0))
 
 function formatUnlockAmount(amount: number, currencyCode: string): string {
   return formatMoney(amount, currencyCode, locale.value)
