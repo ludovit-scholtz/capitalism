@@ -16,10 +16,10 @@ export function computeCityUnlockProgress(status: Pick<CityUnlockStatus, 'isUnlo
   return Math.max(0, Math.min(99, Math.round((status.currentNetWorth / status.requiredNetWorth) * 100)))
 }
 
-export function formatEstimatedTicksLabel(estimatedTicksToUnlock: number | null | undefined): string {
+export function formatEstimatedTicksLabel(estimatedTicksToUnlock: number | null | undefined, locale = 'en-US'): string {
   if (estimatedTicksToUnlock == null || !Number.isFinite(estimatedTicksToUnlock) || estimatedTicksToUnlock <= 0) {
     return '—'
   }
 
-  return `${Math.round(estimatedTicksToUnlock).toLocaleString()}`
+  return new Intl.NumberFormat(locale).format(Math.round(estimatedTicksToUnlock))
 }

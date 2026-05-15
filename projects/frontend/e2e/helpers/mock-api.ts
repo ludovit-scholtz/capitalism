@@ -1179,6 +1179,9 @@ export type MockState = {
     severity?: 'INFO' | 'WARNING' | 'CRITICAL'
     title: string
     message: string
+    titleKey?: string | null
+    bodyKey?: string | null
+    bodyParamsJson?: string | null
     isRead: boolean
     createdAtTick: number
     createdAtUtc: string

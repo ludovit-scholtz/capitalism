@@ -46,4 +46,8 @@ describe('formatEstimatedTicksLabel', () => {
   it('formats whole-number tick estimates', () => {
     expect(formatEstimatedTicksLabel(1234)).toBe('1,234')
   })
+
+  it('supports explicit app locales instead of host defaults', () => {
+    expect(formatEstimatedTicksLabel(1234, 'sk')).toBe(new Intl.NumberFormat('sk').format(1234))
+  })
 })

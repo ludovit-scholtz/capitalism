@@ -434,6 +434,41 @@ test.describe('Header navigation', () => {
     await expect(panel.locator('.notification-item-unread')).toHaveCount(0)
   })
 
+  test('renders localized notification text when only translation keys are present', async ({ page }) => {
+    const player = makePlayer()
+    const now = new Date().toISOString()
+    setupMockApi(page, {
+      players: [player],
+      currentUserId: player.id,
+      currentToken: `token-${player.id}`,
+      playerNotifications: [
+        {
+          id: 'notif-city-unlock',
+          type: 'CITY_EXPANSION_UNLOCKED',
+          title: '',
+          message: '',
+          titleKey: 'cityExpansion.notificationTitle',
+          bodyKey: 'cityExpansion.notificationMessage',
+          bodyParamsJson: JSON.stringify({ city: 'Berlin', company: 'Northwind Holdings' }),
+          isRead: false,
+          createdAtTick: 120,
+          createdAtUtc: now,
+          companyId: 'company-1',
+          relatedEntityType: 'CITY',
+          relatedEntityId: 'city-ber',
+        },
+      ],
+    })
+    await authenticate(page, `token-${player.id}`)
+
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Notifications' }).click()
+
+    const panel = page.locator('.notification-panel')
+    await expect(panel).toContainText('Berlin is now unlocked!')
+    await expect(panel).toContainText('You can now expand Northwind Holdings into Berlin.')
+  })
+
   test('shows shipment and margin warning notification icons with deep links', async ({ page }) => {
     const player = makePlayer()
     const now = new Date().toISOString()

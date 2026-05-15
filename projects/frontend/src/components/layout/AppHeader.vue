@@ -9,6 +9,8 @@ import { useNotificationsStore } from '@/stores/notifications'
 import { useGameAdminStore } from '@/stores/gameAdmin'
 import { useChatStore } from '@/stores/chat'
 import { gqlRequest } from '@/lib/graphql'
+import { resolveNotificationCopy } from '@/lib/notificationText'
+import type { PlayerNotificationItem } from '@/types'
 import ContextSwitcher from '@/components/layout/ContextSwitcher.vue'
 import GameTimeChip from '@/components/layout/GameTimeChip.vue'
 import ThemeToggle from '@/components/layout/ThemeToggle.vue'
@@ -19,7 +21,7 @@ import { useEndgameStore } from '@/stores/endgame'
 const themeStore = useThemeStore()
 themeStore.init()
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 const router = useRouter()
 const auth = useAuthStore()
 const newsStore = usesStore()
@@ -39,6 +41,11 @@ const showUnreadBadge = computed(() => auth.isAuthenticated && unreadCount.value
 const showNotificationBadge = computed(() => auth.isAuthenticated && notificationUnreadCount.value > 0)
 const stockProposalBadgeCount = ref(0)
 const showStockProposalBadge = computed(() => auth.isAuthenticated && stockProposalBadgeCount.value > 0)
+
+type NotificationPanelItem = PlayerNotificationItem & {
+  displayTitle: string
+  displayMessage: string
+}
 
 const impersonationLabel = computed(() => {
   if (!session.value?.isImpersonating || !session.value.effectivePlayer) {
@@ -154,8 +161,15 @@ function formatNotificationAge(createdAtUtc: string) {
 }
 
 const groupedNotifications = computed(() => {
-  const items = notificationsInbox.value?.items ?? []
-  const groups = new Map<string, typeof items>()
+  const items: NotificationPanelItem[] = (notificationsInbox.value?.items ?? []).map((item) => {
+    const localizedCopy = resolveNotificationCopy(item, t, te)
+    return {
+      ...item,
+      displayTitle: localizedCopy.title,
+      displayMessage: localizedCopy.message,
+    }
+  })
+  const groups = new Map<string, NotificationPanelItem[]>()
   for (const item of items) {
     const day = new Date(item.createdAtUtc).toLocaleDateString()
     const existing = groups.get(day) ?? []
@@ -496,9 +510,9 @@ useTickRefresh(async () => {
                   <span class="notification-item-icon" :class="[getNotificationIcon(item.type).className, getNotificationSeverityClass(item.severity)]">
                     {{ getNotificationIcon(item.type).symbol }}
                   </span>
-                  <span class="notification-item-title">{{ item.title }}</span>
+                  <span class="notification-item-title">{{ item.displayTitle }}</span>
                 </div>
-                <span class="notification-item-message">{{ item.message }}</span>
+                <span class="notification-item-message">{{ item.displayMessage }}</span>
                 <span class="notification-item-time">{{ formatNotificationAge(item.createdAtUtc) }}</span>
               </button>
             </li>

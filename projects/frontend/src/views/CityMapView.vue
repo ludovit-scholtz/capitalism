@@ -70,7 +70,7 @@
             <dd>
               {{
                 cityUnlockStatus?.estimatedTicksToUnlock != null
-                  ? t('cityExpansion.estimatedTicksValue', { ticks: formatEstimatedTicksLabel(cityUnlockStatus.estimatedTicksToUnlock) })
+                  ? t('cityExpansion.estimatedTicksValue', { ticks: formatEstimatedTicksLabel(cityUnlockStatus.estimatedTicksToUnlock, locale) })
                   : t('cityExpansion.estimateUnavailable')
               }}
             </dd>

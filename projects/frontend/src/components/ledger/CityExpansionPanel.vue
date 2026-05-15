@@ -70,7 +70,7 @@ function formatAmount(amount: number, currency: string): string {
                 status.isUnlocked
                   ? t('cityExpansion.availableNow')
                   : status.estimatedTicksToUnlock != null
-                    ? t('cityExpansion.estimatedTicksValue', { ticks: formatEstimatedTicksLabel(status.estimatedTicksToUnlock) })
+                    ? t('cityExpansion.estimatedTicksValue', { ticks: formatEstimatedTicksLabel(status.estimatedTicksToUnlock, locale) })
                     : t('cityExpansion.estimateUnavailable')
               }}
             </dd>
