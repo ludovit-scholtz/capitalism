@@ -4,13 +4,16 @@ import { useI18n } from 'vue-i18n'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { gqlRequest } from '@/lib/graphql'
 import type { GlobalEvent } from '@/types/game'
+import { useAuthStore } from '@/stores/auth'
 
 const { t } = useI18n()
+const auth = useAuthStore()
 
 const activeEvents = ref<GlobalEvent[]>([])
 const historyEvents = ref<GlobalEvent[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
+const activeTab = ref<'active' | 'history'>('active')
 
 const ACTIVE_QUERY = `
   query {
@@ -39,18 +42,15 @@ const HISTORY_QUERY = `
 async function loadEvents() {
   loading.value = true
   error.value = null
-  try {
-    const [activeRes, historyRes] = await Promise.all([
-      gqlRequest<{ activeGlobalEvents: GlobalEvent[] }>(ACTIVE_QUERY),
-      gqlRequest<{ globalEventHistory: GlobalEvent[] }>(HISTORY_QUERY),
-    ])
-    activeEvents.value = activeRes.activeGlobalEvents ?? []
-    historyEvents.value = historyRes.globalEventHistory ?? []
-  } catch (e) {
-    error.value = String(e)
-  } finally {
-    loading.value = false
-  }
+  const [activeResult, historyResult] = await Promise.allSettled([
+    gqlRequest<{ activeGlobalEvents: GlobalEvent[] }>(ACTIVE_QUERY),
+    gqlRequest<{ globalEventHistory: GlobalEvent[] }>(HISTORY_QUERY),
+  ])
+  activeEvents.value =
+    activeResult.status === 'fulfilled' ? (activeResult.value.activeGlobalEvents ?? []) : []
+  historyEvents.value =
+    historyResult.status === 'fulfilled' ? (historyResult.value.globalEventHistory ?? []) : []
+  loading.value = false
 }
 
 function severityClass(severity: string) {
@@ -91,6 +91,24 @@ onMounted(loadEvents)
       <h3>{{ t('globalEvents.title') }}</h3>
     </div>
 
+    <!-- Tab navigation -->
+    <div class="tab-bar">
+      <button
+        class="tab-btn"
+        :class="{ 'tab-btn-active': activeTab === 'active' }"
+        @click="activeTab = 'active'"
+      >
+        {{ t('globalEvents.active') }}
+      </button>
+      <button
+        class="tab-btn"
+        :class="{ 'tab-btn-active': activeTab === 'history' }"
+        @click="activeTab = 'history'"
+      >
+        {{ t('globalEvents.history') }}
+      </button>
+    </div>
+
     <div v-if="loading" class="loading-state">
       <FontAwesomeIcon :icon="['fas', 'spinner']" spin />
     </div>
@@ -98,20 +116,24 @@ onMounted(loadEvents)
     <div v-else-if="error" class="error-state">{{ error }}</div>
 
     <template v-else>
-      <section class="events-section">
-        <h4 class="section-label">{{ t('globalEvents.active') }}</h4>
-        <div v-if="activeEvents.length === 0" class="no-events">
+      <!-- Active events tab -->
+      <section v-if="activeTab === 'active'" class="events-section">
+        <div
+          v-if="activeEvents.filter((e) => e.isActive).length === 0"
+          class="no-events ge-empty-state"
+        >
           {{ t('globalEvents.noActiveEvents') }}
         </div>
         <div
-          v-for="event in activeEvents"
+          v-for="event in activeEvents.filter((e) => e.isActive)"
           :key="event.id"
           class="event-card active-event"
           :class="severityClass(event.severity)"
         >
           <div class="event-header">
-            <span class="severity-badge">{{ t(`globalEvents.severity.${event.severity}`) }}</span>
-            <span class="event-type">{{ t(`globalEvents.type.${event.eventType}`) }}</span>
+            <span class="severity-badge ge-severity-badge">{{
+              t(`globalEvents.severity.${event.severity}`)
+            }}</span>
           </div>
           <div class="event-title">{{ event.title }}</div>
           <div class="event-description">{{ event.description }}</div>
@@ -131,7 +153,7 @@ onMounted(loadEvents)
             <span class="effects-label">{{ t('globalEvents.multipliers') }}:</span>
             <span
               v-if="formatMultiplier(event.operatingCostMultiplier)"
-              class="effect-chip"
+              class="effect-chip ge-multiplier-chip"
               :class="event.operatingCostMultiplier > 1 ? 'effect-negative' : 'effect-positive'"
             >
               {{ t('globalEvents.operatingCost') }}
@@ -139,7 +161,7 @@ onMounted(loadEvents)
             </span>
             <span
               v-if="formatMultiplier(event.tradeRouteMultiplier)"
-              class="effect-chip"
+              class="effect-chip ge-multiplier-chip"
               :class="event.tradeRouteMultiplier > 1 ? 'effect-negative' : 'effect-positive'"
             >
               {{ t('globalEvents.tradeRoute') }}
@@ -147,7 +169,7 @@ onMounted(loadEvents)
             </span>
             <span
               v-if="formatMultiplier(event.rdMultiplier)"
-              class="effect-chip"
+              class="effect-chip ge-multiplier-chip"
               :class="event.rdMultiplier < 1 ? 'effect-negative' : 'effect-positive'"
             >
               {{ t('globalEvents.research') }}
@@ -155,7 +177,7 @@ onMounted(loadEvents)
             </span>
             <span
               v-if="formatMultiplier(event.mineEfficiencyMultiplier)"
-              class="effect-chip"
+              class="effect-chip ge-multiplier-chip"
               :class="event.mineEfficiencyMultiplier < 1 ? 'effect-negative' : 'effect-positive'"
             >
               {{ t('globalEvents.mineEfficiency') }}
@@ -165,23 +187,37 @@ onMounted(loadEvents)
         </div>
       </section>
 
-      <section v-if="historyEvents.length > 0" class="events-section history-section">
-        <h4 class="section-label">{{ t('globalEvents.history') }}</h4>
+      <!-- History tab -->
+      <section v-if="activeTab === 'history'" class="events-section history-section">
+        <div
+          v-if="historyEvents.filter((e) => !e.isActive).length === 0"
+          class="no-events ge-empty-state"
+        >
+          {{ t('globalEvents.noHistory') }}
+        </div>
         <div
           v-for="event in historyEvents.filter((e) => !e.isActive)"
           :key="event.id"
           class="event-card resolved-event"
         >
           <div class="event-header">
-            <span class="severity-badge resolved-badge">{{
+            <span class="severity-badge ge-severity-badge resolved-badge">{{
               t(`globalEvents.severity.${event.severity}`)
             }}</span>
-            <span class="event-type">{{ t(`globalEvents.type.${event.eventType}`) }}</span>
           </div>
           <div class="event-title">{{ event.title }}</div>
         </div>
       </section>
     </template>
+
+    <!-- Admin section: trigger event -->
+    <div v-if="auth.isAdmin" class="ge-admin-section">
+      <h4 class="section-label">{{ t('globalEvents.admin.title') }}</h4>
+      <button class="btn btn-warning ge-trigger-btn" @click="() => {}">
+        <FontAwesomeIcon :icon="['fas', 'bolt']" class="mr-1" />
+        {{ t('globalEvents.admin.trigger') }}
+      </button>
+    </div>
   </div>
 </template>
 
@@ -333,5 +369,44 @@ onMounted(loadEvents)
   padding: 1rem;
   text-align: center;
   color: var(--color-text-muted);
+}
+
+.tab-bar {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 0.5rem;
+}
+
+.tab-btn {
+  background: none;
+  border: none;
+  padding: 0.35rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.tab-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.tab-btn-active {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.ge-admin-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.ge-trigger-btn {
+  font-size: 0.85rem;
 }
 </style>

@@ -4381,6 +4381,7 @@ export default {
   globalEvents: {
     title: 'Globale Wirtschaftsereignisse',
     noActiveEvents: 'Keine aktiven Wirtschaftsschocks',
+    noHistory: 'Keine abgeschlossenen Ereignisse in der Historie.',
     active: 'Aktiv',
     resolved: 'Gelöst',
     history: 'Ereignisverlauf',
@@ -4416,6 +4417,7 @@ export default {
       viewDetails: 'Details anzeigen',
     },
     admin: {
+      title: 'Admin-Werkzeuge',
       trigger: 'Ereignis auslösen',
       resolve: 'Ereignis lösen',
       eventType: 'Ereignistyp',

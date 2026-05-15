@@ -1,14 +1,18 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { gqlRequest } from '@/lib/graphql'
 import type { GlobalEvent } from '@/types/game'
 
 const { t } = useI18n()
+const route = useRoute()
 
 const events = ref<GlobalEvent[]>([])
 const dismissed = ref(false)
+
+const isEventsPage = computed(() => route.name === 'global-events')
 
 const QUERY = `
   query {
@@ -54,7 +58,7 @@ onMounted(loadEvents)
 
 <template>
   <div
-    v-if="events.length > 0 && !dismissed"
+    v-if="events.length > 0 && !dismissed && !isEventsPage"
     class="global-event-banner"
     :class="severityClass"
     role="alert"

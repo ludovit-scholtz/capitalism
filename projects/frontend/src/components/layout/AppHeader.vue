@@ -555,7 +555,7 @@ useTickRefresh(async () => {
 
 .desktop-nav-links {
   display: flex;
-  gap: 1.25rem;
+  gap: 1rem;
 }
 
 .nav-link {

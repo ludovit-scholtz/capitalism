@@ -4365,6 +4365,7 @@ export default {
   globalEvents: {
     title: 'Globálne ekonomické udalosti',
     noActiveEvents: 'Žiadne aktívne ekonomické šoky',
+    noHistory: 'V histórii nie sú žiadne vyriešené udalosti.',
     active: 'Aktívne',
     resolved: 'Vyriešené',
     history: 'História udalostí',
@@ -4400,6 +4401,7 @@ export default {
       viewDetails: 'Zobraziť detaily',
     },
     admin: {
+      title: 'Nástroje správcu',
       trigger: 'Spustiť udalosť',
       resolve: 'Vyriešiť udalosť',
       eventType: 'Typ udalosti',

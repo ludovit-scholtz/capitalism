@@ -4376,6 +4376,7 @@ export default {
   globalEvents: {
     title: 'Global Economic Events',
     noActiveEvents: 'No active economic shocks',
+    noHistory: 'No resolved events in history.',
     active: 'Active',
     resolved: 'Resolved',
     history: 'Event History',
@@ -4411,6 +4412,7 @@ export default {
       viewDetails: 'View details',
     },
     admin: {
+      title: 'Admin Tools',
       trigger: 'Trigger Event',
       resolve: 'Resolve Event',
       eventType: 'Event type',

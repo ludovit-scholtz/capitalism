@@ -10178,7 +10178,10 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       !q.includes('productQualityProfile') &&
       !q.includes('buildingResearchProgress') &&
       // competitorQualityIntelligence contains companyName which has 'me' as substring
-      !q.includes('competitorQualityIntelligence')
+      !q.includes('competitorQualityIntelligence') &&
+      // activeGlobalEvents/globalEventHistory queries include affectedCity { id name } where 'name' contains 'me'
+      !q.includes('activeGlobalEvents') &&
+      !q.includes('globalEventHistory')
 
     if (isStandaloneMeQuery(query)) {
       const player = resolveCurrentPlayer()
@@ -11707,6 +11710,29 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { getMineExtractionIntelligence: mockIntelligence } }),
+      })
+    }
+
+    // Standalone activeGlobalEvents query
+    if (
+      query.includes('activeGlobalEvents') &&
+      !query.includes('myCompanies') &&
+      !query.includes('getActiveMarketEvents')
+    ) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { activeGlobalEvents: state.activeGlobalEvents ?? [] } }),
+      })
+    }
+
+    // Standalone globalEventHistory query
+    if (query.includes('globalEventHistory') && !query.includes('myCompanies')) {
+      const historyEvents = (state.activeGlobalEvents ?? []).filter((e) => !e.isActive)
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { globalEventHistory: historyEvents } }),
       })
     }
 
