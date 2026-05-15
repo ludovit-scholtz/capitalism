@@ -74,7 +74,11 @@ function getGuideCardImage(card: { resourceSlug?: string; productSlug?: string; 
   if (card.productSlug) {
     const product = entriesBySlug.value.get(card.productSlug)
     if (product?.kind === 'PRODUCT') {
-      return getProductImageUrl(product)
+      return getProductImageUrl({
+        name: product.name,
+        slug: product.slug,
+        industry: product.industry ?? product.category,
+      })
     }
   }
 

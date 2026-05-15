@@ -204,7 +204,20 @@ function getEntryDescription(entry: EncyclopediaCatalogEntry | null) {
     return getLocalizedResourceDescription(entry, locale.value)
   }
 
-  return getLocalizedProductDescription({ ...entry, industry: entry.industry ?? entry.category, recipes: [] }, locale.value)
+  return getLocalizedProductDescription(
+    {
+      name: entry.name,
+      slug: entry.slug,
+      industry: entry.industry ?? entry.category,
+      description: entry.description,
+      outputQuantity: entry.outputQuantity ?? 0,
+      energyConsumptionMwh: entry.energyConsumptionMwh ?? 0,
+      unitName: entry.unitName,
+      unitSymbol: entry.unitSymbol,
+      recipes: [],
+    },
+    locale.value,
+  )
 }
 
 function getEntryImage(entry: EncyclopediaCatalogEntry | EncyclopediaRecipeIngredient | null) {
@@ -213,7 +226,7 @@ function getEntryImage(entry: EncyclopediaCatalogEntry | EncyclopediaRecipeIngre
   }
 
   return entry.kind === 'RESOURCE'
-    ? getResourceImageUrl(entry)
+    ? getResourceImageUrl({ ...entry, description: 'description' in entry ? entry.description : null })
     : getProductImageUrl({ name: entry.name, slug: entry.slug, industry: entry.industry ?? entry.category })
 }
 

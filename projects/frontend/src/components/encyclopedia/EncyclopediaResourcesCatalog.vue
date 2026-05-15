@@ -114,7 +114,20 @@ function getEntryDescription(entry: EncyclopediaCatalogEntry) {
     return getLocalizedResourceDescription(entry, locale.value)
   }
 
-  return getLocalizedProductDescription({ ...entry, industry: entry.industry ?? entry.category, recipes: [] }, locale.value)
+  return getLocalizedProductDescription(
+    {
+      name: entry.name,
+      slug: entry.slug,
+      industry: entry.industry ?? entry.category,
+      description: entry.description,
+      outputQuantity: entry.outputQuantity ?? 0,
+      energyConsumptionMwh: entry.energyConsumptionMwh ?? 0,
+      unitName: entry.unitName,
+      unitSymbol: entry.unitSymbol,
+      recipes: [],
+    },
+    locale.value,
+  )
 }
 
 function getEntryImage(entry: EncyclopediaCatalogEntry) {
