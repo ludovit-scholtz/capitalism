@@ -42,17 +42,11 @@ export function useChat() {
   const isOverLimit = computed(() => charCount.value > MAX_CHAT_LENGTH)
   const showCharCounter = computed(() => charCount.value >= CHAR_COUNTER_THRESHOLD)
   const candidateCityId = computed(() => {
-    const routeCityId = typeof route.params.id === 'string' && route.path.startsWith('/city/')
-      ? route.params.id
-      : null
+    const routeCityId = typeof route.params.id === 'string' && route.path.startsWith('/city/') ? route.params.id : null
     return routeCityId ?? auth.selectedCityId ?? null
   })
-  const selectedCityId = computed(() => activeChannel.value === 'CITY' ? activeCityId.value : null)
-  const inputPlaceholder = computed(() =>
-    activeChannel.value === 'CITY'
-      ? t('chat.placeholderCity', { city: activeCityName.value ?? t('chat.thisCity') })
-      : t('chat.placeholderGlobal'),
-  )
+  const selectedCityId = computed(() => (activeChannel.value === 'CITY' ? activeCityId.value : null))
+  const inputPlaceholder = computed(() => (activeChannel.value === 'CITY' ? t('chat.placeholderCity', { city: activeCityName.value ?? t('chat.thisCity') }) : t('chat.placeholderGlobal')))
 
   function formatSentAt(createdAtUtc: string): string {
     return new Intl.DateTimeFormat(locale.value, {
