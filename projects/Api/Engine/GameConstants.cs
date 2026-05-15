@@ -147,6 +147,18 @@ public static partial class GameConstants
     /// <summary>Minimum number of non-depleted purchasable mine deposits per resource type and city.</summary>
     public const int MinimumAvailableMineLotsPerResourceType = 2;
 
+    /// <summary>Minimum open government contracts kept active per city.</summary>
+    public const int MinimumOpenGovernmentContractsPerCity = 1;
+
+    /// <summary>How often the tick engine rechecks contract-market replenishment.</summary>
+    public const int GovernmentContractSeedingIntervalTicks = TicksPerDay;
+
+    /// <summary>Ticks before contract deadline when warning notification is sent.</summary>
+    public const int GovernmentContractDeadlineWarningTicks = TicksPerDay;
+
+    /// <summary>Penalty applied to gross payout when a contract is completed after its deadline.</summary>
+    public const decimal GovernmentContractLatePenaltyRate = 0.10m;
+
     /// <summary>Brand awareness increment per unit of marketing budget spent.</summary>
     public const decimal BrandAwarenessPerBudget = 0.0001m;
 

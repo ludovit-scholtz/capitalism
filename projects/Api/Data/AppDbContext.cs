@@ -227,6 +227,11 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Tax-cycle economic health snapshots for each city.</summary>
     public DbSet<CityEconomicReport> CityEconomicReports => Set<CityEconomicReport>();
 
+    /// <summary>City-scoped public procurement tenders.</summary>
+    public DbSet<GovernmentContract> GovernmentContracts => Set<GovernmentContract>();
+    public DbSet<ContractBid> ContractBids => Set<ContractBid>();
+    public DbSet<ContractFulfillment> ContractFulfillments => Set<ContractFulfillment>();
+
     /// <summary>Achievement badges earned by players for reaching milestones.</summary>
     public DbSet<PlayerAchievementBadge> PlayerAchievementBadges => Set<PlayerAchievementBadge>();
 

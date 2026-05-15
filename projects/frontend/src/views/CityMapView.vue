@@ -134,17 +134,37 @@ const router = useRouter()
 const auth = useAuthStore()
 const { selectedCityId } = storeToRefs(auth)
 
-const tabs = [
+const baseTabs = [
   { key: 'overview', name: 'city-map', icon: '📍', labelKey: 'cityMap.tabs.overview' },
   { key: 'economy', name: 'city-economy', icon: '📈', labelKey: 'cityMap.tabs.economy' },
   { key: 'buildings', name: 'city-buildings', icon: '🏗️', labelKey: 'cityMap.tabs.buildings' },
   { key: 'market', name: 'city-market', icon: '🛒', labelKey: 'cityMap.tabs.market' },
   { key: 'competitors', name: 'city-competitors', icon: '🏁', labelKey: 'cityMap.tabs.competitors' },
 ] as const
+const openContractCount = ref(0)
+const tabs = computed(() =>
+  openContractCount.value > 0
+    ? [
+        ...baseTabs.slice(0, 2),
+        { key: 'contracts', name: 'city-contracts', icon: '🏛️', labelKey: 'cityMap.tabs.contracts' as const },
+        ...baseTabs.slice(2),
+      ]
+    : baseTabs,
+)
 
 const cityId = computed(() => route.params.cityId as string)
 const activeTab = computed(() =>
-  route.name === 'city-economy' ? 'economy' : route.name === 'city-buildings' ? 'buildings' : route.name === 'city-market' ? 'market' : route.name === 'city-competitors' ? 'competitors' : 'overview',
+  route.name === 'city-economy'
+    ? 'economy'
+    : route.name === 'city-contracts'
+      ? 'contracts'
+      : route.name === 'city-buildings'
+        ? 'buildings'
+        : route.name === 'city-market'
+          ? 'market'
+          : route.name === 'city-competitors'
+            ? 'competitors'
+            : 'overview',
 )
 const highlightedBuildingId = computed(() => (typeof route.query.building === 'string' ? route.query.building : null))
 
@@ -213,7 +233,7 @@ async function fetchData() {
       await auth.fetchMe()
     }
 
-    const [cityData, companiesData, npcData] = await Promise.all([
+    const [cityData, companiesData, npcData, contractsData] = await Promise.all([
       gqlRequest<{ city: City }>(
         `query GetCity($id: UUID!) {
           city(id: $id) {
@@ -241,15 +261,25 @@ async function fetchData() {
         }`,
         { cityId: cityId.value },
       ),
+      gqlRequest<{ cityGovernmentContracts: Array<{ id: string }> }>(
+        `query CityContractCount($cityId: UUID!) {
+          cityGovernmentContracts(cityId: $cityId, status: "OPEN") {
+            id
+          }
+        }`,
+        { cityId: cityId.value },
+      ),
     ])
 
     city.value = cityData.city
     companies.value = companiesData.myCompanies
     npcCompanies.value = npcData.npcCompanies ?? []
+    openContractCount.value = contractsData.cityGovernmentContracts?.length ?? 0
 
     await fetchCityUnlockStatus()
     if (isCityLocked.value) {
       lots.value = []
+      openContractCount.value = 0
       cityWeather.value = null
       cityPowerBalance.value = null
       cityEconomicReport.value = null
@@ -451,6 +481,7 @@ watch(cityId, async () => {
   cityEconomicReport.value = null
   cityMediaHouses.value = []
   npcCompanies.value = []
+  openContractCount.value = 0
   economyCycle.value = null
   activeMarketEvents.value = []
   economicHistory.value = []

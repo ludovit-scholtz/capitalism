@@ -27,7 +27,7 @@ public static class LedgerCalculator
     public static decimal GetTotalRevenue(IEnumerable<LedgerEntry> entries)
     {
         return entries
-            .Where(entry => entry.Category == LedgerCategory.Revenue)
+            .Where(entry => entry.Category == LedgerCategory.Revenue || entry.Category == LedgerCategory.GovernmentContractRevenue)
             .Sum(entry => entry.Amount);
     }
 

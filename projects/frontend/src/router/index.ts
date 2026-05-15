@@ -88,6 +88,11 @@ const router = createRouter({
           component: () => import('@/components/cityTabs/CityMarketTab.vue'),
         },
         {
+          path: 'contracts',
+          name: 'city-contracts',
+          component: () => import('@/components/cityTabs/CityContractsTab.vue'),
+        },
+        {
           path: 'competitors',
           name: 'city-competitors',
           component: () => import('@/components/cityTabs/CityCompetitorsTab.vue'),
@@ -95,6 +100,7 @@ const router = createRouter({
       ],
     },
     { path: '/ledger/:companyId', name: 'ledger', alias: '/company/:companyId/ledger', component: () => import('@/views/LedgerView.vue') },
+    { path: '/company/:companyId/contracts', name: 'company-contracts', component: () => import('@/views/CompanyContractsView.vue') },
     { path: '/company/:companyId/settings', name: 'company-settings', component: () => import('@/views/CompanySettingsView.vue') },
     { path: '/company/:companyId/research', name: 'company-research', component: () => import('@/views/CompanyResearchView.vue') },
     { path: '/banking', name: 'loan-marketplace', alias: '/loans', component: () => import('@/views/LoanMarketplaceView.vue') },

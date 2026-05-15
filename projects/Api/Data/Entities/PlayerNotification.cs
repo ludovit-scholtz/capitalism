@@ -83,6 +83,9 @@ public static class PlayerNotificationType
     public const string OversupplyWarning = "OVERSUPPLY_WARNING";
     public const string TakeoverAlert = "TAKEOVER_ALERT";
     public const string MineDepleting = "MINE_DEPLETING";
+    public const string ContractAwarded = "CONTRACT_AWARDED";
+    public const string ContractFulfillmentComplete = "CONTRACT_FULFILLMENT_COMPLETE";
+    public const string ContractDeadlineWarning = "CONTRACT_DEADLINE_WARNING";
 }
 
 public static class PlayerNotificationSeverity

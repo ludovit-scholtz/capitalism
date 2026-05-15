@@ -104,6 +104,7 @@ export type MockLedgerSummary = {
   primaryCurrencySymbol?: string
   hasMixedCurrencies?: boolean
   totalRevenue: number
+  totalGovernmentContractRevenue?: number
   totalMediaHouseIncome?: number
   totalRentIncome?: number
   totalPropertyMaintenance?: number
@@ -1031,6 +1032,40 @@ export type MockActiveGlobalEvent = {
   triggeredByAdminId: string | null
 }
 
+export type MockGovernmentContract = {
+  id: string
+  cityId: string
+  cityName: string
+  currencyCode: string
+  title: string
+  description: string
+  productTypeId: string
+  productName: string
+  quantityRequired: number
+  minimumQuality: number
+  budgetCap: number
+  deadlineTick: number
+  status: 'OPEN' | 'AWARDED' | 'FULFILLED' | 'EXPIRED'
+  winnerCompanyId: string | null
+  winnerCompanyName: string | null
+  createdAtTick: number
+  bidCount: number
+  awardedBidPricePerUnit: number | null
+  fulfilledQuantity: number | null
+  fulfillmentPercent: number | null
+}
+
+export type MockContractBid = {
+  id: string
+  contractId: string
+  companyId: string
+  companyName: string
+  bidPricePerUnit: number
+  estimatedDeliveryTick: number
+  submittedAtTick: number
+  contractStatus: 'OPEN' | 'AWARDED' | 'FULFILLED' | 'EXPIRED'
+}
+
 export type MockState = {
   serverKey: string
   players: MockPlayer[]
@@ -1393,6 +1428,10 @@ export type MockState = {
   npcCompanies: MockNpcCompanySummary[]
   /** Mock city competitor rows keyed by cityId. */
   cityCompetitorsByCityId: Record<string, MockCityCompetitorEntry[]>
+  /** Government contracts visible in city and company contracts views. */
+  governmentContracts: MockGovernmentContract[]
+  /** Contract bids keyed by company for contract history views. */
+  contractBids: MockContractBid[]
   /** Mock NPC decision logs returned by npcDecisionLogs query. */
   npcDecisionLogs: MockNpcDecisionLog[]
   /** Rental revenue history per building for apartmentBuildingDetail query. */
@@ -1932,6 +1971,7 @@ function buildMockLedgerSummaryPayload(summary: MockLedgerSummary, gameState: Mo
     totalStockPurchaseCashOut: summary.totalStockPurchaseCashOut ?? 0,
     totalStockSaleCashIn: summary.totalStockSaleCashIn ?? 0,
     totalShippingCosts: summary.totalShippingCosts ?? 0,
+    totalGovernmentContractRevenue: summary.totalGovernmentContractRevenue ?? 0,
     totalMediaHouseIncome: summary.totalMediaHouseIncome ?? 0,
     totalRentIncome: summary.totalRentIncome ?? 0,
     totalPropertyMaintenance: summary.totalPropertyMaintenance ?? 0,
@@ -3294,6 +3334,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     competitorIntelligenceByKey: {},
     npcCompanies: [],
     cityCompetitorsByCityId: {},
+    governmentContracts: [],
+    contractBids: [],
     npcDecisionLogs: [],
     rentalHistory: [],
     cityAverageRentPerSqm: 10,
@@ -8050,10 +8092,18 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
     if (query.includes('gameState') && !query.includes('companyLedger')) {
       applyDueBuildingUpgrades(state)
+      const responseData: Record<string, unknown> = { gameState: buildMockGameStatePayload(state.gameState) }
+      if (query.includes('cityGovernmentContracts')) {
+        const cityId = (body.variables?.cityId ?? body.variables?.id) as string | undefined
+        const status = body.variables?.status as string | undefined
+        responseData.cityGovernmentContracts = state.governmentContracts.filter(
+          (contract) => (!cityId || contract.cityId === cityId) && (!status || contract.status === status),
+        )
+      }
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { gameState: buildMockGameStatePayload(state.gameState) } }),
+        body: JSON.stringify({ data: responseData }),
       })
     }
 
@@ -8241,6 +8291,86 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    if (query.includes('cityGovernmentContracts')) {
+      const cityId = (body.variables?.cityId ?? body.variables?.id) as string | undefined
+      const status = body.variables?.status as string | undefined
+      const cityGovernmentContracts = state.governmentContracts.filter(
+        (contract) => (!cityId || contract.cityId === cityId) && (!status || contract.status === status),
+      )
+      const responseData: Record<string, unknown> = { cityGovernmentContracts }
+      if (query.includes('gameState')) {
+        responseData.gameState = buildMockGameStatePayload(state.gameState)
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: responseData }),
+      })
+    }
+
+    if (query.includes('companyContracts')) {
+      const companyId = body.variables?.companyId as string | undefined
+      const companyContractIds = new Set(
+        state.contractBids.filter((bid) => bid.companyId === companyId).map((bid) => bid.contractId),
+      )
+      for (const contract of state.governmentContracts) {
+        if (contract.winnerCompanyId === companyId) companyContractIds.add(contract.id)
+      }
+      const companyContracts = state.governmentContracts.filter((contract) => companyContractIds.has(contract.id))
+      const responseData: Record<string, unknown> = { companyContracts }
+      if (query.includes('myContractBids')) {
+        responseData.myContractBids = state.contractBids.filter((bid) => bid.companyId === companyId)
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: responseData }),
+      })
+    }
+
+    if (query.includes('myContractBids')) {
+      const companyId = body.variables?.companyId as string | undefined
+      const myContractBids = state.contractBids.filter((bid) => bid.companyId === companyId)
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { myContractBids } }),
+      })
+    }
+
+    if (query.includes('contractDetail')) {
+      const contractId = body.variables?.contractId as string | undefined
+      const companyId = body.variables?.companyId as string | undefined
+      const contract = state.governmentContracts.find((item) => item.id === contractId) ?? null
+      const company = state.players.flatMap((player) => player.companies).find((item) => item.id === companyId)
+      const hasEligibleBuilding = Boolean(company?.buildings.some((building) => building.cityId === contract?.cityId && (building.type === 'FACTORY' || building.type === 'SALES_SHOP')))
+      const currentQualityLevel = hasEligibleBuilding ? 7.5 : 0
+      const eligibility = companyId
+        ? {
+            isEligible: hasEligibleBuilding,
+            reasonCode: hasEligibleBuilding ? null : 'MISSING_CITY_OPERATION',
+            reasonMessage: hasEligibleBuilding ? null : 'Company must own a Factory or Sales Shop in the contract city.',
+            currentQualityLevel,
+          }
+        : null
+      const competingBidCount = contract ? state.contractBids.filter((bid) => bid.contractId === contract.id).length : 0
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            contractDetail: contract
+              ? {
+                  contract,
+                  competingBidCount,
+                  eligibility,
+                }
+              : null,
+          },
+        }),
+      })
+    }
+
     if (query.includes('cityWeatherForecast')) {
       const cityId = body.variables?.cityId
       const cityWeatherForecast = cityId ? (state.cityWeatherForecasts[cityId] ?? buildDefaultCityWeatherForecast(cityId, state.gameState.currentTick)) : null
@@ -8305,7 +8435,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     }
 
     if (query.includes('getCityEconomicReport') && !query.includes('cityPowerBalance')) {
-      const cityId = body.variables?.cityId as string | undefined
+      const cityId = (body.variables?.cityId ?? body.variables?.id) as string | undefined
       const cityReports = cityId ? (state.cityEconomicReports?.[cityId] ?? []) : []
       const latest = cityReports.length > 0 ? cityReports[cityReports.length - 1] : null
       return route.fulfill({
@@ -10171,6 +10301,12 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       !q.includes('marketOverview') &&
       !q.includes('marketPrice') &&
       !q.includes('cityDemandSummary') &&
+      !q.includes('cityGovernmentContracts') &&
+      !q.includes('companyContracts') &&
+      !q.includes('myContractBids') &&
+      !q.includes('contractDetail') &&
+      !q.includes('submitContractBid') &&
+      !q.includes('fulfillContractShipment') &&
       // cities query contains 'name' field which has 'me' as substring; not a me query
       !q.includes('cities') &&
       // R&D research queries contain 'name' / 'productName' fields which have 'me' as substring
@@ -11279,6 +11415,94 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               id: crypto.randomUUID(),
               appliesAtTick: gameState.currentTick + 10,
               totalTicksRequired: 10,
+            },
+          },
+        }),
+      })
+    }
+
+    if (query.includes('submitContractBid')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const input = body.variables?.input as
+        | { contractId?: string; companyId?: string; bidPricePerUnit?: number; estimatedDeliveryTick?: number }
+        | undefined
+      const contractId = input?.contractId ?? ''
+      const companyId = input?.companyId ?? ''
+      const bidPricePerUnit = Number(input?.bidPricePerUnit ?? 0)
+      const estimatedDeliveryTick = Number(input?.estimatedDeliveryTick ?? 0)
+      const contract = state.governmentContracts.find((item) => item.id === contractId)
+      if (!contract) return routeJsonError('Government contract not found.', 'CONTRACT_NOT_FOUND')
+      if (contract.status !== 'OPEN') return routeJsonError('Bidding is closed for this contract.', 'CONTRACT_NOT_OPEN')
+      if (bidPricePerUnit <= 0 || bidPricePerUnit > contract.budgetCap) return routeJsonError('Bid price must be positive and below contract budget cap.', 'BID_PRICE_INVALID')
+
+      const company = state.players.flatMap((player) => player.companies).find((item) => item.id === companyId)
+      if (!company) return routeJsonError('Company not found.', 'COMPANY_NOT_FOUND')
+
+      const existing = state.contractBids.find((bid) => bid.contractId === contractId && bid.companyId === companyId)
+      const nextBid: MockContractBid = existing ?? {
+        id: crypto.randomUUID(),
+        contractId,
+        companyId,
+        companyName: company.name,
+        bidPricePerUnit: 0,
+        estimatedDeliveryTick: 0,
+        submittedAtTick: state.gameState.currentTick,
+        contractStatus: contract.status,
+      }
+      nextBid.bidPricePerUnit = bidPricePerUnit
+      nextBid.estimatedDeliveryTick = estimatedDeliveryTick
+      nextBid.submittedAtTick = state.gameState.currentTick
+      nextBid.contractStatus = contract.status
+      if (!existing) state.contractBids.push(nextBid)
+
+      contract.bidCount = state.contractBids.filter((bid) => bid.contractId === contractId).length
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { submitContractBid: { id: nextBid.id } } }),
+      })
+    }
+
+    if (query.includes('fulfillContractShipment')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const input = body.variables?.input as { contractId?: string; quantity?: number } | undefined
+      const contractId = input?.contractId ?? ''
+      const quantity = Math.max(0, Number(input?.quantity ?? 0))
+      const contract = state.governmentContracts.find((item) => item.id === contractId)
+      if (!contract) return routeJsonError('Government contract not found.', 'CONTRACT_NOT_FOUND')
+      if (contract.status !== 'AWARDED') return routeJsonError('Contract is not in awarded state.', 'CONTRACT_NOT_AWARDED')
+
+      const delivered = contract.fulfilledQuantity ?? 0
+      const required = contract.quantityRequired
+      const nextDelivered = Math.min(required, delivered + quantity)
+      const fulfillmentPercent = required > 0 ? (nextDelivered / required) * 100 : 0
+      contract.fulfilledQuantity = nextDelivered
+      contract.fulfillmentPercent = fulfillmentPercent
+      let settledRevenue: number | null = null
+      let latePenaltyApplied = false
+      if (nextDelivered >= required) {
+        contract.status = 'FULFILLED'
+        settledRevenue = (contract.awardedBidPricePerUnit ?? contract.budgetCap) * required
+        if (state.gameState.currentTick > contract.deadlineTick) {
+          settledRevenue = settledRevenue * 0.9
+          latePenaltyApplied = true
+        }
+      }
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            fulfillContractShipment: {
+              contractId,
+              status: contract.status,
+              quantityDelivered: nextDelivered,
+              quantityRequired: required,
+              fulfillmentPercent,
+              settledRevenue,
+              latePenaltyApplied,
             },
           },
         }),
