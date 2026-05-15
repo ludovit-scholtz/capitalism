@@ -1,8 +1,10 @@
 using Api.Configuration;
 using Api.Data;
+using Api.Data.Migrations;
 using Api.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations.Operations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Reflection;
@@ -48,6 +50,33 @@ public sealed class DatabaseMigrationBootstrapTests
             new HashSet<string>(StringComparer.Ordinal));
 
         Assert.True(shouldRepair);
+    }
+
+    [Fact]
+    public void AddCityScopedChatChannels_UsesConditionalLegacyChatForeignKeyDrop()
+    {
+        var migration = new AddCityScopedChatChannels();
+        var migrationBuilder = new MigrationBuilder("Npgsql.EntityFrameworkCore.PostgreSQL");
+        var upMethod = typeof(AddCityScopedChatChannels).GetMethod(
+            "Up",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.NotNull(upMethod);
+
+        upMethod!.Invoke(migration, [migrationBuilder]);
+
+        Assert.DoesNotContain(
+            migrationBuilder.Operations.OfType<DropForeignKeyOperation>(),
+            operation => operation.Table == "ChatMessages"
+                && operation.Name == "FK_ChatMessages_Players_PlayerId");
+
+        var sqlOperation = Assert.Single(
+            migrationBuilder.Operations.OfType<SqlOperation>(),
+            operation => operation.Sql.Contains(
+                "FK_ChatMessages_Players_PlayerId",
+                StringComparison.Ordinal));
+
+        Assert.Contains("DROP CONSTRAINT IF EXISTS", sqlOperation.Sql, StringComparison.Ordinal);
     }
 
     [Fact]

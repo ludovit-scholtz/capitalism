@@ -18,22 +18,18 @@ public sealed partial class Query
     {
         var hasActivePro = await GetEncyclopediaHasActiveProSubscriptionAsync(db, httpContextAccessor);
 
-        var resourcesTask = db.ResourceTypes
+        var resources = await db.ResourceTypes
             .AsNoTracking()
             .OrderBy(resource => resource.Name)
             .ToListAsync();
 
-        var productsTask = db.ProductTypes
+        var products = await db.ProductTypes
             .AsNoTracking()
             .OrderBy(product => product.Name)
             .ToListAsync();
-
-        await Task.WhenAll(resourcesTask, productsTask);
-
-        var products = productsTask.Result;
         ProductAccessService.ApplyAccessMetadata(products, hasActivePro);
 
-        var entries = resourcesTask.Result
+        var entries = resources
             .Select(MapEncyclopediaResourceEntry)
             .Concat(products.Select(MapEncyclopediaProductEntry))
             .OrderBy(entry => entry.Name)
