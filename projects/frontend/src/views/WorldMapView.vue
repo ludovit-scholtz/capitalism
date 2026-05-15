@@ -283,7 +283,7 @@ async function fetchWorldMap() {
           (isUnlocked
             ? 100
             : requiredNetWorth > 0
-              ? Math.max(0, Math.min(99, Math.round(((city.currentNetWorth ?? 0) / requiredNetWorth) * 100)))
+              ? Math.max(0, Math.min(100, Math.round(((city.currentNetWorth ?? 0) / requiredNetWorth) * 100)))
               : 0),
         availableLandPlots: city.availableLandPlots ?? 0,
         activeCompanyCount: city.activeCompanyCount ?? 0,

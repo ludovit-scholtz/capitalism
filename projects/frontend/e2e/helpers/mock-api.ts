@@ -2535,7 +2535,7 @@ function buildMockCityUnlockStatuses(state: MockApiState, companyId?: string | n
     const requiredNetWorth = city.requiredNetWorth ?? 0
     const isUnlocked = city.isUnlocked ?? requiredNetWorth <= 0
     const currentNetWorth = city.currentNetWorth ?? (isUnlocked ? requiredNetWorth : 0)
-    const progressPercent = city.progressPercent ?? (isUnlocked ? 100 : requiredNetWorth > 0 ? Math.max(0, Math.min(99, Math.round((currentNetWorth / requiredNetWorth) * 100))) : 0)
+    const progressPercent = city.progressPercent ?? (isUnlocked ? 100 : requiredNetWorth > 0 ? Math.max(0, Math.min(100, Math.round((currentNetWorth / requiredNetWorth) * 100))) : 0)
 
     return {
       cityId: city.id,
