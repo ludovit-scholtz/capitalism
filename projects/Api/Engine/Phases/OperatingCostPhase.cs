@@ -91,6 +91,11 @@ public sealed class OperatingCostPhase : ITickPhase
                 continue;
             }
 
+            // Apply global economic shock multiplier to the building's total operating cost.
+            totalBuildingCost = decimal.Round(
+                totalBuildingCost * context.GlobalEventOperatingCostMultiplier,
+                2, MidpointRounding.AwayFromZero);
+
             // ── Bank account check ──
             var hasAssignedAccount = building.BankAccountId.HasValue;
             BankAccount? bankAccount = building.BankAccountId.HasValue

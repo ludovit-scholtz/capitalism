@@ -122,6 +122,11 @@ const router = createRouter({
       component: () => import('@/views/EnergyMarketView.vue'),
     },
     {
+      path: '/market/events',
+      name: 'global-events',
+      component: () => import('@/components/market/GlobalEventsPanel.vue'),
+    },
+    {
       path: '/marketing-analytics',
       name: 'marketing-analytics',
       component: () => import('@/views/MarketingAnalyticsView.vue'),

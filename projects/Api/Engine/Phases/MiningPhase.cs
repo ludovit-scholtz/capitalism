@@ -76,7 +76,8 @@ public sealed class MiningPhase : ITickPhase
                 if (unit.ResourceTypeId.Value != lotResourceTypeId.Value) continue;
                 if (hasFiniteReserve && remainingReserve <= 0m) break;
 
-                var production = GameConstants.MiningRate(unit.Level) * efficiency * efficiencyFactor;
+                var production = GameConstants.MiningRate(unit.Level) * efficiency * efficiencyFactor
+                    * context.GetGlobalEventMineEfficiency(building.CityId);
                 var space = context.GetUnitFreeSpace(unit);
                 var actual = Math.Min(production, space);
                 if (hasFiniteReserve)

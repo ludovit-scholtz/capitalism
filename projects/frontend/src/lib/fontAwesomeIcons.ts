@@ -2,6 +2,7 @@ import type { IconDefinition } from '@fortawesome/fontawesome-svg-core'
 import {
   faBars,
   faBell,
+  faBolt,
   faBookOpen,
   faBullhorn,
   faBuilding,
@@ -27,6 +28,7 @@ import {
   faSignInAlt,
   faSignOutAlt,
   faSkull,
+  faSpinner,
   faStore,
   faTachometerAlt,
   faTriangleExclamation,
@@ -71,6 +73,8 @@ export const frontendSolidIcons: IconDefinition[] = [
   faLocationDot,
   faBuilding,
   faUser,
+  faBolt,
+  faSpinner,
 ]
 
 export const frontendSolidIconNames = [...new Set(frontendSolidIcons.flatMap((icon) => [icon.iconName, ...icon.icon[2].filter((alias): alias is string => typeof alias === 'string')]))]

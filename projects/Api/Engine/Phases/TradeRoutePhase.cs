@@ -188,7 +188,7 @@ public sealed class TradeRoutePhase : ITickPhase
             sourceBuilding.Latitude, sourceBuilding.Longitude,
             destBuilding.Latitude, destBuilding.Longitude,
             itemWeight, fuelIndex);
-        var actualShippingCost = shippingCostPerUnit * route.Quantity;
+        var actualShippingCost = shippingCostPerUnit * route.Quantity * context.GlobalEventTradeRouteMultiplier;
 
         route.ShippingCostActual = actualShippingCost;
 

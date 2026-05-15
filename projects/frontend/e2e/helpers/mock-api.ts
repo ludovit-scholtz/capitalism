@@ -1011,6 +1011,26 @@ export type MockEconomicHistoryPoint = {
   intensityFactor: number
 }
 
+export type MockActiveGlobalEvent = {
+  id: string
+  eventType: string
+  severity: string
+  title: string
+  description: string
+  isActive: boolean
+  startTick: number
+  durationTicks: number
+  affectedCityId: string | null
+  affectedCity: { id: string; name: string } | null
+  operatingCostMultiplier: number
+  tradeRouteMultiplier: number
+  rdMultiplier: number
+  mineEfficiencyMultiplier: number
+  createdAtUtc: string
+  resolvedAtUtc: string | null
+  triggeredByAdminId: string | null
+}
+
 export type MockState = {
   serverKey: string
   players: MockPlayer[]
@@ -1025,6 +1045,7 @@ export type MockState = {
   gameState: { currentTick: number; lastTickAtUtc: string; tickIntervalSeconds: number; taxCycleTicks: number; taxRate: number }
   economicCycle: MockEconomicCycle | null
   activeMarketEvents: MockActiveMarketEvent[]
+  activeGlobalEvents: MockActiveGlobalEvent[]
   economicHistory: MockEconomicHistoryPoint[]
   endgameStatus: {
     gameEnded: boolean
@@ -3192,6 +3213,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       ticksRemaining: 2118,
     },
     activeMarketEvents: [],
+    activeGlobalEvents: [],
     economicHistory: [],
     endgameStatus: {
       gameEnded: false,
@@ -7206,6 +7228,12 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       }
       if (query.includes('getActiveMarketEvents')) {
         responseData.getActiveMarketEvents = state.activeMarketEvents ?? []
+      }
+      if (query.includes('activeGlobalEvents') && !query.includes('getActiveMarketEvents')) {
+        responseData.activeGlobalEvents = state.activeGlobalEvents ?? []
+      }
+      if (query.includes('globalEventHistory')) {
+        responseData.globalEventHistory = state.activeGlobalEvents ?? []
       }
       if (query.includes('getEconomicHistory')) {
         responseData.getEconomicHistory = state.economicHistory ?? []

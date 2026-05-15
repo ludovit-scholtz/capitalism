@@ -133,6 +133,9 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Active and historical macro market events.</summary>
     public DbSet<MarketEvent> MarketEvents => Set<MarketEvent>();
 
+    /// <summary>Server-wide global economic shock events affecting multiple tick-engine phases.</summary>
+    public DbSet<GlobalEvent> GlobalEvents => Set<GlobalEvent>();
+
     /// <summary>Loan offers published by bank buildings.</summary>
     public DbSet<LoanOffer> LoanOffers => Set<LoanOffer>();
 
