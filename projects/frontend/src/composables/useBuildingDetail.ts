@@ -49,6 +49,7 @@ import { getUnitResourceHistoryItemKey, type UnitResourceHistoryItemOption } fro
 import { buildPurchaseVendorOptions, collectSameCityVendorItemKeys, getPurchaseSelectorItemKey, sortPurchaseSelectorItems } from '@/lib/purchaseSelector'
 import { getSalesUnitProductOptions } from '@/lib/salesUnitProductPicker'
 import { serializeUnitConfig, deserializeUnitConfig } from '@/lib/unitClipboard'
+import { getLinkedUnits, getProductionChainDisplayUnits, getProductionChainStatus, hasReachableOutputPath } from '@/lib/buildingChainValidation'
 import type {
   Building,
   BuildingConfigurationPlanRemoval,
@@ -635,30 +636,18 @@ export function useBuildingDetail() {
   // ── Production chain status ──
 
   /**
-   * Returns the PURCHASE, MANUFACTURING and STORAGE units from the best available
-   * source: active live units first, pending-configuration units second.
+   * Returns the PURCHASE, MANUFACTURING and optional STORAGE units from the best
+   * available source: active live units first, pending-configuration units second.
    * Shown in the production-chain status panel.
    */
   const chainDisplayUnits = computed(() => {
     const units = activeUnits.value.length > 0 ? activeUnits.value : pendingUnits.value
-    return {
-      purchase: units.find((u) => u.unitType === 'PURCHASE') ?? null,
-      manufacturing: units.find((u) => u.unitType === 'MANUFACTURING') ?? null,
-      storage: units.find((u) => u.unitType === 'STORAGE') ?? null,
-    }
+    return getProductionChainDisplayUnits(units)
   })
 
   const chainStatus = computed(() => {
-    const { purchase, manufacturing, storage } = chainDisplayUnits.value
-    const isPurchaseConfigured = !!(purchase && (purchase.resourceTypeId || purchase.productTypeId))
-    const isManufacturingConfigured = !!(manufacturing && manufacturing.productTypeId)
-    const isStoragePresent = !!storage
-    return {
-      isPurchaseConfigured,
-      isManufacturingConfigured,
-      isStoragePresent,
-      isChainComplete: isPurchaseConfigured && isManufacturingConfigured && isStoragePresent,
-    }
+    const units = activeUnits.value.length > 0 ? activeUnits.value : pendingUnits.value
+    return getProductionChainStatus(units)
   })
 
   // ── Panel dismissal state ──
@@ -983,15 +972,6 @@ export function useBuildingDetail() {
   /** Ordered list of tabs available for the currently selected unit type. */
   const unitDetailTabs = computed<Array<{ key: string }>>(() => {
     if (isEditing.value) return []
-
-    // Building-level supply chain tab for FACTORY buildings
-    if (!selectedDisplayUnit.value && building.value?.type === 'FACTORY') {
-      const hasLoadedSupplyChain = (supplyChain.value?.units.length ?? 0) > 0
-      const hasUnitsWhileLoading = supplyChainLoading.value && activeUnits.value.length > 0
-      if (hasLoadedSupplyChain || hasUnitsWhileLoading) {
-        return [{ key: 'supplyChain' }]
-      }
-    }
 
     const unitType = selectedDisplayUnit.value?.unitType
     if (!unitType) return []
@@ -2064,46 +2044,6 @@ export function useBuildingDetail() {
 
   type ValidationWarning = { key: string; params?: Record<string, unknown> }
 
-  function getLinkedUnits(unit: EditableGridUnit, units: EditableGridUnit[]): EditableGridUnit[] {
-    const linked: EditableGridUnit[] = []
-    const byPos = new Map(units.map((u) => [`${u.gridX},${u.gridY}`, u]))
-
-    if (unit.linkUp) {
-      const u = byPos.get(`${unit.gridX},${unit.gridY - 1}`)
-      if (u) linked.push(u)
-    }
-    if (unit.linkDown) {
-      const u = byPos.get(`${unit.gridX},${unit.gridY + 1}`)
-      if (u) linked.push(u)
-    }
-    if (unit.linkLeft) {
-      const u = byPos.get(`${unit.gridX - 1},${unit.gridY}`)
-      if (u) linked.push(u)
-    }
-    if (unit.linkRight) {
-      const u = byPos.get(`${unit.gridX + 1},${unit.gridY}`)
-      if (u) linked.push(u)
-    }
-    if (unit.linkUpLeft) {
-      const u = byPos.get(`${unit.gridX - 1},${unit.gridY - 1}`)
-      if (u) linked.push(u)
-    }
-    if (unit.linkUpRight) {
-      const u = byPos.get(`${unit.gridX + 1},${unit.gridY - 1}`)
-      if (u) linked.push(u)
-    }
-    if (unit.linkDownLeft) {
-      const u = byPos.get(`${unit.gridX - 1},${unit.gridY + 1}`)
-      if (u) linked.push(u)
-    }
-    if (unit.linkDownRight) {
-      const u = byPos.get(`${unit.gridX + 1},${unit.gridY + 1}`)
-      if (u) linked.push(u)
-    }
-
-    return linked
-  }
-
   const configWarnings = computed<ValidationWarning[]>(() => {
     const units = isEditing.value ? draftUnits.value : (pendingConfiguration.value?.units ?? activeUnits.value).map(cloneUnit)
     const warnings: ValidationWarning[] = []
@@ -2174,8 +2114,10 @@ export function useBuildingDetail() {
         }
       }
       for (const mu of manufacturingUnits) {
-        const linked = getLinkedUnits(mu, units)
-        const hasOutput = linked.some((u) => ['STORAGE', 'B2B_SALES'].includes(u.unitType))
+        const hasOutput = hasReachableOutputPath(mu, units, {
+          passthroughUnitTypes: ['MANUFACTURING'],
+          terminalUnitTypes: ['STORAGE', 'B2B_SALES', 'PUBLIC_SALES'],
+        })
         if (!hasOutput) {
           warnings.push({ key: 'buildingDetail.warnings.manufacturingNotLinked', params: { x: mu.gridX, y: mu.gridY } })
         }
@@ -2184,8 +2126,9 @@ export function useBuildingDetail() {
 
     if (building.value.type === 'MINE') {
       for (const mu of miningUnits) {
-        const linked = getLinkedUnits(mu, units)
-        const hasOutput = linked.some((u) => ['STORAGE', 'B2B_SALES'].includes(u.unitType))
+        const hasOutput = hasReachableOutputPath(mu, units, {
+          terminalUnitTypes: ['STORAGE', 'B2B_SALES', 'PUBLIC_SALES'],
+        })
         if (!hasOutput) {
           warnings.push({ key: 'buildingDetail.warnings.miningNotLinked', params: { x: mu.gridX, y: mu.gridY } })
         }
@@ -4327,7 +4270,7 @@ export function useBuildingDetail() {
         `query BuildingSupplyChain($buildingId: UUID!) {
           buildingSupplyChain(buildingId: $buildingId) {
             units {
-              id
+              buildingUnitId
               unitType
               gridX
               gridY

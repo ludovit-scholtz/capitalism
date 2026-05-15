@@ -3,7 +3,6 @@ import { inject, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
 import UnitResourceHistoryPanel from '@/components/buildings/UnitResourceHistoryPanel.vue'
-import SupplyChainTab from '@/components/buildings/SupplyChainTab.vue'
 import SeasonalOutlookPanel from '@/components/buildings/SeasonalOutlookPanel.vue'
 import MiningResourceStatusPanel from '@/components/buildings/MiningResourceStatusPanel.vue'
 import type { BuildingUnit } from '@/types'
@@ -28,8 +27,6 @@ const {
   publicSalesAnalyticsLoading,
   unitProductAnalytics,
   unitProductAnalyticsLoading,
-  supplyChain,
-  supplyChainLoading,
   quickPriceInput,
   quickPriceSaving,
   quickPriceSuccess,
@@ -330,8 +327,7 @@ function buildCompetitionPieGradient(entries: CompetitionLegendEntry[]): string 
           <MiningResourceStatusPanel
             v-if="building && getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y)?.unitType === 'MINING'"
             :building="building"
-            :mining-rate-per-tick="selectedMiningRate"
-          /></template
+            :mining-rate-per-tick="selectedMiningRate" /></template
         ><!-- ── Quick Actions tab (PUBLIC_SALES only) ──────────── --><template v-else-if="selectedUnitTab === 'quickActions'"
           ><div class="unit-insight-card mt-0 border-0 pt-0" :aria-label="t('buildingDetail.accessibility.quickActions')">
             <div class="rounded-xl border border-divider bg-surface p-4 sm:p-5">
@@ -1052,11 +1048,8 @@ function buildCompetitionPieGradient(entries: CompetitionLegendEntry[]): string 
                 </p>
               </div>
               <!-- Seasonal Outlook Panel -->
-              <SeasonalOutlookPanel
-                v-if="publicSalesAnalytics.seasonalOutlook"
-                :seasonal-outlook="publicSalesAnalytics.seasonalOutlook"
-              /></template
-            >
+              <SeasonalOutlookPanel v-if="publicSalesAnalytics.seasonalOutlook" :seasonal-outlook="publicSalesAnalytics.seasonalOutlook"
+            /></template>
             <p v-else class="config-help">{{ t('buildingDetail.marketIntelligence.loadFailed') }}</p>
           </div>
           <!-- Manufacturing Unit Product Analytics Panel -->
@@ -1148,8 +1141,6 @@ function buildCompetitionPieGradient(entries: CompetitionLegendEntry[]): string 
               ><p class="config-help">{{ t('buildingDetail.unitProductAnalytics.noProduct') }}</p></template
             >
           </div></template
-        ><!-- ── Supply Chain tab ─────────────────────────────── --><template v-else-if="selectedUnitTab === 'supplyChain'"
-          ><SupplyChainTab :supply-chain="supplyChain" :loading="supplyChainLoading" /></template
         ><!-- ── Recent Activity tab ─────────────────────────────── --><template v-else-if="selectedUnitTab === 'recentActivity'"
           ><div class="unit-insight-card recent-activity-panel mt-0 border-0 pt-0" :aria-label="t('buildingDetail.accessibility.recentActivity')">
             <h5 class="mb-2">{{ t('buildingDetail.recentActivity.title') }}</h5>

@@ -53,11 +53,7 @@ const showReadonlySidebar = computed(() => {
   if (bd.isEditing.value) return false
 
   const selectedCell = bd.selectedCell.value
-
-  // Building-level tabs (e.g. supply chain for FACTORY with no cell selected)
-  if (!selectedCell) {
-    return bd.unitDetailTabs.value.length > 0
-  }
+  if (!selectedCell) return false
 
   return Boolean(bd.getUnitAtFrom(bd.activeUnits.value, selectedCell.x, selectedCell.y))
 })
@@ -67,13 +63,7 @@ const showOverviewSidebar = computed(() => !showEditingSidebar.value && !showRea
 const isMultiUnitBuilding = computed(() => building.value?.type !== 'APARTMENT' && building.value?.type !== 'COMMERCIAL' && building.value?.type !== 'MEDIA_HOUSE')
 
 // ── First-time user tutorial tooltips ────────────────────────────────────────
-const {
-  showBuildingDetailTooltip,
-  showGridEditorTooltip,
-  hydrateFromBackend,
-  dismissBuildingDetailTooltip,
-  dismissGridEditorTooltip,
-} = useFirstTimeUserGates()
+const { showBuildingDetailTooltip, showGridEditorTooltip, hydrateFromBackend, dismissBuildingDetailTooltip, dismissGridEditorTooltip } = useFirstTimeUserGates()
 
 const buildingDetailTooltipReady = ref(false)
 
@@ -121,109 +111,109 @@ onMounted(async () => {
     <template v-else-if="building">
       <BuildingDetailHeader />
       <template v-if="!building.destroyedAtUtc">
-      <PurchaseSelectorDialog />
-      <BuildingPropertyPanel v-if="building.type === 'APARTMENT' || building.type === 'COMMERCIAL'" />
-      <BuildingMediaHousePanel v-if="building.type === 'MEDIA_HOUSE'" />
+        <PurchaseSelectorDialog />
+        <BuildingPropertyPanel v-if="building.type === 'APARTMENT' || building.type === 'COMMERCIAL'" />
+        <BuildingMediaHousePanel v-if="building.type === 'MEDIA_HOUSE'" />
 
-      <div v-if="configWarnings.length > 0" class="config-warnings" role="alert">
-        <strong>{{ t('buildingDetail.warnings.title') }}</strong>
-        <ul>
-          <li v-for="(warning, i) in configWarnings" :key="i">{{ t(warning.key, warning.params || {}) }}</li>
-        </ul>
-      </div>
+        <div v-if="configWarnings.length > 0" class="config-warnings" role="alert">
+          <strong>{{ t('buildingDetail.warnings.title') }}</strong>
+          <ul>
+            <li v-for="(warning, i) in configWarnings" :key="i">{{ t(warning.key, warning.params || {}) }}</li>
+          </ul>
+        </div>
 
-      <BuildingPowerPlantPanel v-if="building.type === 'POWER_PLANT'" />
-      <BuildingResearchPanel v-if="building.type === 'RESEARCH_DEVELOPMENT'" />
+        <BuildingPowerPlantPanel v-if="building.type === 'POWER_PLANT'" />
+        <BuildingResearchPanel v-if="building.type === 'RESEARCH_DEVELOPMENT'" />
 
-      <div v-if="showStarterSetupBanner" class="starter-setup-banner" role="region" aria-label="starter setup">
-        <div class="starter-setup-content">
-          <h2 class="starter-setup-title">🏭 {{ t('buildingDetail.starterSetup.title') }}</h2>
-          <p class="starter-setup-body">{{ t('buildingDetail.starterSetup.body') }}</p>
-          <p class="starter-setup-desc">{{ t('buildingDetail.starterSetup.starterLayoutDesc') }}</p>
-          <p class="starter-setup-whatnext">{{ t('buildingDetail.starterSetup.whatNext') }}</p>
-        </div>
-        <div class="starter-setup-actions">
-          <button class="btn btn-primary" @click="applyStarterLayout">{{ t('buildingDetail.starterSetup.applyStarter') }}</button>
-        </div>
-      </div>
-
-      <div v-if="showSalesShopStarterBanner" class="starter-setup-banner starter-setup-banner--shop" role="region" aria-label="shop starter setup">
-        <div class="starter-setup-content">
-          <h2 class="starter-setup-title">🏪 {{ t('buildingDetail.shopStarterSetup.title') }}</h2>
-          <p class="starter-setup-body">{{ t('buildingDetail.shopStarterSetup.body') }}</p>
-          <p class="starter-setup-desc">{{ t('buildingDetail.shopStarterSetup.starterLayoutDesc') }}</p>
-          <p class="starter-setup-whatnext">{{ t('buildingDetail.shopStarterSetup.whatNext') }}</p>
-        </div>
-        <div class="starter-setup-actions">
-          <button class="btn btn-primary" @click="applyShopStarterLayout">{{ t('buildingDetail.shopStarterSetup.applyStarter') }}</button>
-        </div>
-      </div>
-
-      <div v-if="isUpgradeInProgress" class="upgrade-banner" role="status">
-        <div>
-          <strong>{{ t('buildingDetail.upgradeQueuedTitle') }}</strong>
-          <p>{{ t('buildingDetail.upgradeQueuedBody', { time: formatTickDuration(remainingUpgradeTicks, locale) }) }}</p>
-          <p v-if="upgradeBlockMessage" class="upgrade-block-message">{{ upgradeBlockMessage }}</p>
-        </div>
-        <div class="upgrade-banner-actions">
-          <div class="upgrade-pill" :title="t('buildingDetail.upgradeAppliesAt', { time: pendingConfiguration?.appliesAtTick })">
-            {{ t('buildingDetail.upgradeAppliesAt', { time: formatGameTickTime(pendingConfiguration?.appliesAtTick ?? 0, locale) }) }}
+        <div v-if="showStarterSetupBanner" class="starter-setup-banner" role="region" aria-label="starter setup">
+          <div class="starter-setup-content">
+            <h2 class="starter-setup-title">🏭 {{ t('buildingDetail.starterSetup.title') }}</h2>
+            <p class="starter-setup-body">{{ t('buildingDetail.starterSetup.body') }}</p>
+            <p class="starter-setup-desc">{{ t('buildingDetail.starterSetup.starterLayoutDesc') }}</p>
+            <p class="starter-setup-whatnext">{{ t('buildingDetail.starterSetup.whatNext') }}</p>
           </div>
-          <button v-if="!isEditing" class="btn btn-danger btn-sm" :disabled="cancellingPlan" @click="cancelPlan">{{ cancellingPlan ? t('common.loading') : t('buildingDetail.cancelPlan') }}</button>
-        </div>
-      </div>
-      <div v-if="cancelPlanError" class="error-banner" role="alert">{{ cancelPlanError }}</div>
-
-      <div v-if="allUnitsUnderUpgrade.length > 0" class="concurrent-upgrades-panel" aria-label="Units under upgrade">
-        <h4>⏳ {{ t('buildingDetail.unitUpgrade.concurrentTitle') }}</h4>
-        <p class="concurrent-upgrades-help">{{ t('buildingDetail.unitUpgrade.concurrentHelp') }}</p>
-        <ul class="concurrent-upgrades-list">
-          <li
-            v-for="u in allUnitsUnderUpgrade"
-            :key="`${u.gridX}-${u.gridY}`"
-            class="concurrent-upgrade-item"
-            :aria-label="`${u.unitType} at (${u.gridX}, ${u.gridY}) upgrading to level ${u.toLevel}`"
-          >
-            <span class="concurrent-upgrade-type">{{ u.unitType }}</span>
-            <span class="concurrent-upgrade-pos">({{ u.gridX }}, {{ u.gridY }})</span>
-            <span class="concurrent-upgrade-arrow">→</span>
-            <span class="concurrent-upgrade-level">{{ t('buildingDetail.unitUpgrade.nextLevel', { level: u.toLevel }) }}</span>
-            <span class="concurrent-upgrade-ticks" :title="u.ticksRemaining + ' ticks'">{{
-              t('buildingDetail.unitUpgrade.ticksRemaining', { time: formatTickDuration(u.ticksRemaining, locale) })
-            }}</span>
-          </li>
-        </ul>
-      </div>
-
-      <div v-if="lockedConfiguredProducts.length > 0" class="pro-access-banner" role="status">
-        <strong>{{ t('catalog.proLockedTitle') }}</strong>
-        <p>{{ t('buildingDetail.proAccessGrandfathered', { products: lockedConfiguredProductNames }) }}</p>
-      </div>
-
-      <BuildingChainStatusPanel v-if="isMultiUnitBuilding" />
-
-      <div
-        class="main-content grid items-start gap-8 [grid-template-columns:minmax(0,1.05fr)_minmax(360px,0.95fr)] min-[1320px]:[grid-template-columns:minmax(0,1fr)_minmax(420px,1fr)] max-[1024px]:grid-cols-1 max-[1024px]:gap-6 max-[768px]:gap-4"
-      >
-        <template v-if="isMultiUnitBuilding">
-          <!-- Grid editor section with contextual tooltip for first-time visitors -->
-          <div class="relative">
-            <TutorialTooltip
-              v-if="buildingDetailTooltipReady && showGridEditorTooltip && !showBuildingDetailTooltip"
-              milestone="FIRST_GRID_EDITOR_OPEN"
-              :title="t('tutorial.tooltips.gridEditorOverlay.title')"
-              :description="t('tutorial.tooltips.gridEditorOverlay.body')"
-              position="bottom"
-              @dismiss="dismissGridEditorTooltip"
-            />
-            <BuildingUnitGrid />
+          <div class="starter-setup-actions">
+            <button class="btn btn-primary" @click="applyStarterLayout">{{ t('buildingDetail.starterSetup.applyStarter') }}</button>
           </div>
-          <BuildingEditingSidebar v-if="showEditingSidebar" />
-          <BuildingReadonlySidebar v-else-if="showReadonlySidebar" />
-          <BuildingOverviewSidebar v-if="showOverviewSidebar" />
-        </template>
-      </div>
-      </template><!-- end v-if="!building.destroyedAtUtc" -->
+        </div>
+
+        <div v-if="showSalesShopStarterBanner" class="starter-setup-banner starter-setup-banner--shop" role="region" aria-label="shop starter setup">
+          <div class="starter-setup-content">
+            <h2 class="starter-setup-title">🏪 {{ t('buildingDetail.shopStarterSetup.title') }}</h2>
+            <p class="starter-setup-body">{{ t('buildingDetail.shopStarterSetup.body') }}</p>
+            <p class="starter-setup-desc">{{ t('buildingDetail.shopStarterSetup.starterLayoutDesc') }}</p>
+            <p class="starter-setup-whatnext">{{ t('buildingDetail.shopStarterSetup.whatNext') }}</p>
+          </div>
+          <div class="starter-setup-actions">
+            <button class="btn btn-primary" @click="applyShopStarterLayout">{{ t('buildingDetail.shopStarterSetup.applyStarter') }}</button>
+          </div>
+        </div>
+
+        <div v-if="isUpgradeInProgress" class="upgrade-banner" role="status">
+          <div>
+            <strong>{{ t('buildingDetail.upgradeQueuedTitle') }}</strong>
+            <p>{{ t('buildingDetail.upgradeQueuedBody', { time: formatTickDuration(remainingUpgradeTicks, locale) }) }}</p>
+            <p v-if="upgradeBlockMessage" class="upgrade-block-message">{{ upgradeBlockMessage }}</p>
+          </div>
+          <div class="upgrade-banner-actions">
+            <div class="upgrade-pill" :title="t('buildingDetail.upgradeAppliesAt', { time: pendingConfiguration?.appliesAtTick })">
+              {{ t('buildingDetail.upgradeAppliesAt', { time: formatGameTickTime(pendingConfiguration?.appliesAtTick ?? 0, locale) }) }}
+            </div>
+            <button v-if="!isEditing" class="btn btn-danger btn-sm" :disabled="cancellingPlan" @click="cancelPlan">{{ cancellingPlan ? t('common.loading') : t('buildingDetail.cancelPlan') }}</button>
+          </div>
+        </div>
+        <div v-if="cancelPlanError" class="error-banner" role="alert">{{ cancelPlanError }}</div>
+
+        <div v-if="allUnitsUnderUpgrade.length > 0" class="concurrent-upgrades-panel" aria-label="Units under upgrade">
+          <h4>⏳ {{ t('buildingDetail.unitUpgrade.concurrentTitle') }}</h4>
+          <p class="concurrent-upgrades-help">{{ t('buildingDetail.unitUpgrade.concurrentHelp') }}</p>
+          <ul class="concurrent-upgrades-list">
+            <li
+              v-for="u in allUnitsUnderUpgrade"
+              :key="`${u.gridX}-${u.gridY}`"
+              class="concurrent-upgrade-item"
+              :aria-label="`${u.unitType} at (${u.gridX}, ${u.gridY}) upgrading to level ${u.toLevel}`"
+            >
+              <span class="concurrent-upgrade-type">{{ u.unitType }}</span>
+              <span class="concurrent-upgrade-pos">({{ u.gridX }}, {{ u.gridY }})</span>
+              <span class="concurrent-upgrade-arrow">→</span>
+              <span class="concurrent-upgrade-level">{{ t('buildingDetail.unitUpgrade.nextLevel', { level: u.toLevel }) }}</span>
+              <span class="concurrent-upgrade-ticks" :title="u.ticksRemaining + ' ticks'">{{
+                t('buildingDetail.unitUpgrade.ticksRemaining', { time: formatTickDuration(u.ticksRemaining, locale) })
+              }}</span>
+            </li>
+          </ul>
+        </div>
+
+        <div v-if="lockedConfiguredProducts.length > 0" class="pro-access-banner" role="status">
+          <strong>{{ t('catalog.proLockedTitle') }}</strong>
+          <p>{{ t('buildingDetail.proAccessGrandfathered', { products: lockedConfiguredProductNames }) }}</p>
+        </div>
+
+        <BuildingChainStatusPanel v-if="isMultiUnitBuilding" />
+
+        <div
+          class="main-content grid items-start gap-8 [grid-template-columns:minmax(0,1.05fr)_minmax(360px,0.95fr)] min-[1320px]:[grid-template-columns:minmax(0,1fr)_minmax(420px,1fr)] max-[1024px]:grid-cols-1 max-[1024px]:gap-6 max-[768px]:gap-4"
+        >
+          <template v-if="isMultiUnitBuilding">
+            <!-- Grid editor section with contextual tooltip for first-time visitors -->
+            <div class="relative">
+              <TutorialTooltip
+                v-if="buildingDetailTooltipReady && showGridEditorTooltip && !showBuildingDetailTooltip"
+                milestone="FIRST_GRID_EDITOR_OPEN"
+                :title="t('tutorial.tooltips.gridEditorOverlay.title')"
+                :description="t('tutorial.tooltips.gridEditorOverlay.body')"
+                position="bottom"
+                @dismiss="dismissGridEditorTooltip"
+              />
+              <BuildingUnitGrid />
+            </div>
+            <BuildingEditingSidebar v-if="showEditingSidebar" />
+            <BuildingReadonlySidebar v-else-if="showReadonlySidebar" />
+            <BuildingOverviewSidebar v-if="showOverviewSidebar" />
+          </template>
+        </div> </template
+      ><!-- end v-if="!building.destroyedAtUtc" -->
     </template>
   </div>
 </template>

@@ -8029,10 +8029,16 @@ test.describe('Starter factory setup banner', () => {
 
 test.describe('Production chain configuration', () => {
   /**
-   * Returns a player whose factory has PURCHASE, MANUFACTURING, and STORAGE units
-   * saved as active units. The resources/products can be configured via the override params.
+   * Returns a player whose factory has PURCHASE and MANUFACTURING units saved as
+   * active units, with optional STORAGE. The resources/products can be configured
+   * via the override params.
    */
-  function makeFactoryWithStarterUnits({ purchaseResourceId = null as string | null, purchaseProductId = null as string | null, manufacturingProductId = null as string | null } = {}) {
+  function makeFactoryWithStarterUnits({
+    purchaseResourceId = null as string | null,
+    purchaseProductId = null as string | null,
+    manufacturingProductId = null as string | null,
+    includeStorage = true,
+  } = {}) {
     return makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
       companies: [
@@ -8092,22 +8098,26 @@ test.describe('Production chain configuration', () => {
                   linkDownRight: false,
                   productTypeId: manufacturingProductId,
                 },
-                {
-                  id: 'unit-storage',
-                  buildingId: 'building-chain-factory',
-                  unitType: 'STORAGE',
-                  gridX: 2,
-                  gridY: 0,
-                  level: 1,
-                  linkUp: false,
-                  linkDown: false,
-                  linkLeft: true,
-                  linkRight: false,
-                  linkUpLeft: false,
-                  linkUpRight: false,
-                  linkDownLeft: false,
-                  linkDownRight: false,
-                },
+                ...(includeStorage
+                  ? [
+                      {
+                        id: 'unit-storage',
+                        buildingId: 'building-chain-factory',
+                        unitType: 'STORAGE',
+                        gridX: 2,
+                        gridY: 0,
+                        level: 1,
+                        linkUp: false,
+                        linkDown: false,
+                        linkLeft: true,
+                        linkRight: false,
+                        linkUpLeft: false,
+                        linkUpRight: false,
+                        linkDownLeft: false,
+                        linkDownRight: false,
+                      },
+                    ]
+                  : []),
               ],
             },
           ],
@@ -8174,6 +8184,21 @@ test.describe('Production chain configuration', () => {
     await expect(panel.locator('.chain-step').nth(2).locator('.chain-step-value')).toContainText('Wooden Chair')
     // Should show chain complete message
     await expect(panel.getByText(/next step/i)).toBeVisible()
+  })
+
+  test('chain panel shows fully configured status without storage when purchase and manufacturing are set', async ({ page }) => {
+    const player = makeFactoryWithStarterUnits({
+      purchaseResourceId: 'res-wood',
+      manufacturingProductId: 'prod-chair',
+      includeStorage: false,
+    })
+    await setupChainTest(page, player)
+    await page.goto('/building/building-chain-factory')
+
+    const panel = page.getByRole('region', { name: /production chain status/i })
+    await expect(panel.getByText(/Chain Ready/i)).toBeVisible()
+    await expect(panel.locator('.chain-step').nth(2).locator('.chain-step-optional-label')).toContainText(/optional/i)
+    await expect(panel.locator('.chain-step').nth(2).locator('.chain-step-value')).toContainText('Wooden Chair')
   })
 
   test('configure purchase unit and save: chain panel reflects new resource', async ({ page }) => {
@@ -23343,7 +23368,7 @@ test.describe('Supply chain tab', () => {
     }
   }
 
-  test('supply chain tab appears for FACTORY buildings', async ({ page }) => {
+  test('factory defaults to overview and also exposes the supply chain tab', async ({ page }) => {
     const player = makePlayer()
     const factoryData = makeFactoryBuildingWithUnits()
     player.companies.push({ ...factoryData, id: factoryData.companyId, playerId: player.id, cash: 500000, foundedAtUtc: '2026-01-01T00:00:00Z' })
@@ -23360,8 +23385,9 @@ test.describe('Supply chain tab', () => {
     await page.goto('/building/building-sc-factory')
     await expect(page.getByRole('heading', { name: 'SC Factory' })).toBeVisible()
 
-    // Supply Chain tab visible in building-level view
+    await expect(page.locator('.unit-detail-tabs').getByRole('button', { name: 'P&L & Statistics' })).toBeVisible()
     await expect(page.locator('.unit-detail-tabs').getByRole('button', { name: 'Supply Chain' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Building Overview' })).toBeVisible()
   })
 
   test('supply chain tab shows health status and units when data loads', async ({ page }) => {

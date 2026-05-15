@@ -51,8 +51,8 @@ function getUnitCoords(gridX: number, gridY: number) {
 </script>
 
 <template>
-  <div class="supply-chain-diagram flex flex-col items-center gap-4">
-    <svg :width="svgWidth" :height="svgHeight" viewBox="0 0 180 180" class="border border-gray-300 rounded bg-white" xmlns="http://www.w3.org/2000/svg">
+  <div class="supply-chain-diagram flex flex-col items-center gap-4 text-foreground">
+    <svg :width="svgWidth" :height="svgHeight" viewBox="0 0 180 180" class="rounded border border-divider bg-card" xmlns="http://www.w3.org/2000/svg">
       <!-- Draw links (arrows between units) -->
       <g class="links">
         <template v-for="link in diagram.links" :key="`link-${link.fromUnitId}-${link.toUnitId}`">
@@ -76,7 +76,7 @@ function getUnitCoords(gridX: number, gridY: number) {
                       v-if="link.estimatedTransitCost"
                       :x="(getUnitCoords(unit.gridX, unit.gridY).x + getUnitCoords(targetUnit.gridX, targetUnit.gridY).x) / 2"
                       :y="(getUnitCoords(unit.gridX, unit.gridY).y + getUnitCoords(targetUnit.gridX, targetUnit.gridY).y) / 2 - 5"
-                      class="text-xs fill-gray-600"
+                      class="fill-current text-xs text-muted"
                       text-anchor="middle"
                     >
                       {{ link.estimatedTransitCost.toFixed(2) }}
@@ -124,12 +124,22 @@ function getUnitCoords(gridX: number, gridY: number) {
             />
 
             <!-- Unit type label -->
-            <text :x="getUnitCoords(unit.gridX, unit.gridY).x + CELL_SIZE / 2" :y="getUnitCoords(unit.gridX, unit.gridY).y + 20" class="text-xs font-semibold fill-gray-800" text-anchor="middle">
+            <text
+              :x="getUnitCoords(unit.gridX, unit.gridY).x + CELL_SIZE / 2"
+              :y="getUnitCoords(unit.gridX, unit.gridY).y + 20"
+              class="fill-current text-xs font-semibold text-foreground"
+              text-anchor="middle"
+            >
               {{ unit.unitType.substring(0, 4) }}
             </text>
 
             <!-- Fill percentage -->
-            <text :x="getUnitCoords(unit.gridX, unit.gridY).x + CELL_SIZE / 2" :y="getUnitCoords(unit.gridX, unit.gridY).y + 36" class="text-xs font-bold fill-gray-800" text-anchor="middle">
+            <text
+              :x="getUnitCoords(unit.gridX, unit.gridY).x + CELL_SIZE / 2"
+              :y="getUnitCoords(unit.gridX, unit.gridY).y + 36"
+              class="fill-current text-xs font-bold text-foreground"
+              text-anchor="middle"
+            >
               {{ unit.fillPercent.toFixed(0) }}%
             </text>
 
@@ -138,7 +148,7 @@ function getUnitCoords(gridX: number, gridY: number) {
               v-if="unit.idleTicks > 5"
               :x="getUnitCoords(unit.gridX, unit.gridY).x + CELL_SIZE / 2"
               :y="getUnitCoords(unit.gridX, unit.gridY).y + 52"
-              class="text-xs fill-red-600 font-semibold"
+              class="fill-current text-xs font-semibold text-red-600 dark:text-red-300"
               text-anchor="middle"
             >
               ⚠{{ unit.idleTicks }}
@@ -149,7 +159,7 @@ function getUnitCoords(gridX: number, gridY: number) {
     </svg>
 
     <!-- Legend -->
-    <div class="legend grid grid-cols-2 gap-3 text-xs">
+    <div class="legend grid grid-cols-2 gap-3 text-xs text-muted">
       <div class="flex items-center gap-2">
         <div class="h-4 w-4 rounded bg-green-500"></div>
         <span>Active / Full Stock</span>
@@ -181,7 +191,7 @@ function getUnitCoords(gridX: number, gridY: number) {
 <style scoped>
 .supply-chain-diagram {
   padding: 16px;
-  background: #f9fafb;
+  background: var(--color-surface);
   border-radius: 8px;
 }
 

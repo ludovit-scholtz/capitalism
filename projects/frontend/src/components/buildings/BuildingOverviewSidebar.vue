@@ -8,19 +8,29 @@ import BuildingLayoutsTab from '@/components/buildings/BuildingLayoutsTab.vue'
 import BuildingOverviewTab from '@/components/buildings/BuildingOverviewTab.vue'
 import BuildingBankAccountTab from '@/components/buildings/BuildingBankAccountTab.vue'
 import BuildingEnergySettingsTab from '@/components/buildings/BuildingEnergySettingsTab.vue'
+import SupplyChainTab from '@/components/buildings/SupplyChainTab.vue'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const bd = inject(BUILDING_DETAIL_KEY)!
-const { isEditing } = bd
+const { isEditing, building, supplyChain, supplyChainLoading, activeUnits } = bd
 
 type BuildingEditTab = 'basic-data' | 'energy' | 'bank-account' | 'layouts'
+type BuildingOverviewTabKey = 'overview' | 'supplyChain' | 'bankAccount'
 
-const overviewTabs = [
-  { key: 'overview', label: t('buildingDetail.overviewTab') },
-  { key: 'bankAccount', label: t('buildingDetail.bankAccountTab') },
-]
+const overviewTabs = computed<Array<{ key: BuildingOverviewTabKey; label: string }>>(() => {
+  const tabs: Array<{ key: BuildingOverviewTabKey; label: string }> = [{ key: 'overview', label: t('buildingDetail.overviewTab') }]
+  const hasLoadedSupplyChain = (supplyChain.value?.units.length ?? 0) > 0
+  const hasUnitsWhileLoading = supplyChainLoading.value && activeUnits.value.length > 0
+
+  if (building.value?.type === 'FACTORY' && (hasLoadedSupplyChain || hasUnitsWhileLoading)) {
+    tabs.push({ key: 'supplyChain', label: t('buildingDetail.unitTabs.supplyChain') })
+  }
+
+  tabs.push({ key: 'bankAccount', label: t('buildingDetail.bankAccountTab') })
+  return tabs
+})
 
 const editTabs = computed(() => [
   { key: 'basic-data', label: t('buildingDetail.editBuildingTabBasicData') },
@@ -28,6 +38,12 @@ const editTabs = computed(() => [
   { key: 'bank-account', label: t('buildingDetail.editBuildingTabBankAccount') },
   { key: 'layouts', label: t('buildingDetail.editBuildingTabLayouts') },
 ])
+
+function normalizeOverviewTab(value: unknown): BuildingOverviewTabKey {
+  if (value === 'bankAccount') return 'bankAccount'
+  if (value === 'supplyChain' && overviewTabs.value.some((tab) => tab.key === 'supplyChain')) return 'supplyChain'
+  return 'overview'
+}
 
 function normalizeBuildingEditTab(value: unknown): BuildingEditTab {
   if (value === 'energy') return 'energy'
@@ -37,8 +53,7 @@ function normalizeBuildingEditTab(value: unknown): BuildingEditTab {
 }
 
 const selectedOverviewTab = computed(() => {
-  const tab = route.query.tab as string | undefined
-  return tab === 'bankAccount' ? 'bankAccount' : 'overview'
+  return normalizeOverviewTab(route.query.tab)
 })
 
 const selectedEditTab = computed(() => normalizeBuildingEditTab(route.params.tab))
@@ -59,7 +74,7 @@ watch(
   { immediate: true },
 )
 
-function selectOverviewTab(key: string) {
+function selectOverviewTab(key: BuildingOverviewTabKey) {
   router.replace({ query: { ...route.query, tab: key === 'overview' ? undefined : key } })
 }
 
@@ -118,6 +133,10 @@ function selectEditTab(key: BuildingEditTab) {
         <!-- Tab: P&L & Statistics -->
         <template v-if="selectedOverviewTab === 'overview'">
           <BuildingOverviewTab />
+        </template>
+
+        <template v-else-if="selectedOverviewTab === 'supplyChain'">
+          <SupplyChainTab :supply-chain="supplyChain" :loading="supplyChainLoading" />
         </template>
 
         <!-- Tab: Bank Account -->

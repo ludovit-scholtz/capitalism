@@ -22,12 +22,7 @@ const {
 
 <template>
   <!-- Production chain status panel: shown for factories with the starter layout saved -->
-  <div
-    v-if="showProductionChainPanel"
-    class="production-chain-panel mb-4 rounded-xl border border-divider bg-card p-4 sm:p-5"
-    role="region"
-    aria-label="production chain status"
-  >
+  <div v-if="showProductionChainPanel" class="production-chain-panel mb-4 rounded-xl border border-divider bg-card p-4 sm:p-5" role="region" aria-label="production chain status">
     <div class="chain-panel-header mb-4 flex flex-wrap items-center gap-2">
       <h3 class="chain-panel-title text-lg font-semibold text-foreground">⚙️ {{ t('buildingDetail.productionChain.title') }}</h3>
       <span
@@ -86,11 +81,19 @@ const {
 
       <div
         class="chain-step min-w-[180px] flex-1 rounded-lg border p-3"
-        :class="chainStatus.isStoragePresent ? 'chain-step--configured border-emerald-300/60 bg-emerald-500/10' : 'chain-step--missing border-amber-300/60 bg-amber-500/10'"
+        :class="chainStatus.isStoragePresent ? 'chain-step--configured border-emerald-300/60 bg-emerald-500/10' : 'chain-step--optional border-divider bg-surface'"
         role="listitem"
       >
         <div class="chain-step-icon text-lg">📦</div>
-        <div class="chain-step-type mt-1 text-xs font-semibold uppercase tracking-wide text-muted">{{ t('buildingDetail.unitTypes.STORAGE') }}</div>
+        <div class="mt-1 flex items-center gap-2">
+          <div class="chain-step-type text-xs font-semibold uppercase tracking-wide text-muted">{{ t('buildingDetail.unitTypes.STORAGE') }}</div>
+          <span
+            v-if="!chainStatus.isStoragePresent"
+            class="chain-step-optional-label inline-flex items-center rounded-full border border-divider px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted"
+          >
+            {{ t('common.optional') }}
+          </span>
+        </div>
         <div class="chain-step-value mt-1 text-sm font-semibold text-foreground">
           {{ chainStatus.isManufacturingConfigured ? getProductName(chainDisplayUnits.manufacturing?.productTypeId ?? null) : t('buildingDetail.productionChain.storageDesc') }}
         </div>
