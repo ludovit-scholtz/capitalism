@@ -11,9 +11,8 @@ namespace Api.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropForeignKey(
-                name: "FK_ChatMessages_Players_PlayerId",
-                table: "ChatMessages");
+            migrationBuilder.Sql(
+                "ALTER TABLE \"ChatMessages\" DROP CONSTRAINT IF EXISTS \"FK_ChatMessages_Players_PlayerId\";");
 
             migrationBuilder.RenameColumn(
                 name: "SentAtUtc",

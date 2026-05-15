@@ -122,13 +122,16 @@ public sealed partial class AppDbInitializer
         ProductType starterProduct,
         long gameTick)
     {
+        var salesShopType = BuildingType.SalesShop;
         var lot = await dbContext.BuildingLots
             .Where(candidate => candidate.CityId == city.Id && candidate.OwnerCompanyId == null)
+            .Where(candidate =>
+                candidate.SuitableTypes == salesShopType
+                || candidate.SuitableTypes.StartsWith($"{salesShopType},")
+                || candidate.SuitableTypes.EndsWith($",{salesShopType}")
+                || candidate.SuitableTypes.Contains($",{salesShopType},"))
             .OrderBy(candidate => candidate.Price)
-            .FirstOrDefaultAsync(candidate =>
-                candidate.SuitableTypes
-                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                    .Contains(BuildingType.SalesShop, StringComparer.OrdinalIgnoreCase));
+            .FirstOrDefaultAsync();
         if (lot is null || companyAccount.Balance < lot.Price)
         {
             return;
