@@ -51,20 +51,55 @@ test.describe('Chat side panel', () => {
     await expect(page.locator('.chat-log')).toContainText('Need wood in Bratislava.')
   })
 
-  test('auto-selects city tab on city route and global tab elsewhere', async ({ page }) => {
+  test('uses the current route city for city chat and global chat elsewhere', async ({ page }) => {
     const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
-    const state = setupMockApi(page, { players: [player] })
+    const other = makePlayer({ id: 'player-2', email: 'other@test.com', displayName: 'Other Trader' })
+    const state = setupMockApi(page, {
+      players: [player, other],
+      chatMessages: [
+        {
+          id: 'chat-global',
+          authorPlayerId: other.id,
+          cityId: null,
+          content: 'Global market ping',
+          createdAtUtc: '2026-01-01T00:00:00Z',
+          isVisible: true,
+        },
+        {
+          id: 'chat-ba',
+          authorPlayerId: other.id,
+          cityId: 'city-ba',
+          content: 'Bratislava trading floor',
+          createdAtUtc: '2026-01-01T00:01:00Z',
+          isVisible: true,
+        },
+        {
+          id: 'chat-pr',
+          authorPlayerId: other.id,
+          cityId: 'city-pr',
+          content: 'Prague trading floor',
+          createdAtUtc: '2026-01-01T00:02:00Z',
+          isVisible: true,
+        },
+      ],
+    })
     state.currentUserId = player.id
     await bootstrapAuthenticated(page, `token-${player.id}`)
+    await page.addInitScript(() => localStorage.setItem('selected_city_id', 'city-pr'))
 
     await page.goto('/city/city-ba')
     await page.getByRole('button', { name: 'Chat' }).click()
     await expect(page.getByRole('tab', { name: 'Bratislava' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.locator('.chat-log')).toContainText('Bratislava trading floor')
+    await expect(page.locator('.chat-log')).not.toContainText('Prague trading floor')
+    await expect(page.locator('.chat-log')).not.toContainText('Global market ping')
     await page.locator('.close-btn').click()
 
     await page.goto('/dashboard')
     await page.getByRole('button', { name: 'Chat' }).click()
     await expect(page.getByRole('tab', { name: 'Global' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.locator('.chat-log')).toContainText('Global market ping')
+    await expect(page.locator('.chat-log')).not.toContainText('Bratislava trading floor')
   })
 
   test('shows visible error when backend rejects too-long message', async ({ page }) => {

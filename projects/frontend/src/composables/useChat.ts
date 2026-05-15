@@ -32,6 +32,7 @@ export function useChat() {
   const sendError = ref<string | null>(null)
   const sending = ref(false)
   const activeChannel = ref<'GLOBAL' | 'CITY'>('GLOBAL')
+  const activeCityId = ref<string | null>(null)
   const activeCityName = ref<string | null>(null)
 
   let refreshTimer: ReturnType<typeof setInterval> | null = null
@@ -40,7 +41,7 @@ export function useChat() {
   const charCount = computed(() => draftMessage.value.length)
   const isOverLimit = computed(() => charCount.value > MAX_CHAT_LENGTH)
   const showCharCounter = computed(() => charCount.value >= CHAR_COUNTER_THRESHOLD)
-  const activeCityId = computed(() => {
+  const candidateCityId = computed(() => {
     const routeCityId = typeof route.params.id === 'string' && route.path.startsWith('/city/')
       ? route.params.id
       : null
@@ -74,7 +75,7 @@ export function useChat() {
 
     try {
       const data = await gqlRequest<{ chatMessages: InGameChatMessage[] }>(
-        `query ChatMessages($cityId: ID, $lastN: Int!) {
+        `query ChatMessages($cityId: UUID, $lastN: Int!) {
           chatMessages(cityId: $cityId, lastN: $lastN) {
             id
             authorPlayerId
@@ -135,20 +136,23 @@ export function useChat() {
   }
 
   async function loadActiveCityName() {
-    if (!activeCityId.value) {
+    if (!candidateCityId.value) {
+      activeCityId.value = null
       activeCityName.value = null
       return
     }
 
     try {
-      const result = await gqlRequest<{ city: { name: string } | null }>(
-        `query ChatCityName($id: ID!) {
-          city(id: $id) { name }
+      const result = await gqlRequest<{ city: { id: string; name: string } | null }>(
+        `query ChatCityName($id: UUID!) {
+          city(id: $id) { id name }
         }`,
-        { id: activeCityId.value },
+        { id: candidateCityId.value },
       )
+      activeCityId.value = result.city?.id ?? null
       activeCityName.value = result.city?.name ?? null
     } catch {
+      activeCityId.value = null
       activeCityName.value = null
     }
   }
@@ -180,10 +184,10 @@ export function useChat() {
   }
 
   onMounted(async () => {
+    await loadActiveCityName()
     if (route.path.startsWith('/city/') && activeCityId.value) {
       activeChannel.value = 'CITY'
     }
-    await loadActiveCityName()
     await loadMessages()
     startRefresh()
   })
@@ -192,7 +196,7 @@ export function useChat() {
     stopRefresh()
   })
 
-  watch(activeCityId, async () => {
+  watch(candidateCityId, async () => {
     await loadActiveCityName()
     if (activeChannel.value === 'CITY' || route.path.startsWith('/city/')) {
       selectCityChannel()
