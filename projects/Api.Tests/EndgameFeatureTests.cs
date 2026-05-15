@@ -237,7 +237,7 @@ public sealed class EndgameFeatureTests
         var errors = response.GetProperty("errors");
         Assert.True(errors.GetArrayLength() > 0);
         var firstError = errors[0];
-        Assert.Equal("GAME_ENDED", firstError.GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal("SHARD_CONCLUDED", firstError.GetProperty("extensions").GetProperty("code").GetString());
         Assert.Contains("Alice has won", firstError.GetProperty("message").GetString(), StringComparison.Ordinal);
     }
 
@@ -546,6 +546,6 @@ public sealed class EndgameFeatureTests
 
         Assert.True(blockedResult.TryGetProperty("errors", out var errors) && errors.GetArrayLength() > 0,
             "Mutations should be blocked after game ends.");
-        Assert.Equal("GAME_ENDED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal("SHARD_CONCLUDED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 }

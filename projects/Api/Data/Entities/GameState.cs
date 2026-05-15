@@ -46,6 +46,15 @@ public sealed class GameState
     /// <summary>UTC timestamp when the winner was declared.</summary>
     public DateTime? GameEndedAtUtc { get; set; }
 
+    /// <summary>Winner net worth in USD at the time the game ended.</summary>
+    public decimal? WinnerNetWorth { get; set; }
+
+    /// <summary>Current lifecycle state of this game shard.</summary>
+    public GameShardState ShardState { get; set; } = GameShardState.Active;
+
+    [NotMapped]
+    public DateTime? ConcludedAtUtc => GameEndedAtUtc;
+
     [NotMapped]
     public int CurrentGameYear => GameTime.GetGameYear(CurrentTick);
 

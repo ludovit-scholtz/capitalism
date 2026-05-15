@@ -109,6 +109,9 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Admin-managed real-world billionaire benchmark ladder for endgame progress.</summary>
     public DbSet<RealWorldBillionaire> RealWorldBillionaires => Set<RealWorldBillionaire>();
 
+    /// <summary>Victory newsletter records published when a game shard concludes.</summary>
+    public DbSet<VictoryNewsletter> VictoryNewsletters => Set<VictoryNewsletter>();
+
     /// <summary>Exchange buy/sell orders.</summary>
     public DbSet<ExchangeOrder> ExchangeOrders => Set<ExchangeOrder>();
 

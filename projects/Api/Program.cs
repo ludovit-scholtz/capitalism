@@ -38,6 +38,7 @@ public class Program
         builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.SectionName));
         builder.Services.Configure<ReverseProxyOptions>(builder.Configuration.GetSection(ReverseProxyOptions.SectionName));
         builder.Services.Configure<GraphQlSecurityOptions>(builder.Configuration.GetSection(GraphQlSecurityOptions.SectionName));
+        builder.Services.Configure<GameRulesOptions>(builder.Configuration.GetSection(GameRulesOptions.SectionName));
 
         var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
             ?? throw new InvalidOperationException("JWT configuration is missing.");
@@ -487,6 +488,7 @@ public class Program
         builder.Services.AddScoped<ITickPhase, CityExpansionUnlockPhase>();
         builder.Services.AddScoped<ITickPhase, RankHistoryPhase>();
         builder.Services.AddScoped<ITickPhase, EndgamePhase>();
+        builder.Services.AddScoped<ITickPhase, VictoryCheckPhase>();
         builder.Services.AddScoped<ITickPhase, FxRateHistoryPhase>();
         builder.Services.AddHostedService<GameTickHostedService>();
         builder.Services.AddHostedService<MasterServerRegistrationHostedService>();
