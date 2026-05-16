@@ -65,4 +65,4 @@ spec:
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: events-api-data
+            claimName: capitalism-api-data

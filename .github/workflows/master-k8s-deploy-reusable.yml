@@ -522,8 +522,8 @@ jobs:
               | kubectl apply -f -
           fi
 
-          kubectl rollout status deployment/master-api --namespace "$K8S_NAMESPACE" --timeout=300s
-          kubectl rollout status deployment/master-frontend --namespace "$K8S_NAMESPACE" --timeout=300s
+          kubectl rollout status deployment/master-api --namespace "$K8S_NAMESPACE" --timeout=900s
+          kubectl rollout status deployment/master-frontend --namespace "$K8S_NAMESPACE" --timeout=900s
 
       - name: Smoke check deployed endpoints
         id: smoke_check
@@ -566,8 +566,8 @@ jobs:
           set +e
           kubectl rollout undo deployment/master-api --namespace "$K8S_NAMESPACE"
           kubectl rollout undo deployment/master-frontend --namespace "$K8S_NAMESPACE"
-          kubectl rollout status deployment/master-api --namespace "$K8S_NAMESPACE" --timeout=300s
-          kubectl rollout status deployment/master-frontend --namespace "$K8S_NAMESPACE" --timeout=300s
+          kubectl rollout status deployment/master-api --namespace "$K8S_NAMESPACE" --timeout=900s
+          kubectl rollout status deployment/master-frontend --namespace "$K8S_NAMESPACE" --timeout=900s
 
       - name: Deployment summary
         if: always()

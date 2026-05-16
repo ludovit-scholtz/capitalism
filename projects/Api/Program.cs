@@ -624,8 +624,15 @@ public class Program
             },
         });
 
-        using (var scope = app.Services.CreateScope())
+        if (app.Configuration.GetValue<bool>("Startup:SkipDatabaseInitialization"))
         {
+            startupLogger.LogWarning(
+                "Skipping AppDbInitializer.InitializeAsync because Startup:SkipDatabaseInitialization=true. Environment={EnvironmentName}",
+                app.Environment.EnvironmentName);
+        }
+        else
+        {
+            using var scope = app.Services.CreateScope();
             var initializer = scope.ServiceProvider.GetRequiredService<AppDbInitializer>();
             await initializer.InitializeAsync();
         }

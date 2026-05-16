@@ -16,6 +16,8 @@ permissions:
 env:
   PROJECT_PATH: projects/frontend
   IMAGE_NAME: harbor.de-4.biatec.io/biatec/capitalism-frontend
+  K8S_NAMESPACE: capitalism
+  K8S_DEPLOYMENT_NAME: capitalism-frontend
 
 jobs:
   build-test:
@@ -115,6 +117,15 @@ jobs:
       - name: Apply namespace
         run: kubectl apply -f ${{ env.PROJECT_PATH }}/deploy/k8s/namespace.yaml
 
+      - name: Create or update image pull secret
+        run: |
+          kubectl create secret docker-registry regcred \
+            --namespace ${{ env.K8S_NAMESPACE }} \
+            --docker-server=harbor.de-4.biatec.io \
+            --docker-username='${{ secrets.HARBOR_USERNAME }}' \
+            --docker-password='${{ secrets.HARBOR_PASSWORD }}' \
+            --dry-run=client -o yaml | kubectl apply -f -
+
       - name: Deploy application
         run: |
           sed "s|IMAGE_PLACEHOLDER|${IMAGE_REF}|g" ${{ env.PROJECT_PATH }}/deploy/k8s/deployment.yaml | kubectl apply -f -
@@ -122,7 +133,7 @@ jobs:
           kubectl apply -f ${{ env.PROJECT_PATH }}/deploy/k8s/ingress.yaml
 
       - name: Verify rollout
-        run: kubectl rollout status deployment/frontend --namespace frontend
+        run: kubectl rollout status deployment/${{ env.K8S_DEPLOYMENT_NAME }} --namespace ${{ env.K8S_NAMESPACE }}
 
       - name: Refresh all stage shard frontend deployments
         run: |

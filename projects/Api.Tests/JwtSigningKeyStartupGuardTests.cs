@@ -1,3 +1,4 @@
+using Api.Data;
 using Api.Security;
 using Api.Tests.Infrastructure;
 using Capitalism.Shared.Security;
@@ -181,22 +182,40 @@ internal sealed class ApiJwtSigningKeyGuardFactory(
     bool includeSeedDataSection = true)
     : WebApplicationFactory<Program>
 {
+    private const string SafeGameCatalogConnectionString =
+        "Host=localhost;Port=5432;Database=game1;Username=postgres;Password=RealSecret123!";
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        var effectiveGameCatalogConnectionString = gameCatalogConnectionString ?? SafeGameCatalogConnectionString;
+        var effectivePasswordAuthEnabled = (passwordAuthEnabled ?? true).ToString();
+
         builder.UseEnvironment(environmentName);
         if (!string.IsNullOrWhiteSpace(signingKey))
         {
             builder.UseSetting("Jwt:SigningKey", signingKey);
         }
 
+        builder.UseSetting("ConnectionStrings:GameCatalog", effectiveGameCatalogConnectionString);
+        builder.UseSetting("Auth:PasswordAuthEnabled", effectivePasswordAuthEnabled);
+        builder.UseSetting("Startup:SkipDatabaseInitialization", "true");
+
+        if (includeSeedDataSection)
+        {
+            builder.UseSetting("SeedData:AdminEmail", "admin@capitalism.local");
+            builder.UseSetting("SeedData:AdminDisplayName", "Platform Admin");
+            builder.UseSetting("SeedData:AdminPassword", seedAdminPassword ?? ApiWebApplicationFactory.TestSeedAdminPassword);
+        }
+
         builder.ConfigureAppConfiguration((_, configurationBuilder) =>
         {
             var values = new Dictionary<string, string?>
             {
-                ["ConnectionStrings:GameCatalog"] = gameCatalogConnectionString ?? $"startup-guard-tests-{Guid.NewGuid():N}",
+                ["ConnectionStrings:GameCatalog"] = effectiveGameCatalogConnectionString,
                 ["GameEngine:Enabled"] = "false",
                 ["MasterServer:RegistrationEnabled"] = "false",
-                ["Auth:PasswordAuthEnabled"] = (passwordAuthEnabled ?? true).ToString(),
+                ["Auth:PasswordAuthEnabled"] = effectivePasswordAuthEnabled,
+                ["Startup:SkipDatabaseInitialization"] = "true",
             };
 
             if (includeSeedDataSection)

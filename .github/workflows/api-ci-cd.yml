@@ -12,6 +12,8 @@ permissions:
 env:
   PROJECT_PATH: projects/Api
   IMAGE_NAME: harbor.de-4.biatec.io/biatec/capitalism-api
+  K8S_NAMESPACE: capitalism
+  K8S_DEPLOYMENT_NAME: capitalism-api
   SeedData__AdminPassword: TestSeedAdminPassword123!
 
 jobs:
@@ -101,10 +103,19 @@ jobs:
           kubectl apply -f ${{ env.PROJECT_PATH }}/deploy/k8s/namespace.yaml
           kubectl apply -f ${{ env.PROJECT_PATH }}/deploy/k8s/persistent-volume-claim.yaml
 
+      - name: Create or update image pull secret
+        run: |
+          kubectl create secret docker-registry regcred \
+            --namespace ${{ env.K8S_NAMESPACE }} \
+            --docker-server=harbor.de-4.biatec.io \
+            --docker-username='${{ secrets.HARBOR_USERNAME }}' \
+            --docker-password='${{ secrets.HARBOR_PASSWORD }}' \
+            --dry-run=client -o yaml | kubectl apply -f -
+
       - name: Create or update application secrets
         run: |
-          kubectl create secret generic api-secrets \
-            --namespace api \
+          kubectl create secret generic capitalism-api-secrets \
+            --namespace ${{ env.K8S_NAMESPACE }} \
             --from-literal=jwt-signing-key='${{ secrets.EVENTS_API_JWT_SIGNING_KEY }}' \
             --from-literal=admin-password='${{ secrets.EVENTS_API_ADMIN_PASSWORD }}' \
             --dry-run=client -o yaml | kubectl apply -f -
@@ -116,7 +127,7 @@ jobs:
           kubectl apply -f ${{ env.PROJECT_PATH }}/deploy/k8s/ingress.yaml
 
       - name: Verify rollout
-        run: kubectl rollout status deployment/api --namespace api
+        run: kubectl rollout status deployment/${{ env.K8S_DEPLOYMENT_NAME }} --namespace ${{ env.K8S_NAMESPACE }}
 
       - name: Refresh all stage shard API deployments
         run: |

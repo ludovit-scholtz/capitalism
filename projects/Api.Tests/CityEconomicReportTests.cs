@@ -498,6 +498,19 @@ public sealed class CityEconomicReportTests
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+
+        var existingCitySalesInventory = await db.Inventories
+            .Include(inv => inv.BuildingUnit)
+            .ThenInclude(unit => unit!.Building)
+            .Where(inv => inv.BuildingUnit != null
+                && inv.BuildingUnit.UnitType == UnitType.PublicSales
+                && inv.BuildingUnit.Building != null
+                && inv.BuildingUnit.Building.CityId == city.Id)
+            .ToListAsync();
+
+        db.Inventories.RemoveRange(existingCitySalesInventory);
+        await db.SaveChangesAsync();
+
         var (companyId, buildingId) = await SeedCompanyBuildingAsync(db, city.Id);
 
         // Add a PUBLIC_SALES unit to the building
