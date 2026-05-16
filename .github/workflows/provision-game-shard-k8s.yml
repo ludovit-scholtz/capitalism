@@ -1,0 +1,582 @@
+name: provision-game-shard-k8s
+
+on:
+  workflow_dispatch:
+    inputs:
+      game_name:
+        description: Public game shard name (for slug generation)
+        required: true
+        type: string
+      city:
+        description: Primary city focus for the new shard
+        required: true
+        type: choice
+        options:
+          - Bratislava
+          - Prague
+          - Vienna
+          - Berlin
+          - Warsaw
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options:
+          - stage
+          - production
+      server_region:
+        description: Region label shown in the master registry
+        required: true
+        type: choice
+        options:
+          - eu-central
+          - eu-west
+          - us-east
+      image_tag:
+        description: Game API/frontend image tag to deploy
+        required: false
+        default: latest
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  derive:
+    name: Derive shard identifiers
+    runs-on: ubuntu-latest
+    outputs:
+      shard_slug: ${{ steps.derive.outputs.shard_slug }}
+      k8s_slug: ${{ steps.derive.outputs.k8s_slug }}
+      base_domain: ${{ steps.derive.outputs.base_domain }}
+      frontend_host: ${{ steps.derive.outputs.frontend_host }}
+      api_host: ${{ steps.derive.outputs.api_host }}
+      master_graphql_url: ${{ steps.derive.outputs.master_graphql_url }}
+      namespace: ${{ steps.derive.outputs.namespace }}
+      db_name: ${{ steps.derive.outputs.db_name }}
+      db_user: ${{ steps.derive.outputs.db_user }}
+    steps:
+      - name: Validate inputs and build slug
+        id: derive
+        run: |
+          set -euo pipefail
+
+          GAME_NAME='${{ github.event.inputs.game_name }}'
+          TARGET_ENV='${{ github.event.inputs.environment }}'
+
+          if [ -z "$GAME_NAME" ]; then
+            echo "Input 'game_name' is required. Provide a public shard name such as 'Berlin 2026'." >&2
+            exit 1
+          fi
+
+          normalized=$(printf '%s' "$GAME_NAME" \
+            | iconv -c -t ascii//translit \
+            | tr '[:upper:]' '[:lower:]' \
+            | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//; s/-+/-/g')
+
+          if [ -z "$normalized" ]; then
+            echo "Could not derive a valid slug from game_name='$GAME_NAME'. Use letters/numbers in game_name." >&2
+            exit 1
+          fi
+
+          year=$(date -u +%Y)
+          shard_slug="${normalized}-${year}"
+          shard_slug=$(printf '%s' "$shard_slug" | sed -E 's/-+/-/g; s/^-+//; s/-+$//')
+
+          if [ ${#shard_slug} -gt 48 ]; then
+            shard_slug=$(printf '%s' "$shard_slug" | cut -c1-48 | sed -E 's/-+$//')
+          fi
+
+          if [ "$TARGET_ENV" = "production" ]; then
+            base_domain='capitalism5.com'
+          else
+            base_domain='stage.capitalism5.com'
+          fi
+
+          k8s_slug=$(printf '%s' "$shard_slug" | cut -c1-30 | sed -E 's/-+$//')
+          namespace="capitalism-${TARGET_ENV}-${k8s_slug}"
+          db_name="game_${k8s_slug//-/_}"
+          db_user="u_${k8s_slug//-/_}"
+
+          frontend_host="${shard_slug}.${base_domain}"
+          api_host="${shard_slug}-api.${base_domain}"
+          master_graphql_url="https://api.${base_domain}/graphql"
+
+          {
+            echo "shard_slug=$shard_slug"
+            echo "k8s_slug=$k8s_slug"
+            echo "base_domain=$base_domain"
+            echo "frontend_host=$frontend_host"
+            echo "api_host=$api_host"
+            echo "master_graphql_url=$master_graphql_url"
+            echo "namespace=$namespace"
+            echo "db_name=$db_name"
+            echo "db_user=$db_user"
+          } >> "$GITHUB_OUTPUT"
+
+  provision:
+    name: Provision shard on ${{ github.event.inputs.environment }}
+    runs-on: ubuntu-latest
+    needs: derive
+    environment: ${{ github.event.inputs.environment }}
+    concurrency:
+      group: shard-provision-${{ github.event.inputs.environment }}-${{ needs.derive.outputs.shard_slug }}
+      cancel-in-progress: false
+    env:
+      SHARD_SLUG: ${{ needs.derive.outputs.shard_slug }}
+      K8S_SLUG: ${{ needs.derive.outputs.k8s_slug }}
+      BASE_DOMAIN: ${{ needs.derive.outputs.base_domain }}
+      FRONTEND_HOST: ${{ needs.derive.outputs.frontend_host }}
+      API_HOST: ${{ needs.derive.outputs.api_host }}
+      MASTER_GRAPHQL_URL: ${{ needs.derive.outputs.master_graphql_url }}
+      K8S_NAMESPACE: ${{ needs.derive.outputs.namespace }}
+      DB_NAME: ${{ needs.derive.outputs.db_name }}
+      DB_USER: ${{ needs.derive.outputs.db_user }}
+      GAME_API_IMAGE_REPOSITORY: harbor.de-4.biatec.io/biatec/capitalism-api
+      GAME_FRONTEND_IMAGE_REPOSITORY: harbor.de-4.biatec.io/biatec/capitalism-frontend
+      GAME_IMAGE_TAG: ${{ github.event.inputs.image_tag }}
+      CITY: ${{ github.event.inputs.city }}
+      TARGET_ENVIRONMENT: ${{ github.event.inputs.environment }}
+      SERVER_REGION: ${{ github.event.inputs.server_region }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        run: |
+          set -euo pipefail
+          missing=0
+
+          require_secret() {
+            local name="$1"
+            local value="$2"
+            if [ -z "$value" ]; then
+              echo "Missing required secret: $name" >&2
+              missing=1
+            fi
+          }
+
+          require_secret "KUBE_CONFIG_DATA" "${{ secrets.KUBE_CONFIG_DATA }}"
+          require_secret "HARBOR_USERNAME" "${{ secrets.HARBOR_USERNAME }}"
+          require_secret "HARBOR_PASSWORD" "${{ secrets.HARBOR_PASSWORD }}"
+          require_secret "MASTER_REGISTRATION_KEY" "${{ secrets.MASTER_REGISTRATION_KEY }}"
+          require_secret "GAME_BOOTSTRAP_ADMIN_EMAIL" "${{ secrets.GAME_BOOTSTRAP_ADMIN_EMAIL }}"
+
+          if [ "$missing" -ne 0 ]; then
+            echo "One or more required secrets are missing in the '${TARGET_ENVIRONMENT}' environment. Configure secrets and re-run provisioning." >&2
+            exit 1
+          fi
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: latest
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 --decode > ~/.kube/config
+
+      - name: Generate unique shard credentials
+        id: secrets
+        run: |
+          set -euo pipefail
+
+          db_password=$(openssl rand -base64 36 | tr -dc 'A-Za-z0-9' | head -c 32)
+          jwt_signing_key=$(openssl rand -base64 64 | tr -d '\n')
+          shard_registration_key=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 40)
+          admin_password=$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 20)
+
+          printf '%s\n' "::add-mask::$db_password"
+          printf '%s\n' "::add-mask::$jwt_signing_key"
+          printf '%s\n' "::add-mask::$shard_registration_key"
+          printf '%s\n' "::add-mask::$admin_password"
+          printf '%s\n' "::add-mask::${{ secrets.GAME_BOOTSTRAP_ADMIN_EMAIL }}"
+
+          {
+            echo "db_password=$db_password"
+            echo "jwt_signing_key=$jwt_signing_key"
+            echo "shard_registration_key=$shard_registration_key"
+            echo "admin_password=$admin_password"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create namespace and registry secret
+        run: |
+          set -euo pipefail
+          kubectl create namespace "$K8S_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl create secret docker-registry regcred \
+            --namespace "$K8S_NAMESPACE" \
+            --docker-server=harbor.de-4.biatec.io \
+            --docker-username='${{ secrets.HARBOR_USERNAME }}' \
+            --docker-password='${{ secrets.HARBOR_PASSWORD }}' \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply shard secrets
+        run: |
+          set -euo pipefail
+          connection_string="Host=${K8S_SLUG}-postgres;Port=5432;Database=${DB_NAME};Username=${DB_USER};Password=${{ steps.secrets.outputs.db_password }};SSL Mode=Disable"
+
+          kubectl create secret generic shard-runtime-secrets \
+            --namespace "$K8S_NAMESPACE" \
+            --from-literal=DB_PASSWORD='${{ steps.secrets.outputs.db_password }}' \
+            --from-literal=CONNECTION_STRING="$connection_string" \
+            --from-literal=JWT_SIGNING_KEY='${{ steps.secrets.outputs.jwt_signing_key }}' \
+            --from-literal=SHARD_REGISTRATION_KEY='${{ steps.secrets.outputs.shard_registration_key }}' \
+            --from-literal=ADMIN_PASSWORD='${{ steps.secrets.outputs.admin_password }}' \
+            --from-literal=MASTER_REGISTRATION_KEY='${{ secrets.MASTER_REGISTRATION_KEY }}' \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy PostgreSQL, game API, frontend and ingress
+        id: deploy_rollout
+        run: |
+          set -euo pipefail
+
+          cat <<EOF | kubectl apply -f -
+          apiVersion: apps/v1
+          kind: StatefulSet
+          metadata:
+            name: ${K8S_SLUG}-postgres
+            namespace: ${K8S_NAMESPACE}
+          spec:
+            serviceName: ${K8S_SLUG}-postgres
+            replicas: 1
+            selector:
+              matchLabels:
+                app: ${K8S_SLUG}-postgres
+            template:
+              metadata:
+                labels:
+                  app: ${K8S_SLUG}-postgres
+              spec:
+                containers:
+                  - name: postgres
+                    image: postgres:16-alpine
+                    ports:
+                      - containerPort: 5432
+                    env:
+                      - name: POSTGRES_DB
+                        value: ${DB_NAME}
+                      - name: POSTGRES_USER
+                        value: ${DB_USER}
+                      - name: POSTGRES_PASSWORD
+                        valueFrom:
+                          secretKeyRef:
+                            name: shard-runtime-secrets
+                            key: DB_PASSWORD
+                    readinessProbe:
+                      exec:
+                        command:
+                          - sh
+                          - -c
+                          - pg_isready -U ${DB_USER} -d ${DB_NAME}
+                      periodSeconds: 10
+                    volumeMounts:
+                      - name: postgres-data
+                        mountPath: /var/lib/postgresql/data
+            volumeClaimTemplates:
+              - metadata:
+                  name: postgres-data
+                spec:
+                  accessModes: ["ReadWriteOnce"]
+                  resources:
+                    requests:
+                      storage: 10Gi
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: ${K8S_SLUG}-postgres
+            namespace: ${K8S_NAMESPACE}
+          spec:
+            selector:
+              app: ${K8S_SLUG}-postgres
+            ports:
+              - name: postgres
+                port: 5432
+                targetPort: 5432
+          ---
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: ${K8S_SLUG}-api
+            namespace: ${K8S_NAMESPACE}
+          spec:
+            replicas: 2
+            selector:
+              matchLabels:
+                app: ${K8S_SLUG}-api
+            template:
+              metadata:
+                labels:
+                  app: ${K8S_SLUG}-api
+              spec:
+                imagePullSecrets:
+                  - name: regcred
+                containers:
+                  - name: game-api
+                    image: ${GAME_API_IMAGE_REPOSITORY}:${GAME_IMAGE_TAG}
+                    ports:
+                      - containerPort: 8080
+                    env:
+                      - name: ASPNETCORE_ENVIRONMENT
+                        value: Production
+                      - name: ConnectionStrings__GameCatalog
+                        valueFrom:
+                          secretKeyRef:
+                            name: shard-runtime-secrets
+                            key: CONNECTION_STRING
+                      - name: Cors__AllowedOrigins__0
+                        value: https://${FRONTEND_HOST}
+                      - name: Jwt__SigningKey
+                        valueFrom:
+                          secretKeyRef:
+                            name: shard-runtime-secrets
+                            key: JWT_SIGNING_KEY
+                      - name: SeedData__AdminEmail
+                        value: '${{ secrets.GAME_BOOTSTRAP_ADMIN_EMAIL }}'
+                      - name: SeedData__AdminPassword
+                        valueFrom:
+                          secretKeyRef:
+                            name: shard-runtime-secrets
+                            key: ADMIN_PASSWORD
+                      - name: MasterServer__RegistrationEnabled
+                        value: "true"
+                      - name: MasterServer__ApiUrl
+                        value: ${MASTER_GRAPHQL_URL}
+                      - name: MasterServer__RegistrationKey
+                        valueFrom:
+                          secretKeyRef:
+                            name: shard-runtime-secrets
+                            key: MASTER_REGISTRATION_KEY
+                      - name: MasterServer__ServerKey
+                        value: ${SHARD_SLUG}
+                      - name: MasterServer__DisplayName
+                        value: '${{ github.event.inputs.game_name }}'
+                      - name: MasterServer__Description
+                        value: ${TARGET_ENVIRONMENT} shard for ${{ github.event.inputs.city }}
+                      - name: MasterServer__Region
+                        value: ${SERVER_REGION}
+                      - name: MasterServer__Environment
+                        value: ${TARGET_ENVIRONMENT}
+                      - name: MasterServer__BackendUrl
+                        value: https://${API_HOST}
+                      - name: MasterServer__GraphqlUrl
+                        value: https://${API_HOST}/graphql
+                      - name: MasterServer__FrontendUrl
+                        value: https://${FRONTEND_HOST}
+                    readinessProbe:
+                      httpGet:
+                        path: /healthz
+                        port: 8080
+                      periodSeconds: 10
+                    livenessProbe:
+                      httpGet:
+                        path: /healthz
+                        port: 8080
+                      initialDelaySeconds: 30
+                      periodSeconds: 20
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: ${K8S_SLUG}-api
+            namespace: ${K8S_NAMESPACE}
+          spec:
+            selector:
+              app: ${K8S_SLUG}-api
+            ports:
+              - name: http
+                port: 80
+                targetPort: 8080
+          ---
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: ${K8S_SLUG}-frontend
+            namespace: ${K8S_NAMESPACE}
+          spec:
+            replicas: 2
+            selector:
+              matchLabels:
+                app: ${K8S_SLUG}-frontend
+            template:
+              metadata:
+                labels:
+                  app: ${K8S_SLUG}-frontend
+              spec:
+                imagePullSecrets:
+                  - name: regcred
+                containers:
+                  - name: game-frontend
+                    image: ${GAME_FRONTEND_IMAGE_REPOSITORY}:${GAME_IMAGE_TAG}
+                    ports:
+                      - containerPort: 80
+                    env:
+                      - name: NODE_ENV
+                        value: production
+                      - name: VITE_GRAPHQL_URL
+                        value: https://${API_HOST}/graphql
+                    readinessProbe:
+                      httpGet:
+                        path: /health
+                        port: 80
+                      periodSeconds: 10
+                    livenessProbe:
+                      httpGet:
+                        path: /health
+                        port: 80
+                      initialDelaySeconds: 15
+                      periodSeconds: 20
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: ${K8S_SLUG}-frontend
+            namespace: ${K8S_NAMESPACE}
+          spec:
+            selector:
+              app: ${K8S_SLUG}-frontend
+            ports:
+              - name: http
+                port: 80
+                targetPort: 80
+          ---
+          apiVersion: networking.k8s.io/v1
+          kind: Ingress
+          metadata:
+            name: ${K8S_SLUG}-api
+            namespace: ${K8S_NAMESPACE}
+            annotations:
+              cert-manager.io/cluster-issuer: letsencrypt-dns
+          spec:
+            ingressClassName: nginx
+            tls:
+              - hosts:
+                  - ${API_HOST}
+                secretName: ${K8S_SLUG}-api-tls
+            rules:
+              - host: ${API_HOST}
+                http:
+                  paths:
+                    - path: /
+                      pathType: Prefix
+                      backend:
+                        service:
+                          name: ${K8S_SLUG}-api
+                          port:
+                            number: 80
+          ---
+          apiVersion: networking.k8s.io/v1
+          kind: Ingress
+          metadata:
+            name: ${K8S_SLUG}-frontend
+            namespace: ${K8S_NAMESPACE}
+            annotations:
+              cert-manager.io/cluster-issuer: letsencrypt-dns
+          spec:
+            ingressClassName: nginx
+            tls:
+              - hosts:
+                  - ${FRONTEND_HOST}
+                secretName: ${K8S_SLUG}-frontend-tls
+            rules:
+              - host: ${FRONTEND_HOST}
+                http:
+                  paths:
+                    - path: /
+                      pathType: Prefix
+                      backend:
+                        service:
+                          name: ${K8S_SLUG}-frontend
+                          port:
+                            number: 80
+          EOF
+
+          kubectl rollout status statefulset/${K8S_SLUG}-postgres --namespace "$K8S_NAMESPACE" --timeout=420s
+          kubectl rollout status deployment/${K8S_SLUG}-api --namespace "$K8S_NAMESPACE" --timeout=420s
+          kubectl rollout status deployment/${K8S_SLUG}-frontend --namespace "$K8S_NAMESPACE" --timeout=420s
+
+      - name: Smoke check shard readiness and registration
+        id: smoke_check
+        run: |
+          set -euo pipefail
+
+          api_ok=0
+          frontend_ok=0
+          for attempt in {1..40}; do
+            api_code=$(curl -sS -o /dev/null -w "%{http_code}" "https://${API_HOST}/healthz" || true)
+            frontend_code=$(curl -sS -o /dev/null -w "%{http_code}" "https://${FRONTEND_HOST}" || true)
+
+            if [ "$api_code" = "200" ]; then
+              api_ok=1
+            fi
+            if [ "$frontend_code" = "200" ]; then
+              frontend_ok=1
+            fi
+
+            if [ "$api_ok" = "1" ] && [ "$frontend_ok" = "1" ]; then
+              break
+            fi
+
+            sleep 10
+          done
+
+          if [ "$api_ok" != "1" ]; then
+            echo "Shard API smoke check failed for https://${API_HOST}/healthz. Verify PostgreSQL connectivity and ConnectionStrings__GameCatalog secret." >&2
+            exit 1
+          fi
+
+          if [ "$frontend_ok" != "1" ]; then
+            echo "Shard frontend smoke check failed for https://${FRONTEND_HOST}. Verify ingress host and frontend deployment status." >&2
+            exit 1
+          fi
+
+          graphql_payload='{"query":"query ShardReadiness { cities { id name } }"}'
+          graph_response=$(curl -sS -X POST "https://${API_HOST}/graphql" -H 'content-type: application/json' --data "$graphql_payload")
+          if ! echo "$graph_response" | jq -e '.data.cities | length > 0' >/dev/null 2>&1; then
+            echo "Readiness check failed: shard GraphQL endpoint did not return city data. Check shard database migration/startup." >&2
+            echo "Response: $graph_response" >&2
+            exit 1
+          fi
+
+          registry_ok=0
+          registry_query='{"query":"query GameServers { gameServers { serverKey frontendUrl isActive } }"}'
+          for attempt in {1..30}; do
+            registry_response=$(curl -sS -X POST "${MASTER_GRAPHQL_URL}" -H 'content-type: application/json' --data "$registry_query")
+            if echo "$registry_response" | jq -e --arg key "$SHARD_SLUG" '.data.gameServers[]? | select(.serverKey == $key and .isActive == true)' >/dev/null 2>&1; then
+              registry_ok=1
+              break
+            fi
+            sleep 10
+          done
+
+          if [ "$registry_ok" != "1" ]; then
+            echo "Registration check failed: shard '$SHARD_SLUG' is not active in master registry. Check MasterServer__ApiUrl and MasterServer__RegistrationKey configuration." >&2
+            exit 1
+          fi
+
+      - name: Roll back shard deployment on smoke-check failure
+        if: failure() && steps.deploy_rollout.outcome == 'success'
+        run: |
+          set +e
+          kubectl rollout undo deployment/${K8S_SLUG}-api --namespace "$K8S_NAMESPACE"
+          kubectl rollout undo deployment/${K8S_SLUG}-frontend --namespace "$K8S_NAMESPACE"
+          kubectl rollout status deployment/${K8S_SLUG}-api --namespace "$K8S_NAMESPACE" --timeout=300s
+          kubectl rollout status deployment/${K8S_SLUG}-frontend --namespace "$K8S_NAMESPACE" --timeout=300s
+
+      - name: Provisioning summary
+        if: always()
+        run: |
+          {
+            echo "## Game shard provisioning summary"
+            echo "- Environment: \\`${TARGET_ENVIRONMENT}\\`"
+            echo "- Game name: \\`${{ github.event.inputs.game_name }}\\`"
+            echo "- Game city: \\`${CITY}\\`"
+            echo "- Server region: \\`${SERVER_REGION}\\`"
+            echo "- Shard slug: \\`${SHARD_SLUG}\\`"
+            echo "- Namespace: \\`${K8S_NAMESPACE}\\`"
+            echo "- Image tag: \\`${GAME_IMAGE_TAG}\\`"
+            echo "- Frontend URL: https://${FRONTEND_HOST}"
+            echo "- API URL: https://${API_HOST}"
+          } >> "$GITHUB_STEP_SUMMARY"

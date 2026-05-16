@@ -1,0 +1,125 @@
+name: k8s-daily-backup
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: Namespace scope to back up
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - stage
+          - production
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    name: Backup Kubernetes artifacts and PostgreSQL data
+    runs-on: ubuntu-latest
+    env:
+      TARGET_ENVIRONMENT: ${{ github.event_name == 'workflow_dispatch' && inputs.target_environment || 'all' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: latest
+
+      - name: Configure kubeconfig
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 --decode > ~/.kube/config
+
+      - name: Create backup archive
+        run: |
+          set -euo pipefail
+
+          backup_root="backups/$(date -u +%Y%m%dT%H%M%SZ)"
+          mkdir -p "$backup_root/k8s" "$backup_root/db"
+          gzip_level=6
+
+          case "$TARGET_ENVIRONMENT" in
+            all)
+              ns_pattern='^capitalism-(stage|production)(-.+)?$'
+              ;;
+            stage)
+              ns_pattern='^capitalism-stage(-.+)?$'
+              ;;
+            production)
+              ns_pattern='^capitalism-production(-.+)?$'
+              ;;
+            *)
+              echo "Invalid target_environment '$TARGET_ENVIRONMENT'." >&2
+              exit 1
+              ;;
+          esac
+
+          namespaces=$(kubectl get namespaces -o json | jq -r '.items[].metadata.name' | grep -E "$ns_pattern" || true)
+
+          if [ -z "$namespaces" ]; then
+            echo "No namespaces found matching pattern '$ns_pattern'." >&2
+            exit 1
+          fi
+
+          kubectl get namespaces -o yaml > "$backup_root/k8s/namespaces.yaml"
+
+          for ns in $namespaces; do
+            echo "Backing up namespace: $ns"
+            mkdir -p "$backup_root/k8s/$ns" "$backup_root/db/$ns"
+
+            kubectl get all,configmaps,secrets,serviceaccounts,roles,rolebindings,pvc,ingress,networkpolicies -n "$ns" -o yaml \
+              > "$backup_root/k8s/$ns/core-resources.yaml"
+
+            if kubectl api-resources --api-group=cert-manager.io --no-headers >/dev/null 2>&1; then
+              kubectl get certificates,issuers -n "$ns" -o yaml > "$backup_root/k8s/$ns/cert-manager-resources.yaml" || true
+            fi
+
+            postgres_statefulsets=$(kubectl get statefulsets -n "$ns" -o json | jq -r '.items[].metadata.name' | grep -E 'postgres$' || true)
+            found_pg_pods=0
+            for sts in $postgres_statefulsets; do
+              postgres_pods=$(kubectl get pods -n "$ns" -l "app=${sts}" -o json | jq -r '.items[].metadata.name')
+              if [ -z "$postgres_pods" ]; then
+                echo "No pods found for PostgreSQL StatefulSet $ns/$sts (expected label app=${sts})." >&2
+                continue
+              fi
+              for pod in $postgres_pods; do
+                found_pg_pods=1
+                dump_file="$backup_root/db/$ns/${pod}.sql.gz"
+                echo "Dumping PostgreSQL from $ns/$pod (gzip -${gzip_level})"
+                kubectl exec -n "$ns" "$pod" -- sh -lc 'PGPASSWORD="$POSTGRES_PASSWORD" pg_dumpall -U "$POSTGRES_USER"' \
+                  | gzip -"${gzip_level}" > "$dump_file"
+              done
+            done
+            if [ -n "$postgres_statefulsets" ] && [ "$found_pg_pods" -eq 0 ]; then
+              echo "PostgreSQL StatefulSets found in $ns but no matching pods were discovered for backup." >&2
+            fi
+          done
+
+          echo "backup_root=$backup_root" >> "$GITHUB_OUTPUT"
+        id: backup
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: k8s-backup-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.backup.outputs.backup_root }}
+          retention-days: 7
+
+      - name: Backup summary
+        if: always()
+        run: |
+          {
+            echo "## Kubernetes backup summary"
+            echo "- Target environment scope: \`${TARGET_ENVIRONMENT}\`"
+            echo "- Artifact retention: \`7 days\`"
+            echo "- Backup artifact: \`k8s-backup-${{ github.run_id }}-${{ github.run_attempt }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

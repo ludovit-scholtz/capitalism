@@ -6,17 +6,39 @@ This document defines how to set up GitHub Actions deployment environments for C
 
 Create two GitHub Actions environments before enabling deployment workflows:
 
-- `Stage`
-- `Production`
+- `stage`
+- `production`
 
-Use `Stage` for automatic deployments from `main`. Use `Production` for public releases with approval rules.
+Use `stage` for automatic deployments from `main`. Use `production` for public releases with approval rules.
 
 Create the environments explicitly in GitHub first. Do not rely on workflow files to create them implicitly, because automatically created environments start without protection rules or secrets.
 
 Recommended protection rules:
 
-- `Stage`: allow deployments from `main` without manual approval.
-- `Production`: restrict deployments to `main`, require reviewer approval, and prevent self-approval.
+- `stage`: allow deployments from `main` without manual approval.
+- `production`: restrict deployments to `main`, require reviewer approval, and prevent self-approval.
+
+## Automated Kubernetes workflows
+
+The Kubernetes deployment automation is implemented by these workflows:
+
+- `.github/workflows/master-k8s-deploy-reusable.yml` — reusable master deployment contract (`workflow_call`) used by stage and production.
+- `.github/workflows/deploy-stage-k8s.yml` — auto-triggered from `main` (and manual `workflow_dispatch`) to deploy:
+  - `https://www.stage.capitalism5.com`
+  - `https://api.stage.capitalism5.com`
+- `.github/workflows/deploy-production-k8s.yml` — `workflow_dispatch` production deployment through the `production` environment gate; deploys:
+  - `https://www.capitalism5.com`
+  - `https://capitalism5.com` (canonical redirect to `www`)
+  - `https://api.capitalism5.com`
+- `.github/workflows/provision-game-shard-k8s.yml` — `workflow_dispatch` shard provisioning pipeline with inputs:
+  - `game_name`
+  - `city`
+  - `environment` (`stage`/`production`)
+  - `server_region`
+  - `image_tag`
+- `.github/workflows/k8s-daily-backup.yml` — scheduled daily backup workflow for Kubernetes artifacts and PostgreSQL dumps with 7-day artifact retention.
+
+All workflows include actionable smoke-check failures and automatic rollback for deployment rollouts when smoke checks fail.
 
 ## Deployment topology
 
@@ -52,7 +74,9 @@ Examples that belong in environment secrets:
 - Master-server registration keys
 - Game bootstrap administrator passwords
 - Game administrator email addresses when they identify a real operator
-- DNS provider API credentials used by the `letsencrypt-dns` issuer bootstrap flow
+- Container registry credentials
+
+Cluster-issuer DNS credentials (if needed by cert-manager) should stay in cluster-managed secrets/service-account configuration, not in repository deployment secrets. Configure them directly on the cluster issuer according to cert-manager DNS-01 provider docs: <https://cert-manager.io/docs/configuration/acme/dns01/>.
 
 Use GitHub Actions environment variables only for non-sensitive values such as:
 
@@ -68,10 +92,10 @@ Keep shared infrastructure credentials at the smallest safe scope.
 Recommended pattern:
 
 - Repository or organization secrets: container registry credentials shared by all deployment workflows, if OIDC is not available.
-- `Stage` environment secrets: stage-only kube access, stage-only admin contacts, stage-only database bootstrap secrets.
-- `Production` environment secrets: production-only kube access, production-only admin contacts, production-only database bootstrap secrets.
+- `stage` environment secrets: stage-only kube access, stage-only admin contacts, stage-only database bootstrap secrets.
+- `production` environment secrets: production-only kube access, production-only admin contacts, production-only database bootstrap secrets.
 
-Do not reuse the same secret value between `Stage` and `Production` unless there is a hard external requirement.
+Do not reuse the same secret value between `stage` and `production` unless there is a hard external requirement.
 
 ## Suggested secret names
 
@@ -87,7 +111,8 @@ Environment secrets:
 - `GAME_BOOTSTRAP_ADMIN_EMAIL`
 - `GAME_BOOTSTRAP_ADMIN_PASSWORD`
 - `POSTGRES_SUPERUSER_PASSWORD`
-- `LETSENCRYPT_DNS_PROVIDER_TOKEN`
+- `HARBOR_USERNAME`
+- `HARBOR_PASSWORD`
 
 Environment variables:
 
@@ -97,6 +122,66 @@ Environment variables:
 - `GAME_API_SUFFIX`
 - `K8S_NAMESPACE_PREFIX`
 
+## How to generate or prepare each required secret
+
+Generate separate values for `stage` and `production`. Never reuse generated passwords/keys across environments.
+
+> All commands below print values locally. Copy them directly into GitHub environment secrets and do not commit them into files.
+
+- `KUBE_CONFIG_DATA` (base64 kubeconfig for GitHub runner):
+  ```bash
+  # Linux (GNU coreutils)
+  base64 -w 0 ~/.kube/config
+  # macOS (BSD base64)
+  base64 < ~/.kube/config | tr -d '\n'
+  ```
+- `MASTER_DB_PASSWORD` (if you manage DB user password separately):
+  ```bash
+  openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32
+  ```
+- `MASTER_DB_CONNECTION_STRING`:
+  - No longer stored as a GitHub secret.
+  - The deployment workflow now calculates it at runtime from deployed Kubernetes DB service values + `MASTER_DB_PASSWORD`.
+- `MASTER_JWT_SIGNING_KEY`:
+  ```bash
+  openssl rand -base64 64 | tr -d '\n'
+  ```
+- `MASTER_REGISTRATION_KEY`:
+  ```bash
+  openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 40
+  ```
+- `MASTER_ROOT_ADMIN_EMAIL`:
+  - Use the real operator/admin mailbox value (for example `ops@capitalism5.com`).
+- `GAME_BOOTSTRAP_ADMIN_EMAIL`:
+  - Use a dedicated bootstrap admin mailbox (for example `game-admin@capitalism5.com`).
+- `GAME_BOOTSTRAP_ADMIN_PASSWORD`:
+  ```bash
+  openssl rand -base64 36 | tr -dc 'A-Za-z0-9' | head -c 24
+  ```
+- `POSTGRES_SUPERUSER_PASSWORD` (if your shard provisioning/bootstrap uses superuser access):
+  ```bash
+  openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32
+  ```
+- `HARBOR_USERNAME`:
+  - Use your Harbor robot account/user name from Harbor access control.
+- `HARBOR_PASSWORD`:
+  - Use the Harbor robot account token/password from Harbor access control.
+- `MASTER_GRAPHQL_URL`:
+  - No longer stored as a GitHub secret.
+  - The shard provisioning workflow derives it from environment rules:
+    - Stage: `https://api.stage.capitalism5.com/graphql`
+    - Production: `https://api.capitalism5.com/graphql`
+
+### Quick command to write generated values to GitHub environment secrets
+
+```bash
+gh secret set --env stage MASTER_JWT_SIGNING_KEY --body "$(openssl rand -base64 64 | tr -d '\n')"
+# Generate a DIFFERENT value for production (do not reuse the stage value).
+gh secret set --env production MASTER_JWT_SIGNING_KEY --body "$(openssl rand -base64 64 | tr -d '\n')"
+```
+
+Use the same `gh secret set --env <environment> ... --body "<generated-value>"` pattern for every secret listed in the generation guide above (generated values, operator emails, service credentials, and integration tokens).
+
 ## GitHub setup steps
 
 ### GitHub web UI
@@ -104,9 +189,9 @@ Environment variables:
 1. Open the repository on GitHub.
 2. Go to `Settings`.
 3. Open `Environments`.
-4. Create `Stage`.
-5. Create `Production`.
-6. Add protection rules to `Production`.
+4. Create `stage`.
+5. Create `production`.
+6. Add protection rules to `production`.
 7. Add the required secrets to each environment.
 8. Add the required non-sensitive variables to each environment.
 
@@ -115,11 +200,30 @@ Environment variables:
 You can also set environment secrets and variables from the CLI.
 
 ```bash
-gh secret set --env Stage MASTER_ROOT_ADMIN_EMAIL
-gh secret set --env Production MASTER_ROOT_ADMIN_EMAIL
-gh variable set --env Stage MASTER_FRONTEND_HOST --body "www.stage.capitalism5.com"
-gh variable set --env Production MASTER_FRONTEND_HOST --body "www.capitalism5.com"
+gh secret set --env stage MASTER_ROOT_ADMIN_EMAIL
+gh secret set --env production MASTER_ROOT_ADMIN_EMAIL
+gh variable set --env stage MASTER_FRONTEND_HOST --body "www.stage.capitalism5.com"
+gh variable set --env production MASTER_FRONTEND_HOST --body "www.capitalism5.com"
 ```
+
+## Runtime-derived deployment values
+
+The pipelines now derive these values from deterministic environment rules and deployed Kubernetes resource names:
+
+- `MASTER_DB_CONNECTION_STRING` is computed in `.github/workflows/master-k8s-deploy-reusable.yml` from:
+  - service host: `master-postgres`
+  - database name: `gamemaster`
+  - username: `masterapp`
+  - password: `MASTER_DB_PASSWORD` secret
+- `MASTER_GRAPHQL_URL` is computed in `.github/workflows/provision-game-shard-k8s.yml` from environment:
+  - stage: `https://api.stage.capitalism5.com/graphql`
+  - production: `https://api.capitalism5.com/graphql`
+
+## CORS configuration in deployment workflows
+
+- Master API deployment sets `Cors__AllowedOrigins__0=https://<master-frontend-host>` and optional `Cors__AllowedOrigins__1=https://<redirect-host>` when redirect host is configured.
+- Game API shard deployment sets `Cors__AllowedOrigins__0=https://<shard-frontend-host>`.
+- These CORS values are injected as runtime environment variables in the deployment manifests generated by the CI/CD pipelines.
 
 ## Safe workflow usage
 
@@ -134,7 +238,7 @@ Example:
 ```yaml
 jobs:
   deploy:
-    environment: Production
+    environment: production
     steps:
       - name: Apply runtime secret
         env:
@@ -162,7 +266,6 @@ Rules for safe workflow authoring:
 The dedicated game-provisioning workflow should accept non-sensitive inputs such as:
 
 - `game_name`
-- `game_slug`
 - `environment`
 - `server_region`
 
@@ -170,7 +273,7 @@ The workflow should generate or securely fetch sensitive values at runtime:
 
 - PostgreSQL database name and user password
 - game API JWT signing key
-- server registration key or registration token reference
+- shard-scoped registration secret value
 - bootstrap administrator password
 
 Generated secrets should be written directly to Kubernetes `Secret` objects or a managed secret store. They should not be committed back into the repository.
@@ -182,15 +285,21 @@ Generated secrets should be written directly to Kubernetes `Secret` objects or a
 - Keep separate secret values per environment.
 - Review environment secrets after every infrastructure ownership change.
 - Remove unused secrets when workflows or services are retired.
+- When rotating `MASTER_REGISTRATION_KEY`, rotate it in both master and shard deployment environments in a coordinated maintenance window.
+- For shard reprovisioning, always re-generate per-shard DB/JWT/admin credentials; never copy credentials from a previous shard.
+- Backup retention for Kubernetes/database artifacts is 7 days via `.github/workflows/k8s-daily-backup.yml`.
 
 ## Minimum review checklist
 
 Before merging deployment workflow changes, confirm all of the following:
 
-- `Stage` and `Production` environments already exist in GitHub.
-- `Production` has reviewer protection enabled.
+- `stage` and `production` environments already exist in GitHub.
+- `production` has reviewer protection enabled.
 - No administrator email or password is committed in workflow YAML, manifests, or docs examples.
 - Kubernetes secrets are created from GitHub environment secrets at runtime.
 - Stage deploys from `main` automatically.
 - Production deploys only through the protected environment flow.
 - TLS uses the `letsencrypt-dns` cluster issuer and matches the real domain zone.
+- Stage/production workflow summaries include environment, image tag, and hostnames.
+- Provisioning runs include shard slug, hostnames, and smoke-check status in the job summary.
+- Daily backup workflow is enabled and artifact retention is set to 7 days.

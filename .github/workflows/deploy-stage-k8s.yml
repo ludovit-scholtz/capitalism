@@ -1,0 +1,23 @@
+name: deploy-stage-k8s
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  deploy-stage:
+    name: Deploy stage master stack
+    uses: ./.github/workflows/master-k8s-deploy-reusable.yml
+    with:
+      environment_name: stage
+      namespace: capitalism-stage
+      frontend_host: www.stage.capitalism5.com
+      api_host: api.stage.capitalism5.com
+      redirect_host: ''
+    secrets: inherit

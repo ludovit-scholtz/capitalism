@@ -32,6 +32,13 @@ The master website is the product-pitching website where users can find in-game 
 
 Master API has its own database and handles the subscription management.
 
+### Backup and recovery requirements
+
+- Platform operations must run an automated daily backup pipeline for Kubernetes artifacts and PostgreSQL data.
+- Backups must be retained for 7 days minimum.
+- Recovery tooling must support restoring Kubernetes manifests first and then loading PostgreSQL dumps so shard restart is fast.
+- Backup and restore scripts must be maintained in-repo and documented for operators.
+
 ## Authorization
 
 When player creates the account, he creates it at the master server. When user requests the token, he does it against the master server. The token is usable against every game server and master server.
@@ -993,4 +1000,3 @@ Every push to `main` must rebuild and redeploy all stage workloads: the stage ma
 GitHub Actions must also provide a dedicated workflow for provisioning a brand-new game server end-to-end. That workflow must create the PostgreSQL runtime, generate or inject per-server secrets, deploy the game API and game frontend, configure ingress and TLS, register the shard with the master server, and run smoke checks so the new game is fully configured before it is announced.
 
 Operational documentation must describe how to create GitHub Actions environment secrets and variables for `Stage` and `Production`, how to keep administrator contact data and other sensitive values out of git, and how those values are materialized into Kubernetes Secrets without printing them into workflow logs.
-

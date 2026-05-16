@@ -6,15 +6,7 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 ### Stage & Production Kubernetes Deployment Automation
 
-- [ ] Introduce dedicated `Stage` and `Production` GitHub Actions environments with isolated secrets, environment protection rules, and branch-deployment policies so stage can auto-deploy from `main` while production remains approval-gated.
-- [ ] Build the master deployment workflow contract for Kubernetes so `www.capitalism5.com`, `capitalism5.com`, and `api.capitalism5.com` are deployed together with canonical redirects, ingress rules, and environment-specific configuration.
-- [ ] Build the stage master deployment contract so `www.stage.capitalism5.com` and `api.stage.capitalism5.com` are rebuilt and redeployed automatically whenever anything is pushed to `main`.
-- [ ] Standardize humanly memorable game-server slug generation from the public game name and enforce matching frontend/API hostnames for production on `*.capitalism5.com` and stage on `*.stage.capitalism5.com`.
-- [ ] Add cert-manager ingress automation that uses the `letsencrypt-dns` cluster issuer and provisions the correct certificates for the production master, stage endpoints, and wildcard game-server hostnames without manual TLS setup.
-- [ ] Create a `workflow_dispatch` game-provisioning pipeline that deploys a completely new game shard, including PostgreSQL, the game API, the game frontend, secure runtime secrets, ingress, and master-server registration.
-- [ ] Generate or inject unique per-game credentials during shard provisioning so database passwords, JWT signing keys, registration keys, and admin bootstrap contacts are never committed to the repository or copied between environments.
-- [ ] Add smoke-check and readiness verification steps that confirm the new shard can reach PostgreSQL, complete startup configuration, answer health checks, and appear correctly in the master server registry before rollout is marked successful.
-- [ ] Document GitHub Actions environment-secret setup, rotation, and masking rules so private operator information such as game administrator email addresses is not leaked through git history, workflow logs, or Kubernetes manifests.
+- [x] (100%) Stage & Production Kubernetes deployment automation is live: dedicated `stage` and `production` GitHub Actions environments are now first-class deployment gates; stage auto-deploys from `main`; production deploys through an approval-gated workflow; reusable master Kubernetes deployment contracts roll out `www.capitalism5.com`, `capitalism5.com` redirect, and `api.capitalism5.com`; ingress definitions use cert-manager `letsencrypt-dns` cluster issuer annotations for TLS; a `workflow_dispatch` shard provisioning workflow creates slugged game hosts (`<slug>.capitalism5.com` or `<slug>.stage.capitalism5.com`) with generated per-shard credentials injected as Kubernetes Secrets; rollout success is now conditioned on smoke checks (frontend/API health plus master registry visibility) with automatic rollback on smoke-check failure; and daily Kubernetes/database backup automation with 7-day retention plus recovery scripts is documented for fast disaster recovery.
 
 ### Master Website & Multiple Game Server Hub
 
