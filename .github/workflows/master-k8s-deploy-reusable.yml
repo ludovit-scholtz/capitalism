@@ -168,7 +168,43 @@ jobs:
           # When redirect host is unset, the second slot intentionally duplicates frontend host;
           # duplicates are harmless and preserve env key numbering consistency.
 
+          MASTER_DB_PV_NAME="${K8S_NAMESPACE}-${MASTER_DB_HOST}-pv"
+          MASTER_DB_PVC_NAME="${MASTER_DB_HOST}-data"
+          MASTER_DB_STORAGE_PATH="/mnt/capitalism/db-master"
+          if [ "${{ inputs.environment_name }}" != "production" ]; then
+            MASTER_DB_STORAGE_PATH="${MASTER_DB_STORAGE_PATH}-${{ inputs.environment_name }}"
+          fi
+
           cat <<EOF | kubectl apply -f -
+          apiVersion: v1
+          kind: PersistentVolume
+          metadata:
+            name: ${MASTER_DB_PV_NAME}
+          spec:
+            capacity:
+              storage: 20Gi
+            accessModes:
+              - ReadWriteOnce
+            persistentVolumeReclaimPolicy: Retain
+            storageClassName: manual
+            hostPath:
+              path: ${MASTER_DB_STORAGE_PATH}
+              type: DirectoryOrCreate
+          ---
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: ${MASTER_DB_PVC_NAME}
+            namespace: ${K8S_NAMESPACE}
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
+            storageClassName: manual
+            volumeName: ${MASTER_DB_PV_NAME}
+          ---
           apiVersion: apps/v1
           kind: StatefulSet
           metadata:
@@ -185,6 +221,10 @@ jobs:
                 labels:
                   app: ${MASTER_DB_HOST}
               spec:
+                volumes:
+                  - name: postgres-data
+                    persistentVolumeClaim:
+                      claimName: ${MASTER_DB_PVC_NAME}
                 containers:
                   - name: postgres
                     image: postgres:18
@@ -210,14 +250,6 @@ jobs:
                     volumeMounts:
                       - name: postgres-data
                         mountPath: /var/lib/postgresql/data
-            volumeClaimTemplates:
-              - metadata:
-                  name: postgres-data
-                spec:
-                  accessModes: ["ReadWriteOnce"]
-                  resources:
-                    requests:
-                      storage: 20Gi
           ---
           apiVersion: v1
           kind: Service
@@ -231,7 +263,17 @@ jobs:
               - name: postgres
                 port: 5432
                 targetPort: 5432
-          ---
+          EOF
+
+          kubectl rollout status statefulset/${MASTER_DB_HOST} --namespace "$K8S_NAMESPACE" --timeout=420s
+          kubectl wait --for=condition=ready pod -l app=${MASTER_DB_HOST} --namespace "$K8S_NAMESPACE" --timeout=420s
+          master_postgres_pod=$(kubectl get pod --namespace "$K8S_NAMESPACE" -l app=${MASTER_DB_HOST} -o jsonpath='{.items[0].metadata.name}')
+          until kubectl exec --namespace "$K8S_NAMESPACE" "$master_postgres_pod" -- sh -lc 'PGPASSWORD="$POSTGRES_PASSWORD" psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" "$POSTGRES_DB" -c "select 1" >/dev/null'; do
+            echo "Waiting for active SQL connection on ${MASTER_DB_HOST}/${MASTER_DB_NAME}..."
+            sleep 5
+          done
+
+          cat <<EOF | kubectl apply -f -
           apiVersion: apps/v1
           kind: Deployment
           metadata:
@@ -249,6 +291,33 @@ jobs:
               spec:
                 imagePullSecrets:
                   - name: regcred
+                initContainers:
+                  - name: wait-for-master-postgres
+                    image: postgres:18
+                    env:
+                      - name: PGHOST
+                        value: ${MASTER_DB_HOST}
+                      - name: PGPORT
+                        value: "5432"
+                      - name: PGDATABASE
+                        value: ${MASTER_DB_NAME}
+                      - name: PGUSER
+                        value: ${MASTER_DB_USER}
+                      - name: PGSSLMODE
+                        value: disable
+                      - name: PGPASSWORD
+                        valueFrom:
+                          secretKeyRef:
+                            name: master-runtime-secrets
+                            key: MasterDb__Password
+                    command:
+                      - sh
+                      - -c
+                      - |
+                        until psql -v ON_ERROR_STOP=1 -c 'select 1' >/dev/null 2>&1; do
+                          echo "Waiting for PostgreSQL connection to ${PGHOST}/${PGDATABASE}..."
+                          sleep 5
+                        done
                 containers:
                   - name: master-api
                     image: ${MASTER_API_IMAGE_REPOSITORY}:${MASTER_DEPLOY_TAG}
@@ -437,7 +506,6 @@ jobs:
               | kubectl apply -f -
           fi
 
-          kubectl rollout status statefulset/${MASTER_DB_HOST} --namespace "$K8S_NAMESPACE" --timeout=420s
           kubectl rollout status deployment/master-api --namespace "$K8S_NAMESPACE" --timeout=300s
           kubectl rollout status deployment/master-frontend --namespace "$K8S_NAMESPACE" --timeout=300s
 

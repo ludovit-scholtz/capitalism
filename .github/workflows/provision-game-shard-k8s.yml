@@ -232,7 +232,40 @@ jobs:
         run: |
           set -euo pipefail
 
+          SHARD_DB_PV_NAME="${K8S_NAMESPACE}-${K8S_SLUG}-postgres-pv"
+          SHARD_DB_PVC_NAME="${K8S_SLUG}-postgres-data"
+          SHARD_DB_STORAGE_PATH="/mnt/capitalism/db-game-${SHARD_SLUG}"
+
           cat <<EOF | kubectl apply -f -
+          apiVersion: v1
+          kind: PersistentVolume
+          metadata:
+            name: ${SHARD_DB_PV_NAME}
+          spec:
+            capacity:
+              storage: 10Gi
+            accessModes:
+              - ReadWriteOnce
+            persistentVolumeReclaimPolicy: Retain
+            storageClassName: manual
+            hostPath:
+              path: ${SHARD_DB_STORAGE_PATH}
+              type: DirectoryOrCreate
+          ---
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: ${SHARD_DB_PVC_NAME}
+            namespace: ${K8S_NAMESPACE}
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 10Gi
+            storageClassName: manual
+            volumeName: ${SHARD_DB_PV_NAME}
+          ---
           apiVersion: apps/v1
           kind: StatefulSet
           metadata:
@@ -249,6 +282,10 @@ jobs:
                 labels:
                   app: ${K8S_SLUG}-postgres
               spec:
+                volumes:
+                  - name: postgres-data
+                    persistentVolumeClaim:
+                      claimName: ${SHARD_DB_PVC_NAME}
                 containers:
                   - name: postgres
                     image: postgres:18
@@ -274,14 +311,6 @@ jobs:
                     volumeMounts:
                       - name: postgres-data
                         mountPath: /var/lib/postgresql/data
-            volumeClaimTemplates:
-              - metadata:
-                  name: postgres-data
-                spec:
-                  accessModes: ["ReadWriteOnce"]
-                  resources:
-                    requests:
-                      storage: 10Gi
           ---
           apiVersion: v1
           kind: Service
@@ -295,7 +324,17 @@ jobs:
               - name: postgres
                 port: 5432
                 targetPort: 5432
-          ---
+          EOF
+
+          kubectl rollout status statefulset/${K8S_SLUG}-postgres --namespace "$K8S_NAMESPACE" --timeout=420s
+          kubectl wait --for=condition=ready pod -l app=${K8S_SLUG}-postgres --namespace "$K8S_NAMESPACE" --timeout=420s
+          shard_postgres_pod=$(kubectl get pod --namespace "$K8S_NAMESPACE" -l app=${K8S_SLUG}-postgres -o jsonpath='{.items[0].metadata.name}')
+          until kubectl exec --namespace "$K8S_NAMESPACE" "$shard_postgres_pod" -- sh -lc 'PGPASSWORD="$POSTGRES_PASSWORD" psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" "$POSTGRES_DB" -c "select 1" >/dev/null'; do
+            echo "Waiting for active SQL connection on ${K8S_SLUG}-postgres/${DB_NAME}..."
+            sleep 5
+          done
+
+          cat <<EOF | kubectl apply -f -
           apiVersion: apps/v1
           kind: Deployment
           metadata:
@@ -313,6 +352,33 @@ jobs:
               spec:
                 imagePullSecrets:
                   - name: regcred
+                initContainers:
+                  - name: wait-for-shard-postgres
+                    image: postgres:18
+                    env:
+                      - name: PGHOST
+                        value: ${K8S_SLUG}-postgres
+                      - name: PGPORT
+                        value: "5432"
+                      - name: PGDATABASE
+                        value: ${DB_NAME}
+                      - name: PGUSER
+                        value: ${DB_USER}
+                      - name: PGSSLMODE
+                        value: disable
+                      - name: PGPASSWORD
+                        valueFrom:
+                          secretKeyRef:
+                            name: shard-runtime-secrets
+                            key: DB_PASSWORD
+                    command:
+                      - sh
+                      - -c
+                      - |
+                        until psql -v ON_ERROR_STOP=1 -c 'select 1' >/dev/null 2>&1; do
+                          echo "Waiting for PostgreSQL connection to ${PGHOST}/${PGDATABASE}..."
+                          sleep 5
+                        done
                 containers:
                   - name: game-api
                     image: ${GAME_API_IMAGE_REPOSITORY}:${GAME_IMAGE_TAG}
@@ -493,7 +559,6 @@ jobs:
                             number: 80
           EOF
 
-          kubectl rollout status statefulset/${K8S_SLUG}-postgres --namespace "$K8S_NAMESPACE" --timeout=420s
           kubectl rollout status deployment/${K8S_SLUG}-api --namespace "$K8S_NAMESPACE" --timeout=420s
           kubectl rollout status deployment/${K8S_SLUG}-frontend --namespace "$K8S_NAMESPACE" --timeout=420s
 
