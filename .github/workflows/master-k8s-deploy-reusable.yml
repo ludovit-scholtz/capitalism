@@ -25,7 +25,7 @@ on:
         default: ''
         type: string
       image_tag:
-        description: Container tag to deploy (defaults to YYYY-MM-DD-sha8 for the current commit)
+        description: Base container tag stem to deploy (defaults to YYYY-MM-DD-sha8; workflow appends per-image suffixes such as -ma and -mf)
         required: false
         default: ''
         type: string
@@ -91,18 +91,19 @@ jobs:
           username: ${{ secrets.HARBOR_USERNAME }}
           password: ${{ secrets.HARBOR_PASSWORD }}
 
-      - name: Derive deployment image tag
-        id: derive_image_tag
+      - name: Derive deployment image tags
+        id: derive_image_tags
         run: |
           set -euo pipefail
 
           if [ -n "${{ inputs.image_tag }}" ]; then
-            image_tag="${{ inputs.image_tag }}"
+            tag_base="${{ inputs.image_tag }}"
           else
-            image_tag="$(date -u +%F)-${GITHUB_SHA::8}"
+            tag_base="$(date -u +%F)-${GITHUB_SHA::8}"
           fi
 
-          echo "value=$image_tag" >> "$GITHUB_OUTPUT"
+          echo "master_api=${tag_base}-ma" >> "$GITHUB_OUTPUT"
+          echo "master_frontend=${tag_base}-mf" >> "$GITHUB_OUTPUT"
 
       - name: Build and push master API image
         uses: docker/build-push-action@v6
@@ -111,7 +112,7 @@ jobs:
           file: ./projects/MasterApi/Dockerfile
           push: true
           tags: |
-            ${{ env.MASTER_API_IMAGE_REPOSITORY }}:${{ steps.derive_image_tag.outputs.value }}
+            ${{ env.MASTER_API_IMAGE_REPOSITORY }}:${{ steps.derive_image_tags.outputs.master_api }}
             ${{ env.MASTER_API_IMAGE_REPOSITORY }}:${{ inputs.environment_name }}-latest
 
       - name: Build and push master frontend image
@@ -121,7 +122,7 @@ jobs:
           file: ./projects/master-frontend/Dockerfile
           push: true
           tags: |
-            ${{ env.MASTER_FRONTEND_IMAGE_REPOSITORY }}:${{ steps.derive_image_tag.outputs.value }}
+            ${{ env.MASTER_FRONTEND_IMAGE_REPOSITORY }}:${{ steps.derive_image_tags.outputs.master_frontend }}
             ${{ env.MASTER_FRONTEND_IMAGE_REPOSITORY }}:${{ inputs.environment_name }}-latest
 
       - name: Setup kubectl
@@ -169,7 +170,8 @@ jobs:
       - name: Deploy master PostgreSQL, API, frontend and ingress
         id: deploy_rollout
         env:
-          MASTER_DEPLOY_TAG: ${{ steps.derive_image_tag.outputs.value }}
+          MASTER_API_DEPLOY_TAG: ${{ steps.derive_image_tags.outputs.master_api }}
+          MASTER_FRONTEND_DEPLOY_TAG: ${{ steps.derive_image_tags.outputs.master_frontend }}
         run: |
           set -euo pipefail
 
@@ -334,7 +336,7 @@ jobs:
                         done
                 containers:
                   - name: master-api
-                    image: ${MASTER_API_IMAGE_REPOSITORY}:${MASTER_DEPLOY_TAG}
+                    image: ${MASTER_API_IMAGE_REPOSITORY}:${MASTER_API_DEPLOY_TAG}
                     ports:
                       - containerPort: 8080
                     env:
@@ -408,7 +410,7 @@ jobs:
                   - name: regcred
                 containers:
                   - name: master-frontend
-                    image: ${MASTER_FRONTEND_IMAGE_REPOSITORY}:${MASTER_DEPLOY_TAG}
+                    image: ${MASTER_FRONTEND_IMAGE_REPOSITORY}:${MASTER_FRONTEND_DEPLOY_TAG}
                     ports:
                       - containerPort: 80
                     env:
@@ -574,7 +576,8 @@ jobs:
             echo "## Master deployment summary"
             echo "- Environment: \`${{ inputs.environment_name }}\`"
             echo "- Namespace: \`${K8S_NAMESPACE}\`"
-            echo "- Image tag: \`${{ steps.derive_image_tag.outputs.value }}\`"
+            echo "- Master API image tag: \`${{ steps.derive_image_tags.outputs.master_api }}\`"
+            echo "- Master frontend image tag: \`${{ steps.derive_image_tags.outputs.master_frontend }}\`"
             echo "- Frontend host: https://${FRONTEND_HOST}"
             echo "- API host: https://${API_HOST}"
             if [ -n "$REDIRECT_HOST" ]; then

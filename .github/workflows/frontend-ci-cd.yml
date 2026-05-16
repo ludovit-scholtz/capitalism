@@ -65,7 +65,7 @@ jobs:
         id: derive_image_tag
         run: |
           set -euo pipefail
-          image_tag="$(date -u +%F)-${GITHUB_SHA::8}"
+          image_tag="$(date -u +%F)-${GITHUB_SHA::8}-gf"
           echo "value=$image_tag" >> "$GITHUB_OUTPUT"
 
       - name: Log in to Harbor
@@ -90,7 +90,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: docker
     env:
-      IMAGE_REF: ${{ env.IMAGE_NAME }}:${{ needs.docker.outputs.image_tag }}
+      IMAGE_REF: harbor.de-4.biatec.io/biatec/capitalism-frontend:${{ needs.docker.outputs.image_tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -123,3 +123,29 @@ jobs:
 
       - name: Verify rollout
         run: kubectl rollout status deployment/frontend --namespace frontend
+
+      - name: Refresh all stage shard frontend deployments
+        run: |
+          set -euo pipefail
+
+          shard_namespaces=$(kubectl get namespace -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep '^capitalism-stage-' || true)
+
+          if [ -z "$shard_namespaces" ]; then
+            echo "No stage shard namespaces found."
+            exit 0
+          fi
+
+          for namespace in $shard_namespaces; do
+            deployments=$(kubectl get deployment -n "$namespace" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep -- '-frontend$' || true)
+
+            if [ -z "$deployments" ]; then
+              echo "No shard frontend deployment found in namespace $namespace."
+              continue
+            fi
+
+            for deployment in $deployments; do
+              echo "Updating $namespace/$deployment to $IMAGE_REF"
+              kubectl set image "deployment/$deployment" game-frontend="$IMAGE_REF" --namespace "$namespace"
+              kubectl rollout status "deployment/$deployment" --namespace "$namespace" --timeout=420s
+            done
+          done
