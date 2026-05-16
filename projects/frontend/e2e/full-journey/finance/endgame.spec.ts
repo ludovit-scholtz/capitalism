@@ -212,7 +212,7 @@ test.describe('Endgame UI', () => {
     }, `token-${player.id}`)
     await page.goto('/dashboard')
 
-    await expect(page.locator('.race-to-top-banner')).toBeHidden()
+    await expect(page.locator('.race-to-top-banner')).not.toBeVisible()
   })
 
   test('RaceToTopBanner can be dismissed by clicking the close button', async ({ page }) => {
@@ -234,7 +234,7 @@ test.describe('Endgame UI', () => {
 
     await expect(page.locator('.race-to-top-banner')).toBeVisible()
     await page.getByRole('button', { name: 'Dismiss race-to-top banner' }).click()
-    await expect(page.locator('.race-to-top-banner')).toBeHidden()
+    await expect(page.locator('.race-to-top-banner')).not.toBeVisible()
   })
 
   test('navbar shows lock icon when game has ended', async ({ page }) => {

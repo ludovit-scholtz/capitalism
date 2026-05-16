@@ -1,0 +1,468 @@
+name: master-k8s-deploy-reusable
+
+on:
+  workflow_call:
+    inputs:
+      environment_name:
+        description: GitHub environment name (stage or production)
+        required: true
+        type: string
+      namespace:
+        description: Kubernetes namespace for master workloads
+        required: true
+        type: string
+      frontend_host:
+        description: Public hostname for master frontend
+        required: true
+        type: string
+      api_host:
+        description: Public hostname for master API
+        required: true
+        type: string
+      redirect_host:
+        description: Optional host redirected to frontend_host (e.g. capitalism5.com)
+        required: false
+        default: ''
+        type: string
+      wildcard_domain:
+        description: Wildcard domain for shard TLS certificate (e.g. *.capitalism5.com)
+        required: true
+        type: string
+      wildcard_secret_name:
+        description: Kubernetes TLS secret name for wildcard certificate
+        required: true
+        type: string
+      image_tag:
+        description: Container tag suffix (default github.sha)
+        required: false
+        default: ''
+        type: string
+    secrets:
+      KUBE_CONFIG_DATA:
+        required: true
+      HARBOR_USERNAME:
+        required: true
+      HARBOR_PASSWORD:
+        required: true
+      MASTER_DB_CONNECTION_STRING:
+        required: true
+      MASTER_JWT_SIGNING_KEY:
+        required: true
+      MASTER_REGISTRATION_KEY:
+        required: true
+      MASTER_ROOT_ADMIN_EMAIL:
+        required: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  deploy-master:
+    name: Deploy master to ${{ inputs.environment_name }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment_name }}
+    concurrency:
+      group: master-k8s-${{ inputs.environment_name }}
+      cancel-in-progress: false
+    env:
+      REGISTRY_REPOSITORY: harbor.de-4.biatec.io/biatec
+      MASTER_API_IMAGE_REPOSITORY: harbor.de-4.biatec.io/biatec/capitalism-master-api
+      MASTER_FRONTEND_IMAGE_REPOSITORY: harbor.de-4.biatec.io/biatec/capitalism-master-frontend
+      MASTER_DEPLOY_TAG: ${{ inputs.image_tag != '' && inputs.image_tag || github.sha }}
+      K8S_NAMESPACE: ${{ inputs.namespace }}
+      FRONTEND_HOST: ${{ inputs.frontend_host }}
+      API_HOST: ${{ inputs.api_host }}
+      REDIRECT_HOST: ${{ inputs.redirect_host }}
+      WILDCARD_DOMAIN: ${{ inputs.wildcard_domain }}
+      WILDCARD_SECRET_NAME: ${{ inputs.wildcard_secret_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required deployment inputs
+        run: |
+          set -euo pipefail
+          if [ -z "$FRONTEND_HOST" ] || [ -z "$API_HOST" ]; then
+            echo "Master hostnames are missing. Check workflow inputs frontend_host/api_host." >&2
+            exit 1
+          fi
+          if [ -z "$K8S_NAMESPACE" ]; then
+            echo "Kubernetes namespace is missing. Check workflow input namespace." >&2
+            exit 1
+          fi
+
+      - name: Log in to Harbor registry
+        uses: docker/login-action@v3
+        with:
+          registry: harbor.de-4.biatec.io
+          username: ${{ secrets.HARBOR_USERNAME }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
+
+      - name: Build and push master API image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./projects
+          file: ./projects/MasterApi/Dockerfile
+          push: true
+          tags: |
+            ${{ env.MASTER_API_IMAGE_REPOSITORY }}:${{ env.MASTER_DEPLOY_TAG }}
+            ${{ env.MASTER_API_IMAGE_REPOSITORY }}:${{ inputs.environment_name }}-latest
+
+      - name: Build and push master frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./projects/master-frontend
+          file: ./projects/master-frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.MASTER_FRONTEND_IMAGE_REPOSITORY }}:${{ env.MASTER_DEPLOY_TAG }}
+            ${{ env.MASTER_FRONTEND_IMAGE_REPOSITORY }}:${{ inputs.environment_name }}-latest
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: latest
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 --decode > ~/.kube/config
+
+      - name: Create namespace and image pull secret
+        run: |
+          set -euo pipefail
+          kubectl create namespace "$K8S_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create secret docker-registry regcred \
+            --namespace "$K8S_NAMESPACE" \
+            --docker-server=harbor.de-4.biatec.io \
+            --docker-username='${{ secrets.HARBOR_USERNAME }}' \
+            --docker-password='${{ secrets.HARBOR_PASSWORD }}' \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply runtime config and secrets
+        run: |
+          set -euo pipefail
+          printf '%s\n' "::add-mask::${{ secrets.MASTER_ROOT_ADMIN_EMAIL }}"
+          kubectl create configmap master-runtime-config \
+            --namespace "$K8S_NAMESPACE" \
+            --from-literal=MasterFrontendHost="$FRONTEND_HOST" \
+            --from-literal=MasterApiHost="$API_HOST" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl create secret generic master-runtime-secrets \
+            --namespace "$K8S_NAMESPACE" \
+            --from-literal=ConnectionStrings__MasterCatalog='${{ secrets.MASTER_DB_CONNECTION_STRING }}' \
+            --from-literal=Jwt__SigningKey='${{ secrets.MASTER_JWT_SIGNING_KEY }}' \
+            --from-literal=MasterServer__RegistrationKey='${{ secrets.MASTER_REGISTRATION_KEY }}' \
+            --from-literal=GameAdministration__RootAdministratorEmails__0='${{ secrets.MASTER_ROOT_ADMIN_EMAIL }}' \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply cert-manager certificate resources
+        run: |
+          set -euo pipefail
+          redirect_dns=''
+          if [ -n "$REDIRECT_HOST" ]; then
+            redirect_dns="              - ${REDIRECT_HOST}"
+          fi
+          cat <<EOF | kubectl apply -f -
+          apiVersion: cert-manager.io/v1
+          kind: Certificate
+          metadata:
+            name: master-endpoints
+            namespace: ${K8S_NAMESPACE}
+          spec:
+            secretName: master-endpoints-tls
+            issuerRef:
+              name: letsencrypt-dns
+              kind: ClusterIssuer
+            dnsNames:
+              - ${FRONTEND_HOST}
+              - ${API_HOST}
+          ${redirect_dns}
+          ---
+          apiVersion: cert-manager.io/v1
+          kind: Certificate
+          metadata:
+            name: shard-wildcard
+            namespace: ${K8S_NAMESPACE}
+          spec:
+            secretName: ${WILDCARD_SECRET_NAME}
+            issuerRef:
+              name: letsencrypt-dns
+              kind: ClusterIssuer
+            dnsNames:
+              - ${WILDCARD_DOMAIN}
+          EOF
+
+      - name: Deploy master API, frontend and ingress
+        id: deploy_rollout
+        run: |
+          set -euo pipefail
+
+          cat <<EOF | kubectl apply -f -
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: master-api
+            namespace: ${K8S_NAMESPACE}
+          spec:
+            replicas: 2
+            selector:
+              matchLabels:
+                app: master-api
+            template:
+              metadata:
+                labels:
+                  app: master-api
+              spec:
+                imagePullSecrets:
+                  - name: regcred
+                containers:
+                  - name: master-api
+                    image: ${MASTER_API_IMAGE_REPOSITORY}:${MASTER_DEPLOY_TAG}
+                    ports:
+                      - containerPort: 8080
+                    env:
+                      - name: ASPNETCORE_ENVIRONMENT
+                        value: Production
+                      - name: Cors__AllowedOrigins__0
+                        value: https://${FRONTEND_HOST}
+                      - name: ConnectionStrings__MasterCatalog
+                        valueFrom:
+                          secretKeyRef:
+                            name: master-runtime-secrets
+                            key: ConnectionStrings__MasterCatalog
+                      - name: Jwt__SigningKey
+                        valueFrom:
+                          secretKeyRef:
+                            name: master-runtime-secrets
+                            key: Jwt__SigningKey
+                      - name: MasterServer__RegistrationKey
+                        valueFrom:
+                          secretKeyRef:
+                            name: master-runtime-secrets
+                            key: MasterServer__RegistrationKey
+                      - name: GameAdministration__RootAdministratorEmails__0
+                        valueFrom:
+                          secretKeyRef:
+                            name: master-runtime-secrets
+                            key: GameAdministration__RootAdministratorEmails__0
+                    readinessProbe:
+                      httpGet:
+                        path: /healthz
+                        port: 8080
+                      periodSeconds: 10
+                    livenessProbe:
+                      httpGet:
+                        path: /healthz
+                        port: 8080
+                      initialDelaySeconds: 30
+                      periodSeconds: 20
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: master-api
+            namespace: ${K8S_NAMESPACE}
+          spec:
+            selector:
+              app: master-api
+            ports:
+              - name: http
+                port: 80
+                targetPort: 8080
+          ---
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: master-frontend
+            namespace: ${K8S_NAMESPACE}
+          spec:
+            replicas: 2
+            selector:
+              matchLabels:
+                app: master-frontend
+            template:
+              metadata:
+                labels:
+                  app: master-frontend
+              spec:
+                imagePullSecrets:
+                  - name: regcred
+                containers:
+                  - name: master-frontend
+                    image: ${MASTER_FRONTEND_IMAGE_REPOSITORY}:${MASTER_DEPLOY_TAG}
+                    ports:
+                      - containerPort: 80
+                    env:
+                      - name: NODE_ENV
+                        value: production
+                    readinessProbe:
+                      httpGet:
+                        path: /health
+                        port: 80
+                      periodSeconds: 10
+                    livenessProbe:
+                      httpGet:
+                        path: /health
+                        port: 80
+                      initialDelaySeconds: 15
+                      periodSeconds: 20
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: master-frontend
+            namespace: ${K8S_NAMESPACE}
+          spec:
+            selector:
+              app: master-frontend
+            ports:
+              - name: http
+                port: 80
+                targetPort: 80
+          ---
+          apiVersion: networking.k8s.io/v1
+          kind: Ingress
+          metadata:
+            name: master-api
+            namespace: ${K8S_NAMESPACE}
+            annotations:
+              cert-manager.io/cluster-issuer: letsencrypt-dns
+          spec:
+            ingressClassName: nginx
+            tls:
+              - hosts:
+                  - ${API_HOST}
+                secretName: master-endpoints-tls
+            rules:
+              - host: ${API_HOST}
+                http:
+                  paths:
+                    - path: /
+                      pathType: Prefix
+                      backend:
+                        service:
+                          name: master-api
+                          port:
+                            number: 80
+          ---
+          apiVersion: networking.k8s.io/v1
+          kind: Ingress
+          metadata:
+            name: master-frontend
+            namespace: ${K8S_NAMESPACE}
+            annotations:
+              cert-manager.io/cluster-issuer: letsencrypt-dns
+          spec:
+            ingressClassName: nginx
+            tls:
+              - hosts:
+                  - ${FRONTEND_HOST}
+                secretName: master-endpoints-tls
+            rules:
+              - host: ${FRONTEND_HOST}
+                http:
+                  paths:
+                    - path: /
+                      pathType: Prefix
+                      backend:
+                        service:
+                          name: master-frontend
+                          port:
+                            number: 80
+          EOF
+
+          if [ -n "$REDIRECT_HOST" ]; then
+            cat <<EOF | kubectl apply -f -
+            apiVersion: networking.k8s.io/v1
+            kind: Ingress
+            metadata:
+              name: master-frontend-redirect
+              namespace: ${K8S_NAMESPACE}
+              annotations:
+                cert-manager.io/cluster-issuer: letsencrypt-dns
+                nginx.ingress.kubernetes.io/permanent-redirect: https://${FRONTEND_HOST}\$request_uri
+            spec:
+              ingressClassName: nginx
+              tls:
+                - hosts:
+                    - ${REDIRECT_HOST}
+                  secretName: master-endpoints-tls
+              rules:
+                - host: ${REDIRECT_HOST}
+                  http:
+                    paths:
+                      - path: /
+                        pathType: Prefix
+                        backend:
+                          service:
+                            name: master-frontend
+                            port:
+                              number: 80
+            EOF
+          fi
+
+          kubectl rollout status deployment/master-api --namespace "$K8S_NAMESPACE" --timeout=300s
+          kubectl rollout status deployment/master-frontend --namespace "$K8S_NAMESPACE" --timeout=300s
+
+      - name: Smoke check deployed endpoints
+        id: smoke_check
+        run: |
+          set -euo pipefail
+
+          frontend_ok=0
+          api_ok=0
+          for attempt in {1..30}; do
+            frontend_code=$(curl -sS -o /dev/null -w "%{http_code}" "https://${FRONTEND_HOST}" || true)
+            api_code=$(curl -sS -o /dev/null -w "%{http_code}" "https://${API_HOST}/healthz" || true)
+
+            if [ "$frontend_code" = "200" ]; then
+              frontend_ok=1
+            fi
+            if [ "$api_code" = "200" ]; then
+              api_ok=1
+            fi
+
+            if [ "$frontend_ok" = "1" ] && [ "$api_ok" = "1" ]; then
+              break
+            fi
+
+            sleep 10
+          done
+
+          if [ "$frontend_ok" != "1" ]; then
+            echo "Smoke check failed: https://${FRONTEND_HOST} did not return HTTP 200. Check ingress host and frontend rollout." >&2
+            exit 1
+          fi
+
+          if [ "$api_ok" != "1" ]; then
+            echo "Smoke check failed: https://${API_HOST}/healthz did not return HTTP 200. Check ConnectionStrings__MasterCatalog secret and API rollout." >&2
+            exit 1
+          fi
+
+      - name: Roll back on smoke-check failure
+        if: failure() && steps.deploy_rollout.outcome == 'success'
+        run: |
+          set +e
+          kubectl rollout undo deployment/master-api --namespace "$K8S_NAMESPACE"
+          kubectl rollout undo deployment/master-frontend --namespace "$K8S_NAMESPACE"
+          kubectl rollout status deployment/master-api --namespace "$K8S_NAMESPACE" --timeout=300s
+          kubectl rollout status deployment/master-frontend --namespace "$K8S_NAMESPACE" --timeout=300s
+
+      - name: Deployment summary
+        if: always()
+        run: |
+          {
+            echo "## Master deployment summary"
+            echo "- Environment: \\`${{ inputs.environment_name }}\\`"
+            echo "- Namespace: \\`${K8S_NAMESPACE}\\`"
+            echo "- Image tag: \\`${MASTER_DEPLOY_TAG}\\`"
+            echo "- Frontend host: https://${FRONTEND_HOST}"
+            echo "- API host: https://${API_HOST}"
+            if [ -n "$REDIRECT_HOST" ]; then
+              echo "- Canonical redirect source: https://${REDIRECT_HOST}"
+            fi
+            echo "- Wildcard certificate domain: \\`${WILDCARD_DOMAIN}\\`"
+          } >> "$GITHUB_STEP_SUMMARY"

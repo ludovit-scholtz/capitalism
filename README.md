@@ -6,6 +6,13 @@ This is attempt to create online mmorpg version of the capitalism game.
 
 [ROADMAP.md](ROADMAP.md)
 
+## Kubernetes deployment automation
+
+- Stage master deployment workflow: `.github/workflows/deploy-stage-k8s.yml` (auto deploy from `main`)
+- Production master deployment workflow: `.github/workflows/deploy-production-k8s.yml` (`workflow_dispatch`, approval-gated through `production` environment)
+- Game shard provisioning workflow: `.github/workflows/provision-game-shard-k8s.yml` (`workflow_dispatch`)
+- Environment/secret setup, rotation, and log-masking rules: [`docs/github-actions-environments-and-secrets.md`](docs/github-actions-environments-and-secrets.md)
+
 ## Security configuration
 
 - Required secure environment variables are listed in `.env.example`.

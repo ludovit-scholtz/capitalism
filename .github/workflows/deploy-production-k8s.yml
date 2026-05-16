@@ -1,0 +1,29 @@
+name: deploy-production-k8s
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Optional image tag (defaults to current commit SHA)
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  deploy-production:
+    name: Deploy production master stack
+    uses: ./.github/workflows/master-k8s-deploy-reusable.yml
+    with:
+      environment_name: production
+      namespace: capitalism-production
+      frontend_host: www.capitalism5.com
+      api_host: api.capitalism5.com
+      redirect_host: capitalism5.com
+      wildcard_domain: '*.capitalism5.com'
+      wildcard_secret_name: capitalism5-wildcard-tls
+      image_tag: ${{ inputs.image_tag }}
+    secrets: inherit
