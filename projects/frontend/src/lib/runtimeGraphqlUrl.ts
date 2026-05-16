@@ -1,3 +1,5 @@
+import { readRuntimeAppConfigValue } from './runtimeConfig'
+
 export interface RuntimeLocationLike {
   hostname: string
   protocol: string
@@ -64,7 +66,12 @@ export function resolveGameGraphqlUrl(
   location?: RuntimeLocationLike,
   localFallback = LOCAL_GAME_GRAPHQL_FALLBACK,
 ) {
-  return normalizeExplicitUrl(explicitUrl) ?? deriveGameGraphqlUrl(location) ?? localFallback
+  return (
+    normalizeExplicitUrl(readRuntimeAppConfigValue('graphqlUrl')) ??
+    normalizeExplicitUrl(explicitUrl) ??
+    deriveGameGraphqlUrl(location) ??
+    localFallback
+  )
 }
 
 export function resolveMasterGraphqlUrl(

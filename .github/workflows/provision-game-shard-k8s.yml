@@ -488,8 +488,10 @@ jobs:
                     env:
                       - name: NODE_ENV
                         value: production
-                      - name: VITE_GRAPHQL_URL
+                      - name: APP_GRAPHQL_URL
                         value: https://${API_HOST}/graphql
+                      - name: APP_BIATEC_OIDC_REDIRECT_URI
+                        value: https://${FRONTEND_HOST}/auth/callback
                     readinessProbe:
                       httpGet:
                         path: /health
@@ -566,8 +568,8 @@ jobs:
                             number: 80
           EOF
 
-          kubectl rollout status deployment/${K8S_SLUG}-api --namespace "$K8S_NAMESPACE" --timeout=420s
-          kubectl rollout status deployment/${K8S_SLUG}-frontend --namespace "$K8S_NAMESPACE" --timeout=420s
+          kubectl rollout status deployment/${K8S_SLUG}-api --namespace "$K8S_NAMESPACE" --timeout=900s
+          kubectl rollout status deployment/${K8S_SLUG}-frontend --namespace "$K8S_NAMESPACE" --timeout=900s
 
       - name: Smoke check shard readiness and registration
         id: smoke_check

@@ -151,6 +151,6 @@ jobs:
             for deployment in $deployments; do
               echo "Updating $namespace/$deployment to $IMAGE_REF"
               kubectl set image "deployment/$deployment" game-api="$IMAGE_REF" --namespace "$namespace"
-              kubectl rollout status "deployment/$deployment" --namespace "$namespace" --timeout=420s
+              kubectl rollout status "deployment/$deployment" --namespace "$namespace" --timeout=900s
             done
           done

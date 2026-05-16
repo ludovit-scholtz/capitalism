@@ -5,16 +5,23 @@ import { gqlRequest as gqlMasterRequest } from '@/lib/graphqlMasterServer'
 import { resolvePostLogoutRedirectUri } from '@/lib/authLogout'
 import { selectMainCity, shouldAutoSwitchCity } from '@/lib/cityContext'
 import { resolveApiBaseUrl, resolveGameGraphqlUrl, resolveOptionalMasterApiBaseUrl } from '@/lib/runtimeGraphqlUrl'
+import { readRuntimeAppConfigValue } from '@/lib/runtimeConfig'
 import { deepEqual } from '@/lib/utils'
 import type { AccountContextResult, AccountContextType, Player, AuthPayload, Building, City } from '@/types'
 
-const BIATEC_OIDC_AUTHORIZE_URL = import.meta.env.VITE_BIATEC_OIDC_AUTHORIZE_URL || 'https://google.biatec.io/authorize'
-const BIATEC_OIDC_END_SESSION_URL = import.meta.env.VITE_BIATEC_OIDC_END_SESSION_URL || ''
-const BIATEC_OIDC_CLIENT_ID = import.meta.env.VITE_BIATEC_OIDC_CLIENT_ID || 'capitalism'
-const BIATEC_OIDC_REDIRECT_URI = import.meta.env.VITE_BIATEC_OIDC_REDIRECT_URI
-const BIATEC_OIDC_SCOPE = import.meta.env.VITE_BIATEC_OIDC_SCOPE || 'openid'
-const BIATEC_OIDC_AUDIENCE = import.meta.env.VITE_BIATEC_OIDC_AUDIENCE || BIATEC_OIDC_CLIENT_ID
-const BIATEC_OIDC_ALLOWED_ISSUERS = (import.meta.env.VITE_BIATEC_OIDC_ALLOWED_ISSUERS || 'https://google.biatec.io,https://google.biatec.io')
+const BIATEC_OIDC_AUTHORIZE_URL =
+  readRuntimeAppConfigValue('biatecOidcAuthorizeUrl') || import.meta.env.VITE_BIATEC_OIDC_AUTHORIZE_URL || 'https://google.biatec.io/authorize'
+const BIATEC_OIDC_END_SESSION_URL =
+  readRuntimeAppConfigValue('biatecOidcEndSessionUrl') || import.meta.env.VITE_BIATEC_OIDC_END_SESSION_URL || ''
+const BIATEC_OIDC_CLIENT_ID =
+  readRuntimeAppConfigValue('biatecOidcClientId') || import.meta.env.VITE_BIATEC_OIDC_CLIENT_ID || 'capitalism'
+const BIATEC_OIDC_REDIRECT_URI =
+  readRuntimeAppConfigValue('biatecOidcRedirectUri') || import.meta.env.VITE_BIATEC_OIDC_REDIRECT_URI
+const BIATEC_OIDC_SCOPE =
+  readRuntimeAppConfigValue('biatecOidcScope') || import.meta.env.VITE_BIATEC_OIDC_SCOPE || 'openid'
+const BIATEC_OIDC_AUDIENCE =
+  readRuntimeAppConfigValue('biatecOidcAudience') || import.meta.env.VITE_BIATEC_OIDC_AUDIENCE || BIATEC_OIDC_CLIENT_ID
+const BIATEC_OIDC_ALLOWED_ISSUERS = (readRuntimeAppConfigValue('biatecOidcAllowedIssuers') || import.meta.env.VITE_BIATEC_OIDC_ALLOWED_ISSUERS || 'https://google.biatec.io,https://google.biatec.io')
   .split(',')
   .map((entry: string) => entry.trim())
   .filter((entry: string) => entry.length > 0)
