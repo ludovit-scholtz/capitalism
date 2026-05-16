@@ -135,14 +135,58 @@ jobs:
       - name: Verify rollout
         run: kubectl rollout status deployment/${{ env.K8S_DEPLOYMENT_NAME }} --namespace ${{ env.K8S_NAMESPACE }}
 
-      - name: Refresh all stage shard frontend deployments
+      - name: Refresh all shard frontend deployments
+        env:
+          TARGET_IMAGE_REPOSITORY: ${{ env.IMAGE_NAME }}
         run: |
           set -euo pipefail
 
-          shard_namespaces=$(kubectl get namespace -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep '^capitalism-stage-' || true)
+          resolve_container_name() {
+            local namespace="$1"
+            local deployment="$2"
+            local preferred_container="$3"
+            local image_repository="$4"
+            local deployment_json
+            local container_name
+            local container_names
+            local container_count
+
+            deployment_json=$(kubectl get deployment "$deployment" --namespace "$namespace" -o json)
+            container_name=$(printf '%s' "$deployment_json" | jq -r --arg image_repository "$image_repository" '
+              [.spec.template.spec.containers[]? | select((.image | split(":")[0]) == $image_repository) | .name][0] // empty
+            ')
+            if [ -n "$container_name" ]; then
+              printf '%s\n' "$container_name"
+              return 0
+            fi
+
+            container_names=$(printf '%s' "$deployment_json" | jq -r '.spec.template.spec.containers[]?.name')
+            container_count=$(printf '%s\n' "$container_names" | sed '/^$/d' | wc -l | tr -d ' ')
+
+            if printf '%s\n' "$container_names" | grep -qx "$preferred_container"; then
+              printf '%s\n' "$preferred_container"
+              return 0
+            fi
+
+            if [ "$container_count" = "1" ]; then
+              printf '%s\n' "$container_names" | sed -n '/./{p;q}'
+              return 0
+            fi
+
+            if printf '%s\n' "$container_names" | grep -qx "$deployment"; then
+              printf '%s\n' "$deployment"
+              return 0
+            fi
+
+            echo "Could not resolve frontend container name for $namespace/$deployment." >&2
+            printf '%s\n' "$container_names" >&2
+            return 1
+          }
+
+          shard_namespaces=$(kubectl get namespace -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep -E '^capitalism-(stage|production)-' || true)
 
           if [ -z "$shard_namespaces" ]; then
-            echo "No stage shard namespaces found."
+            echo "No shard namespaces found."
             exit 0
           fi
 
@@ -155,8 +199,9 @@ jobs:
             fi
 
             for deployment in $deployments; do
-              echo "Updating $namespace/$deployment to $IMAGE_REF"
-              kubectl set image "deployment/$deployment" game-frontend="$IMAGE_REF" --namespace "$namespace"
+              container_name=$(resolve_container_name "$namespace" "$deployment" "game-frontend" "$TARGET_IMAGE_REPOSITORY")
+              echo "Updating $namespace/$deployment ($container_name) to $IMAGE_REF"
+              kubectl set image "deployment/$deployment" "$container_name=$IMAGE_REF" --namespace "$namespace"
               kubectl rollout status "deployment/$deployment" --namespace "$namespace" --timeout=900s
             done
           done
