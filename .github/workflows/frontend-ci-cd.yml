@@ -24,10 +24,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
@@ -61,7 +61,7 @@ jobs:
       image_tag: ${{ steps.derive_image_tag.outputs.value }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Derive image tag
         id: derive_image_tag
@@ -71,14 +71,14 @@ jobs:
           echo "value=$image_tag" >> "$GITHUB_OUTPUT"
 
       - name: Log in to Harbor
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: harbor.de-4.biatec.io
           username: ${{ secrets.HARBOR_USERNAME }}
           password: ${{ secrets.HARBOR_PASSWORD }}
 
       - name: Build and push image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./${{ env.PROJECT_PATH }}
           file: ./${{ env.PROJECT_PATH }}/Dockerfile
@@ -95,7 +95,7 @@ jobs:
       IMAGE_REF: harbor.de-4.biatec.io/biatec/capitalism-frontend:${{ needs.docker.outputs.image_tag }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Check secrets
         run: |

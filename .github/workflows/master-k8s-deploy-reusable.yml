@@ -70,7 +70,7 @@ jobs:
       MASTER_DB_USER: masterapp
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Validate required deployment inputs
         run: |
@@ -85,7 +85,7 @@ jobs:
           fi
 
       - name: Log in to Harbor registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: harbor.de-4.biatec.io
           username: ${{ secrets.HARBOR_USERNAME }}
@@ -106,7 +106,7 @@ jobs:
           echo "master_frontend=${tag_base}-mf" >> "$GITHUB_OUTPUT"
 
       - name: Build and push master API image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./projects
           file: ./projects/MasterApi/Dockerfile
@@ -116,7 +116,7 @@ jobs:
             ${{ env.MASTER_API_IMAGE_REPOSITORY }}:${{ inputs.environment_name }}-latest
 
       - name: Build and push master frontend image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./projects/master-frontend
           file: ./projects/master-frontend/Dockerfile

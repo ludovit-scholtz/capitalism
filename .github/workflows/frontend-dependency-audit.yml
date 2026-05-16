@@ -38,9 +38,9 @@ jobs:
       advisory_count: ${{ steps.audit.outputs.advisory_count }}
       report_fragment: ${{ steps.audit.outputs.report_fragment }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
@@ -117,9 +117,9 @@ jobs:
       advisory_count: ${{ steps.audit.outputs.advisory_count }}
       report_fragment: ${{ steps.audit.outputs.report_fragment }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
@@ -196,9 +196,9 @@ jobs:
     outputs:
       unsanitized_count: ${{ steps.track.outputs.unsanitized_count }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
 
@@ -237,9 +237,9 @@ jobs:
     needs: [audit-game-frontend, audit-master-frontend, sink-tracker]
     if: always()
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
@@ -336,7 +336,7 @@ jobs:
       (needs.audit-game-frontend.outputs.advisory_count > 0 ||
        needs.audit-master-frontend.outputs.advisory_count > 0)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Create advisory issue
         uses: actions/github-script@v7
