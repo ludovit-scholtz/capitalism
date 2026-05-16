@@ -408,33 +408,33 @@ jobs:
           EOF
 
           if [ -n "$REDIRECT_HOST" ]; then
-            cat <<EOF | kubectl apply -f -
-            apiVersion: networking.k8s.io/v1
-            kind: Ingress
-            metadata:
-              name: master-frontend-redirect
-              namespace: ${K8S_NAMESPACE}
-              annotations:
-                cert-manager.io/cluster-issuer: letsencrypt-dns
-                nginx.ingress.kubernetes.io/permanent-redirect: https://${FRONTEND_HOST}\$request_uri
-            spec:
-              ingressClassName: nginx
-              tls:
-                - hosts:
-                    - ${REDIRECT_HOST}
-                  secretName: master-redirect-tls
-              rules:
-                - host: ${REDIRECT_HOST}
-                  http:
-                    paths:
-                      - path: /
-                        pathType: Prefix
-                        backend:
-                          service:
-                            name: master-frontend
-                            port:
-                              number: 80
-            EOF
+            printf '%s\n' \
+              'apiVersion: networking.k8s.io/v1' \
+              'kind: Ingress' \
+              'metadata:' \
+              '  name: master-frontend-redirect' \
+              "  namespace: ${K8S_NAMESPACE}" \
+              '  annotations:' \
+              '    cert-manager.io/cluster-issuer: letsencrypt-dns' \
+              "    nginx.ingress.kubernetes.io/permanent-redirect: https://${FRONTEND_HOST}\$request_uri" \
+              'spec:' \
+              '  ingressClassName: nginx' \
+              '  tls:' \
+              '    - hosts:' \
+              "        - ${REDIRECT_HOST}" \
+              '      secretName: master-redirect-tls' \
+              '  rules:' \
+              "    - host: ${REDIRECT_HOST}" \
+              '      http:' \
+              '        paths:' \
+              '          - path: /' \
+              '            pathType: Prefix' \
+              '            backend:' \
+              '              service:' \
+              '                name: master-frontend' \
+              '                port:' \
+              '                  number: 80' \
+              | kubectl apply -f -
           fi
 
           kubectl rollout status statefulset/${MASTER_DB_HOST} --namespace "$K8S_NAMESPACE" --timeout=420s
