@@ -19,7 +19,7 @@ fi
 
 while IFS= read -r -d '' manifest; do
   echo "Applying manifest: $manifest"
-  kubectl apply --dry-run=client -f "$manifest" >/dev/null
+  kubectl apply --dry-run=client -f "$manifest"
   if ! kubectl apply -f "$manifest"; then
     echo "Failed to apply manifest: $manifest" >&2
     exit 1
