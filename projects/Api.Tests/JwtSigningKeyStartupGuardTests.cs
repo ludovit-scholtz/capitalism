@@ -142,6 +142,7 @@ public sealed class ApiJwtSigningKeyStartupGuardHostTests
         using var factory = new ApiJwtSigningKeyGuardFactory(
             "Production",
             "ProductionStrongSigningKey0123456789ABCDE!",
+            seedAdminPassword: "__SET_IN_ENV__",
             includeSeedDataSection: false,
             passwordAuthEnabled: true);
 
@@ -206,6 +207,12 @@ internal sealed class ApiJwtSigningKeyGuardFactory(
             builder.UseSetting("SeedData:AdminDisplayName", "Platform Admin");
             builder.UseSetting("SeedData:AdminPassword", seedAdminPassword ?? ApiWebApplicationFactory.TestSeedAdminPassword);
         }
+        else if (!string.IsNullOrWhiteSpace(seedAdminPassword))
+        {
+            // Override any process-level SeedData__AdminPassword set in CI so missing-section tests
+            // can still assert the startup guard behavior deterministically.
+            builder.UseSetting("SeedData:AdminPassword", seedAdminPassword);
+        }
 
         builder.ConfigureAppConfiguration((_, configurationBuilder) =>
         {
@@ -223,6 +230,10 @@ internal sealed class ApiJwtSigningKeyGuardFactory(
                 values["SeedData:AdminEmail"] = "admin@capitalism.local";
                 values["SeedData:AdminDisplayName"] = "Platform Admin";
                 values["SeedData:AdminPassword"] = seedAdminPassword ?? ApiWebApplicationFactory.TestSeedAdminPassword;
+            }
+            else if (!string.IsNullOrWhiteSpace(seedAdminPassword))
+            {
+                values["SeedData:AdminPassword"] = seedAdminPassword;
             }
 
             configurationBuilder.AddInMemoryCollection(values);
