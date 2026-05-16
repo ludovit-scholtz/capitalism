@@ -244,7 +244,7 @@ jobs:
             local deployments
             local container_name
 
-            shard_namespaces=$(kubectl get namespace -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep -E "$namespace_regex" || true)
+            shard_namespaces=$(kubectl get namespace -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep -E -- "$namespace_regex" || true)
 
             if [ -z "$shard_namespaces" ]; then
               echo "No $friendly_name namespaces found for regex $namespace_regex."
@@ -252,7 +252,7 @@ jobs:
             fi
 
             for namespace in $shard_namespaces; do
-              deployments=$(kubectl get deployment -n "$namespace" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep -E "$deployment_regex" || true)
+              deployments=$(kubectl get deployment -n "$namespace" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep -E -- "$deployment_regex" || true)
 
               if [ -z "$deployments" ]; then
                 echo "No deployments matching $deployment_regex found in namespace $namespace."
