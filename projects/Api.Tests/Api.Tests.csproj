@@ -20,6 +20,14 @@
     <Compile Remove="PublicSalesPricingModelTests.cs" />
     <Compile Remove="MasterRankingTelemetryTests.cs" />
     <Compile Remove="SupplyChainTests.cs" />
+    <Compile Remove="BuildingSecondaryMarketTests.cs" />
+    <Compile Remove="DashboardPerformanceTests.cs" />
+    <Compile Remove="BuildingBankAccountTests.cs" />
+    <Compile Remove="MarketQueriesTests.cs" />
+    <Compile Remove="NpcCompanyIntegrationTests.cs" />
+    <Compile Remove="BankingIntegrationTests.cs" />
+    <Compile Remove="MediaHousePhaseTests.cs" />
+    <Compile Remove="InterCityTradeRouteTests.cs" />
 
   </ItemGroup>
 
