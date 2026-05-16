@@ -1,8 +1,7 @@
 import { gqlRequest } from './graphql'
+import { resolveApiBaseUrl, resolveMasterGraphqlUrl } from './runtimeGraphqlUrl'
 
-const MASTER_API_BASE_URL = (
-  import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:44364/graphql'
-).replace(/\/graphql\/?$/, '')
+const MASTER_API_BASE_URL = resolveApiBaseUrl(resolveMasterGraphqlUrl(import.meta.env.VITE_GRAPHQL_URL))
 
 export interface GameServerSummary {
   id: string

@@ -7,8 +7,10 @@
  * always has a working save/load path.
  */
 
+import { resolveMasterGraphqlUrl } from './runtimeGraphqlUrl'
+
 const MASTER_GRAPHQL_URL =
-  import.meta.env.VITE_MASTER_GRAPHQL_URL || 'http://localhost:44364/graphql'
+  resolveMasterGraphqlUrl(import.meta.env.VITE_MASTER_GRAPHQL_URL, undefined, 'http://localhost:44364/graphql')
 
 const AUTH_PROVIDER_KEY = 'auth_provider'
 

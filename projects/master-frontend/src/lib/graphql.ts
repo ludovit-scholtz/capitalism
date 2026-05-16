@@ -1,4 +1,6 @@
-const GRAPHQL_URL = import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:44364/graphql'
+import { resolveMasterGraphqlUrl } from './runtimeGraphqlUrl'
+
+const GRAPHQL_URL = resolveMasterGraphqlUrl(import.meta.env.VITE_GRAPHQL_URL)
 const COOKIE_SESSION_SENTINEL = 'cookie-session'
 
 export interface GraphQLResponse<T> {

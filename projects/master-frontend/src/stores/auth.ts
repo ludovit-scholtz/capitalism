@@ -10,6 +10,7 @@ import {
   prolongSubscription,
   registerAccount,
 } from '@/lib/masterApi'
+import { resolveApiBaseUrl, resolveMasterGraphqlUrl } from '@/lib/runtimeGraphqlUrl'
 
 const EXPIRES_KEY = 'master_auth_expires'
 const AUTH_PROVIDER_KEY = 'master_auth_provider'
@@ -33,10 +34,7 @@ const BIATEC_OIDC_ALLOWED_ISSUERS = (
   .map((entry) => entry.trim())
   .filter((entry) => entry.length > 0)
 const TOKEN_RENEW_BEFORE_MS = 60 * 1000
-const API_BASE_URL = (import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:44364/graphql').replace(
-  /\/graphql\/?$/,
-  '',
-)
+const API_BASE_URL = resolveApiBaseUrl(resolveMasterGraphqlUrl(import.meta.env.VITE_GRAPHQL_URL))
 
 interface OidcStateRecord {
   state: string

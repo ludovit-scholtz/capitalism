@@ -7,6 +7,7 @@ import { gqlRequest } from '@/lib/graphql'
 import { gqlRequest as gqlMasterRequest } from '@/lib/graphqlMasterServer'
 import GenderPicker from '@/components/profile/GenderPicker.vue'
 import { generatePersonalAccountName, type PlayerGender } from '@/lib/personalAccountName'
+import { resolveApiBaseUrl, resolveGameGraphqlUrl } from '@/lib/runtimeGraphqlUrl'
 import PlayerProfileTabsContent from '@/components/profile/PlayerProfileTabsContent.vue'
 import type { PlayerProfile } from '@/components/profile/PlayerProfileTabsContent.vue'
 
@@ -14,7 +15,7 @@ const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
-const API_BASE_URL = (import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:44356/graphql').replace(/\/graphql\/?$/, '')
+const API_BASE_URL = resolveApiBaseUrl(resolveGameGraphqlUrl(import.meta.env.VITE_GRAPHQL_URL))
 
 // ── State ──────────────────────────────────────────────────────────────────────
 

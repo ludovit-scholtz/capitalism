@@ -4,6 +4,7 @@ import { gqlRequest, GraphQLError } from '@/lib/graphql'
 import { gqlRequest as gqlMasterRequest } from '@/lib/graphqlMasterServer'
 import { resolvePostLogoutRedirectUri } from '@/lib/authLogout'
 import { selectMainCity, shouldAutoSwitchCity } from '@/lib/cityContext'
+import { resolveApiBaseUrl, resolveGameGraphqlUrl, resolveOptionalMasterApiBaseUrl } from '@/lib/runtimeGraphqlUrl'
 import { deepEqual } from '@/lib/utils'
 import type { AccountContextResult, AccountContextType, Player, AuthPayload, Building, City } from '@/types'
 
@@ -25,8 +26,8 @@ const AUTH_PROVIDER_KEY = 'auth_provider'
 const AUTH_PROVIDER_LOCAL = 'local'
 const AUTH_PROVIDER_BIATEC = 'biatec_oidc'
 const COOKIE_SESSION_SENTINEL = 'cookie-session'
-const API_BASE_URL = (import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:44356/graphql').replace(/\/graphql\/?$/, '')
-const MASTER_SESSION_API_BASE_URL = (import.meta.env.VITE_MASTER_GRAPHQL_URL || '').replace(/\/graphql\/?$/, '')
+const API_BASE_URL = resolveApiBaseUrl(resolveGameGraphqlUrl(import.meta.env.VITE_GRAPHQL_URL))
+const MASTER_SESSION_API_BASE_URL = resolveOptionalMasterApiBaseUrl(import.meta.env.VITE_MASTER_GRAPHQL_URL)
 
 interface OidcPendingState {
   state: string

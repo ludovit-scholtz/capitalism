@@ -1,4 +1,6 @@
-const GRAPHQL_URL = import.meta.env.VITE_MASTER_GRAPHQL_URL || 'https://localhost:44364/graphql'
+import { resolveMasterGraphqlUrl } from './runtimeGraphqlUrl'
+
+const GRAPHQL_URL = resolveMasterGraphqlUrl(import.meta.env.VITE_MASTER_GRAPHQL_URL)
 
 export interface GraphQLResponse<T> {
   data?: T
