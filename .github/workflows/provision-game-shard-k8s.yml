@@ -132,6 +132,7 @@ jobs:
       K8S_NAMESPACE: ${{ needs.derive.outputs.namespace }}
       DB_NAME: ${{ needs.derive.outputs.db_name }}
       DB_USER: ${{ needs.derive.outputs.db_user }}
+      GAME_NAME: ${{ github.event.inputs.game_name }}
       GAME_API_IMAGE_REPOSITORY: harbor.de-4.biatec.io/biatec/capitalism-api
       GAME_FRONTEND_IMAGE_REPOSITORY: harbor.de-4.biatec.io/biatec/capitalism-frontend
       GAME_IMAGE_TAG: ${{ github.event.inputs.image_tag }}
@@ -143,6 +144,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Validate required secrets
+        env:
+          KUBE_CONFIG_DATA_SECRET: ${{ secrets.KUBE_CONFIG_DATA }}
+          HARBOR_USERNAME_SECRET: ${{ secrets.HARBOR_USERNAME }}
+          HARBOR_PASSWORD_SECRET: ${{ secrets.HARBOR_PASSWORD }}
+          MASTER_REGISTRATION_KEY_SECRET: ${{ secrets.MASTER_REGISTRATION_KEY }}
+          GAME_BOOTSTRAP_ADMIN_EMAIL_SECRET: ${{ secrets.GAME_BOOTSTRAP_ADMIN_EMAIL }}
         run: |
           set -euo pipefail
           missing=0
@@ -156,11 +163,11 @@ jobs:
             fi
           }
 
-          require_secret "KUBE_CONFIG_DATA" "${{ secrets.KUBE_CONFIG_DATA }}"
-          require_secret "HARBOR_USERNAME" "${{ secrets.HARBOR_USERNAME }}"
-          require_secret "HARBOR_PASSWORD" "${{ secrets.HARBOR_PASSWORD }}"
-          require_secret "MASTER_REGISTRATION_KEY" "${{ secrets.MASTER_REGISTRATION_KEY }}"
-          require_secret "GAME_BOOTSTRAP_ADMIN_EMAIL" "${{ secrets.GAME_BOOTSTRAP_ADMIN_EMAIL }}"
+          require_secret "KUBE_CONFIG_DATA" "$KUBE_CONFIG_DATA_SECRET"
+          require_secret "HARBOR_USERNAME" "$HARBOR_USERNAME_SECRET"
+          require_secret "HARBOR_PASSWORD" "$HARBOR_PASSWORD_SECRET"
+          require_secret "MASTER_REGISTRATION_KEY" "$MASTER_REGISTRATION_KEY_SECRET"
+          require_secret "GAME_BOOTSTRAP_ADMIN_EMAIL" "$GAME_BOOTSTRAP_ADMIN_EMAIL_SECRET"
 
           if [ "$missing" -ne 0 ]; then
             echo "One or more required secrets are missing in the '${TARGET_ENVIRONMENT}' environment. Configure secrets and re-run provisioning." >&2
@@ -635,13 +642,13 @@ jobs:
         run: |
           {
             echo "## Game shard provisioning summary"
-            echo "- Environment: \\`${TARGET_ENVIRONMENT}\\`"
-            echo "- Game name: \\`${{ github.event.inputs.game_name }}\\`"
-            echo "- Game city: \\`${CITY}\\`"
-            echo "- Server region: \\`${SERVER_REGION}\\`"
-            echo "- Shard slug: \\`${SHARD_SLUG}\\`"
-            echo "- Namespace: \\`${K8S_NAMESPACE}\\`"
-            echo "- Image tag: \\`${GAME_IMAGE_TAG}\\`"
+            echo "- Environment: ${TARGET_ENVIRONMENT}"
+            echo "- Game name: ${GAME_NAME}"
+            echo "- Game city: ${CITY}"
+            echo "- Server region: ${SERVER_REGION}"
+            echo "- Shard slug: ${SHARD_SLUG}"
+            echo "- Namespace: ${K8S_NAMESPACE}"
+            echo "- Image tag: ${GAME_IMAGE_TAG}"
             echo "- Frontend URL: https://${FRONTEND_HOST}"
             echo "- API URL: https://${API_HOST}"
           } >> "$GITHUB_STEP_SUMMARY"
