@@ -111,4 +111,7 @@ public static class LedgerCategory
     /// <summary>Expense recorded when perishable inventory quality reaches zero and the entire stock is written off.</summary>
     public const string SpoilageLoss = "SPOILAGE_LOSS";
     public const string GovernmentContractRevenue = "GOVERNMENT_CONTRACT_REVENUE";
+    public const string SupplyContractRevenue = "SUPPLY_CONTRACT_REVENUE";
+    public const string SupplyContractPayment = "SUPPLY_CONTRACT_PAYMENT";
+    public const string SupplyContractPenalty = "SUPPLY_CONTRACT_PENALTY";
 }

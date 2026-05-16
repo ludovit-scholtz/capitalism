@@ -284,6 +284,27 @@ public sealed partial class AppDbContext
             e.HasIndex(f => f.ContractId).IsUnique();
         });
 
+        modelBuilder.Entity<SupplyContract>(e =>
+        {
+            e.HasKey(contract => contract.Id);
+            e.Property(contract => contract.QuantityPerTick).HasPrecision(18, 4);
+            e.Property(contract => contract.PricePerUnit).HasPrecision(18, 4);
+            e.Property(contract => contract.PenaltyRatePercent).HasPrecision(6, 3);
+            e.Property(contract => contract.TotalDeliveredQuantity).HasPrecision(18, 4);
+            e.Property(contract => contract.TotalUndeliveredQuantity).HasPrecision(18, 4);
+            e.Property(contract => contract.TotalPenaltyAmount).HasPrecision(18, 4);
+            e.Property(contract => contract.CurrencyCode).HasMaxLength(8);
+            e.Property(contract => contract.Status).HasMaxLength(20);
+            e.HasOne(contract => contract.SellerCompany).WithMany().HasForeignKey(contract => contract.SellerCompanyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(contract => contract.BuyerCompany).WithMany().HasForeignKey(contract => contract.BuyerCompanyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(contract => contract.SellerBuildingUnit).WithMany().HasForeignKey(contract => contract.SellerBuildingUnitId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(contract => contract.ResourceType).WithMany().HasForeignKey(contract => contract.ResourceTypeId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(contract => contract.ProductType).WithMany().HasForeignKey(contract => contract.ProductTypeId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(contract => new { contract.Status, contract.StartTick });
+            e.HasIndex(contract => new { contract.BuyerCompanyId, contract.Status });
+            e.HasIndex(contract => new { contract.SellerCompanyId, contract.Status });
+        });
+
         modelBuilder.Entity<CityUnlockRequirement>(e =>
         {
             e.HasKey(requirement => requirement.Id);

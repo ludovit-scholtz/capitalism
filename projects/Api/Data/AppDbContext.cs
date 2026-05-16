@@ -231,6 +231,7 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<GovernmentContract> GovernmentContracts => Set<GovernmentContract>();
     public DbSet<ContractBid> ContractBids => Set<ContractBid>();
     public DbSet<ContractFulfillment> ContractFulfillments => Set<ContractFulfillment>();
+    public DbSet<SupplyContract> SupplyContracts => Set<SupplyContract>();
 
     /// <summary>Achievement badges earned by players for reaching milestones.</summary>
     public DbSet<PlayerAchievementBadge> PlayerAchievementBadges => Set<PlayerAchievementBadge>();

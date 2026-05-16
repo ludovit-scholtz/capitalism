@@ -179,6 +179,32 @@ export type MockLedgerEntry = {
   eventDescription?: string | null
 }
 
+export type MockSupplyContract = {
+  id: string
+  sellerCompanyId: string
+  sellerCompanyName: string
+  buyerCompanyId: string
+  buyerCompanyName: string
+  sellerBuildingUnitId: string
+  resourceTypeId: string | null
+  resourceTypeName: string | null
+  productTypeId: string | null
+  productTypeName: string | null
+  quantityPerTick: number
+  pricePerUnit: number
+  durationTicks: number
+  remainingTicks: number
+  startTick: number
+  penaltyRatePercent: number
+  currencyCode: string
+  status: 'PENDING' | 'ACTIVE' | 'FULFILLED' | 'BREACHED' | 'CANCELLED'
+  createdAtTick: number
+  totalDeliveredQuantity: number
+  totalUndeliveredQuantity: number
+  totalPenaltyAmount: number
+  penaltyCount: number
+}
+
 export type MockCompany = {
   id: string
   playerId: string
@@ -1434,6 +1460,8 @@ export type MockState = {
   governmentContracts: MockGovernmentContract[]
   /** Contract bids keyed by company for contract history views. */
   contractBids: MockContractBid[]
+  /** Long-term B2B supply contracts. */
+  supplyContracts: MockSupplyContract[]
   /** Mock NPC decision logs returned by npcDecisionLogs query. */
   npcDecisionLogs: MockNpcDecisionLog[]
   /** Rental revenue history per building for apartmentBuildingDetail query. */
@@ -3340,6 +3368,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     cityCompetitorsByCityId: {},
     governmentContracts: [],
     contractBids: [],
+    supplyContracts: [],
     npcDecisionLogs: [],
     rentalHistory: [],
     cityAverageRentPerSqm: 10,
@@ -8312,6 +8341,46 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    if (query.includes('myContracts')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const status = (body.variables?.status as string | undefined) ?? null
+      const player = state.players.find((item) => item.id === state.currentUserId)
+      const companyIds = new Set((player?.companies ?? []).map((company) => company.id))
+      const rows = state.supplyContracts.filter((contract) => {
+        const belongs = companyIds.has(contract.sellerCompanyId) || companyIds.has(contract.buyerCompanyId)
+        if (!belongs) return false
+        if (!status) return true
+        return contract.status === status
+      })
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { myContracts: rows } }),
+      })
+    }
+
+    if (query.includes('openContractOffers')) {
+      const cityId = body.variables?.cityId as string | undefined
+      const resourceTypeId = body.variables?.resourceTypeId as string | undefined
+      const cityCompanyIds = new Set(
+        state.players
+          .flatMap((player) => player.companies)
+          .filter((company) => company.buildings.some((building) => building.cityId === cityId))
+          .map((company) => company.id),
+      )
+      const rows = state.supplyContracts.filter(
+        (contract) =>
+          contract.status === 'PENDING' &&
+          cityCompanyIds.has(contract.sellerCompanyId) &&
+          (!resourceTypeId || contract.resourceTypeId === resourceTypeId),
+      )
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { openContractOffers: rows } }),
+      })
+    }
+
     if (query.includes('companyContracts')) {
       const companyId = body.variables?.companyId as string | undefined
       const companyContractIds = new Set(
@@ -11465,6 +11534,100 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { submitContractBid: { id: nextBid.id } } }),
+      })
+    }
+
+    if (query.includes('proposeSupplyContract')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const input = body.variables?.input as
+        | {
+            sellerCompanyId?: string
+            buyerCompanyId?: string
+            sellerBuildingUnitId?: string
+            resourceTypeId?: string | null
+            productTypeId?: string | null
+            quantityPerTick?: number
+            pricePerUnit?: number
+            durationTicks?: number
+            penaltyRatePercent?: number
+          }
+        | undefined
+
+      const sellerCompanyId = input?.sellerCompanyId ?? ''
+      const buyerCompanyId = input?.buyerCompanyId ?? ''
+      const sellerCompany = state.players.flatMap((player) => player.companies).find((company) => company.id === sellerCompanyId)
+      const buyerCompany = state.players.flatMap((player) => player.companies).find((company) => company.id === buyerCompanyId)
+      if (!sellerCompany || !buyerCompany) return routeJsonError('Company not found.', 'COMPANY_NOT_FOUND')
+      const contract: MockSupplyContract = {
+        id: crypto.randomUUID(),
+        sellerCompanyId,
+        sellerCompanyName: sellerCompany.name,
+        buyerCompanyId,
+        buyerCompanyName: buyerCompany.name,
+        sellerBuildingUnitId: input?.sellerBuildingUnitId ?? '',
+        resourceTypeId: input?.resourceTypeId ?? null,
+        resourceTypeName: input?.resourceTypeId ? 'Resource' : null,
+        productTypeId: input?.productTypeId ?? null,
+        productTypeName: input?.productTypeId ? 'Product' : null,
+        quantityPerTick: Number(input?.quantityPerTick ?? 0),
+        pricePerUnit: Number(input?.pricePerUnit ?? 0),
+        durationTicks: Number(input?.durationTicks ?? 25),
+        remainingTicks: Number(input?.durationTicks ?? 25),
+        startTick: state.gameState.currentTick + 1,
+        penaltyRatePercent: Number(input?.penaltyRatePercent ?? 0),
+        currencyCode: 'EUR',
+        status: 'PENDING',
+        createdAtTick: state.gameState.currentTick,
+        totalDeliveredQuantity: 0,
+        totalUndeliveredQuantity: 0,
+        totalPenaltyAmount: 0,
+        penaltyCount: 0,
+      }
+      state.supplyContracts.push(contract)
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { proposeSupplyContract: { success: true, message: 'ok', contract } } }),
+      })
+    }
+
+    if (query.includes('acceptSupplyContract')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const contractId = (body.variables?.id as string | undefined) ?? ''
+      const contract = state.supplyContracts.find((item) => item.id === contractId)
+      if (!contract) return routeJsonError('Supply contract not found.', 'SUPPLY_CONTRACT_NOT_FOUND')
+      contract.status = 'ACTIVE'
+      contract.startTick = state.gameState.currentTick + 1
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { acceptSupplyContract: { success: true, contract } } }),
+      })
+    }
+
+    if (query.includes('rejectSupplyContract')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const contractId = (body.variables?.id as string | undefined) ?? ''
+      const contract = state.supplyContracts.find((item) => item.id === contractId)
+      if (!contract) return routeJsonError('Supply contract not found.', 'SUPPLY_CONTRACT_NOT_FOUND')
+      contract.status = 'CANCELLED'
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { rejectSupplyContract: { success: true, contract } } }),
+      })
+    }
+
+    if (query.includes('cancelSupplyContract')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const contractId = (body.variables?.id as string | undefined) ?? ''
+      const contract = state.supplyContracts.find((item) => item.id === contractId)
+      if (!contract) return routeJsonError('Supply contract not found.', 'SUPPLY_CONTRACT_NOT_FOUND')
+      contract.status = 'CANCELLED'
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { cancelSupplyContract: { success: true, contract } } }),
       })
     }
 
