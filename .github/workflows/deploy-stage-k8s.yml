@@ -20,6 +20,4 @@ jobs:
       frontend_host: www.stage.capitalism5.com
       api_host: api.stage.capitalism5.com
       redirect_host: ''
-      wildcard_domain: '*.stage.capitalism5.com'
-      wildcard_secret_name: capitalism5-stage-wildcard-tls
     secrets: inherit

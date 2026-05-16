@@ -24,14 +24,6 @@ on:
         required: false
         default: ''
         type: string
-      wildcard_domain:
-        description: Wildcard domain for shard TLS certificate (e.g. *.capitalism5.com)
-        required: true
-        type: string
-      wildcard_secret_name:
-        description: Kubernetes TLS secret name for wildcard certificate
-        required: true
-        type: string
       image_tag:
         description: Container tag suffix (default github.sha)
         required: false
@@ -44,7 +36,7 @@ on:
         required: true
       HARBOR_PASSWORD:
         required: true
-      MASTER_DB_CONNECTION_STRING:
+      MASTER_DB_PASSWORD:
         required: true
       MASTER_JWT_SIGNING_KEY:
         required: true
@@ -74,8 +66,9 @@ jobs:
       FRONTEND_HOST: ${{ inputs.frontend_host }}
       API_HOST: ${{ inputs.api_host }}
       REDIRECT_HOST: ${{ inputs.redirect_host }}
-      WILDCARD_DOMAIN: ${{ inputs.wildcard_domain }}
-      WILDCARD_SECRET_NAME: ${{ inputs.wildcard_secret_name }}
+      MASTER_DB_HOST: master-postgres
+      MASTER_DB_NAME: gamemaster
+      MASTER_DB_USER: masterapp
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -144,6 +137,8 @@ jobs:
         run: |
           set -euo pipefail
           printf '%s\n' "::add-mask::${{ secrets.MASTER_ROOT_ADMIN_EMAIL }}"
+          connection_string="Host=${MASTER_DB_HOST};Port=5432;Database=${MASTER_DB_NAME};Username=${MASTER_DB_USER};Password=${{ secrets.MASTER_DB_PASSWORD }};SSL Mode=Disable"
+
           kubectl create configmap master-runtime-config \
             --namespace "$K8S_NAMESPACE" \
             --from-literal=MasterFrontendHost="$FRONTEND_HOST" \
@@ -152,55 +147,88 @@ jobs:
 
           kubectl create secret generic master-runtime-secrets \
             --namespace "$K8S_NAMESPACE" \
-            --from-literal=ConnectionStrings__MasterCatalog='${{ secrets.MASTER_DB_CONNECTION_STRING }}' \
+            --from-literal=ConnectionStrings__MasterCatalog="$connection_string" \
+            --from-literal=MasterDb__Password='${{ secrets.MASTER_DB_PASSWORD }}' \
             --from-literal=Jwt__SigningKey='${{ secrets.MASTER_JWT_SIGNING_KEY }}' \
             --from-literal=MasterServer__RegistrationKey='${{ secrets.MASTER_REGISTRATION_KEY }}' \
             --from-literal=GameAdministration__RootAdministratorEmails__0='${{ secrets.MASTER_ROOT_ADMIN_EMAIL }}' \
             --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Apply cert-manager certificate resources
-        run: |
-          set -euo pipefail
-          redirect_dns=''
-          if [ -n "$REDIRECT_HOST" ]; then
-            redirect_dns="              - ${REDIRECT_HOST}"
-          fi
-          cat <<EOF | kubectl apply -f -
-          apiVersion: cert-manager.io/v1
-          kind: Certificate
-          metadata:
-            name: master-endpoints
-            namespace: ${K8S_NAMESPACE}
-          spec:
-            secretName: master-endpoints-tls
-            issuerRef:
-              name: letsencrypt-dns
-              kind: ClusterIssuer
-            dnsNames:
-              - ${FRONTEND_HOST}
-              - ${API_HOST}
-          ${redirect_dns}
-          ---
-          apiVersion: cert-manager.io/v1
-          kind: Certificate
-          metadata:
-            name: shard-wildcard
-            namespace: ${K8S_NAMESPACE}
-          spec:
-            secretName: ${WILDCARD_SECRET_NAME}
-            issuerRef:
-              name: letsencrypt-dns
-              kind: ClusterIssuer
-            dnsNames:
-              - ${WILDCARD_DOMAIN}
-          EOF
-
-      - name: Deploy master API, frontend and ingress
+      - name: Deploy master PostgreSQL, API, frontend and ingress
         id: deploy_rollout
         run: |
           set -euo pipefail
 
+          api_cors_redirect_env=''
+          if [ -n "$REDIRECT_HOST" ]; then
+            api_cors_redirect_env="                      - name: Cors__AllowedOrigins__1
+                        value: https://${REDIRECT_HOST}"
+          fi
+
           cat <<EOF | kubectl apply -f -
+          apiVersion: apps/v1
+          kind: StatefulSet
+          metadata:
+            name: ${MASTER_DB_HOST}
+            namespace: ${K8S_NAMESPACE}
+          spec:
+            serviceName: ${MASTER_DB_HOST}
+            replicas: 1
+            selector:
+              matchLabels:
+                app: ${MASTER_DB_HOST}
+            template:
+              metadata:
+                labels:
+                  app: ${MASTER_DB_HOST}
+              spec:
+                containers:
+                  - name: postgres
+                    image: postgres:16-alpine
+                    ports:
+                      - containerPort: 5432
+                    env:
+                      - name: POSTGRES_DB
+                        value: ${MASTER_DB_NAME}
+                      - name: POSTGRES_USER
+                        value: ${MASTER_DB_USER}
+                      - name: POSTGRES_PASSWORD
+                        valueFrom:
+                          secretKeyRef:
+                            name: master-runtime-secrets
+                            key: MasterDb__Password
+                    readinessProbe:
+                      exec:
+                        command:
+                          - sh
+                          - -c
+                          - pg_isready -U ${MASTER_DB_USER} -d ${MASTER_DB_NAME}
+                      periodSeconds: 10
+                    volumeMounts:
+                      - name: postgres-data
+                        mountPath: /var/lib/postgresql/data
+            volumeClaimTemplates:
+              - metadata:
+                  name: postgres-data
+                spec:
+                  accessModes: ["ReadWriteOnce"]
+                  resources:
+                    requests:
+                      storage: 20Gi
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: ${MASTER_DB_HOST}
+            namespace: ${K8S_NAMESPACE}
+          spec:
+            selector:
+              app: ${MASTER_DB_HOST}
+            ports:
+              - name: postgres
+                port: 5432
+                targetPort: 5432
+          ---
           apiVersion: apps/v1
           kind: Deployment
           metadata:
@@ -228,6 +256,7 @@ jobs:
                         value: Production
                       - name: Cors__AllowedOrigins__0
                         value: https://${FRONTEND_HOST}
+                      ${api_cors_redirect_env}
                       - name: ConnectionStrings__MasterCatalog
                         valueFrom:
                           secretKeyRef:
@@ -335,7 +364,7 @@ jobs:
             tls:
               - hosts:
                   - ${API_HOST}
-                secretName: master-endpoints-tls
+                secretName: master-api-tls
             rules:
               - host: ${API_HOST}
                 http:
@@ -360,7 +389,7 @@ jobs:
             tls:
               - hosts:
                   - ${FRONTEND_HOST}
-                secretName: master-endpoints-tls
+                secretName: master-frontend-tls
             rules:
               - host: ${FRONTEND_HOST}
                 http:
@@ -389,7 +418,7 @@ jobs:
               tls:
                 - hosts:
                     - ${REDIRECT_HOST}
-                  secretName: master-endpoints-tls
+                  secretName: master-redirect-tls
               rules:
                 - host: ${REDIRECT_HOST}
                   http:
@@ -404,6 +433,7 @@ jobs:
             EOF
           fi
 
+          kubectl rollout status statefulset/${MASTER_DB_HOST} --namespace "$K8S_NAMESPACE" --timeout=420s
           kubectl rollout status deployment/master-api --namespace "$K8S_NAMESPACE" --timeout=300s
           kubectl rollout status deployment/master-frontend --namespace "$K8S_NAMESPACE" --timeout=300s
 
@@ -438,7 +468,7 @@ jobs:
           fi
 
           if [ "$api_ok" != "1" ]; then
-            echo "Smoke check failed: https://${API_HOST}/healthz did not return HTTP 200. Check ConnectionStrings__MasterCatalog secret and API rollout." >&2
+            echo "Smoke check failed: https://${API_HOST}/healthz did not return HTTP 200. Check database rollout and API deployment." >&2
             exit 1
           fi
 
@@ -456,13 +486,13 @@ jobs:
         run: |
           {
             echo "## Master deployment summary"
-            echo "- Environment: \\`${{ inputs.environment_name }}\\`"
-            echo "- Namespace: \\`${K8S_NAMESPACE}\\`"
-            echo "- Image tag: \\`${MASTER_DEPLOY_TAG}\\`"
+            echo "- Environment: \`${{ inputs.environment_name }}\`"
+            echo "- Namespace: \`${K8S_NAMESPACE}\`"
+            echo "- Image tag: \`${MASTER_DEPLOY_TAG}\`"
             echo "- Frontend host: https://${FRONTEND_HOST}"
             echo "- API host: https://${API_HOST}"
             if [ -n "$REDIRECT_HOST" ]; then
               echo "- Canonical redirect source: https://${REDIRECT_HOST}"
             fi
-            echo "- Wildcard certificate domain: \\`${WILDCARD_DOMAIN}\\`"
+            echo "- Master DB service: \`${MASTER_DB_HOST}:5432\`"
           } >> "$GITHUB_STEP_SUMMARY"

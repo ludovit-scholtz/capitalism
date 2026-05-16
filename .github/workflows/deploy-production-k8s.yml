@@ -23,7 +23,5 @@ jobs:
       frontend_host: www.capitalism5.com
       api_host: api.capitalism5.com
       redirect_host: capitalism5.com
-      wildcard_domain: '*.capitalism5.com'
-      wildcard_secret_name: capitalism5-wildcard-tls
       image_tag: ${{ inputs.image_tag }}
     secrets: inherit

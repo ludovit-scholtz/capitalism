@@ -51,6 +51,7 @@ jobs:
       base_domain: ${{ steps.derive.outputs.base_domain }}
       frontend_host: ${{ steps.derive.outputs.frontend_host }}
       api_host: ${{ steps.derive.outputs.api_host }}
+      master_graphql_url: ${{ steps.derive.outputs.master_graphql_url }}
       namespace: ${{ steps.derive.outputs.namespace }}
       db_name: ${{ steps.derive.outputs.db_name }}
       db_user: ${{ steps.derive.outputs.db_user }}
@@ -99,6 +100,7 @@ jobs:
 
           frontend_host="${shard_slug}.${base_domain}"
           api_host="${shard_slug}-api.${base_domain}"
+          master_graphql_url="https://api.${base_domain}/graphql"
 
           {
             echo "shard_slug=$shard_slug"
@@ -106,6 +108,7 @@ jobs:
             echo "base_domain=$base_domain"
             echo "frontend_host=$frontend_host"
             echo "api_host=$api_host"
+            echo "master_graphql_url=$master_graphql_url"
             echo "namespace=$namespace"
             echo "db_name=$db_name"
             echo "db_user=$db_user"
@@ -125,6 +128,7 @@ jobs:
       BASE_DOMAIN: ${{ needs.derive.outputs.base_domain }}
       FRONTEND_HOST: ${{ needs.derive.outputs.frontend_host }}
       API_HOST: ${{ needs.derive.outputs.api_host }}
+      MASTER_GRAPHQL_URL: ${{ needs.derive.outputs.master_graphql_url }}
       K8S_NAMESPACE: ${{ needs.derive.outputs.namespace }}
       DB_NAME: ${{ needs.derive.outputs.db_name }}
       DB_USER: ${{ needs.derive.outputs.db_user }}
@@ -155,7 +159,6 @@ jobs:
           require_secret "KUBE_CONFIG_DATA" "${{ secrets.KUBE_CONFIG_DATA }}"
           require_secret "HARBOR_USERNAME" "${{ secrets.HARBOR_USERNAME }}"
           require_secret "HARBOR_PASSWORD" "${{ secrets.HARBOR_PASSWORD }}"
-          require_secret "MASTER_GRAPHQL_URL" "${{ secrets.MASTER_GRAPHQL_URL }}"
           require_secret "MASTER_REGISTRATION_KEY" "${{ secrets.MASTER_REGISTRATION_KEY }}"
           require_secret "GAME_BOOTSTRAP_ADMIN_EMAIL" "${{ secrets.GAME_BOOTSTRAP_ADMIN_EMAIL }}"
 
@@ -208,24 +211,6 @@ jobs:
             --docker-username='${{ secrets.HARBOR_USERNAME }}' \
             --docker-password='${{ secrets.HARBOR_PASSWORD }}' \
             --dry-run=client -o yaml | kubectl apply -f -
-
-      - name: Apply cert-manager wildcard certificate
-        run: |
-          set -euo pipefail
-          cat <<EOF | kubectl apply -f -
-          apiVersion: cert-manager.io/v1
-          kind: Certificate
-          metadata:
-            name: shard-wildcard
-            namespace: ${K8S_NAMESPACE}
-          spec:
-            secretName: shard-wildcard-tls
-            issuerRef:
-              name: letsencrypt-dns
-              kind: ClusterIssuer
-            dnsNames:
-              - *.${BASE_DOMAIN}
-          EOF
 
       - name: Apply shard secrets
         run: |
@@ -341,6 +326,8 @@ jobs:
                           secretKeyRef:
                             name: shard-runtime-secrets
                             key: CONNECTION_STRING
+                      - name: Cors__AllowedOrigins__0
+                        value: https://${FRONTEND_HOST}
                       - name: Jwt__SigningKey
                         valueFrom:
                           secretKeyRef:
@@ -356,7 +343,7 @@ jobs:
                       - name: MasterServer__RegistrationEnabled
                         value: "true"
                       - name: MasterServer__ApiUrl
-                        value: '${{ secrets.MASTER_GRAPHQL_URL }}'
+                        value: ${MASTER_GRAPHQL_URL}
                       - name: MasterServer__RegistrationKey
                         valueFrom:
                           secretKeyRef:
@@ -467,7 +454,7 @@ jobs:
             tls:
               - hosts:
                   - ${API_HOST}
-                secretName: shard-wildcard-tls
+                secretName: ${K8S_SLUG}-api-tls
             rules:
               - host: ${API_HOST}
                 http:
@@ -492,7 +479,7 @@ jobs:
             tls:
               - hosts:
                   - ${FRONTEND_HOST}
-                secretName: shard-wildcard-tls
+                secretName: ${K8S_SLUG}-frontend-tls
             rules:
               - host: ${FRONTEND_HOST}
                 http:
@@ -556,7 +543,7 @@ jobs:
           registry_ok=0
           registry_query='{"query":"query GameServers { gameServers { serverKey frontendUrl isActive } }"}'
           for attempt in {1..30}; do
-            registry_response=$(curl -sS -X POST '${{ secrets.MASTER_GRAPHQL_URL }}' -H 'content-type: application/json' --data "$registry_query")
+            registry_response=$(curl -sS -X POST "${MASTER_GRAPHQL_URL}" -H 'content-type: application/json' --data "$registry_query")
             if echo "$registry_response" | jq -e --arg key "$SHARD_SLUG" '.data.gameServers[]? | select(.serverKey == $key and .isActive == true)' >/dev/null 2>&1; then
               registry_ok=1
               break
@@ -565,7 +552,7 @@ jobs:
           done
 
           if [ "$registry_ok" != "1" ]; then
-            echo "Registration check failed: shard '$SHARD_SLUG' is not active in master registry. Check MASTER_GRAPHQL_URL and MasterServer__RegistrationKey configuration." >&2
+            echo "Registration check failed: shard '$SHARD_SLUG' is not active in master registry. Check MasterServer__ApiUrl and MasterServer__RegistrationKey configuration." >&2
             exit 1
           fi
 
