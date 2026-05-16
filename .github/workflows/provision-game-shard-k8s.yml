@@ -426,7 +426,7 @@ jobs:
             name: ${K8S_SLUG}-api
             namespace: ${K8S_NAMESPACE}
           spec:
-            replicas: 2
+            replicas: 1
             selector:
               matchLabels:
                 app: ${K8S_SLUG}-api
@@ -707,6 +707,21 @@ jobs:
             echo "Registration check failed: shard '$SHARD_SLUG' is not active in master registry. Check MasterServer__ApiUrl and MasterServer__RegistrationKey configuration." >&2
             exit 1
           fi
+
+      - name: Scale shard API to steady-state replicas
+        run: |
+          set -euo pipefail
+
+          # Bring up the first API pod alone so database migrations and seeding only
+          # gate a single cold-start replica, then scale out after the shard is healthy.
+          current_replicas=$(kubectl get deployment/${K8S_SLUG}-api --namespace "$K8S_NAMESPACE" -o jsonpath='{.spec.replicas}')
+          if [ "$current_replicas" = "2" ]; then
+            echo "Shard API deployment is already at 2 replicas."
+            exit 0
+          fi
+
+          kubectl scale deployment/${K8S_SLUG}-api --namespace "$K8S_NAMESPACE" --replicas=2
+          kubectl rollout status deployment/${K8S_SLUG}-api --namespace "$K8S_NAMESPACE" --timeout=600s
 
       - name: Roll back shard deployment on smoke-check failure
         if: failure() && steps.deploy_rollout.outcome == 'success'
