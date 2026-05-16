@@ -54,3 +54,37 @@ export interface ContractFulfillmentResult {
   settledRevenue: number | null
   latePenaltyApplied: boolean
 }
+
+export type SupplyContractStatus = 'PENDING' | 'ACTIVE' | 'FULFILLED' | 'BREACHED' | 'CANCELLED'
+
+export interface SupplyContractCard {
+  id: string
+  sellerCompanyId: string
+  sellerCompanyName: string
+  buyerCompanyId: string
+  buyerCompanyName: string
+  sellerBuildingUnitId: string
+  resourceTypeId: string | null
+  resourceTypeName: string | null
+  productTypeId: string | null
+  productTypeName: string | null
+  quantityPerTick: number
+  pricePerUnit: number
+  durationTicks: number
+  remainingTicks: number
+  startTick: number
+  penaltyRatePercent: number
+  currencyCode: string
+  status: SupplyContractStatus
+  createdAtTick: number
+  totalDeliveredQuantity: number
+  totalUndeliveredQuantity: number
+  totalPenaltyAmount: number
+  penaltyCount: number
+}
+
+export interface SupplyContractActionResult {
+  success: boolean
+  message: string | null
+  contract: SupplyContractCard
+}

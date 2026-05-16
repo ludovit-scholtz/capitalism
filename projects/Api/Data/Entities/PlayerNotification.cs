@@ -86,6 +86,12 @@ public static class PlayerNotificationType
     public const string ContractAwarded = "CONTRACT_AWARDED";
     public const string ContractFulfillmentComplete = "CONTRACT_FULFILLMENT_COMPLETE";
     public const string ContractDeadlineWarning = "CONTRACT_DEADLINE_WARNING";
+    public const string SupplyContractProposed = "SUPPLY_CONTRACT_PROPOSED";
+    public const string SupplyContractAccepted = "SUPPLY_CONTRACT_ACCEPTED";
+    public const string SupplyContractRejected = "SUPPLY_CONTRACT_REJECTED";
+    public const string SupplyContractFirstDelivery = "SUPPLY_CONTRACT_FIRST_DELIVERY";
+    public const string SupplyContractPenalty = "SUPPLY_CONTRACT_PENALTY";
+    public const string SupplyContractFulfilled = "SUPPLY_CONTRACT_FULFILLED";
 }
 
 public static class PlayerNotificationSeverity

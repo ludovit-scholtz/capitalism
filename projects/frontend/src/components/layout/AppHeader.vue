@@ -244,6 +244,7 @@ const mobileNavSections = computed(() => {
         { key: 'exchange', label: t('nav.exchange'), to: '/exchange', icon: ['fas', 'chart-bar'], visible: true, badge: 0 },
         { key: 'stocks', label: t('nav.stocks'), to: '/stocks', icon: ['fas', 'wallet'], visible: true, badge: showStockProposalBadge.value ? stockProposalBadgeCount.value : 0 },
         { key: 'forex', label: t('nav.forex'), to: '/forex', icon: ['fas', 'coins'], visible: auth.isAuthenticated, badge: 0 },
+        { key: 'contracts', label: t('nav.contracts'), to: '/contracts', icon: ['fas', 'route'], visible: auth.isAuthenticated, badge: 0 },
         { key: 'banking', label: t('nav.banking'), to: '/banking', icon: ['fas', 'landmark'], visible: true, badge: 0 },
         { key: 'bank-statement', label: t('nav.bankStatement'), to: '/bank-statement', icon: ['fas', 'file-invoice-dollar'], visible: auth.isAuthenticated, badge: 0 },
         { key: 'campaigns', label: t('nav.campaignAnalytics'), to: '/market-intelligence', icon: ['fas', 'bullhorn'], visible: auth.isAuthenticated, badge: 0 },
@@ -353,6 +354,9 @@ useTickRefresh(async () => {
           </RouterLink>
           <RouterLink v-if="auth.isAuthenticated" to="/forex" :title="t('nav.forex')" class="nav-link" @click="closeMenu">
             <font-awesome-icon :icon="['fas', 'coins']" class="mr-2" />
+          </RouterLink>
+          <RouterLink v-if="auth.isAuthenticated" to="/contracts" :title="t('nav.contracts')" class="nav-link" @click="closeMenu">
+            <font-awesome-icon :icon="['fas', 'route']" class="mr-2" />
           </RouterLink>
           <RouterLink v-if="auth.isAuthenticated" to="/bank-statement" :title="t('nav.bankStatement')" class="nav-link" @click="closeMenu">
             <font-awesome-icon :icon="['fas', 'file-invoice-dollar']" class="mr-2" />
