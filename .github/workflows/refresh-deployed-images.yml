@@ -175,20 +175,90 @@ jobs:
         run: |
           set -euo pipefail
 
+          failed_targets=()
+
+          record_failure() {
+            local target="$1"
+            local reason="$2"
+            echo "::error::$target: $reason"
+            failed_targets+=("$target")
+          }
+
+          emit_rollout_diagnostics() {
+            local namespace="$1"
+            local deployment="$2"
+            local selector
+
+            echo "Diagnostics for $namespace/$deployment:" >&2
+            kubectl describe deployment "$deployment" --namespace "$namespace" >&2 || true
+
+            selector=$(kubectl get deployment "$deployment" --namespace "$namespace" -o json \
+              | jq -r '[.spec.selector.matchLabels // {} | to_entries[] | "\(.key)=\(.value)"] | join(",")')
+
+            if [ -n "$selector" ] && [ "$selector" != "null" ]; then
+              kubectl get pods --namespace "$namespace" -l "$selector" -o wide >&2 || true
+              kubectl describe pods --namespace "$namespace" -l "$selector" >&2 || true
+            fi
+          }
+
+          wait_for_observed_generation() {
+            local namespace="$1"
+            local deployment="$2"
+            local expected_generation="$3"
+            local observed_generation=""
+
+            for _ in $(seq 1 30); do
+              observed_generation=$(kubectl get deployment "$deployment" --namespace "$namespace" -o jsonpath='{.status.observedGeneration}' 2>/dev/null || true)
+              if [ -n "$observed_generation" ] && [ "$observed_generation" -ge "$expected_generation" ]; then
+                return 0
+              fi
+              sleep 2
+            done
+
+            return 1
+          }
+
+          apply_deployment_update() {
+            local namespace="$1"
+            local deployment="$2"
+            local container_name="$3"
+            local image_ref="$4"
+            local target="$namespace/$deployment"
+            local new_generation
+
+            if ! kubectl get deployment "$deployment" --namespace "$namespace" >/dev/null 2>&1; then
+              echo "Skipping missing deployment $target."
+              return 0
+            fi
+
+            echo "Updating $target ($container_name) to $image_ref"
+            if ! kubectl set image "deployment/$deployment" "$container_name=$image_ref" --namespace "$namespace"; then
+              record_failure "$target" "kubectl set image failed"
+              emit_rollout_diagnostics "$namespace" "$deployment"
+              return 0
+            fi
+
+            new_generation=$(kubectl get deployment "$deployment" --namespace "$namespace" -o jsonpath='{.metadata.generation}')
+            if ! wait_for_observed_generation "$namespace" "$deployment" "$new_generation"; then
+              record_failure "$target" "controller did not observe generation $new_generation in time"
+              emit_rollout_diagnostics "$namespace" "$deployment"
+              return 0
+            fi
+
+            if ! kubectl rollout status "deployment/$deployment" --namespace "$namespace" --timeout=900s; then
+              record_failure "$target" "rollout status failed"
+              emit_rollout_diagnostics "$namespace" "$deployment"
+              return 0
+            fi
+          }
+
           patch_named_deployment() {
             local namespace="$1"
             local deployment="$2"
             local container_name="$3"
             local image_ref="$4"
 
-            if ! kubectl get deployment "$deployment" --namespace "$namespace" >/dev/null 2>&1; then
-              echo "Skipping missing deployment $namespace/$deployment."
-              return 0
-            fi
-
-            echo "Updating $namespace/$deployment ($container_name) to $image_ref"
-            kubectl set image "deployment/$deployment" "$container_name=$image_ref" --namespace "$namespace"
-            kubectl rollout status "deployment/$deployment" --namespace "$namespace" --timeout=900s
+            apply_deployment_update "$namespace" "$deployment" "$container_name" "$image_ref"
           }
 
           resolve_container_name() {
@@ -260,28 +330,36 @@ jobs:
               fi
 
               for deployment in $deployments; do
-                container_name=$(resolve_container_name "$namespace" "$deployment" "$preferred_container" "$image_repository")
-                echo "Updating $namespace/$deployment ($container_name) to $image_ref"
-                kubectl set image "deployment/$deployment" "$container_name=$image_ref" --namespace "$namespace"
-                kubectl rollout status "deployment/$deployment" --namespace "$namespace" --timeout=900s
+                if ! container_name=$(resolve_container_name "$namespace" "$deployment" "$preferred_container" "$image_repository"); then
+                  record_failure "$namespace/$deployment" "could not resolve container name"
+                  emit_rollout_diagnostics "$namespace" "$deployment"
+                  continue
+                fi
+
+                apply_deployment_update "$namespace" "$deployment" "$container_name" "$image_ref"
               done
             done
           }
 
           if [ "$TARGET_ENVIRONMENT" = "stage" ]; then
+            refresh_shard_deployments '^capitalism-stage-' '-api$' 'game-api' "$GAME_API_IMAGE_REPOSITORY" "$GAME_API_IMAGE_REF" 'stage shard'
+            refresh_shard_deployments '^capitalism-stage-' '-frontend$' 'game-frontend' "$GAME_FRONTEND_IMAGE_REPOSITORY" "$GAME_FRONTEND_IMAGE_REF" 'stage shard'
             patch_named_deployment "capitalism" "capitalism-api" "capitalism-api" "$GAME_API_IMAGE_REF"
             patch_named_deployment "capitalism" "capitalism-frontend" "capitalism-frontend" "$GAME_FRONTEND_IMAGE_REF"
             patch_named_deployment "capitalism-stage" "master-api" "master-api" "$MASTER_API_IMAGE_REF"
             patch_named_deployment "capitalism-stage" "master-frontend" "master-frontend" "$MASTER_FRONTEND_IMAGE_REF"
-            refresh_shard_deployments '^capitalism-stage-' '-api$' 'game-api' "$GAME_API_IMAGE_REPOSITORY" "$GAME_API_IMAGE_REF" 'stage shard'
-            refresh_shard_deployments '^capitalism-stage-' '-frontend$' 'game-frontend' "$GAME_FRONTEND_IMAGE_REPOSITORY" "$GAME_FRONTEND_IMAGE_REF" 'stage shard'
-            exit 0
+          else
+            refresh_shard_deployments '^capitalism-production-' '-api$' 'game-api' "$GAME_API_IMAGE_REPOSITORY" "$GAME_API_IMAGE_REF" 'production shard'
+            refresh_shard_deployments '^capitalism-production-' '-frontend$' 'game-frontend' "$GAME_FRONTEND_IMAGE_REPOSITORY" "$GAME_FRONTEND_IMAGE_REF" 'production shard'
+            patch_named_deployment "capitalism-production" "master-api" "master-api" "$MASTER_API_IMAGE_REF"
+            patch_named_deployment "capitalism-production" "master-frontend" "master-frontend" "$MASTER_FRONTEND_IMAGE_REF"
           fi
 
-          patch_named_deployment "capitalism-production" "master-api" "master-api" "$MASTER_API_IMAGE_REF"
-          patch_named_deployment "capitalism-production" "master-frontend" "master-frontend" "$MASTER_FRONTEND_IMAGE_REF"
-          refresh_shard_deployments '^capitalism-production-' '-api$' 'game-api' "$GAME_API_IMAGE_REPOSITORY" "$GAME_API_IMAGE_REF" 'production shard'
-          refresh_shard_deployments '^capitalism-production-' '-frontend$' 'game-frontend' "$GAME_FRONTEND_IMAGE_REPOSITORY" "$GAME_FRONTEND_IMAGE_REF" 'production shard'
+          if [ "${#failed_targets[@]}" -gt 0 ]; then
+            printf 'Refresh completed with rollout failures:\n' >&2
+            printf ' - %s\n' "${failed_targets[@]}" >&2
+            exit 1
+          fi
 
       - name: Refresh summary
         if: always()
