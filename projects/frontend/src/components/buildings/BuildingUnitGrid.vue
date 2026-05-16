@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
 import DiagonalConnector from '@/components/buildings/DiagonalConnector.vue'
+import UnitLinkArrow from '@/components/buildings/UnitLinkArrow.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -44,8 +45,6 @@ const {
   getVerticalLinkStateFor,
   getPrimaryDiagonalLinkStateFor,
   getSecondaryDiagonalLinkStateFor,
-  getHorizontalLinkArrow,
-  getVerticalLinkArrow,
   isHorizontalLinkLive,
   isVerticalLinkLive,
   isLinkConnectedToSelectedCell,
@@ -238,9 +237,13 @@ function closeEditMode() {
                 :title="getHorizontalLinkFlowHint(activeUnits, x, y)"
               >
                 <span class="link-line"></span>
-                <span v-if="getHorizontalLinkStateFor(activeUnits, x, y) !== 'none'" class="link-arrow" aria-hidden="true">{{
-                  getHorizontalLinkArrow(getHorizontalLinkStateFor(activeUnits, x, y))
-                }}</span>
+                <UnitLinkArrow
+                  v-if="getHorizontalLinkStateFor(activeUnits, x, y) !== 'none'"
+                  class="link-arrow"
+                  :state="getHorizontalLinkStateFor(activeUnits, x, y)"
+                  orientation="horizontal"
+                  :active="isHorizontalLinkLive(activeUnits, x, y)"
+                />
               </div>
             </template>
           </div>
@@ -261,7 +264,13 @@ function closeEditMode() {
                 :title="getVerticalLinkFlowHint(activeUnits, x, y)"
               >
                 <span class="link-line"></span>
-                <span v-if="getVerticalLinkStateFor(activeUnits, x, y) !== 'none'" class="link-arrow" aria-hidden="true">{{ getVerticalLinkArrow(getVerticalLinkStateFor(activeUnits, x, y)) }}</span>
+                <UnitLinkArrow
+                  v-if="getVerticalLinkStateFor(activeUnits, x, y) !== 'none'"
+                  class="link-arrow"
+                  :state="getVerticalLinkStateFor(activeUnits, x, y)"
+                  orientation="vertical"
+                  :active="isVerticalLinkLive(activeUnits, x, y)"
+                />
               </div>
 
               <DiagonalConnector
@@ -492,9 +501,13 @@ function closeEditMode() {
                 @click="toggleHorizontalLink(x, y)"
               >
                 <span class="link-line"></span>
-                <span v-if="getHorizontalLinkStateFor(plannedUnits, x, y) !== 'none'" class="link-arrow" aria-hidden="true">{{
-                  getHorizontalLinkArrow(getHorizontalLinkStateFor(plannedUnits, x, y))
-                }}</span>
+                <UnitLinkArrow
+                  v-if="getHorizontalLinkStateFor(plannedUnits, x, y) !== 'none'"
+                  class="link-arrow"
+                  :state="getHorizontalLinkStateFor(plannedUnits, x, y)"
+                  orientation="horizontal"
+                  :active="isHorizontalLinkActiveFor(plannedUnits, x, y)"
+                />
               </button>
             </template>
           </div>
@@ -517,7 +530,13 @@ function closeEditMode() {
                 @click="toggleVerticalLink(x, y)"
               >
                 <span class="link-line"></span>
-                <span v-if="getVerticalLinkStateFor(plannedUnits, x, y) !== 'none'" class="link-arrow" aria-hidden="true">{{ getVerticalLinkArrow(getVerticalLinkStateFor(plannedUnits, x, y)) }}</span>
+                <UnitLinkArrow
+                  v-if="getVerticalLinkStateFor(plannedUnits, x, y) !== 'none'"
+                  class="link-arrow"
+                  :state="getVerticalLinkStateFor(plannedUnits, x, y)"
+                  orientation="vertical"
+                  :active="isVerticalLinkActiveFor(plannedUnits, x, y)"
+                />
               </button>
 
               <DiagonalConnector

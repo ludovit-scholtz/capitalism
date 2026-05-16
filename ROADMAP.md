@@ -32,6 +32,7 @@ Create a fun game in the style of Capitalism II, where players experience realis
 - [x] (100%) When building is in editation mode, make sure the tabs are properly used in routing
 - [x] (100%) Unit configuration - the performance tab is not styled properly. Make sure to use the best practices, use tailwind and redisign the whole tab.
 - [x] (100%) Unit configuration - the maintanance tab is not styled properly. Make sure to use the best practices, use tailwind and redisign the whole tab.
+- [x] (100%) Unit Grid Visual Enhancement is live: configured resources now render directly in unit cells with fill-level indicators (green/amber/red thresholds), directional unit links use SVG arrows with active/inactive states, selected-unit cost + movement analytics remain visible in the side panel, and public-sales detail keeps market-share and 100-tick history visualizations.
 
 ### Products definition
 

@@ -76,14 +76,14 @@ export function formatPercent(value: number | null | undefined): string {
  * | Bucket   | fillPercent range |
  * |----------|-------------------|
  * | 'empty'  | null / 0          |
- * | 'low'    | 0 < x < 0.30      |
- * | 'medium' | 0.30 ≤ x < 0.75   |
- * | 'high'   | ≥ 0.75            |
+ * | 'low'    | 0 < x < 0.75      |
+ * | 'medium' | 0.75 ≤ x ≤ 0.90   |
+ * | 'high'   | > 0.90            |
  */
 export function getFillBucket(fillPercent: number | null | undefined): FillBucket {
   if (fillPercent == null || fillPercent <= 0) return 'empty'
-  if (fillPercent < 0.3) return 'low'
-  if (fillPercent < 0.75) return 'medium'
+  if (fillPercent < 0.75) return 'low'
+  if (fillPercent <= 0.9) return 'medium'
   return 'high'
 }
 
