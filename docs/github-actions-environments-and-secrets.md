@@ -76,6 +76,8 @@ Examples that belong in environment secrets:
 - Game administrator email addresses when they identify a real operator
 - Container registry credentials
 
+Cluster-issuer DNS credentials (if needed by cert-manager) should stay in cluster-managed secrets/service-account configuration, not in repository deployment secrets. Configure them directly on the cluster issuer according to cert-manager DNS-01 provider docs: <https://cert-manager.io/docs/configuration/acme/dns01/>.
+
 Use GitHub Actions environment variables only for non-sensitive values such as:
 
 - public hostnames

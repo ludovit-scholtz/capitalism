@@ -19,7 +19,11 @@ fi
 
 while IFS= read -r -d '' manifest; do
   echo "Applying manifest: $manifest"
-  kubectl apply -f "$manifest"
+  kubectl apply --dry-run=client -f "$manifest" >/dev/null
+  if ! kubectl apply -f "$manifest"; then
+    echo "Failed to apply manifest: $manifest" >&2
+    exit 1
+  fi
 done < <(find "$backup_root/k8s" -type f -name '*.yaml' ! -name 'namespaces.yaml' -print0 | sort -z)
 
 echo "Kubernetes artifact restore completed."

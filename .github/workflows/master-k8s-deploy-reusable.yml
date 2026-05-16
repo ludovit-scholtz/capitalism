@@ -159,11 +159,14 @@ jobs:
         run: |
           set -euo pipefail
 
-          api_cors_redirect_env=''
+          SECOND_CORS_HOST="$FRONTEND_HOST"
           if [ -n "$REDIRECT_HOST" ]; then
-            api_cors_redirect_env="                      - name: Cors__AllowedOrigins__1
-                        value: https://${REDIRECT_HOST}"
+            SECOND_CORS_HOST="$REDIRECT_HOST"
           fi
+          # Keep a deterministic second CORS slot so the generated deployment env structure
+          # stays stable across stage/production and redirect-host toggles.
+          # When redirect host is unset, the second slot intentionally duplicates frontend host;
+          # duplicates are harmless and preserve env key numbering consistency.
 
           cat <<EOF | kubectl apply -f -
           apiVersion: apps/v1
@@ -256,7 +259,8 @@ jobs:
                         value: Production
                       - name: Cors__AllowedOrigins__0
                         value: https://${FRONTEND_HOST}
-                      ${api_cors_redirect_env}
+                      - name: Cors__AllowedOrigins__1
+                        value: https://${SECOND_CORS_HOST}
                       - name: ConnectionStrings__MasterCatalog
                         valueFrom:
                           secretKeyRef:

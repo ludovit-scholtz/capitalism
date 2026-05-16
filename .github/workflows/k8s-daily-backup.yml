@@ -45,6 +45,7 @@ jobs:
 
           backup_root="backups/$(date -u +%Y%m%dT%H%M%SZ)"
           mkdir -p "$backup_root/k8s" "$backup_root/db"
+          gzip_level=6
 
           case "$TARGET_ENVIRONMENT" in
             all)
@@ -82,13 +83,25 @@ jobs:
               kubectl get certificates,issuers -n "$ns" -o yaml > "$backup_root/k8s/$ns/cert-manager-resources.yaml" || true
             fi
 
-            postgres_pods=$(kubectl get pods -n "$ns" -o json | jq -r '.items[].metadata.name' | grep -E 'postgres-[0-9]+$' || true)
-            for pod in $postgres_pods; do
-              dump_file="$backup_root/db/$ns/${pod}.sql.gz"
-              echo "Dumping PostgreSQL from $ns/$pod"
-              kubectl exec -n "$ns" "$pod" -- sh -lc 'PGPASSWORD="$POSTGRES_PASSWORD" pg_dumpall -U "$POSTGRES_USER"' \
-                | gzip -9 > "$dump_file"
+            postgres_statefulsets=$(kubectl get statefulsets -n "$ns" -o json | jq -r '.items[].metadata.name' | grep -E 'postgres$' || true)
+            found_pg_pods=0
+            for sts in $postgres_statefulsets; do
+              postgres_pods=$(kubectl get pods -n "$ns" -l "app=${sts}" -o json | jq -r '.items[].metadata.name')
+              if [ -z "$postgres_pods" ]; then
+                echo "No pods found for PostgreSQL StatefulSet $ns/$sts (expected label app=${sts})." >&2
+                continue
+              fi
+              for pod in $postgres_pods; do
+                found_pg_pods=1
+                dump_file="$backup_root/db/$ns/${pod}.sql.gz"
+                echo "Dumping PostgreSQL from $ns/$pod (gzip -${gzip_level})"
+                kubectl exec -n "$ns" "$pod" -- sh -lc 'PGPASSWORD="$POSTGRES_PASSWORD" pg_dumpall -U "$POSTGRES_USER"' \
+                  | gzip -"${gzip_level}" > "$dump_file"
+              done
             done
+            if [ -n "$postgres_statefulsets" ] && [ "$found_pg_pods" -eq 0 ]; then
+              echo "PostgreSQL StatefulSets found in $ns but no matching pods were discovered for backup." >&2
+            fi
           done
 
           echo "backup_root=$backup_root" >> "$GITHUB_OUTPUT"

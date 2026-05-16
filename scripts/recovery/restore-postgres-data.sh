@@ -23,7 +23,14 @@ while IFS= read -r -d '' dump; do
     continue
   fi
 
-  gzip -cd "$dump" | kubectl exec -i -n "$ns" "$pod" -- sh -lc 'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" postgres'
+  if ! gzip -t "$dump"; then
+    echo "Dump integrity check failed: $dump" >&2
+    exit 1
+  fi
+  if ! gzip -cd "$dump" | kubectl exec -i -n "$ns" "$pod" -- sh -lc 'PGPASSWORD="$POSTGRES_PASSWORD" psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" postgres'; then
+    echo "Failed to decompress or restore dump: $dump" >&2
+    exit 1
+  fi
 done < <(find "$backup_root/db" -type f -name '*.sql.gz' -print0 | sort -z)
 
 echo "PostgreSQL restore completed."
