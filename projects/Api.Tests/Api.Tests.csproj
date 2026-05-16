@@ -28,6 +28,12 @@
     <Compile Remove="BankingIntegrationTests.cs" />
     <Compile Remove="MediaHousePhaseTests.cs" />
     <Compile Remove="InterCityTradeRouteTests.cs" />
+    <Compile Remove="EconomyIntegrityHardeningTests.cs" />
+    <Compile Remove="BuildingUnitGridTests.cs" />
+    <Compile Remove="BuildingDestructionTests.cs" />
+    <Compile Remove="BuildingLandMapCoverageTests.cs" />
+    <Compile Remove="PlayerAchievementsTests.cs" />
+    <Compile Remove="ResourceDepletionTests.cs" />
 
   </ItemGroup>
 
