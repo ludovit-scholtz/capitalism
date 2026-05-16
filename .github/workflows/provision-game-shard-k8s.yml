@@ -376,7 +376,7 @@ jobs:
                       - -c
                       - |
                         until psql -v ON_ERROR_STOP=1 -c 'select 1' >/dev/null 2>&1; do
-                          echo "Waiting for PostgreSQL connection to ${PGHOST}/${PGDATABASE}..."
+                            echo "Waiting for PostgreSQL connection to \${PGHOST}/\${PGDATABASE}..."
                           sleep 5
                         done
                 containers:
