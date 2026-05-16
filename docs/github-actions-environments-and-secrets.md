@@ -130,7 +130,10 @@ Generate separate values for `stage` and `production`. Never reuse generated pas
 
 - `KUBE_CONFIG_DATA` (base64 kubeconfig for GitHub runner):
   ```bash
+  # Linux (GNU coreutils)
   base64 -w 0 ~/.kube/config
+  # macOS (BSD base64)
+  base64 < ~/.kube/config | tr -d '\n'
   ```
 - `MASTER_DB_PASSWORD` (if you manage DB user password separately):
   ```bash
@@ -139,7 +142,10 @@ Generate separate values for `stage` and `production`. Never reuse generated pas
 - `MASTER_DB_CONNECTION_STRING` (PostgreSQL runtime connection string):
   ```bash
   MASTER_DB_PASSWORD="$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32)"
-  echo "Host=<db-host>;Port=5432;Database=<db-name>;Username=<db-user>;Password=${MASTER_DB_PASSWORD};SSL Mode=Require;Trust Server Certificate=true"
+  # Production example using explicit CA file mounted in container at /certs/postgres-ca.pem.
+  echo "Host=<db-host>;Port=5432;Database=<db-name>;Username=<db-user>;Password=${MASTER_DB_PASSWORD};SSL Mode=VerifyFull;Trust Server Certificate=false;Root Certificate=/certs/postgres-ca.pem"
+  # If you use runtime/system trust store instead, keep Trust Server Certificate=false and use SSL Mode=Require/VerifyFull.
+  echo "Host=<db-host>;Port=5432;Database=<db-name>;Username=<db-user>;Password=${MASTER_DB_PASSWORD};SSL Mode=Require;Trust Server Certificate=false"
   ```
 - `MASTER_JWT_SIGNING_KEY`:
   ```bash
@@ -175,8 +181,11 @@ Generate separate values for `stage` and `production`. Never reuse generated pas
 
 ```bash
 gh secret set --env stage MASTER_JWT_SIGNING_KEY --body "$(openssl rand -base64 64 | tr -d '\n')"
+# Generate a DIFFERENT value for production (do not reuse the stage value).
 gh secret set --env production MASTER_JWT_SIGNING_KEY --body "$(openssl rand -base64 64 | tr -d '\n')"
 ```
+
+Use the same `gh secret set --env <environment> ... --body "<generated-value>"` pattern for every secret listed in the generation guide above (generated values, operator emails, service credentials, and integration tokens).
 
 ## GitHub setup steps
 
