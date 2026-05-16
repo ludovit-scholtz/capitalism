@@ -86,7 +86,7 @@ jobs:
         id: check_secrets
         run: |
           set -euo pipefail
-          if [ -z "${{ secrets.KUBE_CONFIG_DATA }}" ] || [ -z "${{ secrets.EVENTS_API_JWT_SIGNING_KEY }}" ] || [ -z "${{ secrets.EVENTS_API_ADMIN_PASSWORD }}" ]; then
+          if [ -z "${{ secrets.KUBE_CONFIG_DATA }}" ] || [ -z "${{ secrets.MASTER_JWT_SIGNING_KEY }}" ] || [ -z "${{ secrets.GAME_BOOTSTRAP_ADMIN_PASSWORD }}" ]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
             echo "Required deploy secrets are not set. Skipping deployment steps."
             exit 0
@@ -130,8 +130,8 @@ jobs:
         run: |
           kubectl create secret generic capitalism-api-secrets \
             --namespace ${{ env.K8S_NAMESPACE }} \
-            --from-literal=jwt-signing-key='${{ secrets.EVENTS_API_JWT_SIGNING_KEY }}' \
-            --from-literal=admin-password='${{ secrets.EVENTS_API_ADMIN_PASSWORD }}' \
+            --from-literal=jwt-signing-key='${{ secrets.MASTER_JWT_SIGNING_KEY }}' \
+            --from-literal=admin-password='${{ secrets.GAME_BOOTSTRAP_ADMIN_PASSWORD }}' \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy application
