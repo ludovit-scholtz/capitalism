@@ -310,7 +310,7 @@ jobs:
                       periodSeconds: 10
                     volumeMounts:
                       - name: postgres-data
-                        mountPath: /var/lib/postgresql/data
+                        mountPath: /var/lib/postgresql
           ---
           apiVersion: v1
           kind: Service
