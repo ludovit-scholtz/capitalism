@@ -43,6 +43,11 @@ public sealed class CompanyTypeExtensions
             .AsNoTracking()
             .Where(b => b.CompanyId == company.Id && !b.IsDismissedByOwner)
             .Include(b => b.Units)
+            .Include(b => b.PendingConfiguration)
+            .ThenInclude(plan => plan!.Units)
+            .Include(b => b.PendingConfiguration)
+            .ThenInclude(plan => plan!.Removals)
+            .AsSplitQuery()
             .ToListAsync(cancellationToken);
     }
 }

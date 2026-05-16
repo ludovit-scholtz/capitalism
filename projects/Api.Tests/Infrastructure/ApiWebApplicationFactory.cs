@@ -31,6 +31,7 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>
                 ["GameEngine:Enabled"] = "false",
                 ["MasterServer:RegistrationEnabled"] = "false",
                 ["MasterServer:TelemetryEnabled"] = "false",
+                ["MasterServer:ApiUrl"] = string.Empty,
                 // Enable password auth in tests so all existing auth tests continue to pass.
                 ["Auth:PasswordAuthEnabled"] = "true"
             });
