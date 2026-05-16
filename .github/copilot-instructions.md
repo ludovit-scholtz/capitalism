@@ -1821,3 +1821,15 @@ Root-cause of a CI failure (May 2026, PR #523 city expansion unlocks):
 2. **Default city fixtures must encode the real progression contract.** Berlin and Warsaw should be locked by default in Playwright fixtures with their unlock thresholds, while starter cities remain unlocked.
 3. **World-map expansion tests must click the named locked city they are validating** (for example Berlin), not `cityButtons.first()`, because list order plus starter cities make first-item assertions brittle.
 4. **When a view has both a sidebar CTA and a modal CTA, verify the exact currently rendered i18n string before writing the Playwright selector.** In the world-map modal the correct text is `Grow your company to unlock`, not `Start expanding here`.
+
+## Building grid fill-threshold regression — boundary assertions must match product-definition buckets
+
+Root-cause of a CI failure (May 2026, PR #541 unit-grid visuals):
+- The building-grid fill buckets were intentionally changed to product-definition thresholds: `low < 75%`, `medium 75%–90%`, `high > 90%`.
+- An E2E assertion in `building-detail.spec.ts` still expected a `75%` mining cell to render `data-fill="high"`, which contradicts the new threshold contract.
+- CI failed with `element(s) not found` on `.cell-capacity-fill[data-fill="high"]` for a `75/100` tile.
+
+**Rules to prevent recurrence:**
+1. **Whenever fill-bucket thresholds change, update all boundary E2E assertions in the same PR** (`75%` must assert `medium`; only values `>90%` assert `high`).
+2. **For boundary tests, assert both positive and negative conditions** (for example `75%` is `medium` and NOT `high`) to prevent silent threshold drift.
+3. **When CI reports a single failing E2E selector after a threshold refactor, treat it as expectation drift first** and compare the selector against the canonical helper (`getFillBucket`) before changing UI logic.

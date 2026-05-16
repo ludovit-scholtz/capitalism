@@ -95,27 +95,23 @@ describe('getFillBucket', () => {
     expect(getFillBucket(0)).toBe('empty')
   })
 
-  it('returns low for values below 0.30', () => {
+  it('returns low for values below 0.75', () => {
     expect(getFillBucket(0.01)).toBe('low')
     expect(getFillBucket(0.1)).toBe('low')
-    expect(getFillBucket(0.29)).toBe('low')
+    expect(getFillBucket(0.74)).toBe('low')
   })
 
-  it('returns medium at exactly 0.30', () => {
-    expect(getFillBucket(0.3)).toBe('medium')
+  it('returns medium at exactly 0.75', () => {
+    expect(getFillBucket(0.75)).toBe('medium')
   })
 
-  it('returns medium up to (not including) 0.75', () => {
-    expect(getFillBucket(0.5)).toBe('medium')
-    expect(getFillBucket(0.74)).toBe('medium')
+  it('returns medium through 0.90', () => {
+    expect(getFillBucket(0.8)).toBe('medium')
+    expect(getFillBucket(0.9)).toBe('medium')
   })
 
-  it('returns high at exactly 0.75', () => {
-    expect(getFillBucket(0.75)).toBe('high')
-  })
-
-  it('returns high for values above 0.75', () => {
-    expect(getFillBucket(0.9)).toBe('high')
+  it('returns high above 0.90', () => {
+    expect(getFillBucket(0.91)).toBe('high')
     expect(getFillBucket(1.0)).toBe('high')
   })
 })
@@ -329,4 +325,3 @@ describe('getFlowSegments', () => {
     expect(result.hasMovement).toBe(false)
   })
 })
-

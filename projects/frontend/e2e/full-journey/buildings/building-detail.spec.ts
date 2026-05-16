@@ -108,6 +108,68 @@ async function clickUnitTab(page: Page, tabName: string) {
 }
 
 test.describe('Building detail upgrades', () => {
+  test('renders SVG link arrows with dashed style for inactive links', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-arrow-style',
+      playerId: player.id,
+      name: 'Arrow Style Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-arrow-style',
+          companyId: 'company-arrow-style',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Arrow Style Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'asu-1',
+              buildingId: 'building-arrow-style',
+              unitType: 'PURCHASE',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: true,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-arrow-style')
+
+    const currentSection = getGridSection(page, 'Current Configuration')
+    const connector = currentSection.locator('.unit-row').first().locator('.link-toggle.horizontal').first()
+    await expect(connector.locator('.link-arrow-svg')).toBeVisible()
+    await expect(connector.locator('.link-arrow-line-inactive')).toHaveCount(1)
+  })
+
   test('auto-selects newly placed unit and hides assignment panel in edit sidebar', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({
@@ -5539,9 +5601,10 @@ test.describe('Building detail upgrades', () => {
     await expect(miningCell).toContainText('Mining')
     await expect(miningCell).toContainText('Wood')
 
-    // Mining unit: fill bar is present (75/100 = 75% fill = high bucket)
+    // Mining unit: fill bar is present (75/100 = 75% fill = medium bucket)
     await expect(miningCell.locator('.cell-capacity')).toBeVisible()
-    await expect(miningCell.locator('.cell-capacity-fill[data-fill="high"]')).toBeVisible()
+    await expect(miningCell.locator('.cell-capacity-fill[data-fill="medium"]')).toBeVisible()
+    await expect(miningCell.locator('.cell-capacity-fill[data-fill="high"]')).toHaveCount(0)
 
     // Storage unit: also shows resource label and fill bar at lower fill
     const storageCell = getGridCell(activeSection, 1, 0)
