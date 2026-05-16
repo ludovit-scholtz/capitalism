@@ -1,0 +1,1 @@
+window.__capitalismRuntimeConfig__ = window.__capitalismRuntimeConfig__ || {}

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   deriveGameGraphqlUrl,
@@ -10,6 +10,24 @@ import {
 } from '../runtimeGraphqlUrl'
 
 describe('runtimeGraphqlUrl', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('prefers a runtime-configured game graphql url', () => {
+    vi.stubGlobal('window', {
+      location: {
+        hostname: 'localhost',
+        protocol: 'http:',
+      },
+      __capitalismRuntimeConfig__: {
+        graphqlUrl: 'https://runtime.example.com/graphql',
+      },
+    })
+
+    expect(resolveGameGraphqlUrl(undefined)).toBe('https://runtime.example.com/graphql')
+  })
+
   it('prefers an explicit game graphql url', () => {
     expect(resolveGameGraphqlUrl('https://override.example.com/graphql')).toBe(
       'https://override.example.com/graphql',
