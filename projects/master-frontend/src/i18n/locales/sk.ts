@@ -176,6 +176,7 @@ export default {
     biatecCallbackLoading: 'Overujem reláciu a načítavam účet...',
     biatecCallbackSuccess: 'Prihlásenie je hotové. Presmerovávam...',
     biatecCallbackError: 'Prihlásenie cez Biatec zlyhalo. Vráť sa na prihlásenie a skús to znova.',
+    backToLogin: 'Späť na prihlásenie',
   },
   account: {
     kicker: 'Môj účet',

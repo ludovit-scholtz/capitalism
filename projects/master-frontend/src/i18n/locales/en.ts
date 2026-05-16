@@ -176,6 +176,7 @@ export default {
     biatecCallbackLoading: 'Verifying your session and loading your account...',
     biatecCallbackSuccess: 'Sign-in complete. Redirecting...',
     biatecCallbackError: 'Biatec sign-in failed. Please return to login and try again.',
+    backToLogin: 'Back to login',
   },
   account: {
     kicker: 'My Account',

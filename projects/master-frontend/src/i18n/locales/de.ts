@@ -178,6 +178,7 @@ export default {
     biatecCallbackSuccess: 'Anmeldung abgeschlossen. Weiterleitung...',
     biatecCallbackError:
       'Biatec-Anmeldung fehlgeschlagen. Bitte kehre zum Login zurück und versuche es erneut.',
+    backToLogin: 'Zurück zum Login',
   },
   account: {
     kicker: 'Mein Konto',
