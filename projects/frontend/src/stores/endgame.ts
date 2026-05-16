@@ -18,6 +18,8 @@ const ENDGAME_STATUS_QUERY = `
         name
         wealthUsd
       }
+      leaderDisplayName
+      leaderNetWorthUsd
     }
   }
 `
@@ -44,6 +46,22 @@ export const useEndgameStore = defineStore('endgame', () => {
   const isGameEnded = computed(() => status.value?.gameEnded ?? false)
   const winnerDisplayName = computed(() => status.value?.winnerDisplayName ?? null)
   const winningThresholdUsd = computed(() => status.value?.winningThresholdUsd ?? 0)
+
+  /** Display name of the current server-wide leader (highest personal net worth). */
+  const leaderDisplayName = computed(() => status.value?.leaderDisplayName ?? null)
+
+  /** Server-wide leader's personal net worth in USD. */
+  const leaderNetWorthUsd = computed(() => status.value?.leaderNetWorthUsd ?? 0)
+
+  /**
+   * True when the server-wide leader is within 10% of the winning threshold.
+   * Used to show the Race to the Top banner in the header.
+   */
+  const isLeaderCloseToBenchmark = computed(() => {
+    const threshold = winningThresholdUsd.value
+    if (threshold <= 0 || isGameEnded.value) return false
+    return leaderNetWorthUsd.value >= threshold * 0.9
+  })
 
   /**
    * Computes progress percentage towards the endgame benchmark for a given net worth in USD.
@@ -117,6 +135,9 @@ export const useEndgameStore = defineStore('endgame', () => {
     isGameEnded,
     winnerDisplayName,
     winningThresholdUsd,
+    leaderDisplayName,
+    leaderNetWorthUsd,
+    isLeaderCloseToBenchmark,
     triggeredMilestones,
     progressPercent,
     checkMilestones,

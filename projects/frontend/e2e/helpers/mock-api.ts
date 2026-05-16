@@ -1090,6 +1090,8 @@ export type MockState = {
     gameEndedAtUtc: string | null
     winningThresholdUsd: number
     topRealWorldRichest: Array<{ id: string; rank: number; name: string; wealthUsd: number }>
+    leaderDisplayName: string | null
+    leaderNetWorthUsd: number
   }
   cityWeatherForecasts: Record<string, MockCityWeatherForecast>
   stockPriceHistory: Record<string, MockStockPriceHistoryPoint[]>
@@ -3274,6 +3276,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         { id: 'rw-9', rank: 9, name: 'Steve Ballmer', wealthUsd: 130000000000 },
         { id: 'rw-10', rank: 10, name: 'Jensen Huang', wealthUsd: 116000000000 },
       ],
+      leaderDisplayName: null,
+      leaderNetWorthUsd: 0,
     },
     cityWeatherForecasts: {},
     stockPriceHistory: {},

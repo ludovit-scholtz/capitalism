@@ -2939,6 +2939,10 @@ export default {
     endShardFailed: 'Shard beenden fehlgeschlagen. Bitte versuchen Sie es erneut.',
     endShardTitle: 'Manuelle Shard-Kontrolle',
     endShardBody: 'Beendet diesen Shard für alle Spieler sofort. Der aktuelle Anführer wird als Sieger eingetragen und ein abschließender Newsletter wird veröffentlicht.',
+    raceToTopBannerTitle: '🏁 Rennen zur Spitze:',
+    raceToTopBannerLeader: 'führt mit',
+    raceToTopBannerDistance: '{pct}% der Gewinnschwelle erreicht!',
+    raceToTopBannerDismiss: 'Race-to-Top-Banner schließen',
   },
   powerGrid: {
     title: 'Städtisches Stromnetz',

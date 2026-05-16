@@ -58,6 +58,8 @@ test.describe('Endgame UI', () => {
       gameEndedAtUtc: '2026-05-08T06:30:00Z',
       winningThresholdUsd: 430000000000,
       topRealWorldRichest: state.endgameStatus.topRealWorldRichest,
+      leaderDisplayName: 'Alice Winner',
+      leaderNetWorthUsd: 430000000000,
     }
 
     await page.addInitScript((token) => {
@@ -167,6 +169,74 @@ test.describe('Endgame UI', () => {
     await expect(page.getByRole('button', { name: 'End Shard' })).toBeHidden()
   })
 
+  test('RaceToTopBanner is visible in header when leader is within 10% of benchmark', async ({
+    page,
+  }) => {
+    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    // Leader is at 95% of the 430B threshold — within the 10% proximity window
+    state.endgameStatus = {
+      ...state.endgameStatus,
+      leaderDisplayName: 'Charlie Lead',
+      leaderNetWorthUsd: 408500000000, // ~95% of 430B
+    }
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    await expect(page.locator('.race-to-top-banner')).toBeVisible()
+    await expect(page.locator('.race-to-top-banner')).toContainText('Charlie Lead')
+    await expect(page.locator('.race-to-top-banner')).toContainText('95%')
+  })
+
+  test('RaceToTopBanner is hidden when leader is far below the benchmark', async ({ page }) => {
+    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    // Leader is at only 50% of the threshold — banner must not appear
+    state.endgameStatus = {
+      ...state.endgameStatus,
+      leaderDisplayName: 'Far Below Leader',
+      leaderNetWorthUsd: 215000000000, // ~50% of 430B
+    }
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    await expect(page.locator('.race-to-top-banner')).not.toBeVisible()
+  })
+
+  test('RaceToTopBanner can be dismissed by clicking the close button', async ({ page }) => {
+    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.endgameStatus = {
+      ...state.endgameStatus,
+      leaderDisplayName: 'Charlie Lead',
+      leaderNetWorthUsd: 408500000000, // 95% of 430B
+    }
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    await expect(page.locator('.race-to-top-banner')).toBeVisible()
+    await page.getByRole('button', { name: 'Dismiss race-to-top banner' }).click()
+    await expect(page.locator('.race-to-top-banner')).not.toBeVisible()
+  })
+
   test('navbar shows lock icon when game has ended', async ({ page }) => {
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
@@ -178,6 +248,8 @@ test.describe('Endgame UI', () => {
       ...state.endgameStatus,
       gameEnded: true,
       winnerDisplayName: 'Top Player',
+      leaderDisplayName: 'Top Player',
+      leaderNetWorthUsd: 430000000000,
     }
 
     await page.addInitScript((token) => {

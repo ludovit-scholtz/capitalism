@@ -216,6 +216,10 @@ export interface EndgameStatus {
   gameEndedAtUtc: string | null
   winningThresholdUsd: number
   topRealWorldRichest: RealWorldWealth[]
+  /** Display name of the current server-wide leader (highest personal net worth). */
+  leaderDisplayName: string | null
+  /** Server-wide leader's personal net worth in USD (cash + portfolio). */
+  leaderNetWorthUsd: number
 }
 
 /** Matches backend ScheduledActionSummary — a pending player action waiting for tick resolution. */
