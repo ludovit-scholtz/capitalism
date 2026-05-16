@@ -10,7 +10,32 @@ const auth = useAuthStore()
 
 const callbackError = ref<string | null>(null)
 
+function detectOidcProviderError(): string | null {
+  if (typeof window === 'undefined') return null
+  const url = new URL(window.location.href)
+  const queryError = url.searchParams.get('error')
+  const hashParams = new URLSearchParams(
+    window.location.hash.startsWith('#') ? window.location.hash.slice(1) : '',
+  )
+  const hashError = hashParams.get('error')
+  const oidcError = queryError || hashError
+  if (!oidcError) return null
+  return (
+    url.searchParams.get('error_description') ||
+    hashParams.get('error_description') ||
+    `Sign-in failed: ${oidcError}`
+  )
+}
+
 onMounted(async () => {
+  // Detect provider-side OIDC errors (e.g. invalid_client, access_denied) before
+  // attempting completeBiatecOidcSignIn. These cannot be resolved by retrying.
+  const providerError = detectOidcProviderError()
+  if (providerError) {
+    callbackError.value = providerError
+    return
+  }
+
   try {
     const redirectPath = await auth.completeBiatecOidcSignIn()
     await router.replace(redirectPath || '/')
