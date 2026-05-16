@@ -4,6 +4,18 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 ## Active issues to work on
 
+### Stage & Production Kubernetes Deployment Automation
+
+- [ ] Introduce dedicated `Stage` and `Production` GitHub Actions environments with isolated secrets, environment protection rules, and branch-deployment policies so stage can auto-deploy from `main` while production remains approval-gated.
+- [ ] Build the master deployment workflow contract for Kubernetes so `www.capitalism5.com`, `capitalism5.com`, and `api.capitalism5.com` are deployed together with canonical redirects, ingress rules, and environment-specific configuration.
+- [ ] Build the stage master deployment contract so `www.stage.capitalism5.com` and `api.stage.capitalism5.com` are rebuilt and redeployed automatically whenever anything is pushed to `main`.
+- [ ] Standardize humanly memorable game-server slug generation from the public game name and enforce matching frontend/API hostnames for production on `*.capitalism5.com` and stage on `*.stage.capitalism5.com`.
+- [ ] Add cert-manager ingress automation that uses the `letsencrypt-dns` cluster issuer and provisions the correct certificates for the production master, stage endpoints, and wildcard game-server hostnames without manual TLS setup.
+- [ ] Create a `workflow_dispatch` game-provisioning pipeline that deploys a completely new game shard, including PostgreSQL, the game API, the game frontend, secure runtime secrets, ingress, and master-server registration.
+- [ ] Generate or inject unique per-game credentials during shard provisioning so database passwords, JWT signing keys, registration keys, and admin bootstrap contacts are never committed to the repository or copied between environments.
+- [ ] Add smoke-check and readiness verification steps that confirm the new shard can reach PostgreSQL, complete startup configuration, answer health checks, and appear correctly in the master server registry before rollout is marked successful.
+- [ ] Document GitHub Actions environment-secret setup, rotation, and masking rules so private operator information such as game administrator email addresses is not leaked through git history, workflow logs, or Kubernetes manifests.
+
 ### Master Website & Multiple Game Server Hub
 
 - [x] (100%) Master Website & Multiple Game Server Hub is live: the master portal at `projects/master-frontend` markets the game with a hero section and feature highlights (Economic Simulation, Stock Exchange, Power Grid, R&D), lists active game servers with player counts and tick numbers, shows authenticated players their Pro subscription status with tier badge and expiry date, provides a Pro Renew/Upgrade flow, displays gold token balance with transaction history, and includes a full three-topic Documentation section (Getting Started, Buildings Guide, Economy Overview). All strings use i18n keys in English, Slovak, and German. E2E tests cover the docs view topic switching, feature highlights rendering, subscription panel (Free tier upgrade prompt, Active Pro badge/expiry), and nav link presence.

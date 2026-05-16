@@ -961,7 +961,36 @@ Game server backend is .NET with GraphQL engine and data stored in PostgreSQL. S
 
 Master server backend is .NET with GraphQL engine and data stored in PostgreSQL. Source code is at projects/MasterApi.
 
-
-Deployed to kubernetes.
-
 Players must receive near real-time user experience.
+
+Deployed to Kubernetes.
+
+## Deployment topology and CI/CD
+
+All public environments are deployed to Kubernetes through GitHub Actions. GitHub Actions workflows, Kubernetes manifests, ingress definitions, and runtime secret wiring are the source of truth for stage and production. Manual cluster edits are emergency-only and must be reconciled back into git.
+
+GitHub Actions must define two deployment environments: `Stage` and `Production`. `Stage` is the continuously updated integration environment for the latest `main` branch. `Production` is the public player-facing environment and must use separate secrets, protection rules, and approval flow from stage.
+
+Production master entry points:
+- `https://www.capitalism5.com` is the canonical master frontend URL.
+- `https://capitalism5.com` must stay reachable and redirect to `https://www.capitalism5.com`.
+- `https://api.capitalism5.com` hosts the master API.
+
+Stage master entry points:
+- `https://www.stage.capitalism5.com` hosts the stage master frontend.
+- `https://api.stage.capitalism5.com` hosts the stage master API.
+
+Each game server must use a humanly memorable slug derived from the display name. Example: `Inception of Wealth` becomes `inception-of-wealth`.
+- Production game frontend: `https://inception-of-wealth.capitalism5.com`
+- Production game API: `https://inception-of-wealth-api.capitalism5.com`
+- Stage game frontend: `https://inception-of-wealth.stage.capitalism5.com`
+- Stage game API: `https://inception-of-wealth-api.stage.capitalism5.com`
+
+All ingress resources must use the cert-manager `ClusterIssuer` named `letsencrypt-dns`. Certificate coverage must match the real DNS zones in use: `capitalism5.com` for the production master endpoints, `*.stage.capitalism5.com` for stage endpoints, and `*.capitalism5.com` for production game-server endpoints. Wildcard certificates must not be specified for a different DNS zone than the hostname they secure.
+
+Every push to `main` must rebuild and redeploy all stage workloads: the stage master frontend, the stage master API, every stage game frontend, and every stage game API. Stage must always represent the current integrated branch head.
+
+GitHub Actions must also provide a dedicated workflow for provisioning a brand-new game server end-to-end. That workflow must create the PostgreSQL runtime, generate or inject per-server secrets, deploy the game API and game frontend, configure ingress and TLS, register the shard with the master server, and run smoke checks so the new game is fully configured before it is announced.
+
+Operational documentation must describe how to create GitHub Actions environment secrets and variables for `Stage` and `Production`, how to keep administrator contact data and other sensitive values out of git, and how those values are materialized into Kubernetes Secrets without printing them into workflow logs.
+
