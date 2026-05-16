@@ -101,12 +101,14 @@ These names are examples. Keep the names stable once workflows depend on them.
 Environment secrets:
 
 - `KUBE_CONFIG_DATA`
+- `MASTER_DB_PASSWORD`
 - `MASTER_DB_CONNECTION_STRING`
 - `MASTER_JWT_SIGNING_KEY`
 - `MASTER_REGISTRATION_KEY`
 - `MASTER_ROOT_ADMIN_EMAIL`
 - `GAME_BOOTSTRAP_ADMIN_EMAIL`
 - `GAME_BOOTSTRAP_ADMIN_PASSWORD`
+- `POSTGRES_SUPERUSER_PASSWORD`
 - `HARBOR_USERNAME`
 - `HARBOR_PASSWORD`
 - `MASTER_GRAPHQL_URL`
@@ -119,6 +121,62 @@ Environment variables:
 - `GAME_BASE_DOMAIN`
 - `GAME_API_SUFFIX`
 - `K8S_NAMESPACE_PREFIX`
+
+## How to generate or prepare each required secret
+
+Generate separate values for `stage` and `production`. Never reuse generated passwords/keys across environments.
+
+> All commands below print values locally. Copy them directly into GitHub environment secrets and do not commit them into files.
+
+- `KUBE_CONFIG_DATA` (base64 kubeconfig for GitHub runner):
+  ```bash
+  base64 -w 0 ~/.kube/config
+  ```
+- `MASTER_DB_PASSWORD` (if you manage DB user password separately):
+  ```bash
+  openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32
+  ```
+- `MASTER_DB_CONNECTION_STRING` (PostgreSQL runtime connection string):
+  ```bash
+  MASTER_DB_PASSWORD="$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32)"
+  echo "Host=<db-host>;Port=5432;Database=<db-name>;Username=<db-user>;Password=${MASTER_DB_PASSWORD};SSL Mode=Require;Trust Server Certificate=true"
+  ```
+- `MASTER_JWT_SIGNING_KEY`:
+  ```bash
+  openssl rand -base64 64 | tr -d '\n'
+  ```
+- `MASTER_REGISTRATION_KEY`:
+  ```bash
+  openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 40
+  ```
+- `MASTER_ROOT_ADMIN_EMAIL`:
+  - Use the real operator/admin mailbox value (for example `ops@capitalism5.com`).
+- `GAME_BOOTSTRAP_ADMIN_EMAIL`:
+  - Use a dedicated bootstrap admin mailbox (for example `game-admin@capitalism5.com`).
+- `GAME_BOOTSTRAP_ADMIN_PASSWORD`:
+  ```bash
+  openssl rand -base64 36 | tr -dc 'A-Za-z0-9' | head -c 24
+  ```
+- `POSTGRES_SUPERUSER_PASSWORD` (if your shard provisioning/bootstrap uses superuser access):
+  ```bash
+  openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32
+  ```
+- `HARBOR_USERNAME`:
+  - Use your Harbor robot account/user name from Harbor access control.
+- `HARBOR_PASSWORD`:
+  - Use the Harbor robot account token/password from Harbor access control.
+- `MASTER_GRAPHQL_URL`:
+  - Stage example: `https://api.stage.capitalism5.com/graphql`
+  - Production example: `https://api.capitalism5.com/graphql`
+- `LETSENCRYPT_DNS_PROVIDER_TOKEN`:
+  - Create a DNS API token in your DNS provider console with minimal required permissions for cert-manager DNS-01 challenge updates.
+
+### Quick command to write generated values to GitHub environment secrets
+
+```bash
+gh secret set --env stage MASTER_JWT_SIGNING_KEY --body "$(openssl rand -base64 64 | tr -d '\n')"
+gh secret set --env production MASTER_JWT_SIGNING_KEY --body "$(openssl rand -base64 64 | tr -d '\n')"
+```
 
 ## GitHub setup steps
 
