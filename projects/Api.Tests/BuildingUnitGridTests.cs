@@ -465,7 +465,7 @@ public sealed class BuildingUnitGridTests
         await using (var scope = factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var product = await db.ProductTypes.FirstAsync();
+            var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
             productTypeId = product.Id.ToString();
         }
 
