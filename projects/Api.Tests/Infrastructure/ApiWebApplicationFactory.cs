@@ -30,6 +30,7 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>
                 ["SeedData:AdminPassword"] = TestSeedAdminPassword,
                 ["GameEngine:Enabled"] = "false",
                 ["MasterServer:RegistrationEnabled"] = "false",
+                ["MasterServer:TelemetryEnabled"] = "false",
                 // Enable password auth in tests so all existing auth tests continue to pass.
                 ["Auth:PasswordAuthEnabled"] = "true"
             });
