@@ -164,3 +164,33 @@ Create a fun game in the style of Capitalism II, where players experience realis
   - i18n: all `news.*` keys present in English, Slovak, and German (`news.eyebrow`, `news.title`, `news.filterAll`, `news.filterNews`, `news.filterChangelog`, `news.filterMarketReport`, `news.unread`, `news.markAllRead`, `news.markAllReadConfirm`, `news.markAllReadSuccess`, `news.markAllReadFailed`, `news.loadFailed`, `news.emptyState`, `news.emptyTitle`, `news.emptyBody`).
   - CHANGELOG.csv: new entry added for each major feature release; seeded as global `CHANGELOG`-type `GameNewsEntry` rows accessible in all game instances.
   - 16 Playwright E2E tests (`e2e/full-journey/navigation/news.spec.ts`): public feed renders without auth; badge shows correct count after login; visiting `/news` auto-marks and badge resets to 0; unread/read visual distinction; filter tabs (ALL/NEWS/CHANGELOG); admin can publish from admin dashboard and article appears in feed; empty state; CHANGELOG vs NEWS type badges; mobile viewport card stacking; unauthenticated mark-read is rejected; mark-read mutation persists to mock state.
+
+### Master Ranking Point System & Bounties
+
+- [x] (100%) Master Ranking Point System & Bounties is live: cross-server player leaderboard with 20 bounty types, hourly ranking evaluation service, daily 0.99× point decay at UTC midnight, and full admin management surface.
+  - **Shared constants** (`projects/Shared/Ranking/MasterRankingBountyCodes.cs`): 27 bounty code constants including all 20 core bounties plus tutorial milestones; `All` set for iteration.
+  - **Entities** (`MasterApi/Data/Entities/`):
+    - `MasterRankingBountyDefinition`: code, displayName, description, rewardPoints, isEnabled, cooldownMode, proofRequirement, visibilityScope, requiresModeration, validationSettingsJson.
+    - `MasterRankingEvent`: full event ingestion with telemetry, idempotency, quarantine, and moderation pipeline.
+    - `MasterRankingRewardRecord`: awarded points per player per bounty per server.
+    - `MasterRankingPlayerSnapshot`: totalPoints, globalRank, previousGlobalRank, lastDailyDecayFactorApplied.
+    - `MasterRankingEvaluationRun`: hourlyEvaluation/dailyDecay run audit.
+    - `MasterRankingBountyAudit`: admin change trail.
+    - `RankingTelemetryEventSignature`, `RankingTelemetryAuditLog`: anti-replay and anomaly tracking.
+  - **EF migrations**: `AddMasterRankingSystem`, `AddRankingTelemetryShardValidation`, `AddRankingTelemetryIdempotencyProofAndAnomalyFlags`.
+  - **Seed data** (`MasterDbInitializer.SeedRankingBountyDefinitionsAsync`): all 20 core bounties plus tutorial bounties upserted at startup with correct cooldown modes (UTC_DAY, UTC_DAY_PER_SERVER, ONCE, PER_UNIQUE_KEY), proof requirements, visibility scopes, and moderation flags.
+  - **Scheduler** (`MasterRankingSchedulerHostedService`): `BackgroundService` with 1-minute polling; deduplicates hourly evaluation runs; triggers daily decay only at UTC midnight hour; idempotent via `MasterRankingEvaluationRun` table.
+  - **Ranking service** (`MasterRankingService`): `IngestEventAsync` full pipeline (telemetry validation, duplicate detection, idempotency, quarantine bypass, moderation routing, instant processing for auto-approved events), `EvaluateHourlyAsync` (processes PENDING events, awards points, updates snapshots, recomputes global rank), `ApplyDailyDecayAsync` (0.99× multiplier per snapshot), `FindReplayEventAsync` (idempotency on replay).
+  - **Telemetry validation** (`RankingTelemetryValidator`): signature-based anti-replay with configurable nonce expiry, payload hash verification, shard key protection via HMAC.
+  - **GraphQL queries** (`Query.Ranking.cs`): `getMyRankingSummary` (authenticated), `getRankingLeaderboard(limit, offset)` (public paginated), `getTutorialBountyStatuses(input)` (service-to-service), `getMyRankingBountyHistory(input)` (authenticated, filterable), `getMyRankingBountyDashboard` (authenticated), `getCanAccessRankingAdminDashboard`, `getQuarantinedTelemetryBatches`, `getRankingAdminDashboard`.
+  - **GraphQL mutations** (`Mutation.Ranking.cs`): `ingestRankingEvent(input)` (game-server-to-master pipeline), `claimRankingBounty(input)` (player-initiated proof submission), `moderateRankingEvent(input)`, `quarantineTelemetryBatch`, `clearTelemetryQuarantine`, `runRankingEvaluationNow`, `runRankingDailyDecayNow`, `upsertRankingBountyDefinition(input)` (admin create/update/enable/disable).
+  - **Frontend views** (`master-frontend/src/views/`):
+    - `RankingDashboardView.vue`: public leaderboard with rank movement badges, top-3 competitor cards, paginated table, player-highlight row, name filter, page-size selector, and URL-synced pagination.
+    - `RankingBountiesView.vue`: authenticated bounty catalogue with availability/cooldown status, proof submission modal, and points earned.
+    - `RankingBountyHistoryView.vue`: filterable award history with server key, date range, and bounty code filters.
+    - `RankingAdminView.vue`: full admin dashboard with bounty definition management, moderation queue, evaluation run history, and telemetry quarantine management.
+  - **Router routes**: `/ranking` (public leaderboard), `/ranking/bounties` (personal bounty dashboard), `/ranking/bounties/history` (award history), `/ranking/admin` (admin management).
+  - **i18n**: all `rankingDashboard.*`, `rankingBounties.*`, `rankingHistory.*`, `rankingAdmin.*` keys present in English, Slovak, and German.
+  - **Cooldown modes**: `UTC_DAY` (daily per player), `UTC_DAY_PER_SERVER` (daily per player per server), `ONCE` (lifetime one-time), `PER_UNIQUE_KEY` (one per unique external proof key).
+  - **Proof requirements**: `NONE`, `URL` (social post), `DISCORD_HANDLE` (ownership validation with moderation).
+  - **Visibility scopes**: `PLAYER_HISTORY` (visible to player), `ADMIN_ONLY` (metadata hidden from player responses).
