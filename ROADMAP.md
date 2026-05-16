@@ -148,8 +148,11 @@ Create a fun game in the style of Capitalism II, where players experience realis
 - [x] (100%) Trust `X-Forwarded-For` only from configured reverse proxies, fall back to `RemoteIpAddress` otherwise, and test that spoofed headers cannot rotate rate-limit identities.
 - [x] (100%) Normalize duplicate registration errors so message, extension code, and timing do not reveal whether an email already exists in either API.
 - [x] (100%) Move the game API seed admin password out of committed defaults (`__SET_IN_ENV__` + `.env.example`/README guidance), and block non-Development startup when `Auth:PasswordAuthEnabled=true` and `SeedData:AdminPassword` is missing/placeholder while keeping Development warning-only.
-- [x] (100%) Move game-frontend browser sessions to HttpOnly SameSite cookie auth (`credentials: include`) and stop persisting JWT session tokens in `localStorage`/`sessionStorage` for normal gameplay requests.
+- [x] (100%) Move normal game-frontend gameplay GraphQL traffic to HttpOnly SameSite cookie auth (`credentials: include`) so shipped gameplay requests no longer rely on bearer `Authorization` headers.
 - [x] (100%) Finish canonical object-authorization error normalization in legacy economy CRUD paths and keep the GraphQL surface inventory gate aligned with the normalized contract.
+- [ ] Align `projects/MasterApi/Security/AuthRateLimitMiddleware.cs` with the hardened game API path by parsing selected GraphQL root fields, handling named operations correctly, and inspecting or rejecting JSON-array batched request envelopes before auth throttling.
+- [ ] Extend `projects/MasterApi/Security/GraphQlRequestSecurityMiddleware.cs` to inspect every GraphQL batch item, or reject batching entirely, so custom introspection, depth, and complexity protections plus rejection telemetry cannot be bypassed through array bodies.
+- [ ] Remove the remaining raw JWT persistence from `projects/frontend/src/stores/auth.ts` and rehydrate gameplay sessions from the cookie session instead of `localStorage`, with regression tests covering login, OIDC callback, reload, and logout.
 
 ### Dynamic Global Events & Market Shocks
 
