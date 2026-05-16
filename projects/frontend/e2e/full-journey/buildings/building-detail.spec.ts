@@ -5601,9 +5601,10 @@ test.describe('Building detail upgrades', () => {
     await expect(miningCell).toContainText('Mining')
     await expect(miningCell).toContainText('Wood')
 
-    // Mining unit: fill bar is present (75/100 = 75% fill = high bucket)
+    // Mining unit: fill bar is present (75/100 = 75% fill = medium bucket)
     await expect(miningCell.locator('.cell-capacity')).toBeVisible()
-    await expect(miningCell.locator('.cell-capacity-fill[data-fill="high"]')).toBeVisible()
+    await expect(miningCell.locator('.cell-capacity-fill[data-fill="medium"]')).toBeVisible()
+    await expect(miningCell.locator('.cell-capacity-fill[data-fill="high"]')).toHaveCount(0)
 
     // Storage unit: also shows resource label and fill bar at lower fill
     const storageCell = getGridCell(activeSection, 1, 0)
