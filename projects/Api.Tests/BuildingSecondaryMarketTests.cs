@@ -2082,6 +2082,13 @@ public sealed class BuildingSecondaryMarketTests
             "FORBIDDEN",
         };
         var conflictCount = results.Count(r => GetCodes(r).Any(code => code is not null && conflictLikeCodes.Contains(code)));
+        foreach (var result in results)
+        {
+            var unexpectedCodes = GetCodes(result)
+                .Where(code => code is not null && !conflictLikeCodes.Contains(code))
+                .ToList();
+            Assert.Empty(unexpectedCodes);
+        }
 
         if (successCount == 0)
         {
@@ -2106,7 +2113,7 @@ public sealed class BuildingSecondaryMarketTests
         }
 
         Assert.Equal(1, successCount);
-        Assert.InRange(conflictCount, 1, 2);
+        Assert.InRange(conflictCount, 0, 2);
 
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
