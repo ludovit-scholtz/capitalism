@@ -2935,6 +2935,10 @@ export default {
     endShardFailed: 'Failed to end the shard. Please try again.',
     endShardTitle: 'Manual Shard Control',
     endShardBody: 'Force-end this game shard for all players. The current leader will be recorded as the winner and a final newsletter will be published.',
+    raceToTopBannerTitle: '🏁 Race to the Top:',
+    raceToTopBannerLeader: 'is leading with',
+    raceToTopBannerDistance: '{pct}% of the winning threshold reached!',
+    raceToTopBannerDismiss: 'Dismiss race-to-top banner',
   },
   powerGrid: {
     title: 'City Power Grid',

@@ -15,6 +15,7 @@ import ContextSwitcher from '@/components/layout/ContextSwitcher.vue'
 import GameTimeChip from '@/components/layout/GameTimeChip.vue'
 import ThemeToggle from '@/components/layout/ThemeToggle.vue'
 import GlobalEventBanner from '@/components/market/GlobalEventBanner.vue'
+import RaceToTopBanner from '@/components/layout/RaceToTopBanner.vue'
 import { useThemeStore } from '@/stores/theme'
 import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useEndgameStore } from '@/stores/endgame'
@@ -445,6 +446,9 @@ useTickRefresh(async () => {
 
         <!-- Global economic event banner -->
         <GlobalEventBanner class="hidden sm:flex" />
+
+        <!-- Race to the Top proximity banner -->
+        <RaceToTopBanner class="hidden sm:flex" />
 
         <template v-if="auth.isAuthenticated">
           <button

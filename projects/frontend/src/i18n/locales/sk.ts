@@ -2928,6 +2928,10 @@ export default {
     endShardFailed: 'Ukončenie shardu zlyhalo. Skúste to znova.',
     endShardTitle: 'Manuálne riadenie shardu',
     endShardBody: 'Okamžite ukončí tento shard pre všetkých hráčov. Aktuálny líder bude zaznamenaný ako víťaz a záverečný newsletter bude zverejnený.',
+    raceToTopBannerTitle: '🏁 Preteky o vrchol:',
+    raceToTopBannerLeader: 'vedie s',
+    raceToTopBannerDistance: '{pct}% z víťazného prahu dosiahnutých!',
+    raceToTopBannerDismiss: 'Zavrieť banner pretekov o vrchol',
   },
   powerGrid: {
     title: 'Mestská elektrosieť',
