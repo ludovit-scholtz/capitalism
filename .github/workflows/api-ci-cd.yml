@@ -83,28 +83,40 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Check secrets
+        id: check_secrets
         run: |
+          set -euo pipefail
           if [ -z "${{ secrets.KUBE_CONFIG_DATA }}" ] || [ -z "${{ secrets.EVENTS_API_JWT_SIGNING_KEY }}" ] || [ -z "${{ secrets.EVENTS_API_ADMIN_PASSWORD }}" ]; then
-            echo "Required secrets are not set. Skipping deployment."
-            exit 1
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Required deploy secrets are not set. Skipping deployment steps."
+            exit 0
           fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - name: Deployment skipped (missing secrets)
+        if: steps.check_secrets.outputs.ready != 'true'
+        run: echo "Deployment skipped because required secrets are not configured."
 
       - name: Setup kubectl
+        if: steps.check_secrets.outputs.ready == 'true'
         uses: azure/setup-kubectl@v4
         with:
           version: latest
 
       - name: Configure kubeconfig
+        if: steps.check_secrets.outputs.ready == 'true'
         run: |
           mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 --decode > ~/.kube/config
 
       - name: Apply namespace and storage
+        if: steps.check_secrets.outputs.ready == 'true'
         run: |
           kubectl apply -f ${{ env.PROJECT_PATH }}/deploy/k8s/namespace.yaml
           kubectl apply -f ${{ env.PROJECT_PATH }}/deploy/k8s/persistent-volume-claim.yaml
 
       - name: Create or update image pull secret
+        if: steps.check_secrets.outputs.ready == 'true'
         run: |
           kubectl create secret docker-registry regcred \
             --namespace ${{ env.K8S_NAMESPACE }} \
@@ -114,6 +126,7 @@ jobs:
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Create or update application secrets
+        if: steps.check_secrets.outputs.ready == 'true'
         run: |
           kubectl create secret generic capitalism-api-secrets \
             --namespace ${{ env.K8S_NAMESPACE }} \
@@ -122,15 +135,18 @@ jobs:
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy application
+        if: steps.check_secrets.outputs.ready == 'true'
         run: |
           sed "s|IMAGE_PLACEHOLDER|${IMAGE_REF}|g" ${{ env.PROJECT_PATH }}/deploy/k8s/deployment.yaml | kubectl apply -f -
           kubectl apply -f ${{ env.PROJECT_PATH }}/deploy/k8s/service.yaml
           kubectl apply -f ${{ env.PROJECT_PATH }}/deploy/k8s/ingress.yaml
 
       - name: Verify rollout
+        if: steps.check_secrets.outputs.ready == 'true'
         run: kubectl rollout status deployment/${{ env.K8S_DEPLOYMENT_NAME }} --namespace ${{ env.K8S_NAMESPACE }}
 
       - name: Refresh all stage shard API deployments
+        if: steps.check_secrets.outputs.ready == 'true'
         run: |
           set -euo pipefail
 
