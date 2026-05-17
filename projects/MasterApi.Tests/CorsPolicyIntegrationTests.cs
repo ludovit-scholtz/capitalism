@@ -60,6 +60,28 @@ public sealed class CorsPolicyIntegrationTests
         Assert.False(blockedResponse.Headers.Contains("Access-Control-Allow-Origin"));
     }
 
+    [Fact]
+    public async Task NonDevelopment_WildcardStageShardOrigin_AllowsShardSubdomainAndRejectsOther()
+    {
+        using var factory = CreateFactory("Testing", "https://*.stage.capitalism5.com");
+        using var client = factory.CreateClient();
+
+        using var allowedRequest = CreatePreflightRequest("https://inception-of-wealth-2026.stage.capitalism5.com");
+        using var allowedResponse = await client.SendAsync(allowedRequest);
+
+        Assert.Equal(HttpStatusCode.NoContent, allowedResponse.StatusCode);
+        Assert.True(allowedResponse.Headers.TryGetValues("Access-Control-Allow-Origin", out var allowedValues));
+        Assert.Equal("https://inception-of-wealth-2026.stage.capitalism5.com", allowedValues.Single());
+        Assert.True(allowedResponse.Headers.TryGetValues("Access-Control-Allow-Credentials", out var credentialValues));
+        Assert.Equal("true", credentialValues.Single());
+
+        using var blockedRequest = CreatePreflightRequest("https://evil.capitalism5.com");
+        using var blockedResponse = await client.SendAsync(blockedRequest);
+
+        Assert.Equal(HttpStatusCode.NoContent, blockedResponse.StatusCode);
+        Assert.False(blockedResponse.Headers.Contains("Access-Control-Allow-Origin"));
+    }
+
     private static WebApplicationFactory<Program> CreateFactory(string environmentName, params string[] allowedOrigins)
     {
         return new MasterApiWebApplicationFactory().WithWebHostBuilder(builder =>

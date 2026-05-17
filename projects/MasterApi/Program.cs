@@ -171,6 +171,7 @@ public class Program
                 }
 
                 policy.WithOrigins(allowedOrigins)
+                    .SetIsOriginAllowedToAllowWildcardSubdomains()
                     .AllowAnyHeader()
                     .AllowAnyMethod()
                     .AllowCredentials();
