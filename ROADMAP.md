@@ -14,7 +14,7 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 ### Player Referral System & Pro Subscription Monetization
 
-- [x] (100%) Referral and Pro monetization flow is live end-to-end: players can generate and apply referral codes, onboarding shows the referral discount message only before first authenticated login, startup-pack and Pro subscription management are available through the master portal, and Pro-only onboarding industries stay access-controlled by active subscription checks.
+- [x] (100%) Referral and Pro monetization flow is live end-to-end: Pro can now be activated only by paid gold-token purchases (`0.137 g` monthly Pro, `0.274 g` startup pack for 3 months) with automatic 10% referral discount when referral status is active, and the master portal now includes dedicated deposit/withdraw pages plus an admin oversight page for manually processed tokenized-gold transfer requests on VOI (`302228`) and Algorand (`1241944285`) using ARC26 QR payloads.
 
 ### Game Server Registry & Heartbeat System
 

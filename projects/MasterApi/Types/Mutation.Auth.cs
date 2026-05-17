@@ -384,6 +384,18 @@ public sealed partial class Mutation
                     .Build());
         var userId = player.Id;
         var now = DateTime.UtcNow;
+        var hasReferralDiscount = player.ReferredByEmail is not null;
+        var monthlyPrice = ResolveGoldPriceWithReferralDiscount(MonthlyProPriceGold, hasReferralDiscount);
+        var totalPrice = decimal.Round(monthlyPrice * input.Months, 8, MidpointRounding.AwayFromZero);
+        EnsureSufficientGoldBalance(player, totalPrice, "Not enough tokenized gold for monthly Pro purchase.");
+        var balanceBeforeCharge = player.GoldTokenBalance;
+        ApplyGoldDebit(player, totalPrice);
+        AddSystemGoldTransaction(
+            db,
+            player,
+            -totalPrice,
+            balanceBeforeCharge,
+            $"PRO_SUBSCRIPTION_PURCHASE:{input.Months}M");
 
         var latestSub = await GetLatestSubscriptionAsync(db, userId);
         var resultSub = GrantOrCreateProSubscription(db, userId, now, input.Months, latestSub);
@@ -431,6 +443,8 @@ public sealed partial class Mutation
                     .Build());
         var userId = player.Id;
         var now = DateTime.UtcNow;
+        var hasReferralDiscount = player.ReferredByEmail is not null;
+        var startupPackPrice = ResolveGoldPriceWithReferralDiscount(StartupPackPriceGold, hasReferralDiscount);
 
         var latestSub = await GetLatestSubscriptionAsync(db, userId);
 
@@ -438,6 +452,16 @@ public sealed partial class Mutation
         {
             return Query.BuildSubscriptionInfo(latestSub, now);
         }
+
+        EnsureSufficientGoldBalance(player, startupPackPrice, "Not enough tokenized gold for startup pack purchase.");
+        var balanceBeforeCharge = player.GoldTokenBalance;
+        ApplyGoldDebit(player, startupPackPrice);
+        AddSystemGoldTransaction(
+            db,
+            player,
+            -startupPackPrice,
+            balanceBeforeCharge,
+            "STARTUP_PACK_PURCHASE:3M");
 
         var resultSub = GrantOrCreateProSubscription(db, userId, now, StartupPackDurationMonths, latestSub);
         player.StartupPackClaimedAtUtc = now;

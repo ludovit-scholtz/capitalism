@@ -64,7 +64,10 @@ const selectedBalance = computed(() =>
     : null,
 )
 
-const navItems = computed(() => [{ label: t('nav.gameAdminDashboard'), to: '/game-admin' }])
+const navItems = computed(() => [
+  { label: t('nav.gameAdminDashboard'), to: '/game-admin' },
+  { label: t('goldAdmin.transferOps'), to: '/gold-transfers-admin' },
+])
 
 // ── Data loading ───────────────────────────────────────────────────────────
 

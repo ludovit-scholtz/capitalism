@@ -41,6 +41,7 @@ export interface MockPlayer {
   createdAtUtc: string
   startupPackClaimedAtUtc: string | null
   canClaimStartupPack: boolean
+  hasReferralDiscount?: boolean
 }
 
 export interface MockGameCompany {
@@ -106,6 +107,37 @@ export interface MockPlayerGoldTransaction {
   balanceAfter: number
   note: string | null
   createdAtUtc: string
+}
+
+export interface MockGoldDepositRequest {
+  id: string
+  playerAccountId: string
+  playerEmail: string
+  network: 'VOI' | 'ALGORAND'
+  assetId: number
+  depositAddress: string
+  senderAddress: string | null
+  amount: number
+  status: 'PENDING' | 'PROCESSED'
+  requestedAtUtc: string
+  processedAtUtc: string | null
+  processedByEmail: string | null
+  adminNote: string | null
+}
+
+export interface MockGoldWithdrawalRequest {
+  id: string
+  playerAccountId: string
+  playerEmail: string
+  network: 'VOI' | 'ALGORAND'
+  assetId: number
+  destinationAddress: string
+  amount: number
+  status: 'PENDING' | 'PROCESSED'
+  requestedAtUtc: string
+  processedAtUtc: string | null
+  processedByEmail: string | null
+  adminNote: string | null
 }
 
 export interface MockSupportTicketAuditEvent {
@@ -256,6 +288,8 @@ export interface MockState {
     lastUpdatedAtUtc: string | null
     recentTransactions: MockPlayerGoldTransaction[]
   } | null
+  goldDepositRequests: MockGoldDepositRequest[]
+  goldWithdrawalRequests: MockGoldWithdrawalRequest[]
   supportTickets: MockSupportTicket[]
   myCompanies: MockGameCompany[]
   apiKeys: MockApiKey[]
@@ -332,6 +366,7 @@ export function makePlayer(overrides: Partial<MockPlayer> = {}): MockPlayer {
     createdAtUtc: '2026-01-01T00:00:00.000Z',
     startupPackClaimedAtUtc: null,
     canClaimStartupPack: true,
+    hasReferralDiscount: false,
     ...overrides,
   }
 }
@@ -411,6 +446,8 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
     goldTransactions: initialState.goldTransactions ?? [],
     isGlobalAdmin: initialState.isGlobalAdmin ?? false,
     playerGoldAccount: initialState.playerGoldAccount ?? null,
+    goldDepositRequests: initialState.goldDepositRequests ?? [],
+    goldWithdrawalRequests: initialState.goldWithdrawalRequests ?? [],
     supportTickets: initialState.supportTickets ?? [],
     myCompanies: initialState.myCompanies ?? [],
     apiKeys: initialState.apiKeys ?? [],
@@ -1483,6 +1520,126 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
       return
     }
 
+    if (query.includes('mutation') && query.includes('createGoldTokenDepositRequest')) {
+      if (!state.currentPlayer) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [{ message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } }],
+          }),
+        })
+        return
+      }
+      const vars = body.variables as
+        | { input?: { network?: 'VOI' | 'ALGORAND'; amount?: number; senderAddress?: string | null } }
+        | undefined
+      const network = vars?.input?.network ?? 'ALGORAND'
+      const assetId = network === 'VOI' ? 302228 : 1241944285
+      const request: MockGoldDepositRequest = {
+        id: `deposit-${Date.now()}`,
+        playerAccountId: state.currentPlayer.id,
+        playerEmail: state.currentPlayer.email,
+        network,
+        assetId,
+        depositAddress:
+          network === 'VOI'
+            ? 'voi-deposit-address-not-configured'
+            : 'algorand-deposit-address-not-configured',
+        senderAddress: vars?.input?.senderAddress ?? null,
+        amount: vars?.input?.amount ?? 0.137,
+        status: 'PENDING',
+        requestedAtUtc: new Date().toISOString(),
+        processedAtUtc: null,
+        processedByEmail: null,
+        adminNote: null,
+      }
+      state.goldDepositRequests = [request, ...state.goldDepositRequests]
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { createGoldTokenDepositRequest: request } }),
+      })
+      return
+    }
+
+    if (query.includes('mutation') && query.includes('createGoldTokenWithdrawalRequest')) {
+      if (!state.currentPlayer) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [{ message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } }],
+          }),
+        })
+        return
+      }
+      const vars = body.variables as
+        | {
+            input?: {
+              network?: 'VOI' | 'ALGORAND'
+              amount?: number
+              destinationAddress?: string
+            }
+          }
+        | undefined
+      const network = vars?.input?.network ?? 'ALGORAND'
+      const assetId = network === 'VOI' ? 302228 : 1241944285
+      const request: MockGoldWithdrawalRequest = {
+        id: `withdraw-${Date.now()}`,
+        playerAccountId: state.currentPlayer.id,
+        playerEmail: state.currentPlayer.email,
+        network,
+        assetId,
+        destinationAddress: vars?.input?.destinationAddress ?? '',
+        amount: vars?.input?.amount ?? 0.137,
+        status: 'PENDING',
+        requestedAtUtc: new Date().toISOString(),
+        processedAtUtc: null,
+        processedByEmail: null,
+        adminNote: null,
+      }
+      state.goldWithdrawalRequests = [request, ...state.goldWithdrawalRequests]
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { createGoldTokenWithdrawalRequest: request } }),
+      })
+      return
+    }
+
+    if (query.includes('mutation') && query.includes('processGoldTokenDepositRequest')) {
+      const vars = body.variables as { input?: { requestId?: string } } | undefined
+      const request = state.goldDepositRequests.find((item) => item.id === vars?.input?.requestId)
+      if (request) {
+        request.status = 'PROCESSED'
+        request.processedAtUtc = new Date().toISOString()
+        request.processedByEmail = state.currentPlayer?.email ?? 'admin@example.com'
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { processGoldTokenDepositRequest: request ?? null } }),
+      })
+      return
+    }
+
+    if (query.includes('mutation') && query.includes('processGoldTokenWithdrawalRequest')) {
+      const vars = body.variables as { input?: { requestId?: string } } | undefined
+      const request = state.goldWithdrawalRequests.find((item) => item.id === vars?.input?.requestId)
+      if (request) {
+        request.status = 'PROCESSED'
+        request.processedAtUtc = new Date().toISOString()
+        request.processedByEmail = state.currentPlayer?.email ?? 'admin@example.com'
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { processGoldTokenWithdrawalRequest: request ?? null } }),
+      })
+      return
+    }
+
     if (query.includes('generateApiKey')) {
       const vars = body.variables as
         | { input?: { name?: string; scopes?: string[]; companyIds?: string[] } }
@@ -1694,7 +1851,15 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
       !query.includes('goldTokenBalances') &&
       !query.includes('goldTokenTransactions') &&
       !query.includes('adjustGoldTokenBalance') &&
-      !query.includes('myGoldAccount')
+      !query.includes('myGoldAccount') &&
+      !query.includes('myGoldDepositRequests') &&
+      !query.includes('myGoldWithdrawalRequests') &&
+      !query.includes('goldTokenDepositRequests') &&
+      !query.includes('goldTokenWithdrawalRequests') &&
+      !query.includes('createGoldTokenDepositRequest') &&
+      !query.includes('createGoldTokenWithdrawalRequest') &&
+      !query.includes('processGoldTokenDepositRequest') &&
+      !query.includes('processGoldTokenWithdrawalRequest')
 
     if (isStandaloneMeQuery) {
       if (state.currentPlayer) {
@@ -1740,6 +1905,36 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { myGoldAccount: goldAccount } }),
+      })
+      return
+    }
+
+    if (query.includes('myGoldDepositRequests')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            myGoldDepositRequests: state.goldDepositRequests.filter(
+              (request) => request.playerAccountId === state.currentPlayer?.id,
+            ),
+          },
+        }),
+      })
+      return
+    }
+
+    if (query.includes('myGoldWithdrawalRequests')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            myGoldWithdrawalRequests: state.goldWithdrawalRequests.filter(
+              (request) => request.playerAccountId === state.currentPlayer?.id,
+            ),
+          },
+        }),
       })
       return
     }
@@ -1828,6 +2023,24 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           body: JSON.stringify({ data: { goldTokenTransactions: filtered } }),
         })
       }
+      return
+    }
+
+    if (query.includes('goldTokenDepositRequests')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { goldTokenDepositRequests: state.goldDepositRequests } }),
+      })
+      return
+    }
+
+    if (query.includes('goldTokenWithdrawalRequests')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { goldTokenWithdrawalRequests: state.goldWithdrawalRequests } }),
+      })
       return
     }
 
