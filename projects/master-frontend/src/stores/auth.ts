@@ -22,7 +22,7 @@ const COOKIE_SESSION_SENTINEL = 'cookie-session'
 const BIATEC_OIDC_AUTHORIZE_URL =
   import.meta.env.VITE_BIATEC_OIDC_AUTHORIZE_URL || 'https://google.biatec.io/authorize'
 const BIATEC_OIDC_END_SESSION_URL = import.meta.env.VITE_BIATEC_OIDC_END_SESSION_URL || ''
-const BIATEC_OIDC_CLIENT_ID = import.meta.env.VITE_BIATEC_OIDC_CLIENT_ID || 'capitalism-master'
+const BIATEC_OIDC_CLIENT_ID = import.meta.env.VITE_BIATEC_OIDC_CLIENT_ID || 'capitalism'
 const BIATEC_OIDC_REDIRECT_URI = import.meta.env.VITE_BIATEC_OIDC_REDIRECT_URI
 const BIATEC_OIDC_SCOPE = import.meta.env.VITE_BIATEC_OIDC_SCOPE || 'openid'
 const BIATEC_OIDC_AUDIENCE = import.meta.env.VITE_BIATEC_OIDC_AUDIENCE || BIATEC_OIDC_CLIENT_ID
@@ -171,7 +171,10 @@ export const useAuthStore = defineStore('masterAuth', () => {
     return `${window.location.origin}/login`
   }
 
-  function buildBiatecEndSessionUrl(idTokenHint: string | null, postLogoutRedirectUri = getPostLogoutRedirectUri()) {
+  function buildBiatecEndSessionUrl(
+    idTokenHint: string | null,
+    postLogoutRedirectUri = getPostLogoutRedirectUri(),
+  ) {
     if (typeof window === 'undefined') {
       return null
     }
@@ -216,7 +219,9 @@ export const useAuthStore = defineStore('masterAuth', () => {
     }
   }
 
-  function normalizeBiatecSignInOptions(options?: boolean | BiatecSignInOptions): BiatecSignInOptions {
+  function normalizeBiatecSignInOptions(
+    options?: boolean | BiatecSignInOptions,
+  ): BiatecSignInOptions {
     if (typeof options === 'boolean') {
       return { silentPrompt: options }
     }
@@ -462,13 +467,13 @@ export const useAuthStore = defineStore('masterAuth', () => {
 
   async function completeBiatecOidcSignIn() {
     const callbackSession = getBiatecTokenFromCallback()
-      await establishCookieSession(callbackSession.token)
-      token.value = callbackSession.token
-      player.value = null
+    await establishCookieSession(callbackSession.token)
+    token.value = callbackSession.token
+    player.value = null
     subscription.value = null
     isGameAdmin.value = false
     gameAdminChecked.value = false
-      localStorage.setItem(EXPIRES_KEY, callbackSession.expiresAtUtc)
+    localStorage.setItem(EXPIRES_KEY, callbackSession.expiresAtUtc)
     setStoredAuthProvider(AUTH_PROVIDER_BIATEC)
     scheduleTokenRenewal(callbackSession.expiresAtUtc)
 

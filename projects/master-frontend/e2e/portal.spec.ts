@@ -41,10 +41,34 @@ test.describe('Home page', () => {
   })
 
   test('shows active servers teaser section with top 3 online servers', async ({ page }) => {
-    const s1 = makeServer({ id: 's1', serverKey: 'key-1', displayName: 'EU Server 1', playerCount: 50, isOnline: true })
-    const s2 = makeServer({ id: 's2', serverKey: 'key-2', displayName: 'US Server 2', playerCount: 30, isOnline: true })
-    const s3 = makeServer({ id: 's3', serverKey: 'key-3', displayName: 'Asia Server 3', playerCount: 10, isOnline: true })
-    const s4 = makeServer({ id: 's4', serverKey: 'key-4', displayName: 'Hidden Server 4', playerCount: 5, isOnline: true })
+    const s1 = makeServer({
+      id: 's1',
+      serverKey: 'key-1',
+      displayName: 'EU Server 1',
+      playerCount: 50,
+      isOnline: true,
+    })
+    const s2 = makeServer({
+      id: 's2',
+      serverKey: 'key-2',
+      displayName: 'US Server 2',
+      playerCount: 30,
+      isOnline: true,
+    })
+    const s3 = makeServer({
+      id: 's3',
+      serverKey: 'key-3',
+      displayName: 'Asia Server 3',
+      playerCount: 10,
+      isOnline: true,
+    })
+    const s4 = makeServer({
+      id: 's4',
+      serverKey: 'key-4',
+      displayName: 'Hidden Server 4',
+      playerCount: 5,
+      isOnline: true,
+    })
     setupMockApi(page, { servers: [s1, s2, s3, s4] })
     await page.goto('/')
 
@@ -95,7 +119,6 @@ test.describe('Home page', () => {
     )
   })
 })
-
 
 test.describe('Game servers page', () => {
   test('shows empty state when no server is registered', async ({ page }) => {
@@ -183,7 +206,9 @@ test.describe('Game servers page', () => {
     await expect(page.getByText('Initial Server')).toBeVisible()
 
     // Update mock data so next refresh would show new content
-    state.servers = [makeServer({ id: 'auto-s2', serverKey: 'auto-key', displayName: 'Auto Refreshed Server' })]
+    state.servers = [
+      makeServer({ id: 'auto-s2', serverKey: 'auto-key', displayName: 'Auto Refreshed Server' }),
+    ]
 
     // Navigate away and back — interval cleanup means no outstanding timer errors
     await page.goto('/')
@@ -273,7 +298,7 @@ test.describe('Login page', () => {
     ])
 
     const url = new URL(request.url())
-    expect(url.searchParams.get('client_id')).toBe('capitalism-master')
+    expect(url.searchParams.get('client_id')).toBe('capitalism')
     expect(url.searchParams.get('redirect_uri')).toContain('/auth/callback')
     expect(url.searchParams.get('response_type')).toBe('id_token')
     expect(url.searchParams.get('scope')).toContain('openid')
