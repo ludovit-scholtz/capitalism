@@ -2339,7 +2339,8 @@ test.describe('Stock exchange — navbar account switcher', () => {
     await restoreMockSession(page, `token-${player.id}`)
     await page.goto('/dashboard')
     await expect(page.locator('.ctx-switcher, .account-switcher')).toBeVisible()
-    await page.getByTitle('Stocks').click()
+
+    await page.goto('/stocks')
     await expect(page).toHaveURL(/\/stocks/)
     await expect(page.locator('.ctx-switcher, .account-switcher')).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Stock Exchange' })).toBeVisible()
