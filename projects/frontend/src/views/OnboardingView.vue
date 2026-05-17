@@ -30,6 +30,7 @@ import { useTickCountdown } from '@/composables/useTickCountdown'
 import { formatMoney } from '@/lib/currencyFormat'
 import { generateOnboardingCompanyName, resetNameSession } from '@/lib/onboardingCompanyName'
 import { generatePersonalAccountName, type PlayerGender } from '@/lib/personalAccountName'
+import { resolveMasterWebUrl } from '@/lib/runtimeGraphqlUrl'
 import type { BuildingLot, City, EurFxRate, FirstSaleMission, GameState, OnboardingResult, OnboardingStartResult, ProductType } from '@/types'
 
 const { t, locale } = useI18n()
@@ -39,7 +40,7 @@ const auth = useAuthStore()
 const referralStore = useReferralStore()
 referralStore.initFromStorage()
 auth.initFromStorage()
-const masterPortalUrl = import.meta.env.VITE_MASTER_WEB_URL || 'http://localhost:5174'
+const masterPortalUrl = resolveMasterWebUrl(import.meta.env.VITE_MASTER_WEB_URL)
 
 const hasAuthenticatedSession = computed(() => auth.isAuthenticated || !!auth.player)
 const activeReferralCode = computed(() => (hasAuthenticatedSession.value ? null : referralStore.pendingCode))

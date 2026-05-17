@@ -11,6 +11,7 @@ import { deepEqual } from '@/lib/utils'
 import { formatInGameTime } from '@/lib/gameTime'
 import { formatCompactMoney } from '@/lib/currencyFormat'
 import { calculateRankPage, isActivePlayer } from '@/lib/ranking'
+import { resolveMasterWebUrl } from '@/lib/runtimeGraphqlUrl'
 import {
   computeDistanceToWinUsd,
   computeTargetProgressPercent,
@@ -35,7 +36,7 @@ const playerError = ref<string | null>(null)
 const companyError = ref<string | null>(null)
 const companyRankingsLoaded = ref(false)
 const itemsPerPage = 10
-const masterPortalUrl = import.meta.env.VITE_MASTER_WEB_URL || 'http://localhost:5174'
+const masterPortalUrl = resolveMasterWebUrl(import.meta.env.VITE_MASTER_WEB_URL)
 const masterRankingUrl = `${masterPortalUrl}/ranking`
 
 function getInitialTab(): 'players' | 'companies' {

@@ -141,6 +141,24 @@ jobs:
         run: |
           set -euo pipefail
 
+          get_master_web_url() {
+            local namespace="$1"
+            if [[ "$namespace" == capitalism-stage-* ]]; then
+              printf '%s\n' 'https://www.stage.capitalism5.com'
+              return 0
+            fi
+            printf '%s\n' 'https://www.capitalism5.com'
+          }
+
+          get_master_graphql_url() {
+            local namespace="$1"
+            if [[ "$namespace" == capitalism-stage-* ]]; then
+              printf '%s\n' 'https://api.stage.capitalism5.com/graphql'
+              return 0
+            fi
+            printf '%s\n' 'https://api.capitalism5.com/graphql'
+          }
+
           resolve_container_name() {
             local namespace="$1"
             local deployment="$2"
@@ -199,6 +217,13 @@ jobs:
             fi
 
             for deployment in $deployments; do
+              master_web_url=$(get_master_web_url "$namespace")
+              master_graphql_url=$(get_master_graphql_url "$namespace")
+              kubectl set env "deployment/$deployment" \
+                APP_MASTER_WEB_URL="$master_web_url" \
+                APP_MASTER_GRAPHQL_URL="$master_graphql_url" \
+                --namespace "$namespace"
+
               container_name=$(resolve_container_name "$namespace" "$deployment" "game-frontend" "$TARGET_IMAGE_REPOSITORY")
               echo "Updating $namespace/$deployment ($container_name) to $IMAGE_REF"
               kubectl set image "deployment/$deployment" "$container_name=$IMAGE_REF" --namespace "$namespace"

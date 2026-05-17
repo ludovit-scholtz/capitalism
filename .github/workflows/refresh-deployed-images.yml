@@ -303,6 +303,39 @@ jobs:
             return 1
           }
 
+          get_master_web_url() {
+            local namespace="$1"
+            if [[ "$namespace" == capitalism-stage-* ]] || [ "$namespace" = "capitalism" ]; then
+              printf '%s\n' 'https://www.stage.capitalism5.com'
+              return 0
+            fi
+            printf '%s\n' 'https://www.capitalism5.com'
+          }
+
+          get_master_graphql_url() {
+            local namespace="$1"
+            if [[ "$namespace" == capitalism-stage-* ]] || [ "$namespace" = "capitalism" ]; then
+              printf '%s\n' 'https://api.stage.capitalism5.com/graphql'
+              return 0
+            fi
+            printf '%s\n' 'https://api.capitalism5.com/graphql'
+          }
+
+          set_master_runtime_env() {
+            local namespace="$1"
+            local deployment="$2"
+            local master_web_url
+            local master_graphql_url
+
+            master_web_url=$(get_master_web_url "$namespace")
+            master_graphql_url=$(get_master_graphql_url "$namespace")
+
+            kubectl set env "deployment/$deployment" \
+              APP_MASTER_WEB_URL="$master_web_url" \
+              APP_MASTER_GRAPHQL_URL="$master_graphql_url" \
+              --namespace "$namespace" >/dev/null
+          }
+
           refresh_shard_deployments() {
             local namespace_regex="$1"
             local deployment_regex="$2"
@@ -336,6 +369,10 @@ jobs:
                   continue
                 fi
 
+                if [ "$image_repository" = "$GAME_FRONTEND_IMAGE_REPOSITORY" ]; then
+                  set_master_runtime_env "$namespace" "$deployment"
+                fi
+
                 apply_deployment_update "$namespace" "$deployment" "$container_name" "$image_ref"
               done
             done
@@ -345,6 +382,7 @@ jobs:
             refresh_shard_deployments '^capitalism-stage-' '-api$' 'game-api' "$GAME_API_IMAGE_REPOSITORY" "$GAME_API_IMAGE_REF" 'stage shard'
             refresh_shard_deployments '^capitalism-stage-' '-frontend$' 'game-frontend' "$GAME_FRONTEND_IMAGE_REPOSITORY" "$GAME_FRONTEND_IMAGE_REF" 'stage shard'
             patch_named_deployment "capitalism" "capitalism-api" "capitalism-api" "$GAME_API_IMAGE_REF"
+            set_master_runtime_env "capitalism" "capitalism-frontend"
             patch_named_deployment "capitalism" "capitalism-frontend" "capitalism-frontend" "$GAME_FRONTEND_IMAGE_REF"
             patch_named_deployment "capitalism-stage" "master-api" "master-api" "$MASTER_API_IMAGE_REF"
             patch_named_deployment "capitalism-stage" "master-frontend" "master-frontend" "$MASTER_FRONTEND_IMAGE_REF"
