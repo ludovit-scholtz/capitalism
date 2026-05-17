@@ -1482,6 +1482,97 @@ test.describe('Onboarding resume and progress persistence', () => {
     await expect(page.getByText('Available cash')).toBeVisible()
   })
 
+  test('stuck authenticated player can reset onboarding from step 1 and restart', async ({ page }) => {
+    const buildingLots = makeDefaultBuildingLots()
+    const factoryLot = buildingLots.find((candidate) => candidate.name === 'Factory Site B1')
+    expect(factoryLot).toBeTruthy()
+
+    const companyId = 'company-stuck-onboarding'
+    const factoryId = 'building-stuck-factory'
+    factoryLot!.ownerCompanyId = companyId
+    factoryLot!.buildingId = factoryId
+    factoryLot!.ownerCompany = { id: companyId, name: 'Stuck Works' }
+    factoryLot!.building = { id: factoryId, name: 'Stuck Works Factory', type: 'FACTORY' }
+
+    const player = makePlayer({
+      activeAccountType: 'COMPANY',
+      activeCompanyId: companyId,
+      onboardingCurrentStep: 'FACTORY_SELECTION',
+      onboardingIndustry: 'FURNITURE',
+      onboardingCityId: factoryLot!.cityId,
+      onboardingCompanyId: companyId,
+      onboardingFactoryLotId: factoryLot!.id,
+      companies: [
+        {
+          id: companyId,
+          playerId: 'player-1',
+          name: 'Stuck Works',
+          cash: 110000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [
+            {
+              id: factoryId,
+              companyId,
+              cityId: factoryLot!.cityId,
+              type: 'FACTORY',
+              name: 'Stuck Works Factory',
+              latitude: factoryLot!.latitude,
+              longitude: factoryLot!.longitude,
+              level: 1,
+              powerConsumption: 2,
+              powerStatus: 'POWERED',
+              isForSale: false,
+              builtAtUtc: '2026-01-01T00:00:00Z',
+              units: [],
+              pendingConfiguration: null,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player], buildingLots })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/onboarding')
+
+    await expect(page.getByRole('button', { name: 'Reset onboarding' })).toBeVisible()
+
+    page.once('dialog', (dialog) => void dialog.accept())
+    await page.getByRole('button', { name: 'Reset onboarding' }).click()
+
+    await expect(page.getByText('Onboarding progress was reset. You can start again now.')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Choose Your City' })).toBeVisible()
+
+    await chooseOnboardingRouteChoices(page, { industry: 'Furniture', product: 'Wooden Chair' })
+    await page.getByRole('button', { name: 'List View' }).click()
+    await chooseStarterFactoryLot(page)
+    await page.getByRole('button', { name: 'Purchase First Factory' }).click()
+
+    await expect(page.getByRole('heading', { name: 'Choose Your First Shop Lot' })).toBeVisible()
+  })
+
+  test('onboarding route hides unrelated desktop header shortcuts', async ({ page }) => {
+    setupMockApi(page)
+
+    await page.goto('/onboarding')
+
+    await expect(page.getByTitle('Leaderboard')).toHaveCount(0)
+    await expect(page.getByTitle('Cities')).toHaveCount(0)
+    await expect(page.getByTitle('News')).toHaveCount(0)
+  })
+
+  test('onboarding route hides the mobile navigation toggle', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
+    setupMockApi(page)
+
+    await page.goto('/onboarding')
+
+    await expect(page.getByLabel('Toggle navigation menu')).toHaveCount(0)
+  })
+
   test('player can recover when the selected shop lot becomes unavailable', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, { players: [player] })

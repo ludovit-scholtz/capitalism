@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { baseCompile } from '@intlify/message-compiler'
 
 // We need to import only the pure functions — not the default export
 // which calls createI18n() and triggers import.meta.env. We'll test
@@ -186,6 +187,23 @@ describe('i18n', () => {
             typeof value,
             `Non-string value: ${localeName}.${path} = ${JSON.stringify(value)}`,
           ).toBe('string')
+        })
+      }
+    })
+
+    it('all translation values compile with the vue-i18n message compiler', async () => {
+      const locales: Record<string, LocaleMessages> = {
+        en: await importLocaleMessages('en'),
+        sk: await importLocaleMessages('sk'),
+        de: await importLocaleMessages('de'),
+      }
+
+      for (const [localeName, messages] of Object.entries(locales)) {
+        visitTranslationStrings(messages, (path, value) => {
+          expect(
+            () => baseCompile(value),
+            `Invalid vue-i18n message: ${localeName}.${path} = ${JSON.stringify(value)}`,
+          ).not.toThrow()
         })
       }
     })

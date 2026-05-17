@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { usesStore } from '@/stores/news'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useGameAdminStore } from '@/stores/gameAdmin'
@@ -24,6 +24,7 @@ const themeStore = useThemeStore()
 themeStore.init()
 
 const { t, te } = useI18n()
+const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const newsStore = usesStore()
@@ -38,6 +39,8 @@ const { isChatOpen, unreadCount: chatUnreadCount } = storeToRefs(chatStore)
 const isMenuOpen = ref(false)
 const isNotificationsOpen = ref(false)
 const openMobileSection = ref<'main' | 'economy' | 'build' | 'social' | 'admin'>('main')
+const isOnboardingFocusMode = computed(() => route.name === 'onboarding' && !auth.player?.onboardingCompletedAtUtc)
+const showFullHeaderNavigation = computed(() => !isOnboardingFocusMode.value)
 
 const showUnreadBadge = computed(() => auth.isAuthenticated && unreadCount.value > 0)
 const showNotificationBadge = computed(() => auth.isAuthenticated && notificationUnreadCount.value > 0)
@@ -224,6 +227,10 @@ async function handleLogout() {
 }
 
 const mobileNavSections = computed(() => {
+  if (isOnboardingFocusMode.value) {
+    return []
+  }
+
   const sections = [
     {
       key: 'main' as const,
@@ -297,6 +304,13 @@ onMounted(() => {
   window.addEventListener('keydown', handleNotificationsEsc)
 })
 
+watch(isOnboardingFocusMode, (focused) => {
+  if (focused) {
+    closeMenu()
+    closeNotificationsPanel()
+  }
+})
+
 onUnmounted(() => {
   window.removeEventListener('keydown', handleNotificationsEsc)
 })
@@ -316,6 +330,7 @@ useTickRefresh(async () => {
 
       <!-- Mobile menu toggle -->
       <button
+        v-if="showFullHeaderNavigation"
         class="menu-toggle ml-auto lg:hidden text-muted hover:text-body p-2 rounded-md transition-colors tap-target-44"
         @click="toggleMenu"
         :aria-expanded="isMenuOpen"
@@ -326,7 +341,7 @@ useTickRefresh(async () => {
 
       <!-- Navigation links -->
       <nav class="nav-links" :class="{ 'nav-open': isMenuOpen }">
-        <div class="desktop-nav-links">
+        <div v-if="showFullHeaderNavigation" class="desktop-nav-links">
           <RouterLink to="/" :title="t('nav.home')" class="nav-link" @click="closeMenu">
             <font-awesome-icon :icon="['fas', 'home']" class="mr-2" />
           </RouterLink>
@@ -400,7 +415,7 @@ useTickRefresh(async () => {
           </RouterLink>
         </div>
 
-        <div v-if="isMenuOpen" class="mobile-nav-sections" :aria-label="t('nav.mobileMenuLabel')" role="navigation">
+        <div v-if="isMenuOpen && showFullHeaderNavigation" class="mobile-nav-sections" :aria-label="t('nav.mobileMenuLabel')" role="navigation">
           <section v-for="section in mobileNavSections" :key="section.key" class="mobile-nav-section">
             <button class="mobile-section-toggle tap-target-44" :aria-expanded="openMobileSection === section.key" @click="toggleMobileSection(section.key)">
               <span>{{ section.label }}</span>
@@ -426,13 +441,13 @@ useTickRefresh(async () => {
 
       <!-- Right-side actions -->
       <div class="header-actions flex items-center gap-3 shrink-0">
-        <div class="hidden xl:block">
+        <div v-if="showFullHeaderNavigation" class="hidden xl:block">
           <GameTimeChip />
         </div>
 
         <!-- Game-ended lock indicator -->
         <div
-          v-if="endgameStore.isGameEnded"
+          v-if="showFullHeaderNavigation && endgameStore.isGameEnded"
           class="hidden sm:flex items-center gap-1.5 rounded-full border border-divider bg-card-raised px-3 py-1.5 text-xs text-muted"
           :title="t('endgame.readOnlyNavHint', { winner: endgameStore.winnerDisplayName ?? '' })"
         >
@@ -442,30 +457,32 @@ useTickRefresh(async () => {
 
         <!-- Impersonation chip -->
         <div
-          v-if="impersonationLabel"
+          v-if="showFullHeaderNavigation && impersonationLabel"
           class="impersonation-chip hidden sm:block max-w-[17rem] px-3 py-1.5 rounded-full border border-[rgba(255,138,0,0.5)] bg-[rgba(255,138,0,0.14)] text-[#ffd7a3] text-[0.72rem] leading-tight"
         >
           {{ impersonationLabel }}
         </div>
 
         <!-- Global economic event banner -->
-        <GlobalEventBanner class="hidden sm:flex" />
+        <GlobalEventBanner v-if="showFullHeaderNavigation" class="hidden sm:flex" />
 
         <!-- Race to the Top proximity banner -->
-        <RaceToTopBanner class="hidden sm:flex" />
+        <RaceToTopBanner v-if="showFullHeaderNavigation" class="hidden sm:flex" />
 
         <template v-if="auth.isAuthenticated">
-          <button
-            class="btn btn-secondary h-11 w-11 p-0 justify-center relative notification-bell-btn tap-target-44"
-            :title="t('notifications.title')"
-            :aria-label="t('notifications.title')"
-            :aria-expanded="isNotificationsOpen"
-            @click="toggleNotificationsPanel"
-          >
-            <font-awesome-icon :icon="['fas', 'bell']" />
-            <span v-if="showNotificationBadge" class="notification-badge">{{ notificationUnreadCount }}</span>
-          </button>
-          <ContextSwitcher @switched="closeMenu" />
+          <template v-if="showFullHeaderNavigation">
+            <button
+              class="btn btn-secondary h-11 w-11 p-0 justify-center relative notification-bell-btn tap-target-44"
+              :title="t('notifications.title')"
+              :aria-label="t('notifications.title')"
+              :aria-expanded="isNotificationsOpen"
+              @click="toggleNotificationsPanel"
+            >
+              <font-awesome-icon :icon="['fas', 'bell']" />
+              <span v-if="showNotificationBadge" class="notification-badge">{{ notificationUnreadCount }}</span>
+            </button>
+            <ContextSwitcher @switched="closeMenu" />
+          </template>
           <button class="btn btn-secondary h-11 w-11 p-0 justify-center tap-target-44" @click="handleLogout" :title="t('common.logout')">
             <font-awesome-icon :icon="['fas', 'sign-out-alt']" />
           </button>

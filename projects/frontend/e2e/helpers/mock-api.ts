@@ -3873,6 +3873,61 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       return routeJson({ deleteBuildingLayout: true })
     }
 
+    if (query.includes('ResetOnboardingProgress')) {
+      const player = state.players.find((candidate) => candidate.id === state.currentUserId)
+      if (!player) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Not authenticated' }] }) })
+      }
+
+      if (player.onboardingCompletedAtUtc) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Onboarding has already been completed.', extensions: { code: 'ONBOARDING_ALREADY_COMPLETED' } }] }),
+        })
+      }
+
+      const onboardingCompanyId = player.onboardingCompanyId ?? (player.companies.length === 1 ? player.companies[0]?.id ?? null : null)
+      if (!onboardingCompanyId && player.companies.length > 1) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Onboarding reset is not available for this account.', extensions: { code: 'ONBOARDING_RESET_NOT_AVAILABLE' } }] }),
+        })
+      }
+
+      const onboardingCompany = onboardingCompanyId ? player.companies.find((candidate) => candidate.id === onboardingCompanyId) ?? null : null
+      const onboardingBuildingIds = new Set(onboardingCompany?.buildings.map((building) => building.id) ?? [])
+
+      if (onboardingCompanyId) {
+        for (const lot of state.buildingLots) {
+          if (lot.ownerCompanyId === onboardingCompanyId || (lot.buildingId && onboardingBuildingIds.has(lot.buildingId))) {
+            lot.ownerCompanyId = null
+            lot.buildingId = null
+            lot.ownerCompany = null
+            lot.building = null
+          }
+        }
+
+        player.companies = player.companies.filter((candidate) => candidate.id !== onboardingCompanyId)
+        state.shareholdings = state.shareholdings.filter(
+          (holding) => holding.companyId !== onboardingCompanyId && holding.ownerCompanyId !== onboardingCompanyId,
+        )
+        state.myBankAccounts = state.myBankAccounts.filter((account) => account.companyId !== onboardingCompanyId)
+      }
+
+      player.activeAccountType = 'PERSON'
+      player.activeCompanyId = null
+      player.onboardingCurrentStep = null
+      player.onboardingIndustry = null
+      player.onboardingCityId = null
+      player.onboardingCompanyId = null
+      player.onboardingFactoryLotId = null
+      player.onboardingShopBuildingId = null
+
+      return routeJson({ resetOnboardingProgress: true })
+    }
+
     if (query.includes('StartOnboardingCompany')) {
       const input = body.variables?.input
       const player = state.players.find((p) => p.id === state.currentUserId)

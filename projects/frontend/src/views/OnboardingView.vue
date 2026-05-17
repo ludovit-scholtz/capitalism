@@ -184,6 +184,8 @@ const milestoneCompleted = ref(false)
 const isGuestMode = computed(() => !hasAuthenticatedSession.value)
 const guestSaveError = ref<string | null>(null)
 const guestSaveLoading = ref(false)
+const resettingOnboarding = ref(false)
+const resetStatusMessage = ref<string | null>(null)
 
 const industries = ref<string[]>([])
 const proOnlyIndustries = ref<string[]>([])
@@ -294,6 +296,22 @@ const starterCompany = computed(() => {
   }
 
   return auth.player?.companies.find((company) => company.id === companyId) ?? null
+})
+const hasResettableOnboardingState = computed(() => {
+  const player = auth.player
+  if (!hasAuthenticatedSession.value || !player || player.onboardingCompletedAtUtc) {
+    return false
+  }
+
+  return Boolean(
+    player.onboardingCurrentStep ||
+      player.onboardingIndustry ||
+      player.onboardingCityId ||
+      player.onboardingCompanyId ||
+      player.onboardingFactoryLotId ||
+      player.onboardingShopBuildingId ||
+      player.companies.length > 0,
+  )
 })
 const selectedIpoOption = computed(() => ipoOptions.find((option) => option.raiseTarget === selectedIpoRaiseTarget.value) ?? ipoOptions[0])
 /** Company starting cash in the selected city's local currency (USD founder + USD IPO raise). */
@@ -540,6 +558,20 @@ function applyRouteSelections() {
   selectedShopLotId.value = typeof route.query.shopLotId === 'string' ? route.query.shopLotId : ''
   personalAccountName.value = typeof route.query.personalAccountName === 'string' ? route.query.personalAccountName : ''
   selectedIpoRaiseTarget.value = parseIpoRaiseTarget(route.query.ipoRaiseTarget)
+}
+
+function resetOnboardingSelections() {
+  selectedIndustry.value = ''
+  selectedProductId.value = ''
+  selectedCityId.value = ''
+  selectedFactoryLotId.value = ''
+  selectedShopLotId.value = ''
+  selectedIpoRaiseTarget.value = null
+  onboardingCompanyCash.value = null
+  completionResult.value = null
+  cityLots.value = []
+  products.value = []
+  step.value = 1
 }
 
 function buildRouteQuery() {
@@ -854,6 +886,7 @@ function selectProduct(productId: string) {
 
 async function selectCity(cityId: string) {
   error.value = null
+  resetStatusMessage.value = null
   selectedCityId.value = cityId
   auth.switchCity(cityId)
   selectedIpoRaiseTarget.value = null
@@ -960,8 +993,47 @@ async function persistPersonalAccountNameIfNeeded() {
   }
 }
 
+async function resetOnboardingProgress() {
+  if (!hasResettableOnboardingState.value || resettingOnboarding.value) {
+    return
+  }
+
+  const confirmed = window.confirm(t('onboarding.resetConfirm'))
+  if (!confirmed) {
+    return
+  }
+
+  resettingOnboarding.value = true
+  resetStatusMessage.value = null
+  error.value = null
+  factoryActionError.value = null
+  guestSaveError.value = null
+
+  try {
+    const result = await gqlRequest<{ resetOnboardingProgress: boolean }>(
+      `mutation ResetOnboardingProgress {
+        resetOnboardingProgress
+      }`,
+    )
+
+    if (!result.resetOnboardingProgress) {
+      throw new Error(t('common.unknownError'))
+    }
+
+    resetOnboardingSelections()
+    await auth.fetchMe()
+    refreshSuggestedPersonalAccountName()
+    resetStatusMessage.value = t('onboarding.resetSuccess')
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : t('common.unknownError')
+  } finally {
+    resettingOnboarding.value = false
+  }
+}
+
 async function startOnboardingCompany() {
   factoryActionError.value = null
+  resetStatusMessage.value = null
 
   const validationError = resolveFactoryStartValidationError()
   if (validationError) {
@@ -1347,6 +1419,20 @@ watch(visibleIndustries, () => {
         <div class="mb-4">
           <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step1Title') }}</h2>
           <p class="text-muted text-sm">{{ t('onboarding.step1Desc') }}</p>
+        </div>
+        <div v-if="hasResettableOnboardingState || resetStatusMessage" class="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-amber-100">
+          <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p class="m-0 text-sm font-semibold text-amber-200">{{ t('onboarding.resetTitle') }}</p>
+              <p class="m-0 mt-1 text-sm text-amber-100/80">{{ t('onboarding.resetBody') }}</p>
+            </div>
+            <button v-if="hasResettableOnboardingState" class="onboarding-reset-btn btn btn-secondary whitespace-nowrap" :disabled="resettingOnboarding" @click="resetOnboardingProgress">
+              {{ resettingOnboarding ? t('common.loading') : t('onboarding.resetButton') }}
+            </button>
+          </div>
+          <p v-if="resetStatusMessage" class="m-0 mt-3 text-sm text-[var(--color-secondary)]" role="status">
+            {{ resetStatusMessage }}
+          </p>
         </div>
         <div class="grid grid-cols-1 gap-4 mb-6 md:grid-cols-2 xl:grid-cols-3">
           <button

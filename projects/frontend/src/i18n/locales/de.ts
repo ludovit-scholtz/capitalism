@@ -354,6 +354,11 @@ export default {
     step5Desc: 'Prüfen Sie Ihr Startbudget, behalten Sie den generierten Firmennamen und sichern Sie sich ein fabriktaugliches Grundstück in der gewählten Stadt.',
     step6Title: 'Erstes Ladenlokal wählen',
     step6Desc: 'Ihr Startprodukt ist bereits festgelegt. Kaufen Sie jetzt ein Ladenlokal für den öffentlichen Verkauf.',
+    resetTitle: 'Im Onboarding festgefahren?',
+    resetBody: 'Wenn ein früherer Onboarding-Versuch unterbrochen wurde, können Sie hier das unfertige Unternehmen zurücksetzen und wieder bei der Stadtauswahl beginnen.',
+    resetButton: 'Onboarding zurücksetzen',
+    resetConfirm: 'Das unfertige Onboarding-Unternehmen zurücksetzen und von vorne beginnen? Dieser Schritt kann nicht rückgängig gemacht werden.',
+    resetSuccess: 'Der Onboarding-Fortschritt wurde zurückgesetzt. Sie können jetzt neu starten.',
     industryDescFurniture:
       'Verwandeln Sie Rohholz in Möbel, die jeder Haushalt braucht. Einfache Lieferkette, schneller Taktzyklus und ein Markt, der nie schläft. Ideal für Spieler, die schnell Gewinn sehen wollen.',
     industryDescFoodProcessing:

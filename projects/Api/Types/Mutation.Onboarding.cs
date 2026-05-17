@@ -236,6 +236,91 @@ public sealed partial class Mutation
         };
     }
 
+    [Authorize]
+    public async Task<bool> ResetOnboardingProgress(
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+        var player = await db.Players.FindAsync(userId)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Player not found.")
+                    .SetCode("PLAYER_NOT_FOUND")
+                    .Build());
+
+        if (player.OnboardingCompletedAtUtc is not null)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("You have already completed onboarding.")
+                    .SetCode("ONBOARDING_ALREADY_COMPLETED")
+                    .Build());
+        }
+
+        var ownedCompanies = await db.Companies
+            .Where(company => company.PlayerId == userId)
+            .ToListAsync();
+
+        Company? onboardingCompany = null;
+        if (player.OnboardingCompanyId.HasValue)
+        {
+            onboardingCompany = ownedCompanies.FirstOrDefault(company => company.Id == player.OnboardingCompanyId.Value);
+        }
+
+        if (onboardingCompany is null && ownedCompanies.Count == 1)
+        {
+            onboardingCompany = ownedCompanies[0];
+        }
+
+        if (onboardingCompany is null && ownedCompanies.Count > 1)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Multiple companies exist for this player. Reset onboarding is unavailable.")
+                    .SetCode("ONBOARDING_RESET_NOT_AVAILABLE")
+                    .Build());
+        }
+
+        if (onboardingCompany is not null)
+        {
+            var companyBankAccounts = await db.BankAccounts
+                .Where(account => account.CompanyId == onboardingCompany.Id)
+                .ToListAsync();
+            if (companyBankAccounts.Count > 0)
+            {
+                db.BankAccounts.RemoveRange(companyBankAccounts);
+            }
+
+            var companyLots = await db.BuildingLots
+                .Where(lot => lot.OwnerCompanyId == onboardingCompany.Id)
+                .ToListAsync();
+            foreach (var companyLot in companyLots)
+            {
+                companyLot.OwnerCompanyId = null;
+                companyLot.BuildingId = null;
+            }
+
+            var affectedPlayers = await db.Players
+                .Where(candidate => candidate.ActiveCompanyId == onboardingCompany.Id)
+                .ToListAsync();
+            foreach (var affectedPlayer in affectedPlayers)
+            {
+                affectedPlayer.ActiveCompanyId = null;
+                affectedPlayer.ActiveAccountType = AccountContextType.Person;
+            }
+
+            db.Companies.Remove(onboardingCompany);
+        }
+
+        ClearIncompleteOnboardingProgress(player);
+        player.ActiveCompanyId = null;
+        player.ActiveAccountType = AccountContextType.Person;
+
+        await db.SaveChangesAsync();
+        return true;
+    }
+
     /// <summary>
     /// Starts the lot-based onboarding journey by creating the first company and purchasing its factory lot.
     /// The player can later resume at the sales-shop step using the stored onboarding progress metadata.

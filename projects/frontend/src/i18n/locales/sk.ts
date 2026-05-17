@@ -353,6 +353,11 @@ export default {
     step5Desc: 'Skontrolujte rozpočet na štart, ponechajte si vygenerovaný názov firmy a zabezpečte si pozemok vhodný pre továreň.',
     step6Title: 'Vyberte prvý pozemok pre predajňu',
     step6Desc: 'Štartovací produkt je už uzamknutý. Kúpte pozemok pre predajňu pripravenú na verejný predaj.',
+    resetTitle: 'Zasekli ste sa v onboarding-u?',
+    resetBody: 'Ak bol predchádzajúci pokus o onboarding prerušený, tu môžete zrušiť nedokončenú firmu a začať znovu od výberu mesta.',
+    resetButton: 'Resetovať onboarding',
+    resetConfirm: 'Resetovať nedokončenú onboarding firmu a začať od začiatku? Tento krok sa nedá vrátiť späť.',
+    resetSuccess: 'Postup onboarding-u bol resetovaný. Teraz môžete začať znova.',
     industryDescFurniture:
       'Premieňajte drevo na nábytok, ktorý potrebuje každá domácnosť. Jednoduchý dodávateľský reťazec, rýchly cyklus výroby a trh, ktorý nikdy nespí. Vhodné pre hráčov, ktorí chcú rýchlo dosiahnuť zisk.',
     industryDescFoodProcessing:

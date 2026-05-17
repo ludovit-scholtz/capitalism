@@ -33,6 +33,12 @@ public sealed partial class Mutation
         player.OnboardingFactoryLotId = null;
     }
 
+    private static void ClearIncompleteOnboardingProgress(Player player)
+    {
+        ClearOnboardingProgress(player);
+        player.OnboardingShopBuildingId = null;
+    }
+
     /// <summary>
     /// Returns a human-readable display name for a building type constant.
     /// Used when auto-generating building names.

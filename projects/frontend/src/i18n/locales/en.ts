@@ -353,6 +353,11 @@ export default {
     step5Desc: 'Review your launch budget, keep the generated company name, and secure a factory-capable lot in the selected city.',
     step6Title: 'Choose Your First Shop Lot',
     step6Desc: 'Your starter product is already locked in. Buy a sales-shop lot that is ready for public sales.',
+    resetTitle: 'Stuck in onboarding?',
+    resetBody: 'If a previous onboarding attempt was interrupted, reset the unfinished company here and start again from the city step.',
+    resetButton: 'Reset onboarding',
+    resetConfirm: 'Reset your unfinished onboarding company and start over from the beginning? This cannot be undone.',
+    resetSuccess: 'Onboarding progress was reset. You can start again now.',
     industryDescFurniture:
       'Turn raw timber into home goods that every household needs. A simple wood supply chain, a one-tick craft cycle, and a market that never sleeps. Great for players who want to see profit fast and scale with minimal inputs.',
     industryDescFoodProcessing:
