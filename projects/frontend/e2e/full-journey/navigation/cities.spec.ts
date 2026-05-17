@@ -118,7 +118,8 @@ test.describe('Cities page', () => {
     state.cities = makeDefaultCities()
     await page.goto('/')
 
-    await page.getByRole('link', { name: 'Cities' }).first().click()
+    await page.getByRole('button', { name: 'Main' }).hover()
+    await page.locator('.desktop-section-panel').getByRole('link', { name: 'Cities' }).click()
     await expect(page).toHaveURL('/cities')
   })
 

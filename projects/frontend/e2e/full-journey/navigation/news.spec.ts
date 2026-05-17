@@ -397,13 +397,16 @@ test.describe('News feed — authenticated read state', () => {
     await authenticate(page, `token-${player.id}`)
     await page.goto('/dashboard')
 
-    await expect(page.locator('.news-badge')).toContainText('1')
+    await page.getByRole('button', { name: 'Main' }).hover()
+    const mainPanel = page.locator('.desktop-section-panel')
+    await expect(mainPanel.getByRole('link', { name: 'News' }).locator('.desktop-sub-badge')).toContainText('1')
 
-    await page.getByRole('link', { name: 'News' }).click()
+    await mainPanel.getByRole('link', { name: 'News' }).click()
 
     await expect(page).toHaveURL('/news')
     await expect(page.getByRole('heading', { name: 'Server Gazette' })).toBeVisible()
-    await expect(page.locator('.news-badge')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Main' }).hover()
+    await expect(page.locator('.desktop-section-panel').getByRole('link', { name: 'News' }).locator('.desktop-sub-badge')).toHaveCount(0)
   })
 
   test('unread entries show NEW badge; already-read entries do not', async ({ page }) => {

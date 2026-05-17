@@ -2326,6 +2326,7 @@ test.describe('Stock exchange portfolio and dividend sections', () => {
 test.describe('Stock exchange — navbar account switcher', () => {
   test('account switcher is shown in the nav bar on the /stocks page just like /dashboard', async ({ page }) => {
     const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
       personalCash: 100000,
       companies: [makeControlledCompany()],
     })

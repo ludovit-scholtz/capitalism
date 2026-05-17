@@ -8,6 +8,20 @@ async function bootstrapAuthenticated(page: Parameters<typeof test>[0]['page'], 
   }, token)
 }
 
+async function openSocialSection(page: Parameters<typeof test>[0]['page']) {
+  await page.getByRole('button', { name: 'Social' }).hover()
+  const socialPanel = page.locator('.desktop-section-panel')
+  await expect(socialPanel).toBeVisible()
+  return socialPanel
+}
+
+async function openChatFromHeader(page: Parameters<typeof test>[0]['page']) {
+  const socialPanel = await openSocialSection(page)
+  const chatButton = socialPanel.getByRole('button', { name: 'Chat' })
+  await expect(chatButton).toBeVisible()
+  await chatButton.click()
+}
+
 test.describe('Chat side panel', () => {
   test('opens/closes and clears unread badge when opened', async ({ page }) => {
     const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
@@ -30,10 +44,12 @@ test.describe('Chat side panel', () => {
     await page.addInitScript(() => localStorage.removeItem('chat_last_seen_message_id'))
     await page.goto('/')
 
-    await expect(page.locator('.chat-badge')).toBeVisible()
-    await page.getByRole('button', { name: 'Chat' }).click()
+    const socialPanel = await openSocialSection(page)
+    await expect(socialPanel.getByRole('button', { name: 'Chat' }).locator('.desktop-sub-badge-chat, .desktop-sub-badge')).toBeVisible()
+    await socialPanel.getByRole('button', { name: 'Chat' }).click()
     await expect(page.locator('.chat-side-panel')).toBeVisible()
-    await expect(page.locator('.chat-badge')).toBeHidden()
+    const refreshedSocialPanel = await openSocialSection(page)
+    await expect(refreshedSocialPanel.getByRole('button', { name: 'Chat' }).locator('.desktop-sub-badge-chat, .desktop-sub-badge')).toHaveCount(0)
     await page.locator('.close-btn').click()
     await expect(page.locator('.chat-side-panel')).toBeHidden()
   })
@@ -45,7 +61,7 @@ test.describe('Chat side panel', () => {
     await bootstrapAuthenticated(page, `token-${player.id}`)
     await page.goto('/')
 
-    await page.getByRole('button', { name: 'Chat' }).click()
+    await openChatFromHeader(page)
     await page.getByLabel('Chat message').fill('Need wood in Bratislava.')
     await page.getByRole('button', { name: 'Send' }).click()
     await expect(page.locator('.chat-log')).toContainText('Need wood in Bratislava.')
@@ -88,7 +104,7 @@ test.describe('Chat side panel', () => {
     await page.addInitScript(() => localStorage.setItem('selected_city_id', 'city-pr'))
 
     await page.goto('/city/city-ba')
-    await page.getByRole('button', { name: 'Chat' }).click()
+    await openChatFromHeader(page)
     await expect(page.getByRole('tab', { name: 'Bratislava' })).toHaveAttribute('aria-selected', 'true')
     await expect(page.locator('.chat-log')).toContainText('Bratislava trading floor')
     await expect(page.locator('.chat-log')).not.toContainText('Prague trading floor')
@@ -96,7 +112,7 @@ test.describe('Chat side panel', () => {
     await page.locator('.close-btn').click()
 
     await page.goto('/dashboard')
-    await page.getByRole('button', { name: 'Chat' }).click()
+    await openChatFromHeader(page)
     await expect(page.getByRole('tab', { name: 'Global' })).toHaveAttribute('aria-selected', 'true')
     await expect(page.locator('.chat-log')).toContainText('Global market ping')
     await expect(page.locator('.chat-log')).not.toContainText('Bratislava trading floor')
@@ -122,7 +138,7 @@ test.describe('Chat side panel', () => {
     await bootstrapAuthenticated(page, `token-${player.id}`)
     await page.goto('/')
 
-    await page.getByRole('button', { name: 'Chat' }).click()
+    await openChatFromHeader(page)
     await page.getByLabel('Chat message').fill('x'.repeat(500))
     await page.getByRole('button', { name: 'Send' }).click()
     await expect(page.locator('.panel-footer .chat-state-error')).toContainText('Message is too long')
@@ -145,7 +161,7 @@ test.describe('Chat side panel', () => {
     await bootstrapAuthenticated(page, `token-${player.id}`)
     await page.goto('/')
 
-    await page.getByRole('button', { name: 'Chat' }).click()
+    await openChatFromHeader(page)
     await page.evaluate(() => {
       const log = document.querySelector('.chat-log')
       if (log) {
@@ -164,7 +180,7 @@ test.describe('Chat side panel', () => {
     await bootstrapAuthenticated(page, `token-${player.id}`)
     await page.goto('/')
 
-    await page.getByRole('button', { name: 'Chat' }).click()
+    await openChatFromHeader(page)
     for (let i = 0; i < 5; i += 1) {
       await page.getByLabel('Chat message').fill(`spam ${i}`)
       await page.getByRole('button', { name: 'Send' }).click()
