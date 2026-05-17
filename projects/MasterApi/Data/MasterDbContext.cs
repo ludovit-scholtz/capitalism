@@ -27,6 +27,10 @@ public sealed class MasterDbContext(DbContextOptions<MasterDbContext> options) :
 
     public DbSet<GoldTokenTransaction> GoldTokenTransactions => Set<GoldTokenTransaction>();
 
+    public DbSet<GoldTokenDepositRequest> GoldTokenDepositRequests => Set<GoldTokenDepositRequest>();
+
+    public DbSet<GoldTokenWithdrawalRequest> GoldTokenWithdrawalRequests => Set<GoldTokenWithdrawalRequest>();
+
     public DbSet<SupportTicket> SupportTickets => Set<SupportTicket>();
 
     public DbSet<SupportTicketAuditEvent> SupportTicketAuditEvents => Set<SupportTicketAuditEvent>();
@@ -173,6 +177,39 @@ public sealed class MasterDbContext(DbContextOptions<MasterDbContext> options) :
         goldTx.Property(tx => tx.Amount).HasColumnType("decimal(18,8)");
         goldTx.Property(tx => tx.BalanceBefore).HasColumnType("decimal(18,8)");
         goldTx.Property(tx => tx.BalanceAfter).HasColumnType("decimal(18,8)");
+
+        var goldDeposit = modelBuilder.Entity<GoldTokenDepositRequest>();
+        goldDeposit.HasKey(request => request.Id);
+        goldDeposit.HasIndex(request => new { request.PlayerAccountId, request.RequestedAtUtc });
+        goldDeposit.HasIndex(request => new { request.Status, request.RequestedAtUtc });
+        goldDeposit.Property(request => request.PlayerEmail).HasMaxLength(200);
+        goldDeposit.Property(request => request.Network).HasMaxLength(20);
+        goldDeposit.Property(request => request.DepositAddress).HasMaxLength(256);
+        goldDeposit.Property(request => request.SenderAddress).HasMaxLength(256);
+        goldDeposit.Property(request => request.Status).HasMaxLength(24);
+        goldDeposit.Property(request => request.ProcessedByEmail).HasMaxLength(200);
+        goldDeposit.Property(request => request.AdminNote).HasMaxLength(1000);
+        goldDeposit.Property(request => request.Amount).HasColumnType("decimal(18,8)");
+        goldDeposit.HasOne(request => request.PlayerAccount)
+            .WithMany(playerAccount => playerAccount.GoldTokenDepositRequests)
+            .HasForeignKey(request => request.PlayerAccountId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        var goldWithdrawal = modelBuilder.Entity<GoldTokenWithdrawalRequest>();
+        goldWithdrawal.HasKey(request => request.Id);
+        goldWithdrawal.HasIndex(request => new { request.PlayerAccountId, request.RequestedAtUtc });
+        goldWithdrawal.HasIndex(request => new { request.Status, request.RequestedAtUtc });
+        goldWithdrawal.Property(request => request.PlayerEmail).HasMaxLength(200);
+        goldWithdrawal.Property(request => request.Network).HasMaxLength(20);
+        goldWithdrawal.Property(request => request.DestinationAddress).HasMaxLength(256);
+        goldWithdrawal.Property(request => request.Status).HasMaxLength(24);
+        goldWithdrawal.Property(request => request.ProcessedByEmail).HasMaxLength(200);
+        goldWithdrawal.Property(request => request.AdminNote).HasMaxLength(1000);
+        goldWithdrawal.Property(request => request.Amount).HasColumnType("decimal(18,8)");
+        goldWithdrawal.HasOne(request => request.PlayerAccount)
+            .WithMany(playerAccount => playerAccount.GoldTokenWithdrawalRequests)
+            .HasForeignKey(request => request.PlayerAccountId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         var supportTicket = modelBuilder.Entity<SupportTicket>();
         supportTicket.HasKey(ticket => ticket.Id);

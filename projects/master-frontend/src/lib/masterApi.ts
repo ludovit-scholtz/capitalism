@@ -31,6 +31,7 @@ export interface MasterPlayerProfile {
   createdAtUtc: string
   startupPackClaimedAtUtc: string | null
   canClaimStartupPack: boolean
+  hasReferralDiscount: boolean
 }
 
 export interface MasterAuthPayload {
@@ -90,6 +91,7 @@ const REGISTER_MUTATION = `
         createdAtUtc
         startupPackClaimedAtUtc
         canClaimStartupPack
+        hasReferralDiscount
       }
     }
   }
@@ -109,6 +111,7 @@ const LOGIN_MUTATION = `
         createdAtUtc
         startupPackClaimedAtUtc
         canClaimStartupPack
+        hasReferralDiscount
       }
     }
   }
@@ -125,6 +128,7 @@ const ME_QUERY = `
       createdAtUtc
       startupPackClaimedAtUtc
       canClaimStartupPack
+      hasReferralDiscount
     }
   }
 `
@@ -279,6 +283,37 @@ export interface PlayerGoldAccountInfo {
   recentTransactions: PlayerGoldTransactionInfo[]
 }
 
+export interface GoldDepositRequestInfo {
+  id: string
+  playerAccountId: string
+  playerEmail: string
+  network: 'VOI' | 'ALGORAND'
+  assetId: number
+  depositAddress: string
+  senderAddress: string | null
+  amount: number
+  status: 'PENDING' | 'PROCESSED'
+  requestedAtUtc: string
+  processedAtUtc: string | null
+  processedByEmail: string | null
+  adminNote: string | null
+}
+
+export interface GoldWithdrawalRequestInfo {
+  id: string
+  playerAccountId: string
+  playerEmail: string
+  network: 'VOI' | 'ALGORAND'
+  assetId: number
+  destinationAddress: string
+  amount: number
+  status: 'PENDING' | 'PROCESSED'
+  requestedAtUtc: string
+  processedAtUtc: string | null
+  processedByEmail: string | null
+  adminNote: string | null
+}
+
 const MY_GOLD_ACCOUNT_QUERY = `
   query GetMyGoldAccount {
     myGoldAccount {
@@ -296,6 +331,84 @@ const MY_GOLD_ACCOUNT_QUERY = `
   }
 `
 
+const MY_GOLD_DEPOSIT_REQUESTS_QUERY = `
+  query MyGoldDepositRequests {
+    myGoldDepositRequests {
+      id
+      playerAccountId
+      playerEmail
+      network
+      assetId
+      depositAddress
+      senderAddress
+      amount
+      status
+      requestedAtUtc
+      processedAtUtc
+      processedByEmail
+      adminNote
+    }
+  }
+`
+
+const MY_GOLD_WITHDRAWAL_REQUESTS_QUERY = `
+  query MyGoldWithdrawalRequests {
+    myGoldWithdrawalRequests {
+      id
+      playerAccountId
+      playerEmail
+      network
+      assetId
+      destinationAddress
+      amount
+      status
+      requestedAtUtc
+      processedAtUtc
+      processedByEmail
+      adminNote
+    }
+  }
+`
+
+const CREATE_GOLD_DEPOSIT_REQUEST_MUTATION = `
+  mutation CreateGoldDepositRequest($input: CreateGoldTokenDepositRequestInput!) {
+    createGoldTokenDepositRequest(input: $input) {
+      id
+      playerAccountId
+      playerEmail
+      network
+      assetId
+      depositAddress
+      senderAddress
+      amount
+      status
+      requestedAtUtc
+      processedAtUtc
+      processedByEmail
+      adminNote
+    }
+  }
+`
+
+const CREATE_GOLD_WITHDRAWAL_REQUEST_MUTATION = `
+  mutation CreateGoldWithdrawalRequest($input: CreateGoldTokenWithdrawalRequestInput!) {
+    createGoldTokenWithdrawalRequest(input: $input) {
+      id
+      playerAccountId
+      playerEmail
+      network
+      assetId
+      destinationAddress
+      amount
+      status
+      requestedAtUtc
+      processedAtUtc
+      processedByEmail
+      adminNote
+    }
+  }
+`
+
 export async function fetchMyGoldAccount(token: string): Promise<PlayerGoldAccountInfo> {
   const data = await gqlRequest<{ myGoldAccount: PlayerGoldAccountInfo }>(
     MY_GOLD_ACCOUNT_QUERY,
@@ -303,6 +416,54 @@ export async function fetchMyGoldAccount(token: string): Promise<PlayerGoldAccou
     token,
   )
   return data.myGoldAccount
+}
+
+export async function fetchMyGoldDepositRequests(token: string): Promise<GoldDepositRequestInfo[]> {
+  const data = await gqlRequest<{ myGoldDepositRequests: GoldDepositRequestInfo[] }>(
+    MY_GOLD_DEPOSIT_REQUESTS_QUERY,
+    undefined,
+    token,
+  )
+  return data.myGoldDepositRequests
+}
+
+export async function fetchMyGoldWithdrawalRequests(
+  token: string,
+): Promise<GoldWithdrawalRequestInfo[]> {
+  const data = await gqlRequest<{ myGoldWithdrawalRequests: GoldWithdrawalRequestInfo[] }>(
+    MY_GOLD_WITHDRAWAL_REQUESTS_QUERY,
+    undefined,
+    token,
+  )
+  return data.myGoldWithdrawalRequests
+}
+
+export async function createGoldDepositRequest(
+  token: string,
+  network: 'VOI' | 'ALGORAND',
+  amount: number,
+  senderAddress?: string,
+): Promise<GoldDepositRequestInfo> {
+  const data = await gqlRequest<{ createGoldTokenDepositRequest: GoldDepositRequestInfo }>(
+    CREATE_GOLD_DEPOSIT_REQUEST_MUTATION,
+    { input: { network, amount, senderAddress: senderAddress ?? null } },
+    token,
+  )
+  return data.createGoldTokenDepositRequest
+}
+
+export async function createGoldWithdrawalRequest(
+  token: string,
+  network: 'VOI' | 'ALGORAND',
+  amount: number,
+  destinationAddress: string,
+): Promise<GoldWithdrawalRequestInfo> {
+  const data = await gqlRequest<{ createGoldTokenWithdrawalRequest: GoldWithdrawalRequestInfo }>(
+    CREATE_GOLD_WITHDRAWAL_REQUEST_MUTATION,
+    { input: { network, amount, destinationAddress } },
+    token,
+  )
+  return data.createGoldTokenWithdrawalRequest
 }
 
 // ── Gold token administration ──────────────────────────────────────────────
@@ -362,6 +523,69 @@ const ADJUST_GOLD_TOKEN_MUTATION = `
   }
 `
 
+const GOLD_DEPOSIT_REQUESTS_QUERY = `
+  query GoldTokenDepositRequests {
+    goldTokenDepositRequests {
+      id
+      playerAccountId
+      playerEmail
+      network
+      assetId
+      depositAddress
+      senderAddress
+      amount
+      status
+      requestedAtUtc
+      processedAtUtc
+      processedByEmail
+      adminNote
+    }
+  }
+`
+
+const GOLD_WITHDRAWAL_REQUESTS_QUERY = `
+  query GoldTokenWithdrawalRequests {
+    goldTokenWithdrawalRequests {
+      id
+      playerAccountId
+      playerEmail
+      network
+      assetId
+      destinationAddress
+      amount
+      status
+      requestedAtUtc
+      processedAtUtc
+      processedByEmail
+      adminNote
+    }
+  }
+`
+
+const PROCESS_GOLD_DEPOSIT_REQUEST_MUTATION = `
+  mutation ProcessGoldDepositRequest($input: ProcessGoldTokenDepositRequestInput!) {
+    processGoldTokenDepositRequest(input: $input) {
+      id
+      status
+      processedAtUtc
+      processedByEmail
+      adminNote
+    }
+  }
+`
+
+const PROCESS_GOLD_WITHDRAWAL_REQUEST_MUTATION = `
+  mutation ProcessGoldWithdrawalRequest($input: ProcessGoldTokenWithdrawalRequestInput!) {
+    processGoldTokenWithdrawalRequest(input: $input) {
+      id
+      status
+      processedAtUtc
+      processedByEmail
+      adminNote
+    }
+  }
+`
+
 export async function fetchGoldTokenBalances(token: string): Promise<GoldTokenBalanceInfo[]> {
   const data = await gqlRequest<{ goldTokenBalances: GoldTokenBalanceInfo[] }>(
     GOLD_TOKEN_BALANCES_QUERY,
@@ -396,6 +620,52 @@ export async function adjustGoldTokenBalance(
     token,
   )
   return data.adjustGoldTokenBalance
+}
+
+export async function fetchGoldDepositRequests(token: string): Promise<GoldDepositRequestInfo[]> {
+  const data = await gqlRequest<{ goldTokenDepositRequests: GoldDepositRequestInfo[] }>(
+    GOLD_DEPOSIT_REQUESTS_QUERY,
+    undefined,
+    token,
+  )
+  return data.goldTokenDepositRequests
+}
+
+export async function fetchGoldWithdrawalRequests(
+  token: string,
+): Promise<GoldWithdrawalRequestInfo[]> {
+  const data = await gqlRequest<{ goldTokenWithdrawalRequests: GoldWithdrawalRequestInfo[] }>(
+    GOLD_WITHDRAWAL_REQUESTS_QUERY,
+    undefined,
+    token,
+  )
+  return data.goldTokenWithdrawalRequests
+}
+
+export async function processGoldDepositRequest(
+  token: string,
+  requestId: string,
+  adminNote?: string,
+): Promise<GoldDepositRequestInfo> {
+  const data = await gqlRequest<{ processGoldTokenDepositRequest: GoldDepositRequestInfo }>(
+    PROCESS_GOLD_DEPOSIT_REQUEST_MUTATION,
+    { input: { requestId, adminNote: adminNote ?? null } },
+    token,
+  )
+  return data.processGoldTokenDepositRequest
+}
+
+export async function processGoldWithdrawalRequest(
+  token: string,
+  requestId: string,
+  adminNote?: string,
+): Promise<GoldWithdrawalRequestInfo> {
+  const data = await gqlRequest<{ processGoldTokenWithdrawalRequest: GoldWithdrawalRequestInfo }>(
+    PROCESS_GOLD_WITHDRAWAL_REQUEST_MUTATION,
+    { input: { requestId, adminNote: adminNote ?? null } },
+    token,
+  )
+  return data.processGoldTokenWithdrawalRequest
 }
 
 export async function revokePlayerSessions(token: string, playerId: string): Promise<void> {

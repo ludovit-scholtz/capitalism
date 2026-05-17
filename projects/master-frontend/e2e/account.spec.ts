@@ -289,3 +289,59 @@ test.describe('Account page — subscription panel', () => {
     await expect(page.locator('.sub-expiry')).toContainText('Expires in')
   })
 })
+
+test.describe('Gold transfer pages', () => {
+  test('authenticated player can create a deposit request and see ARC26 QR section', async ({
+    page,
+  }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, {
+      currentPlayer: player,
+      subscription: {
+        tier: 'FREE',
+        status: 'NONE',
+        isActive: false,
+        daysRemaining: null,
+        canProlong: true,
+        expiresAtUtc: null,
+        startsAtUtc: null,
+      },
+    })
+    state.currentToken = 'token-deposit'
+
+    await loginAs(page, state, player, 'token-deposit')
+    await page.goto('/account/deposit')
+
+    await page.getByRole('button', { name: 'Create deposit request' }).click()
+
+    await expect(page.getByText('Latest ARC26 deposit QR')).toBeVisible()
+    await expect(page.getByAltText('ARC26 deposit QR code')).toBeVisible()
+    await expect(page.getByText(/Deposit request created/i)).toBeVisible()
+  })
+
+  test('authenticated player can create a withdrawal request', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, {
+      currentPlayer: player,
+      subscription: {
+        tier: 'FREE',
+        status: 'NONE',
+        isActive: false,
+        daysRemaining: null,
+        canProlong: true,
+        expiresAtUtc: null,
+        startsAtUtc: null,
+      },
+    })
+    state.currentToken = 'token-withdraw'
+
+    await loginAs(page, state, player, 'token-withdraw')
+    await page.goto('/account/withdraw')
+
+    await page.getByLabel('Destination address').fill('ALGO_WALLET_DEST')
+    await page.getByRole('button', { name: 'Create withdrawal request' }).click()
+
+    await expect(page.getByText(/Withdrawal request created/i)).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'My withdrawal requests' })).toBeVisible()
+  })
+})
