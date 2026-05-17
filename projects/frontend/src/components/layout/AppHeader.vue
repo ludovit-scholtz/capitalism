@@ -123,6 +123,25 @@ async function toggleNotificationsPanel() {
   }
 }
 
+function isMobileNotificationsMode() {
+  if (typeof window === 'undefined') {
+    return false
+  }
+  return window.matchMedia('(max-width: 767px)').matches
+}
+
+async function handleNotificationsButtonClick() {
+  if (isMobileNotificationsMode()) {
+    closeMenu()
+    closeDesktopSection()
+    closeNotificationsPanel()
+    await router.push('/notifications')
+    return
+  }
+
+  await toggleNotificationsPanel()
+}
+
 function closeNotificationsPanel() {
   isNotificationsOpen.value = false
 }
@@ -513,8 +532,8 @@ useTickRefresh(async () => {
               class="btn btn-secondary h-11 w-11 p-0 justify-center relative notification-bell-btn tap-target-44"
               :title="t('notifications.title')"
               :aria-label="t('notifications.title')"
-              :aria-expanded="isNotificationsOpen"
-              @click="toggleNotificationsPanel"
+              :aria-expanded="isNotificationsOpen && !isMenuOpen"
+              @click="handleNotificationsButtonClick"
             >
               <font-awesome-icon :icon="['fas', 'bell']" />
               <span v-if="showNotificationBadge" class="notification-badge">{{ notificationUnreadCount }}</span>

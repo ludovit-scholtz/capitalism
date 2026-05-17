@@ -492,4 +492,35 @@ onMounted(async () => {
   color: #f59e0b;
   font-size: 0.75rem;
 }
+
+@media (max-width: 768px) {
+  .upgrade-banner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .upgrade-banner-actions {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .concurrent-upgrade-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+  }
+
+  .concurrent-upgrade-type {
+    min-width: 0;
+  }
+
+  .concurrent-upgrade-arrow {
+    display: none;
+  }
+
+  .concurrent-upgrade-ticks {
+    margin-left: 0;
+  }
+}
 </style>
