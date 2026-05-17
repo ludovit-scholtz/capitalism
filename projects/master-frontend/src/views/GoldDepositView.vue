@@ -21,6 +21,7 @@ const error = ref('')
 const success = ref('')
 const network = ref<'VOI' | 'ALGORAND'>('ALGORAND')
 const DEFAULT_DEPOSIT_AMOUNT_GOLD = '0.137'
+const MICRO_CONVERSION_FACTOR = 1_000_000
 const amount = ref(DEFAULT_DEPOSIT_AMOUNT_GOLD)
 const senderAddress = ref('')
 
@@ -33,7 +34,7 @@ const navItems = computed(() => [
 const latestRequest = computed(() => requests.value[0] ?? null)
 const latestArc26Uri = computed(() => {
   if (!latestRequest.value) return ''
-  const amountMicro = Math.round(Number(latestRequest.value.amount) * 1_000_000)
+  const amountMicro = Math.round(Number(latestRequest.value.amount) * MICRO_CONVERSION_FACTOR)
   const note = encodeURIComponent(`CAPITALISM_DEPOSIT:${latestRequest.value.id}`)
   return `algorand://${latestRequest.value.depositAddress}?asset=${latestRequest.value.assetId}&amount=${amountMicro}&note=${note}`
 })

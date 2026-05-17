@@ -48,23 +48,29 @@ async function loadAll() {
 
 async function processDeposit(requestId: string) {
   if (!auth.token) return
-  await processGoldDepositRequest(auth.token, requestId)
-  await loadAll()
+  error.value = ''
+  try {
+    await processGoldDepositRequest(auth.token, requestId)
+    await loadAll()
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : t('goldTransfersAdmin.processError')
+  }
 }
 
 async function processWithdrawal(requestId: string) {
   if (!auth.token) return
-  await processGoldWithdrawalRequest(auth.token, requestId)
-  await loadAll()
+  error.value = ''
+  try {
+    await processGoldWithdrawalRequest(auth.token, requestId)
+    await loadAll()
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : t('goldTransfersAdmin.processError')
+  }
 }
 
 onMounted(async () => {
   if (!auth.isAuthenticated) {
     await router.push('/login')
-    return
-  }
-  if (!auth.isGameAdmin) {
-    await router.push('/')
     return
   }
   await loadAll()

@@ -356,6 +356,7 @@ export default {
     status: 'Status',
     actions: 'Aktionen',
     markProcessed: 'Als verarbeitet markieren',
+    processError: 'Transferanfrage konnte nicht verarbeitet werden.',
   },
   referralSetup: {
     title: 'Empfehlungscode einrichten',

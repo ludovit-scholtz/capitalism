@@ -87,7 +87,10 @@ public sealed partial class Mutation
                     .SetMessage("Player not found.")
                     .SetCode("PLAYER_NOT_FOUND")
                     .Build());
-        EnsureSufficientGoldBalance(player, input.Amount, "Not enough tokenized gold for withdrawal request.");
+        EnsureSufficientGoldBalance(
+            player,
+            input.Amount,
+            $"Not enough tokenized gold for withdrawal request. Requested {input.Amount:0.########} g, available {player.GoldTokenBalance:0.########} g.");
 
         var network = NormalizeGoldNetwork(input.Network);
         var assetId = ResolveAssetIdByNetwork(network);

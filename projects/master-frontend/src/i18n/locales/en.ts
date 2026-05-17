@@ -353,6 +353,7 @@ export default {
     status: 'Status',
     actions: 'Actions',
     markProcessed: 'Mark processed',
+    processError: 'Failed to process transfer request.',
   },
   referralSetup: {
     title: 'Setup Referral Code',

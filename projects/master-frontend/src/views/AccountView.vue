@@ -23,6 +23,8 @@ const startupPackClaiming = ref(false)
 
 const MONTHLY_PRO_PRICE_GOLD = 0.137
 const STARTUP_PACK_PRICE_GOLD = 0.274
+const REFERRAL_DISCOUNT_MULTIPLIER = 0.9
+const GOLD_PRICE_PRECISION = 10000
 
 const subscription = computed(() => auth.subscription)
 const hasReferralDiscount = computed(() => auth.player?.hasReferralDiscount === true)
@@ -95,7 +97,7 @@ async function prolongSubscription() {
 
 function applyReferralDiscount(price: number): number {
   if (!hasReferralDiscount.value) return price
-  return Math.round(price * 0.9 * 10000) / 10000
+  return Math.round(price * REFERRAL_DISCOUNT_MULTIPLIER * GOLD_PRICE_PRECISION) / GOLD_PRICE_PRECISION
 }
 
 function formatGoldPrice(value: number): string {

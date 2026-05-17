@@ -351,6 +351,7 @@ export default {
     status: 'Stav',
     actions: 'Akcie',
     markProcessed: 'Označiť ako spracované',
+    processError: 'Nepodarilo sa spracovať požiadavku prevodu.',
   },
   referralSetup: {
     title: 'Nastavenie odporúčacieho kódu',
