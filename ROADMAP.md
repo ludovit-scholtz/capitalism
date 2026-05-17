@@ -12,7 +12,7 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 ### Github - private
 
-- [ ] Do not expose ludovit-scholtz/capitalism github repository on frontends. Remove securityLink from footer from both master and game frontend.
+- [x] Do not expose ludovit-scholtz/capitalism github repository on frontends. Remove securityLink from footer from both master and game frontend.
 
 ### Changlog
 
