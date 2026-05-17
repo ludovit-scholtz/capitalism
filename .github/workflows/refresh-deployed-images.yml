@@ -321,16 +321,63 @@ jobs:
             printf '%s\n' 'https://api.capitalism5.com/graphql'
           }
 
-          set_master_runtime_env() {
+          get_deployment_env_value() {
+            local namespace="$1"
+            local deployment="$2"
+            local env_name="$3"
+
+            kubectl get deployment "$deployment" --namespace "$namespace" -o json | jq -r --arg env_name "$env_name" '
+              [.spec.template.spec.containers[]?.env[]? | select(.name == $env_name) | .value][0] // empty
+            '
+          }
+
+          derive_game_graphql_url() {
+            local redirect_uri="$1"
+            local protocol
+            local host
+            local shard_label
+            local domain_suffix
+
+            if [ -z "$redirect_uri" ]; then
+              return 1
+            fi
+
+            protocol=$(printf '%s' "$redirect_uri" | sed -E 's#^([a-z]+)://.*#\1#')
+            host=$(printf '%s' "$redirect_uri" | sed -E 's#^[a-z]+://([^/]+)/?.*#\1#')
+            shard_label=${host%%.*}
+            domain_suffix=${host#*.}
+
+            if [ -z "$protocol" ] || [ -z "$host" ] || [ "$host" = "$domain_suffix" ]; then
+              return 1
+            fi
+
+            printf '%s://%s-api.%s/graphql\n' "$protocol" "$shard_label" "$domain_suffix"
+          }
+
+          set_game_frontend_runtime_env() {
             local namespace="$1"
             local deployment="$2"
             local master_web_url
             local master_graphql_url
+            local redirect_uri
+            local existing_graphql_url
+            local derived_graphql_url
+            local game_graphql_url
 
             master_web_url=$(get_master_web_url "$namespace")
             master_graphql_url=$(get_master_graphql_url "$namespace")
+            redirect_uri=$(get_deployment_env_value "$namespace" "$deployment" 'APP_BIATEC_OIDC_REDIRECT_URI')
+            existing_graphql_url=$(get_deployment_env_value "$namespace" "$deployment" 'APP_GRAPHQL_URL')
+            derived_graphql_url=$(derive_game_graphql_url "$redirect_uri" || true)
+            game_graphql_url=${derived_graphql_url:-$existing_graphql_url}
+
+            if [ -z "$game_graphql_url" ]; then
+              echo "Could not determine APP_GRAPHQL_URL for $namespace/$deployment. Existing runtime env is incomplete." >&2
+              return 1
+            fi
 
             kubectl set env "deployment/$deployment" \
+              APP_GRAPHQL_URL="$game_graphql_url" \
               APP_MASTER_WEB_URL="$master_web_url" \
               APP_MASTER_GRAPHQL_URL="$master_graphql_url" \
               --namespace "$namespace" >/dev/null
@@ -370,7 +417,11 @@ jobs:
                 fi
 
                 if [ "$image_repository" = "$GAME_FRONTEND_IMAGE_REPOSITORY" ]; then
-                  set_master_runtime_env "$namespace" "$deployment"
+                  if ! set_game_frontend_runtime_env "$namespace" "$deployment"; then
+                    record_failure "$namespace/$deployment" "could not determine frontend runtime env"
+                    emit_rollout_diagnostics "$namespace" "$deployment"
+                    continue
+                  fi
                 fi
 
                 apply_deployment_update "$namespace" "$deployment" "$container_name" "$image_ref"
@@ -382,7 +433,7 @@ jobs:
             refresh_shard_deployments '^capitalism-stage-' '-api$' 'game-api' "$GAME_API_IMAGE_REPOSITORY" "$GAME_API_IMAGE_REF" 'stage shard'
             refresh_shard_deployments '^capitalism-stage-' '-frontend$' 'game-frontend' "$GAME_FRONTEND_IMAGE_REPOSITORY" "$GAME_FRONTEND_IMAGE_REF" 'stage shard'
             patch_named_deployment "capitalism" "capitalism-api" "capitalism-api" "$GAME_API_IMAGE_REF"
-            set_master_runtime_env "capitalism" "capitalism-frontend"
+            set_game_frontend_runtime_env "capitalism" "capitalism-frontend"
             patch_named_deployment "capitalism" "capitalism-frontend" "capitalism-frontend" "$GAME_FRONTEND_IMAGE_REF"
             patch_named_deployment "capitalism-stage" "master-api" "master-api" "$MASTER_API_IMAGE_REF"
             patch_named_deployment "capitalism-stage" "master-frontend" "master-frontend" "$MASTER_FRONTEND_IMAGE_REF"
