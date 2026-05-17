@@ -20,7 +20,8 @@ const loading = ref(false)
 const error = ref('')
 const success = ref('')
 const network = ref<'VOI' | 'ALGORAND'>('ALGORAND')
-const amount = ref('0.137')
+const DEFAULT_WITHDRAWAL_AMOUNT_GOLD = '0.137'
+const amount = ref(DEFAULT_WITHDRAWAL_AMOUNT_GOLD)
 const destinationAddress = ref('')
 
 const navItems = computed(() => [

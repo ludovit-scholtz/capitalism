@@ -105,6 +105,15 @@ public sealed partial class Mutation
             RequestedAtUtc = DateTime.UtcNow,
         };
 
+        var balanceBefore = player.GoldTokenBalance;
+        ApplyGoldDebit(player, request.Amount);
+        AddSystemGoldTransaction(
+            db,
+            player,
+            -request.Amount,
+            balanceBefore,
+            $"WITHDRAWAL_REQUEST_CREATED:{request.Network}:{request.Id}");
+
         db.GoldTokenWithdrawalRequests.Add(request);
         await db.SaveChangesAsync();
 
@@ -253,28 +262,10 @@ public sealed partial class Mutation
                     .SetCode("PLAYER_NOT_FOUND")
                     .Build());
 
-        EnsureSufficientGoldBalance(player, request.Amount, "Player no longer has enough tokenized gold for this withdrawal.");
-        var balanceBefore = player.GoldTokenBalance;
-        player.GoldTokenBalance -= request.Amount;
-        player.ConcurrencyToken = Guid.NewGuid();
-
         request.Status = "PROCESSED";
         request.ProcessedAtUtc = DateTime.UtcNow;
         request.ProcessedByEmail = callerEmail;
         request.AdminNote = string.IsNullOrWhiteSpace(input.AdminNote) ? null : input.AdminNote.Trim();
-
-        db.GoldTokenTransactions.Add(new GoldTokenTransaction
-        {
-            Id = Guid.NewGuid(),
-            PlayerAccountId = player.Id,
-            PlayerEmail = player.Email,
-            Amount = -request.Amount,
-            BalanceBefore = balanceBefore,
-            BalanceAfter = player.GoldTokenBalance,
-            AdminEmail = callerEmail,
-            Note = $"WITHDRAWAL_PROCESSED:{request.Network}:{request.Id}",
-            CreatedAtUtc = DateTime.UtcNow,
-        });
 
         await db.SaveChangesAsync();
 

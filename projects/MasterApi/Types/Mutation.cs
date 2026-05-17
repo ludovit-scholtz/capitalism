@@ -183,6 +183,15 @@ public sealed partial class Mutation
 
     private static void ApplyGoldDebit(PlayerAccount player, decimal amount)
     {
+        if (player.GoldTokenBalance - amount < 0m)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Operation would result in a negative gold balance.")
+                    .SetCode("INSUFFICIENT_GOLD_BALANCE")
+                    .Build());
+        }
+
         player.GoldTokenBalance -= amount;
         player.ConcurrencyToken = Guid.NewGuid();
     }
