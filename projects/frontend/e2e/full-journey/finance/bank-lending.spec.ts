@@ -786,14 +786,15 @@ test.describe('Loans nav link', () => {
   test('shows Banking link in nav bar', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/')
-    // Nav now uses /banking (renamed from /loans); /loans is kept as alias
-    await expect(page.locator('.nav-links a[href="/banking"]')).toBeVisible()
+    await page.getByRole('button', { name: 'Economy' }).hover()
+    await expect(page.locator('.desktop-section-panel').getByRole('link', { name: 'Banking', exact: true })).toBeVisible()
   })
 
   test('clicking Banking nav link navigates to /banking', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/')
-    await page.locator('.nav-links a[href="/banking"]').click()
+    await page.getByRole('button', { name: 'Economy' }).hover()
+    await page.locator('.desktop-section-panel').getByRole('link', { name: 'Banking', exact: true }).click()
     await expect(page).toHaveURL('/banking')
   })
 

@@ -213,6 +213,24 @@ test.describe('Responsive layout baseline checks', () => {
     await expect(page.locator('.mobile-nav-sections').getByRole('link', { name: 'Leaderboard', exact: true })).toBeHidden()
   })
 
+  test('desktop navigation groups secondary links into compact section menus on Full HD', async ({ page }) => {
+    setupMockApi(page)
+    await page.setViewportSize({ width: 1920, height: 1080 })
+    await page.goto('/')
+
+    await expect(page.getByRole('button', { name: 'Main' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Economy' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Build' })).toBeVisible()
+    await expect(page.locator('.desktop-nav-links').getByRole('link', { name: 'Exchange', exact: true })).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Economy' }).hover()
+    const desktopPanel = page.locator('.desktop-section-panel')
+    await expect(desktopPanel.getByRole('link', { name: 'Exchange', exact: true })).toBeVisible()
+    await expect(desktopPanel.getByRole('link', { name: 'Banking', exact: true })).toBeVisible()
+    await expect(desktopPanel.getByRole('link', { name: 'Energy', exact: true })).toBeVisible()
+    await expectNoHorizontalOverflow(page)
+  })
+
   test('city map lot detail behaves as a bottom drawer on mobile', async ({ page }) => {
     const { player, state } = seedAuthenticatedState(page)
     await seedAuthenticatedStorage(page, `token-${player.id}`)

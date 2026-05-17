@@ -36,9 +36,11 @@ const { unreadCount } = storeToRefs(newsStore)
 const { inbox: notificationsInbox, unreadCount: notificationUnreadCount, loading: notificationsLoading } = storeToRefs(notificationsStore)
 const { session } = storeToRefs(gameAdminStore)
 const { isChatOpen, unreadCount: chatUnreadCount } = storeToRefs(chatStore)
+const headerRef = ref<HTMLElement | null>(null)
 const isMenuOpen = ref(false)
 const isNotificationsOpen = ref(false)
 const openMobileSection = ref<'main' | 'economy' | 'build' | 'social' | 'admin'>('main')
+const openDesktopSection = ref<'main' | 'economy' | 'build' | 'social' | 'admin' | null>(null)
 const isOnboardingFocusMode = computed(() => route.name === 'onboarding' && !auth.player?.onboardingCompletedAtUtc)
 const showFullHeaderNavigation = computed(() => !isOnboardingFocusMode.value)
 
@@ -70,6 +72,34 @@ const toggleMenu = () => {
 const closeMenu = () => {
   isMenuOpen.value = false
   openMobileSection.value = 'main'
+  openDesktopSection.value = null
+}
+
+function toggleDesktopSection(section: 'main' | 'economy' | 'build' | 'social' | 'admin') {
+  openDesktopSection.value = openDesktopSection.value === section ? null : section
+  closeNotificationsPanel()
+}
+
+function handleDesktopSectionPointerEnter(section: 'main' | 'economy' | 'build' | 'social' | 'admin') {
+  openDesktopSection.value = section
+}
+
+function closeDesktopSection() {
+  openDesktopSection.value = null
+}
+
+function handleDesktopSectionFocusOut(event: FocusEvent) {
+  const currentTarget = event.currentTarget
+  const relatedTarget = event.relatedTarget
+
+  if (!(currentTarget instanceof HTMLElement)) {
+    closeDesktopSection()
+    return
+  }
+
+  if (!(relatedTarget instanceof Node) || !currentTarget.contains(relatedTarget)) {
+    closeDesktopSection()
+  }
 }
 
 function toggleMobileSection(section: 'main' | 'economy' | 'build' | 'social' | 'admin') {
@@ -84,6 +114,7 @@ function handleChatToggle() {
 async function toggleNotificationsPanel() {
   isNotificationsOpen.value = !isNotificationsOpen.value
   if (isNotificationsOpen.value) {
+    closeDesktopSection()
     await notificationsStore.fetchInbox(20)
     const unreadIds = notificationsInbox.value?.items.filter((item) => !item.isRead).map((item) => item.id) ?? []
     if (unreadIds.length > 0) {
@@ -189,8 +220,28 @@ const groupedNotifications = computed(() => {
 })
 
 function handleNotificationsEsc(event: KeyboardEvent) {
-  if (event.key === 'Escape' && isNotificationsOpen.value) {
-    closeNotificationsPanel()
+  if (event.key === 'Escape') {
+    if (isNotificationsOpen.value) {
+      closeNotificationsPanel()
+    }
+    if (openDesktopSection.value) {
+      closeDesktopSection()
+    }
+  }
+}
+
+function handleDocumentPointerDown(event: MouseEvent) {
+  if (!headerRef.value) {
+    return
+  }
+
+  const target = event.target
+  if (!(target instanceof Node)) {
+    return
+  }
+
+  if (!headerRef.value.contains(target)) {
+    closeDesktopSection()
   }
 }
 
@@ -298,10 +349,18 @@ const mobileNavSections = computed(() => {
     .filter((section) => section.links.length > 0)
 })
 
+const desktopNavSections = computed(() =>
+  mobileNavSections.value.map((section) => ({
+    ...section,
+    badge: section.links.reduce((total, link) => total + Math.max(0, link.badge ?? 0), 0),
+  })),
+)
+
 onMounted(() => {
   void refreshStockProposalBadgeCount()
   endgameStore.startPolling()
   window.addEventListener('keydown', handleNotificationsEsc)
+  window.addEventListener('mousedown', handleDocumentPointerDown)
 })
 
 watch(isOnboardingFocusMode, (focused) => {
@@ -311,8 +370,17 @@ watch(isOnboardingFocusMode, (focused) => {
   }
 })
 
+watch(
+  () => route.fullPath,
+  () => {
+    closeMenu()
+    closeNotificationsPanel()
+  },
+)
+
 onUnmounted(() => {
   window.removeEventListener('keydown', handleNotificationsEsc)
+  window.removeEventListener('mousedown', handleDocumentPointerDown)
 })
 
 useTickRefresh(async () => {
@@ -321,7 +389,7 @@ useTickRefresh(async () => {
 </script>
 
 <template>
-  <header class="app-header bg-card border-b border-divider sticky top-0 z-[100] backdrop-blur-sm">
+  <header ref="headerRef" class="app-header bg-card border-b border-divider sticky top-0 z-[100] backdrop-blur-sm">
     <div class="container flex items-center gap-8 h-16">
       <!-- Logo -->
       <RouterLink to="/" class="logo-link shrink-0" @click="closeMenu">
@@ -342,82 +410,52 @@ useTickRefresh(async () => {
       <!-- Navigation links -->
       <nav class="nav-links" :class="{ 'nav-open': isMenuOpen }">
         <div v-if="showFullHeaderNavigation" class="desktop-nav-links">
-          <RouterLink to="/" :title="t('nav.home')" class="nav-link" @click="closeMenu">
-            <font-awesome-icon :icon="['fas', 'home']" class="mr-2" />
-          </RouterLink>
-          <RouterLink v-if="auth.isAuthenticated" to="/dashboard" :title="t('nav.dashboard')" class="nav-link" @click="closeMenu">
-            <font-awesome-icon :icon="['fas', 'tachometer-alt']" class="mr-2" />
-          </RouterLink>
-          <RouterLink to="/leaderboard" :title="t('nav.leaderboard')" class="nav-link" @click="closeMenu">
-            <font-awesome-icon :icon="['fas', 'trophy']" class="mr-2" />
-          </RouterLink>
-          <RouterLink to="/cities" :title="t('nav.cities')" class="nav-link" @click="closeMenu">
-            <font-awesome-icon :icon="['fas', 'globe']" class="mr-2" />
-          </RouterLink>
-          <RouterLink to="/buildings/market" :title="t('nav.buildingMarket')" class="nav-link" @click="closeMenu">
-            <font-awesome-icon :icon="['fas', 'store']" class="mr-2" />
-          </RouterLink>
-          <RouterLink to="/encyclopedia" :title="t('nav.encyclopedia')" class="nav-link" @click="closeMenu">
-            <font-awesome-icon :icon="['fas', 'book-open']" class="mr-2" />
-          </RouterLink>
-          <RouterLink to="/exchange" :title="t('nav.exchange')" class="nav-link" @click="closeMenu">
-            <font-awesome-icon :icon="['fas', 'chart-bar']" class="mr-2" />
-          </RouterLink>
-          <RouterLink to="/stocks" :title="t('nav.stocks')" class="nav-link nav-link-badge-host" @click="closeMenu">
-            <font-awesome-icon :icon="['fas', 'wallet']" class="mr-2" />
-            <span v-if="showStockProposalBadge" class="nav-badge nav-badge-news">{{ stockProposalBadgeCount }}</span>
-          </RouterLink>
-          <RouterLink v-if="auth.isAuthenticated" to="/forex" :title="t('nav.forex')" class="nav-link" @click="closeMenu">
-            <font-awesome-icon :icon="['fas', 'coins']" class="mr-2" />
-          </RouterLink>
-          <RouterLink v-if="auth.isAuthenticated" to="/contracts" :title="t('nav.contracts')" class="nav-link" @click="closeMenu">
-            <font-awesome-icon :icon="['fas', 'route']" class="mr-2" />
-          </RouterLink>
-          <RouterLink v-if="auth.isAuthenticated" to="/bank-statement" :title="t('nav.bankStatement')" class="nav-link" @click="closeMenu">
-            <font-awesome-icon :icon="['fas', 'file-invoice-dollar']" class="mr-2" />
-          </RouterLink>
-          <RouterLink v-if="auth.isAuthenticated" to="/market-intelligence" :title="t('nav.campaignAnalytics')" class="nav-link" @click="closeMenu">
-            <font-awesome-icon :icon="['fas', 'bullhorn']" class="mr-2" />
-          </RouterLink>
-          <RouterLink to="/market" :title="t('nav.market')" :aria-label="t('nav.marketDashboard')" class="nav-link" @click="closeMenu">
-            <font-awesome-icon :icon="['fas', 'chart-pie']" class="mr-2" />
-          </RouterLink>
-          <RouterLink to="/energy-market" :title="t('nav.energy')" class="nav-link" @click="closeMenu">
-            <font-awesome-icon :icon="['fas', 'chart-bar']" class="mr-2" />
-          </RouterLink>
-          <RouterLink to="/banking" :title="t('nav.banking')" class="nav-link" @click="closeMenu">
-            <font-awesome-icon :icon="['fas', 'landmark']" class="mr-2" />
-          </RouterLink>
-          <RouterLink v-if="auth.isAuthenticated" to="/trade-routes" :title="t('tradeRoutes.nav')" class="nav-link" @click="closeMenu">
-            <font-awesome-icon :icon="['fas', 'route']" class="mr-2" />
-          </RouterLink>
-          <RouterLink to="/tutorial" :title="t('nav.tutorial')" class="nav-link" @click="closeMenu">
-            <font-awesome-icon :icon="['fas', 'graduation-cap']" class="mr-2" />
-          </RouterLink>
-          <RouterLink to="/news" :title="t('nav.news')" :aria-label="t('nav.news')" class="nav-link nav-link-badge-host" @click="closeMenu">
-            <font-awesome-icon :icon="['fas', 'newspaper']" class="mr-2" />
-            <span v-if="showUnreadBadge" class="nav-badge nav-badge-news news-badge">{{ unreadCount }}</span>
-          </RouterLink>
-          <button
-            v-if="auth.isAuthenticated"
-            class="nav-link nav-chat-btn nav-link-badge-host"
-            :class="{ 'nav-link-active': isChatOpen }"
-            :title="t('nav.chat')"
-            :aria-label="t('nav.chat')"
-            :aria-pressed="isChatOpen"
-            @click="handleChatToggle"
+          <div
+            v-for="section in desktopNavSections"
+            :key="section.key"
+            class="desktop-nav-section"
+            @mouseenter="handleDesktopSectionPointerEnter(section.key)"
+            @mouseleave="closeDesktopSection"
+            @focusin="handleDesktopSectionPointerEnter(section.key)"
+            @focusout="handleDesktopSectionFocusOut"
           >
-            <font-awesome-icon :icon="['fas', 'comments']" class="mr-2" />
-            <span v-if="chatUnreadCount > 0" class="nav-badge nav-badge-chat chat-badge">{{ chatUnreadCount }}</span>
-          </button>
-          <RouterLink v-if="session?.canAccessAdminDashboard" to="/operations/statistics" :title="t('nav.operations')" :aria-label="t('nav.operations')" class="nav-link" @click="closeMenu">
-            <font-awesome-icon :icon="['fas', 'chart-line']" class="mr-2" />
-          </RouterLink>
+            <button
+              type="button"
+              class="desktop-section-toggle"
+              :class="{ 'desktop-section-toggle-active': openDesktopSection === section.key }"
+              :aria-expanded="openDesktopSection === section.key"
+              @click="toggleDesktopSection(section.key)"
+            >
+              <span>{{ section.label }}</span>
+              <span v-if="section.badge > 0" class="desktop-section-badge">{{ section.badge }}</span>
+              <font-awesome-icon :icon="['fas', openDesktopSection === section.key ? 'chevron-up' : 'chevron-down']" class="desktop-section-chevron" />
+            </button>
+
+            <div v-if="openDesktopSection === section.key" class="desktop-section-panel">
+              <template v-for="link in section.links" :key="link.key">
+                <RouterLink v-if="'to' in link" :to="link.to" class="desktop-sub-link" @click="closeMenu">
+                  <font-awesome-icon :icon="link.icon" />
+                  <span>{{ link.label }}</span>
+                  <span v-if="link.badge && link.badge > 0" class="desktop-sub-badge">{{ link.badge }}</span>
+                </RouterLink>
+                <button
+                  v-else
+                  class="desktop-sub-link desktop-sub-button"
+                  :class="{ 'desktop-sub-link-active': link.active }"
+                  @click="link.action"
+                >
+                  <font-awesome-icon :icon="link.icon" />
+                  <span>{{ link.label }}</span>
+                  <span v-if="link.badge && link.badge > 0" class="desktop-sub-badge desktop-sub-badge-chat">{{ link.badge }}</span>
+                </button>
+              </template>
+            </div>
+          </div>
         </div>
 
         <div v-if="isMenuOpen && showFullHeaderNavigation" class="mobile-nav-sections" :aria-label="t('nav.mobileMenuLabel')" role="navigation">
           <section v-for="section in mobileNavSections" :key="section.key" class="mobile-nav-section">
-            <button class="mobile-section-toggle tap-target-44" :aria-expanded="openMobileSection === section.key" @click="toggleMobileSection(section.key)">
+            <button type="button" class="mobile-section-toggle tap-target-44" :aria-expanded="openMobileSection === section.key" @click="toggleMobileSection(section.key)">
               <span>{{ section.label }}</span>
               <font-awesome-icon :icon="['fas', openMobileSection === section.key ? 'chevron-up' : 'chevron-down']" />
             </button>
@@ -428,7 +466,7 @@ useTickRefresh(async () => {
                   <span>{{ link.label }}</span>
                   <span v-if="link.badge && link.badge > 0" class="mobile-sub-badge">{{ link.badge }}</span>
                 </RouterLink>
-                <button v-else class="mobile-sub-link mobile-sub-button tap-target-44" :class="{ 'mobile-sub-link-active': link.active }" @click="link.action">
+                <button v-else type="button" class="mobile-sub-link mobile-sub-button tap-target-44" :class="{ 'mobile-sub-link-active': link.active }" @click="link.action">
                   <font-awesome-icon :icon="link.icon" />
                   <span>{{ link.label }}</span>
                   <span v-if="link.badge && link.badge > 0" class="mobile-sub-badge">{{ link.badge }}</span>
@@ -580,7 +618,123 @@ useTickRefresh(async () => {
 
 .desktop-nav-links {
   display: flex;
-  gap: 1rem;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.desktop-nav-section {
+  position: relative;
+}
+
+.desktop-section-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--color-divider);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-card) 92%, var(--color-bg));
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.desktop-section-toggle:hover,
+.desktop-section-toggle:focus-visible,
+.desktop-section-toggle-active {
+  color: var(--color-text);
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-card));
+  outline: none;
+}
+
+.desktop-section-chevron {
+  font-size: 0.72rem;
+}
+
+.desktop-section-badge {
+  min-width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 999px;
+  padding-inline: 0.3rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.67rem;
+  font-weight: 700;
+  color: white;
+  background: linear-gradient(135deg, #ff8a00, #ff3d00);
+}
+
+.desktop-section-panel {
+  position: absolute;
+  top: calc(100% + 0.55rem);
+  left: 0;
+  min-width: 15rem;
+  padding: 0.45rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  border: 1px solid var(--color-divider);
+  border-radius: 0.95rem;
+  background: var(--color-card);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.28);
+  z-index: 125;
+}
+
+.desktop-sub-link {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.68rem 0.8rem;
+  border-radius: 0.75rem;
+  border: 1px solid transparent;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  background: transparent;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.desktop-sub-link:hover,
+.desktop-sub-link:focus-visible,
+.desktop-sub-link.router-link-active,
+.desktop-sub-link-active {
+  color: var(--color-text);
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  outline: none;
+}
+
+.desktop-sub-button {
+  cursor: pointer;
+}
+
+.desktop-sub-badge {
+  margin-left: auto;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 999px;
+  padding-inline: 0.28rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: white;
+  background: linear-gradient(135deg, #ff8a00, #ff3d00);
+}
+
+.desktop-sub-badge-chat {
+  background: linear-gradient(135deg, #2196f3, #1565c0);
 }
 
 .nav-link {

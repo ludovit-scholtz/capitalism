@@ -214,7 +214,8 @@ test.describe('Header navigation', () => {
     setupMockApi(page)
     await page.goto('/')
 
-    const energyLink = page.locator('a[title="Energy"]').first()
+    await page.getByRole('button', { name: 'Economy' }).hover()
+    const energyLink = page.locator('.desktop-section-panel').getByRole('link', { name: 'Energy', exact: true })
     await expect(energyLink).toBeVisible()
     await energyLink.click()
 
@@ -254,7 +255,8 @@ test.describe('Header navigation', () => {
     })
     await authenticate(page, `token-${player.id}`)
     await page.goto('/')
-    await expect(page.getByRole('link', { name: 'Dashboard', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Main' }).hover()
+    await expect(page.locator('.desktop-section-panel').getByRole('link', { name: 'Dashboard', exact: true })).toBeVisible()
     await expect(page.getByRole('banner').getByText(player.displayName)).toBeVisible()
   })
 
