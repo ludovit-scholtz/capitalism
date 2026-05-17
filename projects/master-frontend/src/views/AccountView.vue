@@ -16,12 +16,16 @@ const loading = ref(false)
 const errorMessage = ref('')
 
 // Subscription prolong form
-const prolongMonths = ref(1)
 const prolonging = ref(false)
 const prolongError = ref('')
 const prolongSuccess = ref(false)
+const startupPackClaiming = ref(false)
+
+const MONTHLY_PRO_PRICE_GOLD = 0.137
+const STARTUP_PACK_PRICE_GOLD = 0.274
 
 const subscription = computed(() => auth.subscription)
+const hasReferralDiscount = computed(() => auth.player?.hasReferralDiscount === true)
 
 function subscriptionStatusLabel(): string {
   const sub = subscription.value
@@ -80,12 +84,38 @@ async function prolongSubscription() {
   prolongError.value = ''
   prolongSuccess.value = false
   try {
-    await auth.prolong(prolongMonths.value)
+    await auth.prolong(1)
     prolongSuccess.value = true
   } catch (e: unknown) {
     prolongError.value = e instanceof Error ? e.message : t('home.prolongError')
   } finally {
     prolonging.value = false
+  }
+}
+
+function applyReferralDiscount(price: number): number {
+  if (!hasReferralDiscount.value) return price
+  return Math.round(price * 0.9 * 10000) / 10000
+}
+
+function formatGoldPrice(value: number): string {
+  return new Intl.NumberFormat(undefined, {
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 4,
+  }).format(value)
+}
+
+async function claimStartupPack() {
+  startupPackClaiming.value = true
+  prolongError.value = ''
+  prolongSuccess.value = false
+  try {
+    await auth.claimStartupPackOffer()
+    prolongSuccess.value = true
+  } catch (e: unknown) {
+    prolongError.value = e instanceof Error ? e.message : t('home.prolongError')
+  } finally {
+    startupPackClaiming.value = false
   }
 }
 
@@ -100,9 +130,14 @@ onMounted(async () => {
 const navItems = ref<Array<{ label: string; to: string }>>([])
 
 onMounted(() => {
-  navItems.value = [{ label: t('nav.account'), to: '/account' }]
+  navItems.value = [
+    { label: t('nav.account'), to: '/account' },
+    { label: t('account.depositNav'), to: '/account/deposit' },
+    { label: t('account.withdrawNav'), to: '/account/withdraw' },
+  ]
   if (auth.isGameAdmin) {
     navItems.value.unshift({ label: t('home.goldAdmin'), to: '/gold-admin' })
+    navItems.value.push({ label: t('goldAdmin.transferOps'), to: '/gold-transfers-admin' })
   }
 })
 </script>
@@ -181,7 +216,11 @@ onMounted(() => {
           <!-- Upgrade prompt for free users -->
           <template v-if="!subscription?.isActive">
             <p class="sub-upgrade-copy">{{ t('account.subscriptionUpgradeCopy') }}</p>
-            <a href="/login" class="sub-upgrade-btn">{{ t('subscription.subscribeToPro') }}</a>
+            <button type="button" class="sub-upgrade-btn" :disabled="prolonging" @click="prolongSubscription">
+              {{
+                t('account.buyMonthlyPro', { grams: formatGoldPrice(applyReferralDiscount(MONTHLY_PRO_PRICE_GOLD)) })
+              }}
+            </button>
           </template>
 
           <!-- Pro subscription controls -->
@@ -189,33 +228,51 @@ onMounted(() => {
             <p class="sub-active-copy">{{ t('account.subscriptionActiveCopy') }}</p>
 
             <div v-if="subscription?.canProlong" class="sub-prolong-form">
-              <label class="sub-prolong-label" for="prolong-months">
-                {{ t('account.subscriptionProlongLabel') }}
-              </label>
               <div class="sub-prolong-controls">
-                <input
-                  id="prolong-months"
-                  v-model.number="prolongMonths"
-                  type="number"
-                  min="1"
-                  max="12"
-                  class="sub-months-input"
-                  :disabled="prolonging"
-                />
-                <span class="sub-months-unit">{{ t('home.monthsPlural') }}</span>
                 <button
                   type="button"
                   class="sub-prolong-btn"
                   :disabled="prolonging"
                   @click="prolongSubscription"
                 >
-                  {{ prolonging ? t('home.processing') : t('subscription.extendSubscription') }}
+                  {{
+                    prolonging
+                      ? t('home.processing')
+                      : t('account.buyMonthlyPro', {
+                          grams: formatGoldPrice(applyReferralDiscount(MONTHLY_PRO_PRICE_GOLD)),
+                        })
+                  }}
                 </button>
               </div>
-              <p v-if="prolongError" class="sub-error" role="alert">{{ prolongError }}</p>
-              <p v-if="prolongSuccess" class="sub-success">{{ t('home.prolongSuccess') }}</p>
             </div>
           </template>
+
+          <div class="sub-prolong-form">
+            <p class="sub-upgrade-copy">
+              {{
+                t('account.startupPackPrice', {
+                  grams: formatGoldPrice(applyReferralDiscount(STARTUP_PACK_PRICE_GOLD)),
+                })
+              }}
+            </p>
+            <button
+              type="button"
+              class="sub-prolong-btn"
+              :disabled="startupPackClaiming || !auth.player?.canClaimStartupPack"
+              @click="claimStartupPack"
+            >
+              {{
+                startupPackClaiming
+                  ? t('home.processing')
+                  : auth.player?.canClaimStartupPack
+                    ? t('home.startupPack.claimButton')
+                    : t('home.startupPack.claimed')
+              }}
+            </button>
+          </div>
+          <p v-if="hasReferralDiscount" class="sub-success">{{ t('account.referralDiscountActive') }}</p>
+          <p v-if="prolongError" class="sub-error" role="alert">{{ prolongError }}</p>
+          <p v-if="prolongSuccess" class="sub-success">{{ t('home.prolongSuccess') }}</p>
         </section>
 
         <!-- What is gold section -->

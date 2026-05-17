@@ -266,6 +266,7 @@ public sealed partial class Query
             CreatedAtUtc = player.CreatedAtUtc,
             StartupPackClaimedAtUtc = player.StartupPackClaimedAtUtc,
             CanClaimStartupPack = player.StartupPackClaimedAtUtc is null,
+            HasReferralDiscount = player.ReferredByEmail is not null,
         };
     }
 
@@ -603,6 +604,156 @@ public sealed partial class Query
                 AdminEmail = tx.AdminEmail,
                 Note = tx.Note,
                 CreatedAtUtc = tx.CreatedAtUtc,
+            })
+            .ToListAsync();
+    }
+
+    [HotChocolate.Authorization.Authorize]
+    [Cost(20)]
+    public async Task<List<GoldTokenDepositRequestInfo>> GetMyGoldDepositRequests(
+        ClaimsPrincipal claimsPrincipal,
+        [Service] MasterDbContext db)
+    {
+        var player = await GetCurrentUserAsync(claimsPrincipal, db)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Player not found.")
+                    .SetCode("PLAYER_NOT_FOUND")
+                    .Build());
+
+        return await db.GoldTokenDepositRequests
+            .AsNoTracking()
+            .Where(request => request.PlayerAccountId == player.Id)
+            .OrderByDescending(request => request.RequestedAtUtc)
+            .Select(request => new GoldTokenDepositRequestInfo
+            {
+                Id = request.Id,
+                PlayerAccountId = request.PlayerAccountId,
+                PlayerEmail = request.PlayerEmail,
+                Network = request.Network,
+                AssetId = request.AssetId,
+                DepositAddress = request.DepositAddress,
+                SenderAddress = request.SenderAddress,
+                Amount = request.Amount,
+                Status = request.Status,
+                RequestedAtUtc = request.RequestedAtUtc,
+                ProcessedAtUtc = request.ProcessedAtUtc,
+                ProcessedByEmail = request.ProcessedByEmail,
+                AdminNote = request.AdminNote,
+            })
+            .ToListAsync();
+    }
+
+    [HotChocolate.Authorization.Authorize]
+    [Cost(20)]
+    public async Task<List<GoldTokenWithdrawalRequestInfo>> GetMyGoldWithdrawalRequests(
+        ClaimsPrincipal claimsPrincipal,
+        [Service] MasterDbContext db)
+    {
+        var player = await GetCurrentUserAsync(claimsPrincipal, db)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Player not found.")
+                    .SetCode("PLAYER_NOT_FOUND")
+                    .Build());
+
+        return await db.GoldTokenWithdrawalRequests
+            .AsNoTracking()
+            .Where(request => request.PlayerAccountId == player.Id)
+            .OrderByDescending(request => request.RequestedAtUtc)
+            .Select(request => new GoldTokenWithdrawalRequestInfo
+            {
+                Id = request.Id,
+                PlayerAccountId = request.PlayerAccountId,
+                PlayerEmail = request.PlayerEmail,
+                Network = request.Network,
+                AssetId = request.AssetId,
+                DestinationAddress = request.DestinationAddress,
+                Amount = request.Amount,
+                Status = request.Status,
+                RequestedAtUtc = request.RequestedAtUtc,
+                ProcessedAtUtc = request.ProcessedAtUtc,
+                ProcessedByEmail = request.ProcessedByEmail,
+                AdminNote = request.AdminNote,
+            })
+            .ToListAsync();
+    }
+
+    [HotChocolate.Authorization.Authorize]
+    [Cost(25)]
+    public async Task<List<GoldTokenDepositRequestInfo>> GetGoldTokenDepositRequests(
+        ClaimsPrincipal claimsPrincipal,
+        [Service] MasterDbContext db,
+        [Service] IOptions<GameAdministrationOptions> gameAdministrationOptions)
+    {
+        var callerEmail = GetEmailFromClaims(claimsPrincipal);
+        var access = await BuildGameAdministrationAccessAsync(db, gameAdministrationOptions.Value, callerEmail);
+        if (!access.CanAccessEveryGameDashboard)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Gold token administration requires global admin access.")
+                    .SetCode("GLOBAL_ADMIN_REQUIRED")
+                    .Build());
+        }
+
+        return await db.GoldTokenDepositRequests
+            .AsNoTracking()
+            .OrderByDescending(request => request.RequestedAtUtc)
+            .Select(request => new GoldTokenDepositRequestInfo
+            {
+                Id = request.Id,
+                PlayerAccountId = request.PlayerAccountId,
+                PlayerEmail = request.PlayerEmail,
+                Network = request.Network,
+                AssetId = request.AssetId,
+                DepositAddress = request.DepositAddress,
+                SenderAddress = request.SenderAddress,
+                Amount = request.Amount,
+                Status = request.Status,
+                RequestedAtUtc = request.RequestedAtUtc,
+                ProcessedAtUtc = request.ProcessedAtUtc,
+                ProcessedByEmail = request.ProcessedByEmail,
+                AdminNote = request.AdminNote,
+            })
+            .ToListAsync();
+    }
+
+    [HotChocolate.Authorization.Authorize]
+    [Cost(25)]
+    public async Task<List<GoldTokenWithdrawalRequestInfo>> GetGoldTokenWithdrawalRequests(
+        ClaimsPrincipal claimsPrincipal,
+        [Service] MasterDbContext db,
+        [Service] IOptions<GameAdministrationOptions> gameAdministrationOptions)
+    {
+        var callerEmail = GetEmailFromClaims(claimsPrincipal);
+        var access = await BuildGameAdministrationAccessAsync(db, gameAdministrationOptions.Value, callerEmail);
+        if (!access.CanAccessEveryGameDashboard)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Gold token administration requires global admin access.")
+                    .SetCode("GLOBAL_ADMIN_REQUIRED")
+                    .Build());
+        }
+
+        return await db.GoldTokenWithdrawalRequests
+            .AsNoTracking()
+            .OrderByDescending(request => request.RequestedAtUtc)
+            .Select(request => new GoldTokenWithdrawalRequestInfo
+            {
+                Id = request.Id,
+                PlayerAccountId = request.PlayerAccountId,
+                PlayerEmail = request.PlayerEmail,
+                Network = request.Network,
+                AssetId = request.AssetId,
+                DestinationAddress = request.DestinationAddress,
+                Amount = request.Amount,
+                Status = request.Status,
+                RequestedAtUtc = request.RequestedAtUtc,
+                ProcessedAtUtc = request.ProcessedAtUtc,
+                ProcessedByEmail = request.ProcessedByEmail,
+                AdminNote = request.AdminNote,
             })
             .ToListAsync();
     }

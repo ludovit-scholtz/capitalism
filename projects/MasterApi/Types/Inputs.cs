@@ -121,6 +121,8 @@ public sealed class MasterPlayerProfile
     public DateTime? StartupPackClaimedAtUtc { get; set; }
 
     public bool CanClaimStartupPack { get; set; }
+
+    public bool HasReferralDiscount { get; set; }
 }
 
 public sealed class UpdatePersonalAccountNameInput
@@ -398,4 +400,92 @@ public sealed class GoldTokenTransactionInfo
     public string? Note { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
+}
+
+public sealed class CreateGoldTokenDepositRequestInput
+{
+    public string Network { get; set; } = "ALGORAND";
+
+    public decimal Amount { get; set; }
+
+    public string? SenderAddress { get; set; }
+}
+
+public sealed class CreateGoldTokenWithdrawalRequestInput
+{
+    public string Network { get; set; } = "ALGORAND";
+
+    public decimal Amount { get; set; }
+
+    public string DestinationAddress { get; set; } = string.Empty;
+}
+
+public sealed class ProcessGoldTokenDepositRequestInput
+{
+    public Guid RequestId { get; set; }
+
+    public string? AdminNote { get; set; }
+}
+
+public sealed class ProcessGoldTokenWithdrawalRequestInput
+{
+    public Guid RequestId { get; set; }
+
+    public string? AdminNote { get; set; }
+}
+
+public sealed class GoldTokenDepositRequestInfo
+{
+    public Guid Id { get; set; }
+
+    public Guid PlayerAccountId { get; set; }
+
+    public string PlayerEmail { get; set; } = string.Empty;
+
+    public string Network { get; set; } = "ALGORAND";
+
+    public long AssetId { get; set; }
+
+    public string DepositAddress { get; set; } = string.Empty;
+
+    public string? SenderAddress { get; set; }
+
+    public decimal Amount { get; set; }
+
+    public string Status { get; set; } = "PENDING";
+
+    public DateTime RequestedAtUtc { get; set; }
+
+    public DateTime? ProcessedAtUtc { get; set; }
+
+    public string? ProcessedByEmail { get; set; }
+
+    public string? AdminNote { get; set; }
+}
+
+public sealed class GoldTokenWithdrawalRequestInfo
+{
+    public Guid Id { get; set; }
+
+    public Guid PlayerAccountId { get; set; }
+
+    public string PlayerEmail { get; set; } = string.Empty;
+
+    public string Network { get; set; } = "ALGORAND";
+
+    public long AssetId { get; set; }
+
+    public string DestinationAddress { get; set; } = string.Empty;
+
+    public decimal Amount { get; set; }
+
+    public string Status { get; set; } = "PENDING";
+
+    public DateTime RequestedAtUtc { get; set; }
+
+    public DateTime? ProcessedAtUtc { get; set; }
+
+    public string? ProcessedByEmail { get; set; }
+
+    public string? AdminNote { get; set; }
 }

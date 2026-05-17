@@ -29,6 +29,16 @@ const router = createRouter({
       component: () => import('@/views/AccountView.vue'),
     },
     {
+      path: '/account/deposit',
+      name: 'account-deposit',
+      component: () => import('@/views/GoldDepositView.vue'),
+    },
+    {
+      path: '/account/withdraw',
+      name: 'account-withdraw',
+      component: () => import('@/views/GoldWithdrawView.vue'),
+    },
+    {
       path: '/settings/game',
       name: 'game-settings',
       component: () => import('@/views/GameSettingsView.vue'),
@@ -37,6 +47,11 @@ const router = createRouter({
       path: '/gold-admin',
       name: 'gold-admin',
       component: () => import('@/views/GoldAdminView.vue'),
+    },
+    {
+      path: '/gold-transfers-admin',
+      name: 'gold-transfers-admin',
+      component: () => import('@/views/GoldTransfersAdminView.vue'),
     },
     {
       path: '/referrals/setup',

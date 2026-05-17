@@ -1217,6 +1217,14 @@ public sealed class RankingIntegrationTests
 
         var referredToken = registerResult.GetProperty("data").GetProperty("register").GetProperty("token").GetString()!;
 
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
+            var referredPlayer = db.PlayerAccounts.First(player => player.Email == referredEmail);
+            referredPlayer.GoldTokenBalance = 1m;
+            await db.SaveChangesAsync();
+        }
+
         // Referred player claims startup pack.
         var claimResult = await GraphQlAsync(
             client,

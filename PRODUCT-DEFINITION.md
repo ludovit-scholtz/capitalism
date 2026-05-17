@@ -26,6 +26,18 @@ Gold token is a special in-game currency representing 1 gram of real-world gold.
 
 The server global administrator can manage gold token funds on player accounts in the master-frontend global administration.
 
+Pro subscription activation is gold-paid only:
+- Monthly Pro purchase costs `$20` equivalent and is charged as `0.137` grams of tokenized gold.
+- Startup pack purchase costs `$40` equivalent and is charged as `0.274` grams of tokenized gold, granting 3 months of Pro.
+- Referral-active accounts receive a 10% discount on both Pro purchase paths.
+
+Master frontend gold transfer requirements:
+- Provide a deposit page for tokenized gold with both VOI and Algorand source networks.
+- Use network-specific asset ids: VOI `302228`, Algorand `1241944285`.
+- Generate ARC26 QR payloads for deposit intents to reduce manual transfer mistakes.
+- Provide a withdrawal page where users create withdrawal requests; withdrawals are processed manually by administrators and then marked as processed.
+- Provide an administrator oversight page listing all gold deposit and withdrawal requests with manual processing controls.
+
 ## Multiple Game Servers
 
 The master website is the product-pitching website where users can find in-game documentation and a list of active game servers. Authenticated users can see their Pro subscription and purchase an extension.

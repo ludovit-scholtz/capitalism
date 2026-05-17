@@ -236,6 +236,16 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
         return (token, player);
     }
 
+    private async Task SeedGoldBalanceAsync(string email, decimal amount = 10m)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
+        var player = await db.PlayerAccounts.FirstAsync(item => item.Email == email);
+        player.GoldTokenBalance = amount;
+        player.ConcurrencyToken = Guid.NewGuid();
+        await db.SaveChangesAsync();
+    }
+
     private static string CreateSharedToken(string userId, string email, string displayName, params Claim[] extraClaims)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SharedJwtSigningKey));
@@ -1096,7 +1106,9 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
     [Fact]
     public async Task ProlongSubscription_NewPlayer_CreatesProSubscription()
     {
-        var (token, _) = await RegisterAndGetTokenAsync($"prolong-new-{Guid.NewGuid():N}@example.com");
+        var email = $"prolong-new-{Guid.NewGuid():N}@example.com";
+        var (token, _) = await RegisterAndGetTokenAsync(email);
+        await SeedGoldBalanceAsync(email);
 
         var result = await GraphQlAsync("""
             mutation Prolong($input: ProlongSubscriptionInput!) {
@@ -1120,7 +1132,9 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
     [Fact]
     public async Task ProlongSubscription_ExistingSubscription_ExtendsExpiry()
     {
-        var (token, _) = await RegisterAndGetTokenAsync($"prolong-ext-{Guid.NewGuid():N}@example.com");
+        var email = $"prolong-ext-{Guid.NewGuid():N}@example.com";
+        var (token, _) = await RegisterAndGetTokenAsync(email);
+        await SeedGoldBalanceAsync(email);
 
         // First prolong: 1 month
         await GraphQlAsync("""
@@ -1163,7 +1177,9 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
     [Fact]
     public async Task ProlongSubscription_InvalidMonths_ReturnsError()
     {
-        var (token, _) = await RegisterAndGetTokenAsync($"prolong-inv-{Guid.NewGuid():N}@example.com");
+        var email = $"prolong-inv-{Guid.NewGuid():N}@example.com";
+        var (token, _) = await RegisterAndGetTokenAsync(email);
+        await SeedGoldBalanceAsync(email);
 
         var result = await GraphQlAsync("""
             mutation Prolong($input: ProlongSubscriptionInput!) {
@@ -1178,9 +1194,29 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
     }
 
     [Fact]
+    public async Task ProlongSubscription_InsufficientGoldBalance_ReturnsError()
+    {
+        var email = $"prolong-no-gold-{Guid.NewGuid():N}@example.com";
+        var (token, _) = await RegisterAndGetTokenAsync(email);
+
+        var result = await GraphQlAsync("""
+            mutation Prolong($input: ProlongSubscriptionInput!) {
+              prolongSubscription(input: $input) { tier }
+            }
+            """,
+            new { input = new { months = 1 } },
+            token: token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Contains("INSUFFICIENT_GOLD_BALANCE", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
     public async Task ProlongSubscription_12Months_IsValid()
     {
-        var (token, _) = await RegisterAndGetTokenAsync($"prolong-12m-{Guid.NewGuid():N}@example.com");
+        var email = $"prolong-12m-{Guid.NewGuid():N}@example.com";
+        var (token, _) = await RegisterAndGetTokenAsync(email);
+        await SeedGoldBalanceAsync(email, amount: 50m);
 
         var result = await GraphQlAsync("""
             mutation Prolong($input: ProlongSubscriptionInput!) {
@@ -1201,6 +1237,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
         {
                 var email = $"startup-pack-{Guid.NewGuid():N}@example.com";
                 var (token, _) = await RegisterAndGetTokenAsync(email, "Starter");
+                await SeedGoldBalanceAsync(email);
 
                 var claimResult = await GraphQlAsync("""
                         mutation {
@@ -1236,6 +1273,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
         {
                 var email = $"startup-pack-idempotent-{Guid.NewGuid():N}@example.com";
                 var (token, _) = await RegisterAndGetTokenAsync(email, "Idempotent Starter");
+                await SeedGoldBalanceAsync(email);
 
                 var firstClaim = await GraphQlAsync("""
                         mutation {
@@ -2445,7 +2483,9 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
     [Fact]
     public async Task SubscriptionFlow_ProlongThenQuery_ReturnsActiveStatus()
     {
-        var (token, _) = await RegisterAndGetTokenAsync($"flow-{Guid.NewGuid():N}@example.com");
+        var email = $"flow-{Guid.NewGuid():N}@example.com";
+        var (token, _) = await RegisterAndGetTokenAsync(email);
+        await SeedGoldBalanceAsync(email, amount: 20m);
 
         // Create subscription
         await GraphQlAsync("""
@@ -2737,6 +2777,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
             """);
 
         var token = registerResult.GetProperty("data").GetProperty("register").GetProperty("token").GetString()!;
+        await SeedGoldBalanceAsync("expired-sub@example.com", amount: 20m);
 
         // First prolong: 1 month
         await GraphQlAsync("""
@@ -2776,6 +2817,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
             """);
 
         var token = registerResult.GetProperty("data").GetProperty("register").GetProperty("token").GetString()!;
+        await SeedGoldBalanceAsync("fields-test@example.com", amount: 10m);
 
         await GraphQlAsync("""
             mutation Prolong($input: ProlongSubscriptionInput!) {
@@ -2926,6 +2968,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
     public async Task ProlongSubscription_ThenMe_BothWorkWithSameToken()
     {
         var (token, _) = await RegisterAndGetTokenAsync("dual-auth@example.com");
+        await SeedGoldBalanceAsync("dual-auth@example.com", amount: 10m);
 
         // Both queries should work with the same token
         var prolongResult = await GraphQlAsync("""
@@ -3052,6 +3095,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
     {
         // Register and get an initial subscription
         var (token, _) = await RegisterAndGetTokenAsync("lifecycle-stack@example.com");
+        await SeedGoldBalanceAsync("lifecycle-stack@example.com", amount: 10m);
 
         // Prolong for 1 month (creates first Active subscription)
         await GraphQlAsync("""
@@ -3084,6 +3128,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
     public async Task MySubscription_AfterProlong_ShowsActiveStatus()
     {
         var (token, _) = await RegisterAndGetTokenAsync("sub-active-query@example.com");
+        await SeedGoldBalanceAsync("sub-active-query@example.com", amount: 10m);
 
         await GraphQlAsync("""
             mutation Prolong($input: ProlongSubscriptionInput!) {
@@ -3129,6 +3174,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
     public async Task ProlongSubscription_MaxMonths_12_IsAccepted()
     {
         var (token, _) = await RegisterAndGetTokenAsync("max-months@example.com");
+        await SeedGoldBalanceAsync("max-months@example.com", amount: 50m);
 
         var result = await GraphQlAsync("""
             mutation Prolong($input: ProlongSubscriptionInput!) {
@@ -3149,6 +3195,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
     public async Task ProlongSubscription_MonthsOutOfRange_ReturnsError()
     {
         var (token, _) = await RegisterAndGetTokenAsync("months-range@example.com");
+        await SeedGoldBalanceAsync("months-range@example.com", amount: 10m);
 
         var tooFew = await GraphQlAsync("""
             mutation Prolong($input: ProlongSubscriptionInput!) {
@@ -4290,6 +4337,145 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
         var finalBal = adjBody.GetProperty("data").GetProperty("adjustGoldTokenBalance").GetProperty("goldTokenBalance").GetDecimal();
         // 50 (seed) + 10 (concurrent) + 5 (api) = 65
         Assert.Equal(65m, finalBal);
+    }
+
+    [Fact]
+    public async Task CreateGoldTokenDepositRequest_Player_CreatesPendingRequestWithNetworkAssetId()
+    {
+        var email = $"deposit-request-{Guid.NewGuid():N}@example.com";
+        var (token, _) = await RegisterAndGetTokenAsync(email);
+
+        var result = await GraphQlAsync("""
+            mutation CreateDeposit($input: CreateGoldTokenDepositRequestInput!) {
+              createGoldTokenDepositRequest(input: $input) {
+                network
+                assetId
+                amount
+                status
+              }
+            }
+            """,
+            new { input = new { network = "VOI", amount = 0.274m } },
+            token: token);
+
+        Assert.False(result.TryGetProperty("errors", out _));
+        var request = result.GetProperty("data").GetProperty("createGoldTokenDepositRequest");
+        Assert.Equal("VOI", request.GetProperty("network").GetString());
+        Assert.Equal(302228, request.GetProperty("assetId").GetInt64());
+        Assert.Equal("PENDING", request.GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task CreateGoldTokenWithdrawalRequest_WithoutBalance_ReturnsInsufficientGoldError()
+    {
+        var email = $"withdraw-request-{Guid.NewGuid():N}@example.com";
+        var (token, _) = await RegisterAndGetTokenAsync(email);
+
+        var result = await GraphQlAsync("""
+            mutation CreateWithdrawal($input: CreateGoldTokenWithdrawalRequestInput!) {
+              createGoldTokenWithdrawalRequest(input: $input) {
+                id
+              }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    network = "ALGORAND",
+                    amount = 0.137m,
+                    destinationAddress = "ALGO_DEST",
+                }
+            },
+            token: token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Contains(
+            "INSUFFICIENT_GOLD_BALANCE",
+            errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task ProcessGoldTokenDepositRequest_RootAdmin_CreditsPlayerBalance()
+    {
+        var email = $"deposit-process-{Guid.NewGuid():N}@example.com";
+        var (token, _) = await RegisterAndGetTokenAsync(email);
+        var rootToken = CreateSharedToken(Guid.NewGuid().ToString(), "root@example.com", "Root Admin");
+
+        var createResult = await GraphQlAsync("""
+            mutation CreateDeposit($input: CreateGoldTokenDepositRequestInput!) {
+              createGoldTokenDepositRequest(input: $input) { id amount }
+            }
+            """,
+            new { input = new { network = "ALGORAND", amount = 0.5m } },
+            token: token);
+        var requestId = createResult.GetProperty("data").GetProperty("createGoldTokenDepositRequest").GetProperty("id").GetString()!;
+
+        var processResult = await GraphQlAsync("""
+            mutation ProcessDeposit($input: ProcessGoldTokenDepositRequestInput!) {
+              processGoldTokenDepositRequest(input: $input) { status processedByEmail }
+            }
+            """,
+            new { input = new { requestId } },
+            token: rootToken);
+
+        Assert.False(processResult.TryGetProperty("errors", out _));
+        var processed = processResult.GetProperty("data").GetProperty("processGoldTokenDepositRequest");
+        Assert.Equal("PROCESSED", processed.GetProperty("status").GetString());
+
+        var accountResult = await GraphQlAsync("""
+            query { myGoldAccount { goldTokenBalance } }
+            """, token: token);
+        Assert.False(accountResult.TryGetProperty("errors", out _));
+        Assert.Equal(
+            0.5m,
+            accountResult.GetProperty("data").GetProperty("myGoldAccount").GetProperty("goldTokenBalance").GetDecimal());
+    }
+
+    [Fact]
+    public async Task ProcessGoldTokenWithdrawalRequest_RootAdmin_DebitsPlayerBalance()
+    {
+        var email = $"withdraw-process-{Guid.NewGuid():N}@example.com";
+        var (token, _) = await RegisterAndGetTokenAsync(email);
+        await SeedGoldBalanceAsync(email, amount: 1m);
+        var rootToken = CreateSharedToken(Guid.NewGuid().ToString(), "root@example.com", "Root Admin");
+
+        var createResult = await GraphQlAsync("""
+            mutation CreateWithdrawal($input: CreateGoldTokenWithdrawalRequestInput!) {
+              createGoldTokenWithdrawalRequest(input: $input) { id amount }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    network = "VOI",
+                    amount = 0.274m,
+                    destinationAddress = "VOI_DEST",
+                }
+            },
+            token: token);
+        var requestId = createResult.GetProperty("data").GetProperty("createGoldTokenWithdrawalRequest").GetProperty("id").GetString()!;
+
+        var processResult = await GraphQlAsync("""
+            mutation ProcessWithdrawal($input: ProcessGoldTokenWithdrawalRequestInput!) {
+              processGoldTokenWithdrawalRequest(input: $input) { status processedByEmail }
+            }
+            """,
+            new { input = new { requestId } },
+            token: rootToken);
+
+        Assert.False(processResult.TryGetProperty("errors", out _));
+        var processed = processResult.GetProperty("data").GetProperty("processGoldTokenWithdrawalRequest");
+        Assert.Equal("PROCESSED", processed.GetProperty("status").GetString());
+
+        var accountResult = await GraphQlAsync("""
+            query { myGoldAccount { goldTokenBalance } }
+            """, token: token);
+        Assert.False(accountResult.TryGetProperty("errors", out _));
+        Assert.Equal(
+            0.726m,
+            accountResult.GetProperty("data").GetProperty("myGoldAccount").GetProperty("goldTokenBalance").GetDecimal());
     }
 
     #endregion

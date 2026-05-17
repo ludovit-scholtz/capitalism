@@ -41,6 +41,10 @@ public sealed class PlayerAccount
 
     public ICollection<GoldTokenTransaction> GoldTokenTransactions { get; set; } = [];
 
+    public ICollection<GoldTokenDepositRequest> GoldTokenDepositRequests { get; set; } = [];
+
+    public ICollection<GoldTokenWithdrawalRequest> GoldTokenWithdrawalRequests { get; set; } = [];
+
     public ICollection<PasswordResetToken> PasswordResetTokens { get; set; } = [];
 
     public ICollection<MasterRankingRewardRecord> RankingRewardRecords { get; set; } = [];

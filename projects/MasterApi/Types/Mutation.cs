@@ -16,6 +16,11 @@ namespace MasterApi.Types;
 public sealed partial class Mutation
 {
     private const int StartupPackDurationMonths = 3;
+    internal const decimal MonthlyProPriceGold = 0.137m;
+    internal const decimal StartupPackPriceGold = 0.274m;
+    internal const decimal ReferralDiscountFraction = 0.10m;
+    internal const long VoiTokenizedGoldAssetId = 302228;
+    internal const long AlgorandTokenizedGoldAssetId = 1241944285;
 
 
     private static string NormalizeRequiredUrl(string url, string errorCode)
@@ -120,6 +125,87 @@ public sealed partial class Mutation
         {
             return false;
         }
+    }
+
+    internal static decimal ResolveGoldPriceWithReferralDiscount(decimal basePriceGold, bool hasReferralDiscount)
+    {
+        if (!hasReferralDiscount)
+        {
+            return basePriceGold;
+        }
+
+        return decimal.Round(basePriceGold * (1m - ReferralDiscountFraction), 8, MidpointRounding.AwayFromZero);
+    }
+
+    private static string NormalizeGoldNetwork(string? network)
+    {
+        var normalized = network?.Trim().ToUpperInvariant();
+        if (normalized is "VOI" or "ALGORAND")
+        {
+            return normalized;
+        }
+
+        throw new GraphQLException(
+            ErrorBuilder.New()
+                .SetMessage("Network must be VOI or ALGORAND.")
+                .SetCode("INVALID_NETWORK")
+                .Build());
+    }
+
+    private static long ResolveAssetIdByNetwork(string network)
+    {
+        return network == "VOI" ? VoiTokenizedGoldAssetId : AlgorandTokenizedGoldAssetId;
+    }
+
+    private static void EnsurePositiveGoldAmount(decimal amount)
+    {
+        if (amount <= 0m)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Amount must be greater than zero.")
+                    .SetCode("INVALID_AMOUNT")
+                    .Build());
+        }
+    }
+
+    private static void EnsureSufficientGoldBalance(PlayerAccount player, decimal amount, string errorMessage)
+    {
+        if (player.GoldTokenBalance < amount)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage(errorMessage)
+                    .SetCode("INSUFFICIENT_GOLD_BALANCE")
+                    .Build());
+        }
+    }
+
+    private static void ApplyGoldDebit(PlayerAccount player, decimal amount)
+    {
+        player.GoldTokenBalance -= amount;
+        player.ConcurrencyToken = Guid.NewGuid();
+    }
+
+    private static void AddSystemGoldTransaction(
+        MasterDbContext db,
+        PlayerAccount player,
+        decimal amount,
+        decimal balanceBefore,
+        string note)
+    {
+        db.GoldTokenTransactions.Add(new GoldTokenTransaction
+        {
+            Id = Guid.NewGuid(),
+            PlayerAccountId = player.Id,
+            PlayerEmail = player.Email,
+            Amount = amount,
+            BalanceBefore = balanceBefore,
+            BalanceAfter = player.GoldTokenBalance,
+            AdminEmail = "system@capitalism.master",
+            Note = note,
+            CreatedAtUtc = DateTime.UtcNow,
+        });
     }
 
     private static string NormalizeLocale(string locale)

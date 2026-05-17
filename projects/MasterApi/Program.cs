@@ -43,6 +43,8 @@ public class Program
             builder.Configuration.GetSection(ReverseProxyOptions.SectionName));
         builder.Services.Configure<GraphQlSecurityOptions>(
             builder.Configuration.GetSection(GraphQlSecurityOptions.SectionName));
+        builder.Services.Configure<GoldTokenTransferOptions>(
+            builder.Configuration.GetSection(GoldTokenTransferOptions.SectionName));
 
         var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
             ?? new JwtOptions();

@@ -278,4 +278,56 @@ test.describe('Gold token admin — global admin', () => {
     // Use .first() to avoid strict-mode violation while still confirming the link is present.
     await expect(page.getByRole('link', { name: /Game admin dashboard/i }).first()).toBeVisible()
   })
+
+  test('global admin can process pending deposit and withdrawal requests', async ({ page }) => {
+    const admin = makePlayer({ id: 'admin-001', email: 'admin@example.com', displayName: 'Admin' })
+    const state = setupMockApi(page, {
+      currentPlayer: admin,
+      isGlobalAdmin: true,
+      goldDepositRequests: [
+        {
+          id: 'dep-1',
+          playerAccountId: 'player-1',
+          playerEmail: 'alice@example.com',
+          network: 'ALGORAND',
+          assetId: 1241944285,
+          depositAddress: 'algorand-deposit-address-not-configured',
+          senderAddress: 'SENDER_A',
+          amount: 0.137,
+          status: 'PENDING',
+          requestedAtUtc: '2026-05-01T10:00:00.000Z',
+          processedAtUtc: null,
+          processedByEmail: null,
+          adminNote: null,
+        },
+      ],
+      goldWithdrawalRequests: [
+        {
+          id: 'wd-1',
+          playerAccountId: 'player-1',
+          playerEmail: 'alice@example.com',
+          network: 'VOI',
+          assetId: 302228,
+          destinationAddress: 'VOI_DEST',
+          amount: 0.1,
+          status: 'PENDING',
+          requestedAtUtc: '2026-05-01T11:00:00.000Z',
+          processedAtUtc: null,
+          processedByEmail: null,
+          adminNote: null,
+        },
+      ],
+    })
+    state.currentToken = 'token-admin'
+
+    await loginAs(page, state, admin, 'token-admin')
+    await page.goto('/gold-transfers-admin')
+
+    const actionButtons = page.getByRole('button', { name: 'Mark processed' })
+    await expect(actionButtons).toHaveCount(2)
+    await actionButtons.first().click()
+    await actionButtons.first().click()
+
+    await expect(page.getByText('PROCESSED')).toHaveCount(2)
+  })
 })
