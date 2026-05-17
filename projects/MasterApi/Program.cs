@@ -463,6 +463,7 @@ public class Program
             app.UseForwardedHeaders();
         }
 
+        app.UseCors("frontend");
         app.UseMiddleware<AuthRateLimitMiddleware>();
         app.UseAuthentication();
         app.UseAuthorization();
