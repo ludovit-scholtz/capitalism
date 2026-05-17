@@ -22,6 +22,19 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<!-- In CI Docker builds the build context is ./projects, so CHANGELOG.csv is staged into
+		     the Api project directory first. In local development we link the repository-root file. -->
+		<Content Include="CHANGELOG.csv" Condition="Exists('CHANGELOG.csv')">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+		</Content>
+		<Content Include="$(MSBuildProjectDirectory)/../../CHANGELOG.csv" Link="CHANGELOG.csv" Condition="!Exists('CHANGELOG.csv') AND Exists('$(MSBuildProjectDirectory)/../../CHANGELOG.csv')">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+		</Content>
+	</ItemGroup>
+
+	<ItemGroup>
 		<PackageReference Include="HotChocolate.AspNetCore" Version="15.1.15" />
 		<PackageReference Include="HotChocolate.AspNetCore.Authorization" Version="15.1.15" />
 		<PackageReference Include="HotChocolate.Types.Analyzers" Version="15.1.15">

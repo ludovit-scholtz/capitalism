@@ -105,6 +105,9 @@ jobs:
           echo "master_api=${tag_base}-ma" >> "$GITHUB_OUTPUT"
           echo "master_frontend=${tag_base}-mf" >> "$GITHUB_OUTPUT"
 
+      - name: Stage changelog for master API Docker context
+        run: install -m 0644 CHANGELOG.csv projects/MasterApi/CHANGELOG.csv
+
       - name: Build and push master API image
         uses: docker/build-push-action@v7
         with:

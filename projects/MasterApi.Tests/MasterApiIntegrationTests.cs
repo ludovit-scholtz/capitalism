@@ -1517,7 +1517,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
         public async Task GameNewsFeed_CsvImportedEntriesAreVisibleInFeed()
         {
             // The default factory runs MasterDbInitializer which calls ImportChangelogCsvAsync.
-            // Because CHANGELOG.csv is copied to the build output during build (see MasterApi.csproj),
+            // Because CHANGELOG.csv is included as build/publish content by MasterApi.csproj,
             // at least one CSV-imported entry should appear in the feed.
             var result = await GraphQlAsync("""
                 query Feed($input: GetGameNewsFeedInput!) {
@@ -1975,7 +1975,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
         [Fact]
         public void MasterDbInitializer_TryReadChangelogCsv_FindsFileInSearchPath()
         {
-            // When the build output contains CHANGELOG.csv (copied by the CopyFiles target),
+            // When the build output contains CHANGELOG.csv (included by MasterApi.csproj),
             // TryReadChangelogCsv must locate it and return non-null content.
             var content = MasterApi.Data.MasterDbInitializer.TryReadChangelogCsv();
 
