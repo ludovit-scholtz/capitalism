@@ -28,5 +28,11 @@ public sealed class GoldTokenDepositRequest
 
     public string? AdminNote { get; set; }
 
+    /// <summary>
+    /// The note text the depositor must include in the blockchain transaction note field.
+    /// Format: "CAP-{Id}" — used by the automated scanner to match incoming transactions.
+    /// </summary>
+    public string NoteText { get; set; } = string.Empty;
+
     public PlayerAccount PlayerAccount { get; set; } = null!;
 }

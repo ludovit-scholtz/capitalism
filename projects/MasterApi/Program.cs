@@ -1,4 +1,4 @@
-namespace MasterApi;
+﻿namespace MasterApi;
 
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -401,6 +401,9 @@ public class Program
         builder.Services.AddScoped<IJwtSessionRevocationService, JwtSessionRevocationService>();
         builder.Services.AddHostedService<JwtSessionCleanupHostedService>();
 
+        builder.Services.AddHttpClient<BlockchainDepositScannerHostedService>();
+        builder.Services.AddHostedService<BlockchainDepositScannerHostedService>();
+
         builder.Services
             .AddGraphQLServer()
             .ModifyRequestOptions(options =>
@@ -460,7 +463,6 @@ public class Program
             app.UseForwardedHeaders();
         }
 
-        app.UseCors("frontend");
         app.UseMiddleware<AuthRateLimitMiddleware>();
         app.UseAuthentication();
         app.UseAuthorization();
