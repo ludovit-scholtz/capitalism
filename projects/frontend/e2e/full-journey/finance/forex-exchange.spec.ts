@@ -354,9 +354,10 @@ test.describe('Forex Exchange page', () => {
     }, `token-${player.id}`)
     await page.goto('/')
 
-    // The forex link exists in the DOM (may be hidden in mobile nav)
-    await expect(page.locator('a[href="/forex"]')).toHaveCount(1)
-    await expect(page.locator('a[href="/forex"]')).toHaveAttribute('title', 'Forex')
+    await page.getByRole('button', { name: 'Economy' }).hover()
+    const forexLink = page.locator('.desktop-section-panel a[href="/forex"]')
+    await expect(forexLink).toBeVisible()
+    await expect(forexLink).toContainText('Forex')
   })
 
   // ── Bank-account-native swap flow ─────────────────────────────────────────

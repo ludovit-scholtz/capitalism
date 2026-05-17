@@ -601,4 +601,35 @@ test.describe('Header navigation', () => {
     await page.keyboard.press('Escape')
     await expect(page.locator('.notification-panel')).toHaveCount(0)
   })
+
+  test('mobile notifications button opens dedicated notifications page', async ({ page }) => {
+    const player = makePlayer()
+    const now = new Date().toISOString()
+    setupMockApi(page, {
+      players: [player],
+      currentUserId: player.id,
+      currentToken: `token-${player.id}`,
+      playerNotifications: [
+        {
+          id: 'notif-mobile',
+          type: 'BUILDING_CONSTRUCTION_COMPLETED',
+          title: 'Construction complete',
+          message: 'Factory finished.',
+          isRead: false,
+          createdAtTick: 10,
+          createdAtUtc: now,
+        },
+      ],
+    })
+    await authenticate(page, `token-${player.id}`)
+    await page.setViewportSize({ width: 375, height: 812 })
+
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Notifications' }).click()
+
+    await expect(page).toHaveURL('/notifications')
+    await expect(page.locator('.notification-panel')).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Notifications' })).toBeVisible()
+    await expect(page.getByText('Construction complete')).toBeVisible()
+  })
 })

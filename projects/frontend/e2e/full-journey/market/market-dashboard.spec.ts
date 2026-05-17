@@ -196,7 +196,8 @@ test('Market Dashboard nav link is visible in header', async ({ page }) => {
 
   await page.goto('/dashboard')
   const desktopNav = page.locator('header.app-header')
-  await expect(desktopNav.getByRole('link', { name: 'Market Dashboard' })).toBeVisible()
+  await desktopNav.getByRole('button', { name: 'Economy' }).hover()
+  await expect(page.locator('.desktop-section-panel').getByRole('link', { name: 'Market Dashboard' })).toBeVisible()
 })
 
 test('city demand panel is visible in city map view', async ({ page }) => {
@@ -298,7 +299,7 @@ test('shows error state when market data fails to load', async ({ page }) => {
       })
       return
     }
-    await route.continue()
+    await route.fallback()
   })
   await page.addInitScript((token) => {
     localStorage.setItem('auth_token', token)

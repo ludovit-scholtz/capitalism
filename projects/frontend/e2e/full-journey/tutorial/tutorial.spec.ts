@@ -155,8 +155,8 @@ test.describe('Tutorial view (/tutorial)', () => {
     setupMockApi(page)
     await page.goto('/')
 
-    // Find and click the Tutorial nav link
-    const tutorialLink = page.getByRole('link', { name: 'Tutorial' })
+    await page.getByRole('button', { name: 'Main' }).hover()
+    const tutorialLink = page.locator('.desktop-section-panel').getByRole('link', { name: 'Tutorial' })
     await expect(tutorialLink).toBeVisible()
     await tutorialLink.click()
     await expect(page).toHaveURL(/\/tutorial/)

@@ -20,6 +20,7 @@ const router = createRouter({
     { path: '/onboarding', name: 'onboarding', component: () => import('@/views/OnboardingView.vue') },
     { path: '/dashboard', name: 'dashboard', component: () => import('@/views/DashboardView.vue') },
     { path: '/news', name: 'news', component: () => import('@/views/NewsView.vue') },
+    { path: '/notifications', name: 'notifications', component: () => import('@/views/NotificationsView.vue') },
     { path: '/contracts', name: 'contracts', component: () => import('@/views/ContractsView.vue') },
     { path: '/admin', redirect: '/operations/statistics' },
     {

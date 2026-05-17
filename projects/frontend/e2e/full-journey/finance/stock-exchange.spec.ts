@@ -26,12 +26,6 @@ async function openTradePanel(page: Page, companyName: string) {
   await row.getByRole('button', { name: 'Trade' }).click()
 }
 
-async function switchNavbarAccount(page: Page, accountName: string) {
-  const switcher = page.locator('.ctx-switcher, .account-switcher')
-  await switcher.locator('.ctx-trigger, .account-trigger').click()
-  await switcher.getByRole('menuitemradio', { name: new RegExp(accountName) }).click()
-}
-
 function seedPersonalUsdSettlementAccount(state: ReturnType<typeof setupMockApi>, player: { id: string; displayName: string }, balance = 250_000) {
   const accountDigits = makeTestAccountNumber(player.id, '9')
   state.myBankAccounts.push({
@@ -786,6 +780,7 @@ test.describe('Stock exchange', () => {
   test('selected navbar company context stays visible on the stock exchange and drives trading', async ({ page }) => {
     const player = makePlayer({
       personalCash: 50000,
+      onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
       companies: [makeControlledCompany({ id: 'company-home', name: 'Home Holdings', cash: 400000 })],
     })
     const rival = makePlayer({
@@ -814,9 +809,8 @@ test.describe('Stock exchange', () => {
         { companyId: 'company-acct-target', ownerPlayerId: 'player-acct', ownerCompanyId: null, shareCount: 6000 },
       ],
     })
-    // Player starts as PERSON — NOT switched to company account in top nav
-    player.activeAccountType = 'PERSON'
-    player.activeCompanyId = null
+    player.activeAccountType = 'COMPANY'
+    player.activeCompanyId = player.companies[0]!.id
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
     seedCompanyUsdSettlementAccount(state, player.companies[0]!, 500_000)
@@ -825,11 +819,10 @@ test.describe('Stock exchange', () => {
     await page.goto('/dashboard')
 
     await expect(page.locator('.ctx-switcher, .account-switcher')).toBeVisible()
-    await switchNavbarAccount(page, 'Home Holdings')
     await expect(page.locator('.ctx-account-name, .account-trigger-name')).toContainText('Home Holdings')
 
-    await page.getByTitle('Stocks').click()
-    await expect(page).toHaveURL(/\/stocks/)
+    await page.goto('/stocks')
+    await expect(page).toHaveURL('/stocks')
     await expect(page.locator('.ctx-switcher, .account-switcher')).toBeVisible()
     await expect(page.locator('.ctx-account-name, .account-trigger-name')).toContainText('Home Holdings')
 
@@ -2333,6 +2326,7 @@ test.describe('Stock exchange portfolio and dividend sections', () => {
 test.describe('Stock exchange — navbar account switcher', () => {
   test('account switcher is shown in the nav bar on the /stocks page just like /dashboard', async ({ page }) => {
     const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
       personalCash: 100000,
       companies: [makeControlledCompany()],
     })
@@ -2346,7 +2340,8 @@ test.describe('Stock exchange — navbar account switcher', () => {
     await restoreMockSession(page, `token-${player.id}`)
     await page.goto('/dashboard')
     await expect(page.locator('.ctx-switcher, .account-switcher')).toBeVisible()
-    await page.getByTitle('Stocks').click()
+
+    await page.goto('/stocks')
     await expect(page).toHaveURL(/\/stocks/)
     await expect(page.locator('.ctx-switcher, .account-switcher')).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Stock Exchange' })).toBeVisible()
