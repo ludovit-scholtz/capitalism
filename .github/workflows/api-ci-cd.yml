@@ -13,8 +13,6 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   PROJECT_PATH: projects/Api
   IMAGE_NAME: harbor.de-4.biatec.io/biatec/capitalism-api
-  K8S_NAMESPACE: capitalism
-  K8S_DEPLOYMENT_NAME: capitalism-api
   SeedData__AdminPassword: TestSeedAdminPassword123!
 
 jobs:
@@ -86,16 +84,16 @@ jobs:
         id: check_secrets
         run: |
           set -euo pipefail
-          if [ -z "${{ secrets.KUBE_CONFIG_DATA }}" ] || [ -z "${{ secrets.MASTER_JWT_SIGNING_KEY }}" ] || [ -z "${{ secrets.GAME_BOOTSTRAP_ADMIN_PASSWORD }}" ]; then
+          if [ -z "${{ secrets.KUBE_CONFIG_DATA }}" ]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "Required deploy secrets are not set. Skipping deployment steps."
+            echo "KUBE_CONFIG_DATA is not set. Skipping stage shard deployment refresh."
             exit 0
           fi
           echo "ready=true" >> "$GITHUB_OUTPUT"
 
       - name: Deployment skipped (missing secrets)
         if: steps.check_secrets.outputs.ready != 'true'
-        run: echo "Deployment skipped because required secrets are not configured."
+        run: echo "Deployment skipped because KUBE_CONFIG_DATA is not configured."
 
       - name: Setup kubectl
         if: steps.check_secrets.outputs.ready == 'true'
@@ -109,43 +107,7 @@ jobs:
           mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 --decode > ~/.kube/config
 
-      - name: Apply namespace and storage
-        if: steps.check_secrets.outputs.ready == 'true'
-        run: |
-          kubectl apply -f ${{ env.PROJECT_PATH }}/deploy/k8s/namespace.yaml
-          kubectl apply -f ${{ env.PROJECT_PATH }}/deploy/k8s/persistent-volume-claim.yaml
-
-      - name: Create or update image pull secret
-        if: steps.check_secrets.outputs.ready == 'true'
-        run: |
-          kubectl create secret docker-registry regcred \
-            --namespace ${{ env.K8S_NAMESPACE }} \
-            --docker-server=harbor.de-4.biatec.io \
-            --docker-username='${{ secrets.HARBOR_USERNAME }}' \
-            --docker-password='${{ secrets.HARBOR_PASSWORD }}' \
-            --dry-run=client -o yaml | kubectl apply -f -
-
-      - name: Create or update application secrets
-        if: steps.check_secrets.outputs.ready == 'true'
-        run: |
-          kubectl create secret generic capitalism-api-secrets \
-            --namespace ${{ env.K8S_NAMESPACE }} \
-            --from-literal=jwt-signing-key='${{ secrets.MASTER_JWT_SIGNING_KEY }}' \
-            --from-literal=admin-password='${{ secrets.GAME_BOOTSTRAP_ADMIN_PASSWORD }}' \
-            --dry-run=client -o yaml | kubectl apply -f -
-
-      - name: Deploy application
-        if: steps.check_secrets.outputs.ready == 'true'
-        run: |
-          sed "s|IMAGE_PLACEHOLDER|${IMAGE_REF}|g" ${{ env.PROJECT_PATH }}/deploy/k8s/deployment.yaml | kubectl apply -f -
-          kubectl apply -f ${{ env.PROJECT_PATH }}/deploy/k8s/service.yaml
-          kubectl apply -f ${{ env.PROJECT_PATH }}/deploy/k8s/ingress.yaml
-
-      - name: Verify rollout
-        if: steps.check_secrets.outputs.ready == 'true'
-        run: kubectl rollout status deployment/${{ env.K8S_DEPLOYMENT_NAME }} --namespace ${{ env.K8S_NAMESPACE }}
-
-      - name: Refresh all shard API deployments
+      - name: Refresh active stage shard API deployments
         if: steps.check_secrets.outputs.ready == 'true'
         env:
           TARGET_IMAGE_REPOSITORY: ${{ env.IMAGE_NAME }}
@@ -194,10 +156,10 @@ jobs:
             return 1
           }
 
-          shard_namespaces=$(kubectl get namespace -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep -E '^capitalism-(stage|production)-' || true)
+          shard_namespaces=$(kubectl get namespace -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep -E -- '^capitalism-stage-' || true)
 
           if [ -z "$shard_namespaces" ]; then
-            echo "No shard namespaces found."
+            echo "No active stage shard namespaces found."
             exit 0
           fi
 
