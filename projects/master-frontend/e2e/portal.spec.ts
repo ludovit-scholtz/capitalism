@@ -18,13 +18,13 @@ test.describe('Home page', () => {
     await expect(page.locator('head link[rel="icon"]')).toHaveAttribute('href', '/favicon.ico')
     await expect(page.locator('head link[rel="apple-touch-icon"]')).toHaveAttribute(
       'href',
-      '/apple-touch-icon.svg',
+      '/apple-touch-icon.png',
     )
 
     const faviconResponse = await request.get('/favicon.ico')
     expect(faviconResponse.ok()).toBeTruthy()
 
-    const appleTouchIconResponse = await request.get('/apple-touch-icon.svg')
+    const appleTouchIconResponse = await request.get('/apple-touch-icon.png')
     expect(appleTouchIconResponse.ok()).toBeTruthy()
   })
 
