@@ -179,15 +179,14 @@ test.describe('Security board — admin with open findings', () => {
     await expect(page.getByText('@bob')).toBeVisible()
   })
 
-  test('shows linked issue link for resolved finding', async ({ page }) => {
+  test('shows linked issue numbers without exposing repository links', async ({ page }) => {
     const { admin, state } = setupAdminPage(page)
     await loginAs(page, state, admin, 'token-admin')
 
     await page.goto('/admin/security-board')
 
-    const issueLink = page.getByRole('link', { name: '#101' })
-    await expect(issueLink).toBeVisible()
-    await expect(issueLink).toHaveAttribute('href', /issues\/101/)
+    await expect(page.locator('.issue-ref')).toContainText('#101')
+    await expect(page.locator('a[href*="github.com/ludovit-scholtz/capitalism"]')).toHaveCount(0)
   })
 
   test('shows dash for finding with no linked issue', async ({ page }) => {
@@ -232,15 +231,28 @@ test.describe('Security board — admin with open findings', () => {
     await expect(rows.first()).toContainText('Loan offer info leak')
   })
 
-  test('shows audit source link', async ({ page }) => {
+  test('shows audit source text without exposing repository links', async ({ page }) => {
     const { admin, state } = setupAdminPage(page)
     await loginAs(page, state, admin, 'token-admin')
 
     await page.goto('/admin/security-board')
 
-    const auditLink = page.locator('.audit-link').first()
-    await expect(auditLink).toBeVisible()
-    await expect(auditLink).toHaveAttribute('href', /2026-W19-audit/)
+    const auditSource = page.locator('.audit-source').first()
+    await expect(auditSource).toBeVisible()
+    await expect(auditSource).toContainText('2026-W19-audit')
+    await expect(page.locator('a[href*="github.com/ludovit-scholtz/capitalism"]')).toHaveCount(0)
+  })
+})
+
+test.describe('Game admin dashboard — private repository privacy', () => {
+  test('does not expose repository links on the admin dashboard', async ({ page }) => {
+    const { admin, state } = setupAdminPage(page)
+    await loginAs(page, state, admin, 'token-admin')
+
+    await page.goto('/game-admin')
+
+    await expect(page.locator('.dep-audit-card')).toBeVisible()
+    await expect(page.locator('a[href*="github.com/ludovit-scholtz/capitalism"]')).toHaveCount(0)
   })
 })
 

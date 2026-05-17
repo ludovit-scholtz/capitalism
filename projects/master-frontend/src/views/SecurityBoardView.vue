@@ -126,19 +126,6 @@ function severityClass(severity: string): string {
       return 'severity-unknown'
   }
 }
-
-function issueUrl(issueNumber: number): string {
-  return `https://github.com/ludovit-scholtz/capitalism/issues/${issueNumber}`
-}
-
-function auditUrl(f: SecurityFinding): string {
-  const anchor = f.title
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, '')
-    .trim()
-    .replace(/[\s]+/g, '-')
-  return `https://github.com/ludovit-scholtz/capitalism/blob/main/audits/${f.fileStem}.md#${anchor}`
-}
 </script>
 
 <template>
@@ -235,24 +222,16 @@ function auditUrl(f: SecurityFinding): string {
                 <td class="finding-owner">{{ finding.owner || '—' }}</td>
                 <td class="finding-issues">
                   <template v-if="finding.issues.length > 0">
-                    <a
+                    <span
                       v-for="num in finding.issues"
                       :key="num"
-                      :href="issueUrl(num)"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="issue-link"
-                    >#{{ num }}</a>
+                      class="issue-ref"
+                    >#{{ num }}</span>
                   </template>
                   <span v-else class="no-issue">—</span>
                 </td>
                 <td>
-                  <a
-                    :href="auditUrl(finding)"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="audit-link"
-                  >{{ finding.fileStem }}</a>
+                  <span class="audit-source" :title="finding.filePath">{{ finding.fileStem }}</span>
                 </td>
               </tr>
             </tbody>
@@ -428,28 +407,19 @@ function auditUrl(f: SecurityFinding): string {
   white-space: nowrap;
 }
 
-.issue-link {
+.issue-ref {
+  display: inline-block;
   color: var(--color-primary, #6366f1);
-  text-decoration: none;
   margin-right: 0.25rem;
-}
-
-.issue-link:hover {
-  text-decoration: underline;
 }
 
 .no-issue {
   color: var(--color-text-secondary);
 }
 
-.audit-link {
+.audit-source {
   color: var(--color-primary, #6366f1);
-  text-decoration: none;
   font-size: 0.8rem;
-}
-
-.audit-link:hover {
-  text-decoration: underline;
 }
 
 /* Loading / error / empty */
