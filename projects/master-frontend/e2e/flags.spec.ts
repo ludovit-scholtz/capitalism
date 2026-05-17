@@ -7,6 +7,14 @@ test.describe('Country flag icons — master portal', () => {
   // ──────────────────────────────────────────────────
 
   test.describe('Language switcher flags', () => {
+    test('footer does not expose the private repository link', async ({ page }) => {
+      setupMockApi(page)
+      await page.goto('/')
+
+      await page.locator('.language-switcher').first().scrollIntoViewIfNeeded()
+      await expect(page.locator('a[href*="github.com/ludovit-scholtz/capitalism"]')).toHaveCount(0)
+    })
+
     test('footer language switcher shows 3 flag buttons', async ({ page }) => {
       setupMockApi(page)
       await page.goto('/')

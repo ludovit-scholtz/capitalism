@@ -693,10 +693,14 @@ useTickRefresh(async () => {
 
 .desktop-section-panel {
   position: absolute;
-  top: calc(100% + 0.55rem);
+  /* Start at the very bottom of the trigger — no gap — so mouseleave never
+     fires while the cursor is travelling from the button to the panel.
+     The visual spacing is provided by padding-top instead. */
+  top: 100%;
   left: 0;
   min-width: 15rem;
-  padding: 0.45rem;
+  /* Extra top padding bridges the visual gap without creating a dead zone */
+  padding: 0.55rem 0.45rem 0.45rem;
   display: flex;
   flex-direction: column;
   gap: 0.2rem;

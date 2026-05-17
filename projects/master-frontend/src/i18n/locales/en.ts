@@ -2,7 +2,6 @@ export default {
   common: {
     backToPortal: 'Back to portal',
     allRightsReserved: '© {year} Capitalism HQ. All rights reserved.',
-    securityLink: 'Security',
     loading: 'Loading...',
     refresh: 'Refresh',
     apply: 'Apply',
@@ -560,7 +559,6 @@ export default {
     depAuditCopy:
       'View the latest npm audit gate status for both frontends. Green means no high/critical production advisories.',
     depAuditClean: '✅ Gate active — audit baseline is clean',
-    depAuditViewRuns: 'View CI runs',
   },
   rankingHistory: {
     title: 'Bounty History',

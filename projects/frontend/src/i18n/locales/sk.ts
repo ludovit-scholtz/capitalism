@@ -13,7 +13,6 @@ export default {
     submit: 'Odosla\u0165',
     close: 'Zavrie\u0165',
     allRightsReserved: '\u00a9 {year} Kapitalizmus sro. V\u0161etky pr\u00e1va vyhraden\u00e9.',
-    securityLink: 'Bezpečnosť',
     confirm: 'Potvrdi\u0165',
     level: '\u00darove\u0148',
     notAvailable: 'N/A',

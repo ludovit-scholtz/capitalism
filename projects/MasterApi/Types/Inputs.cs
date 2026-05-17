@@ -461,6 +461,11 @@ public sealed class GoldTokenDepositRequestInfo
     public string? ProcessedByEmail { get; set; }
 
     public string? AdminNote { get; set; }
+
+    /// <summary>
+    /// The note text to include in the blockchain transaction note field for automatic matching.
+    /// </summary>
+    public string NoteText { get; set; } = string.Empty;
 }
 
 public sealed class GoldTokenWithdrawalRequestInfo

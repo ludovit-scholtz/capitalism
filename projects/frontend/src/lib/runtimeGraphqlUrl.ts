@@ -7,6 +7,7 @@ export interface RuntimeLocationLike {
 
 const LOCAL_GAME_GRAPHQL_FALLBACK = 'http://localhost:44356/graphql'
 const LOCAL_MASTER_GRAPHQL_FALLBACK = 'https://localhost:44364/graphql'
+const LOCAL_MASTER_WEB_FALLBACK = 'http://localhost:5174'
 
 function normalizeExplicitUrl(explicitUrl?: string | null) {
   const trimmed = explicitUrl?.trim()
@@ -61,6 +62,22 @@ export function deriveMasterGraphqlUrl(location?: RuntimeLocationLike): string |
   return `${protocol}//api.${masterDomain}/graphql`
 }
 
+export function deriveMasterWebUrl(location?: RuntimeLocationLike): string | null {
+  const currentLocation = location ?? getBrowserLocation()
+  if (!currentLocation?.hostname || isLocalHostname(currentLocation.hostname)) {
+    return null
+  }
+
+  const labels = currentLocation.hostname.split('.').filter((label) => label.length > 0)
+  if (labels.length < 2) {
+    return null
+  }
+
+  const masterDomain = labels.length >= 3 ? labels.slice(1).join('.') : currentLocation.hostname
+  const protocol = normalizeProtocol(currentLocation.protocol)
+  return `${protocol}//www.${masterDomain}`
+}
+
 export function resolveGameGraphqlUrl(
   explicitUrl?: string | null,
   location?: RuntimeLocationLike,
@@ -79,7 +96,25 @@ export function resolveMasterGraphqlUrl(
   location?: RuntimeLocationLike,
   localFallback = LOCAL_MASTER_GRAPHQL_FALLBACK,
 ) {
-  return normalizeExplicitUrl(explicitUrl) ?? deriveMasterGraphqlUrl(location) ?? localFallback
+  return (
+    normalizeExplicitUrl(readRuntimeAppConfigValue('masterGraphqlUrl')) ??
+    normalizeExplicitUrl(explicitUrl) ??
+    deriveMasterGraphqlUrl(location) ??
+    localFallback
+  )
+}
+
+export function resolveMasterWebUrl(
+  explicitUrl?: string | null,
+  location?: RuntimeLocationLike,
+  localFallback = LOCAL_MASTER_WEB_FALLBACK,
+) {
+  return (
+    normalizeExplicitUrl(readRuntimeAppConfigValue('masterWebUrl')) ??
+    normalizeExplicitUrl(explicitUrl) ??
+    deriveMasterWebUrl(location) ??
+    localFallback
+  )
 }
 
 export function resolveApiBaseUrl(graphqlUrl: string) {

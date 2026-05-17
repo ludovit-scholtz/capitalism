@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using MasterApi.Configuration;
 using MasterApi.Data;
 using MasterApi.Data.Entities;
@@ -45,6 +45,7 @@ public sealed partial class Mutation
         };
 
         db.GoldTokenDepositRequests.Add(request);
+        request.NoteText = $"CAP-{request.Id}";
         await db.SaveChangesAsync();
 
         return new GoldTokenDepositRequestInfo
@@ -62,6 +63,7 @@ public sealed partial class Mutation
             ProcessedAtUtc = request.ProcessedAtUtc,
             ProcessedByEmail = request.ProcessedByEmail,
             AdminNote = request.AdminNote,
+            NoteText = request.NoteText,
         };
     }
 
@@ -219,14 +221,15 @@ public sealed partial class Mutation
             ProcessedAtUtc = request.ProcessedAtUtc,
             ProcessedByEmail = request.ProcessedByEmail,
             AdminNote = request.AdminNote,
+            NoteText = request.NoteText,
         };
     }
 
     [HotChocolate.Authorization.Authorize]
     public async Task<GoldTokenWithdrawalRequestInfo> ProcessGoldTokenWithdrawalRequest(
-        ProcessGoldTokenWithdrawalRequestInput input,
-        ClaimsPrincipal claimsPrincipal,
-        [Service] MasterDbContext db,
+            ProcessGoldTokenWithdrawalRequestInput input,
+            ClaimsPrincipal claimsPrincipal,
+            [Service] MasterDbContext db,
         [Service] IOptions<GameAdministrationOptions> gameAdministrationOptions)
     {
         var callerEmail = Query.GetEmailFromClaims(claimsPrincipal);

@@ -3,9 +3,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   deriveGameGraphqlUrl,
   deriveMasterGraphqlUrl,
+  deriveMasterWebUrl,
   resolveApiBaseUrl,
   resolveGameGraphqlUrl,
   resolveMasterGraphqlUrl,
+  resolveMasterWebUrl,
   resolveOptionalMasterApiBaseUrl,
 } from '../runtimeGraphqlUrl'
 
@@ -61,6 +63,15 @@ describe('runtimeGraphqlUrl', () => {
     ).toBe('https://api.capitalism5.com/graphql')
   })
 
+  it('derives the master web host for a stage shard frontend', () => {
+    expect(
+      deriveMasterWebUrl({
+        hostname: 'berlin-2026.stage.capitalism5.com',
+        protocol: 'https:',
+      }),
+    ).toBe('https://www.stage.capitalism5.com')
+  })
+
   it('falls back to the local game endpoint for localhost', () => {
     expect(
       resolveGameGraphqlUrl(undefined, {
@@ -95,6 +106,34 @@ describe('runtimeGraphqlUrl', () => {
         protocol: 'http:',
       }),
     ).toBe('https://localhost:44364/graphql')
+  })
+
+  it('prefers a runtime-configured master graphql url', () => {
+    vi.stubGlobal('window', {
+      location: {
+        hostname: 'localhost',
+        protocol: 'http:',
+      },
+      __capitalismRuntimeConfig__: {
+        masterGraphqlUrl: 'https://api.stage.capitalism5.com/graphql',
+      },
+    })
+
+    expect(resolveMasterGraphqlUrl(undefined)).toBe('https://api.stage.capitalism5.com/graphql')
+  })
+
+  it('prefers a runtime-configured master web url', () => {
+    vi.stubGlobal('window', {
+      location: {
+        hostname: 'localhost',
+        protocol: 'http:',
+      },
+      __capitalismRuntimeConfig__: {
+        masterWebUrl: 'https://www.stage.capitalism5.com',
+      },
+    })
+
+    expect(resolveMasterWebUrl(undefined)).toBe('https://www.stage.capitalism5.com')
   })
 
   it('builds a rest api base from a graphql endpoint', () => {

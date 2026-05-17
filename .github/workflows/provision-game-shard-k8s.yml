@@ -57,6 +57,7 @@ jobs:
       frontend_host: ${{ steps.derive.outputs.frontend_host }}
       api_host: ${{ steps.derive.outputs.api_host }}
       master_graphql_url: ${{ steps.derive.outputs.master_graphql_url }}
+      master_web_url: ${{ steps.derive.outputs.master_web_url }}
       namespace: ${{ steps.derive.outputs.namespace }}
       db_name: ${{ steps.derive.outputs.db_name }}
       db_user: ${{ steps.derive.outputs.db_user }}
@@ -106,6 +107,7 @@ jobs:
           frontend_host="${shard_slug}.${base_domain}"
           api_host="${shard_slug}-api.${base_domain}"
           master_graphql_url="https://api.${base_domain}/graphql"
+          master_web_url="https://www.${base_domain}"
 
           {
             echo "shard_slug=$shard_slug"
@@ -114,6 +116,7 @@ jobs:
             echo "frontend_host=$frontend_host"
             echo "api_host=$api_host"
             echo "master_graphql_url=$master_graphql_url"
+            echo "master_web_url=$master_web_url"
             echo "namespace=$namespace"
             echo "db_name=$db_name"
             echo "db_user=$db_user"
@@ -134,6 +137,7 @@ jobs:
       FRONTEND_HOST: ${{ needs.derive.outputs.frontend_host }}
       API_HOST: ${{ needs.derive.outputs.api_host }}
       MASTER_GRAPHQL_URL: ${{ needs.derive.outputs.master_graphql_url }}
+      MASTER_WEB_URL: ${{ needs.derive.outputs.master_web_url }}
       K8S_NAMESPACE: ${{ needs.derive.outputs.namespace }}
       DB_NAME: ${{ needs.derive.outputs.db_name }}
       DB_USER: ${{ needs.derive.outputs.db_user }}
@@ -568,6 +572,10 @@ jobs:
                         value: production
                       - name: APP_GRAPHQL_URL
                         value: https://${API_HOST}/graphql
+                      - name: APP_MASTER_GRAPHQL_URL
+                        value: ${MASTER_GRAPHQL_URL}
+                      - name: APP_MASTER_WEB_URL
+                        value: ${MASTER_WEB_URL}
                       - name: APP_BIATEC_OIDC_REDIRECT_URI
                         value: https://${FRONTEND_HOST}/auth/callback
                     readinessProbe:

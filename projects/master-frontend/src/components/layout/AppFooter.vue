@@ -10,12 +10,6 @@ const { t } = useI18n()
     <div class="container flex h-12 items-center justify-between text-sm text-muted">
       <p>{{ t('common.allRightsReserved', { year: new Date().getFullYear() }) }}</p>
       <div class="flex items-center gap-4">
-        <a
-          href="https://github.com/ludovit-scholtz/capitalism/security/policy"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="security-footer-link text-xs text-muted hover:text-primary transition-colors"
-        >🔒 {{ t('common.securityLink') }}</a>
         <LanguageSwitcher />
       </div>
     </div>

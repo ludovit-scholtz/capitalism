@@ -16,6 +16,7 @@ import DashboardTabNav from '@/components/dashboard/DashboardTabNav.vue'
 import BuildingHeaderFinancials from '@/components/buildings/BuildingHeaderFinancials.vue'
 import NewCompanyModal from '@/components/dashboard/NewCompanyModal.vue'
 import { computeMiningEfficiencyFactor } from '@/lib/miningScarcity'
+import { resolveMasterWebUrl } from '@/lib/runtimeGraphqlUrl'
 import type {
   Company,
   GameState,
@@ -51,7 +52,7 @@ const emit = defineEmits<{
   (e: 'company-launched', companyId: string): void
 }>()
 
-const masterPortalUrl = import.meta.env.VITE_MASTER_WEB_URL || 'http://localhost:5174'
+const masterPortalUrl = resolveMasterWebUrl(import.meta.env.VITE_MASTER_WEB_URL)
 
 // ── Tab state ─────────────────────────────────────────────────────────────────
 

@@ -4,6 +4,8 @@ set -eu
 cat > /usr/share/nginx/html/runtime-config.js <<EOF
 window.__capitalismRuntimeConfig__ = {
   graphqlUrl: "${APP_GRAPHQL_URL:-}",
+  masterGraphqlUrl: "${APP_MASTER_GRAPHQL_URL:-}",
+  masterWebUrl: "${APP_MASTER_WEB_URL:-}",
   biatecOidcAuthorizeUrl: "${APP_BIATEC_OIDC_AUTHORIZE_URL:-}",
   biatecOidcEndSessionUrl: "${APP_BIATEC_OIDC_END_SESSION_URL:-}",
   biatecOidcClientId: "${APP_BIATEC_OIDC_CLIENT_ID:-}",

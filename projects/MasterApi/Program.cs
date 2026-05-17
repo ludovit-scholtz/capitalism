@@ -1,4 +1,4 @@
-namespace MasterApi;
+﻿namespace MasterApi;
 
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -400,6 +400,9 @@ public class Program
         builder.Services.AddSingleton<IPasswordResetThrottleService, PasswordResetThrottleService>();
         builder.Services.AddScoped<IJwtSessionRevocationService, JwtSessionRevocationService>();
         builder.Services.AddHostedService<JwtSessionCleanupHostedService>();
+
+        builder.Services.AddHttpClient<BlockchainDepositScannerHostedService>();
+        builder.Services.AddHostedService<BlockchainDepositScannerHostedService>();
 
         builder.Services
             .AddGraphQLServer()

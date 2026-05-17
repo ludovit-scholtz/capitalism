@@ -2,7 +2,6 @@ export default {
   common: {
     backToPortal: 'Zurück zum Portal',
     allRightsReserved: '© {year} Kapitalismus HQ. Alle Rechte vorbehalten.',
-    securityLink: 'Sicherheit',
     loading: 'Lade...',
     refresh: 'Aktualisieren',
     apply: 'Anwenden',
@@ -566,7 +565,6 @@ export default {
     depAuditCopy:
       'Zeige den aktuellen npm-Audit-Status für beide Frontends. Grün bedeutet keine high/critical Produktionsadvisories.',
     depAuditClean: '✅ Gate aktiv — Audit-Baseline ist sauber',
-    depAuditViewRuns: 'CI-Läufe anzeigen',
   },
   rankingHistory: {
     title: 'Belohnungsverlauf',
