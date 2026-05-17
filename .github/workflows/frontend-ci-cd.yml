@@ -170,26 +170,30 @@ jobs:
           }
 
           derive_game_graphql_url() {
-            local redirect_uri="$1"
-            local protocol
-            local host
-            local shard_label
-            local domain_suffix
+            local namespace="$1"
+            local deployment="$2"
+            local shard_slug
 
-            if [ -z "$redirect_uri" ]; then
+            if [[ "$deployment" != *-frontend ]]; then
               return 1
             fi
 
-            protocol=$(printf '%s' "$redirect_uri" | sed -E 's#^([a-z]+)://.*#\1#')
-            host=$(printf '%s' "$redirect_uri" | sed -E 's#^[a-z]+://([^/]+)/?.*#\1#')
-            shard_label=${host%%.*}
-            domain_suffix=${host#*.}
-
-            if [ -z "$protocol" ] || [ -z "$host" ] || [ "$host" = "$domain_suffix" ]; then
+            shard_slug=${deployment%-frontend}
+            if [ -z "$shard_slug" ]; then
               return 1
             fi
 
-            printf '%s://%s-api.%s/graphql\n' "$protocol" "$shard_label" "$domain_suffix"
+            if [[ "$namespace" == capitalism-stage-* ]]; then
+              printf 'https://%s-api.stage.capitalism5.com/graphql\n' "$shard_slug"
+              return 0
+            fi
+
+            if [[ "$namespace" == capitalism-production-* ]]; then
+              printf 'https://%s-api.capitalism5.com/graphql\n' "$shard_slug"
+              return 0
+            fi
+
+            return 1
           }
 
           set_game_frontend_runtime_env() {
@@ -197,16 +201,14 @@ jobs:
             local deployment="$2"
             local master_web_url
             local master_graphql_url
-            local redirect_uri
             local existing_graphql_url
             local derived_graphql_url
             local game_graphql_url
 
             master_web_url=$(get_master_web_url "$namespace")
             master_graphql_url=$(get_master_graphql_url "$namespace")
-            redirect_uri=$(get_deployment_env_value "$namespace" "$deployment" 'APP_BIATEC_OIDC_REDIRECT_URI')
             existing_graphql_url=$(get_deployment_env_value "$namespace" "$deployment" 'APP_GRAPHQL_URL')
-            derived_graphql_url=$(derive_game_graphql_url "$redirect_uri" || true)
+            derived_graphql_url=$(derive_game_graphql_url "$namespace" "$deployment" || true)
             game_graphql_url=${derived_graphql_url:-$existing_graphql_url}
 
             if [ -z "$game_graphql_url" ]; then
