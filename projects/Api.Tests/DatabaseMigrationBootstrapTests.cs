@@ -80,6 +80,34 @@ public sealed class DatabaseMigrationBootstrapTests
     }
 
     [Fact]
+    public void AddCityScopedChatChannels_ConvertsLegacyAuthorPlayerIdToUuidBeforeBackfill()
+    {
+        var migration = new AddCityScopedChatChannels();
+        var migrationBuilder = new MigrationBuilder("Npgsql.EntityFrameworkCore.PostgreSQL");
+        var upMethod = typeof(AddCityScopedChatChannels).GetMethod(
+            "Up",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.NotNull(upMethod);
+
+        upMethod!.Invoke(migration, [migrationBuilder]);
+
+        var operations = migrationBuilder.Operations.ToList();
+        var conversionIndex = operations.FindIndex(
+            operation => operation is SqlOperation sql
+                && sql.Sql.Contains("ALTER COLUMN \"AuthorPlayerId\" TYPE uuid", StringComparison.Ordinal));
+        var backfillIndex = operations.FindIndex(
+            operation => operation is SqlOperation sql
+                && sql.Sql.Contains("SET \"AuthorDisplayName\"", StringComparison.Ordinal));
+
+        Assert.True(conversionIndex >= 0, "Expected a PostgreSQL AuthorPlayerId uuid conversion step.");
+        Assert.True(backfillIndex >= 0, "Expected the AuthorDisplayName backfill SQL step.");
+        Assert.True(
+            conversionIndex < backfillIndex,
+            "The AuthorPlayerId uuid conversion must run before the AuthorDisplayName backfill.");
+    }
+
+    [Fact]
     public async Task InitializeAsync_InMemory_IsIdempotent()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()

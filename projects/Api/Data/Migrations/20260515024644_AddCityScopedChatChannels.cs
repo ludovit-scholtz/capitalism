@@ -70,6 +70,16 @@ namespace Api.Data.Migrations
                 nullable: false,
                 defaultValue: true);
 
+            if (migrationBuilder.ActiveProvider.Contains("Npgsql", StringComparison.OrdinalIgnoreCase))
+            {
+                migrationBuilder.Sql(
+                    """
+                    ALTER TABLE "ChatMessages"
+                    ALTER COLUMN "AuthorPlayerId" TYPE uuid
+                    USING "AuthorPlayerId"::uuid;
+                    """);
+            }
+
             migrationBuilder.Sql(
                 """
                 UPDATE "ChatMessages" AS m
