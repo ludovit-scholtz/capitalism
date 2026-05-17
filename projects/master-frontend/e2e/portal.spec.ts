@@ -11,6 +11,23 @@ test.describe('Home page', () => {
     await expect(page.getByRole('link', { name: 'Game Servers' }).first()).toBeVisible()
   })
 
+  test('includes favicon links and serves the same icon assets as the game frontend', async ({ page, request }) => {
+    setupMockApi(page, { servers: [] })
+    await page.goto('/')
+
+    await expect(page.locator('head link[rel="icon"]')).toHaveAttribute('href', '/favicon.ico')
+    await expect(page.locator('head link[rel="apple-touch-icon"]')).toHaveAttribute(
+      'href',
+      '/apple-touch-icon.svg',
+    )
+
+    const faviconResponse = await request.get('/favicon.ico')
+    expect(faviconResponse.ok()).toBeTruthy()
+
+    const appleTouchIconResponse = await request.get('/apple-touch-icon.svg')
+    expect(appleTouchIconResponse.ok()).toBeTruthy()
+  })
+
   test('shows ranking error state when backend fails', async ({ page }) => {
     await page.route('**/graphql', async (route) => {
       await route.abort('failed')
