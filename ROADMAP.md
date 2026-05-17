@@ -4,6 +4,20 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 ## Active issues to work on
 
+### Mobile UX issues
+
+- [ ] When building is in upgrade process the 3 colums info message is wierd and goes of the screen.. make it rows design instead
+- [ ] In the grid system, the text for grid item is displayed outside the grid box. Make sure the text outside is hidden or grid items are little bit bigger.
+- [ ] Notifications are not displayed correctly. When one click on notification the bar is displayed in top without any data. Create separate view for notifications and if person clicks on notifications icon in mobile make sure to show this page. 
+
+### Github - private
+
+- [ ] Do not expose ludovit-scholtz/capitalism github repository on frontends. Remove securityLink from footer from both master and game frontend.
+
+### Changlog
+
+- [ ] Changelog is not imported to database on game server restart in stage environment. make sure the csv is copied and make sure the logging tracks if it was imported. Otherwise write to the log that either no changelog.csv was found or no records were found in the files.
+
 ### Stage & Production Kubernetes Deployment Automation
 
 - [x] (100%) Stage & Production Kubernetes deployment automation is live: dedicated `stage` and `production` GitHub Actions environments are now first-class deployment gates; stage auto-deploys from `main`; production deploys through an approval-gated workflow; reusable master Kubernetes deployment contracts roll out `www.capitalism5.com`, `capitalism5.com` redirect, and `api.capitalism5.com`; ingress definitions use cert-manager `letsencrypt-dns` cluster issuer annotations for TLS; a `workflow_dispatch` shard provisioning workflow creates slugged game hosts (`<slug>.capitalism5.com` or `<slug>.stage.capitalism5.com`) with generated per-shard credentials injected as Kubernetes Secrets; rollout success is now conditioned on smoke checks (frontend/API health plus master registry visibility) with automatic rollback on smoke-check failure; and daily Kubernetes/database backup automation with 7-day retention plus recovery scripts is documented for fast disaster recovery.
