@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-05-11T09:10:42.240Z",
-  "totalFindings": 12,
+  "generatedAt": "2026-05-18T09:12:51.412Z",
+  "totalFindings": 70,
   "gateStatus": "pass",
   "failingCount": 0,
   "findings": [
@@ -147,6 +147,698 @@
       "title": "Error-message detail must stay minimally revealing",
       "severity": "Medium",
       "status": "In-Progress",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "2026-W20-security-audit/goldamm-financial-mutations-unguarded-in-botownershipguard",
+      "fileStem": "2026-W20-security-audit",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/2026-W20-security-audit.md",
+      "number": 1,
+      "title": "GoldAmm financial mutations unguarded in BotOwnershipGuard",
+      "severity": "High",
+      "status": "Open",
+      "issues": [
+        394
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "2026-W20-security-audit/limit-order-and-dividend-governance-mutations-unguarded-in-botownershipguard",
+      "fileStem": "2026-W20-security-audit",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/2026-W20-security-audit.md",
+      "number": 2,
+      "title": "Limit-order and dividend-governance mutations unguarded in BotOwnershipGuard",
+      "severity": "High",
+      "status": "Open",
+      "issues": [
+        394
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "2026-W20-security-audit/masterapi-news-trust-boundary-draft-reads-and-upserts-accept-spoofable-requester-identity-carried-from-w19-critical",
+      "fileStem": "2026-W20-security-audit",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/2026-W20-security-audit.md",
+      "number": 3,
+      "title": "MasterApi news trust boundary: draft reads and upserts accept spoofable requester identity (carried from W19 Critical)",
+      "severity": "Critical",
+      "status": "Open",
+      "issues": [
+        395
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "2026-W20-security-audit/frontend-npm-dependency-advisories-remain-unresolved-carried-from-w19",
+      "fileStem": "2026-W20-security-audit",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/2026-W20-security-audit.md",
+      "number": 4,
+      "title": "Frontend npm dependency advisories remain unresolved (carried from W19)",
+      "severity": "High",
+      "status": "Open",
+      "issues": [
+        395
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "2026-W20-security-audit/object-level-authorization-response-standardization-still-in-progress-carried-from-w19",
+      "fileStem": "2026-W20-security-audit",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/2026-W20-security-audit.md",
+      "number": 5,
+      "title": "Object-level authorization response standardization still in progress (carried from W19)",
+      "severity": "Medium",
+      "status": "In-Progress",
+      "issues": [
+        393
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "2026-W20-security-audit/player-api-keys-still-have-full-account-scope-carried-from-w19",
+      "fileStem": "2026-W20-security-audit",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/2026-W20-security-audit.md",
+      "number": 6,
+      "title": "Player API keys still have full-account scope (carried from W19)",
+      "severity": "High",
+      "status": "Open",
+      "issues": [
+        391
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "2026-W20-security-audit/fx-execution-fairness-depends-on-stale-quote-handling-carried-from-w19",
+      "fileStem": "2026-W20-security-audit",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/2026-W20-security-audit.md",
+      "number": 7,
+      "title": "FX execution fairness depends on stale-quote handling (carried from W19)",
+      "severity": "High",
+      "status": "Open",
+      "issues": [
+        391
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "2026-W20-security-audit/building-secondary-market-race-conditions-need-continuous-review-carried-from-w19",
+      "fileStem": "2026-W20-security-audit",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/2026-W20-security-audit.md",
+      "number": 8,
+      "title": "Building secondary-market race conditions need continuous review (carried from W19)",
+      "severity": "High",
+      "status": "In-Progress",
+      "issues": [
+        389
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "2026-W20-security-audit/loan-collateral-and-missed-payment-foreclosure-remain-exploit-sensitive-carried-from-w19",
+      "fileStem": "2026-W20-security-audit",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/2026-W20-security-audit.md",
+      "number": 9,
+      "title": "Loan collateral and missed-payment foreclosure remain exploit-sensitive (carried from W19)",
+      "severity": "High",
+      "status": "In-Progress",
+      "issues": [
+        379
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "2026-W20-security-audit/master-vs-game-token-boundary-confusion-would-be-privilege-critical-carried-from-w19",
+      "fileStem": "2026-W20-security-audit",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/2026-W20-security-audit.md",
+      "number": 10,
+      "title": "Master-vs-game token boundary confusion would be privilege-critical (carried from W19)",
+      "severity": "Critical",
+      "status": "Open",
+      "issues": [
+        313
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "2026-W20-security-audit/bot-automation-can-still-overreach-if-company-boundaries-drift-carried-from-w19",
+      "fileStem": "2026-W20-security-audit",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/2026-W20-security-audit.md",
+      "number": 11,
+      "title": "Bot automation can still overreach if company boundaries drift (carried from W19)",
+      "severity": "High",
+      "status": "Open",
+      "issues": [
+        389
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "2026-W20-security-audit/frontend-trust-boundaries-must-stay-non-authoritative-carried-from-w19",
+      "fileStem": "2026-W20-security-audit",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/2026-W20-security-audit.md",
+      "number": 12,
+      "title": "Frontend trust boundaries must stay non-authoritative (carried from W19)",
+      "severity": "High",
+      "status": "Open",
+      "issues": [
+        391
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "2026-W20-security-audit/leaderboard-and-ranking-manipulation-risk-remains-proof-sensitive-carried-from-w19",
+      "fileStem": "2026-W20-security-audit",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/2026-W20-security-audit.md",
+      "number": 13,
+      "title": "Leaderboard and ranking manipulation risk remains proof-sensitive (carried from W19)",
+      "severity": "Medium",
+      "status": "In-Progress",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-05-11T161724/legacy-economy-mutation-responses-still-leak-foreign-object-state-and-precise-balance-detail",
+      "fileStem": "security-audit-2026-05-11T161724",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-05-11T161724.md",
+      "number": 1,
+      "title": "Legacy economy mutation responses still leak foreign-object state and precise balance detail",
+      "severity": "Medium",
+      "status": "Open",
+      "issues": [
+        393
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-05-11T161724/support-ticket-html-preview-relies-on-a-regex-based-sanitizer-before-rendering-with-v-html",
+      "fileStem": "security-audit-2026-05-11T161724",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-05-11T161724.md",
+      "number": 2,
+      "title": "Support ticket HTML preview relies on a regex-based sanitizer before rendering with `v-html`",
+      "severity": "Medium",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-05-11T161724/masterapi-news-trust-boundary-hardening-is-live-in-code-but-lacks-dedicated-regression-coverage",
+      "fileStem": "security-audit-2026-05-11T161724",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-05-11T161724.md",
+      "number": 3,
+      "title": "MasterApi news trust-boundary hardening is live in code but lacks dedicated regression coverage",
+      "severity": "Medium",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-05-11T161724/npc-bot-runner-still-ships-a-committed-shared-default-password",
+      "fileStem": "security-audit-2026-05-11T161724",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-05-11T161724.md",
+      "number": 4,
+      "title": "NPC bot runner still ships a committed shared default password",
+      "severity": "Medium",
+      "status": "Resolved",
+      "issues": [
+        431
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-05-11T161724/projectsmaster-frontend-still-carries-a-moderate-production-dependency-advisory-in-postcss",
+      "fileStem": "security-audit-2026-05-11T161724",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-05-11T161724.md",
+      "number": 5,
+      "title": "`projects/master-frontend` still carries a moderate production dependency advisory in `postcss`",
+      "severity": "Medium",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-05-11T225436/legacy-economy-mutation-responses-still-leak-foreign-object-state-and-exact-balance-detail",
+      "fileStem": "security-audit-2026-05-11T225436",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-05-11T225436.md",
+      "number": 1,
+      "title": "Legacy economy mutation responses still leak foreign-object state and exact balance detail",
+      "severity": "Medium",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-05-11T225436/projectsmaster-frontend-still-carries-a-moderate-postcss-production-advisory",
+      "fileStem": "security-audit-2026-05-11T225436",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-05-11T225436.md",
+      "number": 2,
+      "title": "`projects/master-frontend` still carries a moderate `postcss` production advisory",
+      "severity": "Medium",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-05-11T225436/previously-open-masterapi-news-trust-boundary-risk-is-now-mitigated-and-regression-tested",
+      "fileStem": "security-audit-2026-05-11T225436",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-05-11T225436.md",
+      "number": 3,
+      "title": "Previously open MasterApi news trust-boundary risk is now mitigated and regression-tested",
+      "severity": "Resolved",
+      "status": "Resolved",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-05-11T225436/support-ticket-preview-sanitization-is-now-allowlist-based-and-covered-by-payload-regression-tests",
+      "fileStem": "security-audit-2026-05-11T225436",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-05-11T225436.md",
+      "number": 4,
+      "title": "Support-ticket preview sanitization is now allowlist-based and covered by payload regression tests",
+      "severity": "Resolved",
+      "status": "Resolved",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-05-11T225436/npc-bot-placeholder-credential-shipping-risk-is-now-mitigated",
+      "fileStem": "security-audit-2026-05-11T225436",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-05-11T225436.md",
+      "number": 5,
+      "title": "NPC bot placeholder credential shipping risk is now mitigated",
+      "severity": "Resolved",
+      "status": "Resolved",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-05-11T231129/legacy-economy-mutation-responses-still-leak-foreign-object-state-and-exact-balance-detail",
+      "fileStem": "security-audit-2026-05-11T231129",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-05-11T231129.md",
+      "number": 1,
+      "title": "Legacy economy mutation responses still leak foreign-object state and exact balance detail",
+      "severity": "Medium",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-05-11T231129/password-authentication-surfaces-lack-throttling-or-lockout-controls-and-still-disclose-duplicate-account-existence-on-registration",
+      "fileStem": "security-audit-2026-05-11T231129",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-05-11T231129.md",
+      "number": 2,
+      "title": "Password-authentication surfaces lack throttling or lockout controls and still disclose duplicate-account existence on registration",
+      "severity": "Medium",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-05-11T231129/game-frontend-full-npm-audit-still-reports-build-tooling-advisories-rooted-in-direct-vercelnode",
+      "fileStem": "security-audit-2026-05-11T231129",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-05-11T231129.md",
+      "number": 3,
+      "title": "Game frontend full npm audit still reports build-tooling advisories rooted in direct `@vercel/node`",
+      "severity": "Medium",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-05-11T231129/previously-tracked-master-frontend-production-dependency-advisory-is-resolved",
+      "fileStem": "security-audit-2026-05-11T231129",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-05-11T231129.md",
+      "number": 4,
+      "title": "Previously tracked master-frontend production dependency advisory is resolved",
+      "severity": "Resolved",
+      "status": "Resolved",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W21/cve-2026-40324-hotchocolate-stack-overflow-via-deeply-nested-graphql-verified-patched",
+      "fileStem": "security-audit-2026-W21",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W21.md",
+      "number": 1,
+      "title": "CVE-2026-40324 — HotChocolate Stack Overflow via Deeply Nested GraphQL (VERIFIED PATCHED)",
+      "severity": "Critical (CVSS 9.1) — verified mitigated by current version",
+      "status": "Mitigated (upgrade already applied)",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W21/npm-frontend-dependency-vulnerabilities-fixed-this-session",
+      "fileStem": "security-audit-2026-W21",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W21.md",
+      "number": 2,
+      "title": "npm Frontend Dependency Vulnerabilities (FIXED THIS SESSION)",
+      "severity": "High (`minimatch` ReDoS), Moderate (`ajv` ReDoS)",
+      "status": "Resolved (fixed in this session)",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W21/no-graphql-query-depth-or-complexity-limits",
+      "fileStem": "security-audit-2026-W21",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W21.md",
+      "number": 3,
+      "title": "No GraphQL Query Depth or Complexity Limits",
+      "severity": "Medium",
+      "status": "Open",
+      "issues": [
+        417
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W21/chat-mutation-has-no-rate-limiting-or-content-length-cap",
+      "fileStem": "security-audit-2026-W21",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W21.md",
+      "number": 4,
+      "title": "Chat Mutation Has No Rate Limiting or Content Length Cap",
+      "severity": "Medium",
+      "status": "Open",
+      "issues": [
+        417
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W21/password-authentication-endpoints-lack-throttling-and-reveal-account-existence-carried-from-w20",
+      "fileStem": "security-audit-2026-W21",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W21.md",
+      "number": 5,
+      "title": "Password-Authentication Endpoints Lack Throttling and Reveal Account Existence (Carried from W20)",
+      "severity": "Medium",
+      "status": "Open",
+      "issues": [
+        416
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W21/object-level-authorization-response-leakage-carried-from-w20",
+      "fileStem": "security-audit-2026-W21",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W21.md",
+      "number": 6,
+      "title": "Object-Level Authorization Response Leakage (Carried from W20)",
+      "severity": "Medium",
+      "status": "Open",
+      "issues": [
+        393
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W21/hotchocolate-nitro-ide-and-schema-introspection-always-enabled",
+      "fileStem": "security-audit-2026-W21",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W21.md",
+      "number": 7,
+      "title": "HotChocolate Nitro IDE and Schema Introspection Always Enabled",
+      "severity": "Low",
+      "status": "Open",
+      "issues": [
+        417
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W21/hsts-strict-transport-security-header-absent-from-nginxconf",
+      "fileStem": "security-audit-2026-W21",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W21.md",
+      "number": 8,
+      "title": "HSTS (Strict-Transport-Security) Header Absent from nginx.conf",
+      "severity": "Low",
+      "status": "Open",
+      "issues": [
+        417
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W21/placeholder-jwt-signing-keys-and-default-db-password-committed-to-source",
+      "fileStem": "security-audit-2026-W21",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W21.md",
+      "number": 9,
+      "title": "Placeholder JWT Signing Keys and Default DB Password Committed to Source",
+      "severity": "Low (development defaults — should not reach production)",
+      "status": "Open",
+      "issues": [
+        417
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W21/cors-falls-back-to-allowanyorigin-when-no-origins-configured",
+      "fileStem": "security-audit-2026-W21",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W21.md",
+      "number": 10,
+      "title": "CORS Falls Back to AllowAnyOrigin When No Origins Configured",
+      "severity": "Low",
+      "status": "Open",
+      "issues": [
+        417
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W21/csp-uses-unsafe-inline-for-script-sources",
+      "fileStem": "security-audit-2026-W21",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W21.md",
+      "number": 11,
+      "title": "CSP Uses `unsafe-inline` for Script Sources",
+      "severity": "Low",
+      "status": "Open",
+      "issues": [
+        417
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W22/ssl-certificate-validation-bypass-for-master-server-http-client",
+      "fileStem": "security-audit-2026-W22",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W22.md",
+      "number": 1,
+      "title": "SSL Certificate Validation Bypass for Master-Server HTTP Client",
+      "severity": "Medium",
+      "status": "Open",
+      "issues": [
+        441
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W22/master-frontend-has-no-deployment-level-security-headers",
+      "fileStem": "security-audit-2026-W22",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W22.md",
+      "number": 2,
+      "title": "Master-Frontend Has No Deployment-Level Security Headers",
+      "severity": "Low",
+      "status": "Resolved",
+      "issues": [
+        441
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W22/no-jwt-session-revocation-mechanism",
+      "fileStem": "security-audit-2026-W22",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W22.md",
+      "number": 3,
+      "title": "No JWT Session Revocation Mechanism",
+      "severity": "Low",
+      "status": "Open",
+      "issues": [
+        441
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W22/root-admin-email-default-db-password-and-seed-admin-password-in-committed-source",
+      "fileStem": "security-audit-2026-W22",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W22.md",
+      "number": 4,
+      "title": "Root Admin Email, Default DB Password, and Seed Admin Password in Committed Source",
+      "severity": "Low (partially mitigated by startup guards)",
+      "status": "Open",
+      "issues": [
+        438
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W23-2026-05-13T105633/graphql-auth-rate-limiting-can-be-bypassed-with-named-operations",
+      "fileStem": "security-audit-2026-W23-2026-05-13T105633",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W23-2026-05-13T105633.md",
+      "number": 1,
+      "title": "GraphQL Auth Rate Limiting Can Be Bypassed With Named Operations",
+      "severity": "Medium",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W23-2026-05-13T105633/client-controlled-x-forwarded-for-can-rotate-rate-limit-identities",
+      "fileStem": "security-audit-2026-W23-2026-05-13T105633",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W23-2026-05-13T105633.md",
+      "number": 2,
+      "title": "Client-Controlled `X-Forwarded-For` Can Rotate Rate-Limit Identities",
+      "severity": "Medium",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W23-2026-05-13T105633/graphql-security-middleware-does-not-inspect-batched-json-bodies",
+      "fileStem": "security-audit-2026-W23-2026-05-13T105633",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W23-2026-05-13T105633.md",
+      "number": 3,
+      "title": "GraphQL Security Middleware Does Not Inspect Batched JSON Bodies",
+      "severity": "Medium",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W23-2026-05-13T105633/duplicate-registration-still-returns-a-machine-readable-email-existence-code",
+      "fileStem": "security-audit-2026-W23-2026-05-13T105633",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W23-2026-05-13T105633.md",
+      "number": 4,
+      "title": "Duplicate Registration Still Returns a Machine-Readable Email-Existence Code",
+      "severity": "Low",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W23-2026-05-13T105633/game-api-seed-admin-password-remains-a-committed-default",
+      "fileStem": "security-audit-2026-W23-2026-05-13T105633",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W23-2026-05-13T105633.md",
+      "number": 5,
+      "title": "Game API Seed Admin Password Remains a Committed Default",
+      "severity": "Low",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W23-2026-05-13T105633/browser-bearer-tokens-are-stored-in-localstorage",
+      "fileStem": "security-audit-2026-W23-2026-05-13T105633",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W23-2026-05-13T105633.md",
+      "number": 6,
+      "title": "Browser Bearer Tokens Are Stored in `localStorage`",
+      "severity": "Low",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W23-2026-05-14T003753/accepted-building-offers-can-bypass-the-minimum-sale-floor",
+      "fileStem": "security-audit-2026-W23-2026-05-14T003753",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W23-2026-05-14T003753.md",
+      "number": 1,
+      "title": "Accepted Building Offers Can Bypass the Minimum Sale Floor",
+      "severity": "Medium",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W23-2026-05-14T003753/defaulted-collateral-can-be-reacquired-cheaply-while-leaving-residual-debt-unsecured",
+      "fileStem": "security-audit-2026-W23-2026-05-14T003753",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W23-2026-05-14T003753.md",
+      "number": 2,
+      "title": "Defaulted Collateral Can Be Reacquired Cheaply While Leaving Residual Debt Unsecured",
+      "severity": "Medium",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W23-2026-05-14T003753/loan-origination-and-repayment-still-contain-currency-blind-company-account-paths",
+      "fileStem": "security-audit-2026-W23-2026-05-14T003753",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W23-2026-05-14T003753.md",
+      "number": 3,
+      "title": "Loan Origination and Repayment Still Contain Currency-Blind Company Account Paths",
+      "severity": "Medium",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W23-2026-05-14T003753/defaulted-loans-do-not-protect-the-scheduled-repayment-account-from-closure",
+      "fileStem": "security-audit-2026-W23-2026-05-14T003753",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W23-2026-05-14T003753.md",
+      "number": 4,
+      "title": "Defaulted Loans Do Not Protect the Scheduled Repayment Account From Closure",
+      "severity": "Medium",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W23-2026-05-14T003753/pledged-buildings-remain-editable-after-loan-origination",
+      "fileStem": "security-audit-2026-W23-2026-05-14T003753",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W23-2026-05-14T003753.md",
+      "number": 5,
+      "title": "Pledged Buildings Remain Editable After Loan Origination",
+      "severity": "Low",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W23-2026-05-14T003753/pending-building-offers-are-not-escrowed-or-globally-reserved",
+      "fileStem": "security-audit-2026-W23-2026-05-14T003753",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W23-2026-05-14T003753.md",
+      "number": 6,
+      "title": "Pending Building Offers Are Not Escrowed or Globally Reserved",
+      "severity": "Low",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W23-2026-05-14T003753/defaulted-residual-principal-no-longer-counts-against-new-lending-capacity",
+      "fileStem": "security-audit-2026-W23-2026-05-14T003753",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W23-2026-05-14T003753.md",
+      "number": 7,
+      "title": "Defaulted Residual Principal No Longer Counts Against New-Lending Capacity",
+      "severity": "Low",
+      "status": "Partially mitigated",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W23-2026-05-16T115624/masterapi-auth-rate-limiting-still-misses-named-operation-and-batched-loginregister-requests",
+      "fileStem": "security-audit-2026-W23-2026-05-16T115624",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W23-2026-05-16T115624.md",
+      "number": 1,
+      "title": "MasterApi Auth Rate Limiting Still Misses Named-Operation and Batched Login/Register Requests",
+      "severity": "Medium",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W23-2026-05-16T115624/masterapi-custom-graphql-request-security-middleware-only-inspects-single-json-object-bodies",
+      "fileStem": "security-audit-2026-W23-2026-05-16T115624",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W23-2026-05-16T115624.md",
+      "number": 2,
+      "title": "MasterApi Custom GraphQL Request-Security Middleware Only Inspects Single JSON-Object Bodies",
+      "severity": "Low",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W23-2026-05-16T115624/game-frontend-still-persists-raw-jwts-in-localstorage-after-cookie-session-bootstrap",
+      "fileStem": "security-audit-2026-W23-2026-05-16T115624",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W23-2026-05-16T115624.md",
+      "number": 3,
+      "title": "Game Frontend Still Persists Raw JWTs in `localStorage` After Cookie-Session Bootstrap",
+      "severity": "Low",
+      "status": "Open",
       "issues": [],
       "owner": ""
     }
