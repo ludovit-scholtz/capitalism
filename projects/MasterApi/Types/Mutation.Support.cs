@@ -16,7 +16,9 @@ public sealed partial class Mutation
         CreateSupportTicketInput input,
         ClaimsPrincipal claimsPrincipal,
         [Service] MasterDbContext db,
-        [Service] MasterRankingService rankingService)
+        [Service] MasterRankingService rankingService,
+        [Service] IMasterEmailService emailService,
+        CancellationToken cancellationToken)
     {
         var player = await Query.GetCurrentUserAsync(claimsPrincipal, db)
             ?? throw new GraphQLException(
@@ -61,7 +63,8 @@ public sealed partial class Mutation
             metadataJson: "{}");
 
         db.SupportTickets.Add(ticket);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
+        await emailService.SendSupportTicketCreatedEmailAsync(player, ticket, cancellationToken);
 
         if (ticketType == SupportTicketType.Suggestion)
         {
@@ -89,7 +92,9 @@ public sealed partial class Mutation
     public async Task<SupportTicketInfo> UpdateSupportTicketContent(
         UpdateSupportTicketContentInput input,
         ClaimsPrincipal claimsPrincipal,
-        [Service] MasterDbContext db)
+        [Service] MasterDbContext db,
+        [Service] IMasterEmailService emailService,
+        CancellationToken cancellationToken)
     {
         var player = await Query.GetCurrentUserAsync(claimsPrincipal, db)
             ?? throw new GraphQLException(
@@ -152,7 +157,12 @@ public sealed partial class Mutation
             note: "Support ticket content was updated.",
             metadataJson: "{}");
 
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
+        await emailService.SendSupportTicketUpdatedEmailAsync(
+            player,
+            ticket,
+            EmailLocalizations.SupportTicketContentUpdatedNote(player.PreferredLocale),
+            cancellationToken);
         return Query.ToSupportTicketInfo(ticket, canViewRaw: true, canViewPreview: true);
     }
 
@@ -161,7 +171,9 @@ public sealed partial class Mutation
         UpdateSupportTicketStatusInput input,
         ClaimsPrincipal claimsPrincipal,
         [Service] MasterDbContext db,
-        [Service] IOptions<GameAdministrationOptions> gameAdministrationOptions)
+        [Service] IOptions<GameAdministrationOptions> gameAdministrationOptions,
+        [Service] IMasterEmailService emailService,
+        CancellationToken cancellationToken)
     {
         var actorEmail = Query.GetEmailFromClaims(claimsPrincipal);
         var access = await Query.BuildGameAdministrationAccessAsync(db, gameAdministrationOptions.Value, actorEmail);
@@ -175,6 +187,7 @@ public sealed partial class Mutation
         }
 
         var ticket = await db.SupportTickets
+            .Include(item => item.CreatedByPlayerAccount)
             .Include(item => item.AuditEvents)
             .FirstOrDefaultAsync(item => item.Id == input.TicketId)
             ?? throw new GraphQLException(
@@ -204,17 +217,30 @@ public sealed partial class Mutation
         ticket.StatusUpdatedAtUtc = now;
         ticket.UpdatedAtUtc = now;
 
+        var changeNote = string.IsNullOrWhiteSpace(input.Note)
+            ? $"Support ticket status changed to {nextStatus}."
+            : input.Note.Trim();
+
         AddSupportAuditEvent(
             ticket,
             eventType: "STATUS_UPDATED",
             actorEmail: actorEmail,
             actorDisplayName: actorEmail,
-            note: string.IsNullOrWhiteSpace(input.Note)
-                ? $"Support ticket status changed to {nextStatus}."
-                : input.Note.Trim(),
+            note: changeNote,
             metadataJson: JsonSerializer.Serialize(new { status = nextStatus }));
 
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
+        if (ticket.CreatedByPlayerAccount is not null)
+        {
+            await emailService.SendSupportTicketUpdatedEmailAsync(
+                ticket.CreatedByPlayerAccount,
+                ticket,
+                string.IsNullOrWhiteSpace(input.Note)
+                    ? EmailLocalizations.SupportTicketStatusChangedNote(ticket.CreatedByPlayerAccount.PreferredLocale, nextStatus)
+                    : changeNote,
+                cancellationToken);
+        }
+
         return Query.ToSupportTicketInfo(ticket, canViewRaw: true, canViewPreview: true);
     }
 
@@ -223,7 +249,9 @@ public sealed partial class Mutation
         ModerateSupportTicketInput input,
         ClaimsPrincipal claimsPrincipal,
         [Service] MasterDbContext db,
-        [Service] IOptions<GameAdministrationOptions> gameAdministrationOptions)
+        [Service] IOptions<GameAdministrationOptions> gameAdministrationOptions,
+        [Service] IMasterEmailService emailService,
+        CancellationToken cancellationToken)
     {
         var actorEmail = Query.GetEmailFromClaims(claimsPrincipal);
         var access = await Query.BuildGameAdministrationAccessAsync(db, gameAdministrationOptions.Value, actorEmail);
@@ -237,6 +265,7 @@ public sealed partial class Mutation
         }
 
         var ticket = await db.SupportTickets
+            .Include(item => item.CreatedByPlayerAccount)
             .Include(item => item.AuditEvents)
             .FirstOrDefaultAsync(item => item.Id == input.TicketId)
             ?? throw new GraphQLException(
@@ -264,7 +293,16 @@ public sealed partial class Mutation
             note: ticket.ModerationReason,
             metadataJson: JsonSerializer.Serialize(new { moderationState = ticket.ModerationState }));
 
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
+        if (ticket.CreatedByPlayerAccount is not null)
+        {
+            await emailService.SendSupportTicketUpdatedEmailAsync(
+                ticket.CreatedByPlayerAccount,
+                ticket,
+                ticket.ModerationReason,
+                cancellationToken);
+        }
+
         return Query.ToSupportTicketInfo(ticket, canViewRaw: true, canViewPreview: true);
     }
 

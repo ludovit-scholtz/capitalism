@@ -17,6 +17,7 @@ const AUTH_PROVIDER_KEY = 'master_auth_provider'
 const OIDC_STATE_KEY = 'master_biatec_oidc_state'
 const OIDC_LOGOUT_STATE_KEY = 'master_biatec_oidc_logout_state'
 const AUTH_PROVIDER_LOCAL = 'local'
+const LOCALE_KEY = 'master_locale'
 const AUTH_PROVIDER_BIATEC = 'biatec_oidc'
 const COOKIE_SESSION_SENTINEL = 'cookie-session'
 const BIATEC_OIDC_AUTHORIZE_URL =
@@ -395,11 +396,18 @@ export const useAuthStore = defineStore('masterAuth', () => {
     gameAdminChecked.value = true
   }
 
+  function getEmailContext() {
+    const rawLocale = localStorage.getItem(LOCALE_KEY) ?? document.documentElement.lang ?? 'en'
+    const locale = rawLocale.toLowerCase().split('-')[0]
+    return { locale, currentUrl: window.location.href }
+  }
+
   async function register(email: string, displayName: string, password: string) {
     loading.value = true
     error.value = null
     try {
-      const auth = await registerAccount(email, displayName, password)
+      const { locale, currentUrl } = getEmailContext()
+      const auth = await registerAccount(email, displayName, password, locale, currentUrl)
       await establishCookieSession(auth.token)
       setSession(auth)
     } catch (e: unknown) {
@@ -414,7 +422,8 @@ export const useAuthStore = defineStore('masterAuth', () => {
     loading.value = true
     error.value = null
     try {
-      const auth = await loginAccount(email, password)
+      const { locale, currentUrl } = getEmailContext()
+      const auth = await loginAccount(email, password, locale, currentUrl)
       await establishCookieSession(auth.token)
       setSession(auth)
     } catch (e: unknown) {

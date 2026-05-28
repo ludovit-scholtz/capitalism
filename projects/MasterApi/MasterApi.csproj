@@ -27,6 +27,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<PackageReference Include="Azure.Communication.Email" Version="1.1.0" />
+		<PackageReference Include="Handlebars.Net" Version="2.1.6" />
 		<PackageReference Include="HotChocolate.AspNetCore" Version="15.1.15" />
 		<PackageReference Include="HotChocolate.AspNetCore.Authorization" Version="15.1.15" />
 		<PackageReference Include="HotChocolate.Types.Analyzers" Version="15.1.15">
@@ -47,6 +49,13 @@
 	<ItemGroup>
 		<Folder Include="Data\Entities\" />
 		<Folder Include="Types\" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Content Include="EmailTemplates\*.html">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+		</Content>
 	</ItemGroup>
 
 	<ItemGroup>

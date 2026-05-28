@@ -10,6 +10,10 @@ public sealed class RegisterInput
 
     /// <summary>Optional email of the existing player who referred this registration.</summary>
     public string? ReferralEmail { get; set; }
+
+    public string? Locale { get; set; }
+
+    public string? CurrentUrl { get; set; }
 }
 
 public sealed class LoginInput
@@ -17,6 +21,10 @@ public sealed class LoginInput
     public string Email { get; set; } = string.Empty;
 
     public string Password { get; set; } = string.Empty;
+
+    public string? Locale { get; set; }
+
+    public string? CurrentUrl { get; set; }
 }
 
 public sealed class ProlongSubscriptionInput
@@ -115,6 +123,8 @@ public sealed class MasterPlayerProfile
     public string PersonalAccountName { get; set; } = string.Empty;
 
     public string Gender { get; set; } = "UNSPECIFIED";
+
+    public string PreferredLocale { get; set; } = "en";
 
     public DateTime CreatedAtUtc { get; set; }
 

@@ -76,6 +76,8 @@ public sealed class MasterDbContext(DbContextOptions<MasterDbContext> options) :
         player.Property(p => p.Email).HasMaxLength(200);
         player.Property(p => p.DisplayName).HasMaxLength(120);
         player.Property(p => p.Gender).HasMaxLength(20);
+        player.Property(p => p.PreferredLocale).HasMaxLength(10).HasDefaultValue("en");
+        player.Property(p => p.LastAccessedUrl).HasMaxLength(500);
         player.Property(p => p.PasswordHash).HasMaxLength(512);
         player.HasMany(p => p.Sessions)
             .WithOne(session => session.PlayerAccount)
