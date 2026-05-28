@@ -230,13 +230,17 @@ public sealed partial class Mutation
             metadataJson: JsonSerializer.Serialize(new { status = nextStatus }));
 
         await db.SaveChangesAsync(cancellationToken);
-        await emailService.SendSupportTicketUpdatedEmailAsync(
-            ticket.CreatedByPlayerAccount,
-            ticket,
-            string.IsNullOrWhiteSpace(input.Note)
-                ? EmailLocalizations.SupportTicketStatusChangedNote(ticket.CreatedByPlayerAccount.PreferredLocale, nextStatus)
-                : changeNote,
-            cancellationToken);
+        if (ticket.CreatedByPlayerAccount is not null)
+        {
+            await emailService.SendSupportTicketUpdatedEmailAsync(
+                ticket.CreatedByPlayerAccount,
+                ticket,
+                string.IsNullOrWhiteSpace(input.Note)
+                    ? EmailLocalizations.SupportTicketStatusChangedNote(ticket.CreatedByPlayerAccount.PreferredLocale, nextStatus)
+                    : changeNote,
+                cancellationToken);
+        }
+
         return Query.ToSupportTicketInfo(ticket, canViewRaw: true, canViewPreview: true);
     }
 
@@ -290,11 +294,15 @@ public sealed partial class Mutation
             metadataJson: JsonSerializer.Serialize(new { moderationState = ticket.ModerationState }));
 
         await db.SaveChangesAsync(cancellationToken);
-        await emailService.SendSupportTicketUpdatedEmailAsync(
-            ticket.CreatedByPlayerAccount,
-            ticket,
-            ticket.ModerationReason,
-            cancellationToken);
+        if (ticket.CreatedByPlayerAccount is not null)
+        {
+            await emailService.SendSupportTicketUpdatedEmailAsync(
+                ticket.CreatedByPlayerAccount,
+                ticket,
+                ticket.ModerationReason,
+                cancellationToken);
+        }
+
         return Query.ToSupportTicketInfo(ticket, canViewRaw: true, canViewPreview: true);
     }
 

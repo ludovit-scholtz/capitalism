@@ -105,9 +105,10 @@ async function sendTestEmail() {
   testEmailPending.value = true
 
   try {
+    const recipientDisplayName = testEmailDisplayName.value.trim()
     const sent = await adminStore.sendAdminTestEmail({
-      recipientEmail: testEmailRecipient.value,
-      recipientDisplayName: testEmailDisplayName.value || undefined,
+      recipientEmail: testEmailRecipient.value.trim(),
+      recipientDisplayName: recipientDisplayName === '' ? undefined : recipientDisplayName,
       locale: testEmailLocale.value,
       message: testEmailMessage.value || undefined,
     })

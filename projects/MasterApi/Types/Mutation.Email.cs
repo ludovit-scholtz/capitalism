@@ -63,7 +63,7 @@ public sealed partial class Mutation
                 throw BuildInvalidTestEmailInput("Recipient email must be a valid email address.");
             }
 
-            return parsed.Address.ToLowerInvariant();
+            return parsed.Address;
         }
         catch (FormatException)
         {
