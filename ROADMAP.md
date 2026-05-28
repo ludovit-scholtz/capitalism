@@ -21,9 +21,9 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 ### Emails
 
-- [ ] Setup email using Email Communication Services in azure
-- [ ] Create templates for emails using handlebars rendered from the html template file. All emails must have same design. Create professional looking email template. Make sure each localization works for every supported language.
-- [ ] When user never received email (create flag in the master database), send him the registration email. In the email also write his current url address which he accessed.
-- [ ] Send users email on weekly basis in friday noon with the report where will be listed all their active game servers, their profit and ranking in the game server, then the master server bounties points they collected in past week, and if there are any news from the changelog within a week add it there.
-- [ ] Store the language preference after the user logs in to the system to the master server database, and use that localization for the emails to be sent. If no language is set in the database use English.
+- [x] Setup email using Email Communication Services in azure
+- [x] Create templates for emails using handlebars rendered from the html template file. All emails must have same design. Create professional looking email template. Make sure each localization works for every supported language.
+- [x] When user never received email (create flag in the master database), send him the registration email. In the email also write his current url address which he accessed.
+- [x] Send users email on weekly basis in friday noon with the report where will be listed all their active game servers, their profit and ranking in the game server, then the master server bounties points they collected in past week, and if there are any news from the changelog within a week add it there.
+- [x] Store the language preference after the user logs in to the system to the master server database, and use that localization for the emails to be sent. If no language is set in the database use English.
 

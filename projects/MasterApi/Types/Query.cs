@@ -263,6 +263,7 @@ public sealed partial class Query
             DisplayName = player.DisplayName,
             PersonalAccountName = player.DisplayName,
             Gender = player.Gender,
+            PreferredLocale = player.PreferredLocale,
             CreatedAtUtc = player.CreatedAtUtc,
             StartupPackClaimedAtUtc = player.StartupPackClaimedAtUtc,
             CanClaimStartupPack = player.StartupPackClaimedAtUtc is null,

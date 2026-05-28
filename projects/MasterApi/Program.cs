@@ -45,6 +45,8 @@ public class Program
             builder.Configuration.GetSection(GraphQlSecurityOptions.SectionName));
         builder.Services.Configure<GoldTokenTransferOptions>(
             builder.Configuration.GetSection(GoldTokenTransferOptions.SectionName));
+        builder.Services.Configure<EmailOptions>(
+            builder.Configuration.GetSection(EmailOptions.SectionName));
 
         var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
             ?? new JwtOptions();
@@ -393,6 +395,10 @@ public class Program
         builder.Services.AddScoped<RankingTelemetryValidator>();
         builder.Services.AddScoped<PasswordResetService>();
         builder.Services.AddScoped<IPasswordResetEmailSender, PasswordResetEmailSender>();
+        builder.Services.AddScoped<IEmailTemplateRenderer, HandlebarsEmailTemplateRenderer>();
+        builder.Services.AddScoped<IEmailSender, AzureCommunicationEmailSender>();
+        builder.Services.AddScoped<IMasterEmailService, MasterEmailService>();
+        builder.Services.AddScoped<IWeeklyEmailReportService, WeeklyEmailReportService>();
         builder.Services.AddHostedService<MasterRankingSchedulerHostedService>();
         builder.Services.AddHostedService<GameServerEvictionHostedService>();
         builder.Services.AddMemoryCache();
@@ -400,6 +406,8 @@ public class Program
         builder.Services.AddSingleton<IPasswordResetThrottleService, PasswordResetThrottleService>();
         builder.Services.AddScoped<IJwtSessionRevocationService, JwtSessionRevocationService>();
         builder.Services.AddHostedService<JwtSessionCleanupHostedService>();
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddHostedService<WeeklyEmailReportHostedService>();
 
         builder.Services.AddHttpClient<BlockchainDepositScannerHostedService>();
         builder.Services.AddHostedService<BlockchainDepositScannerHostedService>();

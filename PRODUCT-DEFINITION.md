@@ -38,6 +38,13 @@ Master frontend gold transfer requirements:
 - Provide a withdrawal page where users create withdrawal requests; withdrawals are processed manually by administrators and then marked as processed.
 - Provide an administrator oversight page listing all gold deposit and withdrawal requests with manual processing controls.
 
+
+## Email support
+
+Master API sends transactional and weekly emails through Azure Email Communication Services when email is enabled in configuration. Email HTML uses one shared Handlebars layout with English, Slovak, and German copy, and the master account stores each player's preferred locale after login with English as the fallback.
+
+Registration email is sent once per master account and records the URL the player was using when the account was created. Weekly reports are scheduled for Friday noon UTC and summarize active game servers, player ranking context, bounty points collected in the previous week, and recent changelog items.
+
 ## Multiple Game Servers
 
 The master website is the product-pitching website where users can find in-game documentation and a list of active game servers. Authenticated users can see their Pro subscription and purchase an extension.

@@ -16,6 +16,18 @@ public sealed class PlayerAccount
 
     public DateTime? LastLoginAtUtc { get; set; }
 
+    public string PreferredLocale { get; set; } = "en";
+
+    public DateTime? PreferredLocaleUpdatedAtUtc { get; set; }
+
+    public bool HasReceivedRegistrationEmail { get; set; }
+
+    public DateTime? RegistrationEmailSentAtUtc { get; set; }
+
+    public DateTime? LastWeeklyEmailSentAtUtc { get; set; }
+
+    public string? LastAccessedUrl { get; set; }
+
     /// <summary>
     /// Tokens issued before this UTC time are considered revoked.
     /// </summary>

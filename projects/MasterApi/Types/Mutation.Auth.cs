@@ -27,6 +27,7 @@ public sealed partial class Mutation
         [Service] IHostEnvironment hostEnvironment,
         [Service] IOptions<AuthOptions> authOptions,
         [Service] MasterRankingService rankingService,
+        [Service] IMasterEmailService emailService,
         [Service] ILoginThrottleService throttle,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
@@ -127,6 +128,10 @@ public sealed partial class Mutation
             shouldAwardReferralBounty = referredByEmail is not null;
         }
 
+        player.PreferredLocale = EmailLocalizations.NormalizeLocale(input.Locale);
+        player.PreferredLocaleUpdatedAtUtc = now;
+        player.LastAccessedUrl = ResolveAccessedUrl(input.CurrentUrl, httpContextAccessor.HttpContext);
+
         await db.SaveChangesAsync();
 
         // Award RECOMMEND_FRIEND bounty to the referrer if applicable.
@@ -161,6 +166,11 @@ public sealed partial class Mutation
             httpContextAccessor.HttpContext,
             httpContextAccessor.HttpContext?.RequestAborted ?? CancellationToken.None);
         AuthSessionCookieService.SetSessionCookies(httpContextAccessor.HttpContext, hostEnvironment, session.Token, session.ExpiresAtUtc);
+        await emailService.SendRegistrationEmailIfNeededAsync(
+            player,
+            ResolveAccessedUrl(input.CurrentUrl, httpContextAccessor.HttpContext),
+            input.Locale,
+            httpContextAccessor.HttpContext?.RequestAborted ?? CancellationToken.None);
         await DelayToMinimumDurationAsync(startedAt, RegistrationMinimumDuration);
 
         return new MasterAuthPayload
@@ -233,6 +243,9 @@ public sealed partial class Mutation
         throttle.RecordSuccess(email);
 
         player.LastLoginAtUtc = DateTime.UtcNow;
+        player.PreferredLocale = EmailLocalizations.NormalizeLocale(input.Locale);
+        player.PreferredLocaleUpdatedAtUtc = DateTime.UtcNow;
+        player.LastAccessedUrl = ResolveAccessedUrl(input.CurrentUrl, httpContextAccessor.HttpContext);
         await db.SaveChangesAsync();
 
         var session = GenerateToken(player, jwtOptions.Value);
@@ -251,6 +264,20 @@ public sealed partial class Mutation
             ExpiresAtUtc = session.ExpiresAtUtc,
             Player = Query.ToProfile(player),
         };
+    }
+
+    private static string? ResolveAccessedUrl(string? inputUrl, HttpContext? httpContext)
+    {
+        var url = !string.IsNullOrWhiteSpace(inputUrl)
+            ? inputUrl
+            : httpContext?.Request.Headers.Referer.FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return null;
+        }
+
+        var trimmed = url.Trim();
+        return trimmed.Length > 500 ? trimmed[..500] : trimmed;
     }
 
     private static void ExecuteDummyPasswordWork(string? password)

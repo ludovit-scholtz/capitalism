@@ -28,6 +28,7 @@ export interface MasterPlayerProfile {
   displayName: string
   personalAccountName?: string
   gender?: 'MALE' | 'FEMALE' | 'UNSPECIFIED'
+  preferredLocale?: 'en' | 'sk' | 'de'
   createdAtUtc: string
   startupPackClaimedAtUtc: string | null
   canClaimStartupPack: boolean
@@ -88,6 +89,7 @@ const REGISTER_MUTATION = `
         displayName
         personalAccountName
         gender
+        preferredLocale
         createdAtUtc
         startupPackClaimedAtUtc
         canClaimStartupPack
@@ -108,6 +110,7 @@ const LOGIN_MUTATION = `
         displayName
         personalAccountName
         gender
+        preferredLocale
         createdAtUtc
         startupPackClaimedAtUtc
         canClaimStartupPack
@@ -125,6 +128,7 @@ const ME_QUERY = `
       displayName
       personalAccountName
       gender
+      preferredLocale
       createdAtUtc
       startupPackClaimedAtUtc
       canClaimStartupPack
@@ -193,16 +197,23 @@ export async function registerAccount(
   email: string,
   displayName: string,
   password: string,
+  locale?: string,
+  currentUrl?: string,
 ): Promise<MasterAuthPayload> {
   const data = await gqlRequest<{ register: MasterAuthPayload }>(REGISTER_MUTATION, {
-    input: { email, displayName, password },
+    input: { email, displayName, password, locale, currentUrl },
   })
   return data.register
 }
 
-export async function loginAccount(email: string, password: string): Promise<MasterAuthPayload> {
+export async function loginAccount(
+  email: string,
+  password: string,
+  locale?: string,
+  currentUrl?: string,
+): Promise<MasterAuthPayload> {
   const data = await gqlRequest<{ login: MasterAuthPayload }>(LOGIN_MUTATION, {
-    input: { email, password },
+    input: { email, password, locale, currentUrl },
   })
   return data.login
 }
