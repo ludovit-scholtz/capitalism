@@ -9,6 +9,19 @@ namespace MasterApi.Utilities;
 public interface IMasterEmailService
 {
     Task SendRegistrationEmailIfNeededAsync(PlayerAccount player, string? accessedUrl, string? locale, CancellationToken cancellationToken);
+    Task<bool> SendAdminTestEmailAsync(
+        string recipientEmail,
+        string recipientDisplayName,
+        string locale,
+        string message,
+        string adminEmail,
+        CancellationToken cancellationToken);
+    Task<bool> SendSupportTicketCreatedEmailAsync(PlayerAccount owner, SupportTicket ticket, CancellationToken cancellationToken);
+    Task<bool> SendSupportTicketUpdatedEmailAsync(
+        PlayerAccount owner,
+        SupportTicket ticket,
+        string changeNote,
+        CancellationToken cancellationToken);
 }
 
 public sealed class MasterEmailService(
@@ -75,6 +88,61 @@ public sealed class MasterEmailService(
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<bool> SendAdminTestEmailAsync(
+        string recipientEmail,
+        string recipientDisplayName,
+        string locale,
+        string message,
+        string adminEmail,
+        CancellationToken cancellationToken)
+    {
+        var normalizedLocale = EmailLocalizations.NormalizeLocale(locale);
+        var copy = EmailLocalizations.AdminTest(normalizedLocale);
+        var adminLine = normalizedLocale switch
+        {
+            "sk" => $"Odoslal administrátor: {adminEmail}",
+            "de" => $"Gesendet von Administrator: {adminEmail}",
+            _ => $"Sent by administrator: {adminEmail}",
+        };
+        var bodyHtml = $"""
+            <p style="margin:0 0 18px;">{WebUtility.HtmlEncode(copy.Intro)}</p>
+            <p style="margin:0 0 8px;font-weight:700;color:#162033;">{WebUtility.HtmlEncode(copy.SectionTitle)}</p>
+            <p style="margin:0 0 18px;white-space:pre-wrap;">{EncodeMultiline(message)}</p>
+            <p style="margin:0;color:#526070;">{WebUtility.HtmlEncode(adminLine)}</p>
+            """.Trim();
+        var text = $"{copy.Headline}{Environment.NewLine}{Environment.NewLine}{copy.Intro}{Environment.NewLine}{Environment.NewLine}{copy.SectionTitle}{Environment.NewLine}{message}{Environment.NewLine}{Environment.NewLine}{adminLine}";
+
+        return await SendRenderedEmailAsync(
+            recipientEmail,
+            recipientDisplayName,
+            normalizedLocale,
+            copy,
+            bodyHtml,
+            text,
+            cancellationToken);
+    }
+
+    public async Task<bool> SendSupportTicketCreatedEmailAsync(
+        PlayerAccount owner,
+        SupportTicket ticket,
+        CancellationToken cancellationToken)
+    {
+        var locale = EmailLocalizations.NormalizeLocale(owner.PreferredLocale);
+        var copy = EmailLocalizations.SupportTicketCreated(locale);
+        return await SendSupportTicketEmailAsync(owner, ticket, copy, locale, null, cancellationToken);
+    }
+
+    public async Task<bool> SendSupportTicketUpdatedEmailAsync(
+        PlayerAccount owner,
+        SupportTicket ticket,
+        string changeNote,
+        CancellationToken cancellationToken)
+    {
+        var locale = EmailLocalizations.NormalizeLocale(owner.PreferredLocale);
+        var copy = EmailLocalizations.SupportTicketUpdated(locale);
+        return await SendSupportTicketEmailAsync(owner, ticket, copy, locale, changeNote, cancellationToken);
+    }
+
     private static string? NormalizeUrl(string? accessedUrl)
     {
         if (string.IsNullOrWhiteSpace(accessedUrl))
@@ -90,6 +158,77 @@ public sealed class MasterEmailService(
         }
 
         return trimmed.Length > 500 ? trimmed[..500] : trimmed;
+    }
+
+    private async Task<bool> SendSupportTicketEmailAsync(
+        PlayerAccount owner,
+        SupportTicket ticket,
+        EmailCopy copy,
+        string locale,
+        string? changeNote,
+        CancellationToken cancellationToken)
+    {
+        var titleLabel = EmailLocalizations.SupportTicketTitleLabel(locale);
+        var typeLabel = EmailLocalizations.SupportTicketTypeLabel(locale);
+        var statusLabel = EmailLocalizations.SupportTicketStatusLabel(locale);
+        var changeHtml = string.IsNullOrWhiteSpace(changeNote)
+            ? string.Empty
+            : $"""<p style="margin:0 0 8px;font-weight:700;color:#162033;">{WebUtility.HtmlEncode(EmailLocalizations.SupportTicketChangeLabel(locale))}</p><p style="margin:0 0 18px;">{WebUtility.HtmlEncode(changeNote)}</p>""";
+        var bodyHtml = $"""
+            <p style="margin:0 0 18px;">{WebUtility.HtmlEncode(copy.Intro)}</p>
+            <dl style="margin:0 0 18px;">
+              <dt style="font-weight:700;color:#162033;">{WebUtility.HtmlEncode(titleLabel)}</dt>
+              <dd style="margin:0 0 8px;">{WebUtility.HtmlEncode(ticket.Title)}</dd>
+              <dt style="font-weight:700;color:#162033;">{WebUtility.HtmlEncode(typeLabel)}</dt>
+              <dd style="margin:0 0 8px;">{WebUtility.HtmlEncode(ticket.TicketType)}</dd>
+              <dt style="font-weight:700;color:#162033;">{WebUtility.HtmlEncode(statusLabel)}</dt>
+              <dd style="margin:0;">{WebUtility.HtmlEncode(ticket.Status)}</dd>
+            </dl>
+            {changeHtml}
+            <p style="margin:0 0 8px;font-weight:700;color:#162033;">{WebUtility.HtmlEncode(copy.SectionTitle)}</p>
+            <p style="margin:0;white-space:pre-wrap;">{EncodeMultiline(ticket.MarkdownSource)}</p>
+            """.Trim();
+        var text = BuildSupportTicketText(ticket, copy, locale, changeNote);
+
+        return await SendRenderedEmailAsync(
+            owner.Email,
+            owner.DisplayName,
+            locale,
+            copy,
+            bodyHtml,
+            text,
+            cancellationToken);
+    }
+
+    private async Task<bool> SendRenderedEmailAsync(
+        string recipientEmail,
+        string recipientDisplayName,
+        string locale,
+        EmailCopy copy,
+        string bodyHtml,
+        string text,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var html = await renderer.RenderAsync(
+                new EmailTemplateModel(locale, copy.Subject, copy.Headline, bodyHtml, copy.Footer),
+                cancellationToken);
+
+            return await sender.SendAsync(
+                new EmailMessageRequest(recipientEmail, recipientDisplayName, copy.Subject, html, text),
+                cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Email send failed for {Email}.", recipientEmail);
+            return false;
+        }
+    }
+
+    private static string EncodeMultiline(string value)
+    {
+        return WebUtility.HtmlEncode(value).Replace("\r\n", "\n").Replace("\n", "<br />");
     }
 
     private static string GetGreeting(string locale, string displayName) => locale switch
@@ -118,6 +257,32 @@ public sealed class MasterEmailService(
         builder.AppendLine(copy.SectionTitle);
         builder.AppendLine(player.LastAccessedUrl ?? "-");
         builder.AppendLine(GetSignoff(locale));
+        return builder.ToString();
+    }
+
+    private static string BuildSupportTicketText(
+        SupportTicket ticket,
+        EmailCopy copy,
+        string locale,
+        string? changeNote)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine(copy.Headline);
+        builder.AppendLine();
+        builder.AppendLine(copy.Intro);
+        builder.AppendLine();
+        builder.AppendLine($"{EmailLocalizations.SupportTicketTitleLabel(locale)}: {ticket.Title}");
+        builder.AppendLine($"{EmailLocalizations.SupportTicketTypeLabel(locale)}: {ticket.TicketType}");
+        builder.AppendLine($"{EmailLocalizations.SupportTicketStatusLabel(locale)}: {ticket.Status}");
+        if (!string.IsNullOrWhiteSpace(changeNote))
+        {
+            builder.AppendLine();
+            builder.AppendLine($"{EmailLocalizations.SupportTicketChangeLabel(locale)}: {changeNote}");
+        }
+
+        builder.AppendLine();
+        builder.AppendLine(copy.SectionTitle);
+        builder.AppendLine(ticket.MarkdownSource);
         return builder.ToString();
     }
 }

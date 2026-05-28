@@ -17,8 +17,14 @@ const actionError = ref<string | null>(null)
 const actionMessage = ref<string | null>(null)
 const showShippingCosts = ref(false)
 const pendingBenchmarkSaveId = ref<string | null>(null)
+const testEmailRecipient = ref('')
+const testEmailDisplayName = ref('')
+const testEmailLocale = ref('en')
+const testEmailMessage = ref('')
+const testEmailPending = ref(false)
 
 const canManageRootFeatures = computed(() => adminStore.session?.isRootAdministrator ?? false)
+const canSendTestEmail = computed(() => adminStore.session?.hasGlobalAdminRole || adminStore.session?.isRootAdministrator)
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat(locale.value, {
@@ -90,6 +96,32 @@ async function saveBillionaire(row: { id: string; rank: number; name: string; we
       caughtError instanceof Error ? caughtError.message : t('admin.billionaireSaveFailed')
   } finally {
     pendingBenchmarkSaveId.value = null
+  }
+}
+
+async function sendTestEmail() {
+  actionError.value = null
+  actionMessage.value = null
+  testEmailPending.value = true
+
+  try {
+    const sent = await adminStore.sendAdminTestEmail({
+      recipientEmail: testEmailRecipient.value,
+      recipientDisplayName: testEmailDisplayName.value || undefined,
+      locale: testEmailLocale.value,
+      message: testEmailMessage.value || undefined,
+    })
+    if (!sent) {
+      actionError.value = t('admin.testEmailNotSent')
+      return
+    }
+
+    testEmailMessage.value = ''
+    actionMessage.value = t('admin.testEmailSent')
+  } catch (caughtError) {
+    actionError.value = caughtError instanceof Error ? caughtError.message : t('admin.testEmailFailed')
+  } finally {
+    testEmailPending.value = false
   }
 }
 
@@ -214,6 +246,41 @@ async function confirmEndShard() {
 
   <section class="admin-grid admin-grid-wide">
     <AdminNewsComposer />
+  </section>
+
+  <section v-if="canSendTestEmail" class="admin-grid admin-grid-wide">
+    <article class="card admin-panel admin-panel-wide">
+      <div class="admin-panel-header">
+        <div>
+          <h2>{{ t('admin.testEmailTitle') }}</h2>
+          <p>{{ t('admin.testEmailBody') }}</p>
+        </div>
+      </div>
+
+      <form class="admin-test-email-form" @submit.prevent="sendTestEmail">
+        <div class="admin-inline-fields">
+          <input v-model="testEmailRecipient" class="form-input" type="email" required :placeholder="t('admin.testEmailRecipient')" />
+          <input v-model="testEmailDisplayName" class="form-input" type="text" maxlength="120" :placeholder="t('admin.testEmailDisplayName')" />
+        </div>
+        <div class="admin-inline-fields">
+          <select v-model="testEmailLocale" class="form-input">
+            <option value="en">English</option>
+            <option value="sk">Slovenčina</option>
+            <option value="de">Deutsch</option>
+          </select>
+          <button type="submit" class="btn btn-primary" :disabled="testEmailPending">
+            {{ testEmailPending ? t('common.loading') : t('admin.sendTestEmail') }}
+          </button>
+        </div>
+        <textarea
+          v-model="testEmailMessage"
+          class="form-input admin-test-email-message"
+          maxlength="2000"
+          rows="4"
+          :placeholder="t('admin.testEmailMessage')"
+        ></textarea>
+      </form>
+    </article>
   </section>
 
   <section class="admin-grid admin-grid-wide">
@@ -510,6 +577,16 @@ async function confirmEndShard() {
 
 .admin-inline-fields-benchmark {
   grid-template-columns: minmax(0, 110px) minmax(0, 1.1fr) minmax(0, 0.9fr);
+}
+
+.admin-test-email-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-test-email-message {
+  min-height: 8rem;
+  resize: vertical;
 }
 
 @media (max-width: 1080px) {

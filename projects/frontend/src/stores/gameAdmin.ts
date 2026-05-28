@@ -428,6 +428,21 @@ export const useGameAdminStore = defineStore('gameAdmin', () => {
     return data.endShardManually
   }
 
+  async function sendAdminTestEmail(input: {
+    recipientEmail: string
+    recipientDisplayName?: string
+    locale: string
+    message?: string
+  }) {
+    const data = await gqlRequest<{ sendAdminTestEmail: boolean }>(
+      `mutation SendAdminTestEmail($input: SendAdminTestEmailInput!) {
+        sendAdminTestEmail(input: $input)
+      }`,
+      { input },
+    )
+    return data.sendAdminTestEmail
+  }
+
   function replaceDashboardPlayer(updatedPlayer: GameAdminPlayer) {
     if (!dashboard.value) {
       return
@@ -470,6 +485,7 @@ export const useGameAdminStore = defineStore('gameAdmin', () => {
     upsertGamesEntry,
     updateRealWorldBillionaire,
     endShardManually,
+    sendAdminTestEmail,
     clear,
   }
 })

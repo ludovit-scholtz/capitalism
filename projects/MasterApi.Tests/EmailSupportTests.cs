@@ -1,6 +1,9 @@
 using System.Net.Http.Headers;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using Capitalism.Shared.Security;
 using MasterApi.Data;
 using MasterApi.Data.Entities;
 using MasterApi.Tests.Infrastructure;
@@ -11,11 +14,16 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.IdentityModel.Tokens;
 
 namespace MasterApi.Tests;
 
 public sealed class EmailSupportTests
 {
+    private const string SharedJwtIssuer = "Capitalism";
+    private const string SharedJwtAudience = "Capitalism";
+    private const string SharedJwtSigningKey = "ChangeThisSigningKeyBeforeProduction123!";
+
     [Fact]
     public async Task Register_SendsLocalizedRegistrationEmailOnce_AndStoresAccessUrl()
     {
@@ -129,6 +137,104 @@ public sealed class EmailSupportTests
         var db = verifyScope.ServiceProvider.GetRequiredService<MasterDbContext>();
         var player = await db.PlayerAccounts.AsNoTracking().SingleAsync(item => item.Email == email);
         Assert.Equal(now, player.LastWeeklyEmailSentAtUtc);
+    }
+
+    [Fact]
+    public async Task SendAdminTestEmail_SendsLocalizedTemplateForRootAdministrator()
+    {
+        var fakeSender = new RecordingEmailSender();
+        await using var factory = CreateFactory(fakeSender);
+        using var client = factory.CreateClient();
+
+        var result = await GraphQlAsync(client, """
+            mutation SendTest($input: SendAdminTestEmailInput!) {
+              sendAdminTestEmail(input: $input)
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    recipientEmail = "test-recipient@example.com",
+                    recipientDisplayName = "Test Recipient",
+                    locale = "de-DE",
+                    message = "Template verification from admin.",
+                },
+            },
+            CreateRootAdminToken());
+
+        Assert.False(result.TryGetProperty("errors", out _));
+        Assert.True(result.GetProperty("data").GetProperty("sendAdminTestEmail").GetBoolean());
+        var sent = Assert.Single(fakeSender.Messages);
+        Assert.Equal("test-recipient@example.com", sent.RecipientEmail);
+        Assert.Equal("Capitalism-Test-E-Mail", sent.Subject);
+        Assert.Contains("Template verification from admin.", sent.HtmlBody);
+        Assert.Contains("root@example.com", sent.HtmlBody);
+    }
+
+    [Fact]
+    public async Task SupportTicketChanges_SendOwnerEmailsWithTicketText()
+    {
+        var fakeSender = new RecordingEmailSender();
+        await using var factory = CreateFactory(fakeSender);
+        using var client = factory.CreateClient();
+        var email = $"ticket-email-{Guid.NewGuid():N}@example.com";
+        var register = await GraphQlAsync(client, """
+            mutation Register($input: RegisterInput!) {
+              register(input: $input) { token }
+            }
+            """,
+            new { input = new { email, displayName = "Ticket Owner", password = "TestPass123!", locale = "sk" } });
+        var token = register.GetProperty("data").GetProperty("register").GetProperty("token").GetString();
+        fakeSender.Messages.Clear();
+
+        var create = await GraphQlAsync(client, """
+            mutation Create($input: CreateSupportTicketInput!) {
+              createSupportTicket(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    ticketType = "BUG",
+                    title = "Factory balance problem",
+                    markdownSource = "The factory balance screen shows incorrect weekly values for my company.",
+                },
+            },
+            token);
+        Assert.False(create.TryGetProperty("errors", out _));
+        var ticketId = create.GetProperty("data").GetProperty("createSupportTicket").GetProperty("id").GetString();
+
+        var createdEmail = Assert.Single(fakeSender.Messages);
+        Assert.Equal(email, createdEmail.RecipientEmail);
+        Assert.Equal("Vaša požiadavka podpory bola prijatá", createdEmail.Subject);
+        Assert.Contains("Factory balance problem", createdEmail.HtmlBody);
+        Assert.Contains("incorrect weekly values", createdEmail.HtmlBody);
+
+        var update = await GraphQlAsync(client, """
+            mutation Update($input: UpdateSupportTicketStatusInput!) {
+              updateSupportTicketStatus(input: $input) { status }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    ticketId,
+                    status = "IN_PROGRESS",
+                    note = "Support team is investigating.",
+                },
+            },
+            CreateRootAdminToken());
+
+        Assert.False(update.TryGetProperty("errors", out _));
+        Assert.Equal(2, fakeSender.Messages.Count);
+        var updatedEmail = fakeSender.Messages[1];
+        Assert.Equal(email, updatedEmail.RecipientEmail);
+        Assert.Equal("Vaša požiadavka podpory bola aktualizovaná", updatedEmail.Subject);
+        Assert.Contains("Support team is investigating.", updatedEmail.HtmlBody);
+        Assert.Contains("Factory balance problem", updatedEmail.HtmlBody);
     }
 
     private static WebApplicationFactory<Program> CreateFactory(RecordingEmailSender sender, bool enableWeeklyReports = false)
@@ -258,6 +364,26 @@ public sealed class EmailSupportTests
         var response = await client.SendAsync(request);
         var body = await response.Content.ReadAsStringAsync();
         return JsonDocument.Parse(body).RootElement.Clone();
+    }
+
+    private static string CreateRootAdminToken()
+    {
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SharedJwtSigningKey));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var token = new JwtSecurityToken(
+            issuer: SharedJwtIssuer,
+            audience: SharedJwtAudience,
+            claims:
+            [
+                new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
+                new Claim(ClaimTypes.Email, "root@example.com"),
+                new Claim(ClaimTypes.Name, "Root Admin"),
+                new Claim(TokenBoundaryClaims.TokenTypeClaimType, TokenBoundaryClaims.TokenTypeMaster),
+            ],
+            expires: DateTime.UtcNow.AddMinutes(30),
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
     private sealed class RecordingEmailSender : IEmailSender
