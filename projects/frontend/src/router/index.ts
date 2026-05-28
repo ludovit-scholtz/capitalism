@@ -193,7 +193,11 @@ const router = createRouter({
       ],
     },
   ],
-  scrollBehavior() {
+  scrollBehavior(to, from) {
+    if (to.name === 'onboarding' && from.name === 'onboarding' && to.path === from.path) {
+      return false
+    }
+
     return { top: 0 }
   },
 })

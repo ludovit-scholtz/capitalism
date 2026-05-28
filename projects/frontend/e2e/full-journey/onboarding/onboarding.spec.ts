@@ -1421,7 +1421,7 @@ test.describe('Onboarding resume and progress persistence', () => {
     await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).toBeVisible()
   })
 
-  test('preserves a custom personal account name across refresh and guest migration', async ({ page }) => {
+  test('keeps generated names hidden from selection while preserving guest migration identity', async ({ page }) => {
     const state = setupMockApi(page)
 
     await page.goto('/onboarding')
@@ -1429,24 +1429,23 @@ test.describe('Onboarding resume and progress persistence', () => {
     await page.locator('.industry-card', { hasText: 'Furniture' }).click()
     await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
 
-    const personalNameInput = page.locator('#onboarding-personal-account-name')
-    await expect(personalNameInput).toBeVisible()
-    await personalNameInput.fill('Captain Walnut')
+    await expect(page.locator('#onboarding-company-name')).toHaveCount(0)
+    await expect(page.locator('#onboarding-personal-account-name')).toHaveCount(0)
+    await page.waitForFunction(() => new URL(window.location.href).searchParams.has('personalAccountName'))
+    const generatedPersonalName = new URL(page.url()).searchParams.get('personalAccountName')
+    expect(generatedPersonalName).toBeTruthy()
 
     await page.reload()
 
     await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
-    await expect(personalNameInput).toHaveValue('Captain Walnut')
+    await expect(page.locator('#onboarding-company-name')).toHaveCount(0)
+    await expect(page.locator('#onboarding-personal-account-name')).toHaveCount(0)
 
     await page.locator('.ipo-card', { hasText: 'Starter IPO' }).click()
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
-    await page.getByRole('button', { name: 'List View' }).click()
-    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
     await expect(page.getByRole('heading', { name: 'Choose Your First Shop Lot' })).toBeVisible()
-    await page.getByRole('button', { name: 'List View' }).click()
-    await chooseStarterShopLot(page)
     await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
 
     await expect(page.getByRole('heading', { name: 'Save Your Progress' })).toBeVisible()
@@ -1455,7 +1454,7 @@ test.describe('Onboarding resume and progress persistence', () => {
 
     await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
     await page.goto('/leaderboard')
-    await expect(page.locator('.rank-card').getByText('Captain Walnut')).toBeVisible()
+    await expect(page.locator('.rank-card').getByText(generatedPersonalName!)).toBeVisible()
   })
 
   test('resumes after first factory purchase and keeps the onboarding company state', async ({ page }) => {
@@ -3196,7 +3195,7 @@ test.describe('Onboarding wizard CTA validation and budget guard rails', () => {
   // consequences of player choices during onboarding."
   // This describes the CTA disabled-state enforcement and budget coaching.
 
-  test('guest factory-lot step keeps Purchase First Factory disabled until lot is selected', async ({ page }) => {
+  test('guest factory-lot step preselects an affordable recommended factory lot', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/onboarding')
 
@@ -3205,16 +3204,14 @@ test.describe('Onboarding wizard CTA validation and budget guard rails', () => {
 
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
 
-    // CTA must be disabled at initial state (no lot selected)
-    await expect(page.getByRole('button', { name: 'Purchase First Factory' })).toBeDisabled()
-
-    // Select lot — CTA must be enabled
-    await page.getByRole('button', { name: 'List View' }).click()
-    await chooseStarterFactoryLot(page)
+    // A recommended affordable lot is selected automatically so the player can continue immediately.
     await expect(page.getByRole('button', { name: 'Purchase First Factory' })).toBeEnabled()
+
+    await page.getByRole('button', { name: 'List View' }).click()
+    await expect(page.getByRole('button', { name: STARTER_FACTORY_LOT_NAME })).toHaveClass(/selected/)
   })
 
-  test('guest shop-lot step keeps Purchase First Sales Shop disabled until lot is selected', async ({ page }) => {
+  test('guest shop-lot step preselects an affordable recommended shop lot and shows factory distance', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/onboarding')
 
@@ -3226,13 +3223,27 @@ test.describe('Onboarding wizard CTA validation and budget guard rails', () => {
 
     await expect(page.getByRole('heading', { name: 'Choose Your First Shop Lot' })).toBeVisible()
 
-    // CTA must be disabled initially (no shop lot selected)
-    await expect(page.getByRole('button', { name: 'Purchase First Sales Shop' })).toBeDisabled()
-
-    // Select shop lot — CTA enabled
-    await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /High Street Retail Space/i }).click()
+    // A recommended affordable lot is selected automatically so the player can continue immediately.
     await expect(page.getByRole('button', { name: 'Purchase First Sales Shop' })).toBeEnabled()
+
+    await page.getByRole('button', { name: 'List View' }).click()
+    await expect(page.getByRole('button', { name: /High Street Retail Space/i })).toHaveClass(/selected/)
+    await expect(page.getByText(/Distance from factory: \d+\.\d km/)).toBeVisible()
+  })
+
+  test('mobile lot selection keeps the current scroll position', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 640 })
+    setupMockApi(page)
+    await page.goto('/onboarding')
+
+    await chooseOnboardingRouteChoices(page, { industry: 'Furniture', product: 'Wooden Chair' })
+    await page.getByRole('button', { name: 'List View' }).click()
+    await page.evaluate(() => window.scrollTo(0, 360))
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100)
+
+    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100)
   })
 
   test('guest profit preview shows higher revenue for Healthcare vs Food Processing (AC6 business consequence)', async ({ browser }) => {

@@ -130,18 +130,43 @@ export function getRecommendedFactoryLotIds(availableFactoryLots: BuildingLot[],
  * @param availableShopLots - Lots already filtered to SALES_SHOP-suitable, unowned lots
  * @param count - Maximum number of IDs to return (default 2)
  */
-export function getRecommendedShopLotIds(availableShopLots: BuildingLot[], count = 2): string[] {
+function getLotDistanceScore(a: BuildingLot, b: BuildingLot): number {
+  const dLat = a.latitude - b.latitude
+  const dLon = a.longitude - b.longitude
+  return Math.sqrt(dLat * dLat + dLon * dLon)
+}
+
+function sortShopLotsForOnboarding(a: BuildingLot, b: BuildingLot, factoryLot: BuildingLot | null = null): number {
+  const populationScore = (b.populationIndex ?? 1) - (a.populationIndex ?? 1)
+  if (Math.abs(populationScore) >= 0.15) return populationScore
+
+  if (factoryLot) {
+    const distanceScore = getLotDistanceScore(a, factoryLot) - getLotDistanceScore(b, factoryLot)
+    if (Math.abs(distanceScore) > 0.00001) return distanceScore
+  }
+
+  return a.price - b.price
+}
+
+export function getRecommendedShopLotIds(availableShopLots: BuildingLot[], count = 2, factoryLot: BuildingLot | null = null): string[] {
   const unowned = availableShopLots.filter((lot) => !lot.ownerCompanyId)
-  const commercial = unowned.filter((lot) => /(commercial|business)/i.test(lot.district)).sort((a, b) => a.price - b.price)
+  const commercial = unowned.filter((lot) => /(commercial|business)/i.test(lot.district)).sort((a, b) => sortShopLotsForOnboarding(a, b, factoryLot))
 
   if (commercial.length > 0) {
     return commercial.slice(0, count).map((lot) => lot.id)
   }
 
   return unowned
-    .sort((a, b) => a.price - b.price)
+    .sort((a, b) => sortShopLotsForOnboarding(a, b, factoryLot))
     .slice(0, count)
     .map((lot) => lot.id)
+}
+
+export function getDefaultRecommendedLotId(availableLots: BuildingLot[], recommendedLotIds: string[], moneyAvailable: number): string {
+  const validLots = availableLots.filter((lot) => !lot.ownerCompanyId && lot.price <= moneyAvailable)
+  const recommendedLot = recommendedLotIds.map((lotId) => validLots.find((lot) => lot.id === lotId)).find((lot): lot is BuildingLot => !!lot)
+
+  return recommendedLot?.id ?? validLots[0]?.id ?? ''
 }
 
 // ---------------------------------------------------------------------------

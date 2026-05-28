@@ -7,6 +7,7 @@ import {
   getAvailableLots,
   getRecommendedFactoryLotIds,
   getRecommendedShopLotIds,
+  getDefaultRecommendedLotId,
   canProceedStep3,
   canProceedStep4,
   type OnboardingStepState,
@@ -32,6 +33,11 @@ function makeLot(overrides: Partial<BuildingLot> = {}): BuildingLot {
     buildingId: null,
     ownerCompany: null,
     building: null,
+    populationIndex: 1,
+    basePrice: 100_000,
+    resourceType: null,
+    materialQuality: null,
+    materialQuantity: null,
     ...overrides,
   }
 }
@@ -380,6 +386,41 @@ describe('getRecommendedShopLotIds', () => {
 
   it('returns empty array for empty input', () => {
     expect(getRecommendedShopLotIds([])).toHaveLength(0)
+  })
+
+  it('prioritizes higher population index and then shorter factory distance', () => {
+    const factoryLot = makeLot({ id: 'factory', latitude: 48.15, longitude: 17.13 })
+    const lots = [
+      makeLot({ id: 'far-premium', district: 'Commercial District', latitude: 48.3, longitude: 17.3, populationIndex: 1.6, price: 90_000 }),
+      makeLot({ id: 'near-high', district: 'Commercial District', latitude: 48.151, longitude: 17.131, populationIndex: 1.42, price: 120_000 }),
+      makeLot({ id: 'far-high', district: 'Commercial District', latitude: 48.2, longitude: 17.2, populationIndex: 1.4, price: 80_000 }),
+    ]
+
+    expect(getRecommendedShopLotIds(lots, 3, factoryLot)).toEqual(['far-premium', 'near-high', 'far-high'])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// getDefaultRecommendedLotId
+// ---------------------------------------------------------------------------
+
+describe('getDefaultRecommendedLotId', () => {
+  it('selects the first affordable recommended lot', () => {
+    const lots = [makeLot({ id: 'a', price: 80_000 }), makeLot({ id: 'b', price: 90_000 })]
+
+    expect(getDefaultRecommendedLotId(lots, ['b', 'a'], 100_000)).toBe('b')
+  })
+
+  it('falls back to the first affordable lot when recommendations are not affordable', () => {
+    const lots = [makeLot({ id: 'expensive', price: 300_000 }), makeLot({ id: 'fallback', price: 90_000 })]
+
+    expect(getDefaultRecommendedLotId(lots, ['expensive'], 100_000)).toBe('fallback')
+  })
+
+  it('returns an empty string when no lot can be purchased', () => {
+    const lots = [makeLot({ id: 'owned', price: 50_000, ownerCompanyId: 'co-1' }), makeLot({ id: 'expensive', price: 300_000 })]
+
+    expect(getDefaultRecommendedLotId(lots, ['owned', 'expensive'], 100_000)).toBe('')
   })
 })
 
