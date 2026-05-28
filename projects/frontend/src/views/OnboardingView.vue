@@ -246,7 +246,7 @@ const personalAccountName = ref('')
 const selectedPersonalGender = ref<PlayerGender>('UNSPECIFIED')
 
 /** Derives a fresh suggested name from the current industry. */
-function refreshSuggestedName() {
+function updateGeneratedCompanyName() {
   companyName.value = generateOnboardingCompanyName(selectedIndustry.value)
 }
 
@@ -275,7 +275,7 @@ function refreshSuggestedPersonalAccountName() {
 // first suggestion always reflects the player's current choices.
 watch([selectedIndustry, selectedCity], ([newIndustry, newCity]) => {
   resetNameSession(`${newIndustry}:${newCity?.name ?? ''}`)
-  refreshSuggestedName()
+  updateGeneratedCompanyName()
   refreshSuggestedPersonalAccountName()
 })
 const starterCompany = computed(() => {

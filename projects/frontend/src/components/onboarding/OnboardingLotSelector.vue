@@ -70,6 +70,7 @@ function calculateDistance(lot: BuildingLot, city: City): number {
 }
 
 function calculateCoordinateDistance(fromLatitude: number, fromLongitude: number, toLatitude: number, toLongitude: number): number {
+  // Onboarding compares nearby lots inside one city, so a light lat/lon approximation is enough for relative distance guidance.
   const dLat = fromLatitude - toLatitude
   const dLon = fromLongitude - toLongitude
   return Math.sqrt(dLat * dLat + dLon * dLon) * 111 // approximate km
@@ -78,6 +79,10 @@ function calculateCoordinateDistance(fromLatitude: number, fromLongitude: number
 function calculateReferenceDistance(lot: BuildingLot): number | null {
   if (!props.referenceLot) return null
   return calculateCoordinateDistance(lot.latitude, lot.longitude, props.referenceLot.latitude, props.referenceLot.longitude)
+}
+
+function formatReferenceDistance(lot: BuildingLot): string {
+  return formatDistance(calculateReferenceDistance(lot) ?? 0)
 }
 
 function calculateDeliveryCost(distance: number): number {
@@ -294,7 +299,7 @@ onUnmounted(() => {
             <div class="lot-list-meta">
               <span>{{ t('cityMap.district') }}: {{ t(`cityMap.districts.${lot.district}`) }}</span>
               <span>{{ lot.suitableTypes.split(',').map(formatBuildingType).join(', ') }}</span>
-              <span v-if="referenceLot && referenceDistanceLabel">{{ referenceDistanceLabel }}: {{ formatDistance(calculateReferenceDistance(lot) ?? 0) }}</span>
+              <span v-if="referenceLot && referenceDistanceLabel">{{ referenceDistanceLabel }}: {{ formatReferenceDistance(lot) }}</span>
               <span>{{ t('cityMap.populationIndex') }}: {{ formatPopulationIndex(lot.populationIndex ?? 1) }}</span>
             </div>
             <div class="lot-badges">
@@ -329,7 +334,7 @@ onUnmounted(() => {
             </div>
             <div v-if="referenceLot && referenceDistanceLabel">
               <dt>{{ referenceDistanceLabel }}</dt>
-              <dd>{{ formatDistance(calculateReferenceDistance(selectedLot) ?? 0) }}</dd>
+              <dd>{{ formatReferenceDistance(selectedLot) }}</dd>
             </div>
             <div>
               <dt>{{ t('cityMap.populationIndex') }}</dt>

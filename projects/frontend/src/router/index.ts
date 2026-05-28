@@ -194,6 +194,7 @@ const router = createRouter({
     },
   ],
   scrollBehavior(to, from) {
+    // Onboarding persists wizard choices in query params; keep the user's mobile scroll position while those params update.
     if (to.name === 'onboarding' && from.name === 'onboarding' && to.path === from.path) {
       return false
     }

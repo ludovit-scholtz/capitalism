@@ -84,6 +84,9 @@ export function clampStep(requestedStep: number, maxReachable: number): number {
 // Lot recommendation helpers
 // ---------------------------------------------------------------------------
 
+const POPULATION_INDEX_PRIORITY_THRESHOLD = 0.15
+const SAME_LOCATION_DISTANCE_EPSILON = 0.00001
+
 /**
  * Filters available lots to those suitable for `buildingType` and not yet owned.
  */
@@ -138,11 +141,11 @@ function getLotDistanceScore(a: BuildingLot, b: BuildingLot): number {
 
 function sortShopLotsForOnboarding(a: BuildingLot, b: BuildingLot, factoryLot: BuildingLot | null = null): number {
   const populationScore = (b.populationIndex ?? 1) - (a.populationIndex ?? 1)
-  if (Math.abs(populationScore) >= 0.15) return populationScore
+  if (Math.abs(populationScore) >= POPULATION_INDEX_PRIORITY_THRESHOLD) return populationScore
 
   if (factoryLot) {
     const distanceScore = getLotDistanceScore(a, factoryLot) - getLotDistanceScore(b, factoryLot)
-    if (Math.abs(distanceScore) > 0.00001) return distanceScore
+    if (Math.abs(distanceScore) > SAME_LOCATION_DISTANCE_EPSILON) return distanceScore
   }
 
   return a.price - b.price
@@ -164,7 +167,8 @@ export function getRecommendedShopLotIds(availableShopLots: BuildingLot[], count
 
 export function getDefaultRecommendedLotId(availableLots: BuildingLot[], recommendedLotIds: string[], moneyAvailable: number): string {
   const validLots = availableLots.filter((lot) => !lot.ownerCompanyId && lot.price <= moneyAvailable)
-  const recommendedLot = recommendedLotIds.map((lotId) => validLots.find((lot) => lot.id === lotId)).find((lot): lot is BuildingLot => !!lot)
+  const validLotsById = new Map(validLots.map((lot) => [lot.id, lot]))
+  const recommendedLot = recommendedLotIds.map((lotId) => validLotsById.get(lotId)).find((lot): lot is BuildingLot => !!lot)
 
   return recommendedLot?.id ?? validLots[0]?.id ?? ''
 }
