@@ -271,7 +271,7 @@ async function confirmEndShard() {
             <option value="sk">Slovenčina</option>
             <option value="de">Deutsch</option>
           </select>
-          <button type="submit" class="btn btn-primary" :disabled="testEmailPending">
+          <button type="submit" class="btn btn-primary" :aria-busy="testEmailPending" :disabled="testEmailPending">
             {{ testEmailPending ? t('common.loading') : t('admin.sendTestEmail') }}
           </button>
         </div>

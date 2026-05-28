@@ -107,7 +107,7 @@ public sealed class MasterEmailService(
         var bodyHtml = $"""
             <p style="margin:0 0 18px;">{WebUtility.HtmlEncode(copy.Intro)}</p>
             <p style="margin:0 0 8px;font-weight:700;color:#162033;">{WebUtility.HtmlEncode(copy.SectionTitle)}</p>
-            <p style="margin:0 0 18px;white-space:pre-wrap;">{EncodeMultiline(message)}</p>
+            <p style="margin:0 0 18px;white-space:pre-wrap;">{WebUtility.HtmlEncode(message)}</p>
             <p style="margin:0;color:#526070;">{WebUtility.HtmlEncode(adminLine)}</p>
             """.Trim();
         var text = $"{copy.Headline}{Environment.NewLine}{Environment.NewLine}{copy.Intro}{Environment.NewLine}{Environment.NewLine}{copy.SectionTitle}{Environment.NewLine}{message}{Environment.NewLine}{Environment.NewLine}{adminLine}";
@@ -186,7 +186,7 @@ public sealed class MasterEmailService(
             </dl>
             {changeHtml}
             <p style="margin:0 0 8px;font-weight:700;color:#162033;">{WebUtility.HtmlEncode(copy.SectionTitle)}</p>
-            <p style="margin:0;white-space:pre-wrap;">{EncodeMultiline(ticket.MarkdownSource)}</p>
+            <p style="margin:0;white-space:pre-wrap;">{WebUtility.HtmlEncode(ticket.MarkdownSource)}</p>
             """.Trim();
         var text = BuildSupportTicketText(ticket, copy, locale, changeNote);
 
@@ -224,11 +224,6 @@ public sealed class MasterEmailService(
             logger.LogError(exception, "Email send failed for {Email}.", recipientEmail);
             return false;
         }
-    }
-
-    private static string EncodeMultiline(string value)
-    {
-        return WebUtility.HtmlEncode(value).Replace("\r\n", "\n").Replace("\n", "<br />");
     }
 
     private static string GetGreeting(string locale, string displayName) => locale switch

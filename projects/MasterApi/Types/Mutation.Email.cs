@@ -45,9 +45,14 @@ public sealed partial class Mutation
     private static string NormalizeEmailAddress(string email)
     {
         var normalized = email.Trim();
-        if (string.IsNullOrWhiteSpace(normalized) || normalized.Length > 320)
+        if (string.IsNullOrWhiteSpace(normalized))
         {
             throw BuildInvalidTestEmailInput("Recipient email is required.");
+        }
+
+        if (normalized.Length > 320)
+        {
+            throw BuildInvalidTestEmailInput("Recipient email must be 320 characters or fewer.");
         }
 
         try
