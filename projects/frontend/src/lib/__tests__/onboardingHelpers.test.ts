@@ -398,6 +398,16 @@ describe('getRecommendedShopLotIds', () => {
 
     expect(getRecommendedShopLotIds(lots, 3, factoryLot)).toEqual(['far-premium', 'near-high', 'far-high'])
   })
+
+  it('uses shorter factory distance before price when population index is close', () => {
+    const factoryLot = makeLot({ id: 'factory', latitude: 48.15, longitude: 17.13 })
+    const lots = [
+      makeLot({ id: 'far-cheap', district: 'Commercial District', latitude: 48.22, longitude: 17.2, populationIndex: 1.4, price: 50_000 }),
+      makeLot({ id: 'near-expensive', district: 'Commercial District', latitude: 48.151, longitude: 17.131, populationIndex: 1.45, price: 150_000 }),
+    ]
+
+    expect(getRecommendedShopLotIds(lots, 2, factoryLot)).toEqual(['near-expensive', 'far-cheap'])
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -415,6 +425,12 @@ describe('getDefaultRecommendedLotId', () => {
     const lots = [makeLot({ id: 'expensive', price: 300_000 }), makeLot({ id: 'fallback', price: 90_000 })]
 
     expect(getDefaultRecommendedLotId(lots, ['expensive'], 100_000)).toBe('fallback')
+  })
+
+  it('skips an unaffordable first recommendation and selects the next affordable recommendation', () => {
+    const lots = [makeLot({ id: 'expensive', price: 300_000 }), makeLot({ id: 'affordable-recommended', price: 90_000 }), makeLot({ id: 'fallback', price: 80_000 })]
+
+    expect(getDefaultRecommendedLotId(lots, ['expensive', 'affordable-recommended'], 100_000)).toBe('affordable-recommended')
   })
 
   it('returns an empty string when no lot can be purchased', () => {
