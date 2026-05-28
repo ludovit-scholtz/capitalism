@@ -116,6 +116,9 @@ async function sendTestEmail() {
       return
     }
 
+    testEmailRecipient.value = ''
+    testEmailDisplayName.value = ''
+    testEmailLocale.value = 'en'
     testEmailMessage.value = ''
     actionMessage.value = t('admin.testEmailSent')
   } catch (caughtError) {

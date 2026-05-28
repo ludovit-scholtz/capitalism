@@ -207,6 +207,20 @@ public static class EmailLocalizations
         "de" => "Änderung",
         _ => "Change",
     };
+
+    public static string SupportTicketContentUpdatedNote(string locale) => NormalizeLocale(locale) switch
+    {
+        "sk" => "Text požiadavky podpory bol aktualizovaný.",
+        "de" => "Der Support-Tickettext wurde aktualisiert.",
+        _ => "Support ticket content was updated.",
+    };
+
+    public static string SupportTicketStatusChangedNote(string locale, string status) => NormalizeLocale(locale) switch
+    {
+        "sk" => $"Stav požiadavky podpory sa zmenil na {status}.",
+        "de" => $"Der Support-Ticketstatus wurde zu {status} geändert.",
+        _ => $"Support ticket status changed to {status}.",
+    };
 }
 
 public sealed record EmailCopy(

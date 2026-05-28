@@ -161,7 +161,7 @@ public sealed partial class Mutation
         await emailService.SendSupportTicketUpdatedEmailAsync(
             player,
             ticket,
-            "Support ticket content was updated.",
+            EmailLocalizations.SupportTicketContentUpdatedNote(player.PreferredLocale),
             cancellationToken);
         return Query.ToSupportTicketInfo(ticket, canViewRaw: true, canViewPreview: true);
     }
@@ -233,7 +233,9 @@ public sealed partial class Mutation
         await emailService.SendSupportTicketUpdatedEmailAsync(
             ticket.CreatedByPlayerAccount,
             ticket,
-            changeNote,
+            string.IsNullOrWhiteSpace(input.Note)
+                ? EmailLocalizations.SupportTicketStatusChangedNote(ticket.CreatedByPlayerAccount.PreferredLocale, nextStatus)
+                : changeNote,
             cancellationToken);
         return Query.ToSupportTicketInfo(ticket, canViewRaw: true, canViewPreview: true);
     }
