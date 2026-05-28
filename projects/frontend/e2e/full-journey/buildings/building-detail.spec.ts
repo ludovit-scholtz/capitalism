@@ -251,6 +251,78 @@ test.describe('Building detail upgrades', () => {
     await expect(sidebar.getByText('Assignment')).toHaveCount(0)
   })
 
+  test('shows copy and paste unit buttons in mobile edit mode', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 760 })
+
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-mobile-clipboard',
+      playerId: player.id,
+      name: 'Mobile Clipboard Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-mobile-clipboard',
+          companyId: 'company-mobile-clipboard',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Mobile Clipboard Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'mobile-clipboard-unit',
+              buildingId: 'building-mobile-clipboard',
+              unitType: 'PURCHASE',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('auth_provider', 'local')
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-mobile-clipboard')
+    await ensureBuildingEditMode(page)
+
+    const plannedSection = getGridSection(page, 'Planned Upgrade')
+    const copyButton = plannedSection.getByRole('button', { name: 'Copy unit' })
+    const pasteButton = plannedSection.getByRole('button', { name: 'Paste unit' })
+    await expect(copyButton).toBeVisible()
+    await expect(pasteButton).toBeVisible()
+    await expect(copyButton).toBeDisabled()
+    await expect(pasteButton).toBeDisabled()
+
+    await getGridCell(plannedSection, 0, 0).click()
+
+    await expect(copyButton).toBeEnabled()
+    await expect(pasteButton).toBeEnabled()
+  })
+
   test('allows revising links while a unit upgrade is still pending', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({

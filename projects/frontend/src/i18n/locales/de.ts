@@ -1608,6 +1608,8 @@ export default {
     unitDetails: 'Einheitendetails',
     buildingDetails: 'Gebäudedetails',
     clipboard: {
+      copyButton: 'Einheit kopieren',
+      pasteButton: 'Einheit einfügen',
       copySuccess: 'Einheitenkonfiguration kopiert',
       pasteSuccess: 'Konfiguration erfolgreich eingefügt',
       pasteEmptySuccess: 'Einheit {type} platziert und konfiguriert',

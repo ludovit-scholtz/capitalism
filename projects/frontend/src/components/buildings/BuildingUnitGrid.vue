@@ -299,6 +299,14 @@ function closeEditMode() {
           </p>
         </div>
         <div class="grid-actions">
+          <div class="clipboard-actions">
+            <button class="btn btn-secondary btn-sm" :disabled="!selectedCell" @click="copySelectedUnit">
+              {{ t('buildingDetail.clipboard.copyButton') }}
+            </button>
+            <button class="btn btn-secondary btn-sm" :disabled="!selectedCell" @click="pasteToSelectedUnit">
+              {{ t('buildingDetail.clipboard.pasteButton') }}
+            </button>
+          </div>
           <button class="btn btn-danger btn-sm inline-flex items-center gap-2" @click="closeEditMode">
             <font-awesome-icon :icon="['fas', 'xmark']" aria-hidden="true" />
             {{ t('buildingDetail.cancelEditing') }}

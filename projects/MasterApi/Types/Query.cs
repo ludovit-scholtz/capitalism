@@ -148,17 +148,31 @@ public sealed partial class Query
             : NormalizeEmail(input.PlayerEmail, "INVALID_PLAYER_EMAIL");
         var limit = Math.Clamp(input.Limit, 1, 500);
 
-        var entries = await db.GameNewsEntries
+        var visibleEntries = db.GameNewsEntries
             .AsNoTracking()
-            .Include(entry => entry.Localizations)
-            .Include(entry => entry.ReadReceipts)
             .Where(entry => entry.TargetServerKey == null || entry.TargetServerKey == input.ServerKey)
-            .Where(entry => includeDrafts || entry.Status == GameNewsEntryStatus.Published)
+            .Where(entry => includeDrafts || entry.Status == GameNewsEntryStatus.Published);
+
+        var entries = new List<GameNewsEntry>();
+        foreach (var entryType in GameNewsEntryType.All)
+        {
+            var categoryEntries = await visibleEntries
+                .Where(entry => entry.EntryType == entryType)
+                .Include(entry => entry.Localizations)
+                .Include(entry => entry.ReadReceipts)
+                .OrderByDescending(entry => entry.PublishedAtUtc ?? entry.UpdatedAtUtc)
+                .ThenByDescending(entry => entry.CreatedAtUtc)
+                .Take(limit)
+                .AsSplitQuery()
+                .ToListAsync();
+
+            entries.AddRange(categoryEntries);
+        }
+
+        entries = entries
             .OrderByDescending(entry => entry.PublishedAtUtc ?? entry.UpdatedAtUtc)
             .ThenByDescending(entry => entry.CreatedAtUtc)
-            .Take(limit)
-            .AsSplitQuery()
-            .ToListAsync();
+            .ToList();
 
         var items = entries
             .Select(entry => ToGameNewsEntryInfo(entry, playerEmail, input.ServerKey))

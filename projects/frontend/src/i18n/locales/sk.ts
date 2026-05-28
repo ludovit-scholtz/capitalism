@@ -1605,6 +1605,8 @@ export default {
     unitDetails: 'Detaily jednotky',
     buildingDetails: 'Detaily budovy',
     clipboard: {
+      copyButton: 'Kopírovať jednotku',
+      pasteButton: 'Vložiť jednotku',
       copySuccess: 'Konfigurácia jednotky skopírovaná',
       pasteSuccess: 'Konfigurácia úspešne vložená',
       pasteEmptySuccess: 'Jednotka {type} umiestnená a nakonfigurovaná',
