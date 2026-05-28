@@ -46,7 +46,7 @@ public sealed class MasterEmailService(
             <p style="margin:0 0 8px;font-weight:700;color:#162033;">{escapedLabel}</p>
             <p style="margin:0 0 22px;"><a href="{escapedUrl}" style="color:#0f766e;text-decoration:none;">{escapedUrl}</a></p>
             <p style="margin:0;">{signoff}</p>
-            """;
+            """.Trim();
         var html = await renderer.RenderAsync(
             new EmailTemplateModel(normalizedLocale, copy.Subject, copy.Headline, bodyHtml, copy.Footer),
             cancellationToken);

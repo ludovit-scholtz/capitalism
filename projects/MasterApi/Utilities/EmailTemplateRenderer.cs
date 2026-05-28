@@ -15,7 +15,7 @@ public interface IEmailTemplateRenderer
     Task<string> RenderAsync(EmailTemplateModel model, CancellationToken cancellationToken);
 }
 
-public sealed class HandlebarsEmailTemplateRenderer(IWebHostEnvironment environment) : IEmailTemplateRenderer
+public sealed class HandlebarsEmailTemplateRenderer(IWebHostEnvironment environment) : IEmailTemplateRenderer, IDisposable
 {
     private const string TemplatePath = "EmailTemplates/capitalism-email.html";
     private HandlebarsTemplate<object, object>? _compiledTemplate;
@@ -65,5 +65,10 @@ public sealed class HandlebarsEmailTemplateRenderer(IWebHostEnvironment environm
         await using var stream = file.CreateReadStream();
         using var reader = new StreamReader(stream);
         return await reader.ReadToEndAsync(cancellationToken);
+    }
+
+    public void Dispose()
+    {
+        _compileLock.Dispose();
     }
 }

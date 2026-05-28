@@ -55,7 +55,7 @@ public sealed class WeeklyEmailReportService(
     {
         var locale = EmailLocalizations.NormalizeLocale(player.PreferredLocale);
         var copy = EmailLocalizations.WeeklyReport(locale);
-        var servers = await BuildServerRowsAsync(player, weekStartUtc, nowUtc, cancellationToken);
+        var servers = await BuildServerRowsAsync(player, locale, weekStartUtc, nowUtc, cancellationToken);
         var bountyPoints = await db.MasterRankingRewardRecords
             .AsNoTracking()
             .Where(record => record.PlayerAccountId == player.Id)
@@ -85,6 +85,7 @@ public sealed class WeeklyEmailReportService(
 
     private async Task<List<WeeklyServerRow>> BuildServerRowsAsync(
         PlayerAccount player,
+        string locale,
         DateTime weekStartUtc,
         DateTime nowUtc,
         CancellationToken cancellationToken)
@@ -110,6 +111,7 @@ public sealed class WeeklyEmailReportService(
         return activeServers.Select(server => new WeeklyServerRow(
                 server.DisplayName,
                 server.FrontendUrl,
+                EmailLocalizations.WeeklyProfitUnavailable(locale),
                 rewards.GetValueOrDefault(server.ServerKey),
                 snapshot?.GlobalRank ?? 0))
             .ToList();
@@ -203,10 +205,7 @@ public sealed class WeeklyEmailReportService(
         return builder.ToString();
     }
 
-    private sealed record WeeklyServerRow(string DisplayName, string FrontendUrl, decimal BountyPoints, int Rank)
-    {
-        public string Profit => "—";
-    }
+    private sealed record WeeklyServerRow(string DisplayName, string FrontendUrl, string Profit, decimal BountyPoints, int Rank);
 
     private sealed record WeeklyChangelogRow(string Title, string Summary);
 }

@@ -100,6 +100,13 @@ public static class EmailLocalizations
         _ => "Bounties",
     };
 
+    public static string WeeklyProfitUnavailable(string locale) => NormalizeLocale(locale) switch
+    {
+        "sk" => "nedostupné",
+        "de" => "nicht verfügbar",
+        _ => "unavailable",
+    };
+
     public static string WeeklyMasterBountyLabel(string locale) => NormalizeLocale(locale) switch
     {
         "sk" => "Master bounty body tento týždeň",
