@@ -6,10 +6,10 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 ### Onboarding
 
-- [ ] Remove the company name selection and person name selection from the onboarding. Keep auto generated name, but hide the name selection. Users can change the name later in the game.
-- [ ] On mobile, when user clicks on any button in the onboarding after he scrolled little down, the screen goes to top which creates undesired confusion.
-- [ ] In the purchase factory step and purchase sales shop, make one of the recommended choices selected one, so that user can just click continue.
-- [ ] In the sales shop purchase onboarding step show on map the distance from the factory. The main point is to optimize the distance between the factory while tuning up the retail index
+- [x] Remove the company name selection and person name selection from the onboarding. Keep auto generated name, but hide the name selection. Users can change the name later in the game.
+- [x] On mobile, when user clicks on any button in the onboarding after he scrolled little down, the screen goes to top which creates undesired confusion.
+- [x] In the purchase factory step and purchase sales shop, make one of the recommended choices selected one, so that user can just click continue.
+- [x] In the sales shop purchase onboarding step show on map the distance from the factory. The main point is to optimize the distance between the factory while tuning up the retail index
 
 ### Copy-Paste units
 
