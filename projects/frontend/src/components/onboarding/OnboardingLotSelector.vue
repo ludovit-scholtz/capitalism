@@ -3,6 +3,7 @@
 
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatPopulationIndex } from '@/lib/cityMapHelpers'
 import { formatMoney } from '@/lib/currencyFormat'
 import type { BuildingLot, City } from '@/types'
 import L from 'leaflet'
@@ -16,9 +17,13 @@ const props = withDefaults(
     moneyAvailable: number
     recommendedLotIds?: string[]
     city: City | null
+    referenceLot?: BuildingLot | null
+    referenceDistanceLabel?: string
   }>(),
   {
     recommendedLotIds: () => [],
+    referenceLot: null,
+    referenceDistanceLabel: '',
   },
 )
 
@@ -61,9 +66,23 @@ function formatBuildingType(type: string): string {
 }
 
 function calculateDistance(lot: BuildingLot, city: City): number {
-  const dLat = lot.latitude - city.latitude
-  const dLon = lot.longitude - city.longitude
+  return calculateCoordinateDistance(lot.latitude, lot.longitude, city.latitude, city.longitude)
+}
+
+function calculateCoordinateDistance(fromLatitude: number, fromLongitude: number, toLatitude: number, toLongitude: number): number {
+  // Onboarding compares nearby lots inside one city, so a light lat/lon approximation is enough for relative distance guidance.
+  const dLat = fromLatitude - toLatitude
+  const dLon = fromLongitude - toLongitude
   return Math.sqrt(dLat * dLat + dLon * dLon) * 111 // approximate km
+}
+
+function calculateReferenceDistance(lot: BuildingLot): number | null {
+  if (!props.referenceLot) return null
+  return calculateCoordinateDistance(lot.latitude, lot.longitude, props.referenceLot.latitude, props.referenceLot.longitude)
+}
+
+function formatReferenceDistance(lot: BuildingLot): string {
+  return formatDistance(calculateReferenceDistance(lot) ?? 0)
 }
 
 function calculateDeliveryCost(distance: number): number {
@@ -120,6 +139,22 @@ function selectLot(lotId: string): void {
   emit('update:selectedLotId', lotId)
 }
 
+function createLotTooltip(lot: BuildingLot): HTMLElement {
+  const tooltip = document.createElement('div')
+  const name = document.createElement('strong')
+  name.textContent = lot.name
+  tooltip.append(name)
+
+  const referenceDistance = calculateReferenceDistance(lot)
+  if (referenceDistance !== null && props.referenceDistanceLabel) {
+    const distance = document.createElement('div')
+    distance.textContent = `${props.referenceDistanceLabel}: ${formatDistance(referenceDistance)}`
+    tooltip.append(distance)
+  }
+
+  return tooltip
+}
+
 function updateMarkers(): void {
   if (!map) return
 
@@ -132,7 +167,7 @@ function updateMarkers(): void {
       icon: createMarkerIcon(getMarkerColor(lot), isSelected),
     }).addTo(map)
 
-    marker.bindTooltip(lot.name, {
+    marker.bindTooltip(createLotTooltip(lot), {
       direction: 'top',
       offset: [0, -10],
     })
@@ -264,6 +299,8 @@ onUnmounted(() => {
             <div class="lot-list-meta">
               <span>{{ t('cityMap.district') }}: {{ t(`cityMap.districts.${lot.district}`) }}</span>
               <span>{{ lot.suitableTypes.split(',').map(formatBuildingType).join(', ') }}</span>
+              <span v-if="referenceLot && referenceDistanceLabel">{{ referenceDistanceLabel }}: {{ formatReferenceDistance(lot) }}</span>
+              <span>{{ t('cityMap.populationIndex') }}: {{ formatPopulationIndex(lot.populationIndex ?? 1) }}</span>
             </div>
             <div class="lot-badges">
               <span v-if="isRecommended(lot)" class="badge recommended">{{ t('onboarding.recommendedLot') }}</span>
@@ -294,6 +331,14 @@ onUnmounted(() => {
             <div v-if="city">
               <dt>{{ t('cityMap.deliveryDistance') }}</dt>
               <dd>{{ formatDistance(calculateDistance(selectedLot, city)) }}</dd>
+            </div>
+            <div v-if="referenceLot && referenceDistanceLabel">
+              <dt>{{ referenceDistanceLabel }}</dt>
+              <dd>{{ formatReferenceDistance(selectedLot) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('cityMap.populationIndex') }}</dt>
+              <dd>{{ formatPopulationIndex(selectedLot.populationIndex ?? 1) }}</dd>
             </div>
             <div>
               <dt>{{ t('cityMap.price') }}</dt>

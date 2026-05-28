@@ -1421,7 +1421,7 @@ test.describe('Onboarding resume and progress persistence', () => {
     await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).toBeVisible()
   })
 
-  test('preserves a custom personal account name across refresh and guest migration', async ({ page }) => {
+  test('keeps generated names hidden from selection while preserving guest migration identity', async ({ page }) => {
     const state = setupMockApi(page)
 
     await page.goto('/onboarding')
@@ -1429,24 +1429,23 @@ test.describe('Onboarding resume and progress persistence', () => {
     await page.locator('.industry-card', { hasText: 'Furniture' }).click()
     await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
 
-    const personalNameInput = page.locator('#onboarding-personal-account-name')
-    await expect(personalNameInput).toBeVisible()
-    await personalNameInput.fill('Captain Walnut')
+    await expect(page.locator('#onboarding-company-name')).toHaveCount(0)
+    await expect(page.locator('#onboarding-personal-account-name')).toHaveCount(0)
+    await page.waitForFunction(() => new URL(window.location.href).searchParams.has('personalAccountName'))
+    const generatedPersonalName = new URL(page.url()).searchParams.get('personalAccountName')
+    expect(generatedPersonalName).toBeTruthy()
 
     await page.reload()
 
     await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
-    await expect(personalNameInput).toHaveValue('Captain Walnut')
+    await expect(page.locator('#onboarding-company-name')).toHaveCount(0)
+    await expect(page.locator('#onboarding-personal-account-name')).toHaveCount(0)
 
     await page.locator('.ipo-card', { hasText: 'Starter IPO' }).click()
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
-    await page.getByRole('button', { name: 'List View' }).click()
-    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
     await expect(page.getByRole('heading', { name: 'Choose Your First Shop Lot' })).toBeVisible()
-    await page.getByRole('button', { name: 'List View' }).click()
-    await chooseStarterShopLot(page)
     await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
 
     await expect(page.getByRole('heading', { name: 'Save Your Progress' })).toBeVisible()
@@ -1455,7 +1454,7 @@ test.describe('Onboarding resume and progress persistence', () => {
 
     await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
     await page.goto('/leaderboard')
-    await expect(page.locator('.rank-card').getByText('Captain Walnut')).toBeVisible()
+    await expect(page.locator('.rank-card').getByText(generatedPersonalName!)).toBeVisible()
   })
 
   test('resumes after first factory purchase and keeps the onboarding company state', async ({ page }) => {
@@ -3196,7 +3195,7 @@ test.describe('Onboarding wizard CTA validation and budget guard rails', () => {
   // consequences of player choices during onboarding."
   // This describes the CTA disabled-state enforcement and budget coaching.
 
-  test('guest factory-lot step keeps Purchase First Factory disabled until lot is selected', async ({ page }) => {
+  test('guest factory-lot step preselects an affordable recommended factory lot', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/onboarding')
 
@@ -3205,16 +3204,14 @@ test.describe('Onboarding wizard CTA validation and budget guard rails', () => {
 
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
 
-    // CTA must be disabled at initial state (no lot selected)
-    await expect(page.getByRole('button', { name: 'Purchase First Factory' })).toBeDisabled()
-
-    // Select lot — CTA must be enabled
-    await page.getByRole('button', { name: 'List View' }).click()
-    await chooseStarterFactoryLot(page)
+    // A recommended affordable lot is selected automatically so the player can continue immediately.
     await expect(page.getByRole('button', { name: 'Purchase First Factory' })).toBeEnabled()
+
+    await page.getByRole('button', { name: 'List View' }).click()
+    await expect(page.getByRole('button', { name: STARTER_FACTORY_LOT_NAME })).toHaveClass(/selected/)
   })
 
-  test('guest shop-lot step keeps Purchase First Sales Shop disabled until lot is selected', async ({ page }) => {
+  test('guest shop-lot step preselects an affordable recommended shop lot and shows factory distance', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/onboarding')
 
@@ -3226,13 +3223,27 @@ test.describe('Onboarding wizard CTA validation and budget guard rails', () => {
 
     await expect(page.getByRole('heading', { name: 'Choose Your First Shop Lot' })).toBeVisible()
 
-    // CTA must be disabled initially (no shop lot selected)
-    await expect(page.getByRole('button', { name: 'Purchase First Sales Shop' })).toBeDisabled()
-
-    // Select shop lot — CTA enabled
-    await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /High Street Retail Space/i }).click()
+    // A recommended affordable lot is selected automatically so the player can continue immediately.
     await expect(page.getByRole('button', { name: 'Purchase First Sales Shop' })).toBeEnabled()
+
+    await page.getByRole('button', { name: 'List View' }).click()
+    await expect(page.getByRole('button', { name: /High Street Retail Space/i })).toHaveClass(/selected/)
+    await expect(page.getByText(/Distance from factory: \d+\.\d km/)).toBeVisible()
+  })
+
+  test('mobile lot selection keeps the current scroll position', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 640 })
+    setupMockApi(page)
+    await page.goto('/onboarding')
+
+    await chooseOnboardingRouteChoices(page, { industry: 'Furniture', product: 'Wooden Chair' })
+    await page.getByRole('button', { name: 'List View' }).click()
+    await page.evaluate(() => window.scrollTo(0, 360))
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100)
+
+    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100)
   })
 
   test('guest profit preview shows higher revenue for Healthcare vs Food Processing (AC6 business consequence)', async ({ browser }) => {
@@ -5762,362 +5773,79 @@ test.describe('Logistics Pro-gated onboarding', () => {
   })
 })
 
-test.describe('Company name generator — generate, regenerate and edit (AC from issue)', () => {
-  test('shows a pre-filled company name suggestion on the IPO step', async ({ page }) => {
+test.describe('Generated onboarding names are hidden but preserved', () => {
+  test('IPO step hides company and personal name pickers while showing generated identity summary after plan selection', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/onboarding')
 
-    // Navigate to IPO step (step 4) where company name editor appears
     await chooseOnboardingCity(page)
     await page.locator('.industry-card', { hasText: 'Furniture' }).click()
     await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
-
     await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
 
-    // The company name editor must be visible with a pre-filled value
-    const nameInput = page.locator('#onboarding-company-name')
-    await expect(nameInput).toBeVisible()
-    const initialName = (await nameInput.inputValue()).trim()
-    expect(initialName.length).toBeGreaterThan(0)
+    await expect(page.locator('#onboarding-company-name')).toHaveCount(0)
+    await expect(page.locator('#onboarding-personal-account-name')).toHaveCount(0)
+    await expect(page.locator('.regenerate-name-btn')).toHaveCount(0)
+    await expect(page.locator('.regenerate-personal-name-btn')).toHaveCount(0)
+    await page.waitForFunction(() => new URL(window.location.href).searchParams.has('personalAccountName'))
+    const generatedPersonalName = new URL(page.url()).searchParams.get('personalAccountName')
+    expect(generatedPersonalName?.trim().split(' ')).toHaveLength(3)
+
+    await page.locator('.ipo-card', { hasText: 'Starter IPO' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
+
+    const budgetCards = page.locator('.budget-card')
+    await expect(budgetCards.nth(0)).toContainText(/\S+\s+\S+/)
+    await expect(budgetCards.nth(1)).toContainText(generatedPersonalName!)
   })
 
-  test('regenerate button produces a different name', async ({ page }) => {
-    setupMockApi(page)
+  test('generated company name changes with industry and is submitted to the backend', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
     await page.goto('/onboarding')
-
-    await chooseOnboardingCity(page)
-    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
-    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
-    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
-
-    const nameInput = page.locator('#onboarding-company-name')
-    const initialName = (await nameInput.inputValue()).trim()
-
-    // Click "Generate Another Name" and verify the name changed
-    await page.locator('.regenerate-name-btn').click()
-    const newName = (await nameInput.inputValue()).trim()
-    expect(newName).not.toBe(initialName)
-    expect(newName.length).toBeGreaterThan(0)
-  })
-
-  test('at least 10 regenerations all produce distinct names', async ({ page }) => {
-    setupMockApi(page)
-    await page.goto('/onboarding')
-
-    await chooseOnboardingCity(page)
-    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
-    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
-    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
-
-    const nameInput = page.locator('#onboarding-company-name')
-    const names = new Set<string>()
-    names.add((await nameInput.inputValue()).trim())
-
-    const regenBtn = page.locator('.regenerate-name-btn')
-    for (let i = 0; i < 10; i++) {
-      await regenBtn.click()
-      names.add((await nameInput.inputValue()).trim())
-    }
-
-    // All 11 names (initial + 10 regenerations) must be unique
-    expect(names.size).toBeGreaterThanOrEqual(10)
-  })
-
-  test('player can edit the name manually and the edit is preserved', async ({ page }) => {
-    setupMockApi(page)
-    await page.goto('/onboarding')
-
-    await chooseOnboardingCity(page)
-    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
-    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
-    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
-
-    const nameInput = page.locator('#onboarding-company-name')
-    await nameInput.fill('My Custom Corp')
-    await expect(nameInput).toHaveValue('My Custom Corp')
-
-    // The hint text is visible below the input
-    await expect(page.locator('.company-name-editor')).toContainText('Accept the suggestion')
-  })
-
-  test('regenerate resets a manually-edited name back to a generated one', async ({ page }) => {
-    setupMockApi(page)
-    await page.goto('/onboarding')
-
-    await chooseOnboardingCity(page)
-    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
-    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
-    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
-
-    const nameInput = page.locator('#onboarding-company-name')
-    await nameInput.fill('My Custom Corp')
-
-    // After regenerating, the input should contain a fresh generated name (not the manual edit)
-    await page.locator('.regenerate-name-btn').click()
-    const generatedName = (await nameInput.inputValue()).trim()
-    expect(generatedName).not.toBe('My Custom Corp')
-    expect(generatedName.length).toBeGreaterThan(0)
-  })
-
-  test('company name suggestion changes when industry changes', async ({ page }) => {
-    setupMockApi(page)
-    await page.goto('/onboarding')
-
     await chooseOnboardingCity(page)
 
-    // Select Furniture first
     await page.locator('.industry-card', { hasText: 'Furniture' }).click()
     await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
-    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
+    await page.locator('.ipo-card', { hasText: 'Starter IPO' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
+    const furnitureName = ((await page.locator('.budget-card').nth(0).locator('strong').textContent()) ?? '').trim()
 
-    const nameInput = page.locator('#onboarding-company-name')
-    const furnitureName = (await nameInput.inputValue()).trim()
-
-    // Go back and select Healthcare
     await page.getByRole('button', { name: '← Back' }).click()
     await page.getByRole('button', { name: '← Back' }).click()
-
+    await page.getByRole('button', { name: '← Back' }).click()
     await page.locator('.industry-card', { hasText: 'Healthcare' }).click()
     await page.locator('.product-card', { hasText: 'Basic Medicine' }).click()
-    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
+    await page.locator('.ipo-card', { hasText: 'Starter IPO' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
+    const healthcareName = ((await page.locator('.budget-card').nth(0).locator('strong').textContent()) ?? '').trim()
 
-    const healthcareName = (await nameInput.inputValue()).trim()
-
-    // Different industry → different name
     expect(healthcareName).not.toBe(furnitureName)
-    expect(healthcareName.length).toBeGreaterThan(0)
+    expect(healthcareName.split(' ')).toHaveLength(2)
+
+    await page.getByRole('button', { name: 'Purchase First Factory' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your First Shop Lot' })).toBeVisible()
+    expect(player.companies.some((company) => company.name === healthcareName)).toBe(true)
   })
 
-  test('generated name contains exactly one space (two-word format visible in UI)', async ({ page }) => {
-    setupMockApi(page)
-    await page.goto('/onboarding')
-
-    await chooseOnboardingCity(page)
-    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
-    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
-    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
-
-    const nameInput = page.locator('#onboarding-company-name')
-    const name = (await nameInput.inputValue()).trim()
-
-    // Must be exactly two words (one space) — validates "combination of two words" ROADMAP requirement
-    const words = name.split(' ')
-    expect(words).toHaveLength(2)
-    expect(words[0]!.length).toBeGreaterThan(0)
-    expect(words[1]!.length).toBeGreaterThan(0)
-  })
-
-  test('name for Food Processing industry is visible on IPO step', async ({ page }) => {
-    setupMockApi(page)
-    await page.goto('/onboarding')
-
-    await chooseOnboardingCity(page)
-    await page.locator('.industry-card', { hasText: 'Food Processing' }).click()
-    await page.locator('.product-card', { hasText: 'Bread' }).click()
-    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
-
-    const nameInput = page.locator('#onboarding-company-name')
-    const name = (await nameInput.inputValue()).trim()
-
-    // Food Processing should produce a name with 2 words
-    expect(name.split(' ')).toHaveLength(2)
-    expect(name.length).toBeGreaterThan(0)
-  })
-
-  test('manual name survives IPO card selection and is still shown when returning to step', async ({ page }) => {
-    setupMockApi(page)
-    await page.goto('/onboarding')
-
-    await chooseOnboardingCity(page)
-    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
-    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
-    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
-
-    // Player types a custom name
-    const nameInput = page.locator('#onboarding-company-name')
-    await nameInput.fill('My Empire Corp')
-    await expect(nameInput).toHaveValue('My Empire Corp')
-
-    // Navigate away and back (back to product step, then forward again)
-    await page.getByRole('button', { name: '← Back' }).click()
-    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
-    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
-
-    // After going back and re-entering the IPO step the name editor is present
-    await expect(page.locator('#onboarding-company-name')).toBeVisible()
-  })
-
-  test('Healthcare industry generates a valid two-word name on IPO step', async ({ page }) => {
-    setupMockApi(page)
-    await page.goto('/onboarding')
-
-    await chooseOnboardingCity(page)
-    await page.locator('.industry-card', { hasText: 'Healthcare' }).click()
-    await page.locator('.product-card', { hasText: 'Basic Medicine' }).click()
-    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
-
-    const nameInput = page.locator('#onboarding-company-name')
-    const name = (await nameInput.inputValue()).trim()
-
-    // Healthcare should produce a two-word professional name
-    const words = name.split(' ')
-    expect(words).toHaveLength(2)
-    expect(words[0]!.length).toBeGreaterThan(0)
-    expect(words[1]!.length).toBeGreaterThan(0)
-    // First word should be capitalized
-    expect(words[0]![0]).toBe(words[0]![0]!.toUpperCase())
-  })
-
-  test('founder contribution and personal cash cards show the same currency on IPO step', async ({ page }) => {
-    setupMockApi(page)
-    await page.goto('/onboarding')
-
-    await chooseOnboardingCity(page) // defaults to Bratislava (EUR)
-    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
-    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
-    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
-
-    const budgetCards = page.locator('.budget-card')
-
-    // Founder contribution card shows EUR (€) for Bratislava
-    await expect(budgetCards.nth(0)).toContainText('€')
-
-    // Personal cash card must also show EUR (€), not USD ($)
-    await expect(budgetCards.nth(1)).toContainText('€')
-    await expect(budgetCards.nth(1)).not.toContainText('$')
-  })
-
-  test('Prague (CZK) city shows CZK currency symbol on both IPO budget cards', async ({ page }) => {
-    setupMockApi(page)
-    await page.goto('/onboarding')
-
-    await chooseOnboardingCity(page, 'Prague') // CZK city
-    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
-    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
-    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
-
-    const budgetCards = page.locator('.budget-card')
-
-    // Both cards must show a CZK-derived amount — no dollar sign
-    await expect(budgetCards.nth(0)).not.toContainText('$')
-    await expect(budgetCards.nth(1)).not.toContainText('$')
-
-    // The company name editor must still be present when Prague is selected
-    await expect(page.locator('#onboarding-company-name')).toBeVisible()
-  })
-
-  test('Vienna (EUR) city shows EUR currency on both IPO budget cards', async ({ page }) => {
-    setupMockApi(page)
-    await page.goto('/onboarding')
-
-    await chooseOnboardingCity(page, 'Vienna') // EUR city, different from Bratislava
-    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
-    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
-    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
-
-    const budgetCards = page.locator('.budget-card')
-
-    // Vienna is EUR like Bratislava — both cards show €
-    await expect(budgetCards.nth(0)).toContainText('€')
-    await expect(budgetCards.nth(1)).toContainText('€')
-    await expect(budgetCards.nth(1)).not.toContainText('$')
-  })
-
-  test('company name hint text is visible below the name input on IPO step', async ({ page }) => {
-    setupMockApi(page)
-    await page.goto('/onboarding')
-
-    await chooseOnboardingCity(page)
-    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
-    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
-    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
-
-    // The hint text instructs the player how to use the company name field
-    await expect(page.locator('.company-name-editor')).toContainText('Accept the suggestion')
-    await expect(page.locator('.company-name-editor')).toContainText('type your own name')
-  })
-
-  test('name with Prague (CZK) city produces a two-word name', async ({ page }) => {
+  test('Prague IPO budget keeps local currency while name pickers remain hidden', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/onboarding')
 
     await chooseOnboardingCity(page, 'Prague')
-    await page.locator('.industry-card', { hasText: 'Healthcare' }).click()
-    await page.locator('.product-card', { hasText: 'Basic Medicine' }).click()
-    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
-
-    const nameInput = page.locator('#onboarding-company-name')
-    const name = (await nameInput.inputValue()).trim()
-
-    // Name must be two words even when Prague (CZK) is the selected city
-    const words = name.split(' ')
-    expect(words).toHaveLength(2)
-    expect(words[0]!.length).toBeGreaterThan(0)
-    expect(words[1]!.length).toBeGreaterThan(0)
-  })
-
-  test('custom company name entered by player is submitted to the backend and reflected in factory name on completion', async ({ page }) => {
-    const player = makePlayer()
-    const state = setupMockApi(page, { players: [player] })
-
-    await authenticateViaLocalStorage(page, `token-${player.id}`)
-    state.currentUserId = player.id
-    state.currentToken = `token-${player.id}`
-
-    await page.goto('/onboarding')
-
-    await page.locator('.city-card', { hasText: 'Bratislava' }).click()
     await page.locator('.industry-card', { hasText: 'Furniture' }).click()
     await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
     await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
 
-    // Clear the auto-generated name and type a custom one
-    const nameInput = page.locator('#onboarding-company-name')
-    await nameInput.clear()
-    await nameInput.fill('Stellar Ventures')
-
-    // Select an IPO plan to proceed
-    await page.locator('.ipo-card', { hasText: 'Starter IPO' }).click()
-    await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
-
-    // Purchase the factory lot
-    await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Factory Site B1/i }).click()
-    await page.getByRole('button', { name: 'Purchase First Factory' }).click()
-
-    // Purchase the shop lot
-    await expect(page.getByRole('heading', { name: 'Choose Your First Shop Lot' })).toBeVisible()
-    await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /High Street Retail Space/i }).click()
-    await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
-
-    // On completion, the factory name should include our custom company name
-    await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
-    // The factory achievement card uses "Stellar Ventures Factory" as the name (from mock: input.companyName + " Factory")
-    await expect(page.locator('.completion-achievements')).toContainText('Stellar Ventures')
-  })
-
-  test('company name is pre-populated from the generated suggestion (not empty) when IPO step first appears', async ({ page }) => {
-    const player = makePlayer()
-    const state = setupMockApi(page, { players: [player] })
-
-    await authenticateViaLocalStorage(page, `token-${player.id}`)
-    state.currentUserId = player.id
-    state.currentToken = `token-${player.id}`
-
-    await page.goto('/onboarding')
-    await page.locator('.city-card', { hasText: 'Bratislava' }).click()
-    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
-    await page.locator('.product-card').first().click()
-    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
-
-    // The name input must be non-empty — a suggestion is always pre-filled
-    const nameInput = page.locator('#onboarding-company-name')
-    const value = (await nameInput.inputValue()).trim()
-    expect(value.length).toBeGreaterThan(0)
-
-    // Must be two words
-    const words = value.split(' ')
-    expect(words).toHaveLength(2)
+    const budgetCards = page.locator('.budget-card')
+    await expect(budgetCards.nth(0)).not.toContainText('$')
+    await expect(budgetCards.nth(1)).not.toContainText('$')
+    await expect(page.locator('#onboarding-company-name')).toHaveCount(0)
+    await expect(page.locator('#onboarding-personal-account-name')).toHaveCount(0)
   })
 })

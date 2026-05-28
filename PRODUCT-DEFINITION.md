@@ -309,6 +309,7 @@ Referral flow requirements in onboarding:
 
 Personal account name requirements in onboarding:
 - Generate personal account name during IPO step using first-name, middle-name, and last-name generator.
+- Do not show onboarding controls for choosing or regenerating the personal account name; keep the generated value in onboarding state for backend submission and guest migration.
 - Personal account name is shown in rankings instead of raw OIDC identity name.
 - Personal account name can be changed later in player settings, with clear warning not to use real legal identity.
 - Personal account name is stored in MasterApi so one person uses same name across all game servers.
@@ -316,8 +317,8 @@ Personal account name requirements in onboarding:
 
 Onboarding steps (city-first order):
 1. **City selection** — Player picks their starting city (e.g. Bratislava EUR, Prague CZK, Vienna EUR, Berlin EUR, Warsaw PLN). City choice is first because it fixes starting currency, available lot inventory, salary baseline, and bank-account context for every subsequent step. The selected city is also reflected in the navbar context switcher immediately.
-2. **Player name & personal bank account** — Player picks a display name. The system grants $200 000 USD to a personal bank account. This is the startup capital for the IPO.
-3. **IPO plan** — Player transfers a founder contribution from the personal bank account to the new company bank account, decides how much to raise on the public market ($800 000 / $600 000 / $400 000), and sets founder ownership (25% / 33% / 50%). Player picks company name. After IPO the personal bank account balance is $0.
+2. **Player name & personal bank account** — The system keeps a generated display name in onboarding state. The player can change it later in player settings. The system grants $200 000 USD to a personal bank account. This is the startup capital for the IPO.
+3. **IPO plan** — Player transfers a founder contribution from the personal bank account to the new company bank account, decides how much to raise on the public market ($800 000 / $600 000 / $400 000), and sets founder ownership (25% / 33% / 50%). The system keeps a generated company name in onboarding state and shows it before factory purchase; the company name can be changed later in company settings. After IPO the personal bank account balance is $0.
 4. **Industry selection** — Player picks the business category:
    - *Free starter industries:* Furniture (Wood), Food Processing (Grain), Healthcare (Chemical Minerals)
    - *Pro-subscription starter industries:* Electronics (Silicon), Construction (Iron Ore), Pharmaceuticals (Gold), Energy (Coal), Logistics (Cotton). Pro-gated industries show a PRO badge; clicking without subscription shows an upgrade modal.
