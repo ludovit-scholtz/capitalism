@@ -44,12 +44,19 @@ async function openBuildingEditTab(page: Page, tabKey: string, tabLabel: string,
 }
 
 async function ensureBuildingEditMode(page: Page) {
+  const plannedUpgradeHeading = page.getByRole('heading', { name: 'Planned Upgrade' })
   const editButton = page.getByRole('button', { name: 'Edit Building', exact: true })
-  if (await editButton.count()) {
+  const initialState = await Promise.any([
+    plannedUpgradeHeading.waitFor({ state: 'visible', timeout: 5000 }).then(() => 'planned'),
+    editButton.waitFor({ state: 'visible', timeout: 5000 }).then(() => 'edit'),
+  ])
+
+  if (initialState === 'edit') {
+    await dismissTutorialTooltipIfPresent(page)
     await editButton.click()
   }
 
-  await expect(page.getByRole('heading', { name: 'Planned Upgrade' })).toBeVisible()
+  await expect(plannedUpgradeHeading).toBeVisible()
 }
 
 async function openPurchaseSelector(page: Page) {
@@ -253,6 +260,7 @@ test.describe('Building detail upgrades', () => {
 
   test('shows copy and paste unit buttons in mobile edit mode', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 760 })
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
 
     const player = makePlayer()
     player.companies.push({
@@ -321,6 +329,14 @@ test.describe('Building detail upgrades', () => {
 
     await expect(copyButton).toBeEnabled()
     await expect(pasteButton).toBeEnabled()
+    await copyButton.click()
+    await expect(plannedSection.getByText('Unit configuration copied')).toBeVisible()
+
+    await getGridCell(plannedSection, 1, 0).click()
+    await pasteButton.click()
+
+    await expect(plannedSection.getByText('Purchase unit placed and configured')).toBeVisible()
+    await expect(getGridCell(plannedSection, 1, 0)).toContainText('Purchase')
   })
 
   test('allows revising links while a unit upgrade is still pending', async ({ page }) => {
