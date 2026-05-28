@@ -83,6 +83,12 @@ public sealed class MasterEmailService(
         }
 
         var trimmed = accessedUrl.Trim();
+        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            return null;
+        }
+
         return trimmed.Length > 500 ? trimmed[..500] : trimmed;
     }
 

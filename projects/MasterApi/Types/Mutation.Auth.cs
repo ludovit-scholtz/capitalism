@@ -268,6 +268,7 @@ public sealed partial class Mutation
 
     private static string? ResolveAccessedUrl(string? inputUrl, HttpContext? httpContext)
     {
+        // This URL is recorded for email context only and must not drive authorization decisions.
         var url = !string.IsNullOrWhiteSpace(inputUrl)
             ? inputUrl
             : httpContext?.Request.Headers.Referer.FirstOrDefault();
@@ -277,6 +278,12 @@ public sealed partial class Mutation
         }
 
         var trimmed = url.Trim();
+        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            return null;
+        }
+
         return trimmed.Length > 500 ? trimmed[..500] : trimmed;
     }
 

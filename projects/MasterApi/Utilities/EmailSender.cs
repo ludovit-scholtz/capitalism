@@ -44,7 +44,19 @@ public sealed class AzureCommunicationEmailSender(
             recipients,
             content);
 
-        await client.SendAsync(WaitUntil.Completed, message, cancellationToken);
-        return true;
+        try
+        {
+            await client.SendAsync(WaitUntil.Completed, message, cancellationToken);
+            return true;
+        }
+        catch (RequestFailedException exception)
+        {
+            logger.LogError(
+                exception,
+                "Azure Communication Services email send failed. Status={Status} ErrorCode={ErrorCode}",
+                exception.Status,
+                exception.ErrorCode);
+            return false;
+        }
     }
 }

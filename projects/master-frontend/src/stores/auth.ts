@@ -397,7 +397,8 @@ export const useAuthStore = defineStore('masterAuth', () => {
   }
 
   function getEmailContext() {
-    const locale = localStorage.getItem(LOCALE_KEY) ?? document.documentElement.lang ?? 'en'
+    const rawLocale = localStorage.getItem(LOCALE_KEY) ?? document.documentElement.lang ?? 'en'
+    const locale = rawLocale.toLowerCase().split('-')[0]
     return { locale, currentUrl: window.location.href }
   }
 

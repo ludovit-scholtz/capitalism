@@ -64,6 +64,48 @@ public static class EmailLocalizations
             "Active game servers",
             "This weekly report is sent at Friday noon UTC."),
     };
+
+    public static string WeeklyNoActiveServers(string locale) => NormalizeLocale(locale) switch
+    {
+        "sk" => "Tento týždeň neboli dostupné žiadne aktívne herné servery.",
+        "de" => "In dieser Woche waren keine aktiven Spielserver verfügbar.",
+        _ => "No active game servers were available this week.",
+    };
+
+    public static string WeeklyChangelogFallbackTitle(string locale) => NormalizeLocale(locale) switch
+    {
+        "sk" => "Aktualizácia Capitalism",
+        "de" => "Capitalism-Aktualisierung",
+        _ => "Capitalism update",
+    };
+
+    public static string WeeklyProfitLabel(string locale) => NormalizeLocale(locale) switch
+    {
+        "sk" => "Zisk",
+        "de" => "Gewinn",
+        _ => "Profit",
+    };
+
+    public static string WeeklyRankLabel(string locale) => NormalizeLocale(locale) switch
+    {
+        "sk" => "Poradie",
+        "de" => "Rang",
+        _ => "Rank",
+    };
+
+    public static string WeeklyBountiesLabel(string locale) => NormalizeLocale(locale) switch
+    {
+        "sk" => "Bounty",
+        "de" => "Bounties",
+        _ => "Bounties",
+    };
+
+    public static string WeeklyMasterBountyLabel(string locale) => NormalizeLocale(locale) switch
+    {
+        "sk" => "Master bounty body tento týždeň",
+        "de" => "Master-Bounty-Punkte diese Woche",
+        _ => "Master bounty points this week",
+    };
 }
 
 public sealed record EmailCopy(

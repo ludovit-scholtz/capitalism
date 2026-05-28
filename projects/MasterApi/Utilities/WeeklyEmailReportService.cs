@@ -64,11 +64,11 @@ public sealed class WeeklyEmailReportService(
             .SumAsync(record => record.PointsAwarded, cancellationToken);
         var changelogRows = await BuildChangelogRowsAsync(locale, weekStartUtc, nowUtc, cancellationToken);
 
-        var bodyHtml = BuildWeeklyBodyHtml(copy, servers, bountyPoints, changelogRows);
+        var bodyHtml = BuildWeeklyBodyHtml(locale, copy, servers, bountyPoints, changelogRows);
         var html = await renderer.RenderAsync(
             new EmailTemplateModel(locale, copy.Subject, copy.Headline, bodyHtml, copy.Footer),
             cancellationToken);
-        var text = BuildWeeklyText(copy, servers, bountyPoints, changelogRows);
+        var text = BuildWeeklyText(locale, copy, servers, bountyPoints, changelogRows);
         var sent = await sender.SendAsync(
             new EmailMessageRequest(player.Email, player.DisplayName, copy.Subject, html, text),
             cancellationToken);
@@ -135,12 +135,15 @@ public sealed class WeeklyEmailReportService(
                 var localization = entry.Localizations.FirstOrDefault(item => item.Locale == locale)
                     ?? entry.Localizations.FirstOrDefault(item => item.Locale == "en")
                     ?? entry.Localizations.FirstOrDefault();
-                return new WeeklyChangelogRow(localization?.Title ?? "Capitalism update", localization?.Summary ?? string.Empty);
+                return new WeeklyChangelogRow(
+                    localization?.Title ?? EmailLocalizations.WeeklyChangelogFallbackTitle(locale),
+                    localization?.Summary ?? string.Empty);
             })
             .ToList();
     }
 
     private static string BuildWeeklyBodyHtml(
+        string locale,
         EmailCopy copy,
         List<WeeklyServerRow> servers,
         decimal bountyPoints,
@@ -154,17 +157,17 @@ public sealed class WeeklyEmailReportService(
         {
             builder.Append("<tr>");
             builder.Append($"<td style=\"padding:10px;border-bottom:1px solid #e5edf3;\"><a href=\"{WebUtility.HtmlEncode(server.FrontendUrl)}\" style=\"color:#0f766e;text-decoration:none;font-weight:700;\">{WebUtility.HtmlEncode(server.DisplayName)}</a></td>");
-            builder.Append($"<td style=\"padding:10px;border-bottom:1px solid #e5edf3;\">Profit: {server.Profit}</td>");
-            builder.Append($"<td style=\"padding:10px;border-bottom:1px solid #e5edf3;\">Rank: {(server.Rank == 0 ? "-" : server.Rank)}</td>");
-            builder.Append($"<td style=\"padding:10px;border-bottom:1px solid #e5edf3;\">Bounties: {server.BountyPoints:N0}</td>");
+            builder.Append($"<td style=\"padding:10px;border-bottom:1px solid #e5edf3;\">{WebUtility.HtmlEncode(EmailLocalizations.WeeklyProfitLabel(locale))}: {WebUtility.HtmlEncode(server.Profit)}</td>");
+            builder.Append($"<td style=\"padding:10px;border-bottom:1px solid #e5edf3;\">{WebUtility.HtmlEncode(EmailLocalizations.WeeklyRankLabel(locale))}: {(server.Rank == 0 ? "-" : server.Rank)}</td>");
+            builder.Append($"<td style=\"padding:10px;border-bottom:1px solid #e5edf3;\">{WebUtility.HtmlEncode(EmailLocalizations.WeeklyBountiesLabel(locale))}: {server.BountyPoints:N0}</td>");
             builder.Append("</tr>");
         }
         if (servers.Count == 0)
         {
-            builder.Append("<tr><td style=\"padding:10px;border-bottom:1px solid #e5edf3;\">No active game servers were available this week.</td></tr>");
+            builder.Append($"<tr><td style=\"padding:10px;border-bottom:1px solid #e5edf3;\">{WebUtility.HtmlEncode(EmailLocalizations.WeeklyNoActiveServers(locale))}</td></tr>");
         }
         builder.Append("</table>");
-        builder.Append($"<p style=\"margin:0 0 18px;\"><strong>Master bounty points this week:</strong> {bountyPoints:N0}</p>");
+        builder.Append($"<p style=\"margin:0 0 18px;\"><strong>{WebUtility.HtmlEncode(EmailLocalizations.WeeklyMasterBountyLabel(locale))}:</strong> {bountyPoints:N0}</p>");
         if (changelogRows.Count > 0)
         {
             builder.Append("<h2 style=\"font-size:18px;margin:24px 0 12px;color:#162033;\">Changelog</h2><ul style=\"padding-left:22px;margin:0;\">");
@@ -178,6 +181,7 @@ public sealed class WeeklyEmailReportService(
     }
 
     private static string BuildWeeklyText(
+        string locale,
         EmailCopy copy,
         List<WeeklyServerRow> servers,
         decimal bountyPoints,
@@ -189,9 +193,9 @@ public sealed class WeeklyEmailReportService(
         builder.AppendLine(copy.SectionTitle);
         foreach (var server in servers)
         {
-            builder.AppendLine($"- {server.DisplayName}: profit {server.Profit}, rank {(server.Rank == 0 ? "-" : server.Rank)}, bounties {server.BountyPoints:N0}");
+            builder.AppendLine($"- {server.DisplayName}: {EmailLocalizations.WeeklyProfitLabel(locale)} {server.Profit}, {EmailLocalizations.WeeklyRankLabel(locale)} {(server.Rank == 0 ? "-" : server.Rank)}, {EmailLocalizations.WeeklyBountiesLabel(locale)} {server.BountyPoints:N0}");
         }
-        builder.AppendLine($"Master bounty points this week: {bountyPoints:N0}");
+        builder.AppendLine($"{EmailLocalizations.WeeklyMasterBountyLabel(locale)}: {bountyPoints:N0}");
         foreach (var row in changelogRows)
         {
             builder.AppendLine($"- {row.Title}: {row.Summary}");
@@ -201,7 +205,7 @@ public sealed class WeeklyEmailReportService(
 
     private sealed record WeeklyServerRow(string DisplayName, string FrontendUrl, decimal BountyPoints, int Rank)
     {
-        public string Profit => "tracked in game server";
+        public string Profit => "—";
     }
 
     private sealed record WeeklyChangelogRow(string Title, string Summary);

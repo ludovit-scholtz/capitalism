@@ -19,10 +19,25 @@ public sealed class HandlebarsEmailTemplateRenderer(IWebHostEnvironment environm
 {
     private const string TemplatePath = "EmailTemplates/capitalism-email.html";
     private HandlebarsTemplate<object, object>? _compiledTemplate;
+    private readonly SemaphoreSlim _compileLock = new(1, 1);
 
     public async Task<string> RenderAsync(EmailTemplateModel model, CancellationToken cancellationToken)
     {
-        var template = _compiledTemplate ??= Handlebars.Compile(await ReadTemplateAsync(cancellationToken));
+        if (_compiledTemplate is null)
+        {
+            await _compileLock.WaitAsync(cancellationToken);
+            try
+            {
+                _compiledTemplate ??= Handlebars.Compile(await ReadTemplateAsync(cancellationToken));
+            }
+            finally
+            {
+                _compileLock.Release();
+            }
+        }
+
+        var template = _compiledTemplate
+            ?? throw new InvalidOperationException("Email template was not compiled.");
         return template(new
         {
             locale = model.Locale,

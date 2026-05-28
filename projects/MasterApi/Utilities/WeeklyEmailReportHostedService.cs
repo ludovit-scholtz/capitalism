@@ -42,7 +42,7 @@ public sealed class WeeklyEmailReportHostedService(
         }
 
         var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
-        if (nowUtc.DayOfWeek != options.WeeklyReportDayOfWeek || nowUtc.Hour != options.WeeklyReportUtcHour)
+        if (nowUtc.DayOfWeek != options.WeeklyReportDayOfWeek || nowUtc.Hour < options.WeeklyReportUtcHour)
         {
             return;
         }
