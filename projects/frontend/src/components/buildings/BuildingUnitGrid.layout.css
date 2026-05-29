@@ -35,6 +35,12 @@
   align-items: center;
 }
 
+.clipboard-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .section-subtitle {
   margin: 0.35rem 0 0;
   font-size: 0.875rem;

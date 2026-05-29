@@ -13,11 +13,11 @@ Create a fun game in the style of Capitalism II, where players experience realis
 
 ### Copy-Paste units
 
-- [ ] Copy-paste of the units works fine on desktop with keyboard, however this feature is not available for small devices at the moment. Add on the grid page also copy and paste buttons when building is in editation mode.
+- [x] Copy-paste of the units works fine on desktop with keyboard, however this feature is not available for small devices at the moment. Add on the grid page also copy and paste buttons when building is in editation mode.
 
 ### News
 
-- [ ] Add pagination to each category of news. At each category make sure to show top 10 recent news. At the moment if there if there is more then 10 news from reporting category and i select the changelog category, it does not show any items.
+- [x] Add pagination to each category of news. At each category make sure to show top 10 recent news. At the moment if there if there is more then 10 news from reporting category and i select the changelog category, it does not show any items.
 
 ### Emails
 
@@ -26,4 +26,3 @@ Create a fun game in the style of Capitalism II, where players experience realis
 - [x] When user never received email (create flag in the master database), send him the registration email. In the email also write his current url address which he accessed.
 - [x] Send users email on weekly basis in friday noon with the report where will be listed all their active game servers, their profit and ranking in the game server, then the master server bounties points they collected in past week, and if there are any news from the changelog within a week add it there.
 - [x] Store the language preference after the user logs in to the system to the master server database, and use that localization for the emails to be sent. If no language is set in the database use English.
-

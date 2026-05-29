@@ -13,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MasterApi;
 using MasterApi.Data;
+using MasterApi.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
@@ -2019,7 +2020,97 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
         }
 
         [Fact]
-    public async Task GameNewsFeed_HidesDraftsFromPublicButIncludesThemForAdminView()
+        public async Task GameNewsFeed_LimitAppliesPerEntryType()
+        {
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
+            var now = new DateTime(2030, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+
+            for (var i = 0; i < 12; i += 1)
+            {
+                db.GameNewsEntries.Add(new GameNewsEntry
+                {
+                    Id = Guid.NewGuid(),
+                    EntryType = GameNewsEntryType.MarketReport,
+                    Status = GameNewsEntryStatus.Published,
+                    TargetServerKey = null,
+                    CreatedByEmail = "admin@test.com",
+                    UpdatedByEmail = "admin@test.com",
+                    CreatedAtUtc = now.AddMinutes(i),
+                    UpdatedAtUtc = now.AddMinutes(i),
+                    PublishedAtUtc = now.AddMinutes(i),
+                    Localizations =
+                    [
+                        new GameNewsEntryLocalization
+                        {
+                            Id = Guid.NewGuid(),
+                            Locale = "en",
+                            Title = $"Recent market report {i + 1}",
+                            Summary = "Market report summary",
+                            HtmlContent = "<p>Market report body.</p>",
+                        },
+                    ],
+                });
+            }
+
+            db.GameNewsEntries.Add(new GameNewsEntry
+            {
+                Id = Guid.NewGuid(),
+                EntryType = GameNewsEntryType.Changelog,
+                Status = GameNewsEntryStatus.Published,
+                TargetServerKey = null,
+                CreatedByEmail = "admin@test.com",
+                UpdatedByEmail = "admin@test.com",
+                CreatedAtUtc = now.AddMinutes(-1),
+                UpdatedAtUtc = now.AddMinutes(-1),
+                PublishedAtUtc = now.AddMinutes(-1),
+                Localizations =
+                [
+                    new GameNewsEntryLocalization
+                    {
+                        Id = Guid.NewGuid(),
+                        Locale = "en",
+                        Title = "Recent changelog remains visible",
+                        Summary = "Changelog summary",
+                        HtmlContent = "<p>Changelog body.</p>",
+                    },
+                ],
+            });
+            await db.SaveChangesAsync();
+
+            var result = await GraphQlAsync("""
+                query Feed($input: GetGameNewsFeedInput!) {
+                    gameNewsFeed(input: $input) {
+                        items {
+                            entryType
+                            localizations { title }
+                        }
+                    }
+                }
+                """,
+                new
+                {
+                    input = new
+                    {
+                        registrationKey = "test-registration-key",
+                        serverKey = "capitalism-local",
+                        includeDrafts = false,
+                        limit = 10,
+                    }
+                });
+
+            Assert.False(result.TryGetProperty("errors", out _));
+            var items = result.GetProperty("data").GetProperty("gameNewsFeed").GetProperty("items").EnumerateArray().ToList();
+
+            Assert.Equal(10, items.Count(item => item.GetProperty("entryType").GetString() == GameNewsEntryType.MarketReport));
+            Assert.Contains(items, item =>
+                item.GetProperty("entryType").GetString() == GameNewsEntryType.Changelog
+                && item.GetProperty("localizations").EnumerateArray().Any(localization =>
+                    localization.GetProperty("title").GetString() == "Recent changelog remains visible"));
+        }
+
+        [Fact]
+        public async Task GameNewsFeed_HidesDraftsFromPublicButIncludesThemForAdminView()
     {
             await RegisterDefaultGameServerAsync();
 

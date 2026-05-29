@@ -1605,6 +1605,8 @@ export default {
     unitDetails: 'Unit Details',
     buildingDetails: 'Building Details',
     clipboard: {
+      copyButton: 'Copy unit',
+      pasteButton: 'Paste unit',
       copySuccess: 'Unit configuration copied',
       pasteSuccess: 'Configuration pasted successfully',
       pasteEmptySuccess: '{type} unit placed and configured',

@@ -30,8 +30,7 @@ const makeNewsEntry = (overrides: Partial<MockGameNewsEntry> = {}): MockGameNews
   ...overrides,
 })
 
-const makeChangelogEntry = (overrides: Partial<MockGameNewsEntry> = {}): MockGameNewsEntry =>
-  makeNewsEntry({ entryType: 'CHANGELOG', ...overrides })
+const makeChangelogEntry = (overrides: Partial<MockGameNewsEntry> = {}): MockGameNewsEntry => makeNewsEntry({ entryType: 'CHANGELOG', ...overrides })
 
 test.describe('News feed — public access', () => {
   test('unauthenticated visitor can browse the news page and see changelog entries', async ({ page }) => {
@@ -71,9 +70,7 @@ test.describe('News feed — public access', () => {
 
     await expect(page.locator('.state-card')).toBeVisible()
     await expect(page.getByText('No published entries yet')).toBeVisible()
-    await expect(
-      page.getByText('When administrators publish news or changelog notes, they will appear here.'),
-    ).toBeVisible()
+    await expect(page.getByText('When administrators publish news or changelog notes, they will appear here.')).toBeVisible()
   })
 
   test('error state is displayed with retry button when the feed fails to load', async ({ page }) => {
@@ -141,12 +138,8 @@ test.describe('News feed — public access', () => {
     await expect(page.getByText('New buildings added to the city.')).toBeVisible()
     await expect(page.getByText('Tax system updated.')).toBeVisible()
     // HTML content is rendered
-    await expect(
-      page.getByText('Three new industrial buildings are now available in Prague.'),
-    ).toBeVisible()
-    await expect(
-      page.getByText('The tax rate now applies to net profit rather than gross revenue.'),
-    ).toBeVisible()
+    await expect(page.getByText('Three new industrial buildings are now available in Prague.')).toBeVisible()
+    await expect(page.getByText('The tax rate now applies to net profit rather than gross revenue.')).toBeVisible()
   })
 
   test('unauthenticated users see no NEW badge even on unread entries', async ({ page }) => {
@@ -266,15 +259,11 @@ test.describe('News feed — entry cards and badges', () => {
       gameNewsEntries: [
         makeChangelogEntry({
           id: 'pill-cl',
-          localizations: [
-            { locale: 'en', title: 'Changelog Pill Test', summary: '', htmlContent: '' },
-          ],
+          localizations: [{ locale: 'en', title: 'Changelog Pill Test', summary: '', htmlContent: '' }],
         }),
         makeNewsEntry({
           id: 'pill-news',
-          localizations: [
-            { locale: 'en', title: 'News Pill Test', summary: '', htmlContent: '' },
-          ],
+          localizations: [{ locale: 'en', title: 'News Pill Test', summary: '', htmlContent: '' }],
         }),
       ],
     })
@@ -321,6 +310,54 @@ test.describe('News feed — entry cards and badges', () => {
     await expect(page.locator('.news-card')).toHaveCount(2)
     await expect(page.getByRole('heading', { name: 'Paginated Entry 2' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Paginated Entry 12' })).toHaveCount(0)
+  })
+
+  test('category filters paginate from each category first page', async ({ page }) => {
+    const marketReports = Array.from({ length: 12 }, (_, index) =>
+      makeNewsEntry({
+        id: `market-report-${index + 1}`,
+        entryType: 'MARKET_REPORT',
+        publishedAtUtc: `2026-04-${String(index + 1).padStart(2, '0')}T10:00:00Z`,
+        localizations: [
+          {
+            locale: 'en',
+            title: `Market Report ${index + 1}`,
+            summary: `Market summary ${index + 1}`,
+            htmlContent: `<p>Market body ${index + 1}</p>`,
+          },
+        ],
+      }),
+    )
+
+    setupMockApi(page, {
+      players: [],
+      gameNewsEntries: [
+        ...marketReports,
+        makeChangelogEntry({
+          id: 'category-changelog',
+          publishedAtUtc: '2026-03-01T10:00:00Z',
+          localizations: [
+            {
+              locale: 'en',
+              title: 'Category Changelog',
+              summary: 'Changelog still appears.',
+              htmlContent: '<p>Changelog body</p>',
+            },
+          ],
+        }),
+      ],
+    })
+
+    await page.goto('/news')
+
+    await page.getByRole('button', { name: /Market Reports/ }).click()
+    await expect(page.locator('.news-card')).toHaveCount(10)
+    await page.getByRole('button', { name: 'Next' }).click()
+    await expect(page.getByRole('heading', { name: 'Market Report 2' })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Changelog' }).click()
+    await expect(page.locator('.news-card')).toHaveCount(1)
+    await expect(page.getByRole('heading', { name: 'Category Changelog' })).toBeVisible()
   })
 
   test('global news entries are visible on all servers (null targetServerKey)', async ({ page }) => {
@@ -583,9 +620,7 @@ test.describe('News feed — security', () => {
     await page.goto('/news')
 
     await expect(page.locator('.news-card-body')).toContainText('Safe body')
-    const alertCount = await page.evaluate(
-      () => (window as Window & { __alerts?: string[] }).__alerts?.length ?? 0,
-    )
+    const alertCount = await page.evaluate(() => (window as Window & { __alerts?: string[] }).__alerts?.length ?? 0)
     expect(alertCount).toBe(0)
   })
 })
@@ -639,9 +674,7 @@ test.describe('News feed — mobile viewport', () => {
     await expect(page.locator('.news-unread-badge')).toHaveCount(2)
 
     // No horizontal overflow: every card should be within the viewport width
-    const cardWidths = await page.locator('.news-card').evaluateAll((cards) =>
-      cards.map((c) => c.getBoundingClientRect().width),
-    )
+    const cardWidths = await page.locator('.news-card').evaluateAll((cards) => cards.map((c) => c.getBoundingClientRect().width))
     for (const width of cardWidths) {
       expect(width).toBeLessThanOrEqual(375)
     }
