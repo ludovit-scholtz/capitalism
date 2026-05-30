@@ -184,6 +184,15 @@ export default {
     loading: 'Loading your gold account...',
     loadError: 'Failed to load gold account.',
     retry: 'Retry',
+    emailPrefsTitle: 'Email preferences',
+    emailPrefsIntro:
+      'Choose which emails you receive. After signing in you can always see which email types you are subscribed to here.',
+    emailPrefsError: 'Failed to update email preferences.',
+    weeklyReportEmailTitle: 'Weekly report email',
+    emailStatusSubscribed: 'Subscribed',
+    emailStatusUnsubscribed: 'Unsubscribed',
+    emailSubscribeAction: 'Subscribe',
+    emailUnsubscribeAction: 'Unsubscribe',
     currentBalance: 'Current balance',
     ratio: '1 gold token = 1 gram of real-world gold',
     zeroTitle: "You don't have any gold yet",
@@ -219,6 +228,15 @@ export default {
     buyMonthlyPro: 'Buy 1 month Pro ({grams} g)',
     startupPackPrice: 'Startup pack (3 months Pro): {grams} g',
     referralDiscountActive: 'Referral discount active: 10% off Pro purchases.',
+  },
+  emailUnsubscribe: {
+    title: 'Unsubscribe',
+    loading: 'Updating your email preferences...',
+    success: 'You have been unsubscribed from the weekly report emails.',
+    successHint: 'You can re-subscribe any time from your Account page.',
+    manageLink: 'Manage email preferences',
+    missingToken: 'This unsubscribe link is missing its token.',
+    error: 'We could not update your email preferences. Please try again later.',
   },
   gameSettings: {
     kicker: 'Cross-server identity',
@@ -815,6 +833,7 @@ export default {
     topicGettingStarted: 'Getting Started',
     topicBuildingsGuide: 'Buildings Guide',
     topicEconomyOverview: 'Economy Overview',
+    topicEmailSystem: 'Email & Notifications',
     gs: {
       welcomeTitle: 'Welcome to Capitalism',
       welcomeBody:
@@ -895,6 +914,30 @@ export default {
       stocksTitle: 'Stock Exchange',
       stocksBody:
         'Companies can list shares on the stock exchange. Players buy and sell at limit-order prices. Owning 50% of combined shares triggers a hostile takeover option; 90% enables a full company merge.',
+    },
+    em: {
+      introTitle: 'How Email Works',
+      introBody:
+        'Capitalism sends a small number of transactional and informational emails to keep you up to date. Every email is localized to your preferred language and is sent only to the address on your own account.',
+      typesTitle: 'Emails We Send',
+      registration: 'Registration welcome',
+      registrationDesc:
+        'Sent once when you create your account. It confirms your registration and attaches the Terms and Conditions and Privacy Policy.',
+      weekly: 'Weekly report',
+      weeklyDesc:
+        'A weekly summary of active game servers, your bounty points, ranking, and recent changelog news. You can unsubscribe from this email at any time.',
+      support: 'Support ticket updates',
+      supportDesc:
+        'Sent when you create a support ticket and whenever its status or content changes, so you can follow your request.',
+      deletion: 'Account deletion notices',
+      deletionDesc:
+        'Sent when you request account deletion and again right before your account is permanently removed.',
+      unsubscribeTitle: 'Unsubscribing',
+      unsubscribeBody:
+        'Only the weekly report email is promotional, and you can opt out of it. Use the one-click unsubscribe link at the bottom of any weekly report, or toggle the weekly report subscription from your Account page. Transactional emails (registration, support, and account deletion) cannot be disabled because they confirm important actions on your account.',
+      privacyTitle: 'Your Email Is Private',
+      privacyBody:
+        'Your email address is private. It is never shown to other players and is only accessible to administrators for support and account management. The unsubscribe link uses an opaque token and never reveals your email address.',
     },
   },
 } as const

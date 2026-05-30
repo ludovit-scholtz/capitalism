@@ -2110,6 +2110,87 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
         }
 
         [Fact]
+        public async Task GameNewsFeed_RedactsAuthorEmailsFromUntrustedCallers()
+        {
+            await RegisterDefaultGameServerAsync();
+
+            using (var scope = _factory.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
+                db.GameNewsEntries.Add(new GameNewsEntry
+                {
+                    Id = Guid.NewGuid(),
+                    EntryType = GameNewsEntryType.Changelog,
+                    Status = GameNewsEntryStatus.Published,
+                    TargetServerKey = null,
+                    CreatedByEmail = "author@admin.test",
+                    UpdatedByEmail = "editor@admin.test",
+                    CreatedAtUtc = new DateTime(2031, 1, 1, 12, 0, 0, DateTimeKind.Utc),
+                    UpdatedAtUtc = new DateTime(2031, 1, 1, 12, 0, 0, DateTimeKind.Utc),
+                    PublishedAtUtc = new DateTime(2031, 1, 1, 12, 0, 0, DateTimeKind.Utc),
+                    Localizations =
+                    [
+                        new GameNewsEntryLocalization
+                        {
+                            Id = Guid.NewGuid(),
+                            Locale = "en",
+                            Title = "Author email privacy entry",
+                            Summary = "Summary",
+                            HtmlContent = "<p>Body.</p>",
+                        },
+                    ],
+                });
+                await db.SaveChangesAsync();
+            }
+
+            const string feedQuery = """
+                query Feed($input: GetGameNewsFeedInput!) {
+                    gameNewsFeed(input: $input) {
+                        items { createdByEmail updatedByEmail localizations { title } }
+                    }
+                }
+                """;
+
+            var untrustedFeed = await GraphQlAsync(feedQuery, new
+            {
+                input = new
+                {
+                    registrationKey = "invalid-registration-key",
+                    serverKey = "unknown-shard",
+                    includeDrafts = false,
+                    limit = 50,
+                }
+            });
+
+            Assert.False(untrustedFeed.TryGetProperty("errors", out _));
+            var untrustedItems = untrustedFeed.GetProperty("data").GetProperty("gameNewsFeed").GetProperty("items").EnumerateArray().ToList();
+            var untrustedEntry = untrustedItems.Single(item =>
+                item.GetProperty("localizations").EnumerateArray().Any(localization =>
+                    localization.GetProperty("title").GetString() == "Author email privacy entry"));
+            Assert.Equal(string.Empty, untrustedEntry.GetProperty("createdByEmail").GetString());
+            Assert.Equal(string.Empty, untrustedEntry.GetProperty("updatedByEmail").GetString());
+
+            var trustedFeed = await GraphQlAsync(feedQuery, new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey = "capitalism-local",
+                    includeDrafts = false,
+                    limit = 50,
+                }
+            });
+
+            Assert.False(trustedFeed.TryGetProperty("errors", out _));
+            var trustedItems = trustedFeed.GetProperty("data").GetProperty("gameNewsFeed").GetProperty("items").EnumerateArray().ToList();
+            var trustedEntry = trustedItems.Single(item =>
+                item.GetProperty("localizations").EnumerateArray().Any(localization =>
+                    localization.GetProperty("title").GetString() == "Author email privacy entry"));
+            Assert.Equal("author@admin.test", trustedEntry.GetProperty("createdByEmail").GetString());
+            Assert.Equal("editor@admin.test", trustedEntry.GetProperty("updatedByEmail").GetString());
+        }
+
+        [Fact]
         public async Task GameNewsFeed_HidesDraftsFromPublicButIncludesThemForAdminView()
     {
             await RegisterDefaultGameServerAsync();

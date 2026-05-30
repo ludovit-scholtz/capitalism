@@ -121,6 +121,23 @@ async function claimStartupPack() {
   }
 }
 
+// Email preferences
+const weeklyEmailUpdating = ref(false)
+const weeklyEmailError = ref('')
+const weeklyReportSubscribed = computed(() => auth.player?.weeklyReportEmailSubscribed !== false)
+
+async function toggleWeeklyReportEmail() {
+  weeklyEmailUpdating.value = true
+  weeklyEmailError.value = ''
+  try {
+    await auth.setWeeklyReportSubscription(!weeklyReportSubscribed.value)
+  } catch (e: unknown) {
+    weeklyEmailError.value = e instanceof Error ? e.message : t('account.emailPrefsError')
+  } finally {
+    weeklyEmailUpdating.value = false
+  }
+}
+
 onMounted(async () => {
   if (!auth.isAuthenticated) {
     void router.push('/login')
@@ -300,6 +317,37 @@ onMounted(() => {
               </div>
             </li>
           </ul>
+        </section>
+
+        <!-- Email preferences -->
+        <section class="email-prefs-card" aria-labelledby="email-prefs-heading">
+          <h2 id="email-prefs-heading">{{ t('account.emailPrefsTitle') }}</h2>
+          <p class="email-prefs-intro">{{ t('account.emailPrefsIntro') }}</p>
+          <div class="email-pref-row">
+            <div class="email-pref-info">
+              <strong>{{ t('account.weeklyReportEmailTitle') }}</strong>
+              <span class="email-pref-status">
+                {{
+                  weeklyReportSubscribed
+                    ? t('account.emailStatusSubscribed')
+                    : t('account.emailStatusUnsubscribed')
+                }}
+              </span>
+            </div>
+            <button
+              type="button"
+              class="email-pref-btn"
+              :disabled="weeklyEmailUpdating"
+              @click="toggleWeeklyReportEmail"
+            >
+              {{
+                weeklyReportSubscribed
+                  ? t('account.emailUnsubscribeAction')
+                  : t('account.emailSubscribeAction')
+              }}
+            </button>
+          </div>
+          <p v-if="weeklyEmailError" class="state-error" role="alert">{{ weeklyEmailError }}</p>
         </section>
 
         <!-- Recent transactions -->
@@ -546,6 +594,72 @@ h1 {
   border: 1px solid #1e1e30;
   border-radius: 12px;
   padding: 1.5rem;
+}
+
+.email-prefs-card {
+  background: #12121e;
+  border: 1px solid #1e1e30;
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.email-prefs-card h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e8e8f0;
+  margin: 0 0 0.5rem;
+}
+
+.email-prefs-intro {
+  font-size: 0.9rem;
+  color: #c0c0d0;
+  line-height: 1.5;
+  margin: 0 0 1rem;
+}
+
+.email-pref-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.email-pref-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.email-pref-info strong {
+  color: #e8e8f0;
+  font-size: 0.95rem;
+}
+
+.email-pref-status {
+  font-size: 0.85rem;
+  color: #9090a8;
+}
+
+.email-pref-btn {
+  border: 1px solid #2a2a40;
+  background: #1a1a2c;
+  color: #e8e8f0;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.email-pref-btn:hover:not(:disabled) {
+  background: #23233a;
+}
+
+.email-pref-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .gold-info-card h2 {

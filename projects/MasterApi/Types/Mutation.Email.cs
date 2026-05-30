@@ -3,6 +3,7 @@ using System.Security.Claims;
 using MasterApi.Configuration;
 using MasterApi.Data;
 using MasterApi.Utilities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace MasterApi.Types;
@@ -40,6 +41,63 @@ public sealed partial class Mutation
             message,
             actorEmail,
             cancellationToken);
+    }
+
+    /// <summary>
+    /// One-click, unauthenticated unsubscribe from the weekly report emails. The
+    /// player is resolved by their opaque <c>EmailUnsubscribeToken</c>. To avoid
+    /// leaking whether a token (or its email) exists, this always returns
+    /// <c>true</c> and never echoes the email address.
+    /// </summary>
+    public async Task<bool> UnsubscribeFromWeeklyReportEmail(
+        Guid token,
+        [Service] MasterDbContext db,
+        CancellationToken cancellationToken)
+    {
+        if (token == Guid.Empty)
+        {
+            // Neutral response: do not reveal that the token is malformed/unknown.
+            return true;
+        }
+
+        var player = await db.PlayerAccounts
+            .FirstOrDefaultAsync(candidate => candidate.EmailUnsubscribeToken == token, cancellationToken);
+        if (player is not null && !player.WeeklyReportEmailUnsubscribed)
+        {
+            player.WeeklyReportEmailUnsubscribed = true;
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        // Always neutral so unknown tokens cannot be distinguished from known ones.
+        return true;
+    }
+
+    /// <summary>
+    /// Toggles the weekly report email subscription preference for the authenticated
+    /// player. Returns the resulting subscription state (true = subscribed).
+    /// </summary>
+    [HotChocolate.Authorization.Authorize]
+    public async Task<bool> SetWeeklyReportEmailSubscription(
+        bool subscribed,
+        ClaimsPrincipal claimsPrincipal,
+        [Service] MasterDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var player = await Query.GetCurrentUserAsync(claimsPrincipal, db)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Player not found.")
+                    .SetCode("PLAYER_NOT_FOUND")
+                    .Build());
+
+        var unsubscribed = !subscribed;
+        if (player.WeeklyReportEmailUnsubscribed != unsubscribed)
+        {
+            player.WeeklyReportEmailUnsubscribed = unsubscribed;
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        return !player.WeeklyReportEmailUnsubscribed;
     }
 
     private static string NormalizeEmailAddress(string email)

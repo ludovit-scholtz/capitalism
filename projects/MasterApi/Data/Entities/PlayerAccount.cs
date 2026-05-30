@@ -26,6 +26,18 @@ public sealed class PlayerAccount
 
     public DateTime? LastWeeklyEmailSentAtUtc { get; set; }
 
+    /// <summary>
+    /// When true, the player has opted out of the weekly report emails and the
+    /// background sender must skip them.
+    /// </summary>
+    public bool WeeklyReportEmailUnsubscribed { get; set; }
+
+    /// <summary>
+    /// Stable opaque token embedded in one-click unsubscribe links so a player can
+    /// unsubscribe from the weekly report emails without authenticating.
+    /// </summary>
+    public Guid EmailUnsubscribeToken { get; set; } = Guid.NewGuid();
+
     public string? LastAccessedUrl { get; set; }
 
     /// <summary>

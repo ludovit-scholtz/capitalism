@@ -164,6 +164,8 @@ public sealed class MasterDbContext(DbContextOptions<MasterDbContext> options) :
 
         player.Property(p => p.GoldTokenBalance).HasColumnType("decimal(18,8)").HasDefaultValue(0m);
         player.Property(p => p.ConcurrencyToken).IsConcurrencyToken().HasDefaultValueSql("gen_random_uuid()").IsRequired();
+        player.Property(p => p.EmailUnsubscribeToken).HasDefaultValueSql("gen_random_uuid()").IsRequired();
+        player.HasIndex(p => p.EmailUnsubscribeToken).IsUnique();
 
         var goldTx = modelBuilder.Entity<GoldTokenTransaction>();
         goldTx.HasKey(tx => tx.Id);

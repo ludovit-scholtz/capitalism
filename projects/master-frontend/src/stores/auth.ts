@@ -9,6 +9,7 @@ import {
   probeGameAdminAccess,
   prolongSubscription,
   registerAccount,
+  setWeeklyReportEmailSubscription,
 } from '@/lib/masterApi'
 import { resolveApiBaseUrl, resolveMasterGraphqlUrl } from '@/lib/runtimeGraphqlUrl'
 
@@ -543,6 +544,23 @@ export const useAuthStore = defineStore('masterAuth', () => {
     }
   }
 
+  async function setWeeklyReportSubscription(subscribed: boolean) {
+    if (!token.value) return
+    loading.value = true
+    error.value = null
+    try {
+      const result = await setWeeklyReportEmailSubscription(token.value, subscribed)
+      if (player.value) {
+        player.value = { ...player.value, weeklyReportEmailSubscribed: result }
+      }
+    } catch (e: unknown) {
+      error.value = e instanceof Error ? e.message : 'Failed to update email preferences'
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
   function logout(options: LogoutOptions = {}) {
     const shouldFederatedLogout =
       options.federated === true && getStoredAuthProvider() === AUTH_PROVIDER_BIATEC
@@ -585,6 +603,7 @@ export const useAuthStore = defineStore('masterAuth', () => {
     fetchSubscription,
     prolong,
     claimStartupPackOffer,
+    setWeeklyReportSubscription,
     startBiatecOidcSignIn,
     completeBiatecOidcSignIn,
     resetBiatecSessionForRetry,

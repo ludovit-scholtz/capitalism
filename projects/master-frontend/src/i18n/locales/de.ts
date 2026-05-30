@@ -186,6 +186,15 @@ export default {
     loading: 'Dein Goldkonto wird geladen...',
     loadError: 'Goldkonto konnte nicht geladen werden.',
     retry: 'Erneut versuchen',
+    emailPrefsTitle: 'E-Mail-Einstellungen',
+    emailPrefsIntro:
+      'Wähle aus, welche E-Mails du erhältst. Nach der Anmeldung siehst du hier jederzeit, für welche E-Mail-Typen du angemeldet bist.',
+    emailPrefsError: 'E-Mail-Einstellungen konnten nicht aktualisiert werden.',
+    weeklyReportEmailTitle: 'Wöchentlicher Bericht per E-Mail',
+    emailStatusSubscribed: 'Abonniert',
+    emailStatusUnsubscribed: 'Abbestellt',
+    emailSubscribeAction: 'Abonnieren',
+    emailUnsubscribeAction: 'Abbestellen',
     currentBalance: 'Aktuelles Guthaben',
     ratio: '1 Gold-Token = 1 Gramm echtes Gold',
     zeroTitle: 'Du hast noch kein Gold',
@@ -221,6 +230,15 @@ export default {
     buyMonthlyPro: '1 Monat Pro kaufen ({grams} g)',
     startupPackPrice: 'Startup-Paket (3 Monate Pro): {grams} g',
     referralDiscountActive: 'Referral-Rabatt aktiv: 10 % Rabatt auf Pro-Käufe.',
+  },
+  emailUnsubscribe: {
+    title: 'Abbestellen',
+    loading: 'Deine E-Mail-Einstellungen werden aktualisiert...',
+    success: 'Du hast die wöchentlichen Bericht-E-Mails abbestellt.',
+    successHint: 'Du kannst sie jederzeit auf deiner Kontoseite wieder abonnieren.',
+    manageLink: 'E-Mail-Einstellungen verwalten',
+    missingToken: 'Diesem Abbestell-Link fehlt das Token.',
+    error: 'Wir konnten deine E-Mail-Einstellungen nicht aktualisieren. Bitte versuche es später erneut.',
   },
   gameSettings: {
     kicker: 'Serverübergreifende Identität',
@@ -829,6 +847,7 @@ export default {
     topicGettingStarted: 'Erste Schritte',
     topicBuildingsGuide: 'Gebäudeguide',
     topicEconomyOverview: 'Wirtschaftsüberblick',
+    topicEmailSystem: 'E-Mails & Benachrichtigungen',
     gs: {
       welcomeTitle: 'Willkommen bei Capitalism',
       welcomeBody:
@@ -902,6 +921,30 @@ export default {
       goldBody: '1 Gold-Token = 1 Gramm physisches Gold. Der Saldo wird auf dem Master-Server gespeichert.',
       stocksTitle: 'Börse',
       stocksBody: 'Unternehmen können Aktien an der Börse notieren. Spieler kaufen und verkaufen zu Limitpreisen.',
+    },
+    em: {
+      introTitle: 'Wie E-Mails funktionieren',
+      introBody:
+        'Capitalism sendet eine kleine Anzahl von Transaktions- und Informations-E-Mails, um dich auf dem Laufenden zu halten. Jede E-Mail ist in deine bevorzugte Sprache übersetzt und wird nur an die Adresse deines eigenen Kontos gesendet.',
+      typesTitle: 'E-Mails, die wir senden',
+      registration: 'Willkommens-E-Mail bei der Registrierung',
+      registrationDesc:
+        'Wird einmal beim Erstellen deines Kontos gesendet. Sie bestätigt deine Registrierung und enthält die Allgemeinen Geschäftsbedingungen sowie die Datenschutzerklärung.',
+      weekly: 'Wöchentlicher Bericht',
+      weeklyDesc:
+        'Eine wöchentliche Zusammenfassung der aktiven Spielserver, deiner Bounty-Punkte, deines Rangs und der neuesten Changelog-Nachrichten. Du kannst diese E-Mail jederzeit abbestellen.',
+      support: 'Support-Ticket-Updates',
+      supportDesc:
+        'Wird gesendet, wenn du ein Support-Ticket erstellst und immer dann, wenn sich dessen Status oder Inhalt ändert, damit du deine Anfrage verfolgen kannst.',
+      deletion: 'Hinweise zur Kontolöschung',
+      deletionDesc:
+        'Wird gesendet, wenn du die Kontolöschung anforderst, und erneut kurz bevor dein Konto endgültig entfernt wird.',
+      unsubscribeTitle: 'Abbestellen',
+      unsubscribeBody:
+        'Nur der wöchentliche Bericht ist werblich, und du kannst ihn abbestellen. Verwende den Ein-Klick-Abbestell-Link am Ende jedes wöchentlichen Berichts oder ändere das Abonnement des wöchentlichen Berichts auf deiner Kontoseite. Transaktions-E-Mails (Registrierung, Support und Kontolöschung) können nicht deaktiviert werden, da sie wichtige Aktionen für dein Konto bestätigen.',
+      privacyTitle: 'Deine E-Mail ist privat',
+      privacyBody:
+        'Deine E-Mail-Adresse ist privat. Sie wird niemals anderen Spielern angezeigt und ist nur für Administratoren zur Unterstützung und Kontoverwaltung zugänglich. Der Abbestell-Link verwendet ein undurchsichtiges Token und gibt deine E-Mail-Adresse niemals preis.',
     },
   },
 } as const

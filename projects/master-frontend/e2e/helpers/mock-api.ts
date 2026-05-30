@@ -45,6 +45,7 @@ export interface MockPlayer {
   deletionRequestedAtUtc?: string | null
   deletionScheduledAtUtc?: string | null
   isPendingDeletion?: boolean
+  weeklyReportEmailSubscribed?: boolean
 }
 
 export interface MockGameCompany {
@@ -370,6 +371,7 @@ export function makePlayer(overrides: Partial<MockPlayer> = {}): MockPlayer {
     startupPackClaimedAtUtc: null,
     canClaimStartupPack: true,
     hasReferralDiscount: false,
+    weeklyReportEmailSubscribed: overrides.weeklyReportEmailSubscribed ?? true,
     ...overrides,
   }
 }
@@ -1478,6 +1480,54 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
               deletionScheduledAtUtc: null,
             },
           },
+        }),
+      })
+      return
+    }
+
+    if (query.includes('mutation') && query.includes('setWeeklyReportEmailSubscription')) {
+      if (!state.currentPlayer) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              { message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } },
+            ],
+          }),
+        })
+        return
+      }
+
+      const subscribed = (body.variables as { subscribed?: boolean })?.subscribed === true
+      state.currentPlayer = {
+        ...state.currentPlayer,
+        weeklyReportEmailSubscribed: subscribed,
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { setWeeklyReportEmailSubscription: subscribed },
+        }),
+      })
+      return
+    }
+
+    if (query.includes('mutation') && query.includes('unsubscribeFromWeeklyReportEmail')) {
+      if (state.currentPlayer) {
+        state.currentPlayer = {
+          ...state.currentPlayer,
+          weeklyReportEmailSubscribed: false,
+        }
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { unsubscribeFromWeeklyReportEmail: true },
         }),
       })
       return

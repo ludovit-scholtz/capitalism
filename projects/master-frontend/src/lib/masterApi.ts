@@ -36,6 +36,7 @@ export interface MasterPlayerProfile {
   deletionRequestedAtUtc?: string | null
   deletionScheduledAtUtc?: string | null
   isPendingDeletion?: boolean
+  weeklyReportEmailSubscribed?: boolean
 }
 
 export interface AccountDeletionStatus {
@@ -123,6 +124,7 @@ const REGISTER_MUTATION = `
         deletionRequestedAtUtc
         deletionScheduledAtUtc
         isPendingDeletion
+        weeklyReportEmailSubscribed
       }
     }
   }
@@ -147,6 +149,7 @@ const LOGIN_MUTATION = `
         deletionRequestedAtUtc
         deletionScheduledAtUtc
         isPendingDeletion
+        weeklyReportEmailSubscribed
       }
     }
   }
@@ -168,6 +171,7 @@ const ME_QUERY = `
       deletionRequestedAtUtc
       deletionScheduledAtUtc
       isPendingDeletion
+      weeklyReportEmailSubscribed
     }
   }
 `
@@ -257,6 +261,18 @@ const CANCEL_ACCOUNT_DELETION_MUTATION = `
       deletionRequestedAtUtc
       deletionScheduledAtUtc
     }
+  }
+`
+
+const SET_WEEKLY_REPORT_EMAIL_SUBSCRIPTION_MUTATION = `
+  mutation SetWeeklyReportEmailSubscription($subscribed: Boolean!) {
+    setWeeklyReportEmailSubscription(subscribed: $subscribed)
+  }
+`
+
+const UNSUBSCRIBE_FROM_WEEKLY_REPORT_EMAIL_MUTATION = `
+  mutation UnsubscribeFromWeeklyReportEmail($token: UUID!) {
+    unsubscribeFromWeeklyReportEmail(token: $token)
   }
 `
 
@@ -375,6 +391,26 @@ export async function cancelAccountDeletion(token: string): Promise<AccountDelet
     token,
   )
   return data.cancelAccountDeletion
+}
+
+export async function setWeeklyReportEmailSubscription(
+  token: string,
+  subscribed: boolean,
+): Promise<boolean> {
+  const data = await gqlRequest<{ setWeeklyReportEmailSubscription: boolean }>(
+    SET_WEEKLY_REPORT_EMAIL_SUBSCRIPTION_MUTATION,
+    { subscribed },
+    token,
+  )
+  return data.setWeeklyReportEmailSubscription
+}
+
+export async function unsubscribeFromWeeklyReportEmail(unsubscribeToken: string): Promise<boolean> {
+  const data = await gqlRequest<{ unsubscribeFromWeeklyReportEmail: boolean }>(
+    UNSUBSCRIBE_FROM_WEEKLY_REPORT_EMAIL_MUTATION,
+    { token: unsubscribeToken },
+  )
+  return data.unsubscribeFromWeeklyReportEmail
 }
 
 // ── Player gold account ────────────────────────────────────────────────────

@@ -129,6 +129,11 @@ const router = createRouter({
       component: () => import('@/views/SecurityBoardView.vue'),
     },
     {
+      path: '/email/unsubscribe',
+      name: 'email-unsubscribe',
+      component: () => import('@/views/EmailUnsubscribeView.vue'),
+    },
+    {
       path: '/docs',
       name: 'docs',
       component: () => import('@/views/DocsView.vue'),
