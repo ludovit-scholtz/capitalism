@@ -822,6 +822,16 @@ export default {
       proTitle: 'Pro Subscription',
       proBody:
         'A free account gives you access to all core gameplay. Upgrading to Pro unlocks advanced analytics, unlimited company creation, and priority server access. You can manage your subscription from the Account page.',
+      deleteTitle: 'Deleting Your Account',
+      deleteBody:
+        'You can permanently delete your account from the Danger Zone in Game Settings. You will be asked to confirm by entering your email address. When you do, your account is scheduled for deletion after a 24-hour cooldown, and you can cancel any time during that period.',
+      deleteList1: 'You lose all of your game progress and companies across every game server.',
+      deleteList2: 'You lose your tokenized gold deposits and any future tokenized gold rewards.',
+      deleteList3:
+        'All of your buildings are destroyed, except banks, which are transferred to the government (0% deposit and 20% lending interest).',
+      deleteList4: 'All of your account data is permanently removed from the game servers.',
+      deleteEmails:
+        'We email you when the deletion is requested and again right before your account is finally removed.',
     },
     bg: {
       overviewTitle: 'Overview',

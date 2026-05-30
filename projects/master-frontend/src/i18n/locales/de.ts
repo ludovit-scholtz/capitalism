@@ -835,6 +835,18 @@ export default {
       proTitle: 'Pro-Abonnement',
       proBody:
         'Ein kostenloses Konto bietet Zugriff auf alle Kernfunktionen. Das Upgrade auf Pro schaltet erweiterte Analysen und unbegrenzte Unternehmensgründungen frei.',
+      deleteTitle: 'Konto löschen',
+      deleteBody:
+        'Sie können Ihr Konto in der Gefahrenzone unter den Spieleinstellungen dauerhaft löschen. Sie werden gebeten, dies durch Eingabe Ihrer E-Mail-Adresse zu bestätigen. Anschließend wird Ihr Konto nach einer 24-stündigen Wartezeit zur Löschung vorgemerkt, und Sie können den Vorgang in diesem Zeitraum jederzeit abbrechen.',
+      deleteList1:
+        'Sie verlieren Ihren gesamten Spielfortschritt und Ihre Unternehmen auf allen Spielservern.',
+      deleteList2:
+        'Sie verlieren Ihre tokenisierten Goldeinlagen und alle zukünftigen tokenisierten Goldprämien.',
+      deleteList3:
+        'Alle Ihre Gebäude werden zerstört, ausgenommen Banken, die an die Regierung übertragen werden (0% Einlagen- und 20% Kreditzins).',
+      deleteList4: 'Alle Daten Ihres Kontos werden dauerhaft von den Spielservern entfernt.',
+      deleteEmails:
+        'Wir senden Ihnen eine E-Mail, wenn die Löschung angefordert wird, und erneut kurz bevor Ihr Konto endgültig entfernt wird.',
     },
     bg: {
       overviewTitle: 'Übersicht',

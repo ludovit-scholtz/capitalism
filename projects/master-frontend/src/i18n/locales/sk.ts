@@ -821,6 +821,17 @@ export default {
       proTitle: 'Pro predplatné',
       proBody:
         'Bezplatný účet vám dáva prístup ku všetkým základným funkciám. Upgrade na Pro odomkne pokročilú analytiku a neobmedzené zakladanie spoločností.',
+      deleteTitle: 'Odstránenie účtu',
+      deleteBody:
+        'Svoj účet môžete natrvalo odstrániť v Nebezpečnej zóne v Nastaveniach hry. Budete požiadaní o potvrdenie zadaním e-mailovej adresy. Po potvrdení sa účet naplánuje na odstránenie po 24-hodinovej čakacej dobe a počas tohto obdobia môžete akciu kedykoľvek zrušiť.',
+      deleteList1: 'Prídete o celý herný postup a spoločnosti na všetkých herných serveroch.',
+      deleteList2:
+        'Prídete o tokenizované zlaté vklady a akékoľvek budúce tokenizované zlaté odmeny.',
+      deleteList3:
+        'Všetky vaše budovy budú zničené okrem bánk, ktoré sa prevedú na vládu (0% úrok z vkladov a 20% úrok z úverov).',
+      deleteList4: 'Všetky údaje vášho účtu budú natrvalo odstránené z herných serverov.',
+      deleteEmails:
+        'Pošleme vám e-mail pri vyžiadaní odstránenia a znova tesne pred konečným odstránením účtu.',
     },
     bg: {
       overviewTitle: 'Prehľad',
