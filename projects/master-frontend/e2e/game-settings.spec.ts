@@ -49,4 +49,33 @@ test.describe('Game settings', () => {
       page.locator('table[aria-label="Master ranking leaderboard table"]'),
     ).toContainText('Nova Alias')
   })
+
+  test('player can schedule and cancel account deletion in the danger zone', async ({ page }) => {
+    const player = makePlayer({ email: 'alice@example.com', displayName: 'Alice' })
+    const state = setupMockApi(page, { currentPlayer: player })
+
+    await loginAs(page, state, player, 'token-player')
+    await page.goto('/settings/game')
+
+    const dangerZone = page.getByTestId('danger-zone')
+    await expect(dangerZone).toBeVisible()
+
+    await page.getByTestId('open-delete-account').click()
+
+    // Mismatched email keeps the confirm button disabled.
+    await page.getByTestId('confirm-email-input').fill('wrong@example.com')
+    await expect(page.getByTestId('confirm-delete-account')).toBeDisabled()
+
+    // Correct email enables and schedules the deletion.
+    await page.getByTestId('confirm-email-input').fill('alice@example.com')
+    await page.getByTestId('confirm-delete-account').click()
+
+    const pending = page.getByTestId('deletion-pending')
+    await expect(pending).toBeVisible()
+    await expect(pending).toContainText('scheduled for deletion')
+
+    // Cancelling restores the active danger-zone state.
+    await page.getByTestId('cancel-deletion').click()
+    await expect(page.getByTestId('open-delete-account')).toBeVisible()
+  })
 })

@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import ViewJumbotron from '@/components/layout/ViewJumbotron.vue'
 import ViewSubnav from '@/components/layout/ViewSubnav.vue'
 import GenderPicker from '@/components/profile/GenderPicker.vue'
+import DangerZoneCard from '@/components/profile/DangerZoneCard.vue'
 import { generatePersonalAccountName, type PlayerGender } from '@/lib/personalAccountName'
 import { updatePersonalAccountName } from '@/lib/masterApi'
 import { useAuthStore } from '@/stores/auth'
@@ -198,6 +199,8 @@ async function savePersonalAccountNameSetting() {
           </article>
         </div>
       </section>
+
+      <DangerZoneCard />
     </main>
   </div>
 </template>

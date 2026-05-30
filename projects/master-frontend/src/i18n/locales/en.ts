@@ -246,6 +246,25 @@ export default {
     usageBodyMaster:
       'The same name is used in the master ranking, your master profile, and shared cross-server account surfaces.',
   },
+  dangerZone: {
+    title: 'Danger zone',
+    body: 'Deleting your account is permanent. Please read carefully what you will lose before continuing.',
+    lossProgress: 'All of your game progress and companies across every game server.',
+    lossDeposits: 'Your tokenized gold deposits held in the game.',
+    lossRewards: 'Any future tokenized gold rewards you would have earned.',
+    lossData: 'All of your account data will be permanently removed from the game servers.',
+    deleteButton: 'Delete my account',
+    confirmInstruction:
+      'To confirm, please enter your account email address below. Your account will be scheduled for deletion after a 24-hour cooldown, during which you can still cancel.',
+    confirmEmailLabel: 'Confirm your email address',
+    confirmButton: 'Schedule account deletion',
+    abortButton: 'Keep my account',
+    pendingNotice:
+      'Your account is scheduled for deletion on {date}. You can still cancel until then.',
+    cancelButton: 'Cancel account deletion',
+    requestError: 'We could not schedule your account deletion. Please try again.',
+    cancelError: 'We could not cancel your account deletion. Please try again.',
+  },
   goldAdmin: {
     kicker: 'Master Administration',
     title: 'Gold Token Management',

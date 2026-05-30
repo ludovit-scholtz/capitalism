@@ -42,6 +42,9 @@ export interface MockPlayer {
   startupPackClaimedAtUtc: string | null
   canClaimStartupPack: boolean
   hasReferralDiscount?: boolean
+  deletionRequestedAtUtc?: string | null
+  deletionScheduledAtUtc?: string | null
+  isPendingDeletion?: boolean
 }
 
 export interface MockGameCompany {
@@ -1381,6 +1384,102 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           }),
         })
       }
+      return
+    }
+
+    if (query.includes('mutation') && query.includes('requestAccountDeletion')) {
+      if (!state.currentPlayer) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              { message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } },
+            ],
+          }),
+        })
+        return
+      }
+
+      const vars = body.variables as { input?: { confirmationEmail?: string } } | undefined
+      const confirmationEmail = vars?.input?.confirmationEmail?.trim() ?? ''
+      if (confirmationEmail.toLowerCase() !== state.currentPlayer.email.trim().toLowerCase()) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              {
+                message: 'The confirmation email does not match your account email.',
+                extensions: { code: 'CONFIRMATION_EMAIL_MISMATCH' },
+              },
+            ],
+          }),
+        })
+        return
+      }
+
+      const requestedAtUtc = state.currentPlayer.deletionRequestedAtUtc ?? new Date().toISOString()
+      const scheduledAtUtc =
+        state.currentPlayer.deletionScheduledAtUtc ??
+        new Date(new Date(requestedAtUtc).getTime() + 24 * 60 * 60 * 1000).toISOString()
+      state.currentPlayer = {
+        ...state.currentPlayer,
+        deletionRequestedAtUtc: requestedAtUtc,
+        deletionScheduledAtUtc: scheduledAtUtc,
+        isPendingDeletion: true,
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            requestAccountDeletion: {
+              isPendingDeletion: true,
+              deletionRequestedAtUtc: requestedAtUtc,
+              deletionScheduledAtUtc: scheduledAtUtc,
+            },
+          },
+        }),
+      })
+      return
+    }
+
+    if (query.includes('mutation') && query.includes('cancelAccountDeletion')) {
+      if (!state.currentPlayer) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [
+              { message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } },
+            ],
+          }),
+        })
+        return
+      }
+
+      state.currentPlayer = {
+        ...state.currentPlayer,
+        deletionRequestedAtUtc: null,
+        deletionScheduledAtUtc: null,
+        isPendingDeletion: false,
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            cancelAccountDeletion: {
+              isPendingDeletion: false,
+              deletionRequestedAtUtc: null,
+              deletionScheduledAtUtc: null,
+            },
+          },
+        }),
+      })
       return
     }
 

@@ -248,6 +248,25 @@ export default {
     usageBodyMaster:
       'Derselbe Name wird in der Master-Rangliste, Ihrem Master-Profil und den gemeinsamen serverübergreifenden Kontoflächen verwendet.',
   },
+  dangerZone: {
+    title: 'Gefahrenzone',
+    body: 'Das Löschen Ihres Kontos ist endgültig. Bitte lesen Sie sorgfältig, was Sie verlieren, bevor Sie fortfahren.',
+    lossProgress: 'Ihren gesamten Spielfortschritt und Ihre Unternehmen auf allen Spielservern.',
+    lossDeposits: 'Ihre tokenisierten Goldeinlagen im Spiel.',
+    lossRewards: 'Alle zukünftigen tokenisierten Goldprämien, die Sie erhalten hätten.',
+    lossData: 'Alle Daten Ihres Kontos werden dauerhaft von den Spielservern entfernt.',
+    deleteButton: 'Mein Konto löschen',
+    confirmInstruction:
+      'Geben Sie zur Bestätigung bitte unten die E-Mail-Adresse Ihres Kontos ein. Ihr Konto wird nach einer 24-stündigen Wartezeit zur Löschung vorgemerkt, während der Sie den Vorgang noch abbrechen können.',
+    confirmEmailLabel: 'Bestätigen Sie Ihre E-Mail-Adresse',
+    confirmButton: 'Kontolöschung planen',
+    abortButton: 'Mein Konto behalten',
+    pendingNotice:
+      'Ihr Konto ist für die Löschung am {date} vorgemerkt. Bis dahin können Sie den Vorgang noch abbrechen.',
+    cancelButton: 'Kontolöschung abbrechen',
+    requestError: 'Wir konnten die Löschung Ihres Kontos nicht planen. Bitte versuchen Sie es erneut.',
+    cancelError: 'Wir konnten die Löschung Ihres Kontos nicht abbrechen. Bitte versuchen Sie es erneut.',
+  },
   goldAdmin: {
     kicker: 'Master-Administration',
     title: 'Verwaltung der Gold-Token',

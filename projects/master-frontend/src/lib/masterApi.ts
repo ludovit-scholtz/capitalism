@@ -33,6 +33,15 @@ export interface MasterPlayerProfile {
   startupPackClaimedAtUtc: string | null
   canClaimStartupPack: boolean
   hasReferralDiscount: boolean
+  deletionRequestedAtUtc?: string | null
+  deletionScheduledAtUtc?: string | null
+  isPendingDeletion?: boolean
+}
+
+export interface AccountDeletionStatus {
+  isPendingDeletion: boolean
+  deletionRequestedAtUtc: string | null
+  deletionScheduledAtUtc: string | null
 }
 
 export interface MasterAuthPayload {
@@ -94,6 +103,9 @@ const REGISTER_MUTATION = `
         startupPackClaimedAtUtc
         canClaimStartupPack
         hasReferralDiscount
+        deletionRequestedAtUtc
+        deletionScheduledAtUtc
+        isPendingDeletion
       }
     }
   }
@@ -115,6 +127,9 @@ const LOGIN_MUTATION = `
         startupPackClaimedAtUtc
         canClaimStartupPack
         hasReferralDiscount
+        deletionRequestedAtUtc
+        deletionScheduledAtUtc
+        isPendingDeletion
       }
     }
   }
@@ -133,6 +148,9 @@ const ME_QUERY = `
       startupPackClaimedAtUtc
       canClaimStartupPack
       hasReferralDiscount
+      deletionRequestedAtUtc
+      deletionScheduledAtUtc
+      isPendingDeletion
     }
   }
 `
@@ -184,6 +202,26 @@ const UPDATE_PERSONAL_ACCOUNT_NAME_MUTATION = `
     updatePersonalAccountName(input: $input) {
       personalAccountName
       gender
+    }
+  }
+`
+
+const REQUEST_ACCOUNT_DELETION_MUTATION = `
+  mutation RequestAccountDeletion($input: RequestAccountDeletionInput!) {
+    requestAccountDeletion(input: $input) {
+      isPendingDeletion
+      deletionRequestedAtUtc
+      deletionScheduledAtUtc
+    }
+  }
+`
+
+const CANCEL_ACCOUNT_DELETION_MUTATION = `
+  mutation CancelAccountDeletion {
+    cancelAccountDeletion {
+      isPendingDeletion
+      deletionRequestedAtUtc
+      deletionScheduledAtUtc
     }
   }
 `
@@ -275,6 +313,27 @@ export async function updatePersonalAccountName(
   )
 
   return data.updatePersonalAccountName.personalAccountName
+}
+
+export async function requestAccountDeletion(
+  token: string,
+  confirmationEmail: string,
+): Promise<AccountDeletionStatus> {
+  const data = await gqlRequest<{ requestAccountDeletion: AccountDeletionStatus }>(
+    REQUEST_ACCOUNT_DELETION_MUTATION,
+    { input: { confirmationEmail } },
+    token,
+  )
+  return data.requestAccountDeletion
+}
+
+export async function cancelAccountDeletion(token: string): Promise<AccountDeletionStatus> {
+  const data = await gqlRequest<{ cancelAccountDeletion: AccountDeletionStatus }>(
+    CANCEL_ACCOUNT_DELETION_MUTATION,
+    undefined,
+    token,
+  )
+  return data.cancelAccountDeletion
 }
 
 // ── Player gold account ────────────────────────────────────────────────────
