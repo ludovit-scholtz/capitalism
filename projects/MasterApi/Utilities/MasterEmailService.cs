@@ -64,11 +64,13 @@ public sealed class MasterEmailService(
         var escapedUrl = WebUtility.HtmlEncode(player.LastAccessedUrl ?? "-");
         var greeting = WebUtility.HtmlEncode(GetGreeting(normalizedLocale, player.DisplayName));
         var signoff = WebUtility.HtmlEncode(GetSignoff(normalizedLocale));
+        var legalNote = WebUtility.HtmlEncode(EmailLocalizations.RegistrationLegalNote(normalizedLocale));
         var bodyHtml = $"""
             <p style="margin:0 0 18px;">{greeting}</p>
             <p style="margin:0 0 18px;">{escapedIntro}</p>
             <p style="margin:0 0 8px;font-weight:700;color:#162033;">{escapedLabel}</p>
             <p style="margin:0 0 22px;"><a href="{escapedUrl}" style="color:#0f766e;text-decoration:none;">{escapedUrl}</a></p>
+            <p style="margin:0 0 18px;color:#526070;">{legalNote}</p>
             <p style="margin:0;">{signoff}</p>
             """.Trim();
         var html = await renderer.RenderAsync(
@@ -76,11 +78,13 @@ public sealed class MasterEmailService(
             cancellationToken);
         var text = BuildRegistrationText(player, copy);
 
+        var attachments = BuildLegalAttachments(normalizedLocale);
+
         bool sent;
         try
         {
             sent = await sender.SendAsync(
-                new EmailMessageRequest(player.Email, player.DisplayName, copy.Subject, html, text),
+                new EmailMessageRequest(player.Email, player.DisplayName, copy.Subject, html, text, attachments),
                 cancellationToken);
         }
         catch (Exception exception)
@@ -373,6 +377,20 @@ public sealed class MasterEmailService(
         _ => "Good luck in the market!",
     };
 
+    private static IReadOnlyList<EmailAttachmentContent> BuildLegalAttachments(string locale)
+    {
+        var attachments = new List<EmailAttachmentContent>();
+        foreach (var document in LegalDocuments.All(locale))
+        {
+            attachments.Add(new EmailAttachmentContent(
+                LegalDocuments.FileName(document.Kind, locale),
+                "application/pdf",
+                LegalPdfGenerator.Generate(document)));
+        }
+
+        return attachments;
+    }
+
     private static string BuildRegistrationText(PlayerAccount player, EmailCopy copy)
     {
         var builder = new StringBuilder();
@@ -384,6 +402,8 @@ public sealed class MasterEmailService(
         builder.AppendLine();
         builder.AppendLine(copy.SectionTitle);
         builder.AppendLine(player.LastAccessedUrl ?? "-");
+        builder.AppendLine();
+        builder.AppendLine(EmailLocalizations.RegistrationLegalNote(locale));
         builder.AppendLine(GetSignoff(locale));
         return builder.ToString();
     }

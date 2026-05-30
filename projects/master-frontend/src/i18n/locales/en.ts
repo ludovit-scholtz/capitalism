@@ -794,6 +794,19 @@ export default {
     loadError:
       'Failed to load security board data. The report file may not have been generated yet.',
   },
+  legal: {
+    kicker: 'Legal',
+    title: 'Legal Documents',
+    subtitle: 'Terms and Conditions and Privacy Policy for the Capitalism service.',
+    documentsLabel: 'Documents',
+    terms: 'Terms and Conditions',
+    privacy: 'Privacy Policy',
+    version: 'Version',
+    effectiveDate: 'Effective',
+    loading: 'Loading legal documents…',
+    loadError: 'Unable to load the legal documents. Please try again later.',
+    tokenizationNote: 'Tokenized gold is also subject to the ASA.Gold tokenization platform terms:',
+  },
   docs: {
     kicker: 'Documentation',
     title: 'Game Docs',

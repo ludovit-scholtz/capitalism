@@ -57,6 +57,16 @@ public sealed class EmailSupportTests
         Assert.Equal(email, sent.RecipientEmail);
         Assert.Equal("Vitajte v Capitalism", sent.Subject);
         Assert.Contains("https://capitalism.example.com/register?server=one", sent.HtmlBody);
+        Assert.NotNull(sent.Attachments);
+        Assert.Equal(2, sent.Attachments!.Count);
+        Assert.All(sent.Attachments, attachment =>
+        {
+            Assert.Equal("application/pdf", attachment.ContentType);
+            Assert.EndsWith(".pdf", attachment.FileName);
+            Assert.StartsWith("%PDF-", Encoding.ASCII.GetString(attachment.Content, 0, 5));
+        });
+        Assert.Contains(sent.Attachments, attachment => attachment.FileName.Contains("terms-and-conditions"));
+        Assert.Contains(sent.Attachments, attachment => attachment.FileName.Contains("privacy-policy"));
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
@@ -235,6 +245,39 @@ public sealed class EmailSupportTests
         Assert.Equal("Vaša požiadavka podpory bola aktualizovaná", updatedEmail.Subject);
         Assert.Contains("Support team is investigating.", updatedEmail.HtmlBody);
         Assert.Contains("Factory balance problem", updatedEmail.HtmlBody);
+    }
+
+    [Fact]
+    public async Task GetLegalDocuments_ReturnsTermsAndPrivacyForLocale()
+    {
+        var fakeSender = new RecordingEmailSender();
+        await using var factory = CreateFactory(fakeSender);
+        using var client = factory.CreateClient();
+
+        var result = await GraphQlAsync(client, """
+            query Legal($locale: String) {
+              legalDocuments(locale: $locale) {
+                kind
+                locale
+                title
+                version
+                sections { heading paragraphs }
+              }
+            }
+            """,
+            new { locale = "sk" });
+
+        Assert.False(result.TryGetProperty("errors", out _));
+        var documents = result.GetProperty("data").GetProperty("legalDocuments");
+        Assert.Equal(2, documents.GetArrayLength());
+        var kinds = documents.EnumerateArray().Select(item => item.GetProperty("kind").GetString()).ToArray();
+        Assert.Contains("TERMS", kinds);
+        Assert.Contains("PRIVACY", kinds);
+        Assert.All(documents.EnumerateArray(), document =>
+        {
+            Assert.Equal("sk", document.GetProperty("locale").GetString());
+            Assert.True(document.GetProperty("sections").GetArrayLength() > 0);
+        });
     }
 
     private static WebApplicationFactory<Program> CreateFactory(RecordingEmailSender sender, bool enableWeeklyReports = false)

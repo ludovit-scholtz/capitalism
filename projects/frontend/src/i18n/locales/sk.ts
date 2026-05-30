@@ -1,4 +1,8 @@
 export default {
+  legal: {
+    terms: 'Všeobecné obchodné podmienky',
+    privacy: 'Zásady ochrany osobných údajov',
+  },
   common: {
     appName: 'Kapitalizmus 5',
     loading: 'Na\u010d\u00edtavam...',

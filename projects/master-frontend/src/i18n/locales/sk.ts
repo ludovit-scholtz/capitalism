@@ -794,6 +794,19 @@ export default {
     loadError:
       'Nepodarilo sa načítať dáta bezpečnostnej tabule. Súbor reportu nemusel byť ešte vygenerovaný.',
   },
+  legal: {
+    kicker: 'Právne dokumenty',
+    title: 'Právne dokumenty',
+    subtitle: 'Všeobecné obchodné podmienky a Zásady ochrany osobných údajov služby Capitalism.',
+    documentsLabel: 'Dokumenty',
+    terms: 'Všeobecné obchodné podmienky',
+    privacy: 'Zásady ochrany osobných údajov',
+    version: 'Verzia',
+    effectiveDate: 'Účinné od',
+    loading: 'Načítavajú sa právne dokumenty…',
+    loadError: 'Právne dokumenty sa nepodarilo načítať. Skúste to neskôr.',
+    tokenizationNote: 'Na tokenizované zlato sa vzťahujú aj podmienky tokenizačnej platformy ASA.Gold:',
+  },
   docs: {
     kicker: 'Dokumentácia',
     title: 'Herná dokumentácia',

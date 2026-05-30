@@ -5,12 +5,18 @@ using Microsoft.Extensions.Options;
 
 namespace MasterApi.Utilities;
 
+public sealed record EmailAttachmentContent(
+    string FileName,
+    string ContentType,
+    byte[] Content);
+
 public sealed record EmailMessageRequest(
     string RecipientEmail,
     string RecipientDisplayName,
     string Subject,
     string HtmlBody,
-    string PlainTextBody);
+    string PlainTextBody,
+    IReadOnlyList<EmailAttachmentContent>? Attachments = null);
 
 public interface IEmailSender
 {
@@ -43,6 +49,17 @@ public sealed class AzureCommunicationEmailSender(
             options.SenderAddress,
             recipients,
             content);
+
+        if (request.Attachments is { Count: > 0 })
+        {
+            foreach (var attachment in request.Attachments)
+            {
+                message.Attachments.Add(new EmailAttachment(
+                    attachment.FileName,
+                    attachment.ContentType,
+                    BinaryData.FromBytes(attachment.Content)));
+            }
+        }
 
         try
         {
