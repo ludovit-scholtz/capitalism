@@ -121,6 +121,22 @@ public static class EmailLocalizations
         _ => "Master bounty points this week",
     };
 
+    /// <summary>Localized label for the one-click unsubscribe link in weekly report emails.</summary>
+    public static string WeeklyUnsubscribeLabel(string locale) => NormalizeLocale(locale) switch
+    {
+        "sk" => "Odhlásiť sa z týždenných reportov",
+        "de" => "Wöchentliche Berichte abbestellen",
+        _ => "Unsubscribe from weekly reports",
+    };
+
+    /// <summary>Localized sentence introducing the unsubscribe link in weekly report emails.</summary>
+    public static string WeeklyUnsubscribeNote(string locale, string unsubscribeUrl) => NormalizeLocale(locale) switch
+    {
+        "sk" => $"Už nechcete dostávať týždenné reporty? Odhláste sa tu: {unsubscribeUrl}",
+        "de" => $"Möchtest du keine wöchentlichen Berichte mehr erhalten? Hier abbestellen: {unsubscribeUrl}",
+        _ => $"No longer want to receive weekly reports? Unsubscribe here: {unsubscribeUrl}",
+    };
+
     public static EmailCopy AdminTest(string locale) => NormalizeLocale(locale) switch
     {
         "sk" => new EmailCopy(

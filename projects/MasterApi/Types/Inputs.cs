@@ -142,6 +142,9 @@ public sealed class MasterPlayerProfile
 
     /// <summary>True when the account is marked for deletion and still inside the cancellable cooldown window.</summary>
     public bool IsPendingDeletion { get; set; }
+
+    /// <summary>True when the player currently receives the weekly report emails (i.e. not unsubscribed).</summary>
+    public bool WeeklyReportEmailSubscribed { get; set; } = true;
 }
 
 public sealed class UpdatePersonalAccountNameInput

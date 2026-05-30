@@ -31,6 +31,7 @@ public sealed class WeeklyEmailReportService(
         var weekStartUtc = nowUtc.AddDays(-7);
         var duePlayers = await db.PlayerAccounts
             .Where(player => player.HasReceivedRegistrationEmail)
+            .Where(player => !player.WeeklyReportEmailUnsubscribed)
             .Where(player => player.LastWeeklyEmailSentAtUtc == null || player.LastWeeklyEmailSentAtUtc < weekStartUtc)
             .OrderBy(player => player.Email)
             .ToListAsync(cancellationToken);
@@ -64,11 +65,12 @@ public sealed class WeeklyEmailReportService(
             .SumAsync(record => record.PointsAwarded, cancellationToken);
         var changelogRows = await BuildChangelogRowsAsync(locale, weekStartUtc, nowUtc, cancellationToken);
 
-        var bodyHtml = BuildWeeklyBodyHtml(locale, copy, servers, bountyPoints, changelogRows);
+        var unsubscribeUrl = BuildUnsubscribeUrl(player.EmailUnsubscribeToken);
+        var bodyHtml = BuildWeeklyBodyHtml(locale, copy, servers, bountyPoints, changelogRows, unsubscribeUrl);
         var html = await renderer.RenderAsync(
             new EmailTemplateModel(locale, copy.Subject, copy.Headline, bodyHtml, copy.Footer),
             cancellationToken);
-        var text = BuildWeeklyText(locale, copy, servers, bountyPoints, changelogRows);
+        var text = BuildWeeklyText(locale, copy, servers, bountyPoints, changelogRows, unsubscribeUrl);
         var sent = await sender.SendAsync(
             new EmailMessageRequest(player.Email, player.DisplayName, copy.Subject, html, text),
             cancellationToken);
@@ -144,12 +146,28 @@ public sealed class WeeklyEmailReportService(
             .ToList();
     }
 
+    private string BuildUnsubscribeUrl(Guid token)
+    {
+        var portalBaseUrl = emailOptions.Value.PortalBaseUrl;
+        var trimmed = string.IsNullOrWhiteSpace(portalBaseUrl)
+            ? "https://capitalism.de-4.biatec.io"
+            : portalBaseUrl.Trim().TrimEnd('/');
+        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            trimmed = "https://capitalism.de-4.biatec.io";
+        }
+
+        return $"{trimmed}/email/unsubscribe?token={token:D}";
+    }
+
     private static string BuildWeeklyBodyHtml(
         string locale,
         EmailCopy copy,
         List<WeeklyServerRow> servers,
         decimal bountyPoints,
-        List<WeeklyChangelogRow> changelogRows)
+        List<WeeklyChangelogRow> changelogRows,
+        string unsubscribeUrl)
     {
         var builder = new StringBuilder();
         builder.Append($"<p style=\"margin:0 0 18px;\">{WebUtility.HtmlEncode(copy.Intro)}</p>");
@@ -179,6 +197,7 @@ public sealed class WeeklyEmailReportService(
             }
             builder.Append("</ul>");
         }
+        builder.Append($"<p style=\"margin:24px 0 0;font-size:13px;color:#526070;\"><a href=\"{WebUtility.HtmlEncode(unsubscribeUrl)}\" style=\"color:#526070;text-decoration:underline;\">{WebUtility.HtmlEncode(EmailLocalizations.WeeklyUnsubscribeLabel(locale))}</a></p>");
         return builder.ToString();
     }
 
@@ -187,7 +206,8 @@ public sealed class WeeklyEmailReportService(
         EmailCopy copy,
         List<WeeklyServerRow> servers,
         decimal bountyPoints,
-        List<WeeklyChangelogRow> changelogRows)
+        List<WeeklyChangelogRow> changelogRows,
+        string unsubscribeUrl)
     {
         var builder = new StringBuilder();
         builder.AppendLine(copy.Headline);
@@ -202,6 +222,8 @@ public sealed class WeeklyEmailReportService(
         {
             builder.AppendLine($"- {row.Title}: {row.Summary}");
         }
+        builder.AppendLine();
+        builder.AppendLine(EmailLocalizations.WeeklyUnsubscribeNote(locale, unsubscribeUrl));
         return builder.ToString();
     }
 

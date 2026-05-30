@@ -6,14 +6,15 @@ import ViewSubnav from '@/components/layout/ViewSubnav.vue'
 
 const { t } = useI18n()
 
-const activeTopic = ref<'getting-started' | 'buildings-guide' | 'economy-overview'>(
-  'getting-started',
-)
+const activeTopic = ref<
+  'getting-started' | 'buildings-guide' | 'economy-overview' | 'email-system'
+>('getting-started')
 
 const topics = computed(() => [
   { key: 'getting-started' as const, label: t('docs.topicGettingStarted') },
   { key: 'buildings-guide' as const, label: t('docs.topicBuildingsGuide') },
   { key: 'economy-overview' as const, label: t('docs.topicEconomyOverview') },
+  { key: 'email-system' as const, label: t('docs.topicEmailSystem') },
 ])
 
 const navItems = computed(() => [
@@ -193,6 +194,48 @@ const navItems = computed(() => [
             <section class="doc-section">
               <h2>{{ t('docs.eo.stocksTitle') }}</h2>
               <p>{{ t('docs.eo.stocksBody') }}</p>
+            </section>
+          </template>
+
+          <!-- Email System -->
+          <template v-else-if="activeTopic === 'email-system'">
+            <h1 class="mb-4 text-2xl font-bold text-body">{{ t('docs.topicEmailSystem') }}</h1>
+
+            <section class="doc-section">
+              <h2>{{ t('docs.em.introTitle') }}</h2>
+              <p>{{ t('docs.em.introBody') }}</p>
+            </section>
+
+            <section class="doc-section">
+              <h2>{{ t('docs.em.typesTitle') }}</h2>
+              <dl class="building-type-list">
+                <div class="building-type-item">
+                  <dt>{{ t('docs.em.registration') }}</dt>
+                  <dd>{{ t('docs.em.registrationDesc') }}</dd>
+                </div>
+                <div class="building-type-item">
+                  <dt>{{ t('docs.em.weekly') }}</dt>
+                  <dd>{{ t('docs.em.weeklyDesc') }}</dd>
+                </div>
+                <div class="building-type-item">
+                  <dt>{{ t('docs.em.support') }}</dt>
+                  <dd>{{ t('docs.em.supportDesc') }}</dd>
+                </div>
+                <div class="building-type-item">
+                  <dt>{{ t('docs.em.deletion') }}</dt>
+                  <dd>{{ t('docs.em.deletionDesc') }}</dd>
+                </div>
+              </dl>
+            </section>
+
+            <section class="doc-section">
+              <h2>{{ t('docs.em.unsubscribeTitle') }}</h2>
+              <p>{{ t('docs.em.unsubscribeBody') }}</p>
+            </section>
+
+            <section class="doc-section">
+              <h2>{{ t('docs.em.privacyTitle') }}</h2>
+              <p>{{ t('docs.em.privacyBody') }}</p>
             </section>
           </template>
         </article>

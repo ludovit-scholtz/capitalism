@@ -184,6 +184,15 @@ export default {
     loading: 'Načítavam tvoj zlatý účet...',
     loadError: 'Nepodarilo sa načítať zlatý účet.',
     retry: 'Skúsiť znova',
+    emailPrefsTitle: 'Nastavenia e-mailov',
+    emailPrefsIntro:
+      'Vyberte si, ktoré e-maily chcete dostávať. Po prihlásení tu vždy uvidíte, na ktoré typy e-mailov ste prihlásení.',
+    emailPrefsError: 'Nastavenia e-mailov sa nepodarilo aktualizovať.',
+    weeklyReportEmailTitle: 'Týždenný report e-mailom',
+    emailStatusSubscribed: 'Prihlásené',
+    emailStatusUnsubscribed: 'Odhlásené',
+    emailSubscribeAction: 'Prihlásiť sa',
+    emailUnsubscribeAction: 'Odhlásiť sa',
     currentBalance: 'Aktuálny zostatok',
     ratio: '1 zlatý token = 1 gram reálneho zlata',
     zeroTitle: 'Zatiaľ nemáš žiadne zlato',
@@ -218,6 +227,15 @@ export default {
     buyMonthlyPro: 'Kúpiť 1 mesiac Pro ({grams} g)',
     startupPackPrice: 'Startup balík (3 mesiace Pro): {grams} g',
     referralDiscountActive: 'Referral zľava je aktívna: 10 % zľava na Pro nákupy.',
+  },
+  emailUnsubscribe: {
+    title: 'Odhlásenie',
+    loading: 'Aktualizujeme vaše nastavenia e-mailov...',
+    success: 'Boli ste odhlásení z týždenných reportových e-mailov.',
+    successHint: 'Kedykoľvek sa môžete znova prihlásiť na stránke Účet.',
+    manageLink: 'Spravovať nastavenia e-mailov',
+    missingToken: 'Tomuto odhlasovaciemu odkazu chýba token.',
+    error: 'Vaše nastavenia e-mailov sa nepodarilo aktualizovať. Skúste to neskôr.',
   },
   gameSettings: {
     kicker: 'Identita naprieč servermi',
@@ -815,6 +833,7 @@ export default {
     topicGettingStarted: 'Začíname',
     topicBuildingsGuide: 'Sprievodca budovami',
     topicEconomyOverview: 'Prehľad ekonomiky',
+    topicEmailSystem: 'E-maily a oznámenia',
     gs: {
       welcomeTitle: 'Vitajte v Capitalism',
       welcomeBody:
@@ -887,6 +906,30 @@ export default {
       goldBody: '1 zlatý token = 1 gram fyzického zlata. Zostatok je uložený na master serveri.',
       stocksTitle: 'Burza cenných papierov',
       stocksBody: 'Spoločnosti môžu kotovať akcie na burze. Hráči nakupujú a predávajú za limitné ceny.',
+    },
+    em: {
+      introTitle: 'Ako fungujú e-maily',
+      introBody:
+        'Capitalism posiela malé množstvo transakčných a informačných e-mailov, aby ste mali prehľad. Každý e-mail je preložený do vášho preferovaného jazyka a posiela sa len na adresu vášho vlastného účtu.',
+      typesTitle: 'E-maily, ktoré posielame',
+      registration: 'Uvítací e-mail po registrácii',
+      registrationDesc:
+        'Posiela sa raz pri vytvorení účtu. Potvrdzuje registráciu a prikladá Obchodné podmienky a Zásady ochrany osobných údajov.',
+      weekly: 'Týždenný report',
+      weeklyDesc:
+        'Týždenný súhrn aktívnych herných serverov, vašich bounty bodov, poradia a noviniek z changelogu. Z tohto e-mailu sa môžete kedykoľvek odhlásiť.',
+      support: 'Aktualizácie požiadaviek podpory',
+      supportDesc:
+        'Posiela sa pri vytvorení požiadavky podpory a vždy, keď sa zmení jej stav alebo obsah, aby ste mohli sledovať svoju požiadavku.',
+      deletion: 'Oznámenia o vymazaní účtu',
+      deletionDesc:
+        'Posiela sa pri žiadosti o vymazanie účtu a znova tesne pred trvalým odstránením účtu.',
+      unsubscribeTitle: 'Odhlásenie',
+      unsubscribeBody:
+        'Iba týždenný report je propagačný a môžete sa z neho odhlásiť. Použite odhlasovací odkaz na jedno kliknutie v spodnej časti ktoréhokoľvek týždenného reportu, alebo prepnite prihlásenie na týždenný report na stránke Účet. Transakčné e-maily (registrácia, podpora a vymazanie účtu) nie je možné vypnúť, pretože potvrdzujú dôležité akcie na vašom účte.',
+      privacyTitle: 'Váš e-mail je súkromný',
+      privacyBody:
+        'Vaša e-mailová adresa je súkromná. Nikdy sa nezobrazuje iným hráčom a je prístupná len administrátorom na účely podpory a správy účtu. Odhlasovací odkaz používa neprehľadný token a nikdy neodhalí vašu e-mailovú adresu.',
     },
   },
 } as const

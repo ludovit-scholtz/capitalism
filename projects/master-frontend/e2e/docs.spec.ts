@@ -38,6 +38,15 @@ test.describe('Documentation page', () => {
     await expect(page.getByRole('heading', { name: 'The Tick Cycle' })).toBeVisible()
   })
 
+  test('switches to Email & Notifications topic on click', async ({ page }) => {
+    setupMockApi(page, { servers: [] })
+    await page.goto('/docs')
+
+    await page.getByRole('button', { name: 'Email & Notifications' }).click()
+    await expect(page.getByRole('heading', { name: 'How Email Works' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Your Email Is Private' })).toBeVisible()
+  })
+
   test('nav link to /docs is visible on home page', async ({ page }) => {
     setupMockApi(page, { servers: [] })
     await page.goto('/')

@@ -285,6 +285,7 @@ public sealed partial class Query
             DeletionRequestedAtUtc = player.DeletionRequestedAtUtc,
             DeletionScheduledAtUtc = player.DeletionScheduledAtUtc,
             IsPendingDeletion = player.DeletionRequestedAtUtc is not null,
+            WeeklyReportEmailSubscribed = !player.WeeklyReportEmailUnsubscribed,
         };
     }
 

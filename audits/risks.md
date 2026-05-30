@@ -99,6 +99,14 @@ Account lifecycle controls reduce the impact of credential loss and token compro
 - **Password reset flow**: Mitigated. MasterApi implements time-limited email reset endpoints with `PasswordResetThrottleService` rate limiting and token expiry. Game API has no independent password reset and relies on MasterApi or OIDC re-linkage.
 - **Explicit logout and admin session termination**: Mitigated. Both APIs expose current-session logout, logout-all, active session listing, and admin revoke-all endpoints backed by persistent session/revocation data.
 
+## Email and Notifications
+
+The email system sends registration, weekly report, support, and account-deletion messages. Email addresses are personal data and must stay private, and outbound mail must not become a spam or enumeration vector.
+
+- **Player email-address disclosure**: Mitigated. Email addresses are private and exposed only to the owning player (via the authenticated `me` query) or to administrators. All cross-player email-bearing surfaces in MasterApi (`goldTokenBalances`, `goldTokenTransactions`, `goldTokenDepositRequests`, `goldTokenWithdrawalRequests`, support admin queries) gate on `BuildGameAdministrationAccessAsync(...).CanAccessEveryGameDashboard`. The weekly-report unsubscribe surfaces never echo the address back.
+- **Unsubscribe-token abuse and enumeration**: Mitigated. The unauthenticated `unsubscribeFromWeeklyReportEmail(token: UUID!)` mutation resolves players by an opaque, per-account `EmailUnsubscribeToken` (random GUID, unique index) and always returns a neutral `true` — including for empty/unknown tokens — so callers cannot distinguish valid tokens or infer that an email exists. The token only toggles the weekly-report opt-out flag and grants no other account access. Changing the per-player preference for the logged-in account uses the authenticated `setWeeklyReportEmailSubscription` mutation.
+- **Unsolicited email**: Mitigated. Only the weekly report is promotional and players can opt out one-click from the email footer link or from the Account page; `WeeklyEmailReportService.SendDueWeeklyReportsAsync` skips accounts with `WeeklyReportEmailUnsubscribed == true`. Transactional emails (registration, support, account deletion) remain mandatory because they confirm account actions. All email bodies HTML-encode dynamic content via `WebUtility.HtmlEncode` to avoid injection in rendered messages.
+
 ## SSL/TLS and Outbound Connection Security
 
 Outbound calls to the master server and external dependencies must not weaken TLS validation outside local development.
