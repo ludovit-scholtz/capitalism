@@ -19,7 +19,7 @@ public interface IAccountDeletionService
 /// </summary>
 public sealed class AccountDeletionService(
     MasterDbContext db,
-    GameServerAccountPurgeService purgeService,
+    IGameServerAccountPurgeService purgeService,
     IMasterEmailService emailService,
     ILogger<AccountDeletionService> logger) : IAccountDeletionService
 {

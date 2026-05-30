@@ -8,11 +8,16 @@ using Microsoft.Extensions.Options;
 
 namespace MasterApi.Utilities;
 
+public interface IGameServerAccountPurgeService
+{
+    Task PurgeAsync(string playerEmail, CancellationToken cancellationToken);
+}
+
 /// <summary>
 /// Calls every active game server to purge a player's game data when their master
 /// account is deleted. Building/bank handling is owned by the game server.
 /// </summary>
-public sealed class GameServerAccountPurgeService
+public sealed class GameServerAccountPurgeService : IGameServerAccountPurgeService
 {
     private const string PurgeMutation = """
         mutation PurgePlayerAccountFromMaster($input: PurgePlayerAccountFromMasterInput!) {

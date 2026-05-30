@@ -391,7 +391,7 @@ public class Program
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddHttpClient("master-server");
         builder.Services.AddHttpClient<PersonalAccountNamePropagationService>();
-        builder.Services.AddHttpClient<GameServerAccountPurgeService>();
+        builder.Services.AddHttpClient<IGameServerAccountPurgeService, GameServerAccountPurgeService>();
         builder.Services.AddScoped<AuthenticatedMasterPlayerClaimsSyncService>();
         builder.Services.AddScoped<IPasswordHasher<PlayerAccount>, PasswordHasher<PlayerAccount>>();
         builder.Services.AddScoped<MasterRankingService>();
