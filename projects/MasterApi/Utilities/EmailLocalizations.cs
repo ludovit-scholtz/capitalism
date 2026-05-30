@@ -21,6 +21,13 @@ public static class EmailLocalizations
         return shortLocale is not null && SupportedLocales.Contains(shortLocale) ? shortLocale : "en";
     }
 
+    public static string RegistrationLegalNote(string locale) => NormalizeLocale(locale) switch
+    {
+        "sk" => "V prílohe tohto e-mailu nájdete Všeobecné obchodné podmienky a Zásady ochrany osobných údajov vo formáte PDF. Registráciou ste s nimi vyjadrili súhlas.",
+        "de" => "Im Anhang dieser E-Mail finden Sie die Allgemeinen Geschäftsbedingungen und die Datenschutzerklärung als PDF. Mit der Registrierung haben Sie ihnen zugestimmt.",
+        _ => "Attached to this email you will find the Terms and Conditions and the Privacy Policy as PDF files. By registering you agreed to them.",
+    };
+
     public static EmailCopy Registration(string locale) => NormalizeLocale(locale) switch
     {
         "sk" => new EmailCopy(
