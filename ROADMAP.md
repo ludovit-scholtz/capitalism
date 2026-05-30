@@ -33,3 +33,11 @@ Create a fun game in the style of Capitalism II, where players experience realis
 - [x] Do not delete immediately: mark the account for deletion with a 24-hour cooldown that the user can cancel, and send a request email and a final confirmation email (both polite, localized, with the master portal link).
 - [x] When purging game-server data destroy all of the user's buildings except banks, transfer banks to the government entity, and set deposit interest to 0% and lending interest to 20%.
 - [x] Keep it secure (only the user can delete their own account) with backend and e2e test coverage, and update the in-game user documentation.
+
+### Security improvements
+
+- [ ] Fix company-merge tax evasion in `projects/Api/Types/Mutation.CompanyMerge.cs`: clamp the merge-time tax to the target's available balance (`Math.Min(balance, taxAmount)`), assert the `TryDebit` result, and record only the amount actually paid so cash-poor companies cannot merge to escape tax. Add a regression test for the cash-poor merge scenario.
+- [ ] Harden MasterApi auth rate limiting in `projects/MasterApi/Security/AuthRateLimitMiddleware.cs` to parse selected GraphQL root fields across named operations and JSON-array batched bodies, matching the game API, so batched/named login and register requests cannot bypass the per-IP limiter. Add regression tests covering these bypass shapes.
+- [ ] Make GraphQL batching explicit on MasterApi in `projects/MasterApi/Security/GraphQlRequestSecurityMiddleware.cs`: either reject JSON-array envelopes early, or iterate every batch item and apply the same introspection, depth, and complexity checks the game API performs before execution.
+- [ ] Remove raw JWT persistence from the game frontend `projects/frontend/src/stores/auth.ts` (`auth_token`/`auth_expires` in `localStorage`) and rehydrate gameplay sessions from the cookie session instead. Add tests for login, OIDC callback, reload, and logout to prevent session-bootstrap regressions.
+- [ ] Audit and standardize the remaining unchecked `CompanyBankingService.TryDebit`/`TryCredit` call sites in `projects/Api/Engine/Phases` for the same ignored-failure-plus-phantom-ledger pattern, adopting the `Math.Min(balance, due)` clamp-and-record convention used by `TaxPhase`.
