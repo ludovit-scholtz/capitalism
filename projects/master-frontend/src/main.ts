@@ -5,6 +5,7 @@ import App from './App.vue'
 import { i18n } from './i18n'
 import router from './router'
 import './assets/styles/main.css'
+import { initMonitoring } from './lib/monitoring'
 
 export function createApp() {
   const app = createVueApp(App)
@@ -18,4 +19,5 @@ export function createApp() {
 }
 
 const { app } = createApp()
+initMonitoring(app)
 app.mount('#app')

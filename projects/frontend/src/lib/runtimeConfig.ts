@@ -9,6 +9,8 @@ export interface RuntimeAppConfig {
   biatecOidcScope?: string | null
   biatecOidcAudience?: string | null
   biatecOidcAllowedIssuers?: string | null
+  sentryDsn?: string | null
+  googleAnalyticsId?: string | null
 }
 
 declare global {

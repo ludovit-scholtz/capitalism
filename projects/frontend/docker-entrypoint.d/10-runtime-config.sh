@@ -13,5 +13,7 @@ window.__capitalismRuntimeConfig__ = {
   biatecOidcScope: "${APP_BIATEC_OIDC_SCOPE:-}",
   biatecOidcAudience: "${APP_BIATEC_OIDC_AUDIENCE:-}",
   biatecOidcAllowedIssuers: "${APP_BIATEC_OIDC_ALLOWED_ISSUERS:-}",
+  sentryDsn: "${APP_SENTRY_DSN:-}",
+  googleAnalyticsId: "${APP_GOOGLE_ANALYTICS_ID:-}",
 }
 EOF
