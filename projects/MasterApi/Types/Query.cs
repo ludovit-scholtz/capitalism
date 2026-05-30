@@ -135,13 +135,13 @@ public sealed partial class Query
                 Limit = 20,
             };
         }
-        var includeDrafts = false;
-        if (input.IncludeDrafts)
-        {
-            var trustedServer = await TryResolveTrustedNewsServerIdentityAsync(db, masterServerOptions.Value, input);
-            var trustedAdmin = await TryResolvePrivilegedNewsAdminIdentityAsync(db, gameAdministrationOptions.Value, claimsPrincipal);
-            includeDrafts = trustedServer is not null || trustedAdmin is not null;
-        }
+        // Resolve viewer privilege on every request so that author email addresses
+        // (CreatedByEmail/UpdatedByEmail) are never disclosed to non-administrators,
+        // and so draft visibility stays restricted to trusted servers or admins.
+        var trustedServer = await TryResolveTrustedNewsServerIdentityAsync(db, masterServerOptions.Value, input);
+        var trustedAdmin = await TryResolvePrivilegedNewsAdminIdentityAsync(db, gameAdministrationOptions.Value, claimsPrincipal);
+        var isPrivilegedViewer = trustedServer is not null || trustedAdmin is not null;
+        var includeDrafts = input.IncludeDrafts && isPrivilegedViewer;
 
         var playerEmail = string.IsNullOrWhiteSpace(input.PlayerEmail)
             ? null
@@ -175,7 +175,7 @@ public sealed partial class Query
             .ToList();
 
         var items = entries
-            .Select(entry => ToGameNewsEntryInfo(entry, playerEmail, input.ServerKey))
+            .Select(entry => ToGameNewsEntryInfo(entry, playerEmail, input.ServerKey, isPrivilegedViewer))
             .ToList();
 
         var unreadCount = 0;
@@ -423,7 +423,8 @@ public sealed partial class Query
     internal static GameNewsEntryInfo ToGameNewsEntryInfo(
         GameNewsEntry entry,
         string? normalizedPlayerEmail,
-        string serverKey)
+        string serverKey,
+        bool includeAuthorEmails = true)
     {
         var isRead = normalizedPlayerEmail is not null
             && entry.ReadReceipts.Any(receipt => receipt.PlayerEmail == normalizedPlayerEmail && receipt.ServerKey == serverKey);
@@ -434,8 +435,10 @@ public sealed partial class Query
             EntryType = entry.EntryType,
             Status = entry.Status,
             TargetServerKey = entry.TargetServerKey,
-            CreatedByEmail = entry.CreatedByEmail,
-            UpdatedByEmail = entry.UpdatedByEmail,
+            // Author email addresses are personal data and must stay private:
+            // only trusted servers or administrators may see them.
+            CreatedByEmail = includeAuthorEmails ? entry.CreatedByEmail : string.Empty,
+            UpdatedByEmail = includeAuthorEmails ? entry.UpdatedByEmail : string.Empty,
             CreatedAtUtc = entry.CreatedAtUtc,
             UpdatedAtUtc = entry.UpdatedAtUtc,
             PublishedAtUtc = entry.PublishedAtUtc,
