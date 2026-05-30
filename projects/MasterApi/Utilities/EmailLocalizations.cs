@@ -221,6 +221,97 @@ public static class EmailLocalizations
         "de" => $"Der Support-Ticketstatus wurde zu {status} geändert.",
         _ => $"Support ticket status changed to {status}.",
     };
+
+    public static EmailCopy AccountDeletionRequested(string locale) => NormalizeLocale(locale) switch
+    {
+        "sk" => new EmailCopy(
+            "Žiadosť o vymazanie účtu Capitalism",
+            "Váš účet je naplánovaný na vymazanie",
+            "Dostali sme žiadosť o vymazanie vášho účtu Capitalism. Mrzí nás, že odchádzate. Pred trvalým odstránením máte ešte čas si to rozmyslieť.",
+            "Čo stratíte",
+            "Tento e-mail ste dostali, pretože bola odoslaná žiadosť o vymazanie vášho účtu Capitalism."),
+        "de" => new EmailCopy(
+            "Anfrage zur Löschung deines Capitalism-Kontos",
+            "Dein Konto ist zur Löschung vorgemerkt",
+            "Wir haben eine Anfrage zur Löschung deines Capitalism-Kontos erhalten. Schade, dass du gehst. Vor der endgültigen Löschung hast du noch Zeit, es dir anders zu überlegen.",
+            "Was du verlierst",
+            "Du erhältst diese E-Mail, weil eine Anfrage zur Löschung deines Capitalism-Kontos gestellt wurde."),
+        _ => new EmailCopy(
+            "Capitalism account deletion request",
+            "Your account is scheduled for deletion",
+            "We received a request to delete your Capitalism account. We are sorry to see you go. Before anything is permanently removed, you still have time to change your mind.",
+            "What you will lose",
+            "You received this email because a request was made to delete your Capitalism account."),
+    };
+
+    public static EmailCopy AccountDeletionCompleted(string locale) => NormalizeLocale(locale) switch
+    {
+        "sk" => new EmailCopy(
+            "Váš účet Capitalism bol vymazaný",
+            "Váš účet bol vymazaný",
+            "Váš účet Capitalism a súvisiace herné údaje boli odstránené z našich serverov, ako ste požadovali. Ďakujeme, že ste s nami hrali.",
+            "Čo nasleduje",
+            "Tento e-mail ste dostali, pretože vymazanie vášho účtu Capitalism bolo dokončené."),
+        "de" => new EmailCopy(
+            "Dein Capitalism-Konto wurde gelöscht",
+            "Dein Konto wurde gelöscht",
+            "Dein Capitalism-Konto und die zugehörigen Spieldaten wurden wie gewünscht von unseren Servern entfernt. Danke, dass du mit uns gespielt hast.",
+            "Wie es weitergeht",
+            "Du erhältst diese E-Mail, weil die Löschung deines Capitalism-Kontos abgeschlossen wurde."),
+        _ => new EmailCopy(
+            "Your Capitalism account has been deleted",
+            "Your account has been deleted",
+            "Your Capitalism account and the related game data have been removed from our servers as you requested. Thank you for playing with us.",
+            "What happens next",
+            "You received this email because the deletion of your Capitalism account has been completed."),
+    };
+
+    /// <summary>Bullet points describing what the player loses when the account is deleted.</summary>
+    public static IReadOnlyList<string> AccountDeletionLossItems(string locale) => NormalizeLocale(locale) switch
+    {
+        "sk" =>
+        [
+            "Všetok herný postup na všetkých herných serveroch.",
+            "Tokenizované zlaté vklady spojené s vaším účtom.",
+            "Akékoľvek budúce tokenizované zlaté odmeny.",
+            "Po dokončení budú všetky vaše údaje z herného servera natrvalo odstránené.",
+        ],
+        "de" =>
+        [
+            "Deinen gesamten Spielfortschritt auf allen Spielservern.",
+            "Die mit deinem Konto verknüpften tokenisierten Goldeinlagen.",
+            "Alle zukünftigen tokenisierten Goldbelohnungen.",
+            "Nach Abschluss werden alle deine Daten dauerhaft vom Spielserver entfernt.",
+        ],
+        _ =>
+        [
+            "All of your game progress across every game server.",
+            "The tokenized gold deposits linked to your account.",
+            "Any future tokenized gold rewards.",
+            "Once completed, all of your data will be permanently removed from the game server.",
+        ],
+    };
+
+    public static string AccountDeletionScheduledNote(string locale, string scheduledAtUtc) => NormalizeLocale(locale) switch
+    {
+        "sk" => $"Váš účet bude trvalo odstránený po {scheduledAtUtc}.",
+        "de" => $"Dein Konto wird nach {scheduledAtUtc} dauerhaft entfernt.",
+        _ => $"Your account will be permanently removed after {scheduledAtUtc}.",
+    };
+
+    public static string AccountDeletionCancelNote(string locale, string portalUrl) => NormalizeLocale(locale) switch
+    {
+        "sk" => $"Rozmysleli ste si to? Vymazanie môžete kedykoľvek počas tejto lehoty zrušiť v nastaveniach účtu: {portalUrl}",
+        "de" => $"Anders überlegt? Du kannst die Löschung während dieser Frist jederzeit in deinen Kontoeinstellungen abbrechen: {portalUrl}",
+        _ => $"Changed your mind? You can cancel the deletion at any time during this period from your account settings: {portalUrl}",
+    };
+
+    public static string AccountDeletionPortalNote(string locale, string portalUrl) => NormalizeLocale(locale) switch
+    {
+        "sk" => $"Ak budete chcieť, ste vždy vítaní späť. Nový účet si môžete vytvoriť na {portalUrl}",
+        "de" => $"Du bist jederzeit wieder willkommen. Ein neues Konto kannst du unter {portalUrl} erstellen.",
+        _ => $"You are always welcome back. You can create a new account any time at {portalUrl}",
+    };
 }
 
 public sealed record EmailCopy(

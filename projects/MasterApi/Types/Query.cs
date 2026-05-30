@@ -282,6 +282,9 @@ public sealed partial class Query
             StartupPackClaimedAtUtc = player.StartupPackClaimedAtUtc,
             CanClaimStartupPack = player.StartupPackClaimedAtUtc is null,
             HasReferralDiscount = player.ReferredByEmail is not null,
+            DeletionRequestedAtUtc = player.DeletionRequestedAtUtc,
+            DeletionScheduledAtUtc = player.DeletionScheduledAtUtc,
+            IsPendingDeletion = player.DeletionRequestedAtUtc is not null,
         };
     }
 

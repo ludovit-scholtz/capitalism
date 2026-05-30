@@ -47,6 +47,8 @@ public class Program
             builder.Configuration.GetSection(GoldTokenTransferOptions.SectionName));
         builder.Services.Configure<EmailOptions>(
             builder.Configuration.GetSection(EmailOptions.SectionName));
+        builder.Services.Configure<AccountDeletionOptions>(
+            builder.Configuration.GetSection(AccountDeletionOptions.SectionName));
 
         var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
             ?? new JwtOptions();
@@ -389,6 +391,7 @@ public class Program
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddHttpClient("master-server");
         builder.Services.AddHttpClient<PersonalAccountNamePropagationService>();
+        builder.Services.AddHttpClient<GameServerAccountPurgeService>();
         builder.Services.AddScoped<AuthenticatedMasterPlayerClaimsSyncService>();
         builder.Services.AddScoped<IPasswordHasher<PlayerAccount>, PasswordHasher<PlayerAccount>>();
         builder.Services.AddScoped<MasterRankingService>();
@@ -399,6 +402,8 @@ public class Program
         builder.Services.AddScoped<IEmailSender, AzureCommunicationEmailSender>();
         builder.Services.AddScoped<IMasterEmailService, MasterEmailService>();
         builder.Services.AddScoped<IWeeklyEmailReportService, WeeklyEmailReportService>();
+        builder.Services.AddScoped<IAccountDeletionService, AccountDeletionService>();
+        builder.Services.AddHostedService<AccountDeletionHostedService>();
         builder.Services.AddHostedService<MasterRankingSchedulerHostedService>();
         builder.Services.AddHostedService<GameServerEvictionHostedService>();
         builder.Services.AddMemoryCache();
