@@ -808,6 +808,8 @@ export default {
     tokenizationNote: 'Tokenized gold is also subject to the ASA.Gold tokenization platform terms:',
   },
   docs: {
+    kicker: 'Documentation',
+    title: 'Game Docs',
     subtitle: 'Learn how to play Capitalism, understand the economy, and master buildings.',
     topicsLabel: 'Topics',
     topicGettingStarted: 'Getting Started',

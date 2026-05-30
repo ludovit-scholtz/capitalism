@@ -263,6 +263,7 @@ public static class LegalPdfGenerator
         var output = new MemoryStream();
         var writer = new StreamWriter(output, new UTF8Encoding(false)) { NewLine = "\n" };
         writer.Write("%PDF-1.4\n");
+        // Binary marker required by the PDF specification (%âãÏÓ) so tools treat the file as binary.
         writer.Write("%\u00E2\u00E3\u00CF\u00D3\n");
         writer.Flush();
 
