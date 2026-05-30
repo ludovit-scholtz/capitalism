@@ -133,6 +133,16 @@ const router = createRouter({
       name: 'docs',
       component: () => import('@/views/DocsView.vue'),
     },
+    {
+      path: '/terms',
+      name: 'terms',
+      component: () => import('@/views/LegalView.vue'),
+    },
+    {
+      path: '/privacy',
+      name: 'privacy',
+      component: () => import('@/views/LegalView.vue'),
+    },
   ],
   scrollBehavior(to) {
     if (to.hash) {

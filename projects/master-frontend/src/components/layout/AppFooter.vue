@@ -10,6 +10,8 @@ const { t } = useI18n()
     <div class="container flex h-12 items-center justify-between text-sm text-muted">
       <p>{{ t('common.allRightsReserved', { year: new Date().getFullYear() }) }}</p>
       <div class="flex items-center gap-4">
+        <RouterLink to="/terms" class="hover:text-body">{{ t('legal.terms') }}</RouterLink>
+        <RouterLink to="/privacy" class="hover:text-body">{{ t('legal.privacy') }}</RouterLink>
         <LanguageSwitcher />
       </div>
     </div>

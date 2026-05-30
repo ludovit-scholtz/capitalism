@@ -44,6 +44,23 @@ export interface AccountDeletionStatus {
   deletionScheduledAtUtc: string | null
 }
 
+export type LegalDocumentKind = 'TERMS' | 'PRIVACY'
+
+export interface LegalDocumentSection {
+  heading: string
+  paragraphs: string[]
+}
+
+export interface LegalDocument {
+  kind: LegalDocumentKind
+  locale: string
+  title: string
+  version: string
+  effectiveDate: string
+  intro: string
+  sections: LegalDocumentSection[]
+}
+
 export interface MasterAuthPayload {
   token: string
   expiresAtUtc: string
@@ -155,6 +172,23 @@ const ME_QUERY = `
   }
 `
 
+const LEGAL_DOCUMENTS_QUERY = `
+  query LegalDocuments($locale: String) {
+    legalDocuments(locale: $locale) {
+      kind
+      locale
+      title
+      version
+      effectiveDate
+      intro
+      sections {
+        heading
+        paragraphs
+      }
+    }
+  }
+`
+
 const MY_SUBSCRIPTION_QUERY = `
   query {
     mySubscription {
@@ -229,6 +263,13 @@ const CANCEL_ACCOUNT_DELETION_MUTATION = `
 export async function fetchGameServers(): Promise<GameServerSummary[]> {
   const data = await gqlRequest<GameServersPayload>(GAME_SERVERS_QUERY)
   return data.gameServers
+}
+
+export async function fetchLegalDocuments(locale?: string): Promise<LegalDocument[]> {
+  const data = await gqlRequest<{ legalDocuments: LegalDocument[] }>(LEGAL_DOCUMENTS_QUERY, {
+    locale: locale ?? null,
+  })
+  return data.legalDocuments
 }
 
 export async function registerAccount(

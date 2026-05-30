@@ -808,6 +808,19 @@ export default {
     loadError:
       'Sicherheitstafel-Daten konnten nicht geladen werden. Die Berichtsdatei wurde möglicherweise noch nicht generiert.',
   },
+  legal: {
+    kicker: 'Rechtliches',
+    title: 'Rechtliche Dokumente',
+    subtitle: 'Allgemeine Geschäftsbedingungen und Datenschutzerklärung für den Capitalism-Dienst.',
+    documentsLabel: 'Dokumente',
+    terms: 'Allgemeine Geschäftsbedingungen',
+    privacy: 'Datenschutzerklärung',
+    version: 'Version',
+    effectiveDate: 'Gültig ab',
+    loading: 'Rechtliche Dokumente werden geladen…',
+    loadError: 'Die rechtlichen Dokumente konnten nicht geladen werden. Bitte versuche es später erneut.',
+    tokenizationNote: 'Für tokenisiertes Gold gelten auch die Bedingungen der ASA.Gold-Tokenisierungsplattform:',
+  },
   docs: {
     kicker: 'Dokumentation',
     title: 'Spiel-Dokumentation',

@@ -1,4 +1,8 @@
 export default {
+  legal: {
+    terms: 'Allgemeine Geschäftsbedingungen',
+    privacy: 'Datenschutzerklärung',
+  },
   common: {
     appName: 'Kapitalismus 5',
     loading: 'Laden...',

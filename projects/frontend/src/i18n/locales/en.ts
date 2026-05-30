@@ -1,4 +1,8 @@
 export default {
+  legal: {
+    terms: 'Terms and Conditions',
+    privacy: 'Privacy Policy',
+  },
   common: {
     appName: 'Capitalism 5',
     loading: 'Loading...',

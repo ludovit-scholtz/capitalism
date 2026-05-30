@@ -2070,6 +2070,55 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
       return
     }
 
+    // LegalDocuments query
+    if (query.includes('legalDocuments')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            legalDocuments: [
+              {
+                kind: 'TERMS',
+                locale: 'en',
+                title: 'Terms and Conditions',
+                version: '2026.1',
+                effectiveDate: '2026-01-01',
+                intro:
+                  'These Terms and Conditions govern the use of the Capitalism game operated by Scholtz & Company, jsa.',
+                sections: [
+                  {
+                    heading: '6. Pay-to-play mechanism and tokenized gold',
+                    paragraphs: [
+                      'The pay-to-play mechanism allows players to receive tokenized gold via the ASA.Gold tokenization platform.',
+                    ],
+                  },
+                ],
+              },
+              {
+                kind: 'PRIVACY',
+                locale: 'en',
+                title: 'Privacy Policy',
+                version: '2026.1',
+                effectiveDate: '2026-01-01',
+                intro:
+                  'This Privacy Policy describes how Scholtz & Company, jsa processes personal data.',
+                sections: [
+                  {
+                    heading: '4. Data storage in the EU',
+                    paragraphs: [
+                      'Personal data is stored and processed on servers located within the European Union.',
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+      })
+      return
+    }
+
     // goldTokenBalances query
     if (query.includes('goldTokenBalances')) {
       if (!state.currentPlayer || !state.isGlobalAdmin) {
