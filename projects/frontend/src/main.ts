@@ -10,6 +10,7 @@ import './assets/styles/main.css'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { frontendSolidIcons } from '@/lib/fontAwesomeIcons'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import { initMonitoring } from '@/lib/monitoring'
 
 library.add(...frontendSolidIcons)
 
@@ -29,4 +30,5 @@ export function createApp() {
 
 // Client-side mounting
 const { app } = createApp()
+initMonitoring(app)
 app.mount('#app')
