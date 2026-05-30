@@ -152,6 +152,20 @@ img {
   background: var(--color-hover);
 }
 
+.btn-danger {
+  color: #fff;
+  background: #dc2626;
+}
+
+.btn-danger:hover {
+  background: #b91c1c;
+}
+
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .form-input,
 .form-select,
 .form-textarea {

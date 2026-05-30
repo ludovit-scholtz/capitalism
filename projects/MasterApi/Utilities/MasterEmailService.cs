@@ -3,6 +3,7 @@ using System.Text;
 using MasterApi.Data;
 using MasterApi.Data.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace MasterApi.Utilities;
 
@@ -22,12 +23,22 @@ public interface IMasterEmailService
         SupportTicket ticket,
         string changeNote,
         CancellationToken cancellationToken);
+    Task<bool> SendAccountDeletionRequestedEmailAsync(
+        PlayerAccount player,
+        DateTime scheduledAtUtc,
+        CancellationToken cancellationToken);
+    Task<bool> SendAccountDeletionCompletedEmailAsync(
+        string recipientEmail,
+        string recipientDisplayName,
+        string locale,
+        CancellationToken cancellationToken);
 }
 
 public sealed class MasterEmailService(
     MasterDbContext db,
     IEmailTemplateRenderer renderer,
     IEmailSender sender,
+    IOptions<MasterApi.Configuration.EmailOptions> emailOptions,
     ILogger<MasterEmailService> logger) : IMasterEmailService
 {
     public async Task SendRegistrationEmailIfNeededAsync(
@@ -141,6 +152,128 @@ public sealed class MasterEmailService(
         var locale = EmailLocalizations.NormalizeLocale(owner.PreferredLocale);
         var copy = EmailLocalizations.SupportTicketUpdated(locale);
         return await SendSupportTicketEmailAsync(owner, ticket, copy, locale, changeNote, cancellationToken);
+    }
+
+    public async Task<bool> SendAccountDeletionRequestedEmailAsync(
+        PlayerAccount player,
+        DateTime scheduledAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var locale = EmailLocalizations.NormalizeLocale(player.PreferredLocale);
+        var copy = EmailLocalizations.AccountDeletionRequested(locale);
+        var portalUrl = NormalizePortalUrl(emailOptions.Value.PortalBaseUrl);
+        var scheduledText = scheduledAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'", System.Globalization.CultureInfo.InvariantCulture);
+        var lossItems = EmailLocalizations.AccountDeletionLossItems(locale);
+        var scheduledNote = EmailLocalizations.AccountDeletionScheduledNote(locale, scheduledText);
+        var cancelNote = EmailLocalizations.AccountDeletionCancelNote(locale, portalUrl);
+        var greeting = WebUtility.HtmlEncode(GetGreeting(locale, player.DisplayName));
+        var signoff = WebUtility.HtmlEncode(GetSignoff(locale));
+
+        var lossListHtml = new StringBuilder();
+        foreach (var item in lossItems)
+        {
+            lossListHtml.Append($"<li style=\"margin:0 0 6px;\">{WebUtility.HtmlEncode(item)}</li>");
+        }
+
+        var bodyHtml = $"""
+            <p style="margin:0 0 18px;">{greeting}</p>
+            <p style="margin:0 0 18px;">{WebUtility.HtmlEncode(copy.Intro)}</p>
+            <p style="margin:0 0 8px;font-weight:700;color:#162033;">{WebUtility.HtmlEncode(copy.SectionTitle)}</p>
+            <ul style="margin:0 0 18px;padding-left:20px;">{lossListHtml}</ul>
+            <p style="margin:0 0 18px;">{WebUtility.HtmlEncode(scheduledNote)}</p>
+            <p style="margin:0 0 18px;">{WebUtility.HtmlEncode(cancelNote)}</p>
+            <p style="margin:0 0 22px;"><a href="{WebUtility.HtmlEncode(portalUrl)}" style="color:#0f766e;text-decoration:none;">{WebUtility.HtmlEncode(portalUrl)}</a></p>
+            <p style="margin:0;">{signoff}</p>
+            """.Trim();
+
+        var text = new StringBuilder();
+        text.AppendLine(copy.Headline);
+        text.AppendLine();
+        text.AppendLine(GetGreeting(locale, player.DisplayName));
+        text.AppendLine(copy.Intro);
+        text.AppendLine();
+        text.AppendLine(copy.SectionTitle);
+        foreach (var item in lossItems)
+        {
+            text.AppendLine($"- {item}");
+        }
+
+        text.AppendLine();
+        text.AppendLine(scheduledNote);
+        text.AppendLine(cancelNote);
+        text.AppendLine(portalUrl);
+        text.AppendLine();
+        text.AppendLine(GetSignoff(locale));
+
+        return await SendRenderedEmailAsync(
+            player.Email,
+            player.DisplayName,
+            locale,
+            copy,
+            bodyHtml,
+            text.ToString(),
+            cancellationToken);
+    }
+
+    public async Task<bool> SendAccountDeletionCompletedEmailAsync(
+        string recipientEmail,
+        string recipientDisplayName,
+        string locale,
+        CancellationToken cancellationToken)
+    {
+        var normalizedLocale = EmailLocalizations.NormalizeLocale(locale);
+        var copy = EmailLocalizations.AccountDeletionCompleted(normalizedLocale);
+        var portalUrl = NormalizePortalUrl(emailOptions.Value.PortalBaseUrl);
+        var portalNote = EmailLocalizations.AccountDeletionPortalNote(normalizedLocale, portalUrl);
+        var greeting = WebUtility.HtmlEncode(GetGreeting(normalizedLocale, recipientDisplayName));
+        var signoff = WebUtility.HtmlEncode(GetSignoff(normalizedLocale));
+
+        var bodyHtml = $"""
+            <p style="margin:0 0 18px;">{greeting}</p>
+            <p style="margin:0 0 18px;">{WebUtility.HtmlEncode(copy.Intro)}</p>
+            <p style="margin:0 0 8px;font-weight:700;color:#162033;">{WebUtility.HtmlEncode(copy.SectionTitle)}</p>
+            <p style="margin:0 0 18px;">{WebUtility.HtmlEncode(portalNote)}</p>
+            <p style="margin:0 0 22px;"><a href="{WebUtility.HtmlEncode(portalUrl)}" style="color:#0f766e;text-decoration:none;">{WebUtility.HtmlEncode(portalUrl)}</a></p>
+            <p style="margin:0;">{signoff}</p>
+            """.Trim();
+
+        var text = new StringBuilder();
+        text.AppendLine(copy.Headline);
+        text.AppendLine();
+        text.AppendLine(GetGreeting(normalizedLocale, recipientDisplayName));
+        text.AppendLine(copy.Intro);
+        text.AppendLine();
+        text.AppendLine(copy.SectionTitle);
+        text.AppendLine(portalNote);
+        text.AppendLine(portalUrl);
+        text.AppendLine();
+        text.AppendLine(GetSignoff(normalizedLocale));
+
+        return await SendRenderedEmailAsync(
+            recipientEmail,
+            recipientDisplayName,
+            normalizedLocale,
+            copy,
+            bodyHtml,
+            text.ToString(),
+            cancellationToken);
+    }
+
+    private static string NormalizePortalUrl(string? portalBaseUrl)
+    {
+        if (string.IsNullOrWhiteSpace(portalBaseUrl))
+        {
+            return "https://capitalism.de-4.biatec.io";
+        }
+
+        var trimmed = portalBaseUrl.Trim().TrimEnd('/');
+        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            return "https://capitalism.de-4.biatec.io";
+        }
+
+        return trimmed;
     }
 
     private static string? NormalizeUrl(string? accessedUrl)

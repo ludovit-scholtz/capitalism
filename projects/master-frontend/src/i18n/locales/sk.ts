@@ -245,6 +245,25 @@ export default {
     usageBodyMaster:
       'Rovnaké meno sa používa v master rebríčku, vašom master profile a na zdieľaných povrchoch naprieč servermi.',
   },
+  dangerZone: {
+    title: 'Nebezpečná zóna',
+    body: 'Odstránenie účtu je trvalé. Pred pokračovaním si prosím pozorne prečítajte, o čo prídete.',
+    lossProgress: 'Celý váš herný postup a spoločnosti na všetkých herných serveroch.',
+    lossDeposits: 'Vaše tokenizované zlaté vklady držané v hre.',
+    lossRewards: 'Akékoľvek budúce tokenizované zlaté odmeny, ktoré by ste získali.',
+    lossData: 'Všetky údaje vášho účtu budú natrvalo odstránené z herných serverov.',
+    deleteButton: 'Odstrániť môj účet',
+    confirmInstruction:
+      'Pre potvrdenie prosím nižšie zadajte e-mailovú adresu svojho účtu. Váš účet bude naplánovaný na odstránenie po 24-hodinovej čakacej dobe, počas ktorej môžete akciu stále zrušiť.',
+    confirmEmailLabel: 'Potvrďte svoju e-mailovú adresu',
+    confirmButton: 'Naplánovať odstránenie účtu',
+    abortButton: 'Ponechať môj účet',
+    pendingNotice:
+      'Váš účet je naplánovaný na odstránenie dňa {date}. Do tej doby môžete akciu stále zrušiť.',
+    cancelButton: 'Zrušiť odstránenie účtu',
+    requestError: 'Odstránenie vášho účtu sa nepodarilo naplánovať. Skúste to prosím znova.',
+    cancelError: 'Odstránenie vášho účtu sa nepodarilo zrušiť. Skúste to prosím znova.',
+  },
   goldAdmin: {
     kicker: 'Master administrácia',
     title: 'Správa zlatých tokenov',
@@ -802,6 +821,17 @@ export default {
       proTitle: 'Pro predplatné',
       proBody:
         'Bezplatný účet vám dáva prístup ku všetkým základným funkciám. Upgrade na Pro odomkne pokročilú analytiku a neobmedzené zakladanie spoločností.',
+      deleteTitle: 'Odstránenie účtu',
+      deleteBody:
+        'Svoj účet môžete natrvalo odstrániť v Nebezpečnej zóne v Nastaveniach hry. Budete požiadaní o potvrdenie zadaním e-mailovej adresy. Po potvrdení sa účet naplánuje na odstránenie po 24-hodinovej čakacej dobe a počas tohto obdobia môžete akciu kedykoľvek zrušiť.',
+      deleteList1: 'Prídete o celý herný postup a spoločnosti na všetkých herných serveroch.',
+      deleteList2:
+        'Prídete o tokenizované zlaté vklady a akékoľvek budúce tokenizované zlaté odmeny.',
+      deleteList3:
+        'Všetky vaše budovy budú zničené okrem bánk, ktoré sa prevedú na vládu (0% úrok z vkladov a 20% úrok z úverov).',
+      deleteList4: 'Všetky údaje vášho účtu budú natrvalo odstránené z herných serverov.',
+      deleteEmails:
+        'Pošleme vám e-mail pri vyžiadaní odstránenia a znova tesne pred konečným odstránením účtu.',
     },
     bg: {
       overviewTitle: 'Prehľad',

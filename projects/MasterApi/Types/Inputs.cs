@@ -133,6 +133,15 @@ public sealed class MasterPlayerProfile
     public bool CanClaimStartupPack { get; set; }
 
     public bool HasReferralDiscount { get; set; }
+
+    /// <summary>UTC time when the player requested account deletion, or null when none is pending.</summary>
+    public DateTime? DeletionRequestedAtUtc { get; set; }
+
+    /// <summary>UTC time after which a pending account deletion will be finalized, or null when none is pending.</summary>
+    public DateTime? DeletionScheduledAtUtc { get; set; }
+
+    /// <summary>True when the account is marked for deletion and still inside the cancellable cooldown window.</summary>
+    public bool IsPendingDeletion { get; set; }
 }
 
 public sealed class UpdatePersonalAccountNameInput

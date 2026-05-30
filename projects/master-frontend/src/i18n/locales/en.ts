@@ -246,6 +246,25 @@ export default {
     usageBodyMaster:
       'The same name is used in the master ranking, your master profile, and shared cross-server account surfaces.',
   },
+  dangerZone: {
+    title: 'Danger zone',
+    body: 'Deleting your account is permanent. Please read carefully what you will lose before continuing.',
+    lossProgress: 'All of your game progress and companies across every game server.',
+    lossDeposits: 'Your tokenized gold deposits held in the game.',
+    lossRewards: 'Any future tokenized gold rewards you would have earned.',
+    lossData: 'All of your account data will be permanently removed from the game servers.',
+    deleteButton: 'Delete my account',
+    confirmInstruction:
+      'To confirm, please enter your account email address below. Your account will be scheduled for deletion after a 24-hour cooldown, during which you can still cancel.',
+    confirmEmailLabel: 'Confirm your email address',
+    confirmButton: 'Schedule account deletion',
+    abortButton: 'Keep my account',
+    pendingNotice:
+      'Your account is scheduled for deletion on {date}. You can still cancel until then.',
+    cancelButton: 'Cancel account deletion',
+    requestError: 'We could not schedule your account deletion. Please try again.',
+    cancelError: 'We could not cancel your account deletion. Please try again.',
+  },
   goldAdmin: {
     kicker: 'Master Administration',
     title: 'Gold Token Management',
@@ -803,6 +822,16 @@ export default {
       proTitle: 'Pro Subscription',
       proBody:
         'A free account gives you access to all core gameplay. Upgrading to Pro unlocks advanced analytics, unlimited company creation, and priority server access. You can manage your subscription from the Account page.',
+      deleteTitle: 'Deleting Your Account',
+      deleteBody:
+        'You can permanently delete your account from the Danger Zone in Game Settings. You will be asked to confirm by entering your email address. When you do, your account is scheduled for deletion after a 24-hour cooldown, and you can cancel any time during that period.',
+      deleteList1: 'You lose all of your game progress and companies across every game server.',
+      deleteList2: 'You lose your tokenized gold deposits and any future tokenized gold rewards.',
+      deleteList3:
+        'All of your buildings are destroyed, except banks, which are transferred to the government (0% deposit and 20% lending interest).',
+      deleteList4: 'All of your account data is permanently removed from the game servers.',
+      deleteEmails:
+        'We email you when the deletion is requested and again right before your account is finally removed.',
     },
     bg: {
       overviewTitle: 'Overview',

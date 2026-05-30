@@ -26,3 +26,10 @@ Create a fun game in the style of Capitalism II, where players experience realis
 - [x] When user never received email (create flag in the master database), send him the registration email. In the email also write his current url address which he accessed.
 - [x] Send users email on weekly basis in friday noon with the report where will be listed all their active game servers, their profit and ranking in the game server, then the master server bounties points they collected in past week, and if there are any news from the changelog within a week add it there.
 - [x] Store the language preference after the user logs in to the system to the master server database, and use that localization for the emails to be sent. If no language is set in the database use English.
+
+### Account deletion
+
+- [x] Add a Danger Zone in the master frontend user settings with a delete account section that requires the user to confirm by entering their email address, lists what they lose (game progress, tokenized gold deposits, future tokenized gold rewards) and warns that all game-server data will be removed.
+- [x] Do not delete immediately: mark the account for deletion with a 24-hour cooldown that the user can cancel, and send a request email and a final confirmation email (both polite, localized, with the master portal link).
+- [x] When purging game-server data destroy all of the user's buildings except banks, transfer banks to the government entity, and set deposit interest to 0% and lending interest to 20%.
+- [x] Keep it secure (only the user can delete their own account) with backend and e2e test coverage, and update the in-game user documentation.

@@ -97,6 +97,18 @@ const navItems = computed(() => [
               <h2>{{ t('docs.gs.proTitle') }}</h2>
               <p>{{ t('docs.gs.proBody') }}</p>
             </section>
+
+            <section class="doc-section">
+              <h2>{{ t('docs.gs.deleteTitle') }}</h2>
+              <p>{{ t('docs.gs.deleteBody') }}</p>
+              <ul class="doc-list">
+                <li>{{ t('docs.gs.deleteList1') }}</li>
+                <li>{{ t('docs.gs.deleteList2') }}</li>
+                <li>{{ t('docs.gs.deleteList3') }}</li>
+                <li>{{ t('docs.gs.deleteList4') }}</li>
+              </ul>
+              <p>{{ t('docs.gs.deleteEmails') }}</p>
+            </section>
           </template>
 
           <!-- Buildings Guide -->

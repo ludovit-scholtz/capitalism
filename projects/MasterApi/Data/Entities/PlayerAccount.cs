@@ -35,6 +35,20 @@ public sealed class PlayerAccount
 
     public DateTime? StartupPackClaimedAtUtc { get; set; }
 
+    /// <summary>
+    /// UTC time when the player requested deletion of their account. Null when no
+    /// deletion is pending. The account is not removed immediately; a cooldown
+    /// period gives the player a chance to cancel.
+    /// </summary>
+    public DateTime? DeletionRequestedAtUtc { get; set; }
+
+    /// <summary>
+    /// UTC time after which the pending account deletion may be finalized by the
+    /// background deletion worker. Equals <see cref="DeletionRequestedAtUtc"/> plus
+    /// the configured cooldown period.
+    /// </summary>
+    public DateTime? DeletionScheduledAtUtc { get; set; }
+
     /// <summary>Email of the player who referred this account (null if self-registered).</summary>
     public string? ReferredByEmail { get; set; }
 

@@ -248,6 +248,25 @@ export default {
     usageBodyMaster:
       'Derselbe Name wird in der Master-Rangliste, Ihrem Master-Profil und den gemeinsamen serverübergreifenden Kontoflächen verwendet.',
   },
+  dangerZone: {
+    title: 'Gefahrenzone',
+    body: 'Das Löschen Ihres Kontos ist endgültig. Bitte lesen Sie sorgfältig, was Sie verlieren, bevor Sie fortfahren.',
+    lossProgress: 'Ihren gesamten Spielfortschritt und Ihre Unternehmen auf allen Spielservern.',
+    lossDeposits: 'Ihre tokenisierten Goldeinlagen im Spiel.',
+    lossRewards: 'Alle zukünftigen tokenisierten Goldprämien, die Sie erhalten hätten.',
+    lossData: 'Alle Daten Ihres Kontos werden dauerhaft von den Spielservern entfernt.',
+    deleteButton: 'Mein Konto löschen',
+    confirmInstruction:
+      'Geben Sie zur Bestätigung bitte unten die E-Mail-Adresse Ihres Kontos ein. Ihr Konto wird nach einer 24-stündigen Wartezeit zur Löschung vorgemerkt, während der Sie den Vorgang noch abbrechen können.',
+    confirmEmailLabel: 'Bestätigen Sie Ihre E-Mail-Adresse',
+    confirmButton: 'Kontolöschung planen',
+    abortButton: 'Mein Konto behalten',
+    pendingNotice:
+      'Ihr Konto ist für die Löschung am {date} vorgemerkt. Bis dahin können Sie den Vorgang noch abbrechen.',
+    cancelButton: 'Kontolöschung abbrechen',
+    requestError: 'Wir konnten die Löschung Ihres Kontos nicht planen. Bitte versuchen Sie es erneut.',
+    cancelError: 'Wir konnten die Löschung Ihres Kontos nicht abbrechen. Bitte versuchen Sie es erneut.',
+  },
   goldAdmin: {
     kicker: 'Master-Administration',
     title: 'Verwaltung der Gold-Token',
@@ -816,6 +835,18 @@ export default {
       proTitle: 'Pro-Abonnement',
       proBody:
         'Ein kostenloses Konto bietet Zugriff auf alle Kernfunktionen. Das Upgrade auf Pro schaltet erweiterte Analysen und unbegrenzte Unternehmensgründungen frei.',
+      deleteTitle: 'Konto löschen',
+      deleteBody:
+        'Sie können Ihr Konto in der Gefahrenzone unter den Spieleinstellungen dauerhaft löschen. Sie werden gebeten, dies durch Eingabe Ihrer E-Mail-Adresse zu bestätigen. Anschließend wird Ihr Konto nach einer 24-stündigen Wartezeit zur Löschung vorgemerkt, und Sie können den Vorgang in diesem Zeitraum jederzeit abbrechen.',
+      deleteList1:
+        'Sie verlieren Ihren gesamten Spielfortschritt und Ihre Unternehmen auf allen Spielservern.',
+      deleteList2:
+        'Sie verlieren Ihre tokenisierten Goldeinlagen und alle zukünftigen tokenisierten Goldprämien.',
+      deleteList3:
+        'Alle Ihre Gebäude werden zerstört, ausgenommen Banken, die an die Regierung übertragen werden (0% Einlagen- und 20% Kreditzins).',
+      deleteList4: 'Alle Daten Ihres Kontos werden dauerhaft von den Spielservern entfernt.',
+      deleteEmails:
+        'Wir senden Ihnen eine E-Mail, wenn die Löschung angefordert wird, und erneut kurz bevor Ihr Konto endgültig entfernt wird.',
     },
     bg: {
       overviewTitle: 'Übersicht',
