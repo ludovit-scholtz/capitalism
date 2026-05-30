@@ -7,6 +7,9 @@ import { readRuntimeAppConfigValue } from './runtimeConfig'
  * Default Sentry DSN and Google Analytics measurement id. These can be
  * overridden at runtime through the deployed runtime-config.js so that staging
  * and production environments can report to their own projects.
+ *
+ * The Sentry DSN is a public client key (safe to ship to browsers); it only
+ * allows submitting events, not reading them.
  */
 const DEFAULT_SENTRY_DSN =
   'https://4a2e8303a6a395550e7c5b11b648c230@o4511479034413056.ingest.de.sentry.io/4511479036903504'
