@@ -28,7 +28,9 @@ public sealed partial class Mutation
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
-        var companies = await db.Companies.ToListAsync();
+        var companies = await db.Companies
+            .Include(c => c.BankAccounts)
+            .ToListAsync();
 
         var targetCompany = companies.FirstOrDefault(c => c.Id == input.TargetCompanyId)
             ?? throw new GraphQLException(
@@ -87,18 +89,26 @@ public sealed partial class Mutation
         var taxRate = gameState?.TaxRate ?? 0m;
         if (taxableIncome > 0m && taxRate > 0m)
         {
-            var taxAmount = decimal.Round(taxableIncome * taxRate, 2, MidpointRounding.AwayFromZero);
-            CompanyBankingService.TryDebit(targetCompany.BankAccounts, taxAmount);
-            db.LedgerEntries.Add(new LedgerEntry
+            // TaxRate is stored as a percentage (e.g. 15 for 15%); use the shared helper so the
+            // merge-time tax matches the annual TaxPhase calculation instead of over-charging.
+            var taxDue = GameTime.ComputeEstimatedIncomeTax(taxableIncome, taxRate);
+            // Clamp the merge-time tax to the target's available balance so cash-poor
+            // companies cannot merge to escape tax (matching the TaxPhase convention).
+            var availableBalance = CompanyBankingService.GetAvailableBalance(targetCompany.BankAccounts);
+            var taxPaid = Math.Min(availableBalance, taxDue);
+            if (taxPaid > 0m && CompanyBankingService.TryDebit(targetCompany.BankAccounts, taxPaid))
             {
-                Id = Guid.NewGuid(),
-                CompanyId = targetCompany.Id,
-                Category = LedgerCategory.Tax,
-                Description = $"Merger settlement tax",
-                Amount = -taxAmount,
-                RecordedAtTick = currentTick,
-                RecordedAtUtc = DateTime.UtcNow,
-            });
+                db.LedgerEntries.Add(new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = targetCompany.Id,
+                    Category = LedgerCategory.Tax,
+                    Description = $"Merger settlement tax",
+                    Amount = -taxPaid,
+                    RecordedAtTick = currentTick,
+                    RecordedAtUtc = DateTime.UtcNow,
+                });
+            }
         }
 
         // Transfer buildings
