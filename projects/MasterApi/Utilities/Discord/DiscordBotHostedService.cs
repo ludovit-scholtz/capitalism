@@ -1,6 +1,7 @@
 using Discord;
 using Discord.WebSocket;
 using MasterApi.Configuration;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -252,10 +253,10 @@ public sealed class DiscordBotHostedService : BackgroundService
             using var scope = _scopeFactory.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<Data.MasterDbContext>();
             var discordUserId = message.Author.Id.ToString();
-            var email = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(
-                db.PlayerAccounts
-                    .Where(account => account.DiscordUserId == discordUserId)
-                    .Select(account => account.Email));
+            var email = await db.PlayerAccounts
+                .Where(account => account.DiscordUserId == discordUserId)
+                .Select(account => account.Email)
+                .FirstOrDefaultAsync();
 
             if (string.IsNullOrEmpty(email))
             {
