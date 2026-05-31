@@ -71,8 +71,8 @@ Using environment variables (note the double underscore):
 DiscordBot__Enabled=true
 DiscordBot__BotToken=your-bot-token
 DiscordBot__CommandPrefix=cap5        # cap5stage on the staging master server
-DiscordBot__GuildId=123456789012345678
-DiscordBot__ChatChannelId=234567890123456789
+DiscordBot__GuildId=..
+DiscordBot__ChatChannelId=..
 ```
 
 When `Enabled` is `false` or `BotToken` is empty, the bot hosted service does not start.
