@@ -276,6 +276,17 @@ const UNSUBSCRIBE_FROM_WEEKLY_REPORT_EMAIL_MUTATION = `
   }
 `
 
+const REQUEST_DISCORD_LINK_CODE_MUTATION = `
+  mutation RequestDiscordLinkCode {
+    requestDiscordLinkCode {
+      code
+      expiresAtUtc
+      commandPrefix
+      discordInviteUrl
+    }
+  }
+`
+
 export async function fetchGameServers(): Promise<GameServerSummary[]> {
   const data = await gqlRequest<GameServersPayload>(GAME_SERVERS_QUERY)
   return data.gameServers
@@ -1894,4 +1905,20 @@ export async function revokeAllPlayerApiKeys(
     gameGqlUrl,
   )
   return data.revokeAllPlayerApiKeys
+}
+
+export interface DiscordLinkCodeInfo {
+  code: string
+  expiresAtUtc: string
+  commandPrefix: string
+  discordInviteUrl: string
+}
+
+export async function requestDiscordLinkCode(token: string): Promise<DiscordLinkCodeInfo> {
+  const data = await gqlRequest<{ requestDiscordLinkCode: DiscordLinkCodeInfo }>(
+    REQUEST_DISCORD_LINK_CODE_MUTATION,
+    undefined,
+    token,
+  )
+  return data.requestDiscordLinkCode
 }

@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { fetchMyGoldAccount, type PlayerGoldAccountInfo } from '@/lib/masterApi'
+import { fetchMyGoldAccount, requestDiscordLinkCode, type DiscordLinkCodeInfo, type PlayerGoldAccountInfo } from '@/lib/masterApi'
 import ViewJumbotron from '@/components/layout/ViewJumbotron.vue'
 import ViewSubnav from '@/components/layout/ViewSubnav.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -120,6 +120,29 @@ async function claimStartupPack() {
     startupPackClaiming.value = false
   }
 }
+
+// Discord account linking
+const discordLinkLoading = ref(false)
+const discordLinkError = ref('')
+const discordLink = ref<DiscordLinkCodeInfo | null>(null)
+
+async function generateDiscordLinkCode() {
+  if (!auth.token) return
+  discordLinkLoading.value = true
+  discordLinkError.value = ''
+  try {
+    discordLink.value = await requestDiscordLinkCode(auth.token)
+  } catch (e: unknown) {
+    discordLinkError.value = e instanceof Error ? e.message : t('account.discordLinkError')
+  } finally {
+    discordLinkLoading.value = false
+  }
+}
+
+const discordVerifyCommand = computed(() => {
+  if (!discordLink.value) return ''
+  return `/${discordLink.value.commandPrefix}-verify code:${discordLink.value.code}`
+})
 
 // Email preferences
 const weeklyEmailUpdating = ref(false)
@@ -348,6 +371,34 @@ onMounted(() => {
             </button>
           </div>
           <p v-if="weeklyEmailError" class="state-error" role="alert">{{ weeklyEmailError }}</p>
+        </section>
+
+        <section class="discord-link-card" aria-labelledby="discord-link-heading">
+          <h2 id="discord-link-heading">{{ t('account.discordTitle') }}</h2>
+          <p class="discord-link-intro">{{ t('account.discordIntro') }}</p>
+          <button
+            type="button"
+            class="email-pref-btn"
+            :disabled="discordLinkLoading"
+            @click="generateDiscordLinkCode"
+          >
+            {{ discordLinkLoading ? t('account.discordGenerating') : t('account.discordGenerate') }}
+          </button>
+          <div v-if="discordLink" class="discord-link-result">
+            <p>
+              {{ t('account.discordCodeLabel') }}
+              <code class="discord-link-code">{{ discordLink.code }}</code>
+            </p>
+            <p class="discord-link-hint">
+              {{ t('account.discordCommandHint') }}
+              <code class="discord-link-command">{{ discordVerifyCommand }}</code>
+            </p>
+            <p class="discord-link-hint">{{ t('account.discordExpiryHint') }}</p>
+            <a :href="discordLink.discordInviteUrl" target="_blank" rel="noopener noreferrer">
+              {{ t('account.discordJoin') }}
+            </a>
+          </div>
+          <p v-if="discordLinkError" class="state-error" role="alert">{{ discordLinkError }}</p>
         </section>
 
         <!-- Recent transactions -->

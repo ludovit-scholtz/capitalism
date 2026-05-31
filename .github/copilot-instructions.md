@@ -84,6 +84,14 @@
 - The registration key in `projects/Api/appsettings*.json` must match `projects/MasterApi/appsettings*.json` for the game server to appear in the master frontend.
 - Treat `frontendUrl`, `backendUrl`, and `graphqlUrl` as server-owned infrastructure metadata. Do not let the master frontend invent or mutate them client-side.
 
+## Discord bot
+- The master-server Discord bot lives in `projects/MasterApi/Utilities/Discord/` and is configured through the `DiscordBot` section of `projects/MasterApi/appsettings*.json` (`DiscordBotOptions`). It only starts when `Enabled` is true and `BotToken` is set.
+- A single Discord server hosts both environments: every slash command is prefixed by `CommandPrefix` (`cap5` for production, `cap5stage` for staging), and staging/production run as separate Discord applications with their own bot tokens.
+- Keep bot command logic in the testable `DiscordCommandService` (verify/deposit/withdraw/help); `DiscordBotHostedService` only does Discord.Net wiring and is not unit-tested. Verify awards the `MasterRankingBountyCodes.DiscordPlayer` bounty via `MasterRankingService`.
+- Deposit/withdrawal command logic must reuse the shared `projects/MasterApi/Utilities/GoldTokenRequests.cs` helper so the bot and the GraphQL `Mutation.GoldTransfers.cs` stay in sync (note format `CAP-{id}`).
+- The two-way chat bridge mirrors `DiscordBot:ChatChannelId` with in-game chat. Discord→game uses `postBridgedChatMessage` on each active game server (system-auth, same trust boundary as `purgePlayerAccountFromMaster`); game→Discord uses `forwardInGameChatToDiscord` on the master, driven by `projects/Api/Utilities/IngameChatToDiscordForwarderHostedService.cs` (gated by `MasterServer:ChatBridgeEnabled`). `BridgedChatMessageTracker` is the loop guard on both sides.
+- Setup is documented in `docs/discord-bot-setup.md`.
+
 ## Game administration and news feed
 - MasterApi is the source of truth for shared game administration metadata and the cross-server news feed. The core persistence types are `GlobalGameAdminGrant`, `GameNewsEntry`, `GameNewsEntryLocalization`, and `GameNewsReadReceipt` in `projects/MasterApi/Data/Entities/`.
 - The game frontend must continue to use the local game API as its only GraphQL endpoint. Game-admin and news data are proxied through the game API via `projects/Api/Utilities/MasterGameAdministrationService.cs` and exposed to the frontend through `gameAdminSession`, `gameAdminDashboard`, `gameNewsFeed`, and the related mutations.
