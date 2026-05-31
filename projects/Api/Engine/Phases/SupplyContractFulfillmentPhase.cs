@@ -178,9 +178,17 @@ public sealed class SupplyContractFulfillmentPhase : ITickPhase
             return;
         }
 
-        CompanyBankingService.TryDebit(context.GetCompanyBankAccounts(sellerCompany.Id), penalty);
-        CompanyBankingService.TryCredit(context.GetCompanyBankAccounts(buyerCompany.Id), penalty, null, out _);
-        contract.TotalPenaltyAmount += penalty;
+        // Clamp the penalty to the seller's available balance and record only the amount
+        // actually paid so an under-funded seller cannot credit the buyer with phantom cash.
+        var availablePenaltyFunds = CompanyBankingService.GetAvailableBalance(context.GetCompanyBankAccounts(sellerCompany.Id));
+        var penaltyPaid = Math.Min(availablePenaltyFunds, penalty);
+        if (penaltyPaid <= 0m || !CompanyBankingService.TryDebit(context.GetCompanyBankAccounts(sellerCompany.Id), penaltyPaid))
+        {
+            return;
+        }
+
+        CompanyBankingService.TryCredit(context.GetCompanyBankAccounts(buyerCompany.Id), penaltyPaid, null, out _);
+        contract.TotalPenaltyAmount += penaltyPaid;
         contract.PenaltyCount++;
 
         context.Db.LedgerEntries.Add(new LedgerEntry
@@ -189,7 +197,7 @@ public sealed class SupplyContractFulfillmentPhase : ITickPhase
             CompanyId = sellerCompany.Id,
             Category = LedgerCategory.SupplyContractPenalty,
             Description = $"Under-delivery penalty paid: {reason}",
-            Amount = -penalty,
+            Amount = -penaltyPaid,
             RecordedAtTick = context.CurrentTick,
             RecordedAtUtc = DateTime.UtcNow,
             ResourceTypeId = contract.ResourceTypeId,
@@ -201,7 +209,7 @@ public sealed class SupplyContractFulfillmentPhase : ITickPhase
             CompanyId = buyerCompany.Id,
             Category = LedgerCategory.SupplyContractPenalty,
             Description = $"Under-delivery compensation received: {reason}",
-            Amount = penalty,
+            Amount = penaltyPaid,
             RecordedAtTick = context.CurrentTick,
             RecordedAtUtc = DateTime.UtcNow,
             ResourceTypeId = contract.ResourceTypeId,
@@ -213,7 +221,7 @@ public sealed class SupplyContractFulfillmentPhase : ITickPhase
             sellerCompany.PlayerId,
             PlayerNotificationType.SupplyContractPenalty,
             "Supply contract penalty applied",
-            $"Penalty applied for under-delivery: {penalty:N2} {contract.CurrencyCode}.",
+            $"Penalty applied for under-delivery: {penaltyPaid:N2} {contract.CurrencyCode}.",
             context.CurrentTick,
             sellerCompany.Id,
             relatedEntityType: "SUPPLY_CONTRACT",
@@ -225,7 +233,7 @@ public sealed class SupplyContractFulfillmentPhase : ITickPhase
                 buyerCompany.PlayerId,
                 PlayerNotificationType.SupplyContractPenalty,
                 "Supply contract penalty applied",
-                $"Penalty credit received: {penalty:N2} {contract.CurrencyCode}.",
+                $"Penalty credit received: {penaltyPaid:N2} {contract.CurrencyCode}.",
                 context.CurrentTick,
                 buyerCompany.Id,
                 relatedEntityType: "SUPPLY_CONTRACT",

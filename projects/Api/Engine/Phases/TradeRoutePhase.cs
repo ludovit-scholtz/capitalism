@@ -192,14 +192,26 @@ public sealed class TradeRoutePhase : ITickPhase
 
         route.ShippingCostActual = actualShippingCost;
 
-        // Deduct shipping cost from seller account.
-        if (sellerAccount2 is not null && sellerAccount2.Balance >= actualShippingCost)
+        // Deduct shipping cost from seller, clamped to available funds so the ledger
+        // never records a charge the seller could not actually pay (phantom ledger).
+        var shippingCostPaid = 0m;
+        if (actualShippingCost > 0m)
         {
-            sellerAccount2.Balance -= actualShippingCost;
-        }
-        else
-        {
-            CompanyBankingService.TryDebit(context.GetCompanyBankAccounts(sellerCompany.Id), actualShippingCost);
+            if (sellerAccount2 is not null && sellerAccount2.Balance >= actualShippingCost)
+            {
+                sellerAccount2.Balance -= actualShippingCost;
+                shippingCostPaid = actualShippingCost;
+            }
+            else
+            {
+                var availableSellerFunds = CompanyBankingService.GetAvailableBalance(context.GetCompanyBankAccounts(sellerCompany.Id));
+                var clampedShippingCost = Math.Min(availableSellerFunds, actualShippingCost);
+                if (clampedShippingCost > 0m
+                    && CompanyBankingService.TryDebit(context.GetCompanyBankAccounts(sellerCompany.Id), clampedShippingCost))
+                {
+                    shippingCostPaid = clampedShippingCost;
+                }
+            }
         }
 
         // Ledger: buyer purchasing cost.
@@ -236,7 +248,7 @@ public sealed class TradeRoutePhase : ITickPhase
         }
 
         // Ledger: seller shipping cost.
-        if (actualShippingCost > 0m)
+        if (shippingCostPaid > 0m)
         {
             context.Db.LedgerEntries.Add(new LedgerEntry
             {
@@ -245,7 +257,7 @@ public sealed class TradeRoutePhase : ITickPhase
                 BuildingId = route.SourceBuildingId,
                 Category = LedgerCategory.ShippingCost,
                 Description = $"Inter-city shipping cost to {destBuilding.Name ?? destCity?.Name ?? "destination"}",
-                Amount = -actualShippingCost,
+                Amount = -shippingCostPaid,
                 RecordedAtTick = context.CurrentTick,
                 RecordedAtUtc = DateTime.UtcNow,
             });
