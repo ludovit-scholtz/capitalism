@@ -368,19 +368,29 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  function getStoredToken() {
+  // Raw JWTs are never persisted in localStorage. Older builds stored
+  // `auth_token`/`auth_expires`; proactively purge any such legacy values so a
+  // previously-leaked token cannot be picked up after upgrading. Returns true
+  // when a legacy session token was present so the session can be rehydrated
+  // from the secure cookie instead.
+  function purgeLegacyTokenStorage() {
     if (typeof localStorage === 'undefined') {
-      return null
+      return false
     }
+    const hadLegacyToken = localStorage.getItem('auth_token') !== null
+    localStorage.removeItem('auth_token')
+    localStorage.removeItem('auth_expires')
+    return hadLegacyToken
+  }
 
-    const stored = localStorage.getItem('auth_token')
-    const expires = localStorage.getItem('auth_expires')
-    if (stored && expires && new Date(expires) > new Date()) {
-      return stored
+  // A non-sensitive provider marker records that an authenticated session was
+  // established. It lets us optimistically rehydrate from the secure cookie
+  // session on reload without exposing the bearer token.
+  function hasPersistedSessionMarker() {
+    if (typeof localStorage === 'undefined') {
+      return false
     }
-
-    clearStoredSession()
-    return null
+    return localStorage.getItem(AUTH_PROVIDER_KEY) !== null
   }
 
   function getStoredCityId() {
@@ -476,13 +486,15 @@ export const useAuthStore = defineStore('auth', () => {
   const effectiveProSubscriptionEndsAtUtc = computed(() => player.value?.proSubscriptionEndsAtUtc ?? null)
 
   function initFromStorage() {
-    token.value = getStoredToken()
     selectedCityId.value = getStoredCityId()
-    if (token.value) {
-      const expiresAtUtc = typeof localStorage !== 'undefined' ? localStorage.getItem('auth_expires') : null
-      if (expiresAtUtc) {
-        scheduleTokenRenewal(expiresAtUtc)
-      }
+    const hadLegacyToken = purgeLegacyTokenStorage()
+    // Rehydrate the gameplay session from the secure cookie rather than a
+    // persisted JWT. A non-sensitive provider marker (or a legacy bootstrap
+    // token from an older build) indicates a prior session; marking the
+    // in-memory token with the cookie sentinel keeps the user authenticated
+    // until fetchMe() validates the cookie session.
+    if (hasPersistedSessionMarker() || hadLegacyToken) {
+      token.value = COOKIE_SESSION_SENTINEL
     }
   }
 
@@ -493,10 +505,9 @@ export const useAuthStore = defineStore('auth', () => {
 
   function applyStoredSession(tokenValue: string, expiresAtUtc: string, provider = AUTH_PROVIDER_LOCAL) {
     token.value = tokenValue
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('auth_token', tokenValue)
-      localStorage.setItem('auth_expires', expiresAtUtc)
-    }
+    // The bearer token is held in memory only; gameplay requests authenticate
+    // via the secure cookie session. Persist just the non-sensitive provider
+    // marker so the session can be rehydrated from the cookie on reload.
     setStoredAuthProvider(provider)
     scheduleTokenRenewal(expiresAtUtc)
   }
