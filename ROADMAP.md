@@ -33,3 +33,11 @@ Create a fun game in the style of Capitalism II, where players experience realis
 - [x] Do not delete immediately: mark the account for deletion with a 24-hour cooldown that the user can cancel, and send a request email and a final confirmation email (both polite, localized, with the master portal link).
 - [x] When purging game-server data destroy all of the user's buildings except banks, transfer banks to the government entity, and set deposit interest to 0% and lending interest to 20%.
 - [x] Keep it secure (only the user can delete their own account) with backend and e2e test coverage, and update the in-game user documentation.
+
+### Security audit findings
+
+- [x] Fix company-merge tax evasion in `Api/Types/Mutation.CompanyMerge.cs`: clamp the merge-time tax to the target's available balance, assert the `TryDebit` result, and record only the amount actually paid so cash-poor companies cannot merge to escape tax. Regression test for the cash-poor merge scenario added.
+- [x] Harden MasterApi auth rate limiting in `MasterApi/Security/AuthRateLimitMiddleware.cs` to parse selected GraphQL root fields across named operations and JSON-array batched bodies, matching the game API, so batched/named login and register requests cannot bypass the per-IP limiter. Regression tests cover the bypass shapes.
+- [x] Make GraphQL batching explicit on MasterApi in `MasterApi/Security/GraphQlRequestSecurityMiddleware.cs`: every batch item is iterated and the same introspection, depth, and complexity checks the game API performs are applied before execution. Regression tests added.
+- [x] Remove raw JWT persistence from the game frontend `frontend/src/stores/auth.ts` (`auth_token`/`auth_expires` in `localStorage`) and rehydrate gameplay sessions from the cookie session instead. Tests for login, OIDC callback, reload, and logout added.
+- [x] Audit and standardize the remaining unchecked `CompanyBankingService.TryDebit`/`TryCredit` call sites in `Api/Engine/Phases` for the same ignored-failure-plus-phantom-ledger pattern, adopting the `Math.Min(balance, due)` clamp-and-record convention used by `TaxPhase` (applied to `SupplyContractFulfillmentPhase` under-delivery penalties and `TradeRoutePhase` shipping costs).

@@ -349,7 +349,7 @@ Player acting for the company or person account can sell shares it owns.
 
 When sum of ownership for person account and all controlled companies in another company reaches 50%, player can replace CEO (takeover) and gain control of that company.
 
-When sum of ownerships for person account and all controlled companies reaches 90%, person can merge this company into another company. This way all assets owned by the company are moved to the new company and the merged company is closed. Taxes for old company are paid on the tick of merge for old company.
+When sum of ownerships for person account and all controlled companies reaches 90%, person can merge this company into another company. This way all assets owned by the company are moved to the new company and the merged company is closed. Taxes for old company are paid on the tick of merge for old company. The merge-time tax is clamped to the company's available cash and only the amount actually settled is recorded, so a cash-poor company cannot merge to overdraw or escape tax.
 
 Stock-exchange company details include shareholder list and pie chart.
 
@@ -964,6 +964,8 @@ All Playwright E2E tests for player-facing views must include at least a mobile 
 A security audit is conducted weekly by reviewing the audit log and running a structured threat model against the OWASP Top 10. The audit covers:
 - Whether any API mutation or query allows one player to gain an unfair advantage over another through unvalidated input, object-level authorisation bypass, or race conditions.
 - Whether server-controlled fields (tick counts, prices, balances, ownership) can be overridden by client-supplied input.
+- Whether GraphQL anti-abuse controls (introspection, query depth, complexity, and auth rate limiting) are enforced consistently across both single and JSON-array batched requests and across named operations on the game API and Master API.
+- Whether session bearer tokens are kept out of persistent web storage: gameplay sessions authenticate via the secure cookie session and the frontend never persists the raw JWT in `localStorage`.
 - Findings are documented in `/audits/<YYYY-WW>.md` with risk severity, affected endpoint or component, and a remediation action plan.
 
 ## Building lifecycle delivery notes
