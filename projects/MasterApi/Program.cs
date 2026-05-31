@@ -10,6 +10,7 @@ using MasterApi.Data;
 using MasterApi.Data.Entities;
 using MasterApi.Security;
 using MasterApi.Utilities;
+using MasterApi.Utilities.Discord;
 using Capitalism.Shared.Security;
 using HotChocolate.AspNetCore;
 using HotChocolate.CostAnalysis;
@@ -49,6 +50,8 @@ public class Program
             builder.Configuration.GetSection(EmailOptions.SectionName));
         builder.Services.Configure<AccountDeletionOptions>(
             builder.Configuration.GetSection(AccountDeletionOptions.SectionName));
+        builder.Services.Configure<DiscordBotOptions>(
+            builder.Configuration.GetSection(DiscordBotOptions.SectionName));
 
         var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
             ?? new JwtOptions();
@@ -416,6 +419,11 @@ public class Program
 
         builder.Services.AddHttpClient<BlockchainDepositScannerHostedService>();
         builder.Services.AddHostedService<BlockchainDepositScannerHostedService>();
+
+        builder.Services.AddScoped<DiscordCommandService>();
+        builder.Services.AddHttpClient<DiscordGameChatBridge>();
+        builder.Services.AddSingleton<DiscordChatRelay>();
+        builder.Services.AddHostedService<DiscordBotHostedService>();
 
         builder.Services
             .AddGraphQLServer()

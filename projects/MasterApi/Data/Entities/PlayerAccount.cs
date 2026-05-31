@@ -64,6 +64,25 @@ public sealed class PlayerAccount
     /// <summary>Email of the player who referred this account (null if self-registered).</summary>
     public string? ReferredByEmail { get; set; }
 
+    /// <summary>
+    /// Discord user snowflake id linked to this account, or null when no Discord
+    /// account is linked. Set when the player runs the Discord verify command with a
+    /// valid link code. Used by the Discord bot to resolve a player from a Discord user.
+    /// </summary>
+    public string? DiscordUserId { get; set; }
+
+    /// <summary>Discord username captured at link time (for display/audit only).</summary>
+    public string? DiscordUsername { get; set; }
+
+    /// <summary>
+    /// Short, single-use code the player generates in the master frontend and types
+    /// into the Discord verify command to link their Discord account. Null once consumed.
+    /// </summary>
+    public string? DiscordLinkCode { get; set; }
+
+    /// <summary>UTC expiry of <see cref="DiscordLinkCode"/>; codes are rejected after this time.</summary>
+    public DateTime? DiscordLinkCodeExpiresAtUtc { get; set; }
+
     /// <summary>Current gold token balance (grams of gold). Cannot go negative.</summary>
     public decimal GoldTokenBalance { get; set; } = 0m;
 

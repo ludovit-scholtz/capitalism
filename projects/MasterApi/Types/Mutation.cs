@@ -137,26 +137,6 @@ public sealed partial class Mutation
         return decimal.Round(basePriceGold * (1m - ReferralDiscountFraction), 8, MidpointRounding.AwayFromZero);
     }
 
-    private static string NormalizeGoldNetwork(string? network)
-    {
-        var normalized = network?.Trim().ToUpperInvariant();
-        if (normalized is "VOI" or "ALGORAND")
-        {
-            return normalized;
-        }
-
-        throw new GraphQLException(
-            ErrorBuilder.New()
-                .SetMessage("Network must be VOI or ALGORAND.")
-                .SetCode("INVALID_NETWORK")
-                .Build());
-    }
-
-    private static long ResolveAssetIdByNetwork(string network)
-    {
-        return network == "VOI" ? VoiTokenizedGoldAssetId : AlgorandTokenizedGoldAssetId;
-    }
-
     private static void EnsurePositiveGoldAmount(decimal amount)
     {
         if (amount <= 0m)

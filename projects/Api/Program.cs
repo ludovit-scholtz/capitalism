@@ -497,6 +497,8 @@ public class Program
         builder.Services.AddHostedService<MasterServerRegistrationHostedService>();
         builder.Services.AddHostedService<MarketReportPublisherHostedService>();
         builder.Services.AddHostedService<JwtSessionCleanupHostedService>();
+        builder.Services.AddSingleton<BridgedChatMessageTracker>();
+        builder.Services.AddHostedService<IngameChatToDiscordForwarderHostedService>();
 
         var app = builder.Build();
         var appCorsAllowedOrigins = CorsPolicyHelper.ResolveAllowedOrigins(app.Configuration);
