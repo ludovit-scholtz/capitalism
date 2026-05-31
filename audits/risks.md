@@ -37,6 +37,7 @@ The 2026-05-14 business-logic hardening work is now live. The main residual risk
 - **Same-currency transfer and account-context enforcement**: Mitigated. `transferFunds` allows only same-currency moves and confines transfers to the active personal or company context.
 - **Company-context forex routing**: Mitigated. `executeForexSwap` requires explicit matching-currency source and destination accounts and rejects mismatches with `CURRENCY_MISMATCH`.
 - **Forced-sale building currency and FX debt settlement**: Mitigated. defaulted collateral is listed in the building city currency, while debt settlement converts internally into the lending bank currency.
+- **Company-merge tax evasion via unclamped settlement**: Open. `projects/Api/Types/Mutation.CompanyMerge.cs` settles the target company's income tax with an all-or-nothing `CompanyBankingService.TryDebit(taxAmount)` whose return value is ignored and which is not clamped to the available balance, while still writing a `-taxAmount` tax ledger entry. A cash-poor, taxable-income-positive company can therefore be merged without paying any merge-time tax (the debit silently fails) and leaves a phantom "tax paid" ledger row. The canonical engine `TaxPhase` already does this correctly by clamping to `Math.Min(balance, due)` and recording the actual settled amount. Mitigation target: align the merge path with `TaxPhase` (clamp-and-record the real debit) and add a regression test for the cash-poor merge-evasion scenario.
 
 ## GraphQL and API Infrastructure Security
 
@@ -62,9 +63,9 @@ The frontends intentionally render rich HTML in news and support flows. Browser-
 
 Package-level security posture is currently clean. Dependency drift remains an operational risk because both frontend and backend ecosystems move quickly.
 
-- **Game frontend dependencies**: Mitigated. `npm audit --omit=dev` and full `npm audit` both report zero vulnerabilities as of 2026-05-16.
-- **Master frontend dependencies**: Mitigated. `npm audit --omit=dev` and full `npm audit` both report zero vulnerabilities as of 2026-05-16.
-- **.NET package vulnerabilities**: Mitigated. Individual `dotnet list package --vulnerable --include-transitive` scans for `Api`, `Api.Tests`, `MasterApi`, `MasterApi.Tests`, `Shared`, `NPCBot`, and `NPCBot.Tests` report no known vulnerable packages as of 2026-05-16. Solution-level scanning still has tooling friction because the compose project uses legacy package configuration.
+- **Game frontend dependencies**: Mitigated. `npm audit --omit=dev` and full `npm audit` both report zero vulnerabilities as of 2026-05-30.
+- **Master frontend dependencies**: Mitigated. `npm audit --omit=dev` and full `npm audit` both report zero vulnerabilities as of 2026-05-30.
+- **.NET package vulnerabilities**: Mitigated. Individual `dotnet list package --vulnerable --include-transitive` scans for `Api`, `Api.Tests`, `MasterApi`, `MasterApi.Tests`, `Shared`, `NPCBot`, and `NPCBot.Tests` report no known vulnerable packages as of 2026-05-30. Solution-level scanning still has tooling friction because the compose project uses legacy package configuration.
 - **CVE-2026-40324 / GHSA-qr3m-xw4c-jqw3 HotChocolate stack overflow**: Mitigated. The advisory affects HotChocolate versions before 15.1.14; current projects use 15.1.15.
 
 ## Security Assurance and Regression Control
