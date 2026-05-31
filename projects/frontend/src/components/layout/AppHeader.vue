@@ -351,6 +351,14 @@ const mobileNavSections = computed(() => {
           active: isChatOpen.value,
           badge: chatUnreadCount.value,
         },
+        {
+          key: 'discord',
+          label: t('nav.discord'),
+          icon: ['fas', 'comments'],
+          visible: true,
+          href: 'https://discord.gg/PhHSxJvDn6',
+          badge: 0,
+        },
       ],
     },
     {
@@ -457,6 +465,10 @@ useTickRefresh(async () => {
                   <span>{{ link.label }}</span>
                   <span v-if="link.badge && link.badge > 0" class="desktop-sub-badge">{{ link.badge }}</span>
                 </RouterLink>
+                <a v-else-if="'href' in link" :href="link.href" target="_blank" rel="noopener noreferrer" class="desktop-sub-link" @click="closeMenu">
+                  <font-awesome-icon :icon="link.icon" />
+                  <span>{{ link.label }}</span>
+                </a>
                 <button
                   v-else
                   class="desktop-sub-link desktop-sub-button"
@@ -485,6 +497,10 @@ useTickRefresh(async () => {
                   <span>{{ link.label }}</span>
                   <span v-if="link.badge && link.badge > 0" class="mobile-sub-badge">{{ link.badge }}</span>
                 </RouterLink>
+                <a v-else-if="'href' in link" :href="link.href" target="_blank" rel="noopener noreferrer" class="mobile-sub-link tap-target-44" @click="closeMenu">
+                  <font-awesome-icon :icon="link.icon" />
+                  <span>{{ link.label }}</span>
+                </a>
                 <button v-else type="button" class="mobile-sub-link mobile-sub-button tap-target-44" :class="{ 'mobile-sub-link-active': link.active }" @click="link.action">
                   <font-awesome-icon :icon="link.icon" />
                   <span>{{ link.label }}</span>

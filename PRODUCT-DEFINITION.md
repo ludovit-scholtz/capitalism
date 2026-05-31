@@ -408,6 +408,14 @@ Every resource must have unique picture.
 
 In-game chat will be available.
 
+### Discord chat bridge
+
+The master server runs a Discord bot that bridges the in-game chat with a dedicated
+Discord channel. Messages posted in the bridged Discord channel by a player whose
+Discord account is linked are relayed into the in-game chat on that player's behalf,
+and in-game chat messages are mirrored back into the Discord channel, allowing players
+to interact across Discord and the game in both directions.
+
 ## Game administrators
 
 Game administrators have a dashboard where they can see all critical issues in the game like inflow of money, highlighting users which may be doing multiaccount gaming where they boost one of the account.
@@ -589,6 +597,30 @@ Administrators can see all tickets from all users, can sort and filter by type, 
 The tickets are created in md format. There must be nice wysiwyg editor so that users are happy and can also post the images.
 
 If the post contains images or links make sure to show the raw file to admin and after he confirms it is safe he is able to see the formatted md content.
+
+## Discord bot
+
+The master server provides a Discord bot so a community Discord can interact with both
+the staging and production master servers from one place. Every slash command is
+prefixed to keep environments apart: production uses the `cap5` prefix and staging uses
+the `cap5stage` prefix (for example `/cap5-verify` and `/cap5stage-verify`). Staging and
+production run as separate Discord applications with their own bot tokens.
+
+Commands:
+
+- **verify** (`/cap5-verify`): links the player's Discord account to their master account
+  using a one-time code generated on the master frontend, and awards the Discord player
+  bounty.
+- **deposit** (`/cap5-deposit`): creates a tokenized-gold deposit request and returns the
+  deposit address and the required note field.
+- **withdraw** (`/cap5-withdraw`): creates a tokenized-gold withdrawal request for the
+  given amount and destination address.
+- **help** (`/cap5-help`): posts the master frontend URL, the community Discord invite,
+  and basic instructions on how to play.
+
+The bot also bridges in-game chat with a configured Discord channel in both directions
+(see the Discord chat bridge under Chat). Setup instructions live in
+`docs/discord-bot-setup.md`.
 
 ## Master ranking point system
 

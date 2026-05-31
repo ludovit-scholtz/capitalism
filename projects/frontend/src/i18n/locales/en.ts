@@ -80,6 +80,7 @@ export default {
     sectionEconomy: 'Economy',
     sectionBuild: 'Build',
     sectionSocial: 'Social',
+    discord: 'Discord',
     sectionAdmin: 'Administration',
   },
   news: {

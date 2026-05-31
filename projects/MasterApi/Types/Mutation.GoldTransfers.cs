@@ -24,28 +24,13 @@ public sealed partial class Mutation
                     .SetCode("PLAYER_NOT_FOUND")
                     .Build());
 
-        var network = NormalizeGoldNetwork(input.Network);
-        var assetId = ResolveAssetIdByNetwork(network);
-        var depositAddress = network == "VOI"
-            ? transferOptions.Value.VoiDepositAddress.Trim()
-            : transferOptions.Value.AlgorandDepositAddress.Trim();
-
-        var request = new GoldTokenDepositRequest
-        {
-            Id = Guid.NewGuid(),
-            PlayerAccountId = player.Id,
-            PlayerEmail = player.Email,
-            Network = network,
-            AssetId = assetId,
-            DepositAddress = depositAddress,
-            SenderAddress = string.IsNullOrWhiteSpace(input.SenderAddress) ? null : input.SenderAddress.Trim(),
-            Amount = decimal.Round(input.Amount, 8, MidpointRounding.AwayFromZero),
-            Status = "PENDING",
-            RequestedAtUtc = DateTime.UtcNow,
-        };
-
-        db.GoldTokenDepositRequests.Add(request);
-        request.NoteText = $"CAP-{request.Id}";
+        var request = Utilities.GoldTokenRequests.CreateDepositRequest(
+            db,
+            player,
+            input.Network,
+            input.SenderAddress,
+            input.Amount,
+            transferOptions.Value);
         await db.SaveChangesAsync();
 
         return new GoldTokenDepositRequestInfo
@@ -89,37 +74,13 @@ public sealed partial class Mutation
                     .SetMessage("Player not found.")
                     .SetCode("PLAYER_NOT_FOUND")
                     .Build());
-        EnsureSufficientGoldBalance(
-            player,
-            input.Amount,
-            $"Not enough tokenized gold for withdrawal request. Requested {input.Amount:0.########} g, available {player.GoldTokenBalance:0.########} g.");
 
-        var network = NormalizeGoldNetwork(input.Network);
-        var assetId = ResolveAssetIdByNetwork(network);
-
-        var request = new GoldTokenWithdrawalRequest
-        {
-            Id = Guid.NewGuid(),
-            PlayerAccountId = player.Id,
-            PlayerEmail = player.Email,
-            Network = network,
-            AssetId = assetId,
-            DestinationAddress = input.DestinationAddress.Trim(),
-            Amount = decimal.Round(input.Amount, 8, MidpointRounding.AwayFromZero),
-            Status = "PENDING",
-            RequestedAtUtc = DateTime.UtcNow,
-        };
-
-        var balanceBefore = player.GoldTokenBalance;
-        ApplyGoldDebit(player, request.Amount);
-        AddSystemGoldTransaction(
+        var request = Utilities.GoldTokenRequests.CreateWithdrawalRequest(
             db,
             player,
-            -request.Amount,
-            balanceBefore,
-            $"WITHDRAWAL_REQUEST_CREATED:{request.Network}:{request.Id}");
-
-        db.GoldTokenWithdrawalRequests.Add(request);
+            input.Network,
+            input.Amount,
+            input.DestinationAddress);
         await db.SaveChangesAsync();
 
         return new GoldTokenWithdrawalRequestInfo

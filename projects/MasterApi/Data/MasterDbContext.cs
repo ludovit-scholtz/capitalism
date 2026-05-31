@@ -79,6 +79,10 @@ public sealed class MasterDbContext(DbContextOptions<MasterDbContext> options) :
         player.Property(p => p.PreferredLocale).HasMaxLength(10).HasDefaultValue("en");
         player.Property(p => p.LastAccessedUrl).HasMaxLength(500);
         player.Property(p => p.PasswordHash).HasMaxLength(512);
+        player.Property(p => p.DiscordUserId).HasMaxLength(32);
+        player.Property(p => p.DiscordUsername).HasMaxLength(64);
+        player.Property(p => p.DiscordLinkCode).HasMaxLength(16);
+        player.HasIndex(p => p.DiscordUserId);
         player.HasMany(p => p.Sessions)
             .WithOne(session => session.PlayerAccount)
             .HasForeignKey(session => session.PlayerAccountId)

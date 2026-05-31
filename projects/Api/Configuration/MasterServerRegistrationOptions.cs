@@ -8,6 +8,12 @@ public sealed class MasterServerRegistrationOptions
 
     public bool TelemetryEnabled { get; set; } = true;
 
+    /// <summary>
+    /// When true (and master registration is configured), in-game chat messages are forwarded to
+    /// the master server so the Discord bot can mirror them into the bridged Discord channel.
+    /// </summary>
+    public bool ChatBridgeEnabled { get; set; }
+
     public string ApiUrl { get; set; } = string.Empty;
 
     public string RegistrationKey { get; set; } = string.Empty;
