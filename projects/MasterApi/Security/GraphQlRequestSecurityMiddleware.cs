@@ -35,38 +35,48 @@ public sealed class GraphQlRequestSecurityMiddleware(
         var requestBody = await ReadRequestBodyAsync(context.Request);
         context.Request.Body.Position = 0;
 
-        if (!TryExtractQuery(requestBody, out var query) || string.IsNullOrWhiteSpace(query))
+        if (!TryExtractRequestItems(requestBody, out var requestItems))
         {
             await next(context);
-            return;
-        }
-
-        if (!TryParseDocument(query, out var document))
-        {
-            await next(context);
-            return;
-        }
-
-        if (!environment.IsDevelopment() && ContainsIntrospection(document))
-        {
-            await RejectAsync(context, "FORBIDDEN", "This operation is forbidden.", "IntrospectionForbidden");
             return;
         }
 
         var maxDepth = Math.Max(1, options.Value.MaxDepth);
-        var depth = ComputeMaxDepth(document);
-        if (depth > maxDepth)
-        {
-            await RejectAsync(context, "MAX_DEPTH_EXCEEDED", "Request exceeds the allowed query depth.", "MaxDepthExceeded");
-            return;
-        }
-
         var maxComplexity = Math.Max(1, options.Value.MaxComplexity);
-        var complexity = ComputeComplexity(document);
-        if (complexity > maxComplexity)
+
+        // Validate every batched request item before execution so that JSON-array
+        // batches cannot smuggle introspection, deep, or expensive queries past the
+        // per-request checks that the game API also performs.
+        foreach (var (query, operationName) in requestItems)
         {
-            await RejectAsync(context, "MAX_COMPLEXITY_EXCEEDED", "Request exceeds the allowed query complexity.", "MaxComplexityExceeded");
-            return;
+            if (string.IsNullOrWhiteSpace(query) || !TryParseDocument(query, out var document))
+            {
+                continue;
+            }
+
+            var operations = SelectOperations(document, operationName);
+            if (operations.Count == 0)
+            {
+                continue;
+            }
+
+            if (!environment.IsDevelopment() && ContainsIntrospection(operations))
+            {
+                await RejectAsync(context, "FORBIDDEN", "This operation is forbidden.", "IntrospectionForbidden");
+                return;
+            }
+
+            if (ComputeMaxDepth(document, operations) > maxDepth)
+            {
+                await RejectAsync(context, "MAX_DEPTH_EXCEEDED", "Request exceeds the allowed query depth.", "MaxDepthExceeded");
+                return;
+            }
+
+            if (ComputeComplexity(document, operations) > maxComplexity)
+            {
+                await RejectAsync(context, "MAX_COMPLEXITY_EXCEEDED", "Request exceeds the allowed query complexity.", "MaxComplexityExceeded");
+                return;
+            }
         }
 
         await next(context);
@@ -104,21 +114,43 @@ public sealed class GraphQlRequestSecurityMiddleware(
         return await reader.ReadToEndAsync();
     }
 
-    private static bool TryExtractQuery(string requestBody, out string? query)
+    private static bool TryExtractRequestItems(string requestBody, out IReadOnlyList<(string? Query, string? OperationName)> requestItems)
     {
         try
         {
             using var document = JsonDocument.Parse(requestBody);
-            query = document.RootElement.TryGetProperty("query", out var queryElement)
-                ? queryElement.GetString()
-                : null;
-            return true;
+            switch (document.RootElement.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    requestItems = new[] { ExtractRequestItem(document.RootElement) };
+                    return true;
+                case JsonValueKind.Array:
+                    requestItems = document.RootElement.EnumerateArray()
+                        .Where(static element => element.ValueKind == JsonValueKind.Object)
+                        .Select(ExtractRequestItem)
+                        .ToList();
+                    return true;
+                default:
+                    requestItems = Array.Empty<(string?, string?)>();
+                    return false;
+            }
         }
         catch (JsonException)
         {
-            query = null;
+            requestItems = Array.Empty<(string?, string?)>();
             return false;
         }
+    }
+
+    private static (string? Query, string? OperationName) ExtractRequestItem(JsonElement element)
+    {
+        var query = element.TryGetProperty("query", out var queryElement) && queryElement.ValueKind == JsonValueKind.String
+            ? queryElement.GetString()
+            : null;
+        var operationName = element.TryGetProperty("operationName", out var operationNameElement) && operationNameElement.ValueKind == JsonValueKind.String
+            ? operationNameElement.GetString()
+            : null;
+        return (query, operationName);
     }
 
     private static bool TryParseDocument(string query, out DocumentNode document)
@@ -135,11 +167,26 @@ public sealed class GraphQlRequestSecurityMiddleware(
         }
     }
 
-    private static bool ContainsIntrospection(DocumentNode document)
+    private static IReadOnlyList<OperationDefinitionNode> SelectOperations(DocumentNode document, string? operationName)
     {
-        return document.Definitions
-            .OfType<OperationDefinitionNode>()
-            .Any(definition => SelectionSetContainsIntrospection(definition.SelectionSet));
+        var operations = document.Definitions.OfType<OperationDefinitionNode>().ToList();
+        if (!string.IsNullOrWhiteSpace(operationName))
+        {
+            var selected = operations
+                .Where(operation => operation.Name?.Value.Equals(operationName, StringComparison.Ordinal) == true)
+                .ToList();
+            if (selected.Count > 0)
+            {
+                return selected;
+            }
+        }
+
+        return operations;
+    }
+
+    private static bool ContainsIntrospection(IReadOnlyList<OperationDefinitionNode> operations)
+    {
+        return operations.Any(operation => SelectionSetContainsIntrospection(operation.SelectionSet));
     }
 
     private static bool SelectionSetContainsIntrospection(SelectionSetNode selectionSet)
@@ -168,14 +215,14 @@ public sealed class GraphQlRequestSecurityMiddleware(
         return false;
     }
 
-    private static int ComputeMaxDepth(DocumentNode document)
+    private static int ComputeMaxDepth(DocumentNode document, IReadOnlyList<OperationDefinitionNode> operations)
     {
         var fragments = document.Definitions
             .OfType<FragmentDefinitionNode>()
             .ToDictionary(definition => definition.Name.Value, definition => definition, StringComparer.Ordinal);
 
         var maxDepth = 0;
-        foreach (var operation in document.Definitions.OfType<OperationDefinitionNode>())
+        foreach (var operation in operations)
         {
             maxDepth = Math.Max(maxDepth, ComputeDepth(operation.SelectionSet, 1, fragments, new HashSet<string>(StringComparer.Ordinal)));
         }
@@ -212,14 +259,14 @@ public sealed class GraphQlRequestSecurityMiddleware(
         return maxDepth;
     }
 
-    private static int ComputeComplexity(DocumentNode document)
+    private static int ComputeComplexity(DocumentNode document, IReadOnlyList<OperationDefinitionNode> operations)
     {
         var fragments = document.Definitions
             .OfType<FragmentDefinitionNode>()
             .ToDictionary(definition => definition.Name.Value, definition => definition, StringComparer.Ordinal);
 
         var total = 0;
-        foreach (var operation in document.Definitions.OfType<OperationDefinitionNode>())
+        foreach (var operation in operations)
         {
             total += ComputeSelectionSetComplexity(operation.SelectionSet, fragments, new HashSet<string>(StringComparer.Ordinal));
         }

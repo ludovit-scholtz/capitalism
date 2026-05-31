@@ -187,6 +187,68 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
         Assert.Contains("FORBIDDEN", errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
+    [Fact]
+    public async Task GraphQl_BatchedArray_IntrospectionItem_ReturnsForbidden()
+    {
+        var batch = JsonSerializer.Serialize(new object[]
+        {
+            new { query = "query { __typename }" },
+            new { query = "query { __type(name: \"Query\") { name } }" },
+        });
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/graphql")
+        {
+            Content = new StringContent(batch, Encoding.UTF8, "application/json")
+        };
+        var response = await _client.SendAsync(request);
+        var result = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Contains("FORBIDDEN", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task GraphQl_BatchedArray_DeepItem_ReturnsMaxDepthExceeded()
+    {
+        using var limitedFactory = _factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.ConfigureAppConfiguration((_, config) =>
+            {
+                config.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["GraphQL:MaxDepth"] = "3",
+                });
+            });
+        });
+        using var client = limitedFactory.CreateClient();
+
+        var batch = JsonSerializer.Serialize(new object[]
+        {
+            new { query = "query { gameServers { id } }" },
+            new
+            {
+                query = """
+                    query {
+                      gameNewsFeed(input: { serverKey: "", limit: 5 }) {
+                        items { localizations { locale } }
+                      }
+                    }
+                    """
+            },
+        });
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/graphql")
+        {
+            Content = new StringContent(batch, Encoding.UTF8, "application/json")
+        };
+        var response = await client.SendAsync(request);
+        var result = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Contains("MAX_DEPTH_EXCEEDED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
     private async Task RegisterDefaultGameServerAsync()
     {
         _ = await GraphQlAsync("""
