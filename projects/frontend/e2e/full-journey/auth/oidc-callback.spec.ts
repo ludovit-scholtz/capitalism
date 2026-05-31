@@ -22,7 +22,7 @@ function makeOidcToken(nonce: string) {
   return `${header}.${payload}.signature`
 }
 
-test('OIDC callback stores the token and survives a reload on the redirected route', async ({ page }) => {
+test('OIDC callback persists only the provider marker and survives a reload on the redirected route', async ({ page }) => {
   const player = makePlayer({
     onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
     companies: [
@@ -66,11 +66,13 @@ test('OIDC callback stores the token and survives a reload on the redirected rou
     token: window.localStorage.getItem('auth_token'),
     expiresAtUtc: window.localStorage.getItem('auth_expires'),
     provider: window.localStorage.getItem('auth_provider'),
+    sessionToken: window.sessionStorage.getItem('auth_token'),
   }))
 
-  expect(storedSession.token).toBe(oidcToken)
-  expect(storedSession.expiresAtUtc).toBeTruthy()
+  expect(storedSession.token).toBeNull()
+  expect(storedSession.expiresAtUtc).toBeNull()
   expect(storedSession.provider).toBe('biatec_oidc')
+  expect(storedSession.sessionToken).toBeNull()
 
   await page.reload()
 
