@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-05-25T09:22:12.074Z",
-  "totalFindings": 70,
+  "generatedAt": "2026-06-01T09:51:47.543Z",
+  "totalFindings": 74,
   "gateStatus": "pass",
   "failingCount": 0,
   "findings": [
@@ -472,6 +472,50 @@
       "title": "Previously tracked master-frontend production dependency advisory is resolved",
       "severity": "Resolved",
       "status": "Resolved",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-05-30T211354/company-merge-tax-settlement-can-be-evaded-unchecked-unclamped-trydebit",
+      "fileStem": "security-audit-2026-05-30T211354",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-05-30T211354.md",
+      "number": 1,
+      "title": "Company-Merge Tax Settlement Can Be Evaded (Unchecked, Unclamped `TryDebit`)",
+      "severity": "Medium",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-05-30T211354/masterapi-auth-rate-limiting-still-misses-named-operation-and-batched-loginregister-requests",
+      "fileStem": "security-audit-2026-05-30T211354",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-05-30T211354.md",
+      "number": 2,
+      "title": "MasterApi Auth Rate Limiting Still Misses Named-Operation and Batched Login/Register Requests",
+      "severity": "Medium",
+      "status": "Open (carried over from 2026-05-16; not yet fixed in this revision)",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-05-30T211354/masterapi-custom-graphql-request-security-middleware-only-inspects-single-json-object-bodies",
+      "fileStem": "security-audit-2026-05-30T211354",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-05-30T211354.md",
+      "number": 3,
+      "title": "MasterApi Custom GraphQL Request-Security Middleware Only Inspects Single JSON-Object Bodies",
+      "severity": "Low",
+      "status": "Open (carried over from 2026-05-16)",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-05-30T211354/game-frontend-still-persists-raw-jwts-in-localstorage-after-cookie-session-bootstrap",
+      "fileStem": "security-audit-2026-05-30T211354",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-05-30T211354.md",
+      "number": 4,
+      "title": "Game Frontend Still Persists Raw JWTs in `localStorage` After Cookie-Session Bootstrap",
+      "severity": "Low",
+      "status": "Open (carried over from 2026-05-16)",
       "issues": [],
       "owner": ""
     },
