@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import ViewJumbotron from '@/components/layout/ViewJumbotron.vue'
 import ViewSubnav from '@/components/layout/ViewSubnav.vue'
+import { trackEvent } from '@/lib/analytics'
 import {
   createGoldDepositRequest,
   fetchMyGoldDepositRequests,
@@ -61,6 +62,7 @@ async function submitDepositRequest() {
   if (!auth.token) return
   error.value = ''
   success.value = ''
+  trackEvent('deposit_gold_submit', { network: network.value, amount: Number(amount.value) })
   try {
     await createGoldDepositRequest(
       auth.token,
@@ -69,9 +71,11 @@ async function submitDepositRequest() {
       senderAddress.value.trim() || undefined,
     )
     success.value = t('goldDeposit.createdSuccess')
+    trackEvent('deposit_gold_request_created', { network: network.value })
     await loadRequests()
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : t('goldDeposit.createError')
+    trackEvent('deposit_gold_submit_error', { network: network.value })
   }
 }
 
@@ -80,6 +84,7 @@ onMounted(async () => {
     await router.push('/login')
     return
   }
+  trackEvent('deposit_gold_form_view', { network: network.value })
   await loadRequests()
 })
 </script>

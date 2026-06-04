@@ -102,4 +102,14 @@ describe('initGoogleAnalytics', () => {
 
     expect(appended).toHaveLength(1)
   })
+
+  it('does not inject the tag when the static gtag snippet already loaded it', () => {
+    const { document, appended } = createDomMocks()
+    vi.stubGlobal('window', { gtag: () => {} })
+    vi.stubGlobal('document', document)
+
+    initGoogleAnalytics()
+
+    expect(appended).toHaveLength(0)
+  })
 })

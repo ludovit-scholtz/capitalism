@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '@/views/HomeView.vue'
+import { trackPageView } from '@/lib/analytics'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -201,6 +202,10 @@ const router = createRouter({
 
     return { top: 0 }
   },
+})
+
+router.afterEach((to) => {
+  trackPageView(to.fullPath, typeof to.name === 'string' ? to.name : undefined)
 })
 
 export default router

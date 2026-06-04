@@ -87,4 +87,14 @@ describe('initGoogleAnalytics', () => {
       document.querySelectorAll('script[data-google-analytics-id="G-QQWP6LQH27"]'),
     ).toHaveLength(1)
   })
+
+  it('does not inject the tag when the static gtag snippet already loaded it', () => {
+    testWindow.gtag = () => {}
+
+    initGoogleAnalytics()
+
+    expect(
+      document.querySelectorAll('script[data-google-analytics-id="G-QQWP6LQH27"]'),
+    ).toHaveLength(0)
+  })
 })

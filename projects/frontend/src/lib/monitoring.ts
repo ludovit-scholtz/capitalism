@@ -66,6 +66,14 @@ export function initGoogleAnalytics(): void {
     return
   }
 
+  const gtagWindow = window as GtagWindow
+  // The gtag.js snippet in index.html normally loads and configures Google
+  // Analytics before the app boots. When it has already run, gtag is defined
+  // and we must not inject a second tag (which would double-count page views).
+  if (typeof gtagWindow.gtag === 'function') {
+    return
+  }
+
   if (document.querySelector(`script[data-google-analytics-id="${measurementId}"]`)) {
     return
   }
@@ -76,7 +84,6 @@ export function initGoogleAnalytics(): void {
   script.setAttribute('data-google-analytics-id', measurementId)
   document.head.appendChild(script)
 
-  const gtagWindow = window as GtagWindow
   gtagWindow.dataLayer = gtagWindow.dataLayer || []
   function gtag(...args: unknown[]) {
     gtagWindow.dataLayer?.push(args)
