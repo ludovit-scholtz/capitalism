@@ -18,35 +18,35 @@
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
-    "@sentry/vue": "^10.55.0",
+    "@sentry/vue": "^10.59.0",
     "country-flag-icons": "^1.6.17",
-    "dompurify": "^3.4.2",
+    "dompurify": "^3.4.11",
     "easymde": "^2.21.0",
     "pinia": "^3.0.4",
     "vue": "^3.5.29",
-    "vue-i18n": "^11.4.2",
-    "vue-router": "^5.0.6"
+    "vue-i18n": "^11.4.6",
+    "vue-router": "^5.1.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.60.0",
-    "@tailwindcss/vite": "^4.3.0",
+    "@playwright/test": "^1.61.0",
+    "@tailwindcss/vite": "^4.3.1",
     "@tsconfig/node24": "^24.0.4",
     "@types/dompurify": "^3.0.5",
-    "@types/node": "^24.12.3",
-    "@vitejs/plugin-vue": "^6.0.6",
-    "@vue/eslint-config-typescript": "^14.7.0",
+    "@types/node": "^24.13.2",
+    "@vitejs/plugin-vue": "^6.0.7",
+    "@vue/eslint-config-typescript": "^14.8.0",
     "@vue/tsconfig": "^0.8.1",
-    "eslint": "^10.3.0",
+    "eslint": "^10.5.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-oxlint": "~1.50.0",
     "eslint-plugin-vue": "~10.8.0",
     "npm-run-all2": "^8.0.4",
     "oxlint": "~1.50.0",
-    "prettier": "^3.8.3",
+    "prettier": "^3.8.4",
     "typescript": "~5.9.3",
-    "vite": "^7.3.3",
-    "vitest": "^4.1.6",
-    "vue-tsc": "^3.2.8"
+    "vite": "^7.3.5",
+    "vitest": "^4.1.9",
+    "vue-tsc": "^3.3.5"
   },
   "engines": {
     "node": "^24.0.0"
