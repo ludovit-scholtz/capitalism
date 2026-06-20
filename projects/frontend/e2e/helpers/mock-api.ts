@@ -3538,6 +3538,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
   mockStateByPage.set(page, state)
 
+  page.route('**sentry.io/**', (route) => route.abort())
+  page.route('**/googletagmanager.com/**', (route) => route.abort())
+
   page.route('**/auth/forgot-password', async (route) => {
     if (route.request().method() !== 'POST') {
       return route.fallback()
