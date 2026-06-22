@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-15T10:09:47.551Z",
-  "totalFindings": 74,
+  "generatedAt": "2026-06-22T10:02:51.750Z",
+  "totalFindings": 76,
   "gateStatus": "pass",
   "failingCount": 0,
   "findings": [
@@ -516,6 +516,28 @@
       "title": "Game Frontend Still Persists Raw JWTs in `localStorage` After Cookie-Session Bootstrap",
       "severity": "Low",
       "status": "Open (carried over from 2026-05-16)",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-06-20T204234/dompurify-3410-production-runtime-both-frontends",
+      "fileStem": "security-audit-2026-06-20T204234",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-06-20T204234.md",
+      "number": 1,
+      "title": "DOMPurify ≤3.4.10 (Production Runtime — Both Frontends)",
+      "severity": "Low (moderate per npm audit)",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-06-20T204234/vite-733-dev-server-windows-developer-workstation-risk",
+      "fileStem": "security-audit-2026-06-20T204234",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-06-20T204234.md",
+      "number": 2,
+      "title": "Vite 7.3.3 Dev Server — Windows Developer Workstation Risk",
+      "severity": "Low (production builds are not affected; only developer machines running `npm run dev` on Windows)",
+      "status": "Open",
       "issues": [],
       "owner": ""
     },

@@ -1,6 +1,6 @@
 # Security Action Board
 
-> Auto-generated from `/audits/*.md` on 2026-06-15.  
+> Auto-generated from `/audits/*.md` on 2026-06-22.  
 > Add `<!-- issue: #NNN -->` in a finding's **Status** line to link an implementation issue.
 
 ✅ **All clear** — No unlinked High/Critical open findings.
@@ -79,6 +79,8 @@
 | Resolved | Support-ticket preview sanitization is now allowlist-based and covered by payload regression tests | Resolved | — | — | [security-audit-2026-05-11T225436](../../audits/security-audit-2026-05-11T225436.md#support-ticket-preview-sanitization-is-now-allowlist-based-and-covered-by-payload-regression-tests) |
 | Resolved | NPC bot placeholder credential shipping risk is now mitigated | Resolved | — | — | [security-audit-2026-05-11T225436](../../audits/security-audit-2026-05-11T225436.md#npc-bot-placeholder-credential-shipping-risk-is-now-mitigated) |
 | Resolved | Previously tracked master-frontend production dependency advisory is resolved | Resolved | — | — | [security-audit-2026-05-11T231129](../../audits/security-audit-2026-05-11T231129.md#previously-tracked-master-frontend-production-dependency-advisory-is-resolved) |
+| Low (moderate per npm audit) | DOMPurify ≤3.4.10 (Production Runtime — Both Frontends) | Open | — | — | [security-audit-2026-06-20T204234](../../audits/security-audit-2026-06-20T204234.md#dompurify-3410-production-runtime-both-frontends) |
+| Low (production builds are not affected; only developer machines running `npm run dev` on Windows) | Vite 7.3.3 Dev Server — Windows Developer Workstation Risk | Open | — | — | [security-audit-2026-06-20T204234](../../audits/security-audit-2026-06-20T204234.md#vite-733-dev-server-windows-developer-workstation-risk) |
 | Critical (CVSS 9.1) — verified mitigated by current version | CVE-2026-40324 — HotChocolate Stack Overflow via Deeply Nested GraphQL (VERIFIED PATCHED) | Mitigated (upgrade already applied) | — | — | [security-audit-2026-W21](../../audits/security-audit-2026-W21.md#cve-2026-40324-hotchocolate-stack-overflow-via-deeply-nested-graphql-verified-patched) |
 | High (`minimatch` ReDoS), Moderate (`ajv` ReDoS) | npm Frontend Dependency Vulnerabilities (FIXED THIS SESSION) | Resolved (fixed in this session) | — | — | [security-audit-2026-W21](../../audits/security-audit-2026-W21.md#npm-frontend-dependency-vulnerabilities-fixed-this-session) |
 | Low (development defaults — should not reach production) | Placeholder JWT Signing Keys and Default DB Password Committed to Source | Open | — | [#417](https://github.com/ludovit-scholtz/capitalism/issues/417) | [security-audit-2026-W21](../../audits/security-audit-2026-W21.md#placeholder-jwt-signing-keys-and-default-db-password-committed-to-source) |
