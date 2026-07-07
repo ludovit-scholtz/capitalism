@@ -93,4 +93,60 @@ public sealed class RequiredSecretsStartupGuardTests
         Assert.False(isUnsafe);
         Assert.Equal(string.Empty, reason);
     }
+
+    [Fact]
+    public void TryGetUnsafeOidcHttpsMetadataReason_ReturnsFalse_WhenOidcDisabled()
+    {
+        var isUnsafe = RequiredSecretsStartupGuard.TryGetUnsafeOidcHttpsMetadataReason(
+            oidcEnabled: false,
+            requireHttpsMetadata: false,
+            authority: "http://insecure.example.com",
+            out var reason);
+
+        Assert.False(isUnsafe);
+        Assert.Equal(string.Empty, reason);
+    }
+
+    [Fact]
+    public void TryGetUnsafeOidcHttpsMetadataReason_ReturnsTrue_WhenRequireHttpsMetadataDisabled()
+    {
+        var isUnsafe = RequiredSecretsStartupGuard.TryGetUnsafeOidcHttpsMetadataReason(
+            oidcEnabled: true,
+            requireHttpsMetadata: false,
+            authority: "https://google.biatec.io",
+            out var reason);
+
+        Assert.True(isUnsafe);
+        Assert.Contains("RequireHttpsMetadata", reason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("http://google.biatec.io")]
+    public void TryGetUnsafeOidcHttpsMetadataReason_ReturnsTrue_ForMissingOrNonHttpsAuthority(string? authority)
+    {
+        var isUnsafe = RequiredSecretsStartupGuard.TryGetUnsafeOidcHttpsMetadataReason(
+            oidcEnabled: true,
+            requireHttpsMetadata: true,
+            authority: authority,
+            out var reason);
+
+        Assert.True(isUnsafe);
+        Assert.Contains("HTTPS", reason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void TryGetUnsafeOidcHttpsMetadataReason_ReturnsFalse_ForHttpsAuthorityAndRequireHttpsMetadataEnabled()
+    {
+        var isUnsafe = RequiredSecretsStartupGuard.TryGetUnsafeOidcHttpsMetadataReason(
+            oidcEnabled: true,
+            requireHttpsMetadata: true,
+            authority: "https://google.biatec.io",
+            out var reason);
+
+        Assert.False(isUnsafe);
+        Assert.Equal(string.Empty, reason);
+    }
 }

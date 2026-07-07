@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+  schedule:
+    # Weekly rebuild so the MasterApi/master-frontend base images pick up security
+    # patches (e.g. .NET runtime, nginx:alpine) even when main has no code pushes.
+    - cron: '0 4 * * 1'
   workflow_dispatch:
 
 permissions:

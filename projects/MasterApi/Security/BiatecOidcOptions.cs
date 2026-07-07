@@ -12,5 +12,5 @@ public sealed class BiatecOidcOptions
 
     public string Audience { get; set; } = "capitalism";
 
-    public bool RequireHttpsMetadata { get; set; } = false;
+    public bool RequireHttpsMetadata { get; set; } = true;
 }

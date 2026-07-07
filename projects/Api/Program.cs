@@ -125,6 +125,34 @@ public class Program
             }
         }
 
+        if (RequiredSecretsStartupGuard.TryGetUnsafeOidcHttpsMetadataReason(
+                biatecOidcOptions.Enabled,
+                biatecOidcOptions.RequireHttpsMetadata,
+                biatecOidcOptions.Authority,
+                out var unsafeOidcHttpsMetadataReason))
+        {
+            if (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing"))
+            {
+                startupLogger.LogWarning(
+                    "Startup with insecure BiatecOidc HTTPS metadata configuration is allowed only in Development/Testing. Environment={EnvironmentName} Reason={Reason} OverrideEnvironmentVariable={OverrideEnvironmentVariable}",
+                    builder.Environment.EnvironmentName,
+                    unsafeOidcHttpsMetadataReason,
+                    "BiatecOidc__RequireHttpsMetadata");
+            }
+            else
+            {
+                startupLogger.LogCritical(
+                    "Blocking startup because BiatecOidc HTTPS metadata configuration is insecure. Environment={EnvironmentName} Reason={Reason} OverrideEnvironmentVariable={OverrideEnvironmentVariable}",
+                    builder.Environment.EnvironmentName,
+                    unsafeOidcHttpsMetadataReason,
+                    "BiatecOidc__RequireHttpsMetadata");
+                throw new InvalidOperationException(
+                    "BiatecOidc:RequireHttpsMetadata must be true and BiatecOidc:Authority must be an HTTPS URL while BiatecOidc:Enabled=true. " +
+                    "Set BiatecOidc__RequireHttpsMetadata=true (and an HTTPS authority) before starting outside Development. " +
+                    $"Validation reason: {unsafeOidcHttpsMetadataReason}");
+            }
+        }
+
         if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing"))
         {
             var gameCatalogConnectionString = builder.Configuration.GetConnectionString("GameCatalog");

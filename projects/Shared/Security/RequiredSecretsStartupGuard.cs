@@ -87,6 +87,30 @@ public static class RequiredSecretsStartupGuard
         return false;
     }
 
+    public static bool TryGetUnsafeOidcHttpsMetadataReason(bool oidcEnabled, bool requireHttpsMetadata, string? authority, out string reason)
+    {
+        if (!oidcEnabled)
+        {
+            reason = string.Empty;
+            return false;
+        }
+
+        if (!requireHttpsMetadata)
+        {
+            reason = "RequireHttpsMetadata is disabled";
+            return true;
+        }
+
+        if (string.IsNullOrWhiteSpace(authority) || !authority.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            reason = "Authority is not an HTTPS URL";
+            return true;
+        }
+
+        reason = string.Empty;
+        return false;
+    }
+
     private static bool ContainsPlaceholderMarker(string value)
     {
         return PlaceholderMarkers.Any(marker => value.Contains(marker, StringComparison.OrdinalIgnoreCase));
