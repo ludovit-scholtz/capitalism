@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-06T09:23:07.093Z",
-  "totalFindings": 76,
+  "generatedAt": "2026-07-13T09:06:37.209Z",
+  "totalFindings": 81,
   "gateStatus": "pass",
   "failingCount": 0,
   "findings": [
@@ -537,6 +537,61 @@
       "number": 2,
       "title": "Vite 7.3.3 Dev Server — Windows Developer Workstation Risk",
       "severity": "Low (production builds are not affected; only developer machines running `npm run dev` on Windows)",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-07-07T201327/oidc-requirehttpsmetadatafalse-in-production-base-configuration-both-apis",
+      "fileStem": "security-audit-2026-07-07T201327",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-07-07T201327.md",
+      "number": 1,
+      "title": "OIDC `RequireHttpsMetadata=false` in Production-Base Configuration (Both APIs)",
+      "severity": "Low (defense-in-depth; Authority is currently HTTPS)",
+      "status": "Open (carried as a residual note since 2026-05-30; formalized this audit)",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-07-07T201327/net-runtime-patch-currency-depends-on-push-cadence-cve-2026-45591-context",
+      "fileStem": "security-audit-2026-07-07T201327",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-07-07T201327.md",
+      "number": 2,
+      "title": ".NET Runtime Patch Currency Depends on Push Cadence (CVE-2026-45591 Context)",
+      "severity": "Low (currently patched; process gap)",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-07-07T201327/esbuild-0277-dev-server-arbitrary-file-read-on-windows-ghsa-g7r4-m6w7-qqqr",
+      "fileStem": "security-audit-2026-07-07T201327",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-07-07T201327.md",
+      "number": 3,
+      "title": "esbuild 0.27.7 — Dev-Server Arbitrary File Read on Windows (GHSA-g7r4-m6w7-qqqr)",
+      "severity": "Low (development tooling only)",
+      "status": "Open",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-07-07T201327/nginx-add_header-inheritance-drops-security-headers-on-asset-responses-both-frontends",
+      "fileStem": "security-audit-2026-07-07T201327",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-07-07T201327.md",
+      "number": 4,
+      "title": "nginx `add_header` Inheritance Drops Security Headers on Asset Responses (Both Frontends)",
+      "severity": "Low",
+      "status": "Open (pre-existing; first flagged this audit)",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-07-07T201327/game-frontend-cspheader-hygiene-missing-permissions-policy-stale-script-hash",
+      "fileStem": "security-audit-2026-07-07T201327",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-07-07T201327.md",
+      "number": 5,
+      "title": "Game Frontend CSP/Header Hygiene: Missing `Permissions-Policy`, Stale Script Hash",
+      "severity": "Informational",
       "status": "Open",
       "issues": [],
       "owner": ""
