@@ -1,6 +1,6 @@
 # Security Action Board
 
-> Auto-generated from `/audits/*.md` on 2026-07-13.  
+> Auto-generated from `/audits/*.md` on 2026-07-20.  
 > Add `<!-- issue: #NNN -->` in a finding's **Status** line to link an implementation issue.
 
 ✅ **All clear** — No unlinked High/Critical open findings.
