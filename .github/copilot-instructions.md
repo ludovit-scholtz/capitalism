@@ -8,6 +8,7 @@
 - Backend tests live at `projects/Api.Tests`.
 - Game frontend Vue app lives at `projects/frontend`.
 - Master frontend Vue app lives at `projects/master-frontend`.
+- Flutter mobile app lives at `projects/flutter_app` (mirrors `projects/frontend`'s screens against the same game GraphQL API; see `## Flutter mobile app` below).
 - The deployed backend is available at `https://capitalism.de-4.biatec.io/graphql`.
 - Main game frontend source files are in `projects/frontend/src`.
 - Main master frontend source files are in `projects/master-frontend/src`.
@@ -339,7 +340,24 @@ npm run build
 cd projects/MasterApi
 dotnet run           # API server on :44364
 dotnet build
+
+# Flutter app (requires Flutter SDK; see projects/flutter_app/README.md)
+cd projects/flutter_app
+flutter create . --org io.biatec --project-name capitalism_app --platforms android,ios,web  # one-time, generates native runners
+flutter pub get
+flutter run --dart-define=GRAPHQL_URL=http://localhost:44356/graphql
+flutter test
 ```
+
+## Flutter mobile app (`projects/flutter_app`)
+- Mobile client providing the same game-playing interface as `projects/frontend`, talking to the same game GraphQL API. It was scaffolded without the Flutter SDK available in that environment, so native platform folders (`android/`, `ios/`, `web/`, …) do not exist yet — run `flutter create .` inside `projects/flutter_app` to generate them (does not overwrite the committed `lib/`).
+- **Every screen is currently an empty placeholder** built from the shared `lib/core/widgets/placeholder_screen.dart` widget. Each screen file/class names the Vue view it mirrors (e.g. `HomeScreen` → `HomeView.vue`). See `ROADMAP.md` → `### Flutter mobile app` for the per-screen implementation backlog; implement screens by porting the matching Vue view's behavior, not by inventing new UX.
+- **Auth uses Bearer JWT, not cookies.** The web frontend uses HttpOnly session cookies (see `## Authentication` above), which a native mobile app can't participate in. The backend's `login`/`register` GraphQL mutations already return the raw JWT in the response payload alongside setting the cookie (`projects/Api/Types/Mutation.Auth.cs`), and `projects/Api/Program.cs`'s `TryReadRequestToken` accepts either an `Authorization: Bearer <jwt>` header or the cookie — so the Flutter app stores the returned token in `flutter_secure_storage` (`lib/core/auth/auth_state.dart`) and sends it as a Bearer header via `lib/core/graphql/graphql_service.dart`. No backend changes were required for this. Player API Keys (`Authorization: ApiKey <key>` / `X-Api-Key`, `projects/Api/Security/ApiKeyAuthMiddleware.cs`) are an available alternative for long-lived non-expiring credentials if short JWT sessions prove inconvenient on mobile.
+- The Biatec OIDC redirect flow is browser-only today; a native OIDC/AppAuth flow or in-app browser tab is still needed for that login path (roadmap item).
+- Routing (`lib/core/router/app_router.dart`, go_router) and the nav drawer (`lib/core/router/nav_items.dart`) are kept in sync with `projects/frontend/src/router/index.ts` and `AppHeader.vue`'s nav sections (Main, Economy, Build, Social, Administration) respectively — update both together when the web app's routes or nav change. Route **path shapes** are adapted for go_router/mobile conventions and are not required to be byte-identical to the web URLs; screen-to-view mirroring is what must stay 1:1.
+- GraphQL endpoint is a build-time `--dart-define=GRAPHQL_URL=...` (see `lib/core/config/app_config.dart`), analogous to the web app's `VITE_GRAPHQL_URL`/runtime-config resolution — there is no per-shard hostname-derivation option on mobile, so a build flavor or in-app server picker is the mobile equivalent for multi-shard deployments.
+- i18n uses Flutter's ARB/`flutter gen-l10n` tooling (`lib/l10n/app_{en,sk,de}.arb`, `l10n.yaml`), mirroring the web app's `en`/`sk`/`de` locale support. `lib/l10n/generated/` is gitignored — regenerate via `flutter pub get`, never hand-edit.
+- App theme is dark-first (`ThemeMode.dark`, no `prefers-color-scheme` fallback), matching the web app's dark-first rule.
 
 ## Docker Compose startup debugging (clean PostgreSQL)
 - Do not use or recreate the legacy manual migration scripts (`Manage-ApiMigrations.ps1`, `Manage-MasterMigrations.ps1`). Use `projects/Api/scripts/New-AppMigration.ps1` to scaffold new code-first PostgreSQL migrations and `projects/Api/scripts/Remove-AppMigration.ps1` only to undo the last un-applied scaffold. Startup migrations must still run from application boot (`MigrateAsync()` in initializers) against PostgreSQL.

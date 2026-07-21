@@ -13,6 +13,7 @@ Full-stack multiplayer economic strategy game (Capitalism II-style).
 | Shared | `projects/Shared` | C# class library (constants, pure helpers) |
 | Game frontend | `projects/frontend` | Vue 3 + TypeScript + Vite + Tailwind |
 | Master frontend | `projects/master-frontend` | Vue 3 + TypeScript + Vite + Tailwind |
+| Flutter app | `projects/flutter_app` | Flutter/Dart mobile client mirroring `projects/frontend` |
 | NPC bot | `projects/NPCBot` | .NET console app |
 
 Default dev ports: game frontend `5173`, master frontend `5174`, game API `5095`, master API `44364`.
@@ -158,6 +159,14 @@ docker-compose logs --no-color --tail=200 postgresmaster masterapi game1
 ## Discord bot
 
 Master-server bot lives in `projects/MasterApi/Utilities/Discord/`, gated by `DiscordBot:Enabled` + `BotToken`. One Discord server hosts both environments via command prefixes (`cap5` prod, `cap5stage` staging) with separate bot tokens. The two-way chat bridge (`postBridgedChatMessage` / `forwardInGameChatToDiscord`) uses `BridgedChatMessageTracker` as a loop guard on both sides. Setup: `docs/discord-bot-setup.md`.
+
+## Flutter app (`projects/flutter_app`)
+
+Mobile client mirroring `projects/frontend`'s screens/nav against the same game GraphQL API — see `projects/flutter_app/README.md` and `.github/copilot-instructions.md` → `## Flutter mobile app` for full detail. Key points:
+- **Every screen is currently an empty placeholder.** Implement by porting the matching Vue view; `ROADMAP.md` → `### Flutter mobile app` has the per-screen backlog with exact file/view names.
+- **Auth is Bearer-JWT, not cookies** — the backend already returns the raw token from `login`/`register` (`projects/Api/Types/Mutation.Auth.cs`) and accepts it via `Authorization: Bearer` (`Program.cs`'s `TryReadRequestToken`), so no backend changes were needed. Token lives in `flutter_secure_storage` via `lib/core/auth/auth_state.dart`.
+- Routing (`lib/core/router/app_router.dart`) and the nav drawer (`lib/core/router/nav_items.dart`) must be kept in sync with `projects/frontend/src/router/index.ts` and `AppHeader.vue`'s nav sections when either changes.
+- Native platform folders don't exist yet — run `flutter create .` inside `projects/flutter_app` first (see its README).
 
 ## GraphQL endpoints
 

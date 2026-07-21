@@ -47,3 +47,63 @@ Create a fun game in the style of Capitalism II, where players experience realis
 - [x] Added a weekly scheduled (cron) trigger to `api-ci-cd.yml`, `frontend-ci-cd.yml`, and `deploy-stage-k8s.yml` (which builds and deploys MasterApi/master-frontend) so Docker images are rebuilt and redeployed even when `main` has no code pushes, ensuring runtime security patches (e.g. CVE-2026-45591, fixed in .NET 10.0.9) ship on a regular cadence. Production master deploy remains manual (`workflow_dispatch`) by existing design; not changed here.
 - [x] Fixed nginx `add_header` inheritance in `projects/frontend/nginx.conf` and `projects/master-frontend/nginx.conf`: every location that declares its own `add_header` (static assets, `/sw.js`, `/health`) now repeats the full security-header set so asset responses keep `nosniff` and HSTS; added the missing `Permissions-Policy` header to the game frontend. Verified with `npm run test:security-headers` in both frontends.
 - [ ] Clear esbuild advisory GHSA-g7r4-m6w7-qqqr (dev-server arbitrary file read on Windows, low, dev-tooling only) in both frontends at the next dependency cycle: run `npm audit fix` or bump Vite to a release that lifts esbuild past 0.28.0, then re-run `npm audit` to confirm zero advisories. Attempted 2026-07-07 via an `overrides` pin to `esbuild@^0.28.1`, but `npm install` could not complete in the sandboxed audit environment (registry fetches for the platform-specific `@esbuild/*` optional packages were silently dropped mid-run); needs a normal dev machine or CI runner with full network access.
+
+### Flutter mobile app
+
+The scaffold in `projects/flutter_app` (routing, nav drawer, theming, i18n plumbing, GraphQL client, Bearer-token auth state) was generated without the Flutter SDK available and ships every screen as an empty placeholder. Native platform runners still need generating, and each screen below needs its real implementation, ported from the matching Vue view in `projects/frontend/src/views/`.
+
+- [ ] Generate native platform runners for `projects/flutter_app` by running `flutter create .` (Android/iOS/Web) now that the Dart source, pubspec, and l10n config exist; this must not overwrite the committed `lib/`.
+- [ ] Wire `url_launcher` for the Discord nav link and build the Chat side-panel/screen in `lib/core/widgets/app_shell.dart` (`_handleTap`), both currently no-ops.
+- [ ] Build a native Biatec OIDC sign-in flow (AppAuth or in-app browser tab) to complement the Bearer-JWT auth already wired in `lib/core/auth/auth_state.dart`.
+- [ ] Implement the Home screen (`lib/features/home/home_screen.dart`, mirrors `HomeView.vue`).
+- [ ] Implement the Sign In screen (`lib/features/auth/auth_screens.dart` `LoginScreen`, mirrors `LoginView.vue`).
+- [ ] Implement the Forgot Password screen (`lib/features/auth/auth_screens.dart` `ForgotPasswordScreen`, mirrors `ForgotPasswordView.vue`).
+- [ ] Implement the Reset Password screen (`lib/features/auth/auth_screens.dart` `ResetPasswordScreen`, mirrors `ResetPasswordView.vue`).
+- [ ] Implement the Auth Callback screen (`lib/features/auth/auth_screens.dart` `AuthCallbackScreen`, mirrors `AuthCallbackView.vue`).
+- [ ] Implement the Onboarding screen (`lib/features/onboarding/onboarding_screen.dart`, mirrors `OnboardingView.vue`).
+- [ ] Implement the Dashboard screen (`lib/features/dashboard/dashboard_screen.dart`, mirrors `DashboardView.vue`).
+- [ ] Implement the News screen (`lib/features/news/news_screens.dart` `NewsScreen`, mirrors `NewsView.vue`).
+- [ ] Implement the Notifications screen (`lib/features/news/news_screens.dart` `NotificationsScreen`, mirrors `NotificationsView.vue`).
+- [ ] Implement the Contracts screen (`lib/features/economy/contracts_screen.dart`, mirrors `ContractsView.vue`).
+- [ ] Implement the Leaderboard screen (`lib/features/leaderboard/leaderboard_screens.dart` `LeaderboardScreen`, mirrors `LeaderboardView.vue`).
+- [ ] Implement the Player Profile screen (`lib/features/leaderboard/leaderboard_screens.dart` `PlayerProfileScreen`, mirrors `PlayerProfileView.vue`).
+- [ ] Implement the Cities screen (`lib/features/cities/cities_screens.dart` `CitiesScreen`, mirrors `CitiesView.vue`).
+- [ ] Implement the World Map screen (`lib/features/cities/cities_screens.dart` `WorldMapScreen`, mirrors `WorldMapView.vue`).
+- [ ] Implement the Building Market screen (`lib/features/buildings/buildings_screens.dart` `BuildingMarketScreen`, mirrors `BuildingMarketView.vue`).
+- [ ] Implement the Buy Building screen (`lib/features/buildings/buildings_screens.dart` `BuyBuildingScreen`, mirrors `BuyBuildingView.vue`).
+- [ ] Implement the Building Detail screen (`lib/features/buildings/buildings_screens.dart` `BuildingDetailScreen`, mirrors `BuildingDetailView.vue`).
+- [ ] Implement the Sell Building screen (`lib/features/buildings/buildings_screens.dart` `SellBuildingScreen`, mirrors `SellBuildingView.vue`).
+- [ ] Implement the Encyclopedia screen (`lib/features/encyclopedia/encyclopedia_screens.dart` `EncyclopediaScreen`, mirrors `ManufacturingEncyclopediaView.vue`).
+- [ ] Implement the Resource Detail screen (`lib/features/encyclopedia/encyclopedia_screens.dart` `ResourceDetailScreen`, mirrors `ResourceDetailView.vue`).
+- [ ] Implement the Exchange screen (`lib/features/exchange/exchange_screens.dart` `GlobalExchangeScreen`, mirrors `GlobalExchangeView.vue`).
+- [ ] Implement the Stocks screen (`lib/features/exchange/exchange_screens.dart` `StockExchangeScreen`, mirrors `StockExchangeView.vue`).
+- [ ] Implement the Trade Stock screen (`lib/features/exchange/exchange_screens.dart` `StockTradingScreen`, mirrors `StockTradingView.vue`).
+- [ ] Implement the Forex screen (`lib/features/exchange/exchange_screens.dart` `ForexExchangeScreen`, mirrors `ForexExchangeView.vue`).
+- [ ] Implement the City Overview tab (`lib/features/city/city_tab_screens.dart` `CityOverviewScreen`, mirrors `CityOverviewTab.vue`).
+- [ ] Implement the City Economy tab (`lib/features/city/city_tab_screens.dart` `CityEconomyScreen`, mirrors `CityEconomyTab.vue`).
+- [ ] Implement the City Buildings tab (`lib/features/city/city_tab_screens.dart` `CityBuildingsScreen`, mirrors `CityBuildingsTab.vue`).
+- [ ] Implement the City Market tab (`lib/features/city/city_tab_screens.dart` `CityMarketScreen`, mirrors `CityMarketTab.vue`).
+- [ ] Implement the City Contracts tab (`lib/features/city/city_tab_screens.dart` `CityContractsScreen`, mirrors `CityContractsTab.vue`).
+- [ ] Implement the City Competitors tab (`lib/features/city/city_tab_screens.dart` `CityCompetitorsScreen`, mirrors `CityCompetitorsTab.vue`).
+- [ ] Implement the Ledger screen (`lib/features/company/company_screens.dart` `LedgerScreen`, mirrors `LedgerView.vue`).
+- [ ] Implement the Company Contracts screen (`lib/features/company/company_screens.dart` `CompanyContractsScreen`, mirrors `CompanyContractsView.vue`).
+- [ ] Implement the Company Settings screen (`lib/features/company/company_screens.dart` `CompanySettingsScreen`, mirrors `CompanySettingsView.vue`).
+- [ ] Implement the Company Research screen (`lib/features/company/company_screens.dart` `CompanyResearchScreen`, mirrors `CompanyResearchView.vue`).
+- [ ] Implement the Personal Ledger screen (`lib/features/company/company_screens.dart` `PersonalLedgerScreen`, mirrors `PersonalLedgerView.vue`).
+- [ ] Implement the Banking (loan marketplace) screen (`lib/features/banking/banking_screens.dart` `LoanMarketplaceScreen`, mirrors `LoanMarketplaceView.vue`).
+- [ ] Implement the Bank Management screen (`lib/features/banking/banking_screens.dart` `BankManagementScreen`, mirrors `BankManagementView.vue`).
+- [ ] Implement the Request Loan screen (`lib/features/banking/banking_screens.dart` `BankLoanRequestScreen`, mirrors `BankLoanRequestView.vue`).
+- [ ] Implement the Bank Statement screen (`lib/features/banking/banking_screens.dart` `BankStatementScreen`, mirrors `BankStatementView.vue`).
+- [ ] Implement the Campaigns / Market Intelligence screen (`lib/features/market/market_screens.dart` `MarketIntelligenceScreen`, mirrors `MarketIntelligenceView.vue`).
+- [ ] Implement the Market Dashboard screen (`lib/features/market/market_screens.dart` `MarketDashboardScreen`, mirrors `MarketDashboardView.vue`).
+- [ ] Implement the Energy Market screen (`lib/features/market/market_screens.dart` `EnergyMarketScreen`, mirrors `EnergyMarketView.vue`).
+- [ ] Implement the Global Events screen (`lib/features/market/market_screens.dart` `GlobalEventsScreen`, mirrors `GlobalEventsPanel.vue`).
+- [ ] Implement the Marketing Analytics screen (`lib/features/market/market_screens.dart` `MarketingAnalyticsScreen`, mirrors `MarketingAnalyticsView.vue`).
+- [ ] Implement the Trade Routes screen (`lib/features/trade/trade_screens.dart`, mirrors `TradeRoutesView.vue`).
+- [ ] Implement the Tutorial screen (`lib/features/tutorial/tutorial_screen.dart`, mirrors `TutorialView.vue`).
+- [ ] Implement the Operations Overview screen (`lib/features/operations/operations_screens.dart` `OperationsOverviewScreen`, mirrors `OperationsOverviewView.vue`).
+- [ ] Implement the Operations Money Flow screen (`lib/features/operations/operations_screens.dart` `OperationsMoneyFlowScreen`, mirrors `OperationsStatisticsView.vue`).
+- [ ] Implement the Operations Product Analytics screen (`lib/features/operations/operations_screens.dart` `OperationsProductAnalyticsScreen`, mirrors `OperationsAnalyticsView.vue`).
+- [ ] Implement the Operations News screen (`lib/features/operations/operations_screens.dart` `OperationsNewsScreen`, mirrors `OperationsNewsView.vue`).
+- [ ] Implement the Operations Players screen (`lib/features/operations/operations_screens.dart` `OperationsPlayersScreen`, mirrors `OperationsPlayersView.vue`).
+- [ ] Implement the Operations Player Detail screen (`lib/features/operations/operations_screens.dart` `OperationsPlayerDetailScreen`, mirrors `OperationsPlayerDetailView.vue`).
