@@ -11,6 +11,7 @@ class NavItem {
     this.requiresAuth = false,
     this.requiresAdmin = false,
     this.externalUrl,
+    this.opensChatPanel = false,
   });
 
   final String label;
@@ -22,6 +23,11 @@ class NavItem {
   final bool requiresAuth;
   final bool requiresAdmin;
   final String? externalUrl;
+
+  /// True for the Chat item, which opens an in-app panel rather than
+  /// navigating — mirrors the side panel opened from `AppHeader.vue`'s Chat
+  /// button on the web, which likewise has no route of its own.
+  final bool opensChatPanel;
 }
 
 class NavSection {
@@ -71,7 +77,7 @@ const List<NavSection> navSections = <NavSection>[
   NavSection(
     title: 'Social',
     items: [
-      NavItem(label: 'Chat', icon: Icons.chat_bubble_outline, requiresAuth: true),
+      NavItem(label: 'Chat', icon: Icons.chat_bubble_outline, requiresAuth: true, opensChatPanel: true),
       NavItem(label: 'Discord', icon: Icons.forum_outlined, externalUrl: 'https://discord.gg/PhHSxJvDn6'),
     ],
   ),

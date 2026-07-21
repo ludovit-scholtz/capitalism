@@ -1,4 +1,6 @@
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 
 import '../../features/auth/auth_screens.dart';
 import '../../features/banking/banking_screens.dart';
@@ -18,6 +20,9 @@ import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/operations/operations_screens.dart';
 import '../../features/trade/trade_screens.dart';
 import '../../features/tutorial/tutorial_screen.dart';
+import '../auth/auth_state.dart';
+import '../graphql/graphql_service.dart';
+import '../services/url_opener.dart';
 import '../widgets/app_shell.dart';
 
 /// Route table mirroring `projects/frontend/src/router/index.ts`.
@@ -30,14 +35,23 @@ import '../widgets/app_shell.dart';
 ///
 /// [createAppRouter] is a factory rather than a bare singleton so tests can
 /// build a fresh [GoRouter] per test — a shared instance would leak
-/// navigation state (current location) across tests via `pumpWidget`.
-GoRouter createAppRouter() => GoRouter(
+/// navigation state (current location) across tests via `pumpWidget`. It
+/// also accepts an injectable [UrlOpener] (so tests can fake external-link
+/// taps, e.g. Discord, without exercising the real url_launcher platform
+/// channel) and an injectable [httpClient] (so tests can fake HomeScreen's
+/// GraphQL call instead of hitting a real backend).
+GoRouter createAppRouter({UrlOpener urlOpener = const ExternalUrlOpener(), http.Client? httpClient}) => GoRouter(
   initialLocation: '/',
   routes: [
     ShellRoute(
-      builder: (context, state, child) => AppShell(child: child),
+      builder: (context, state, child) => AppShell(urlOpener: urlOpener, child: child),
       routes: [
-        GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+        GoRoute(
+          path: '/',
+          builder: (context, state) => HomeScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
         GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
         GoRoute(path: '/forgot-password', builder: (context, state) => const ForgotPasswordScreen()),
         GoRoute(path: '/reset-password', builder: (context, state) => const ResetPasswordScreen()),

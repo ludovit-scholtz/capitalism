@@ -1,17 +1,25 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../features/chat/chat_panel.dart';
 import '../auth/auth_state.dart';
 import '../router/nav_items.dart';
+import '../services/url_opener.dart';
 
 /// Persistent chrome (app bar, drawer, bottom nav) wrapped around every
 /// route via a go_router `ShellRoute`. Equivalent to `AppHeader.vue` +
 /// `App.vue`'s layout in the web frontend.
 class AppShell extends StatelessWidget {
-  const AppShell({super.key, required this.child});
+  const AppShell({super.key, required this.child, this.urlOpener = const ExternalUrlOpener()});
 
   final Widget child;
+
+  /// Injectable so tests can substitute a fake instead of exercising the
+  /// real url_launcher platform channel.
+  final UrlOpener urlOpener;
 
   @override
   Widget build(BuildContext context) {
@@ -65,11 +73,16 @@ class AppShell extends StatelessWidget {
 
   void _handleTap(BuildContext context, NavItem item) {
     Navigator.of(context).pop();
-    if (item.externalUrl != null || item.route.isEmpty) {
-      // External links (Discord) and panel-only items (Chat) have no route
-      // yet — wire up url_launcher / a side panel when those are built.
+
+    if (item.opensChatPanel) {
+      unawaited(ChatPanel.show(context));
       return;
     }
+    if (item.externalUrl != null) {
+      unawaited(urlOpener.open(item.externalUrl!));
+      return;
+    }
+    if (item.route.isEmpty) return;
     context.go(item.route);
   }
 
