@@ -9,12 +9,5 @@ lib/l10n/generated/
 *.iml
 *.g.dart
 
-android/
-ios/
-linux/
-macos/
-windows/
-web/
-
 .vscode/
 .idea/

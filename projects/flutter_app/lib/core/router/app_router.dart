@@ -27,7 +27,11 @@ import '../widgets/app_shell.dart';
 /// `/encyclopedia/:topicSlug(pattern)` route becomes two flat routes here).
 /// Screen names and the views they mirror are kept 1:1 with the web app —
 /// see CLAUDE.md for the full route/nav parity notes.
-final GoRouter appRouter = GoRouter(
+///
+/// [createAppRouter] is a factory rather than a bare singleton so tests can
+/// build a fresh [GoRouter] per test — a shared instance would leak
+/// navigation state (current location) across tests via `pumpWidget`.
+GoRouter createAppRouter() => GoRouter(
   initialLocation: '/',
   routes: [
     ShellRoute(

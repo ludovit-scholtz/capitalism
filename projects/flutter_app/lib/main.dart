@@ -13,7 +13,7 @@ Future<void> main() async {
   runApp(
     ChangeNotifierProvider<AuthState>.value(
       value: authState,
-      child: const CapitalismApp(),
+      child: CapitalismApp(),
     ),
   );
 }

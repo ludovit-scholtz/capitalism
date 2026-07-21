@@ -26,17 +26,18 @@ class AppShell extends StatelessWidget {
             children: [
               const DrawerHeader(child: Center(child: Text('Capitalism'))),
               for (final section in navSections) ...[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                  child: Text(section.title, style: Theme.of(context).textTheme.labelLarge),
-                ),
-                for (final item in section.items)
-                  if ((!item.requiresAuth || auth.isAuthenticated) && (!item.requiresAdmin || auth.isAdmin))
+                if (_visibleItems(section, auth).isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                    child: Text(section.title, style: Theme.of(context).textTheme.labelLarge),
+                  ),
+                  for (final item in _visibleItems(section, auth))
                     ListTile(
                       leading: Icon(item.icon),
                       title: Text(item.label),
                       onTap: () => _handleTap(context, item),
                     ),
+                ],
               ],
             ],
           ),
@@ -54,6 +55,12 @@ class AppShell extends StatelessWidget {
         onDestinationSelected: (index) => _handleBottomTap(context, index),
       ),
     );
+  }
+
+  List<NavItem> _visibleItems(NavSection section, AuthState auth) {
+    return section.items
+        .where((item) => (!item.requiresAuth || auth.isAuthenticated) && (!item.requiresAdmin || auth.isAdmin))
+        .toList();
   }
 
   void _handleTap(BuildContext context, NavItem item) {

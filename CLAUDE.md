@@ -164,9 +164,10 @@ Master-server bot lives in `projects/MasterApi/Utilities/Discord/`, gated by `Di
 
 Mobile client mirroring `projects/frontend`'s screens/nav against the same game GraphQL API — see `projects/flutter_app/README.md` and `.github/copilot-instructions.md` → `## Flutter mobile app` for full detail. Key points:
 - **Every screen is currently an empty placeholder.** Implement by porting the matching Vue view; `ROADMAP.md` → `### Flutter mobile app` has the per-screen backlog with exact file/view names.
-- **Auth is Bearer-JWT, not cookies** — the backend already returns the raw token from `login`/`register` (`projects/Api/Types/Mutation.Auth.cs`) and accepts it via `Authorization: Bearer` (`Program.cs`'s `TryReadRequestToken`), so no backend changes were needed. Token lives in `flutter_secure_storage` via `lib/core/auth/auth_state.dart`.
-- Routing (`lib/core/router/app_router.dart`) and the nav drawer (`lib/core/router/nav_items.dart`) must be kept in sync with `projects/frontend/src/router/index.ts` and `AppHeader.vue`'s nav sections when either changes.
-- Native platform folders don't exist yet — run `flutter create .` inside `projects/flutter_app` first (see its README).
+- **Auth is Bearer-JWT, not cookies** — the backend already returns the raw token from `login`/`register` (`projects/Api/Types/Mutation.Auth.cs`) and accepts it via `Authorization: Bearer` (`Program.cs`'s `TryReadRequestToken`), so no backend changes were needed. Token lives behind the `TokenStorage` abstraction (`lib/core/auth/token_storage.dart`) — `SecureTokenStorage` (real) vs. test-only `InMemoryTokenStorage` — so widget tests don't hit the secure-storage platform channel.
+- Routing (`lib/core/router/app_router.dart`, `createAppRouter()` factory) and the nav drawer (`lib/core/router/nav_items.dart`) must be kept in sync with `projects/frontend/src/router/index.ts` and `AppHeader.vue`'s nav sections when either changes.
+- Native platform folders (`android/`, `ios/`, `web/`, `windows/`) are generated and committed; `flutter analyze`/`flutter test`/`flutter build web` are verified clean. Android/iOS/Windows builds additionally need their native toolchains installed locally.
+- **Test with `flutter_test`/`WidgetTester`** (no device/emulator needed) — `test/navigation_test.dart` covers drawer visibility (auth/admin gating), tapping nav items, and bottom-nav switching. Its drawer assertions need `tester.binding.setSurfaceSize(const Size(800, 2400))` first, since `ListView` only mounts children within the viewport even for a non-lazy list — items below the default 600px test height silently fail `find.text`. Add `integration_test` later for real device-level e2e once screens are implemented (the mobile analogue of Playwright).
 
 ## GraphQL endpoints
 

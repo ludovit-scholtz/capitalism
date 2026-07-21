@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import 'token_storage.dart';
 
 /// Holds the player's Bearer JWT and exposes it to [GraphQlService].
 ///
@@ -9,11 +10,9 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 /// no HttpOnly-cookie story, so this app takes the raw token and sends it as
 /// `Authorization: Bearer <token>` instead — no backend changes required.
 class AuthState extends ChangeNotifier {
-  AuthState({FlutterSecureStorage? storage}) : _storage = storage ?? const FlutterSecureStorage();
+  AuthState({TokenStorage? storage}) : _storage = storage ?? SecureTokenStorage();
 
-  static const _tokenStorageKey = 'auth_token';
-
-  final FlutterSecureStorage _storage;
+  final TokenStorage _storage;
 
   String? _token;
   bool _isAdmin = false;
@@ -23,13 +22,13 @@ class AuthState extends ChangeNotifier {
   String? get token => _token;
 
   Future<void> restoreSession() async {
-    _token = await _storage.read(key: _tokenStorageKey);
+    _token = await _storage.read();
     notifyListeners();
   }
 
   Future<void> setToken(String token) async {
     _token = token;
-    await _storage.write(key: _tokenStorageKey, value: token);
+    await _storage.write(token);
     notifyListeners();
   }
 
@@ -44,7 +43,7 @@ class AuthState extends ChangeNotifier {
   Future<void> logout() async {
     _token = null;
     _isAdmin = false;
-    await _storage.delete(key: _tokenStorageKey);
+    await _storage.delete();
     notifyListeners();
   }
 }
