@@ -29,9 +29,11 @@ heavily trimmed Building Detail (overview, unit list, upgrade/price quick action
 Contracts, Competitors), the 4 exchange screens — Global Exchange (buy resources
 from other cities), Stocks (listings), Stock Trading (order book, limit orders,
 shareholders), and Forex (swap/rates/history) — Ledger, Company Contracts, Company
-Settings, Company Research, Personal Ledger, and the four banking screens — Loan
-Marketplace, Bank Management, Request Loan, Bank Statement — are implemented,
-matching the web app's fields, validation,
+Settings, Company Research, Personal Ledger, the four banking screens — Loan
+Marketplace, Bank Management, Request Loan, Bank Statement — and the six market/
+trade screens — Market Intelligence, Market Dashboard, Energy Market, Global
+Events, Marketing Analytics, Trade Routes — are implemented, matching the web
+app's fields, validation,
 GraphQL/REST endpoints, and error handling. The app now also has a cohesive dark
 "22nd century HUD" visual theme (custom Material 3 `ThemeData`, bundled
 Orbitron/Inter/Rajdhani fonts, animated starfield background) that applies to every
