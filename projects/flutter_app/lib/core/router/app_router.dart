@@ -105,7 +105,12 @@ GoRouter createAppRouter({
             oidcService: webAuthenticator != null ? BiatecOidcService(authenticator: webAuthenticator) : const BiatecOidcService(),
           ),
         ),
-        GoRoute(path: '/dashboard', builder: (context, state) => const DashboardScreen()),
+        GoRoute(
+          path: '/dashboard',
+          builder: (context, state) => DashboardScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
         GoRoute(path: '/news', builder: (context, state) => const NewsScreen()),
         GoRoute(path: '/notifications', builder: (context, state) => const NotificationsScreen()),
         GoRoute(path: '/contracts', builder: (context, state) => const ContractsScreen()),

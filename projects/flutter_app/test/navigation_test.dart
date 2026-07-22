@@ -91,7 +91,12 @@ void main() {
       await tester.tap(find.widgetWithText(ListTile, 'Dashboard'));
       await tester.pumpAndSettle();
 
-      expect(_placeholderBodyFor('DashboardView.vue'), findsOneWidget);
+      // DashboardScreen is implemented (no longer a placeholder); the shared
+      // fake GraphQL client used by this harness answers every query with
+      // the Home status shape, so `myCompanies` resolves empty and the
+      // screen lands on its real empty state rather than placeholder text.
+      // See test/dashboard_screen_test.dart for full DashboardScreen coverage.
+      expect(find.text('You do not have a company yet.'), findsOneWidget);
     });
 
     testWidgets('admin players see the Administration section and reach Operations', (tester) async {

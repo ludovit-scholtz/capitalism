@@ -7,19 +7,23 @@ Mobile client for the Capitalism MMO, providing the same game-playing interface 
 
 Most screens are still empty placeholders — see `ROADMAP.md` (`### Flutter mobile
 app`) for the one-line-per-screen implementation backlog — but the app shell, auth
-flow, and onboarding wizard are real and working: Home (live tick/tax-rate/leaderboard
-data), navigation (drawer + bottom nav, auth/admin-gated visibility), Discord (opens
-the system browser via `url_launcher`), Chat (an in-app panel), all four auth screens —
-Sign In (login/register + Biatec OIDC), Forgot Password, Reset Password, Auth Callback
-— and the full 7-step Onboarding wizard (city → industry → product → IPO → factory
-purchase → shop purchase → completion, with guest mode and backend-driven resume) are
+flow, onboarding wizard, and dashboard are real and working: Home (live
+tick/tax-rate/leaderboard data), navigation (drawer + bottom nav, auth/admin-gated
+visibility), Discord (opens the system browser via `url_launcher`), Chat (an in-app
+panel), all four auth screens — Sign In (login/register + Biatec OIDC), Forgot
+Password, Reset Password, Auth Callback — the full 7-step Onboarding wizard (city →
+industry → product → IPO → factory purchase → shop purchase → completion, with guest
+mode and backend-driven resume), and the Dashboard (company cards, buildings with
+status badges, pending actions, the same auth/onboarding redirect guards as the web) are
 implemented, matching the web app's fields, validation, GraphQL/REST endpoints, and
 error handling. See `CLAUDE.md` / `.github/copilot-instructions.md` for architecture
 and conventions, including several non-obvious behaviors worth knowing before touching
 that code (password auth is **disabled by default**, matching the web; login/register
 hit the Master API, not the game API; forgot/reset-password are REST, not GraphQL;
 onboarding uses `startOnboardingCompany` + `finishOnboarding`, not the legacy one-shot
-`completeOnboarding`).
+`completeOnboarding`; any screen redirecting from `initState()` before its first
+`await` must defer via `addPostFrameCallback` or it'll throw mid-build — a real bug
+the Dashboard's test suite caught, documented in `.github/copilot-instructions.md`).
 
 Native platform runners (`android/`, `ios/`, `web/`, `windows/`) are generated and
 committed. `flutter analyze`/`flutter test` are clean, and `flutter build
@@ -108,6 +112,13 @@ right default for CI and for an app where most screens are still placeholders.
   has too many distinct operations for a generic fake `http.Client` to stay readable;
   reach for this pattern (implement the concrete service class directly — Dart classes
   are implicitly interfaces) whenever a service has more than 2-3 operations.
+- `test/dashboard_screen_test.dart` — both redirect guards (unauthenticated → `/login`,
+  onboarding-incomplete → `/onboarding`, the latter verified to skip the dashboard-data
+  fetch entirely); loading/error(+Retry)/empty(+"Start Onboarding") states; companies,
+  buildings, cash, and status badges (destroyed/loan-default/power-status) rendering
+  correctly; per-building-type navigation (`BANK` → `/bank/:id`, else `/building/:id`);
+  and pull-to-refresh silently re-fetching (call-count assertion, not just that the UI
+  looks the same). Uses `FakeDashboardService implements DashboardService`.
 - `test/support/app_harness.dart` — shared `pumpCapitalismApp()` helper: fresh
   `AuthState` + fresh `createAppRouter()` per test (a shared router singleton would
   leak navigation state across tests), `InMemoryTokenStorage`, and a faked
@@ -124,6 +135,12 @@ right default for CI and for an app where most screens are still placeholders.
   async flow (fake HTTP + fake authenticator, no real delay anywhere) can fully resolve
   within one `pump()`, so don't rely on catching an intermediate "loading" frame —
   assert on a recording fake having been called, plus the final state, instead.
+- **A real bug the Dashboard tests caught**: calling `context.go(...)` synchronously
+  from `initState()` — i.e. before the triggering async function's first `await` —
+  throws "setState() or markNeedsBuild() called during build", since the Router is
+  still mid-build on the first frame. Any screen with an early, no-await redirect check
+  in `initState` needs to defer via `WidgetsBinding.instance.addPostFrameCallback`
+  rather than calling its bootstrap function directly.
 
 Once more screens exist and true device-level end-to-end journeys matter (mirroring
 the role Playwright plays for `projects/frontend`), add the official `integration_test`
@@ -175,6 +192,12 @@ exercise platform channels, real network calls, or true multi-frame animations.
   step widgets), `onboarding_complete_step.dart` (step 7), `onboarding_screen.dart`
   (the orchestrating state machine — guest mode, backend resume, error recovery; see
   its top-of-file comment for the list of things trimmed from the web version).
+- `lib/features/dashboard/` — the "company mode" dashboard: `dashboard_models.dart`
+  (data classes), `dashboard_service.dart` (the `myCompanies`/`gameState`/
+  `myPendingActions` combined query plus the onboarding-guard `me` query),
+  `dashboard_widgets.dart` (company card, building tile, pending-actions section),
+  `dashboard_screen.dart` (guards, loading/error/empty states, silent pull-to-refresh;
+  see its top-of-file comment for the list of things trimmed from the web version).
 - `lib/l10n/app_{en,sk,de}.arb` — source strings for `flutter gen-l10n`, covering the
   app shell/nav/auth chrome today. Mirrors the web app's `en`/`sk`/`de` locale support;
   extend with a screen's own keys as that screen is implemented.
