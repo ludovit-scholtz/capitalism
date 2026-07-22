@@ -98,7 +98,13 @@ GoRouter createAppRouter({
             redirectPath: state.uri.queryParameters['redirect'] ?? '/',
           ),
         ),
-        GoRoute(path: '/onboarding', builder: (context, state) => const OnboardingScreen()),
+        GoRoute(
+          path: '/onboarding',
+          builder: (context, state) => OnboardingScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+            oidcService: webAuthenticator != null ? BiatecOidcService(authenticator: webAuthenticator) : const BiatecOidcService(),
+          ),
+        ),
         GoRoute(path: '/dashboard', builder: (context, state) => const DashboardScreen()),
         GoRoute(path: '/news', builder: (context, state) => const NewsScreen()),
         GoRoute(path: '/notifications', builder: (context, state) => const NotificationsScreen()),

@@ -6,17 +6,20 @@ Mobile client for the Capitalism MMO, providing the same game-playing interface 
 ## Status
 
 Most screens are still empty placeholders — see `ROADMAP.md` (`### Flutter mobile
-app`) for the one-line-per-screen implementation backlog — but the app shell and auth
-flow are real and working: Home (live tick/tax-rate/leaderboard data), navigation
-(drawer + bottom nav, auth/admin-gated visibility), Discord (opens the system browser
-via `url_launcher`), Chat (an in-app panel), and all four auth screens — Sign In
-(login/register + Biatec OIDC), Forgot Password, Reset Password, Auth Callback — are
+app`) for the one-line-per-screen implementation backlog — but the app shell, auth
+flow, and onboarding wizard are real and working: Home (live tick/tax-rate/leaderboard
+data), navigation (drawer + bottom nav, auth/admin-gated visibility), Discord (opens
+the system browser via `url_launcher`), Chat (an in-app panel), all four auth screens —
+Sign In (login/register + Biatec OIDC), Forgot Password, Reset Password, Auth Callback
+— and the full 7-step Onboarding wizard (city → industry → product → IPO → factory
+purchase → shop purchase → completion, with guest mode and backend-driven resume) are
 implemented, matching the web app's fields, validation, GraphQL/REST endpoints, and
 error handling. See `CLAUDE.md` / `.github/copilot-instructions.md` for architecture
-and conventions, including several non-obvious auth behaviors worth knowing before
-touching that code (password auth is **disabled by default**, matching the web;
-login/register hit the Master API, not the game API; forgot/reset-password are REST,
-not GraphQL).
+and conventions, including several non-obvious behaviors worth knowing before touching
+that code (password auth is **disabled by default**, matching the web; login/register
+hit the Master API, not the game API; forgot/reset-password are REST, not GraphQL;
+onboarding uses `startOnboardingCompany` + `finishOnboarding`, not the legacy one-shot
+`completeOnboarding`).
 
 Native platform runners (`android/`, `ios/`, `web/`, `windows/`) are generated and
 committed. `flutter analyze`/`flutter test` are clean, and `flutter build
@@ -92,6 +95,19 @@ right default for CI and for an app where most screens are still placeholders.
   that forces `debugDefaultTargetPlatformOverride` through Android/iOS/Windows to
   assert the redirect URI shape differs correctly per platform **without needing all
   three native toolchains** — see `.github/copilot-instructions.md` for that pattern.
+- `test/onboarding_screen_test.dart` — the full authenticated happy path across all 7
+  steps with exact mutation-arg assertions (`startOnboardingCompany`/`finishOnboarding`
+  called with the precise selected industry/city/lot/product); Pro-only-industry
+  gating; `LOT_ALREADY_OWNED` recovery (selection cleared, lots reloaded); backend
+  resume landing directly on step 6 when `onboardingCurrentStep == 'SHOP_SELECTION'`;
+  redirect to `/dashboard` when onboarding + first sale are already complete;
+  milestone completion; and the guest flow (zero mutation calls through step 6, then
+  "Save Progress" migrating via both mutations). Uses
+  `test/support/fake_onboarding_service.dart`'s `FakeOnboardingService implements
+  OnboardingService` — a full in-memory fake, not an HTTP mock, since `OnboardingService`
+  has too many distinct operations for a generic fake `http.Client` to stay readable;
+  reach for this pattern (implement the concrete service class directly — Dart classes
+  are implicitly interfaces) whenever a service has more than 2-3 operations.
 - `test/support/app_harness.dart` — shared `pumpCapitalismApp()` helper: fresh
   `AuthState` + fresh `createAppRouter()` per test (a shared router singleton would
   leak navigation state across tests), `InMemoryTokenStorage`, and a faked
@@ -152,6 +168,13 @@ exercise platform channels, real network calls, or true multi-frame animations.
   `ResetPasswordScreen`, `AuthCallbackScreen` (owns the actual OIDC round trip — see
   the file's doc comment for why that differs from a literal port of the web).
 - `lib/features/chat/chat_panel.dart` — the Chat nav item's in-app panel.
+- `lib/features/onboarding/` — the full 7-step onboarding wizard: `onboarding_models.dart`
+  (data classes + IPO plan/starter-industry constants), `onboarding_service.dart`
+  (GraphQL calls, real `startOnboardingCompany`/`finishOnboarding` contract — not the
+  legacy `completeOnboarding`), `onboarding_steps.dart` (city/industry/product/IPO/lot
+  step widgets), `onboarding_complete_step.dart` (step 7), `onboarding_screen.dart`
+  (the orchestrating state machine — guest mode, backend resume, error recovery; see
+  its top-of-file comment for the list of things trimmed from the web version).
 - `lib/l10n/app_{en,sk,de}.arb` — source strings for `flutter gen-l10n`, covering the
   app shell/nav/auth chrome today. Mirrors the web app's `en`/`sk`/`de` locale support;
   extend with a screen's own keys as that screen is implemented.
