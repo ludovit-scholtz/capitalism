@@ -1,19 +1,41 @@
+import 'package:flutter/foundation.dart' show kReleaseMode;
+
 /// Runtime configuration, mirroring how `projects/frontend/src/lib/runtimeGraphqlUrl.ts`
 /// resolves the game API URL. Values are supplied at build time via
 /// `--dart-define=GRAPHQL_URL=...` (see README.md); there is no window-based
-/// runtime override on mobile, so a build-flavor-per-shard or in-app server
-/// picker is the mobile equivalent of the web's per-container runtime config.
+/// runtime override on mobile, so [setGraphqlUrl] (driven by
+/// `GameServerState`/`GameServerSelectionScreen`) is the mobile equivalent of
+/// the web's per-container runtime config — the player picks a registered
+/// game server from the Master API and this becomes the active game endpoint
+/// for the rest of the session.
 class AppConfig {
   AppConfig._();
 
-  static const String graphqlUrl = String.fromEnvironment(
+  static const String _defaultGraphqlUrl = String.fromEnvironment(
     'GRAPHQL_URL',
     defaultValue: 'http://localhost:44356/graphql',
   );
 
+  static String _graphqlUrl = _defaultGraphqlUrl;
+
+  /// The active game-server GraphQL endpoint. Starts at the `GRAPHQL_URL`
+  /// build-time default and is overridden at runtime once the player selects
+  /// a server (persisted by `GameServerState` so the choice survives restarts).
+  static String get graphqlUrl => _graphqlUrl;
+
+  static void setGraphqlUrl(String url) => _graphqlUrl = url;
+
+  static void resetGraphqlUrl() => _graphqlUrl = _defaultGraphqlUrl;
+
+  /// Stage and production are distinct, real Master API deployments (not
+  /// placeholders) — default to stage outside release builds so local/CI
+  /// runs don't accidentally hit production, matching how release builds
+  /// should default to the real production Master API without requiring a
+  /// `--dart-define` on every release build. Override either with
+  /// `--dart-define=MASTER_GRAPHQL_URL=...`.
   static const String masterGraphqlUrl = String.fromEnvironment(
     'MASTER_GRAPHQL_URL',
-    defaultValue: 'https://localhost:44364/graphql',
+    defaultValue: kReleaseMode ? 'https://api.capitalism5.com/graphql' : 'https://api.stage.capitalism5.com/graphql',
   );
 
   /// Master API origin with the trailing `/graphql` stripped, for the REST

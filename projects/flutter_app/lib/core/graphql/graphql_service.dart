@@ -30,7 +30,7 @@ class GraphQlService {
   Future<Map<String, dynamic>> request(
     String query, {
     Map<String, dynamic>? variables,
-    String endpoint = AppConfig.graphqlUrl,
+    String? endpoint,
   }) async {
     final headers = <String, String>{'Content-Type': 'application/json'};
     final token = _authState.token;
@@ -38,8 +38,12 @@ class GraphQlService {
       headers['Authorization'] = 'Bearer $token';
     }
 
+    // Resolved per-call rather than as a constant default parameter value —
+    // AppConfig.graphqlUrl is mutable at runtime once the player picks a
+    // game server on GameServerSelectionScreen, and default parameter
+    // values in Dart must be compile-time constants.
     final response = await _client.post(
-      Uri.parse(endpoint),
+      Uri.parse(endpoint ?? AppConfig.graphqlUrl),
       headers: headers,
       body: jsonEncode({'query': query, 'variables': variables ?? <String, dynamic>{}}),
     );

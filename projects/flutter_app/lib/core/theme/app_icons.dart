@@ -43,6 +43,10 @@ class AppIcons {
   // Administration nav
   static const operations = FontAwesomeIcons.shieldHalved;
 
+  // Servers / bounties
+  static const server = FontAwesomeIcons.server;
+  static const bounty = FontAwesomeIcons.medal;
+
   // Auth
   static const login = FontAwesomeIcons.rightToBracket;
   static const logout = FontAwesomeIcons.rightFromBracket;

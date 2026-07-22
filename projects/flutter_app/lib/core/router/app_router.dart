@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../features/auth/auth_screens.dart';
 import '../../features/banking/banking_screens.dart';
+import '../../features/bounties/bounty_history_screen.dart';
 import '../../features/buildings/building_detail_screen.dart';
 import '../../features/buildings/building_market_screen.dart';
 import '../../features/buildings/buy_building_screen.dart';
@@ -26,6 +27,7 @@ import '../../features/news/news_screen.dart';
 import '../../features/news/notifications_screen.dart';
 import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/operations/operations_screens.dart';
+import '../../features/servers/game_server_selection_screen.dart';
 import '../../features/trade/trade_screens.dart';
 import '../../features/tutorial/tutorial_screen.dart';
 import '../auth/auth_state.dart';
@@ -419,6 +421,18 @@ GoRouter createAppRouter({
           path: '/operations/statistics/players/:id',
           builder: (context, state) => OperationsPlayerDetailScreen(
             playerId: state.pathParameters['id']!,
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/servers',
+          builder: (context, state) => GameServerSelectionScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/bounties',
+          builder: (context, state) => BountyHistoryScreen(
             graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
           ),
         ),

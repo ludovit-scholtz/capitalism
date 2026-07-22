@@ -3,16 +3,21 @@ import 'package:provider/provider.dart';
 
 import 'app.dart';
 import 'core/auth/auth_state.dart';
+import 'core/config/game_server_state.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final authState = AuthState();
-  await authState.restoreSession();
+  final gameServerState = GameServerState();
+  await Future.wait([authState.restoreSession(), gameServerState.restoreSelection()]);
 
   runApp(
-    ChangeNotifierProvider<AuthState>.value(
-      value: authState,
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AuthState>.value(value: authState),
+        ChangeNotifierProvider<GameServerState>.value(value: gameServerState),
+      ],
       child: CapitalismApp(),
     ),
   );

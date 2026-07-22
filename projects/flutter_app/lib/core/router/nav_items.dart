@@ -43,6 +43,14 @@ class NavSection {
 /// so both clients present the same menu. Keep this in sync when the web
 /// nav changes. Icons come from [AppIcons], the mobile mirror of the web's
 /// `fontAwesomeIcons.ts`.
+///
+/// The `Account` section is a mobile-only addition — `projects/frontend`
+/// has no equivalent, since a single web deployment only ever talks to one
+/// game shard. Mobile has no per-shard build-flavor story, so `Game
+/// Servers` (`GameServerSelectionScreen`) is the in-app equivalent of
+/// `projects/master-frontend`'s `GameServersView.vue`, and `Bounties`
+/// (`BountyHistoryScreen`) surfaces the Master API's completed-bounty
+/// history, which currently only has a `master-frontend` UI.
 const List<NavSection> navSections = <NavSection>[
   NavSection(
     title: 'Main',
@@ -82,6 +90,13 @@ const List<NavSection> navSections = <NavSection>[
     items: [
       NavItem(label: 'Chat', icon: AppIcons.chat, requiresAuth: true, opensChatPanel: true),
       NavItem(label: 'Discord', icon: AppIcons.discord, externalUrl: 'https://discord.gg/PhHSxJvDn6'),
+    ],
+  ),
+  NavSection(
+    title: 'Account',
+    items: [
+      NavItem(label: 'Game Servers', route: '/servers', icon: AppIcons.server),
+      NavItem(label: 'Bounties', route: '/bounties', icon: AppIcons.bounty, requiresAuth: true),
     ],
   ),
   NavSection(
