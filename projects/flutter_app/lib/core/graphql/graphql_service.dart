@@ -5,10 +5,14 @@ import 'package:http/http.dart' as http;
 import '../auth/auth_state.dart';
 import '../config/app_config.dart';
 
+/// Mirrors `GraphQLError` in `projects/frontend/src/lib/graphql.ts`: carries
+/// the machine-readable `code` from the first error's `extensions.code` (e.g.
+/// `LOGIN_THROTTLED`) so callers can distinguish specific failure types.
 class GraphQlException implements Exception {
-  GraphQlException(this.message);
+  GraphQlException(this.message, [this.code]);
 
   final String message;
+  final String? code;
 
   @override
   String toString() => 'GraphQlException: $message';
@@ -43,8 +47,10 @@ class GraphQlService {
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
     final errors = decoded['errors'] as List<dynamic>?;
     if (errors != null && errors.isNotEmpty) {
+      final firstError = errors.first as Map<String, dynamic>;
+      final extensions = firstError['extensions'] as Map<String, dynamic>?;
       final message = errors.map((error) => (error as Map<String, dynamic>)['message']).join('; ');
-      throw GraphQlException(message);
+      throw GraphQlException(message, extensions?['code'] as String?);
     }
 
     return decoded['data'] as Map<String, dynamic>? ?? <String, dynamic>{};

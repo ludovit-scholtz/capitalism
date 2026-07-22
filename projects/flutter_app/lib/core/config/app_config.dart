@@ -15,4 +15,15 @@ class AppConfig {
     'MASTER_GRAPHQL_URL',
     defaultValue: 'https://localhost:44364/graphql',
   );
+
+  /// Master API origin with the trailing `/graphql` stripped, for the REST
+  /// `/auth/forgot-password` and `/auth/reset-password` endpoints (there is
+  /// no GraphQL mutation for either — see `MasterApi/Program.cs`).
+  static String get masterApiBaseUrl => masterGraphqlUrl.replaceFirst(RegExp(r'/graphql/?$'), '');
+
+  /// Mirrors `VITE_AUTH_PASSWORD_ENABLED` in the web frontend, which also
+  /// defaults to **disabled** — production shows Biatec-OIDC-only sign-in by
+  /// default, and email/password is opt-in via env var for dev/testing.
+  /// Override with `--dart-define=AUTH_PASSWORD_ENABLED=true`.
+  static const bool authPasswordEnabled = bool.fromEnvironment('AUTH_PASSWORD_ENABLED');
 }

@@ -21,6 +21,9 @@ import '../../features/operations/operations_screens.dart';
 import '../../features/trade/trade_screens.dart';
 import '../../features/tutorial/tutorial_screen.dart';
 import '../auth/auth_state.dart';
+import '../auth/biatec_oidc_service.dart';
+import '../auth/password_reset_service.dart';
+import '../auth/web_authenticator.dart';
 import '../graphql/graphql_service.dart';
 import '../services/url_opener.dart';
 import '../widgets/app_shell.dart';
@@ -38,9 +41,18 @@ import '../widgets/app_shell.dart';
 /// navigation state (current location) across tests via `pumpWidget`. It
 /// also accepts an injectable [UrlOpener] (so tests can fake external-link
 /// taps, e.g. Discord, without exercising the real url_launcher platform
-/// channel) and an injectable [httpClient] (so tests can fake HomeScreen's
-/// GraphQL call instead of hitting a real backend).
-GoRouter createAppRouter({UrlOpener urlOpener = const ExternalUrlOpener(), http.Client? httpClient}) => GoRouter(
+/// channel), an injectable [httpClient] (so tests can fake HomeScreen's and
+/// LoginScreen's GraphQL calls instead of hitting a real backend), and an
+/// injectable [webAuthenticator] (so tests can fake the Biatec OIDC round
+/// trip on AuthCallbackScreen instead of exercising the real platform
+/// channel).
+GoRouter createAppRouter({
+  UrlOpener urlOpener = const ExternalUrlOpener(),
+  http.Client? httpClient,
+  http.Client? passwordResetHttpClient,
+  WebAuthenticator? webAuthenticator,
+  bool? passwordAuthEnabled,
+}) => GoRouter(
   initialLocation: '/',
   routes: [
     ShellRoute(
@@ -52,10 +64,40 @@ GoRouter createAppRouter({UrlOpener urlOpener = const ExternalUrlOpener(), http.
             graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
           ),
         ),
-        GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-        GoRoute(path: '/forgot-password', builder: (context, state) => const ForgotPasswordScreen()),
-        GoRoute(path: '/reset-password', builder: (context, state) => const ResetPasswordScreen()),
-        GoRoute(path: '/auth/callback', builder: (context, state) => const AuthCallbackScreen()),
+        GoRoute(
+          path: '/login',
+          builder: (context, state) => LoginScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+            redirectPath: state.uri.queryParameters['redirect'] ?? '/',
+            passwordAuthEnabled: passwordAuthEnabled,
+          ),
+        ),
+        GoRoute(
+          path: '/forgot-password',
+          builder: (context, state) => ForgotPasswordScreen(
+            passwordResetService: passwordResetHttpClient != null
+                ? PasswordResetService(client: passwordResetHttpClient)
+                : null,
+          ),
+        ),
+        GoRoute(
+          path: '/reset-password',
+          builder: (context, state) => ResetPasswordScreen(
+            token: state.uri.queryParameters['token'],
+            passwordResetService: passwordResetHttpClient != null
+                ? PasswordResetService(client: passwordResetHttpClient)
+                : null,
+          ),
+        ),
+        GoRoute(
+          path: '/auth/callback',
+          builder: (context, state) => AuthCallbackScreen(
+            oidcService: webAuthenticator != null ? BiatecOidcService(authenticator: webAuthenticator) : const BiatecOidcService(),
+            providerError: state.uri.queryParameters['error'],
+            providerErrorDescription: state.uri.queryParameters['error_description'],
+            redirectPath: state.uri.queryParameters['redirect'] ?? '/',
+          ),
+        ),
         GoRoute(path: '/onboarding', builder: (context, state) => const OnboardingScreen()),
         GoRoute(path: '/dashboard', builder: (context, state) => const DashboardScreen()),
         GoRoute(path: '/news', builder: (context, state) => const NewsScreen()),

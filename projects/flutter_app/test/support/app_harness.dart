@@ -1,9 +1,11 @@
 import 'package:capitalism_app/app.dart';
 import 'package:capitalism_app/core/auth/auth_state.dart';
+import 'package:capitalism_app/core/auth/web_authenticator.dart';
 import 'package:capitalism_app/core/router/app_router.dart';
 import 'package:capitalism_app/core/services/url_opener.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
@@ -13,9 +15,11 @@ import 'in_memory_token_storage.dart';
 /// Pumps a real [CapitalismApp] with a fresh [AuthState] and a fresh
 /// [createAppRouter] instance (never the shared default singleton, which
 /// would leak navigation state across tests). Platform-channel-backed
-/// dependencies (secure storage, the HomeScreen GraphQL call, external URL
-/// launches) are faked by default; pass [urlOpener] to observe/intercept
-/// external-link taps.
+/// dependencies (secure storage, GraphQL calls, external URL launches, the
+/// Biatec OIDC round trip) are faked by default; pass the corresponding
+/// parameter to observe/intercept/customize them, or pass a fully-built
+/// [router] directly (e.g. via [createAppRouter]) when a test needs to keep
+/// a reference to it for `router.go(...)` navigation afterwards.
 ///
 /// Uses a taller-than-default virtual screen because the drawer's
 /// `ListView` only mounts children within the viewport + cache extent, even
@@ -27,6 +31,10 @@ Future<AuthState> pumpCapitalismApp(
   bool admin = false,
   UrlOpener urlOpener = const ExternalUrlOpener(),
   http.Client? httpClient,
+  http.Client? passwordResetHttpClient,
+  WebAuthenticator? webAuthenticator,
+  bool? passwordAuthEnabled,
+  GoRouter? router,
 }) async {
   await tester.binding.setSurfaceSize(const Size(800, 2400));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -42,7 +50,17 @@ Future<AuthState> pumpCapitalismApp(
   await tester.pumpWidget(
     ChangeNotifierProvider<AuthState>.value(
       value: auth,
-      child: CapitalismApp(router: createAppRouter(urlOpener: urlOpener, httpClient: httpClient ?? fakeHomeStatusClient())),
+      child: CapitalismApp(
+        router:
+            router ??
+            createAppRouter(
+              urlOpener: urlOpener,
+              httpClient: httpClient ?? fakeHomeStatusClient(),
+              passwordResetHttpClient: passwordResetHttpClient,
+              webAuthenticator: webAuthenticator,
+              passwordAuthEnabled: passwordAuthEnabled,
+            ),
+      ),
     ),
   );
   await tester.pumpAndSettle();

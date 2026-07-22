@@ -6,18 +6,25 @@ Mobile client for the Capitalism MMO, providing the same game-playing interface 
 ## Status
 
 Most screens are still empty placeholders — see `ROADMAP.md` (`### Flutter mobile
-app`) for the one-line-per-screen implementation backlog — but the app shell is real
-and working: Home (live tick/tax-rate/leaderboard data), navigation (drawer + bottom
-nav, auth/admin-gated visibility), Discord (opens the system browser via
-`url_launcher`), Chat (an in-app panel), and Biatec OIDC sign-in are implemented. See
-`CLAUDE.md` / `.github/copilot-instructions.md` for architecture and conventions.
+app`) for the one-line-per-screen implementation backlog — but the app shell and auth
+flow are real and working: Home (live tick/tax-rate/leaderboard data), navigation
+(drawer + bottom nav, auth/admin-gated visibility), Discord (opens the system browser
+via `url_launcher`), Chat (an in-app panel), and all four auth screens — Sign In
+(login/register + Biatec OIDC), Forgot Password, Reset Password, Auth Callback — are
+implemented, matching the web app's fields, validation, GraphQL/REST endpoints, and
+error handling. See `CLAUDE.md` / `.github/copilot-instructions.md` for architecture
+and conventions, including several non-obvious auth behaviors worth knowing before
+touching that code (password auth is **disabled by default**, matching the web;
+login/register hit the Master API, not the game API; forgot/reset-password are REST,
+not GraphQL).
 
 Native platform runners (`android/`, `ios/`, `web/`, `windows/`) are generated and
 committed. `flutter analyze`/`flutter test` are clean, and `flutter build
 web`/`windows`/`apk` all succeed — verified with real runs, not just builds: a built
-Windows exe stays open and renders correctly, and a real Android emulator install boots
-Home, opens the drawer with correct auth-gated visibility, and tapping Discord genuinely
-launches Chrome. iOS cannot be built or verified without a macOS machine running Xcode.
+Windows exe stays open and renders the Sign In and Forgot Password screens correctly,
+and a real Android emulator install boots Home, opens the drawer with correct
+auth-gated visibility, and tapping Discord genuinely launches Chrome. iOS cannot be
+built or verified without a macOS machine running Xcode.
 
 Building for Android/Windows requires their native toolchains, which are **not**
 covered by a plain Flutter SDK install — see `.github/copilot-instructions.md` →
@@ -45,12 +52,15 @@ scaffold was created.
 ## Run
 
 ```bash
-flutter run --dart-define=GRAPHQL_URL=http://localhost:44356/graphql
+flutter run --dart-define=GRAPHQL_URL=http://localhost:44356/graphql --dart-define=AUTH_PASSWORD_ENABLED=true
 ```
 
 `GRAPHQL_URL` defaults to `http://localhost:44356/graphql` (matches the local game API
 port) when omitted. `MASTER_GRAPHQL_URL` defaults to `https://localhost:44364/graphql`.
-See `lib/core/config/app_config.dart`.
+`AUTH_PASSWORD_ENABLED` defaults to `false` (matching the web's
+`VITE_AUTH_PASSWORD_ENABLED`) — without it, the Sign In screen shows a Biatec-OIDC-only
+banner and auto-redirects rather than the email/password form. See
+`lib/core/config/app_config.dart`.
 
 ## Test
 
@@ -68,8 +78,15 @@ right default for CI and for an app where most screens are still placeholders.
   auth-only items, changes the Home CTA, and reaches Dashboard; an admin session
   reveals the Administration section and reaches Operations.
 - `test/feature_actions_test.dart` — Discord opens the (faked) external link without
-  navigating; Chat opens and dismisses its panel; the Biatec sign-in button both
-  succeeds (stores the token in `AuthState`) and surfaces a failure via SnackBar.
+  navigating; Chat opens and dismisses its panel.
+- `test/auth_screens_test.dart` — the OIDC-only default (auto-redirect after a real
+  500ms delay); login/register success and every mapped server error code
+  (`LOGIN_THROTTLED`, `INVALID_CREDENTIALS`, `REGISTRATION_FAILED`, ...); the
+  forgot-password link; the Biatec button navigating to (not signing in from) the
+  callback screen; `AuthCallbackScreen` success, failure, provider-error, and
+  redirect-param handling; the forgot/reset-password REST flows including the
+  client-side missing-token/password-mismatch checks that skip the network call
+  entirely, and the live password-strength label.
 - `test/biatec_oidc_service_test.dart` — the OIDC client-side validation logic (state,
   nonce, issuer, audience, provider errors, authenticator cancellation), plus a test
   that forces `debugDefaultTargetPlatformOverride` through Android/iOS/Windows to
@@ -79,7 +96,18 @@ right default for CI and for an app where most screens are still placeholders.
   `AuthState` + fresh `createAppRouter()` per test (a shared router singleton would
   leak navigation state across tests), `InMemoryTokenStorage`, and a faked
   `HomeScreen` GraphQL response (`fake_graphql_client.dart`) so no test needs a real
-  backend.
+  backend. Pass `router:` yourself (built via `createAppRouter(...)`, keeping the
+  reference) when a test needs to `router.go(...)` after pumping, or needs to override
+  the GraphQL/REST/OIDC fakes — see `fake_auth_graphql_client.dart` and
+  `fake_password_reset_client.dart` for the login/register and forgot/reset-password
+  fakes respectively.
+- **Timing gotchas worth knowing before adding more tests here**: a single `pump()`
+  right after `router.go(...)` isn't always enough for go_router's transition to land;
+  never wrap `pumpAndSettle()` around a screen with a real `Future.delayed` (it'll fire
+  mid-settle and you'll observe the post-timer state); and a purely-microtask-chained
+  async flow (fake HTTP + fake authenticator, no real delay anywhere) can fully resolve
+  within one `pump()`, so don't rely on catching an intermediate "loading" frame —
+  assert on a recording fake having been called, plus the final state, instead.
 
 Once more screens exist and true device-level end-to-end journeys matter (mirroring
 the role Playwright plays for `projects/frontend`), add the official `integration_test`
@@ -88,7 +116,8 @@ exercise platform channels, real network calls, or true multi-frame animations.
 
 ## Architecture
 
-- `lib/core/config` — build-time GraphQL endpoint configuration (`--dart-define`).
+- `lib/core/config` — build-time GraphQL endpoint configuration (`--dart-define`),
+  including the Master API base URL and the `authPasswordEnabled` flag.
 - `lib/core/auth` — `AuthState` (ChangeNotifier) holds the player's Bearer JWT via the
   `TokenStorage` abstraction (`token_storage.dart`): `SecureTokenStorage` wraps
   `flutter_secure_storage` for the real app, `InMemoryTokenStorage` (test-only, under
@@ -98,14 +127,18 @@ exercise platform channels, real network calls, or true multi-frame animations.
   authenticates with `Authorization: Bearer <token>` headers — no backend changes were
   needed. `biatec_oidc_service.dart` + `web_authenticator.dart` are the native
   complement to the web's Biatec OIDC redirect flow, using `flutter_web_auth_2`.
+  `password_reset_service.dart` is a plain REST client for the forgot/reset-password
+  endpoints — there are no GraphQL mutations for either.
 - `lib/core/graphql` — `GraphQlService`, a thin GraphQL POST helper mirroring
-  `projects/frontend/src/lib/graphql.ts`'s `gqlRequest()`.
+  `projects/frontend/src/lib/graphql.ts`'s `gqlRequest()`; `GraphQlException` carries
+  the server's `extensions.code`, mirroring the web's `GraphQLError` class.
 - `lib/core/router` — `createAppRouter()` builds the `go_router` route table
   (`app_router.dart`, mirroring `projects/frontend/src/router/index.ts`) as a factory
-  rather than a bare singleton, so tests can get a fresh `GoRouter` (and inject a fake
-  `UrlOpener`/`http.Client`) per test instead of leaking navigation state across
-  `pumpWidget` calls. The nav drawer's section/item data (`nav_items.dart`) mirrors
-  `AppHeader.vue`'s `mobileNavSections`/`desktopNavSections`.
+  rather than a bare singleton, so tests can get a fresh `GoRouter` (and inject fakes
+  for `UrlOpener`/`http.Client`/`WebAuthenticator`/`passwordAuthEnabled`) per test
+  instead of leaking navigation state across `pumpWidget` calls. The nav drawer's
+  section/item data (`nav_items.dart`) mirrors `AppHeader.vue`'s
+  `mobileNavSections`/`desktopNavSections`.
 - `lib/core/services/url_opener.dart` — `UrlOpener` abstraction over `url_launcher`
   (real impl `ExternalUrlOpener`), used for the Discord nav link.
 - `lib/core/widgets/app_shell.dart` — persistent chrome (app bar, drawer, bottom nav)
@@ -114,10 +147,10 @@ exercise platform channels, real network calls, or true multi-frame animations.
   never fall back to `prefers-color-scheme`).
 - `lib/features/home/home_screen.dart` — hero + auth-dependent CTA, tick/tax-rate
   status cards, and a top-5 leaderboard preview from one GraphQL query.
-- `lib/features/auth/auth_screens.dart` — `LoginScreen` has a working "Sign in with
-  Biatec" button; the rest of the auth screens (and most other feature areas) are
-  still `PlaceholderScreen` stubs (bare content, no nested `Scaffold`/`AppBar` — it's
-  always rendered as `AppShell`'s `Scaffold.body`) naming the Vue view they mirror.
+- `lib/features/auth/auth_screens.dart` — all four auth screens: `LoginScreen`
+  (login/register form + Biatec button + OIDC-only default), `ForgotPasswordScreen`,
+  `ResetPasswordScreen`, `AuthCallbackScreen` (owns the actual OIDC round trip — see
+  the file's doc comment for why that differs from a literal port of the web).
 - `lib/features/chat/chat_panel.dart` — the Chat nav item's in-app panel.
 - `lib/l10n/app_{en,sk,de}.arb` — source strings for `flutter gen-l10n`, covering the
   app shell/nav/auth chrome today. Mirrors the web app's `en`/`sk`/`de` locale support;
@@ -125,11 +158,13 @@ exercise platform channels, real network calls, or true multi-frame animations.
 
 ## Known follow-ups
 
-- Wiring `GraphQlService`/`AuthState` into the remaining login/register/gameplay
-  screens as each is implemented (see ROADMAP.md).
+- Wiring `GraphQlService`/`AuthState` into the remaining gameplay screens as each is
+  implemented (see ROADMAP.md).
 - `integration_test`-based end-to-end coverage once more screens exist (see Test
   section above).
 - The Biatec OIDC flow was only validated against fakes (`FakeWebAuthenticator`) —
-  it hasn't been exercised against a real Biatec IdP yet.
+  it hasn't been exercised against a real Biatec IdP yet. Same for the auth screens'
+  GraphQL/REST calls — validated against fakes matching the real backend's schema and
+  error contracts, not a live Master API.
 - macOS and Linux builds weren't attempted or verified (this scaffold was built and
   tested on Windows only, covering Windows desktop + Android emulator + Web).
