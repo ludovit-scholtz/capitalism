@@ -1,4 +1,5 @@
 import 'package:capitalism_app/core/auth/auth_state.dart';
+import 'package:capitalism_app/core/theme/app_icons.dart';
 import 'package:capitalism_app/features/buildings/buy_building_models.dart';
 import 'package:capitalism_app/features/cities/cities_models.dart';
 import 'package:capitalism_app/features/city/city_tab_models.dart';
@@ -139,7 +140,7 @@ void main() {
       final service = FakeCityTabService(lots: [_ownedLot]);
 
       await _pump(tester, (s) => CityBuildingsScreen(cityId: 'city-1', cityTabService: s), service: service);
-      await tester.tap(find.byIcon(Icons.arrow_forward));
+      await tester.tap(find.byIcon(AppIcons.arrowRight));
       await tester.pumpAndSettle();
 
       expect(find.text('Building building-42'), findsOneWidget);

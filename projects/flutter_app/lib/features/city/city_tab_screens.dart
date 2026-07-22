@@ -17,11 +17,13 @@
 //   top-selling-products analytics or `CityMediaHousesSection`.
 
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/theme/app_icons.dart';
 import '../buildings/buy_building_models.dart';
 import '../cities/cities_models.dart';
 import 'city_tab_models.dart';
@@ -290,7 +292,7 @@ class _CityBuildingsScreenState extends _CityTabScreenState<CityBuildingsScreen>
               title: Text(lot.name ?? lot.district ?? 'Lot'),
               subtitle: Text(lot.isAvailable ? 'Available · ${lot.price.toStringAsFixed(0)}' : 'Owned'),
               trailing: !lot.isAvailable && lot.buildingId != null
-                  ? IconButton(icon: const Icon(Icons.arrow_forward), onPressed: () => context.go('/building/${lot.buildingId}'))
+                  ? IconButton(icon: const FaIcon(AppIcons.arrowRight, size: 16), onPressed: () => context.go('/building/${lot.buildingId}'))
                   : null,
             ),
           ),

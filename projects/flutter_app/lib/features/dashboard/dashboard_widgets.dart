@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/theme/app_icons.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/widgets/icon_badge.dart';
 import 'dashboard_models.dart';
 
 class DashboardCompanyCard extends StatelessWidget {
@@ -68,7 +71,7 @@ class DashboardBuildingTile extends StatelessWidget {
     return ListTile(
       key: ValueKey('building-${building.id}'),
       contentPadding: EdgeInsets.zero,
-      leading: const Icon(Icons.factory_outlined),
+      leading: const IconBadge(icon: AppIcons.factory, size: 36, iconSize: 16),
       title: Text(building.name),
       subtitle: Text('${building.type} · Lv.${building.level} · ${building.unitCount} unit(s)'),
       trailing: Wrap(
@@ -107,7 +110,7 @@ class DashboardPendingActionsSection extends StatelessWidget {
                 ListTile(
                   key: ValueKey('action-${action.id}'),
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.schedule_outlined),
+                  leading: const IconBadge(icon: AppIcons.clock, size: 36, iconSize: 16, color: AppTheme.neonAmber),
                   title: Text('${action.actionType} · ${action.buildingName}'),
                   subtitle: Text('${action.ticksRemaining} ticks remaining'),
                 ),

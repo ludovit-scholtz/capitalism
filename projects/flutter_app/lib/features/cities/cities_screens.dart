@@ -11,11 +11,13 @@
 //   — no mapping library dependency added for one screen.
 
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/theme/app_icons.dart';
 import 'cities_models.dart';
 import 'cities_service.dart';
 
@@ -297,7 +299,7 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
             key: ValueKey('expansion-city-${city.id}'),
             color: city.id == _selectedId ? Theme.of(context).colorScheme.surfaceContainerHigh : null,
             child: ListTile(
-              leading: Icon(city.isUnlocked ? Icons.lock_open : Icons.lock_outline),
+              leading: FaIcon(city.isUnlocked ? AppIcons.lockOpen : AppIcons.lock, size: 18),
               title: Text(city.name),
               subtitle: Text(city.currencyCode),
               onTap: () => setState(() => _selectedId = city.id),

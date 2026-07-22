@@ -21,6 +21,8 @@ import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/theme/app_icons.dart';
+import '../../core/widgets/icon_badge.dart';
 import 'dashboard_models.dart';
 import 'dashboard_service.dart';
 import 'dashboard_widgets.dart';
@@ -132,7 +134,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.business_outlined, size: 48),
+              const IconBadge(icon: AppIcons.business, size: 64, iconSize: 28),
               const SizedBox(height: 12),
               const Text('You do not have a company yet.'),
               const SizedBox(height: 12),

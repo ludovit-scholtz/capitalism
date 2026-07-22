@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_icons.dart';
+import 'icon_badge.dart';
+
 /// Shared body for every not-yet-implemented screen in this scaffold.
 /// [sourceView] names the Vue view in `projects/frontend/src/views/` this
 /// screen mirrors, so it's easy to find the reference implementation.
@@ -26,7 +29,7 @@ class PlaceholderScreen extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.construction_outlined, size: 48, color: theme.colorScheme.primary),
+            const IconBadge(icon: AppIcons.construction, size: 64, iconSize: 28),
             const SizedBox(height: 16),
             Text(title, style: theme.textTheme.headlineSmall, textAlign: TextAlign.center),
             const SizedBox(height: 8),

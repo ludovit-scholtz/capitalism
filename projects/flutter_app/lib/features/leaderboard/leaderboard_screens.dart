@@ -19,11 +19,13 @@
 //   file-download/print flows with no direct mobile equivalent.
 
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/theme/app_icons.dart';
 import 'leaderboard_models.dart';
 import 'leaderboard_service.dart';
 
@@ -240,11 +242,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          IconButton(onPressed: page > 0 ? () => setState(() => _page = page - 1) : null, icon: const Icon(Icons.chevron_left)),
+          IconButton(onPressed: page > 0 ? () => setState(() => _page = page - 1) : null, icon: const FaIcon(AppIcons.chevronLeft, size: 16)),
           Text('${page + 1} / $_totalPages'),
           IconButton(
             onPressed: page < _totalPages - 1 ? () => setState(() => _page = page + 1) : null,
-            icon: const Icon(Icons.chevron_right),
+            icon: const FaIcon(AppIcons.chevronRight, size: 16),
           ),
         ],
       ),

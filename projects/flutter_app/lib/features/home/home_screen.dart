@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/theme/app_icons.dart';
 
 /// Mirrors `HomeView.vue`: hero section, game status cards (tick, tax
 /// rate), a leaderboard preview, and an auth-state-dependent CTA. The web
@@ -218,7 +220,7 @@ class _LeaderboardPreview extends StatelessWidget {
             for (final player in topPlayers)
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.emoji_events_outlined),
+                leading: const FaIcon(AppIcons.leaderboard, size: 18),
                 title: Text(player.displayName),
                 trailing: Text('\$${player.totalWealthUsd.toStringAsFixed(0)}'),
               ),
@@ -240,7 +242,7 @@ class _StatusError extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 24),
       child: Column(
         children: [
-          const Icon(Icons.cloud_off_outlined),
+          const FaIcon(AppIcons.wifiOff, size: 28),
           const SizedBox(height: 8),
           const Text('Could not load game status.'),
           const SizedBox(height: 8),

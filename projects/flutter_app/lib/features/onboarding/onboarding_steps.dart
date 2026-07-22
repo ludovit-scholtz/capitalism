@@ -1,7 +1,9 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
+import '../../core/theme/app_icons.dart';
 import 'onboarding_models.dart';
 
 /// Web's `OnboardingLotSelector` uses this same simplified approximation
@@ -88,7 +90,7 @@ class OnboardingCityStep extends StatelessWidget {
                 key: ValueKey('city-${city.id}'),
                 title: Text(city.name),
                 subtitle: Text('${city.countryCode} · ${city.currencyCode} · pop. ${city.population}'),
-                trailing: const Icon(Icons.chevron_right),
+                trailing: const FaIcon(AppIcons.chevronRight, size: 16),
                 onTap: () => onSelect(city.id),
               ),
             ),
@@ -127,7 +129,7 @@ class OnboardingIndustryStep extends StatelessWidget {
                 title: Text(industry),
                 trailing: proOnlyIndustries.contains(industry)
                     ? const Chip(label: Text('PRO'))
-                    : const Icon(Icons.chevron_right),
+                    : const FaIcon(AppIcons.chevronRight, size: 16),
                 onTap: () => onSelect(industry),
               ),
             ),
@@ -161,7 +163,7 @@ class OnboardingProductStep extends StatelessWidget {
                   '\$${product.basePrice.toStringAsFixed(2)} · ${product.baseCraftTicks} ticks to craft'
                   '${product.recipes.isNotEmpty ? ' · needs ${product.recipes.map((r) => r.ingredientName).join(', ')}' : ''}',
                 ),
-                trailing: const Icon(Icons.chevron_right),
+                trailing: const FaIcon(AppIcons.chevronRight, size: 16),
                 onTap: () => onSelect(product.id),
               ),
             ),
@@ -196,7 +198,7 @@ class OnboardingIpoStep extends StatelessWidget {
                   'Raise \$${plan.raiseTarget.toStringAsFixed(0)} · '
                   'you keep ${(plan.founderOwnershipRatio * 100).toStringAsFixed(0)}% ownership',
                 ),
-                trailing: const Icon(Icons.chevron_right),
+                trailing: const FaIcon(AppIcons.chevronRight, size: 16),
                 onTap: () => onSelect(plan.raiseTarget),
               ),
             ),

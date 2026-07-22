@@ -11,11 +11,13 @@
 //   types, and this first pass only covers the common path.
 
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/theme/app_icons.dart';
 import 'buy_building_models.dart';
 import 'buy_building_service.dart';
 
@@ -168,7 +170,7 @@ class _BuyBuildingScreenState extends State<BuyBuildingScreen> {
         ListTile(
           key: ValueKey('city-${city['id']}'),
           selected: _cityId == city['id'],
-          leading: Icon(_cityId == city['id'] ? Icons.radio_button_checked : Icons.radio_button_unchecked),
+          leading: FaIcon(_cityId == city['id'] ? AppIcons.radioChecked : AppIcons.radioUnchecked, size: 18),
           title: Text(city['name']!),
           onTap: () => setState(() => _cityId = city['id']),
         ),
@@ -192,7 +194,7 @@ class _BuyBuildingScreenState extends State<BuyBuildingScreen> {
         ListTile(
           key: ValueKey('type-$type'),
           selected: _buildingType == type,
-          leading: Icon(_buildingType == type ? Icons.radio_button_checked : Icons.radio_button_unchecked),
+          leading: FaIcon(_buildingType == type ? AppIcons.radioChecked : AppIcons.radioUnchecked, size: 18),
           title: Text(type),
           onTap: () => setState(() => _buildingType = type),
         ),
@@ -230,7 +232,7 @@ class _BuyBuildingScreenState extends State<BuyBuildingScreen> {
             key: ValueKey('lot-${lot.id}'),
             child: ListTile(
               selected: _selectedLot?.id == lot.id,
-              leading: Icon(_selectedLot?.id == lot.id ? Icons.radio_button_checked : Icons.radio_button_unchecked),
+              leading: FaIcon(_selectedLot?.id == lot.id ? AppIcons.radioChecked : AppIcons.radioUnchecked, size: 18),
               title: Text(lot.name ?? lot.district ?? 'Lot'),
               subtitle: Text(lot.price.toStringAsFixed(0)),
               onTap: () => setState(() => _selectedLot = lot),

@@ -27,10 +27,12 @@
 // on the drawer hiding the nav section for non-admins.
 
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/theme/app_icons.dart';
 import 'operations_models.dart';
 import 'operations_service.dart';
 
@@ -327,7 +329,7 @@ class _OperationsPlayersScreenState extends _OperationsScreenState<OperationsPla
           Text('Players', style: theme.textTheme.headlineSmall),
           const SizedBox(height: 12),
           TextField(
-            decoration: const InputDecoration(labelText: 'Search', prefixIcon: Icon(Icons.search)),
+            decoration: const InputDecoration(labelText: 'Search', prefixIcon: FaIcon(AppIcons.search, size: 16)),
             onChanged: (value) => setState(() => _search = value),
           ),
           const SizedBox(height: 12),

@@ -14,11 +14,13 @@
 //   way the web router does elsewhere either.
 
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/theme/app_icons.dart';
 import 'encyclopedia_models.dart';
 import 'encyclopedia_service.dart';
 
@@ -114,7 +116,7 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
         Text('$resourceCount resources · $productCount products', style: Theme.of(context).textTheme.bodyMedium),
         const SizedBox(height: 16),
         TextField(
-          decoration: const InputDecoration(labelText: 'Search', prefixIcon: Icon(Icons.search)),
+          decoration: const InputDecoration(labelText: 'Search', prefixIcon: FaIcon(AppIcons.search, size: 16)),
           onChanged: (value) => setState(() => _search = value),
         ),
         const SizedBox(height: 12),
@@ -326,7 +328,7 @@ class _RecipeCard extends StatelessWidget {
                     label: Text('${input.name} × ${input.quantity}${input.unitSymbol ?? ''}'),
                     onPressed: () => context.go('/encyclopedia/resource/${input.slug}'),
                   ),
-                const Icon(Icons.arrow_forward, size: 16),
+                const FaIcon(AppIcons.arrowRight, size: 16),
                 ActionChip(
                   label: Text(recipe.output.name),
                   onPressed: () => context.go('/encyclopedia/resource/${recipe.output.slug}'),

@@ -7,10 +7,12 @@
 // affordance.
 
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/theme/app_icons.dart';
 import 'building_market_models.dart';
 import 'building_market_service.dart';
 
@@ -294,11 +296,11 @@ class _BuildingMarketScreenState extends State<BuildingMarketScreen> {
                         children: [
                           Expanded(child: Text('${offer.buyerCompanyName ?? offer.buyerDisplayName ?? 'Buyer'}: ${offer.offeredPrice.toStringAsFixed(0)}')),
                           IconButton(
-                            icon: const Icon(Icons.check),
+                            icon: const FaIcon(AppIcons.check, size: 16),
                             onPressed: _actionLoadingIds.contains(offer.id) ? null : () => _respondToOffer(offer, true),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.close),
+                            icon: const FaIcon(AppIcons.close, size: 16),
                             onPressed: _actionLoadingIds.contains(offer.id) ? null : () => _respondToOffer(offer, false),
                           ),
                         ],

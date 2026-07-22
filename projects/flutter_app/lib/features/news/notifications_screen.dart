@@ -3,22 +3,24 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/theme/app_icons.dart';
 import 'notification_models.dart';
 import 'notifications_service.dart';
 
 IconData _iconFor(String type) {
   switch (type) {
     case 'SHIPMENT_ARRIVED':
-      return Icons.check_circle_outline;
+      return AppIcons.checkCircle;
     case 'LOGISTICS_MARGIN_EROSION':
-      return Icons.warning_amber_outlined;
+      return AppIcons.warning;
     default:
-      return Icons.notifications_outlined;
+      return AppIcons.bell;
   }
 }
 
@@ -187,7 +189,7 @@ class _NotificationTile extends StatelessWidget {
       color: notification.isRead ? null : Theme.of(context).colorScheme.surfaceContainerHigh,
       child: ListTile(
         key: ValueKey('notification-${notification.id}'),
-        leading: Icon(_iconFor(notification.type), color: _colorFor(context, notification.severity)),
+        leading: FaIcon(_iconFor(notification.type), color: _colorFor(context, notification.severity), size: 18),
         title: Text(notification.title ?? notification.type),
         subtitle: notification.message != null ? Text(notification.message!) : null,
         onTap: onTap,

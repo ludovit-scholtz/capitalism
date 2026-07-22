@@ -1,4 +1,5 @@
 import 'package:capitalism_app/core/auth/auth_state.dart';
+import 'package:capitalism_app/core/theme/app_icons.dart';
 import 'package:capitalism_app/features/buildings/building_market_models.dart';
 import 'package:capitalism_app/features/buildings/building_market_screen.dart';
 import 'package:flutter/material.dart';
@@ -106,7 +107,7 @@ void main() {
 
       expect(find.textContaining('Buyer Co'), findsOneWidget);
 
-      await tester.tap(find.byIcon(Icons.check));
+      await tester.tap(find.byIcon(AppIcons.check));
       await tester.pumpAndSettle();
 
       expect(service.acceptedOfferIds, ['offer-1']);

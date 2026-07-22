@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -8,8 +9,10 @@ import '../../features/chat/chat_panel.dart';
 import '../auth/auth_state.dart';
 import '../router/nav_items.dart';
 import '../services/url_opener.dart';
+import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
 import '../theme/cosmic_background.dart';
+import 'icon_badge.dart';
 
 /// Persistent chrome (app bar, drawer, bottom nav) wrapped around every
 /// route via a go_router `ShellRoute`. Equivalent to `AppHeader.vue` +
@@ -36,7 +39,7 @@ class AppShell extends StatelessWidget {
           title: const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.hexagon_outlined, color: AppTheme.neonCyan, size: 22),
+              FaIcon(AppIcons.brandMark, color: AppTheme.neonCyan, size: 20),
               SizedBox(width: 10),
               Text('CAPITALISM'),
             ],
@@ -52,14 +55,20 @@ class AppShell extends StatelessWidget {
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [AppTheme.neonCyan.withValues(alpha: 0.15), Colors.transparent],
+                      colors: [AppTheme.neonCyan.withValues(alpha: 0.18), Colors.transparent],
                     ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.hexagon_outlined, color: AppTheme.neonCyan, size: 28),
-                      const SizedBox(width: 12),
-                      Text('CAPITALISM', style: Theme.of(context).textTheme.titleLarge),
+                      const IconBadge(icon: AppIcons.brandMark, color: AppTheme.neonCyan, size: 36, iconSize: 16),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'CAPITALISM',
+                          style: Theme.of(context).textTheme.titleMedium,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -76,7 +85,7 @@ class AppShell extends StatelessWidget {
                     ),
                     for (final item in _visibleItems(section, auth))
                       ListTile(
-                        leading: Icon(item.icon),
+                        leading: FaIcon(item.icon, size: 18),
                         title: Text(item.label),
                         onTap: () => _handleTap(context, item),
                       ),
@@ -90,10 +99,10 @@ class AppShell extends StatelessWidget {
         bottomNavigationBar: NavigationBar(
           selectedIndex: _bottomIndexFor(GoRouterState.of(context).uri.toString()),
           destinations: const [
-            NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
-            NavigationDestination(icon: Icon(Icons.dashboard_outlined), label: 'Dashboard'),
-            NavigationDestination(icon: Icon(Icons.swap_horiz), label: 'Exchange'),
-            NavigationDestination(icon: Icon(Icons.article_outlined), label: 'News'),
+            NavigationDestination(icon: FaIcon(AppIcons.home, size: 20), label: 'Home'),
+            NavigationDestination(icon: FaIcon(AppIcons.dashboard, size: 20), label: 'Dashboard'),
+            NavigationDestination(icon: FaIcon(AppIcons.exchange, size: 20), label: 'Exchange'),
+            NavigationDestination(icon: FaIcon(AppIcons.news, size: 20), label: 'News'),
           ],
           onDestinationSelected: (index) => _handleBottomTap(context, index),
         ),

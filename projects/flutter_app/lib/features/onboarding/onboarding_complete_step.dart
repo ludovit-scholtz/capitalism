@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/theme/app_icons.dart';
+import '../../core/widgets/icon_badge.dart';
 import 'onboarding_models.dart';
 
 /// Mirrors the core of step 7 in `OnboardingView.vue`: a completion summary
@@ -40,7 +43,7 @@ class OnboardingCompleteStep extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(Icons.celebration_outlined, size: 48, color: theme.colorScheme.primary),
+          const Center(child: IconBadge(icon: AppIcons.celebration, size: 64, iconSize: 28)),
           const SizedBox(height: 12),
           Text('Your empire has launched!', style: theme.textTheme.headlineSmall, textAlign: TextAlign.center),
           const SizedBox(height: 16),
@@ -84,7 +87,7 @@ class OnboardingCompleteStep extends StatelessWidget {
               onPressed: savingProgress ? null : onSaveProgress,
               icon: savingProgress
                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.login),
+                  : const FaIcon(AppIcons.login, size: 16),
               label: const Text('Save Progress'),
             ),
           ] else if (!milestoneCompleted) ...[

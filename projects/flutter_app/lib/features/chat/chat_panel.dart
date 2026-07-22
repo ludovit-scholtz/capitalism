@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+
+import '../../core/theme/app_icons.dart';
+import '../../core/widgets/icon_badge.dart';
 
 /// In-app panel opened from the drawer's Chat item, mirroring the chat side
 /// panel opened by the "Chat" button in `AppHeader.vue` on the web (which is
@@ -26,12 +30,12 @@ class ChatPanel extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.chat_bubble_outline, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
+                const IconBadge(icon: AppIcons.chat, size: 36, iconSize: 16),
+                const SizedBox(width: 10),
                 Text('Chat', style: theme.textTheme.titleLarge),
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.close),
+                  icon: const FaIcon(AppIcons.close, size: 18),
                   tooltip: 'Close',
                   onPressed: () => Navigator.of(context).pop(),
                 ),

@@ -31,11 +31,13 @@
 // — `SellBuildingScreen`), linked from here rather than duplicated.
 
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/theme/app_icons.dart';
 import 'building_detail_models.dart';
 import 'building_detail_service.dart';
 
@@ -235,12 +237,12 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
                     children: [
                       if (unit.unitType == 'PUBLIC_SALES')
                         IconButton(
-                          icon: const Icon(Icons.sell_outlined),
+                          icon: const FaIcon(AppIcons.sell, size: 16),
                           tooltip: 'Update price',
                           onPressed: _actionLoadingIds.contains(unit.id) ? null : () => _updatePrice(unit),
                         ),
                       IconButton(
-                        icon: const Icon(Icons.upgrade),
+                        icon: const FaIcon(AppIcons.upgrade, size: 16),
                         tooltip: 'Upgrade',
                         onPressed: _actionLoadingIds.contains(unit.id) ? null : () => _upgradeUnit(unit),
                       ),

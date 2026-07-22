@@ -9,6 +9,7 @@
 // — matches the web app; see ROADMAP.md history for the verification notes.
 
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -17,6 +18,7 @@ import '../../core/auth/biatec_oidc_service.dart';
 import '../../core/auth/password_reset_service.dart';
 import '../../core/config/app_config.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/theme/app_icons.dart';
 
 const _loginMutation = r'''
   mutation Login($input: LoginInput!) {
@@ -275,7 +277,7 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 8),
             OutlinedButton.icon(
               onPressed: _goToBiatecSignIn,
-              icon: const Icon(Icons.login),
+              icon: const FaIcon(AppIcons.login, size: 16),
               label: const Text('Sign in with Biatec'),
             ),
             const SizedBox(height: 16),
@@ -599,7 +601,7 @@ class _AuthCallbackScreenState extends State<AuthCallbackScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.error_outline, color: theme.colorScheme.error, size: 40),
+              FaIcon(AppIcons.errorOutline, color: theme.colorScheme.error, size: 36),
               const SizedBox(height: 12),
               Text(error, textAlign: TextAlign.center),
               const SizedBox(height: 16),
