@@ -14,7 +14,10 @@ import '../../features/company/company_screens.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/economy/contracts_screen.dart';
 import '../../features/encyclopedia/encyclopedia_screens.dart';
-import '../../features/exchange/exchange_screens.dart';
+import '../../features/exchange/forex_exchange_screen.dart';
+import '../../features/exchange/global_exchange_screen.dart';
+import '../../features/exchange/stock_exchange_screen.dart';
+import '../../features/exchange/stock_trading_screen.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/leaderboard/leaderboard_screens.dart';
 import '../../features/market/market_screens.dart';
@@ -183,10 +186,31 @@ GoRouter createAppRouter({
             graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
           ),
         ),
-        GoRoute(path: '/exchange', builder: (context, state) => const GlobalExchangeScreen()),
-        GoRoute(path: '/stocks', builder: (context, state) => const StockExchangeScreen()),
-        GoRoute(path: '/stock/trade/:companyId', builder: (context, state) => const StockTradingScreen()),
-        GoRoute(path: '/forex', builder: (context, state) => const ForexExchangeScreen()),
+        GoRoute(
+          path: '/exchange',
+          builder: (context, state) => GlobalExchangeScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/stocks',
+          builder: (context, state) => StockExchangeScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/stock/trade/:companyId',
+          builder: (context, state) => StockTradingScreen(
+            companyId: state.pathParameters['companyId']!,
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/forex',
+          builder: (context, state) => ForexExchangeScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
         GoRoute(
           path: '/buy-building/:companyId',
           builder: (context, state) => BuyBuildingScreen(

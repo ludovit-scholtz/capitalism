@@ -25,8 +25,11 @@ history), Cities (population-sorted directory with resource chips), World Map
 and the four building screens — Building Market (listings + offers), Buy Building
 (city/type/lot/confirm flow), Sell Building (list/update-price/destroy), and a
 heavily trimmed Building Detail (overview, unit list, upgrade/price quick actions
-— no grid editor), and all 6 City tabs (Overview, Economy, Buildings, Market,
-Contracts, Competitors) — are implemented, matching the web app's fields, validation,
+— no grid editor), all 6 City tabs (Overview, Economy, Buildings, Market,
+Contracts, Competitors), and the 4 exchange screens — Global Exchange (buy resources
+from other cities), Stocks (listings), Stock Trading (order book, limit orders,
+shareholders), and Forex (swap/rates/history) — are implemented, matching the web
+app's fields, validation,
 GraphQL/REST endpoints, and error handling. The app now also has a cohesive dark
 "22nd century HUD" visual theme (custom Material 3 `ThemeData`, bundled
 Orbitron/Inter/Rajdhani fonts, animated starfield background) that applies to every

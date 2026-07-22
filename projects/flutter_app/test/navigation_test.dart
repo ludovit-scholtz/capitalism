@@ -74,7 +74,11 @@ void main() {
 
       await tester.tap(_bottomNavLabel('Exchange'));
       await tester.pumpAndSettle();
-      expect(_placeholderBodyFor('GlobalExchangeView.vue'), findsOneWidget);
+      // GlobalExchangeScreen is real and GraphQL-backed now; the harness's
+      // generic fake client doesn't shape a `cities` response, so no
+      // destination city gets selected and the Resources tab shows its
+      // empty state — still proves the navigation itself works.
+      expect(find.text('No offers available for this city.'), findsOneWidget);
       expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 2);
 
       await tester.tap(_bottomNavLabel('Home'));
