@@ -14,6 +14,7 @@ class FakeBankingService implements BankingService {
     this.collateralBuildings = const [],
     this.companyBankAccounts = const [],
     this.bankStatement,
+    this.rateHistory = const [],
     this.loadError,
     this.actionError,
   });
@@ -29,15 +30,20 @@ class FakeBankingService implements BankingService {
   final List<CollateralBuilding> collateralBuildings;
   final List<Map<String, String>> companyBankAccounts;
   final BankStatementResult? bankStatement;
+  final List<BankDepositRateHistoryEntry> rateHistory;
   final Object? loadError;
   final Object? actionError;
 
   final List<String> calls = [];
   Map<String, dynamic>? lastOpenAccountArgs;
   String? closedAccountId;
+  double? lastCloseAmount;
   Map<String, dynamic>? lastSetRatesArgs;
   bool baseDepositActivated = false;
   Map<String, dynamic>? lastAcceptLoanArgs;
+  String? lastRepaidLoanId;
+  Map<String, dynamic>? lastUpdateDepositRateArgs;
+  Map<String, dynamic>? lastBankStatementArgs;
 
   @override
   Future<List<LoanSummary>> fetchMyLoans() async {
@@ -79,9 +85,11 @@ class FakeBankingService implements BankingService {
   }
 
   @override
-  Future<void> closeBankAccount(String depositId) async {
+  Future<void> closeBankAccount(String depositId, {double amount = 0}) async {
     calls.add('closeBankAccount');
+    if (actionError != null) throw actionError!;
     closedAccountId = depositId;
+    lastCloseAmount = amount;
   }
 
   @override
@@ -140,18 +148,59 @@ class FakeBankingService implements BankingService {
     required String bankBuildingId,
     required String borrowerCompanyId,
     required double principalAmount,
+    int? durationTicks,
     String? collateralBuildingId,
     String? bankAccountId,
   }) async {
     calls.add('acceptLoan');
     if (actionError != null) throw actionError!;
-    lastAcceptLoanArgs = {'bankBuildingId': bankBuildingId, 'borrowerCompanyId': borrowerCompanyId, 'principalAmount': principalAmount};
+    lastAcceptLoanArgs = {
+      'bankBuildingId': bankBuildingId,
+      'borrowerCompanyId': borrowerCompanyId,
+      'principalAmount': principalAmount,
+      'durationTicks': durationTicks,
+    };
   }
 
   @override
-  Future<BankStatementResult> fetchBankStatement({String? companyId, String? accountId, int limit = 50, int offset = 0}) async {
+  Future<void> repayLoanDebt({required String loanId, String? bankAccountId}) async {
+    calls.add('repayLoanDebt');
+    if (actionError != null) throw actionError!;
+    lastRepaidLoanId = loanId;
+  }
+
+  @override
+  Future<void> updateBankDepositRate({required String bankBuildingId, required double newRatePercent}) async {
+    calls.add('updateBankDepositRate');
+    if (actionError != null) throw actionError!;
+    lastUpdateDepositRateArgs = {'bankBuildingId': bankBuildingId, 'newRatePercent': newRatePercent};
+  }
+
+  @override
+  Future<List<BankDepositRateHistoryEntry>> fetchBankDepositRateHistory(String bankBuildingId) async {
+    calls.add('fetchBankDepositRateHistory');
+    return rateHistory;
+  }
+
+  @override
+  Future<BankStatementResult> fetchBankStatement({
+    String? companyId,
+    String? accountId,
+    int limit = 50,
+    int offset = 0,
+    int? fromTick,
+    int? toTick,
+  }) async {
     calls.add('fetchBankStatement');
     if (loadError != null) throw loadError!;
+    lastBankStatementArgs = {
+      'companyId': companyId,
+      'accountId': accountId,
+      'limit': limit,
+      'offset': offset,
+      'fromTick': fromTick,
+      'toTick': toTick,
+    };
     return bankStatement!;
   }
 }

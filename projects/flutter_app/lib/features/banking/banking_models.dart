@@ -18,6 +18,9 @@ class LoanSummary {
     required this.paymentAmount,
     required this.status,
     required this.missedPayments,
+    this.accumulatedPenalty = 0,
+    this.collateralBuildingId,
+    this.collateralBuildingName,
   });
 
   final String id;
@@ -30,9 +33,16 @@ class LoanSummary {
   final int nextPaymentTick;
   final double paymentAmount;
 
-  /// `ACTIVE`, `PAID_OFF`, or `DEFAULTED`.
+  /// `ACTIVE`, `OVERDUE`, `DEFAULTED`, or `REPAID` (`Api/Data/Entities/Loan.cs`'s `LoanStatus`).
   final String status;
   final int missedPayments;
+  final double accumulatedPenalty;
+  final String? collateralBuildingId;
+  final String? collateralBuildingName;
+
+  /// Whether this loan can be paid off in full immediately via `repayLoanDebt`
+  /// — matches the web's overdue/defaulted repayment banner.
+  bool get isRepayable => status == 'OVERDUE' || status == 'DEFAULTED';
 
   factory LoanSummary.fromJson(Map<String, dynamic> json) => LoanSummary(
     id: json['id'] as String,
@@ -46,6 +56,9 @@ class LoanSummary {
     paymentAmount: (json['paymentAmount'] as num?)?.toDouble() ?? 0,
     status: (json['status'] as String?) ?? 'ACTIVE',
     missedPayments: (json['missedPayments'] as num?)?.toInt() ?? 0,
+    accumulatedPenalty: (json['accumulatedPenalty'] as num?)?.toDouble() ?? 0,
+    collateralBuildingId: json['collateralBuildingId'] as String?,
+    collateralBuildingName: json['collateralBuildingName'] as String?,
   );
 }
 
@@ -141,6 +154,13 @@ class BankInfo {
     required this.baseCapitalDeposited,
     required this.baseCapitalRequirement,
     required this.liquidityStatus,
+    this.centralBankDebt = 0,
+    this.centralBankInterestRatePercent = 0,
+    this.reserveRequirement = 0,
+    this.availableCash = 0,
+    this.reserveShortfall = 0,
+    this.pendingDepositInterestRatePercent,
+    this.pendingDepositRateEffectiveTick,
   });
 
   final String bankBuildingId;
@@ -155,6 +175,20 @@ class BankInfo {
   final double baseCapitalRequirement;
   final String? liquidityStatus;
 
+  /// Amount the bank currently owes the central bank for covering
+  /// withdrawal/lending shortfalls (`Api/Types/Query.Types.Banking.cs`).
+  final double centralBankDebt;
+  final double centralBankInterestRatePercent;
+  final double reserveRequirement;
+  final double availableCash;
+
+  /// `> 0` when the bank's available cash is below its reserve requirement.
+  final double reserveShortfall;
+
+  /// A scheduled (not-yet-applied) `updateBankDepositRate` change, if any.
+  final double? pendingDepositInterestRatePercent;
+  final int? pendingDepositRateEffectiveTick;
+
   factory BankInfo.fromJson(Map<String, dynamic> json) => BankInfo(
     bankBuildingId: json['bankBuildingId'] as String,
     bankBuildingName: (json['bankBuildingName'] as String?) ?? '',
@@ -167,6 +201,38 @@ class BankInfo {
     baseCapitalDeposited: json['baseCapitalDeposited'] as bool? ?? false,
     baseCapitalRequirement: (json['baseCapitalRequirement'] as num?)?.toDouble() ?? 0,
     liquidityStatus: json['liquidityStatus'] as String?,
+    centralBankDebt: (json['centralBankDebt'] as num?)?.toDouble() ?? 0,
+    centralBankInterestRatePercent: (json['centralBankInterestRatePercent'] as num?)?.toDouble() ?? 0,
+    reserveRequirement: (json['reserveRequirement'] as num?)?.toDouble() ?? 0,
+    availableCash: (json['availableCash'] as num?)?.toDouble() ?? 0,
+    reserveShortfall: (json['reserveShortfall'] as num?)?.toDouble() ?? 0,
+    pendingDepositInterestRatePercent: (json['pendingDepositInterestRatePercent'] as num?)?.toDouble(),
+    pendingDepositRateEffectiveTick: (json['pendingDepositRateEffectiveTick'] as num?)?.toInt(),
+  );
+}
+
+/// Mirrors `BankDepositRateHistorySummary` (`Api/Types/Query.Types.Banking.cs`).
+class BankDepositRateHistoryEntry {
+  const BankDepositRateHistoryEntry({
+    required this.id,
+    required this.previousRatePercent,
+    required this.newRatePercent,
+    required this.effectiveTick,
+    required this.isApplied,
+  });
+
+  final String id;
+  final double previousRatePercent;
+  final double newRatePercent;
+  final int effectiveTick;
+  final bool isApplied;
+
+  factory BankDepositRateHistoryEntry.fromJson(Map<String, dynamic> json) => BankDepositRateHistoryEntry(
+    id: json['id'] as String,
+    previousRatePercent: (json['previousRatePercent'] as num?)?.toDouble() ?? 0,
+    newRatePercent: (json['newRatePercent'] as num?)?.toDouble() ?? 0,
+    effectiveTick: (json['effectiveTick'] as num?)?.toInt() ?? 0,
+    isApplied: json['isApplied'] as bool? ?? false,
   );
 }
 

@@ -123,6 +123,28 @@ const _acceptLoanMutation = r'''
   }
 ''';
 
+const _repayLoanDebtMutation = r'''
+  mutation RepayLoanDebt($input: RepayLoanDebtInput!) {
+    repayLoanDebt(input: $input) { id status remainingPrincipal }
+  }
+''';
+
+const _updateBankDepositRateMutation = r'''
+  mutation UpdateBankDepositRate($input: UpdateBankDepositRateInput!) {
+    updateBankDepositRate(input: $input) {
+      bankBuildingId depositInterestRatePercent pendingDepositInterestRatePercent pendingDepositRateEffectiveTick
+    }
+  }
+''';
+
+const _bankDepositRateHistoryQuery = r'''
+  query BankDepositRateHistory($bankBuildingId: UUID!) {
+    bankDepositRateHistory(bankBuildingId: $bankBuildingId) {
+      id previousRatePercent newRatePercent effectiveTick isApplied
+    }
+  }
+''';
+
 const _bankStatementQuery = r'''
   query BankStatement($companyId: UUID, $accountId: UUID, $limit: Int, $offset: Int, $fromTick: Long, $toTick: Long) {
     bankStatement(companyId: $companyId, accountId: $accountId, limit: $limit, offset: $offset, fromTick: $fromTick, toTick: $toTick) {
@@ -180,11 +202,15 @@ class BankingService {
     );
   }
 
-  Future<void> closeBankAccount(String depositId) {
+  /// Pass [amount] `0` only for a zero-balance closure; otherwise pass the
+  /// exact withdrawal amount (the full balance to close the account, or a
+  /// smaller amount for a partial withdrawal that keeps it open) — matches
+  /// `Mutation.Banking.cs`'s `CloseBankAccount` validation.
+  Future<void> closeBankAccount(String depositId, {double amount = 0}) {
     return _graphQlService.request(
       _closeBankAccountMutation,
       variables: {
-        'input': {'depositId': depositId, 'amount': 0},
+        'input': {'depositId': depositId, 'amount': amount},
       },
     );
   }
@@ -246,6 +272,7 @@ class BankingService {
     required String bankBuildingId,
     required String borrowerCompanyId,
     required double principalAmount,
+    int? durationTicks,
     String? collateralBuildingId,
     String? bankAccountId,
   }) {
@@ -256,6 +283,7 @@ class BankingService {
           'loanOfferId': bankBuildingId,
           'borrowerCompanyId': borrowerCompanyId,
           'principalAmount': principalAmount,
+          'durationTicks': durationTicks,
           'collateralBuildingId': collateralBuildingId,
           'bankAccountId': bankAccountId,
         },
@@ -263,15 +291,48 @@ class BankingService {
     );
   }
 
+  Future<void> repayLoanDebt({required String loanId, String? bankAccountId}) {
+    return _graphQlService.request(
+      _repayLoanDebtMutation,
+      variables: {
+        'input': {'loanId': loanId, 'bankAccountId': bankAccountId},
+      },
+    );
+  }
+
+  Future<void> updateBankDepositRate({required String bankBuildingId, required double newRatePercent}) {
+    return _graphQlService.request(
+      _updateBankDepositRateMutation,
+      variables: {
+        'input': {'bankBuildingId': bankBuildingId, 'newRatePercent': newRatePercent},
+      },
+    );
+  }
+
+  Future<List<BankDepositRateHistoryEntry>> fetchBankDepositRateHistory(String bankBuildingId) async {
+    final result = await _graphQlService.request(_bankDepositRateHistoryQuery, variables: {'bankBuildingId': bankBuildingId});
+    final list = result['bankDepositRateHistory'] as List<dynamic>? ?? const [];
+    return list.map((e) => BankDepositRateHistoryEntry.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
   Future<BankStatementResult> fetchBankStatement({
     String? companyId,
     String? accountId,
     int limit = 50,
     int offset = 0,
+    int? fromTick,
+    int? toTick,
   }) async {
     final result = await _graphQlService.request(
       _bankStatementQuery,
-      variables: {'companyId': companyId, 'accountId': accountId, 'limit': limit, 'offset': offset, 'fromTick': null, 'toTick': null},
+      variables: {
+        'companyId': companyId,
+        'accountId': accountId,
+        'limit': limit,
+        'offset': offset,
+        'fromTick': fromTick,
+        'toTick': toTick,
+      },
     );
     return BankStatementResult.fromJson(result['bankStatement'] as Map<String, dynamic>);
   }

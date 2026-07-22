@@ -3,7 +3,10 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../../features/auth/auth_screens.dart';
-import '../../features/banking/banking_screens.dart';
+import '../../features/banking/bank_loan_request_screen.dart';
+import '../../features/banking/bank_management_screen.dart';
+import '../../features/banking/bank_statement_screen.dart';
+import '../../features/banking/loan_marketplace_screen.dart';
 import '../../features/bounties/bounty_history_screen.dart';
 import '../../features/buildings/building_detail_screen.dart';
 import '../../features/buildings/building_market_screen.dart';
