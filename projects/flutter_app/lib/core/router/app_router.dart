@@ -304,9 +304,26 @@ GoRouter createAppRouter({
             graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
           ),
         ),
-        GoRoute(path: '/banking', builder: (context, state) => const LoanMarketplaceScreen()),
-        GoRoute(path: '/bank/:buildingId', builder: (context, state) => const BankManagementScreen()),
-        GoRoute(path: '/bank/:buildingId/request-loan', builder: (context, state) => const BankLoanRequestScreen()),
+        GoRoute(
+          path: '/banking',
+          builder: (context, state) => LoanMarketplaceScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/bank/:buildingId',
+          builder: (context, state) => BankManagementScreen(
+            bankBuildingId: state.pathParameters['buildingId']!,
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/bank/:buildingId/request-loan',
+          builder: (context, state) => BankLoanRequestScreen(
+            bankBuildingId: state.pathParameters['buildingId']!,
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
         GoRoute(
           path: '/personal-ledger',
           builder: (context, state) => PersonalLedgerScreen(
@@ -318,8 +335,19 @@ GoRouter createAppRouter({
         GoRoute(path: '/energy-market', builder: (context, state) => const EnergyMarketScreen()),
         GoRoute(path: '/market/events', builder: (context, state) => const GlobalEventsScreen()),
         GoRoute(path: '/marketing-analytics', builder: (context, state) => const MarketingAnalyticsScreen()),
-        GoRoute(path: '/bank-statement', builder: (context, state) => const BankStatementScreen()),
-        GoRoute(path: '/bank-statement/:companyId', builder: (context, state) => const BankStatementScreen()),
+        GoRoute(
+          path: '/bank-statement',
+          builder: (context, state) => BankStatementScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/bank-statement/:companyId',
+          builder: (context, state) => BankStatementScreen(
+            companyId: state.pathParameters['companyId'],
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
         GoRoute(path: '/trade-routes', builder: (context, state) => const TradeRoutesScreen()),
         GoRoute(path: '/tutorial', builder: (context, state) => const TutorialScreen()),
         GoRoute(path: '/operations/statistics', builder: (context, state) => const OperationsOverviewScreen()),
