@@ -143,8 +143,18 @@ GoRouter createAppRouter({
             graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
           ),
         ),
-        GoRoute(path: '/cities', builder: (context, state) => const CitiesScreen()),
-        GoRoute(path: '/map', builder: (context, state) => const WorldMapScreen()),
+        GoRoute(
+          path: '/cities',
+          builder: (context, state) => CitiesScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/map',
+          builder: (context, state) => WorldMapScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
         GoRoute(path: '/buildings/market', builder: (context, state) => const BuildingMarketScreen()),
         GoRoute(path: '/encyclopedia', builder: (context, state) => const EncyclopediaScreen()),
         GoRoute(path: '/encyclopedia/topic/:topicSlug', builder: (context, state) => const EncyclopediaScreen()),
