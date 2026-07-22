@@ -19,7 +19,7 @@ void main() {
     testWidgets('boots to the Home screen with app bar, hero CTA and bottom nav visible', (tester) async {
       await pumpCapitalismApp(tester);
 
-      expect(find.widgetWithText(AppBar, 'Capitalism'), findsOneWidget);
+      expect(find.widgetWithText(AppBar, 'CAPITALISM'), findsOneWidget);
       expect(find.byType(NavigationBar), findsOneWidget);
       expect(find.text('Get Started'), findsOneWidget);
       expect(find.text('Tick'), findsOneWidget);
@@ -29,11 +29,12 @@ void main() {
       await pumpCapitalismApp(tester);
       await _openDrawer(tester);
 
-      expect(find.text('Main'), findsOneWidget);
-      expect(find.text('Economy'), findsOneWidget);
-      expect(find.text('Build'), findsOneWidget);
-      expect(find.text('Social'), findsOneWidget);
-      expect(find.text('Administration'), findsNothing);
+      // Section headers are rendered upper-cased (HUD styling) — see AppShell.
+      expect(find.text('MAIN'), findsOneWidget);
+      expect(find.text('ECONOMY'), findsOneWidget);
+      expect(find.text('BUILD'), findsOneWidget);
+      expect(find.text('SOCIAL'), findsOneWidget);
+      expect(find.text('ADMINISTRATION'), findsNothing);
 
       expect(find.widgetWithText(ListTile, 'Dashboard'), findsNothing);
       expect(find.widgetWithText(ListTile, 'Forex'), findsNothing);
@@ -61,7 +62,10 @@ void main() {
 
       await tester.tap(_bottomNavLabel('News'));
       await tester.pumpAndSettle();
-      expect(_placeholderBodyFor('NewsView.vue'), findsOneWidget);
+      // NewsScreen is a real GraphQL-backed screen now (not a placeholder);
+      // the harness's generic fake HTTP client doesn't shape a
+      // `gameNewsFeed` response, so it lands on the screen's own error state.
+      expect(find.text('Could not load the news feed. Please try again.'), findsOneWidget);
       expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 3);
 
       await tester.tap(_bottomNavLabel('Exchange'));
@@ -103,7 +107,7 @@ void main() {
       await pumpCapitalismApp(tester, authenticated: true, admin: true);
       await _openDrawer(tester);
 
-      expect(find.text('Administration'), findsOneWidget);
+      expect(find.text('ADMINISTRATION'), findsOneWidget);
 
       await tester.tap(find.widgetWithText(ListTile, 'Operations'));
       await tester.pumpAndSettle();

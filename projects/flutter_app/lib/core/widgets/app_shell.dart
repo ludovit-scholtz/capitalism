@@ -8,10 +8,14 @@ import '../../features/chat/chat_panel.dart';
 import '../auth/auth_state.dart';
 import '../router/nav_items.dart';
 import '../services/url_opener.dart';
+import '../theme/app_theme.dart';
+import '../theme/cosmic_background.dart';
 
 /// Persistent chrome (app bar, drawer, bottom nav) wrapped around every
 /// route via a go_router `ShellRoute`. Equivalent to `AppHeader.vue` +
-/// `App.vue`'s layout in the web frontend.
+/// `App.vue`'s layout in the web frontend. Also where the app-wide
+/// [CosmicBackground] backdrop is applied — every screen gets it without
+/// needing to opt in individually.
 class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.child, this.urlOpener = const ExternalUrlOpener()});
 
@@ -25,42 +29,74 @@ class AppShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthState>();
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Capitalism')),
-      drawer: Drawer(
-        child: SafeArea(
-          child: ListView(
-            padding: EdgeInsets.zero,
+    return CosmicBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: const Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const DrawerHeader(child: Center(child: Text('Capitalism'))),
-              for (final section in navSections) ...[
-                if (_visibleItems(section, auth).isNotEmpty) ...[
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                    child: Text(section.title, style: Theme.of(context).textTheme.labelLarge),
-                  ),
-                  for (final item in _visibleItems(section, auth))
-                    ListTile(
-                      leading: Icon(item.icon),
-                      title: Text(item.label),
-                      onTap: () => _handleTap(context, item),
-                    ),
-                ],
-              ],
+              Icon(Icons.hexagon_outlined, color: AppTheme.neonCyan, size: 22),
+              SizedBox(width: 10),
+              Text('CAPITALISM'),
             ],
           ),
         ),
-      ),
-      body: child,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _bottomIndexFor(GoRouterState.of(context).uri.toString()),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.dashboard_outlined), label: 'Dashboard'),
-          NavigationDestination(icon: Icon(Icons.swap_horiz), label: 'Exchange'),
-          NavigationDestination(icon: Icon(Icons.article_outlined), label: 'News'),
-        ],
-        onDestinationSelected: (index) => _handleBottomTap(context, index),
+        drawer: Drawer(
+          child: SafeArea(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                DrawerHeader(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [AppTheme.neonCyan.withValues(alpha: 0.15), Colors.transparent],
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.hexagon_outlined, color: AppTheme.neonCyan, size: 28),
+                      const SizedBox(width: 12),
+                      Text('CAPITALISM', style: Theme.of(context).textTheme.titleLarge),
+                    ],
+                  ),
+                ),
+                for (final section in navSections) ...[
+                  if (_visibleItems(section, auth).isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                      child: Text(
+                        section.title.toUpperCase(),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.labelMedium?.copyWith(color: AppTheme.neonCyan, letterSpacing: 1.2),
+                      ),
+                    ),
+                    for (final item in _visibleItems(section, auth))
+                      ListTile(
+                        leading: Icon(item.icon),
+                        title: Text(item.label),
+                        onTap: () => _handleTap(context, item),
+                      ),
+                  ],
+                ],
+              ],
+            ),
+          ),
+        ),
+        body: child,
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _bottomIndexFor(GoRouterState.of(context).uri.toString()),
+          destinations: const [
+            NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
+            NavigationDestination(icon: Icon(Icons.dashboard_outlined), label: 'Dashboard'),
+            NavigationDestination(icon: Icon(Icons.swap_horiz), label: 'Exchange'),
+            NavigationDestination(icon: Icon(Icons.article_outlined), label: 'News'),
+          ],
+          onDestinationSelected: (index) => _handleBottomTap(context, index),
+        ),
       ),
     );
   }

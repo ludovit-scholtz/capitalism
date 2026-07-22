@@ -15,7 +15,8 @@ import '../../features/exchange/exchange_screens.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/leaderboard/leaderboard_screens.dart';
 import '../../features/market/market_screens.dart';
-import '../../features/news/news_screens.dart';
+import '../../features/news/news_screen.dart';
+import '../../features/news/notifications_screen.dart';
 import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/operations/operations_screens.dart';
 import '../../features/trade/trade_screens.dart';
@@ -111,9 +112,24 @@ GoRouter createAppRouter({
             graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
           ),
         ),
-        GoRoute(path: '/news', builder: (context, state) => const NewsScreen()),
-        GoRoute(path: '/notifications', builder: (context, state) => const NotificationsScreen()),
-        GoRoute(path: '/contracts', builder: (context, state) => const ContractsScreen()),
+        GoRoute(
+          path: '/news',
+          builder: (context, state) => NewsScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/notifications',
+          builder: (context, state) => NotificationsScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/contracts',
+          builder: (context, state) => ContractsScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
         GoRoute(path: '/leaderboard', builder: (context, state) => const LeaderboardScreen()),
         GoRoute(path: '/player/:id', builder: (context, state) => const PlayerProfileScreen()),
         GoRoute(path: '/cities', builder: (context, state) => const CitiesScreen()),

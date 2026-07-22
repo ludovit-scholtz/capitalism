@@ -13,10 +13,15 @@ visibility), Discord (opens the system browser via `url_launcher`), Chat (an in-
 panel), all four auth screens — Sign In (login/register + Biatec OIDC), Forgot
 Password, Reset Password, Auth Callback — the full 7-step Onboarding wizard (city →
 industry → product → IPO → factory purchase → shop purchase → completion, with guest
-mode and backend-driven resume), and the Dashboard (company cards, buildings with
-status badges, pending actions, the same auth/onboarding redirect guards as the web) are
-implemented, matching the web app's fields, validation, GraphQL/REST endpoints, and
-error handling. See `CLAUDE.md` / `.github/copilot-instructions.md` for architecture
+mode and backend-driven resume), the Dashboard (company cards, buildings with
+status badges, pending actions, the same auth/onboarding redirect guards as the web),
+News (filters, pagination, mark-all-read), Notifications (day-grouped, click-to-navigate
+by type), and Contracts (create-offer form, Pending/Active/History columns with
+accept/reject/cancel) are implemented, matching the web app's fields, validation,
+GraphQL/REST endpoints, and error handling. The app now also has a cohesive dark
+"22nd century HUD" visual theme (custom Material 3 `ThemeData`, bundled
+Orbitron/Inter/Rajdhani fonts, animated starfield background) that applies to every
+screen automatically. See `CLAUDE.md` / `.github/copilot-instructions.md` for architecture
 and conventions, including several non-obvious behaviors worth knowing before touching
 that code (password auth is **disabled by default**, matching the web; login/register
 hit the Master API, not the game API; forgot/reset-password are REST, not GraphQL;
