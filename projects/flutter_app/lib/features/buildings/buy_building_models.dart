@@ -24,6 +24,7 @@ class CityLot {
     required this.price,
     required this.suitableTypes,
     required this.ownerCompanyId,
+    required this.buildingId,
   });
 
   final String id;
@@ -32,6 +33,7 @@ class CityLot {
   final double price;
   final List<String> suitableTypes;
   final String? ownerCompanyId;
+  final String? buildingId;
 
   bool get isAvailable => ownerCompanyId == null;
 
@@ -42,5 +44,6 @@ class CityLot {
     price: (json['price'] as num?)?.toDouble() ?? 0,
     suitableTypes: ((json['suitableTypes'] as List<dynamic>?) ?? const []).cast<String>(),
     ownerCompanyId: json['ownerCompanyId'] as String?,
+    buildingId: json['buildingId'] as String?,
   );
 }

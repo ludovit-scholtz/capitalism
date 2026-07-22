@@ -209,12 +209,48 @@ GoRouter createAppRouter({
           ),
         ),
         GoRoute(path: '/city/:cityId', redirect: (context, state) => '${state.uri.path}/overview'),
-        GoRoute(path: '/city/:cityId/overview', builder: (context, state) => const CityOverviewScreen()),
-        GoRoute(path: '/city/:cityId/economy', builder: (context, state) => const CityEconomyScreen()),
-        GoRoute(path: '/city/:cityId/buildings', builder: (context, state) => const CityBuildingsScreen()),
-        GoRoute(path: '/city/:cityId/market', builder: (context, state) => const CityMarketScreen()),
-        GoRoute(path: '/city/:cityId/contracts', builder: (context, state) => const CityContractsScreen()),
-        GoRoute(path: '/city/:cityId/competitors', builder: (context, state) => const CityCompetitorsScreen()),
+        GoRoute(
+          path: '/city/:cityId/overview',
+          builder: (context, state) => CityOverviewScreen(
+            cityId: state.pathParameters['cityId']!,
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/city/:cityId/economy',
+          builder: (context, state) => CityEconomyScreen(
+            cityId: state.pathParameters['cityId']!,
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/city/:cityId/buildings',
+          builder: (context, state) => CityBuildingsScreen(
+            cityId: state.pathParameters['cityId']!,
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/city/:cityId/market',
+          builder: (context, state) => CityMarketScreen(
+            cityId: state.pathParameters['cityId']!,
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/city/:cityId/contracts',
+          builder: (context, state) => CityContractsScreen(
+            cityId: state.pathParameters['cityId']!,
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/city/:cityId/competitors',
+          builder: (context, state) => CityCompetitorsScreen(
+            cityId: state.pathParameters['cityId']!,
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
         GoRoute(path: '/ledger/:companyId', builder: (context, state) => const LedgerScreen()),
         GoRoute(path: '/company/:companyId/contracts', builder: (context, state) => const CompanyContractsScreen()),
         GoRoute(path: '/company/:companyId/settings', builder: (context, state) => const CompanySettingsScreen()),

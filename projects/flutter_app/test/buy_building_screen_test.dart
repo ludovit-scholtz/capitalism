@@ -16,6 +16,7 @@ const _availableLot = CityLot(
   price: 50000,
   suitableTypes: ['FACTORY'],
   ownerCompanyId: null,
+  buildingId: null,
 );
 
 const _ownedLot = CityLot(
@@ -25,6 +26,7 @@ const _ownedLot = CityLot(
   price: 30000,
   suitableTypes: ['FACTORY'],
   ownerCompanyId: 'someone-else',
+  buildingId: 'building-99',
 );
 
 Future<GoRouter> _pumpBuyBuilding(WidgetTester tester, {required FakeBuyBuildingService service}) async {
