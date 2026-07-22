@@ -156,9 +156,25 @@ GoRouter createAppRouter({
           ),
         ),
         GoRoute(path: '/buildings/market', builder: (context, state) => const BuildingMarketScreen()),
-        GoRoute(path: '/encyclopedia', builder: (context, state) => const EncyclopediaScreen()),
-        GoRoute(path: '/encyclopedia/topic/:topicSlug', builder: (context, state) => const EncyclopediaScreen()),
-        GoRoute(path: '/encyclopedia/resource/:slug', builder: (context, state) => const ResourceDetailScreen()),
+        GoRoute(
+          path: '/encyclopedia',
+          builder: (context, state) => EncyclopediaScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/encyclopedia/topic/:topicSlug',
+          builder: (context, state) => EncyclopediaScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/encyclopedia/resource/:slug',
+          builder: (context, state) => ResourceDetailScreen(
+            slug: state.pathParameters['slug']!,
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
         GoRoute(path: '/exchange', builder: (context, state) => const GlobalExchangeScreen()),
         GoRoute(path: '/stocks', builder: (context, state) => const StockExchangeScreen()),
         GoRoute(path: '/stock/trade/:companyId', builder: (context, state) => const StockTradingScreen()),

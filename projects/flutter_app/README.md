@@ -19,9 +19,10 @@ News (filters, pagination, mark-all-read), Notifications (day-grouped, click-to-
 by type), Contracts (create-offer form, Pending/Active/History columns with
 accept/reject/cancel), Leaderboard (Players/Companies tabs, pagination, endgame
 benchmark), Player Profile (stats, industries, hall of fame, achievements, rank
-history), Cities (population-sorted directory with resource chips), and World Map
-(expansion status, unlock progress, list-based city picker) are implemented,
-matching the web app's fields, validation,
+history), Cities (population-sorted directory with resource chips), World Map
+(expansion status, unlock progress, list-based city picker), and the Encyclopedia
++ Resource Detail (searchable resource/product catalog with recipe cross-links)
+are implemented, matching the web app's fields, validation,
 GraphQL/REST endpoints, and error handling. The app now also has a cohesive dark
 "22nd century HUD" visual theme (custom Material 3 `ThemeData`, bundled
 Orbitron/Inter/Rajdhani fonts, animated starfield background) that applies to every
