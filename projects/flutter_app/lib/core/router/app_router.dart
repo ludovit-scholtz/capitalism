@@ -4,7 +4,10 @@ import 'package:provider/provider.dart';
 
 import '../../features/auth/auth_screens.dart';
 import '../../features/banking/banking_screens.dart';
-import '../../features/buildings/buildings_screens.dart';
+import '../../features/buildings/building_detail_screen.dart';
+import '../../features/buildings/building_market_screen.dart';
+import '../../features/buildings/buy_building_screen.dart';
+import '../../features/buildings/sell_building_screen.dart';
 import '../../features/cities/cities_screens.dart';
 import '../../features/city/city_tab_screens.dart';
 import '../../features/company/company_screens.dart';
@@ -155,7 +158,12 @@ GoRouter createAppRouter({
             graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
           ),
         ),
-        GoRoute(path: '/buildings/market', builder: (context, state) => const BuildingMarketScreen()),
+        GoRoute(
+          path: '/buildings/market',
+          builder: (context, state) => BuildingMarketScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
         GoRoute(
           path: '/encyclopedia',
           builder: (context, state) => EncyclopediaScreen(
@@ -179,9 +187,27 @@ GoRouter createAppRouter({
         GoRoute(path: '/stocks', builder: (context, state) => const StockExchangeScreen()),
         GoRoute(path: '/stock/trade/:companyId', builder: (context, state) => const StockTradingScreen()),
         GoRoute(path: '/forex', builder: (context, state) => const ForexExchangeScreen()),
-        GoRoute(path: '/buy-building/:companyId', builder: (context, state) => const BuyBuildingScreen()),
-        GoRoute(path: '/building/:id', builder: (context, state) => const BuildingDetailScreen()),
-        GoRoute(path: '/building/:id/sell', builder: (context, state) => const SellBuildingScreen()),
+        GoRoute(
+          path: '/buy-building/:companyId',
+          builder: (context, state) => BuyBuildingScreen(
+            companyId: state.pathParameters['companyId']!,
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/building/:id',
+          builder: (context, state) => BuildingDetailScreen(
+            buildingId: state.pathParameters['id']!,
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/building/:id/sell',
+          builder: (context, state) => SellBuildingScreen(
+            buildingId: state.pathParameters['id']!,
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
         GoRoute(path: '/city/:cityId', redirect: (context, state) => '${state.uri.path}/overview'),
         GoRoute(path: '/city/:cityId/overview', builder: (context, state) => const CityOverviewScreen()),
         GoRoute(path: '/city/:cityId/economy', builder: (context, state) => const CityEconomyScreen()),
