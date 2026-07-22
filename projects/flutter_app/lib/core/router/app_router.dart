@@ -379,21 +379,48 @@ GoRouter createAppRouter({
             graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
           ),
         ),
-        GoRoute(path: '/tutorial', builder: (context, state) => const TutorialScreen()),
-        GoRoute(path: '/operations/statistics', builder: (context, state) => const OperationsOverviewScreen()),
+        GoRoute(
+          path: '/tutorial',
+          builder: (context, state) => TutorialScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/operations/statistics',
+          builder: (context, state) => OperationsOverviewScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
         GoRoute(
           path: '/operations/statistics/money-flow',
-          builder: (context, state) => const OperationsMoneyFlowScreen(),
+          builder: (context, state) => OperationsMoneyFlowScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
         ),
         GoRoute(
           path: '/operations/statistics/product-analytics',
-          builder: (context, state) => const OperationsProductAnalyticsScreen(),
+          builder: (context, state) => OperationsProductAnalyticsScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
         ),
-        GoRoute(path: '/operations/statistics/news', builder: (context, state) => const OperationsNewsScreen()),
-        GoRoute(path: '/operations/statistics/players', builder: (context, state) => const OperationsPlayersScreen()),
+        GoRoute(
+          path: '/operations/statistics/news',
+          builder: (context, state) => OperationsNewsScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/operations/statistics/players',
+          builder: (context, state) => OperationsPlayersScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
         GoRoute(
           path: '/operations/statistics/players/:id',
-          builder: (context, state) => const OperationsPlayerDetailScreen(),
+          builder: (context, state) => OperationsPlayerDetailScreen(
+            playerId: state.pathParameters['id']!,
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
         ),
       ],
     ),

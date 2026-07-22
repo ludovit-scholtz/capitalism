@@ -120,7 +120,13 @@ void main() {
       await tester.tap(find.widgetWithText(ListTile, 'Operations'));
       await tester.pumpAndSettle();
 
-      expect(_placeholderBodyFor('OperationsOverviewView.vue'), findsOneWidget);
+      // OperationsOverviewScreen is real and GraphQL-backed now; it gates
+      // on the server's `gameAdminSession.canAccessAdminDashboard` (not
+      // just the drawer's locally-set `admin` flag used to show the nav
+      // item), and the harness's generic fake client doesn't shape that
+      // field as true, so it correctly lands on the "admins only" state —
+      // still proves the navigation itself reached the Operations screen.
+      expect(find.text('Administrators only.'), findsOneWidget);
     });
   });
 }

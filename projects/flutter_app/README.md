@@ -5,39 +5,22 @@ Mobile client for the Capitalism MMO, providing the same game-playing interface 
 
 ## Status
 
-Most screens are still empty placeholders — see `ROADMAP.md` (`### Flutter mobile
-app`) for the one-line-per-screen implementation backlog — but the app shell, auth
-flow, onboarding wizard, and dashboard are real and working: Home (live
-tick/tax-rate/leaderboard data), navigation (drawer + bottom nav, auth/admin-gated
-visibility), Discord (opens the system browser via `url_launcher`), Chat (an in-app
-panel), all four auth screens — Sign In (login/register + Biatec OIDC), Forgot
-Password, Reset Password, Auth Callback — the full 7-step Onboarding wizard (city →
-industry → product → IPO → factory purchase → shop purchase → completion, with guest
-mode and backend-driven resume), the Dashboard (company cards, buildings with
-status badges, pending actions, the same auth/onboarding redirect guards as the web),
-News (filters, pagination, mark-all-read), Notifications (day-grouped, click-to-navigate
-by type), Contracts (create-offer form, Pending/Active/History columns with
-accept/reject/cancel), Leaderboard (Players/Companies tabs, pagination, endgame
-benchmark), Player Profile (stats, industries, hall of fame, achievements, rank
-history), Cities (population-sorted directory with resource chips), World Map
-(expansion status, unlock progress, list-based city picker), the Encyclopedia
-+ Resource Detail (searchable resource/product catalog with recipe cross-links),
-and the four building screens — Building Market (listings + offers), Buy Building
-(city/type/lot/confirm flow), Sell Building (list/update-price/destroy), and a
-heavily trimmed Building Detail (overview, unit list, upgrade/price quick actions
-— no grid editor), all 6 City tabs (Overview, Economy, Buildings, Market,
-Contracts, Competitors), the 4 exchange screens — Global Exchange (buy resources
-from other cities), Stocks (listings), Stock Trading (order book, limit orders,
-shareholders), and Forex (swap/rates/history) — Ledger, Company Contracts, Company
-Settings, Company Research, Personal Ledger, the four banking screens — Loan
-Marketplace, Bank Management, Request Loan, Bank Statement — and the six market/
-trade screens — Market Intelligence, Market Dashboard, Energy Market, Global
-Events, Marketing Analytics, Trade Routes — are implemented, matching the web
-app's fields, validation,
-GraphQL/REST endpoints, and error handling. The app now also has a cohesive dark
-"22nd century HUD" visual theme (custom Material 3 `ThemeData`, bundled
-Orbitron/Inter/Rajdhani fonts, animated starfield background) that applies to every
-screen automatically. See `CLAUDE.md` / `.github/copilot-instructions.md` for architecture
+**Every screen in `ROADMAP.md` (`### Flutter mobile app`) is now implemented** against
+the real game/Master API GraphQL contracts — the app shell, full auth flow (Sign In,
+Forgot/Reset Password, Auth Callback, Biatec OIDC), the 7-step Onboarding wizard, the
+Dashboard, and every economy/social/building/banking/market screen through Tutorial
+and all 6 Operations admin screens. The app has a cohesive dark "22nd century HUD"
+visual theme (custom Material 3 `ThemeData`, bundled Orbitron/Inter/Rajdhani fonts,
+animated starfield background) applied automatically to every screen.
+
+Several screens are deliberately trimmed from full web parity rather than being
+byte-for-byte ports — most notably Building Detail (overview + unit list + two quick
+actions, no drag-drop grid editor), Ledger (P&L summary only, no drill-down/shipments/
+city-unlock panel), Bank Management (owner+customer views folded into one screen), and
+all 6 Operations admin screens (read-only — no impersonation, admin-role grants, NPC
+control, or shard-ending). Each trim is documented in its file's top-of-file comment
+and in `ROADMAP.md`; check there before assuming byte-for-byte parity on something
+specific. See `CLAUDE.md` / `.github/copilot-instructions.md` for architecture
 and conventions, including several non-obvious behaviors worth knowing before touching
 that code (password auth is **disabled by default**, matching the web; login/register
 hit the Master API, not the game API; forgot/reset-password are REST, not GraphQL;
