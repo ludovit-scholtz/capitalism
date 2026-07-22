@@ -104,5 +104,94 @@ void main() {
 
       expect(service.cancelledOrderId, 'order-1');
     });
+
+    testWidgets('market sell calls sellShares with entered quantity', (tester) async {
+      final service = FakeStockService(listings: [_listing]);
+
+      await _pumpStockTrading(tester, service: service);
+      await tester.enterText(find.byType(TextField).first, '4');
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Sell'));
+      await tester.pumpAndSettle();
+
+      expect(service.lastSellArgs?['companyId'], 'company-1');
+      expect(service.lastSellArgs?['shareCount'], 4.0);
+    });
+
+    testWidgets('shows a price-history sparkline when enough history is available', (tester) async {
+      final service = FakeStockService(
+        listings: [_listing],
+        priceHistory: const [
+          StockPriceHistoryPoint(tick: 1, price: 40),
+          StockPriceHistoryPoint(tick: 2, price: 41),
+          StockPriceHistoryPoint(tick: 3, price: 42.5),
+        ],
+      );
+
+      await _pumpStockTrading(tester, service: service);
+
+      expect(find.byKey(const Key('stock-price-history-chart')), findsOneWidget);
+    });
+
+    testWidgets('shows the position summary with average buy price and unrealized P&L', (tester) async {
+      final service = FakeStockService(
+        listings: [_listing],
+        personAccountStockSummary: const PersonAccountStockSummary(
+          playerId: 'player-1',
+          availableCash: 5000,
+          shareholdings: [PortfolioHolding(companyId: 'company-1', shareCount: 10, marketValue: 425)],
+          stockTrades: [
+            PersonTradeRecord(companyId: 'company-1', direction: 'BUY', shareCount: 10, pricePerShare: 40, recordedAtTick: 1),
+          ],
+        ),
+      );
+
+      await _pumpStockTrading(tester, service: service);
+
+      expect(find.text('Shares owned: 10'), findsOneWidget);
+      expect(find.text('Average buy price: 40.00'), findsOneWidget);
+      expect(find.text('Unrealized P&L: +25.00'), findsOneWidget);
+      expect(find.text('Available cash: 5000.00'), findsOneWidget);
+    });
+
+    testWidgets('shows no average buy price when there is no trade history', (tester) async {
+      final service = FakeStockService(listings: [_listing]);
+
+      await _pumpStockTrading(tester, service: service);
+
+      expect(find.text('Shares owned: 0'), findsOneWidget);
+      expect(find.textContaining('Average buy price'), findsNothing);
+      expect(find.textContaining('Unrealized P&L'), findsNothing);
+    });
+
+    testWidgets('shows the empty state for recent trades when there is no trade history', (tester) async {
+      final service = FakeStockService(listings: [_listing], tradeHistory: const []);
+
+      await _pumpStockTrading(tester, service: service);
+
+      expect(find.text('No trades yet.'), findsOneWidget);
+    });
+
+    testWidgets('renders no shareholder rows when the company has no public shareholders', (tester) async {
+      final service = FakeStockService(
+        listings: [_listing],
+        shareholders: const CompanyShareholders(totalSharesIssued: 1000, shareholders: []),
+      );
+
+      await _pumpStockTrading(tester, service: service);
+
+      expect(find.text('Shareholders'), findsOneWidget);
+      expect(find.byType(ListTile), findsNothing);
+    });
+
+    testWidgets('does not show the price-history sparkline with fewer than 2 points', (tester) async {
+      final service = FakeStockService(
+        listings: [_listing],
+        priceHistory: const [StockPriceHistoryPoint(tick: 1, price: 40)],
+      );
+
+      await _pumpStockTrading(tester, service: service);
+
+      expect(find.byKey(const Key('stock-price-history-chart')), findsNothing);
+    });
   });
 }

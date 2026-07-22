@@ -8,6 +8,8 @@ class FakeGlobalExchangeService implements GlobalExchangeService {
     this.products = const [],
     this.bankAccounts = const [],
     this.targetUnits = const [],
+    this.resourceTypes = const [],
+    this.productTypes = const [],
     this.buyError,
   });
 
@@ -16,6 +18,8 @@ class FakeGlobalExchangeService implements GlobalExchangeService {
   final List<GlobalExchangeProductListing> products;
   final List<Map<String, String>> bankAccounts;
   final List<ExchangeTargetUnit> targetUnits;
+  final List<ExchangeCatalogEntry> resourceTypes;
+  final List<ExchangeCatalogEntry> productTypes;
   final Object? buyError;
 
   final List<String> calls = [];
@@ -37,6 +41,18 @@ class FakeGlobalExchangeService implements GlobalExchangeService {
   Future<List<GlobalExchangeProductListing>> fetchProductListings() async {
     calls.add('fetchProductListings');
     return products;
+  }
+
+  @override
+  Future<List<ExchangeCatalogEntry>> fetchResourceTypes() async {
+    calls.add('fetchResourceTypes');
+    return resourceTypes;
+  }
+
+  @override
+  Future<List<ExchangeCatalogEntry>> fetchProductTypes() async {
+    calls.add('fetchProductTypes');
+    return productTypes;
   }
 
   @override

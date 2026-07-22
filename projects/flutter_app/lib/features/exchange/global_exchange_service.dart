@@ -25,6 +25,14 @@ const _productListingsQuery = r'''
   }
 ''';
 
+const _resourceTypesQuery = r'''
+  query GlobalExchangeResourceTypes { resourceTypes { id name category } }
+''';
+
+const _productTypesQuery = r'''
+  query GlobalExchangeProductTypes { productTypes { id name industry } }
+''';
+
 const _myUnitsAndAccountsQuery = r'''
   query GlobalExchangeMyResources {
     myBankAccounts { id currencyCode balance companyId ownerType }
@@ -70,6 +78,22 @@ class GlobalExchangeService {
     final result = await _graphQlService.request(_productListingsQuery, variables: {'productTypeId': null});
     final list = result['globalExchangeProductListings'] as List<dynamic>? ?? const [];
     return list.map((e) => GlobalExchangeProductListing.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// Used to build the Resources tab's category filter dropdown, matching
+  /// `GlobalExchangeView.vue`'s `RESOURCES_QUERY`.
+  Future<List<ExchangeCatalogEntry>> fetchResourceTypes() async {
+    final result = await _graphQlService.request(_resourceTypesQuery);
+    final list = result['resourceTypes'] as List<dynamic>? ?? const [];
+    return list.map((e) => ExchangeCatalogEntry.fromResourceJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// Used to build the Products tab's industry filter dropdown, matching
+  /// `GlobalExchangeView.vue`'s `PRODUCTS_QUERY`.
+  Future<List<ExchangeCatalogEntry>> fetchProductTypes() async {
+    final result = await _graphQlService.request(_productTypesQuery);
+    final list = result['productTypes'] as List<dynamic>? ?? const [];
+    return list.map((e) => ExchangeCatalogEntry.fromProductJson(e as Map<String, dynamic>)).toList();
   }
 
   /// Returns `(bankAccounts, targetUnits)` for the buy dialog — bank

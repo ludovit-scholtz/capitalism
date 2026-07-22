@@ -38,7 +38,9 @@ class GlobalExchangeOffer {
 class GlobalExchangeProductListing {
   const GlobalExchangeProductListing({
     required this.orderId,
+    required this.productTypeId,
     required this.productName,
+    required this.productIndustry,
     required this.unitSymbol,
     required this.pricePerUnit,
     required this.remainingQuantity,
@@ -47,7 +49,9 @@ class GlobalExchangeProductListing {
   });
 
   final String orderId;
+  final String productTypeId;
   final String productName;
+  final String productIndustry;
   final String? unitSymbol;
   final double pricePerUnit;
   final double remainingQuantity;
@@ -56,12 +60,37 @@ class GlobalExchangeProductListing {
 
   factory GlobalExchangeProductListing.fromJson(Map<String, dynamic> json) => GlobalExchangeProductListing(
     orderId: json['orderId'] as String,
+    productTypeId: (json['productTypeId'] as String?) ?? '',
     productName: (json['productName'] as String?) ?? '',
+    productIndustry: (json['productIndustry'] as String?) ?? '',
     unitSymbol: json['unitSymbol'] as String?,
     pricePerUnit: (json['pricePerUnit'] as num?)?.toDouble() ?? 0,
     remainingQuantity: (json['remainingQuantity'] as num?)?.toDouble() ?? 0,
     sellerCityName: (json['sellerCityName'] as String?) ?? '',
     sellerCompanyName: (json['sellerCompanyName'] as String?) ?? '',
+  );
+}
+
+/// Minimal projection of `resourceTypes`/`productTypes`, used only to build
+/// the category/industry filter dropdowns — mirrors
+/// `GlobalExchangeView.vue`'s `RESOURCES_QUERY`/`PRODUCTS_QUERY` usage.
+class ExchangeCatalogEntry {
+  const ExchangeCatalogEntry({required this.id, required this.name, required this.category});
+
+  final String id;
+  final String name;
+  final String category;
+
+  factory ExchangeCatalogEntry.fromResourceJson(Map<String, dynamic> json) => ExchangeCatalogEntry(
+    id: json['id'] as String,
+    name: (json['name'] as String?) ?? '',
+    category: (json['category'] as String?) ?? '',
+  );
+
+  factory ExchangeCatalogEntry.fromProductJson(Map<String, dynamic> json) => ExchangeCatalogEntry(
+    id: json['id'] as String,
+    name: (json['name'] as String?) ?? '',
+    category: (json['industry'] as String?) ?? '',
   );
 }
 

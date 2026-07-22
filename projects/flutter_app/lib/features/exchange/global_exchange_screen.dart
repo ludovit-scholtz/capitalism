@@ -1,14 +1,17 @@
-// Ported from `projects/frontend/src/views/GlobalExchangeView.vue`.
-// Trimmed: no category/industry filter dropdowns or free-text search (the
-// list is short enough to scroll on mobile); the Products tab is read-only
-// here too, matching the web (it has no direct buy flow for product
-// listings — that's presumably company-to-company via Contracts).
+// Ported from `projects/frontend/src/views/GlobalExchangeView.vue`, including
+// its category/industry filter dropdowns and free-text search (built from
+// `resourceTypes`/`productTypes`, matching the web's `RESOURCES_QUERY`/
+// `PRODUCTS_QUERY`). Still trimmed: the Products tab is read-only here too,
+// matching the web (it has no direct buy flow for product listings —
+// that's presumably company-to-company via Contracts).
 
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/theme/app_icons.dart';
 import 'global_exchange_models.dart';
 import 'global_exchange_service.dart';
 
@@ -34,11 +37,18 @@ class _GlobalExchangeScreenState extends State<GlobalExchangeScreen> {
   bool _offersLoading = false;
   String? _offersError;
   List<GlobalExchangeOffer> _offers = const [];
+  Map<String, String> _resourceCategoryById = const {};
+  List<String> _resourceCategories = const [];
+  String _resourceCategoryFilter = 'ALL';
+  String _resourceSearch = '';
 
   bool _productsLoading = false;
   bool _productsLoaded = false;
   String? _productsError;
   List<GlobalExchangeProductListing> _products = const [];
+  List<String> _productIndustries = const [];
+  String _productIndustryFilter = 'ALL';
+  String _productSearch = '';
 
   @override
   void initState() {
@@ -47,6 +57,56 @@ class _GlobalExchangeScreenState extends State<GlobalExchangeScreen> {
     final graphQlService = widget._injectedGraphQlService ?? GraphQlService(auth);
     _service = widget._injectedGlobalExchangeService ?? GlobalExchangeService(graphQlService);
     _loadCities();
+    _loadResourceCatalog();
+    _loadProductCatalog();
+  }
+
+  Future<void> _loadResourceCatalog() async {
+    try {
+      final catalog = await _service.fetchResourceTypes();
+      if (!mounted) return;
+      setState(() {
+        _resourceCategoryById = {for (final entry in catalog) entry.id: entry.category};
+        _resourceCategories = catalog.map((e) => e.category).where((c) => c.isNotEmpty).toSet().toList()..sort();
+      });
+    } catch (_) {
+      // Filter dropdown just stays empty (only "All") on failure — the
+      // offers list itself still loads independently.
+    }
+  }
+
+  Future<void> _loadProductCatalog() async {
+    try {
+      final catalog = await _service.fetchProductTypes();
+      if (!mounted) return;
+      setState(() {
+        _productIndustries = catalog.map((e) => e.category).where((c) => c.isNotEmpty).toSet().toList()..sort();
+      });
+    } catch (_) {
+      // Filter dropdown just stays empty (only "All") on failure.
+    }
+  }
+
+  List<GlobalExchangeOffer> get _filteredOffers {
+    return _offers.where((offer) {
+      if (_resourceCategoryFilter != 'ALL' && (_resourceCategoryById[offer.resourceTypeId] ?? '') != _resourceCategoryFilter) {
+        return false;
+      }
+      if (_resourceSearch.isNotEmpty && !offer.resourceName.toLowerCase().contains(_resourceSearch.toLowerCase())) {
+        return false;
+      }
+      return true;
+    }).toList();
+  }
+
+  List<GlobalExchangeProductListing> get _filteredProducts {
+    return _products.where((listing) {
+      if (_productIndustryFilter != 'ALL' && listing.productIndustry != _productIndustryFilter) return false;
+      if (_productSearch.isNotEmpty && !listing.productName.toLowerCase().contains(_productSearch.toLowerCase())) {
+        return false;
+      }
+      return true;
+    }).toList();
   }
 
   Future<void> _loadCities() async {
@@ -198,6 +258,7 @@ class _GlobalExchangeScreenState extends State<GlobalExchangeScreen> {
   }
 
   List<Widget> _buildResourcesTab() {
+    final filtered = _filteredOffers;
     return [
       DropdownButtonFormField<String>(
         initialValue: _destinationCityId,
@@ -209,14 +270,31 @@ class _GlobalExchangeScreenState extends State<GlobalExchangeScreen> {
         },
       ),
       const SizedBox(height: 12),
+      TextField(
+        key: const Key('resource-search'),
+        decoration: const InputDecoration(labelText: 'Search resources', prefixIcon: FaIcon(AppIcons.search, size: 16)),
+        onChanged: (value) => setState(() => _resourceSearch = value),
+      ),
+      const SizedBox(height: 12),
+      DropdownButtonFormField<String>(
+        key: const Key('resource-category-filter'),
+        initialValue: _resourceCategoryFilter,
+        decoration: const InputDecoration(labelText: 'Category'),
+        items: [
+          const DropdownMenuItem(value: 'ALL', child: Text('All categories')),
+          for (final category in _resourceCategories) DropdownMenuItem(value: category, child: Text(category)),
+        ],
+        onChanged: (value) => setState(() => _resourceCategoryFilter = value ?? 'ALL'),
+      ),
+      const SizedBox(height: 12),
       if (_offersLoading)
         const Center(child: CircularProgressIndicator())
       else if (_offersError != null)
         Column(children: [Text(_offersError!), const SizedBox(height: 8), OutlinedButton(onPressed: _loadOffers, child: const Text('Try again'))])
-      else if (_offers.isEmpty)
-        const Text('No offers available for this city.')
+      else if (filtered.isEmpty)
+        Text(_offers.isEmpty ? 'No offers available for this city.' : 'No offers match your filters.')
       else
-        for (final offer in _offers)
+        for (final offer in filtered)
           Card(
             key: ValueKey('exchange-offer-${offer.cityId}-${offer.resourceTypeId}'),
             margin: const EdgeInsets.only(bottom: 8),
@@ -234,18 +312,38 @@ class _GlobalExchangeScreenState extends State<GlobalExchangeScreen> {
     if (_productsError != null) {
       return [Text(_productsError!), const SizedBox(height: 8), OutlinedButton(onPressed: _loadProducts, child: const Text('Try again'))];
     }
-    if (_products.isEmpty) return const [Text('No product listings available.')];
+    final filtered = _filteredProducts;
     return [
-      for (final listing in _products)
-        Card(
-          key: ValueKey('product-listing-${listing.orderId}'),
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            title: Text(listing.productName),
-            subtitle: Text('${listing.sellerCompanyName} · ${listing.sellerCityName}'),
-            trailing: Text('${listing.pricePerUnit.toStringAsFixed(2)} × ${listing.remainingQuantity.toStringAsFixed(0)}'),
+      TextField(
+        key: const Key('product-search'),
+        decoration: const InputDecoration(labelText: 'Search products', prefixIcon: FaIcon(AppIcons.search, size: 16)),
+        onChanged: (value) => setState(() => _productSearch = value),
+      ),
+      const SizedBox(height: 12),
+      DropdownButtonFormField<String>(
+        key: const Key('product-industry-filter'),
+        initialValue: _productIndustryFilter,
+        decoration: const InputDecoration(labelText: 'Industry'),
+        items: [
+          const DropdownMenuItem(value: 'ALL', child: Text('All industries')),
+          for (final industry in _productIndustries) DropdownMenuItem(value: industry, child: Text(industry)),
+        ],
+        onChanged: (value) => setState(() => _productIndustryFilter = value ?? 'ALL'),
+      ),
+      const SizedBox(height: 12),
+      if (filtered.isEmpty)
+        Text(_products.isEmpty ? 'No product listings available.' : 'No listings match your filters.')
+      else
+        for (final listing in filtered)
+          Card(
+            key: ValueKey('product-listing-${listing.orderId}'),
+            margin: const EdgeInsets.only(bottom: 8),
+            child: ListTile(
+              title: Text(listing.productName),
+              subtitle: Text('${listing.sellerCompanyName} · ${listing.sellerCityName}'),
+              trailing: Text('${listing.pricePerUnit.toStringAsFixed(2)} × ${listing.remainingQuantity.toStringAsFixed(0)}'),
+            ),
           ),
-        ),
     ];
   }
 }

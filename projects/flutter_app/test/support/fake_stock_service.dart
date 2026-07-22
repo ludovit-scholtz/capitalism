@@ -9,9 +9,21 @@ class FakeStockService implements StockService {
     this.shareholders = const CompanyShareholders(totalSharesIssued: 0, shareholders: []),
     this.openOrders = const [],
     this.bankAccounts = const [],
+    this.priceHistory = const [],
+    this.personAccountStockSummary = const PersonAccountStockSummary(
+      playerId: 'player-1',
+      availableCash: 0,
+      shareholdings: [],
+      stockTrades: [],
+    ),
+    this.myCompanies = const [],
+    this.dividendProposals = const [],
     this.listingsError,
     this.tradeError,
     this.orderError,
+    this.dividendError,
+    this.mergeError,
+    this.replaceCeoError,
   });
 
   final List<StockListing> listings;
@@ -20,15 +32,26 @@ class FakeStockService implements StockService {
   final CompanyShareholders shareholders;
   final List<OpenOrder> openOrders;
   final List<Map<String, String>> bankAccounts;
+  final List<StockPriceHistoryPoint> priceHistory;
+  final PersonAccountStockSummary personAccountStockSummary;
+  final List<Map<String, String>> myCompanies;
+  final List<DividendProposal> dividendProposals;
   final Object? listingsError;
   final Object? tradeError;
   final Object? orderError;
+  final Object? dividendError;
+  final Object? mergeError;
+  final Object? replaceCeoError;
 
   final List<String> calls = [];
   Map<String, dynamic>? lastBuyArgs;
   Map<String, dynamic>? lastSellArgs;
   Map<String, dynamic>? lastLimitOrderArgs;
   String? cancelledOrderId;
+  Map<String, dynamic>? lastProposeDividendArgs;
+  Map<String, dynamic>? lastVoteArgs;
+  Map<String, dynamic>? lastMergeArgs;
+  Map<String, dynamic>? lastReplaceCeoArgs;
 
   @override
   Future<List<StockListing>> fetchListings() async {
@@ -98,5 +121,57 @@ class FakeStockService implements StockService {
     calls.add('cancelLimitOrder');
     if (orderError != null) throw orderError!;
     cancelledOrderId = orderId;
+  }
+
+  @override
+  Future<List<StockPriceHistoryPoint>> fetchPriceHistory(String companyId) async {
+    calls.add('fetchPriceHistory');
+    return priceHistory;
+  }
+
+  @override
+  Future<PersonAccountStockSummary> fetchPersonAccountStockSummary() async {
+    calls.add('fetchPersonAccountStockSummary');
+    return personAccountStockSummary;
+  }
+
+  @override
+  Future<List<Map<String, String>>> fetchMyCompanies() async {
+    calls.add('fetchMyCompanies');
+    return myCompanies;
+  }
+
+  @override
+  Future<List<DividendProposal>> fetchDividendProposals(String stockSymbol) async {
+    calls.add('fetchDividendProposals');
+    return dividendProposals;
+  }
+
+  @override
+  Future<void> proposeDividend({required String stockSymbol, required double dividendPerShare}) async {
+    calls.add('proposeDividend');
+    if (dividendError != null) throw dividendError!;
+    lastProposeDividendArgs = {'stockSymbol': stockSymbol, 'dividendPerShare': dividendPerShare};
+  }
+
+  @override
+  Future<void> voteDividendProposal({required String proposalId, required String choice}) async {
+    calls.add('voteDividendProposal');
+    if (dividendError != null) throw dividendError!;
+    lastVoteArgs = {'proposalId': proposalId, 'choice': choice};
+  }
+
+  @override
+  Future<void> mergeCompany({required String targetCompanyId, required String destinationCompanyId}) async {
+    calls.add('mergeCompany');
+    if (mergeError != null) throw mergeError!;
+    lastMergeArgs = {'targetCompanyId': targetCompanyId, 'destinationCompanyId': destinationCompanyId};
+  }
+
+  @override
+  Future<void> replaceCeo({required String companyId, required String newCeoPlayerId}) async {
+    calls.add('replaceCeo');
+    if (replaceCeoError != null) throw replaceCeoError!;
+    lastReplaceCeoArgs = {'companyId': companyId, 'newCeoPlayerId': newCeoPlayerId};
   }
 }

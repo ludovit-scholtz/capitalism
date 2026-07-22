@@ -71,7 +71,7 @@ void main() {
       expect(find.textContaining('100.00 EUR'), findsOneWidget);
     });
 
-    testWidgets('getting a quote and confirming executes the swap', (tester) async {
+    testWidgets('getting a quote and confirming executes the swap with the default slippage', (tester) async {
       final service = FakeForexService(rates: const [_rate], balances: const [_balance]);
 
       await _pumpForex(tester, service: service);
@@ -79,11 +79,93 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('You receive:'), findsOneWidget);
+      expect(find.text('Quote expires in 30s'), findsOneWidget);
 
       await tester.tap(find.widgetWithText(FilledButton, 'Confirm swap'));
       await tester.pumpAndSettle();
 
-      expect(service.lastSwapArgs, isNotNull);
+      expect(service.lastSwapArgs?['quoteNonce'], 'nonce-1');
+      expect(service.lastSwapArgs?['acceptedSlippageBps'], 100);
+    });
+
+    testWidgets('selecting a slippage preset is passed through to the swap', (tester) async {
+      final service = FakeForexService(rates: const [_rate], balances: const [_balance]);
+
+      await _pumpForex(tester, service: service);
+      await tester.tap(find.byKey(const Key('slippage-200')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Get quote'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Confirm swap'));
+      await tester.pumpAndSettle();
+
+      expect(service.lastSwapArgs?['acceptedSlippageBps'], 200);
+    });
+
+    testWidgets('shows a commodity-shock market event banner when active', (tester) async {
+      final service = FakeForexService(
+        rates: const [_rate],
+        balances: const [_balance],
+        activeMarketEvents: const [
+          MarketEvent(
+            id: 'event-1',
+            title: 'Oil shock',
+            description: 'Oil prices are spiking.',
+            magnitudeMultiplier: 1.5,
+            ticksRemaining: 20,
+            affectedResourceName: 'Crude Oil',
+          ),
+        ],
+      );
+
+      await _pumpForex(tester, service: service);
+
+      expect(find.text('Oil shock'), findsOneWidget);
+      expect(find.text('20 ticks remaining'), findsOneWidget);
+    });
+
+    testWidgets('Rates tab shows a rate-history chart once a currency is selected', (tester) async {
+      final service = FakeForexService(
+        rates: const [_rate],
+        balances: const [_balance],
+        rateHistory: const [
+          FxRateHistoryPoint(gameTick: 1, midRate: 1.05),
+          FxRateHistoryPoint(gameTick: 2, midRate: 1.08),
+        ],
+      );
+
+      await _pumpForex(tester, service: service);
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Rates'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('rate-history-chart')), findsOneWidget);
+    });
+
+    testWidgets('Transfer tab shows the bank-transfer section', (tester) async {
+      final service = FakeForexService(
+        rates: const [_rate],
+        balances: const [_balance],
+        bankAccounts: const [
+          BankAccountOption(id: 'acc-1', accountNumber: '001', currencyCode: 'EUR', currencySymbol: '€', balance: 100, ownerDisplayName: 'Me'),
+          BankAccountOption(id: 'acc-2', accountNumber: '002', currencyCode: 'EUR', currencySymbol: '€', balance: 50, ownerDisplayName: 'Me'),
+        ],
+      );
+
+      await _pumpForex(tester, service: service);
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Transfer'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('transfer-from-account')), findsOneWidget);
+    });
+
+    testWidgets('Gold tab shows the gold AMM section', (tester) async {
+      final service = FakeForexService(rates: const [_rate], balances: const [_balance]);
+
+      await _pumpForex(tester, service: service);
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Gold'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('My gold'), findsOneWidget);
     });
   });
 }

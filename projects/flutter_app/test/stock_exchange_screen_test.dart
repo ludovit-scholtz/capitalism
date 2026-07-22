@@ -21,6 +21,21 @@ const _listing = StockListing(
   playerOwnedShares: 10,
 );
 
+const _controllableListing = StockListing(
+  companyId: 'company-2',
+  stockSymbol: 'RIVL',
+  companyName: 'Rival Corp',
+  primaryCityName: 'Metropolis',
+  primaryIndustry: 'MANUFACTURING',
+  sharePrice: 12,
+  dailyChangePercent: -1.5,
+  marketValue: 500000,
+  playerOwnedShares: 6000,
+  canProposeDividend: true,
+  canClaimControl: true,
+  canMerge: true,
+);
+
 Future<GoRouter> _pumpStockExchange(WidgetTester tester, {required FakeStockService service}) async {
   await tester.binding.setSurfaceSize(const Size(800, 2000));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -69,6 +84,90 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Trade company-1'), findsOneWidget);
+    });
+
+    testWidgets('does not show governance actions for listings without control rights', (tester) async {
+      final service = FakeStockService(listings: [_listing]);
+
+      await _pumpStockExchange(tester, service: service);
+
+      expect(find.text('Dividends'), findsNothing);
+      expect(find.text('Claim control'), findsNothing);
+      expect(find.text('Merge'), findsNothing);
+    });
+
+    testWidgets('shows governance actions and opens the dividends dialog with vote/propose', (tester) async {
+      final service = FakeStockService(
+        listings: [_controllableListing],
+        dividendProposals: const [
+          DividendProposal(
+            id: 'proposal-1',
+            stockSymbol: 'RIVL',
+            dividendPerShare: 0.25,
+            totalPayout: 1000,
+            status: 'VOTING',
+            ticksRemaining: 5,
+            forVotes: 100,
+            againstVotes: 20,
+            myVoteChoice: null,
+          ),
+        ],
+      );
+
+      await _pumpStockExchange(tester, service: service);
+      expect(find.text('Claim control'), findsOneWidget);
+      expect(find.text('Merge'), findsOneWidget);
+
+      await tester.tap(find.text('Dividends'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('0.25/share · VOTING'), findsOneWidget);
+      await tester.tap(find.text('Vote For'));
+      await tester.pumpAndSettle();
+      expect(service.lastVoteArgs, {'proposalId': 'proposal-1', 'choice': 'FOR'});
+
+      await tester.enterText(find.widgetWithText(TextField, 'Dividend per share'), '1.0');
+      await tester.tap(find.text('Propose'));
+      await tester.pumpAndSettle();
+      expect(service.lastProposeDividendArgs, {'stockSymbol': 'RIVL', 'dividendPerShare': 1.0});
+    });
+
+    testWidgets('claiming control confirms and calls replaceCeo with the current player id', (tester) async {
+      final service = FakeStockService(
+        listings: [_controllableListing],
+        personAccountStockSummary: const PersonAccountStockSummary(
+          playerId: 'player-42',
+          availableCash: 0,
+          shareholdings: [],
+          stockTrades: [],
+        ),
+      );
+
+      await _pumpStockExchange(tester, service: service);
+      await tester.tap(find.text('Claim control'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Claim control'));
+      await tester.pumpAndSettle();
+
+      expect(service.lastReplaceCeoArgs, {'companyId': 'company-2', 'newCeoPlayerId': 'player-42'});
+      expect(find.text('You are now the CEO of Rival Corp.'), findsOneWidget);
+    });
+
+    testWidgets('merging picks a destination company and calls mergeCompany', (tester) async {
+      final service = FakeStockService(
+        listings: [_controllableListing],
+        myCompanies: const [
+          {'id': 'my-company-1', 'name': 'My Holding Co'},
+        ],
+      );
+
+      await _pumpStockExchange(tester, service: service);
+      await tester.tap(find.text('Merge'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Merge'));
+      await tester.pumpAndSettle();
+
+      expect(service.lastMergeArgs, {'targetCompanyId': 'company-2', 'destinationCompanyId': 'my-company-1'});
     });
   });
 }

@@ -1,13 +1,12 @@
-// Ported from `projects/frontend/src/views/ForexExchangeView.vue`.
-//
-// Deliberately trimmed (documented, not oversights):
-// - No Transfer tab — the web's version reuses a generic
-//   `BankAccountTransferPanel` that isn't forex-specific.
-// - No Gold tab — it wraps a full AMM (quote/swap/create-pool/
-//   add-liquidity/remove-liquidity via `goldAmmPools`/`myGoldBalance`/
-//   `goldAmmSwapQuote`/`executeGoldAmmSwap`/`addGoldAmmLiquidity`/
-//   `createGoldAmmPool`/`removeGoldAmmLiquidity`), a large separate feature
-//   deferred to a later pass.
+// Ported from `projects/frontend/src/views/ForexExchangeView.vue`, including
+// the Transfer tab (`BankTransferSection`, mirroring
+// `BankAccountTransferPanel.vue`), the Gold tab (`GoldAmmSection`, the full
+// AMM: quote/swap/create-pool/add-liquidity/remove-liquidity), the
+// rate-history chart (via the shared `SparklineChart` widget), the
+// commodity-shock event banner (`getActiveMarketEvents`), and slippage
+// presets + a quote-countdown timer on the Swap tab.
+
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -15,8 +14,11 @@ import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/widgets/sparkline_chart.dart';
+import 'bank_transfer_section.dart';
 import 'forex_models.dart';
 import 'forex_service.dart';
+import 'gold_amm_section.dart';
 
 class ForexExchangeScreen extends StatefulWidget {
   const ForexExchangeScreen({super.key, GraphQlService? graphQlService, ForexService? forexService})
@@ -39,6 +41,7 @@ class _ForexExchangeScreenState extends State<ForexExchangeScreen> {
   List<FxRate> _rates = const [];
   List<CurrencyBalance> _balances = const [];
   List<ForexTrade> _history = const [];
+  List<MarketEvent> _marketEvents = const [];
 
   String? _fromCurrency;
   String? _toCurrency;
@@ -46,6 +49,13 @@ class _ForexExchangeScreenState extends State<ForexExchangeScreen> {
   ForexQuote? _quote;
   bool _quoting = false;
   bool _swapping = false;
+  int _slippageBps = 100;
+  Timer? _quoteCountdownTimer;
+  int _quoteSecondsRemaining = 0;
+
+  String? _rateHistoryCurrency;
+  List<FxRateHistoryPoint> _rateHistory = const [];
+  bool _rateHistoryLoading = false;
 
   @override
   void initState() {
@@ -59,6 +69,7 @@ class _ForexExchangeScreenState extends State<ForexExchangeScreen> {
   @override
   void dispose() {
     _amountController.dispose();
+    _quoteCountdownTimer?.cancel();
     super.dispose();
   }
 
@@ -76,15 +87,23 @@ class _ForexExchangeScreenState extends State<ForexExchangeScreen> {
       _error = null;
     });
     try {
-      final results = await Future.wait([_service.fetchRates(), _service.fetchBalances(), _service.fetchHistory()]);
+      final results = await Future.wait([
+        _service.fetchRates(),
+        _service.fetchBalances(),
+        _service.fetchHistory(),
+        _service.fetchActiveMarketEvents(),
+      ]);
       if (!mounted) return;
       final balances = results[1] as List<CurrencyBalance>;
+      final rates = results[0] as List<FxRate>;
       setState(() {
-        _rates = results[0] as List<FxRate>;
+        _rates = rates;
         _balances = balances;
         _history = results[2] as List<ForexTrade>;
+        _marketEvents = results[3] as List<MarketEvent>;
         _fromCurrency ??= balances.isNotEmpty ? balances.first.currencyCode : 'EUR';
-        _toCurrency ??= _rates.isNotEmpty ? _rates.first.quoteCurrencyCode : 'USD';
+        _toCurrency ??= rates.isNotEmpty ? rates.first.quoteCurrencyCode : 'USD';
+        _rateHistoryCurrency ??= rates.isNotEmpty ? rates.first.quoteCurrencyCode : null;
         _loading = false;
       });
     } catch (_) {
@@ -105,7 +124,13 @@ class _ForexExchangeScreenState extends State<ForexExchangeScreen> {
         toCurrencyCode: _toCurrency!,
         amount: double.tryParse(_amountController.text) ?? 0,
       );
-      if (mounted) setState(() => _quote = quote);
+      if (mounted) {
+        setState(() {
+          _quote = quote;
+          _quoteSecondsRemaining = quote.quoteExpiresInSeconds;
+        });
+        _startQuoteCountdown();
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not get a quote.')));
@@ -113,6 +138,25 @@ class _ForexExchangeScreenState extends State<ForexExchangeScreen> {
     } finally {
       if (mounted) setState(() => _quoting = false);
     }
+  }
+
+  void _startQuoteCountdown() {
+    _quoteCountdownTimer?.cancel();
+    _quoteCountdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        if (_quoteSecondsRemaining <= 1) {
+          _quoteSecondsRemaining = 0;
+          _quote = null;
+          timer.cancel();
+        } else {
+          _quoteSecondsRemaining -= 1;
+        }
+      });
+    });
   }
 
   Future<void> _executeSwap() async {
@@ -123,10 +167,13 @@ class _ForexExchangeScreenState extends State<ForexExchangeScreen> {
         fromCurrencyCode: _fromCurrency!,
         toCurrencyCode: _toCurrency!,
         amount: double.tryParse(_amountController.text) ?? 0,
+        quoteNonce: _quote?.quoteNonce,
+        acceptedSlippageBps: _slippageBps,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Swap complete.')));
       }
+      _quoteCountdownTimer?.cancel();
       setState(() => _quote = null);
       await _load();
     } catch (_) {
@@ -135,6 +182,34 @@ class _ForexExchangeScreenState extends State<ForexExchangeScreen> {
       }
     } finally {
       if (mounted) setState(() => _swapping = false);
+    }
+  }
+
+  void _selectTab(String tab) {
+    setState(() => _tab = tab);
+    if (tab == 'rates' && _rateHistory.isEmpty && !_rateHistoryLoading && _rateHistoryCurrency != null) {
+      _loadRateHistory(_rateHistoryCurrency!);
+    }
+  }
+
+  Future<void> _loadRateHistory(String quoteCurrencyCode) async {
+    setState(() {
+      _rateHistoryCurrency = quoteCurrencyCode;
+      _rateHistoryLoading = true;
+    });
+    try {
+      final history = await _service.fetchRateHistory(quoteCurrencyCode);
+      if (!mounted) return;
+      setState(() {
+        _rateHistory = history;
+        _rateHistoryLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _rateHistory = const [];
+        _rateHistoryLoading = false;
+      });
     }
   }
 
@@ -164,19 +239,50 @@ class _ForexExchangeScreenState extends State<ForexExchangeScreen> {
       children: [
         Text('Forex Exchange', style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(child: ChoiceChip(label: const Text('Swap'), selected: _tab == 'swap', onSelected: (_) => setState(() => _tab = 'swap'))),
-            const SizedBox(width: 8),
-            Expanded(child: ChoiceChip(label: const Text('Rates'), selected: _tab == 'rates', onSelected: (_) => setState(() => _tab = 'rates'))),
-            const SizedBox(width: 8),
-            Expanded(child: ChoiceChip(label: const Text('History'), selected: _tab == 'history', onSelected: (_) => setState(() => _tab = 'history'))),
-          ],
+        if (_marketEvents.isNotEmpty) ..._buildMarketEventBanners(),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (final entry in const {'swap': 'Swap', 'transfer': 'Transfer', 'rates': 'Rates', 'history': 'History', 'gold': 'Gold'}.entries)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(label: Text(entry.value), selected: _tab == entry.key, onSelected: (_) => _selectTab(entry.key)),
+                ),
+            ],
+          ),
         ),
         const SizedBox(height: 16),
-        if (_tab == 'swap') ..._buildSwapTab() else if (_tab == 'rates') ..._buildRatesTab() else ..._buildHistoryTab(),
+        if (_tab == 'swap') ..._buildSwapTab(),
+        if (_tab == 'transfer') BankTransferSection(forexService: _service),
+        if (_tab == 'rates') ..._buildRatesTab(),
+        if (_tab == 'history') ..._buildHistoryTab(),
+        if (_tab == 'gold') GoldAmmSection(forexService: _service),
       ],
     );
+  }
+
+  List<Widget> _buildMarketEventBanners() {
+    return [
+      for (final event in _marketEvents)
+        Card(
+          key: ValueKey('market-event-${event.id}'),
+          color: Theme.of(context).colorScheme.tertiaryContainer,
+          margin: const EdgeInsets.only(bottom: 8),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(event.title, style: Theme.of(context).textTheme.titleSmall),
+                Text(event.description, style: Theme.of(context).textTheme.bodySmall),
+                Text('${event.ticksRemaining} ticks remaining', style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
+          ),
+        ),
+      const SizedBox(height: 8),
+    ];
   }
 
   List<Widget> _buildSwapTab() {
@@ -210,6 +316,20 @@ class _ForexExchangeScreenState extends State<ForexExchangeScreen> {
         onChanged: (_) => setState(() => _quote = null),
       ),
       const SizedBox(height: 12),
+      Text('Slippage tolerance', style: Theme.of(context).textTheme.labelMedium),
+      Wrap(
+        spacing: 8,
+        children: [
+          for (final bps in const [50, 100, 200])
+            ChoiceChip(
+              key: Key('slippage-$bps'),
+              label: Text('${(bps / 100).toStringAsFixed(1)}%'),
+              selected: _slippageBps == bps,
+              onSelected: (_) => setState(() => _slippageBps = bps),
+            ),
+        ],
+      ),
+      const SizedBox(height: 12),
       OutlinedButton(onPressed: _quoting ? null : _requestQuote, child: Text(_quoting ? 'Getting quote…' : 'Get quote')),
       if (_quote != null) ...[
         const SizedBox(height: 12),
@@ -222,8 +342,12 @@ class _ForexExchangeScreenState extends State<ForexExchangeScreen> {
                 Text('You receive: ${_quote!.toAmount.toStringAsFixed(2)} ${_quote!.toCurrencyCode}'),
                 Text('Fee: ${_quote!.feeAmount.toStringAsFixed(2)}'),
                 Text('Rate: ${_quote!.rate.toStringAsFixed(4)}'),
+                Text('Quote expires in ${_quoteSecondsRemaining}s'),
                 const SizedBox(height: 8),
-                FilledButton(onPressed: _swapping ? null : _executeSwap, child: Text(_swapping ? 'Swapping…' : 'Confirm swap')),
+                FilledButton(
+                  onPressed: (_swapping || _quoteSecondsRemaining <= 0) ? null : _executeSwap,
+                  child: Text(_swapping ? 'Swapping…' : 'Confirm swap'),
+                ),
               ],
             ),
           ),
@@ -233,12 +357,34 @@ class _ForexExchangeScreenState extends State<ForexExchangeScreen> {
   }
 
   List<Widget> _buildRatesTab() {
+    final quoteCurrencies = _rates.map((r) => r.quoteCurrencyCode).toSet().toList()..sort();
     return [
       for (final rate in _rates)
         ListTile(
           title: Text('${rate.baseCurrencyCode} → ${rate.quoteCurrencyCode}'),
           trailing: Text(rate.rate.toStringAsFixed(4)),
         ),
+      if (quoteCurrencies.isNotEmpty) ...[
+        const SizedBox(height: 16),
+        Text('Rate history', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          key: const Key('rate-history-currency'),
+          initialValue: _rateHistoryCurrency,
+          decoration: const InputDecoration(labelText: 'Currency'),
+          items: [for (final code in quoteCurrencies) DropdownMenuItem(value: code, child: Text(code))],
+          onChanged: (value) {
+            if (value != null) _loadRateHistory(value);
+          },
+        ),
+        const SizedBox(height: 8),
+        if (_rateHistoryLoading)
+          const Center(child: CircularProgressIndicator())
+        else if (_rateHistory.length >= 2)
+          SparklineChart(key: const Key('rate-history-chart'), values: _rateHistory.map((p) => p.midRate).toList())
+        else
+          const Text('Not enough history yet.'),
+      ],
     ];
   }
 

@@ -1,15 +1,17 @@
-// Ported from `projects/frontend/src/views/StockTradingView.vue`.
-//
-// Deliberately trimmed (documented, not oversights): the price-history bar
-// chart is a plain recent-trades list instead (no charting dependency
-// added); position summary (avg buy price, unrealized PnL) isn't computed
-// — the web derives it from full trade history which isn't fetched here.
+// Ported from `projects/frontend/src/views/StockTradingView.vue`, including
+// the price-history chart (via the shared `SparklineChart` widget instead of
+// a charting package dependency — same precedent as the web's own
+// list-based fallbacks elsewhere) and the position summary panel (avg buy
+// price, unrealized P&L, available cash), computed client-side exactly like
+// `projects/frontend/src/lib/stockTrading.ts`'s `computeStockPositionSummary`
+// (see `StockPositionSummary.compute` in `stock_models.dart`).
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/widgets/sparkline_chart.dart';
 import 'stock_models.dart';
 import 'stock_service.dart';
 
@@ -40,6 +42,8 @@ class _StockTradingScreenState extends State<StockTradingScreen> {
   List<StockTradeRecord> _tradeHistory = const [];
   CompanyShareholders? _shareholders;
   List<OpenOrder> _openOrders = const [];
+  List<StockPriceHistoryPoint> _priceHistory = const [];
+  PersonAccountStockSummary? _personAccount;
 
   final _quantityController = TextEditingController(text: '1');
   final _limitPriceController = TextEditingController();
@@ -84,6 +88,8 @@ class _StockTradingScreenState extends State<StockTradingScreen> {
         _service.fetchTradeHistory(listing.stockSymbol),
         _service.fetchShareholders(widget.companyId),
         _service.fetchMyOpenOrders(),
+        _service.fetchPriceHistory(widget.companyId),
+        _service.fetchPersonAccountStockSummary(),
       ]);
       if (!mounted) return;
       setState(() {
@@ -92,6 +98,8 @@ class _StockTradingScreenState extends State<StockTradingScreen> {
         _tradeHistory = results[1] as List<StockTradeRecord>;
         _shareholders = results[2] as CompanyShareholders;
         _openOrders = (results[3] as List<OpenOrder>).where((o) => o.stockSymbol == listing.stockSymbol).toList();
+        _priceHistory = results[4] as List<StockPriceHistoryPoint>;
+        _personAccount = results[5] as PersonAccountStockSummary;
         _loading = false;
       });
     } catch (_) {
@@ -187,8 +195,17 @@ class _StockTradingScreenState extends State<StockTradingScreen> {
         children: [
           Text('${listing.companyName} (${listing.stockSymbol})', style: theme.textTheme.headlineSmall),
           Text('${listing.sharePrice.toStringAsFixed(2)} · ${listing.dailyChangePercent.toStringAsFixed(1)}%', style: theme.textTheme.titleMedium),
-          Text('You own ${listing.playerOwnedShares.toStringAsFixed(0)} shares', style: theme.textTheme.bodyMedium),
+          if (_priceHistory.length >= 2) ...[
+            const SizedBox(height: 12),
+            SparklineChart(
+              key: const Key('stock-price-history-chart'),
+              values: _priceHistory.map((p) => p.price).toList(),
+              color: listing.dailyChangePercent >= 0 ? Colors.green : Colors.red,
+            ),
+          ],
           const SizedBox(height: 16),
+          _buildPositionCard(theme, listing),
+          const SizedBox(height: 12),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -288,8 +305,38 @@ class _StockTradingScreenState extends State<StockTradingScreen> {
       ),
     );
   }
-}
 
-extension _FirstOrNull<T> on Iterable<T> {
-  T? get firstOrNull => isEmpty ? null : first;
+  Widget _buildPositionCard(ThemeData theme, StockListing listing) {
+    final personAccount = _personAccount;
+    final position = StockPositionSummary.compute(
+      companyId: listing.companyId,
+      currentSharePrice: listing.sharePrice,
+      shareholdings: personAccount?.shareholdings ?? const [],
+      stockTrades: personAccount?.stockTrades ?? const [],
+    );
+    final unrealizedPnl = position.unrealizedPnl;
+
+    return Card(
+      key: const Key('stock-position-card'),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Your position', style: theme.textTheme.titleSmall),
+            const SizedBox(height: 8),
+            Text('Shares owned: ${position.sharesOwned.toStringAsFixed(0)}'),
+            Text('Market value: ${position.marketValue.toStringAsFixed(2)}'),
+            if (position.averageBuyPrice != null) Text('Average buy price: ${position.averageBuyPrice!.toStringAsFixed(2)}'),
+            if (unrealizedPnl != null)
+              Text(
+                'Unrealized P&L: ${unrealizedPnl >= 0 ? '+' : ''}${unrealizedPnl.toStringAsFixed(2)}',
+                style: TextStyle(color: unrealizedPnl >= 0 ? Colors.green : Colors.red),
+              ),
+            if (personAccount != null) Text('Available cash: ${personAccount.availableCash.toStringAsFixed(2)}'),
+          ],
+        ),
+      ),
+    );
+  }
 }
