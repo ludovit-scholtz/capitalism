@@ -11,6 +11,7 @@ import '../../features/buildings/sell_building_screen.dart';
 import '../../features/cities/cities_screens.dart';
 import '../../features/city/city_tab_screens.dart';
 import '../../features/company/company_screens.dart';
+import '../../features/company/personal_ledger_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/economy/contracts_screen.dart';
 import '../../features/encyclopedia/encyclopedia_screens.dart';
@@ -275,14 +276,43 @@ GoRouter createAppRouter({
             graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
           ),
         ),
-        GoRoute(path: '/ledger/:companyId', builder: (context, state) => const LedgerScreen()),
-        GoRoute(path: '/company/:companyId/contracts', builder: (context, state) => const CompanyContractsScreen()),
-        GoRoute(path: '/company/:companyId/settings', builder: (context, state) => const CompanySettingsScreen()),
-        GoRoute(path: '/company/:companyId/research', builder: (context, state) => const CompanyResearchScreen()),
+        GoRoute(
+          path: '/ledger/:companyId',
+          builder: (context, state) => LedgerScreen(
+            companyId: state.pathParameters['companyId']!,
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/company/:companyId/contracts',
+          builder: (context, state) => CompanyContractsScreen(
+            companyId: state.pathParameters['companyId']!,
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/company/:companyId/settings',
+          builder: (context, state) => CompanySettingsScreen(
+            companyId: state.pathParameters['companyId']!,
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/company/:companyId/research',
+          builder: (context, state) => CompanyResearchScreen(
+            companyId: state.pathParameters['companyId']!,
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
         GoRoute(path: '/banking', builder: (context, state) => const LoanMarketplaceScreen()),
         GoRoute(path: '/bank/:buildingId', builder: (context, state) => const BankManagementScreen()),
         GoRoute(path: '/bank/:buildingId/request-loan', builder: (context, state) => const BankLoanRequestScreen()),
-        GoRoute(path: '/personal-ledger', builder: (context, state) => const PersonalLedgerScreen()),
+        GoRoute(
+          path: '/personal-ledger',
+          builder: (context, state) => PersonalLedgerScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
         GoRoute(path: '/market-intelligence', builder: (context, state) => const MarketIntelligenceScreen()),
         GoRoute(path: '/market', builder: (context, state) => const MarketDashboardScreen()),
         GoRoute(path: '/energy-market', builder: (context, state) => const EnergyMarketScreen()),
