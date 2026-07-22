@@ -130,8 +130,19 @@ GoRouter createAppRouter({
             graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
           ),
         ),
-        GoRoute(path: '/leaderboard', builder: (context, state) => const LeaderboardScreen()),
-        GoRoute(path: '/player/:id', builder: (context, state) => const PlayerProfileScreen()),
+        GoRoute(
+          path: '/leaderboard',
+          builder: (context, state) => LeaderboardScreen(
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
+        GoRoute(
+          path: '/player/:id',
+          builder: (context, state) => PlayerProfileScreen(
+            playerId: state.pathParameters['id']!,
+            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          ),
+        ),
         GoRoute(path: '/cities', builder: (context, state) => const CitiesScreen()),
         GoRoute(path: '/map', builder: (context, state) => const WorldMapScreen()),
         GoRoute(path: '/buildings/market', builder: (context, state) => const BuildingMarketScreen()),

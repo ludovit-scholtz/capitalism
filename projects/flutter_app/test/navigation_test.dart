@@ -51,7 +51,11 @@ void main() {
       await tester.tap(find.widgetWithText(ListTile, 'Leaderboard'));
       await tester.pumpAndSettle();
 
-      expect(_placeholderBodyFor('LeaderboardView.vue'), findsOneWidget);
+      // LeaderboardScreen is real and GraphQL-backed now (not a
+      // placeholder); the harness's generic fake HTTP client doesn't shape a
+      // `rankings` response with a `playerId` field, so it lands on the
+      // screen's own error state — still proves the navigation itself works.
+      expect(find.text('Could not load the leaderboard. Please try again.'), findsOneWidget);
       expect(find.byType(Drawer), findsNothing);
     });
 

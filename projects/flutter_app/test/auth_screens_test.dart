@@ -273,7 +273,12 @@ void main() {
       );
 
       expect(auth.isAuthenticated, isTrue);
-      expect(find.text('Not implemented yet. Mirrors LeaderboardView.vue in the web frontend.'), findsOneWidget);
+      // LeaderboardScreen is real and GraphQL-backed now; this test's fake
+      // GraphQL client (`fakeAuthGraphQlClient`) returns an empty `{}` for
+      // any query it doesn't specifically recognize, so the screen lands on
+      // its own empty state rather than a placeholder — still proves the
+      // redirect itself landed on /leaderboard.
+      expect(find.text('No players on the leaderboard yet.'), findsOneWidget);
     });
   });
 
