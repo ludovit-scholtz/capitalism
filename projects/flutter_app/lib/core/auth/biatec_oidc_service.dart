@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
+import '../services/app_logger.dart';
 import 'biatec_oidc_config.dart';
 import 'web_authenticator.dart';
 
@@ -72,11 +73,14 @@ class BiatecOidcService {
         url: authorizeUrl.toString(),
         callbackUrlScheme: _callbackUrlScheme,
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
+      AppLogger.instance.error('OIDC authenticate() was cancelled or failed to start', e, stackTrace, 'OIDC');
       throw BiatecOidcException('OIDC sign-in was cancelled or failed to start.');
     }
 
-    return _handleCallback(callbackUrl, expectedState: state, expectedNonce: nonce);
+    final result = _handleCallback(callbackUrl, expectedState: state, expectedNonce: nonce);
+    AppLogger.instance.info('OIDC sign-in succeeded, token expires at ${result.expiresAtUtc.toIso8601String()}', tag: 'OIDC');
+    return result;
   }
 
   BiatecOidcResult _handleCallback(String callbackUrl, {required String expectedState, required String expectedNonce}) {
@@ -84,16 +88,19 @@ class BiatecOidcService {
 
     final errorCode = params['error'];
     if (errorCode != null) {
+      AppLogger.instance.error('OIDC provider returned error: $errorCode', params['error_description'], null, 'OIDC');
       throw BiatecOidcException(params['error_description'] ?? 'OIDC login failed: $errorCode');
     }
 
     final callbackState = params['state'];
     if (callbackState == null || callbackState != expectedState) {
+      AppLogger.instance.error('OIDC state mismatch', null, null, 'OIDC');
       throw BiatecOidcException('OIDC state validation failed. Please try signing in again.');
     }
 
     final token = params['id_token'] ?? params['access_token'] ?? params['token'] ?? params['jwt'];
     if (token == null) {
+      AppLogger.instance.error('OIDC callback carried no token', null, null, 'OIDC');
       throw BiatecOidcException('No token was returned from Biatec authentication.');
     }
 
@@ -101,11 +108,13 @@ class BiatecOidcService {
 
     final tokenNonce = payload['nonce'];
     if (tokenNonce is String && tokenNonce != expectedNonce) {
+      AppLogger.instance.error('OIDC nonce mismatch', null, null, 'OIDC');
       throw BiatecOidcException('OIDC nonce validation failed. Please try signing in again.');
     }
 
     final issuer = payload['iss'];
     if (issuer is! String || !BiatecOidcConfig.allowedIssuers.contains(issuer)) {
+      AppLogger.instance.error('OIDC issuer not allowed: $issuer', null, null, 'OIDC');
       throw BiatecOidcException('OIDC issuer validation failed. Please try signing in again.');
     }
 
@@ -116,6 +125,7 @@ class BiatecOidcService {
       _ => const <String>[],
     };
     if (!audiences.contains(BiatecOidcConfig.audience)) {
+      AppLogger.instance.error('OIDC audience not allowed: $audiences', null, null, 'OIDC');
       throw BiatecOidcException('OIDC audience validation failed. Please try signing in again.');
     }
 
@@ -136,6 +146,7 @@ class BiatecOidcService {
   Map<String, dynamic> _decodeJwtPayload(String token) {
     final parts = token.split('.');
     if (parts.length != 3) {
+      AppLogger.instance.error('OIDC token was malformed (expected 3 JWT segments, got ${parts.length})', null, null, 'OIDC');
       throw BiatecOidcException('Malformed token returned from Biatec authentication.');
     }
     final normalized = base64Url.normalize(parts[1]);

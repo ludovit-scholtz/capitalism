@@ -2,6 +2,8 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
+import '../../features/about/about_screen.dart';
+import '../../features/about/dev_info_screen.dart';
 import '../../features/auth/auth_screens.dart';
 import '../../features/banking/bank_loan_request_screen.dart';
 import '../../features/banking/bank_management_screen.dart';
@@ -442,6 +444,8 @@ GoRouter createAppRouter({
             graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
           ),
         ),
+        GoRoute(path: '/about', builder: (context, state) => const AboutScreen()),
+        GoRoute(path: '/about/dev-info', builder: (context, state) => const DevInfoScreen()),
       ],
     ),
   ],

@@ -105,4 +105,10 @@ const List<NavSection> navSections = <NavSection>[
       NavItem(label: 'Operations', route: '/operations/statistics', icon: AppIcons.operations, requiresAdmin: true),
     ],
   ),
+  NavSection(
+    title: 'App',
+    items: [
+      NavItem(label: 'About', route: '/about', icon: AppIcons.about),
+    ],
+  ),
 ];
