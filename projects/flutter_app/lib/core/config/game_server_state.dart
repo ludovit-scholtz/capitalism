@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 
 import '../../features/servers/game_server_models.dart';
+import '../../features/servers/game_server_service.dart';
+import '../services/app_logger.dart';
 import 'app_config.dart';
 import 'selected_game_server_storage.dart';
 
@@ -47,5 +49,30 @@ class GameServerState extends ChangeNotifier {
     AppConfig.resetGraphqlUrl();
     await _storage.clear();
     notifyListeners();
+  }
+
+  /// Fetches the registered server list from the current environment's
+  /// Master API and, if no shard is already selected, connects to the
+  /// first online one (or just the first, if none report online) — so the
+  /// app has a working game endpoint out of the box instead of falling
+  /// back to a build-time default that may not exist in this environment
+  /// (see `main.dart` and `AboutScreen`'s environment switcher). A no-op if
+  /// a shard is already selected, unless [force] is set (used right after
+  /// switching environments, when any existing selection belongs to the
+  /// *previous* environment's registry and must be replaced).
+  Future<void> autoSelectFirstAvailable(GameServerService service, {bool force = false}) async {
+    if (hasSelection && !force) return;
+    try {
+      final servers = await service.fetchGameServers().timeout(const Duration(seconds: 8));
+      if (servers.isEmpty) {
+        AppLogger.instance.warning('No game servers registered for this environment', tag: 'GameServer');
+        return;
+      }
+      final chosen = servers.firstWhere((s) => s.isOnline, orElse: () => servers.first);
+      await selectServer(chosen);
+      AppLogger.instance.info('Auto-connected to ${chosen.displayName} (${chosen.graphqlUrl})', tag: 'GameServer');
+    } catch (e, stackTrace) {
+      AppLogger.instance.error('Auto-select of a game server failed', e, stackTrace, 'GameServer');
+    }
   }
 }

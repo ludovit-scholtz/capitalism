@@ -63,15 +63,35 @@ scaffold was created.
 ## Run
 
 ```bash
-flutter run --dart-define=GRAPHQL_URL=http://localhost:44356/graphql --dart-define=AUTH_PASSWORD_ENABLED=true
+flutter run --dart-define=APP_ENVIRONMENT=local --dart-define=AUTH_PASSWORD_ENABLED=true
 ```
 
-`GRAPHQL_URL` defaults to `http://localhost:44356/graphql` (matches the local game API
-port) when omitted. `MASTER_GRAPHQL_URL` defaults to `https://localhost:44364/graphql`.
-`AUTH_PASSWORD_ENABLED` defaults to `false` (matching the web's
-`VITE_AUTH_PASSWORD_ENABLED`) — without it, the Sign In screen shows a Biatec-OIDC-only
-banner and auto-redirects rather than the email/password form. See
-`lib/core/config/app_config.dart`.
+The app talks to one of three deployments (`AppEnvironment` in
+`lib/core/config/app_environment.dart`), each with its own fixed Master API URL — the
+source of truth for the registered game-server (shard) list, fetched via
+`GameServerService`:
+
+| Environment | Master API                                  | Default game API                   |
+|-------------|----------------------------------------------|-------------------------------------|
+| `local`     | `https://localhost:44364/graphql`             | `http://localhost:44356/graphql`    |
+| `stage`     | `https://api.stage.capitalism5.com/graphql`   | none — picked from the shard list   |
+| `prod`      | `https://api.capitalism5.com/graphql`         | none — picked from the shard list   |
+
+`APP_ENVIRONMENT` seeds the *build-time* default (`stage` for every build, debug and
+release alike, when omitted — a release build must never silently fall back to a
+dev-only `localhost` address). Players can switch it at runtime from the About screen
+(`AppEnvironmentState`, persisted across restarts); switching signs the player out and
+reconnects to a shard registered in the new environment. On stage/prod, where there is
+no single fixed game API address, `main.dart` calls
+`GameServerState.autoSelectFirstAvailable` at startup to fetch the shard list from the
+active environment's Master API and connect to the first online one automatically —
+the player is never left pointed at a build-time default that doesn't exist in that
+environment. `GRAPHQL_URL`/`MASTER_GRAPHQL_URL` dart-defines remain available as
+explicit overrides on top of the environment (e.g. for CI), taking priority over both
+the environment default and any runtime shard selection. `AUTH_PASSWORD_ENABLED`
+defaults to `false` (matching the web's `VITE_AUTH_PASSWORD_ENABLED`) — without it, the
+Sign In screen shows a Biatec-OIDC-only banner and auto-redirects rather than the
+email/password form. See `lib/core/config/app_config.dart`.
 
 ## Test
 

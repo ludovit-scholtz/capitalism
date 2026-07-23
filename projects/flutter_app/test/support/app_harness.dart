@@ -1,6 +1,9 @@
 import 'package:capitalism_app/app.dart';
 import 'package:capitalism_app/core/auth/auth_state.dart';
 import 'package:capitalism_app/core/auth/web_authenticator.dart';
+import 'package:capitalism_app/core/config/app_config.dart';
+import 'package:capitalism_app/core/config/app_environment.dart';
+import 'package:capitalism_app/core/config/app_environment_state.dart';
 import 'package:capitalism_app/core/config/game_server_state.dart';
 import 'package:capitalism_app/core/context/account_context_service.dart';
 import 'package:capitalism_app/core/context/account_context_state.dart';
@@ -15,6 +18,7 @@ import 'package:provider/provider.dart';
 import 'fake_account_context_service.dart';
 import 'fake_graphql_client.dart';
 import 'in_memory_selected_city_storage.dart';
+import 'in_memory_selected_environment_storage.dart';
 import 'in_memory_selected_game_server_storage.dart';
 import 'in_memory_token_storage.dart';
 
@@ -46,6 +50,17 @@ Future<AuthState> pumpCapitalismApp(
   await tester.binding.setSurfaceSize(const Size(800, 2400));
   addTearDown(() => tester.binding.setSurfaceSize(null));
 
+  // AppConfig's environment/graphqlUrl are process-wide static state (see
+  // `app_config.dart`) rather than something threaded through the widget
+  // tree, so every test run resets them to a known-good baseline instead of
+  // inheriting whatever an earlier test in the same file left behind (e.g.
+  // an environment-switch test). Stage has no fixed default game endpoint
+  // by design (see `AppEnvironment.defaultGameGraphqlUrl`) — tests need a
+  // non-empty one so `GraphQlService` doesn't short-circuit with "no game
+  // server selected" before ever reaching the injected fake `httpClient`.
+  AppConfig.setEnvironment(AppEnvironment.stage);
+  AppConfig.setGraphqlUrl('https://example.test/graphql');
+
   final auth = AuthState(storage: InMemoryTokenStorage());
   if (authenticated) {
     await auth.setToken('test-token');
@@ -53,6 +68,7 @@ Future<AuthState> pumpCapitalismApp(
   if (admin) {
     auth.setIsAdmin(true);
   }
+  final environmentState = AppEnvironmentState(storage: InMemorySelectedEnvironmentStorage());
   final gameServerState = GameServerState(storage: InMemorySelectedGameServerStorage());
   final accountContextState = AccountContextState(storage: InMemorySelectedCityStorage());
 
@@ -60,6 +76,7 @@ Future<AuthState> pumpCapitalismApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider<AuthState>.value(value: auth),
+        ChangeNotifierProvider<AppEnvironmentState>.value(value: environmentState),
         ChangeNotifierProvider<GameServerState>.value(value: gameServerState),
         ChangeNotifierProvider<AccountContextState>.value(value: accountContextState),
       ],

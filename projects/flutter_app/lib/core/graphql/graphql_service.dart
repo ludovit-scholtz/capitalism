@@ -46,6 +46,11 @@ class GraphQlService {
     // values in Dart must be compile-time constants.
     final url = endpoint ?? AppConfig.graphqlUrl;
 
+    if (url.isEmpty) {
+      AppLogger.instance.warning('$opName -> no game server selected yet', tag: 'GraphQL');
+      throw GraphQlException('No game server selected. Pick one from Game Servers or About.');
+    }
+
     final http.Response response;
     try {
       response = await _client.post(

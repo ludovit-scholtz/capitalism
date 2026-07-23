@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/config/app_config.dart';
+import '../../core/config/app_environment_state.dart';
 import '../../core/config/game_server_state.dart';
 import '../../core/services/app_logger.dart';
 import '../../core/theme/app_icons.dart';
@@ -51,13 +52,15 @@ class _DevInfoScreenState extends State<DevInfoScreen> {
 
   String _buildReport() {
     final auth = context.read<AuthState>();
+    final environment = context.read<AppEnvironmentState>().environment;
     final gameServer = context.read<GameServerState>();
     final info = _packageInfo;
     final buffer = StringBuffer()
       ..writeln('Capitalism 5 — Dev info')
       ..writeln('App version: ${info == null ? 'unknown' : '${info.version} (${info.buildNumber})'}')
       ..writeln('Platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}')
-      ..writeln('Game server: ${gameServer.selectedDisplayName ?? 'default'} (${AppConfig.graphqlUrl})')
+      ..writeln('Environment: ${environment.label}')
+      ..writeln('Game server: ${gameServer.selectedDisplayName ?? 'not connected'} (${AppConfig.graphqlUrl})')
       ..writeln('Master API: ${AppConfig.masterGraphqlUrl}')
       ..writeln('Authenticated: ${auth.isAuthenticated} (admin: ${auth.isAdmin})')
       ..writeln('---- log ----')
@@ -69,6 +72,7 @@ class _DevInfoScreenState extends State<DevInfoScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final auth = context.watch<AuthState>();
+    final environment = context.watch<AppEnvironmentState>().environment;
     final gameServer = context.watch<GameServerState>();
 
     return AnimatedBuilder(
@@ -92,8 +96,12 @@ class _DevInfoScreenState extends State<DevInfoScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _InfoLine('Game server', '${gameServer.selectedDisplayName ?? 'default'} — ${AppConfig.graphqlUrl}'),
-                          const _InfoLine('Master API', AppConfig.masterGraphqlUrl),
+                          _InfoLine('Environment', environment.label),
+                          _InfoLine(
+                            'Game server',
+                            '${gameServer.selectedDisplayName ?? 'not connected'} — ${AppConfig.graphqlUrl.isEmpty ? '(none)' : AppConfig.graphqlUrl}',
+                          ),
+                          _InfoLine('Master API', AppConfig.masterGraphqlUrl),
                           _InfoLine('Authenticated', '${auth.isAuthenticated} (admin: ${auth.isAdmin})'),
                           _InfoLine('Platform', '${Platform.operatingSystem} ${Platform.operatingSystemVersion}'),
                         ],
