@@ -11,6 +11,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
+import '../../core/context/account_context_state.dart';
 import '../../core/graphql/graphql_service.dart';
 import '../../core/theme/app_icons.dart';
 import 'building_market_models.dart';
@@ -116,7 +117,8 @@ class _BuildingMarketScreenState extends State<BuildingMarketScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You need a company to make an offer.')));
       return;
     }
-    String buyerCompanyId = companies.first['id']!;
+    final activeCompanyId = context.read<AccountContextState>().activeCompanyId;
+    String buyerCompanyId = companies.any((c) => c['id'] == activeCompanyId) ? activeCompanyId! : companies.first['id']!;
     final priceController = TextEditingController(text: building.askingPrice?.toStringAsFixed(0) ?? '');
     final confirmed = await showDialog<bool>(
       context: context,

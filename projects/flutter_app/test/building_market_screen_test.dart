@@ -1,4 +1,6 @@
 import 'package:capitalism_app/core/auth/auth_state.dart';
+import 'package:capitalism_app/core/context/account_context_models.dart';
+import 'package:capitalism_app/core/context/account_context_state.dart';
 import 'package:capitalism_app/core/theme/app_icons.dart';
 import 'package:capitalism_app/features/buildings/building_market_models.dart';
 import 'package:capitalism_app/features/buildings/building_market_screen.dart';
@@ -7,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import 'support/fake_building_market_service.dart';
+import 'support/in_memory_selected_city_storage.dart';
 import 'support/in_memory_token_storage.dart';
 
 const _city = MarketBuildingCity(id: 'city-1', name: 'Metropolis', currencyCode: 'USD');
@@ -35,14 +38,32 @@ const _pendingOffer = BuildingOffer(
 
 const _myListing = MyBuildingListing(building: _forSaleBuilding, offers: [_pendingOffer]);
 
-Future<void> _pumpMarket(WidgetTester tester, {required FakeBuildingMarketService service, bool authenticated = true}) async {
+Future<void> _pumpMarket(
+  WidgetTester tester, {
+  required FakeBuildingMarketService service,
+  bool authenticated = true,
+  String? activeCompanyId,
+}) async {
   await tester.binding.setSurfaceSize(const Size(800, 2000));
   addTearDown(() => tester.binding.setSurfaceSize(null));
   final auth = AuthState(storage: InMemoryTokenStorage());
   if (authenticated) await auth.setToken('test-token');
+  final accountContextState = AccountContextState(storage: InMemorySelectedCityStorage());
+  if (activeCompanyId != null) {
+    accountContextState.activeAccount = ActiveAccountInfo(
+      playerId: 'player-1',
+      displayName: 'Player',
+      availableCash: 0,
+      activeAccountType: 'COMPANY',
+      activeCompanyId: activeCompanyId,
+    );
+  }
   await tester.pumpWidget(
-    ChangeNotifierProvider<AuthState>.value(
-      value: auth,
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AuthState>.value(value: auth),
+        ChangeNotifierProvider<AccountContextState>.value(value: accountContextState),
+      ],
       child: MaterialApp(home: Scaffold(body: BuildingMarketScreen(buildingMarketService: service))),
     ),
   );
@@ -86,6 +107,24 @@ void main() {
 
       expect(service.lastOfferArgs?['buildingId'], 'building-1');
       expect(service.lastOfferArgs?['buyerCompanyId'], 'company-1');
+    });
+
+    testWidgets('Make Offer dialog defaults the buyer company to the header\'s active company', (tester) async {
+      final service = FakeBuildingMarketService(
+        market: [_forSaleBuilding],
+        myCompanies: const [
+          {'id': 'company-1', 'name': 'My Company'},
+          {'id': 'company-3', 'name': 'Third Company'},
+        ],
+      );
+
+      await _pumpMarket(tester, service: service, activeCompanyId: 'company-3');
+      await tester.tap(find.text('Downtown Factory'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Send offer'));
+      await tester.pumpAndSettle();
+
+      expect(service.lastOfferArgs?['buyerCompanyId'], 'company-3');
     });
 
     testWidgets('My Listings tab is disabled when unauthenticated', (tester) async {

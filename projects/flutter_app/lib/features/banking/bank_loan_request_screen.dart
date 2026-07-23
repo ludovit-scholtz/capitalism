@@ -2,12 +2,19 @@
 // Simplified from the web's 4-step wizard into one flat form, but the real
 // `acceptLoan` contract — including `durationTicks` (default 8760, matching
 // the web's `durationTicks` ref) — is fully wired.
+//
+// The "Borrowing company" field defaults to whichever company is currently
+// active in the header [ContextSwitcher] (falling back to the first owned
+// company if none is active/found), so a player who switched to "Acme Corp"
+// before tapping Borrow lands here already set up for that company instead
+// of silently defaulting to whichever company happened to load first.
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
+import '../../core/context/account_context_state.dart';
 import '../../core/graphql/graphql_service.dart';
 import 'banking_models.dart';
 import 'banking_service.dart';
@@ -75,7 +82,10 @@ class _BankLoanRequestScreenState extends State<BankLoanRequestScreen> {
       ]);
       if (!mounted) return;
       final companies = results[1] as List<Map<String, String>>;
-      final companyId = companies.isNotEmpty ? companies.first['id'] : null;
+      final activeCompanyId = context.read<AccountContextState>().activeCompanyId;
+      final companyId = companies.any((c) => c['id'] == activeCompanyId)
+          ? activeCompanyId
+          : (companies.isNotEmpty ? companies.first['id'] : null);
       List<Map<String, String>> accounts = const [];
       if (companyId != null) {
         accounts = await _service.fetchCompanyBankAccounts(companyId);

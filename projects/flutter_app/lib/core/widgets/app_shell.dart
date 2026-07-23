@@ -7,11 +7,13 @@ import 'package:provider/provider.dart';
 
 import '../../features/chat/chat_panel.dart';
 import '../auth/auth_state.dart';
+import '../context/account_context_service.dart';
 import '../router/nav_items.dart';
 import '../services/url_opener.dart';
 import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
 import '../theme/cosmic_background.dart';
+import 'context_switcher.dart';
 import 'icon_badge.dart';
 
 /// Persistent chrome (app bar, drawer, bottom nav) wrapped around every
@@ -20,13 +22,22 @@ import 'icon_badge.dart';
 /// [CosmicBackground] backdrop is applied — every screen gets it without
 /// needing to opt in individually.
 class AppShell extends StatelessWidget {
-  const AppShell({super.key, required this.child, this.urlOpener = const ExternalUrlOpener()});
+  const AppShell({
+    super.key,
+    required this.child,
+    this.urlOpener = const ExternalUrlOpener(),
+    this.accountContextService,
+  });
 
   final Widget child;
 
   /// Injectable so tests can substitute a fake instead of exercising the
   /// real url_launcher platform channel.
   final UrlOpener urlOpener;
+
+  /// Injectable so tests can fake [ContextSwitcher]'s GraphQL calls instead
+  /// of hitting a real backend, same pattern as [urlOpener].
+  final AccountContextService? accountContextService;
 
   @override
   Widget build(BuildContext context) {
@@ -36,12 +47,15 @@ class AppShell extends StatelessWidget {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
-          title: const Row(
+          title: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              FaIcon(AppIcons.brandMark, color: AppTheme.neonCyan, size: 20),
-              SizedBox(width: 10),
-              Text('CAPITALISM'),
+              const FaIcon(AppIcons.brandMark, color: AppTheme.neonCyan, size: 20),
+              const SizedBox(width: 10),
+              if (auth.isAuthenticated)
+                Flexible(child: ContextSwitcher(accountContextService: accountContextService))
+              else
+                const Text('CAPITALISM'),
             ],
           ),
         ),

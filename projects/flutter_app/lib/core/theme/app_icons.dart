@@ -62,6 +62,8 @@ class AppIcons {
   static const search = FontAwesomeIcons.magnifyingGlass;
   static const chevronRight = FontAwesomeIcons.chevronRight;
   static const chevronLeft = FontAwesomeIcons.chevronLeft;
+  static const chevronDown = FontAwesomeIcons.chevronDown;
+  static const city = FontAwesomeIcons.locationDot;
   static const arrowRight = FontAwesomeIcons.arrowRight;
   static const arrowUp = FontAwesomeIcons.arrowUp;
   static const radioChecked = FontAwesomeIcons.circleDot;

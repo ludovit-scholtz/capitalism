@@ -2,6 +2,8 @@ import 'package:capitalism_app/app.dart';
 import 'package:capitalism_app/core/auth/auth_state.dart';
 import 'package:capitalism_app/core/auth/web_authenticator.dart';
 import 'package:capitalism_app/core/config/game_server_state.dart';
+import 'package:capitalism_app/core/context/account_context_service.dart';
+import 'package:capitalism_app/core/context/account_context_state.dart';
 import 'package:capitalism_app/core/router/app_router.dart';
 import 'package:capitalism_app/core/services/url_opener.dart';
 import 'package:flutter/material.dart';
@@ -10,7 +12,9 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
+import 'fake_account_context_service.dart';
 import 'fake_graphql_client.dart';
+import 'in_memory_selected_city_storage.dart';
 import 'in_memory_selected_game_server_storage.dart';
 import 'in_memory_token_storage.dart';
 
@@ -36,6 +40,7 @@ Future<AuthState> pumpCapitalismApp(
   http.Client? passwordResetHttpClient,
   WebAuthenticator? webAuthenticator,
   bool? passwordAuthEnabled,
+  AccountContextService? accountContextService,
   GoRouter? router,
 }) async {
   await tester.binding.setSurfaceSize(const Size(800, 2400));
@@ -49,12 +54,14 @@ Future<AuthState> pumpCapitalismApp(
     auth.setIsAdmin(true);
   }
   final gameServerState = GameServerState(storage: InMemorySelectedGameServerStorage());
+  final accountContextState = AccountContextState(storage: InMemorySelectedCityStorage());
 
   await tester.pumpWidget(
     MultiProvider(
       providers: [
         ChangeNotifierProvider<AuthState>.value(value: auth),
         ChangeNotifierProvider<GameServerState>.value(value: gameServerState),
+        ChangeNotifierProvider<AccountContextState>.value(value: accountContextState),
       ],
       child: CapitalismApp(
         router:
@@ -65,6 +72,7 @@ Future<AuthState> pumpCapitalismApp(
               passwordResetHttpClient: passwordResetHttpClient,
               webAuthenticator: webAuthenticator,
               passwordAuthEnabled: passwordAuthEnabled,
+              accountContextService: accountContextService ?? FakeAccountContextService(),
             ),
       ),
     ),
