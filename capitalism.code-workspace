@@ -27,6 +27,10 @@
 		{
 			"name": "MasterApi.Tests",
 			"path": "./projects/MasterApi.Tests"
+		},
+		{
+			"name": "FlutterApp",
+			"path": "./projects/flutter_app"
 		}
 	],
 	"settings": {}
