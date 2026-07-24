@@ -165,27 +165,45 @@ describe('useAuthStore', () => {
     expect(localStorage.getItem('auth_provider')).toBe('local')
   })
 
-  it('OIDC callback bootstraps a cookie session without persisting the token', async () => {
+  it('OIDC callback exchanges the authorization code via PKCE and bootstraps a cookie session', async () => {
     const state = 'oidc-state'
     const nonce = 'oidc-nonce'
-    sessionStorage.setItem('biatec_oidc_state', JSON.stringify({ state, nonce, redirectPath: '/dashboard' }))
+    const codeVerifier = 'oidc-code-verifier'
+    sessionStorage.setItem('biatec_oidc_state', JSON.stringify({ state, nonce, redirectPath: '/dashboard', codeVerifier }))
 
     const idToken = makeFakeJwt({
       iss: 'https://google.biatec.io',
-      aud: 'capitalism',
+      aud: 'capitalism-pkce',
       nonce,
       exp: Math.floor(Date.now() / 1000) + 3600,
     })
 
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
-      value: { location: new URL(`https://app.test/auth/callback?state=${state}&id_token=${idToken}`) },
+      value: { location: new URL(`https://app.test/auth/callback?state=${state}&code=auth-code-123`) },
+    })
+
+    fetchMock.mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('/token')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ id_token: idToken, access_token: 'access-token', expires_in: 3600 }),
+        })
+      }
+      return Promise.resolve({ ok: true })
     })
 
     const store = useAuthStore()
     const redirectPath = await store.completeBiatecOidcSignIn()
 
     expect(redirectPath).toBe('/dashboard')
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/token'),
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('code_verifier=oidc-code-verifier'),
+      }),
+    )
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/auth/session'), expect.objectContaining({ credentials: 'include' }))
     expect(store.token).toBe(idToken)
     expect(store.isAuthenticated).toBe(true)

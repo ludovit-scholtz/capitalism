@@ -89,12 +89,22 @@ function makeOidcToken(nonce: string) {
     JSON.stringify({
       nonce,
       iss: 'https://google.biatec.io',
-      aud: 'capitalism',
+      aud: 'capitalism-pkce',
       exp: Math.floor(Date.now() / 1000) + 3600,
     }),
   ).toString('base64url')
 
   return `${header}.${payload}.signature`
+}
+
+async function mockOidcTokenExchange(page: Parameters<typeof test>[0]['page'], idToken: string) {
+  await page.route('https://google.biatec.io/token', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id_token: idToken, access_token: idToken, expires_in: 3600 }),
+    })
+  })
 }
 
 function addPlayerShareholding(state: ReturnType<typeof setupMockApi>, playerId: string, companyId: string, shareCount = 10000) {
@@ -236,7 +246,7 @@ test.describe('Header navigation', () => {
     await page.getByRole('button', { name: 'Sign in with google' }).click()
 
     await expect(page).toHaveURL(/https:\/\/google.biatec.io\/authorize/)
-    await expect(page).toHaveURL(/client_id=capitalism/)
+    await expect(page).toHaveURL(/client_id=capitalism-pkce/)
     const authorizeUrl = new URL(page.url())
     const redirectUri = authorizeUrl.searchParams.get('redirect_uri')
     expect(redirectUri).toBeTruthy()
@@ -244,6 +254,9 @@ test.describe('Header navigation', () => {
     await expect(page).toHaveURL(/scope=openid/)
     await expect(page).toHaveURL(/state=/)
     await expect(page).toHaveURL(/nonce=/)
+    expect(authorizeUrl.searchParams.get('response_type')).toBe('code')
+    expect(authorizeUrl.searchParams.get('code_challenge')).toBeTruthy()
+    expect(authorizeUrl.searchParams.get('code_challenge_method')).toBe('S256')
   })
 
   test('shows Dashboard link when authenticated', async ({ page }) => {
@@ -301,9 +314,11 @@ test.describe('Header navigation', () => {
 
     const state = 'oidc-state'
     const nonce = 'oidc-nonce'
+    const codeVerifier = 'oidc-code-verifier'
     const token = makeOidcToken(nonce)
+    await mockOidcTokenExchange(page, token)
     await page.addInitScript(
-      ({ storedState, storedNonce }) => {
+      ({ storedState, storedNonce, storedCodeVerifier }) => {
         localStorage.setItem('selected_city_id', 'city-vi')
         sessionStorage.setItem(
           'biatec_oidc_state',
@@ -311,13 +326,14 @@ test.describe('Header navigation', () => {
             state: storedState,
             nonce: storedNonce,
             redirectPath: '/',
+            codeVerifier: storedCodeVerifier,
           }),
         )
       },
-      { storedState: state, storedNonce: nonce },
+      { storedState: state, storedNonce: nonce, storedCodeVerifier: codeVerifier },
     )
 
-    await page.goto(`/auth/callback?state=${state}&id_token=${encodeURIComponent(token)}`)
+    await page.goto(`/auth/callback?state=${state}&code=oidc-auth-code`)
 
     await expect(page).toHaveURL('/')
     await expect(page.locator('.ctx-trigger .ctx-city-name')).toContainText('Bratislava')
@@ -349,9 +365,11 @@ test.describe('Header navigation', () => {
 
     const state = 'oidc-state-keep-city'
     const nonce = 'oidc-nonce-keep-city'
+    const codeVerifier = 'oidc-code-verifier-keep-city'
     const token = makeOidcToken(nonce)
+    await mockOidcTokenExchange(page, token)
     await page.addInitScript(
-      ({ storedState, storedNonce }) => {
+      ({ storedState, storedNonce, storedCodeVerifier }) => {
         localStorage.setItem('selected_city_id', 'city-pr')
         sessionStorage.setItem(
           'biatec_oidc_state',
@@ -359,13 +377,14 @@ test.describe('Header navigation', () => {
             state: storedState,
             nonce: storedNonce,
             redirectPath: '/',
+            codeVerifier: storedCodeVerifier,
           }),
         )
       },
-      { storedState: state, storedNonce: nonce },
+      { storedState: state, storedNonce: nonce, storedCodeVerifier: codeVerifier },
     )
 
-    await page.goto(`/auth/callback?state=${state}&id_token=${encodeURIComponent(token)}`)
+    await page.goto(`/auth/callback?state=${state}&code=oidc-auth-code-keep-city`)
 
     await expect(page).toHaveURL('/')
     await expect(page.locator('.ctx-trigger .ctx-city-name')).toContainText('Prague')

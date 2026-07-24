@@ -1198,7 +1198,7 @@ async function saveGuestProgress() {
 
   try {
     const redirectPath = route.fullPath || '/onboarding'
-    auth.startBiatecOidcSignIn(redirectPath, { prompt: 'consent' })
+    await auth.startBiatecOidcSignIn(redirectPath, { prompt: 'consent' })
   } catch (e: unknown) {
     guestSaveError.value = e instanceof Error ? e.message : t('auth.oidcCallbackFailed')
     guestSaveLoading.value = false

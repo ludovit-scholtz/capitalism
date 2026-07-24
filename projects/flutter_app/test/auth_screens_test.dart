@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:capitalism_app/core/auth/auth_state.dart';
 import 'package:capitalism_app/core/auth/web_authenticator.dart';
 import 'package:capitalism_app/core/router/app_router.dart';
@@ -5,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 import 'support/app_harness.dart';
 import 'support/fake_auth_graphql_client.dart';
@@ -19,11 +22,13 @@ Future<(AuthState auth, GoRouter router)> _pumpAt(
   WebAuthenticator? webAuthenticator,
   http.Client? httpClient,
   http.Client? passwordResetHttpClient,
+  http.Client? oidcHttpClient,
 }) async {
   final router = createAppRouter(
     httpClient: httpClient ?? fakeAuthGraphQlClient(),
     passwordResetHttpClient: passwordResetHttpClient,
     webAuthenticator: webAuthenticator,
+    oidcHttpClient: oidcHttpClient ?? _oidcTokenClient(),
     passwordAuthEnabled: passwordAuthEnabled,
   );
   final auth = await pumpCapitalismApp(tester, router: router);
@@ -32,21 +37,34 @@ Future<(AuthState auth, GoRouter router)> _pumpAt(
   return (auth, router);
 }
 
-/// Builds a fake id_token whose `nonce`/`iss`/`aud`/`exp` claims pass
-/// [BiatecOidcService]'s validation, echoing back whatever `state` the
-/// authorize URL was built with — for tests exercising a *successful*
-/// Biatec round trip.
+// The last id_token minted by `_successfulCallbackFor`, served back by
+// `_oidcTokenClient()` to stand in for the real PKCE code-exchange response.
+String? _lastMintedIdToken;
+
+/// Builds a fake authorization-code callback URL, echoing back whatever
+/// `state` the authorize URL was built with, and mints an id_token (passing
+/// [BiatecOidcService]'s nonce/iss/aud/exp validation) that `_oidcTokenClient`
+/// hands back for the subsequent `/token` exchange — for tests exercising a
+/// *successful* Biatec round trip.
 String _successfulCallbackFor(Uri authorizeUrl) {
   final state = authorizeUrl.queryParameters['state']!;
   final nonce = authorizeUrl.queryParameters['nonce']!;
-  final token = buildFakeIdToken({
+  _lastMintedIdToken = buildFakeIdToken({
     'nonce': nonce,
     'iss': 'https://google.biatec.io',
-    'aud': 'capitalism',
+    'aud': 'capitalism-pkce',
     'exp': DateTime.now().add(const Duration(hours: 1)).millisecondsSinceEpoch ~/ 1000,
   });
-  return '${authorizeUrl.queryParameters['redirect_uri']}?state=$state&id_token=$token';
+  return '${authorizeUrl.queryParameters['redirect_uri']}?state=$state&code=test-oidc-code';
 }
+
+http.Client _oidcTokenClient() => MockClient((request) async {
+  return http.Response(
+    jsonEncode({'id_token': _lastMintedIdToken}),
+    200,
+    headers: {'content-type': 'application/json'},
+  );
+});
 
 void main() {
   group('LoginScreen — password auth disabled by default (matches VITE_AUTH_PASSWORD_ENABLED)', () {
@@ -57,6 +75,7 @@ void main() {
       final router = createAppRouter(
         httpClient: fakeAuthGraphQlClient(),
         webAuthenticator: authenticator,
+        oidcHttpClient: _oidcTokenClient(),
         passwordAuthEnabled: false,
       );
       final auth = await pumpCapitalismApp(tester, router: router);

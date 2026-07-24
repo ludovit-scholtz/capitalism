@@ -23,10 +23,11 @@ const AUTH_PROVIDER_BIATEC = 'biatec_oidc'
 const COOKIE_SESSION_SENTINEL = 'cookie-session'
 const BIATEC_OIDC_AUTHORIZE_URL =
   import.meta.env.VITE_BIATEC_OIDC_AUTHORIZE_URL || 'https://google.biatec.io/authorize'
+const BIATEC_OIDC_TOKEN_URL = import.meta.env.VITE_BIATEC_OIDC_TOKEN_URL || 'https://google.biatec.io/token'
 const BIATEC_OIDC_END_SESSION_URL = import.meta.env.VITE_BIATEC_OIDC_END_SESSION_URL || ''
-const BIATEC_OIDC_CLIENT_ID = import.meta.env.VITE_BIATEC_OIDC_CLIENT_ID || 'capitalism'
+const BIATEC_OIDC_CLIENT_ID = import.meta.env.VITE_BIATEC_OIDC_CLIENT_ID || 'capitalism-pkce'
 const BIATEC_OIDC_REDIRECT_URI = import.meta.env.VITE_BIATEC_OIDC_REDIRECT_URI
-const BIATEC_OIDC_SCOPE = import.meta.env.VITE_BIATEC_OIDC_SCOPE || 'openid'
+const BIATEC_OIDC_SCOPE = import.meta.env.VITE_BIATEC_OIDC_SCOPE || 'openid profile email'
 const BIATEC_OIDC_AUDIENCE = import.meta.env.VITE_BIATEC_OIDC_AUDIENCE || BIATEC_OIDC_CLIENT_ID
 const BIATEC_OIDC_ALLOWED_ISSUERS = (
   import.meta.env.VITE_BIATEC_OIDC_ALLOWED_ISSUERS ||
@@ -42,6 +43,7 @@ interface OidcStateRecord {
   state: string
   nonce: string
   redirectPath: string
+  codeVerifier: string
 }
 
 interface BiatecCallbackSession {
@@ -76,6 +78,26 @@ function generateOidcRandom(length = 32) {
     result += chars[value % chars.length]
   }
   return result
+}
+
+function arrayBufferToBase64Url(buffer: ArrayBuffer) {
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte)
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+}
+
+// PKCE (RFC 7636): code_verifier alphabet [A-Za-z0-9-._~], 43-128 chars;
+// generateOidcRandom's alphanumeric alphabet is a valid subset.
+function createPkceCodeVerifier() {
+  return generateOidcRandom(64)
+}
+
+async function createPkceCodeChallenge(codeVerifier: string) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(codeVerifier))
+  return arrayBufferToBase64Url(digest)
 }
 
 function createLogoutState() {
@@ -247,11 +269,41 @@ export const useAuthStore = defineStore('masterAuth', () => {
     renewalTimer = setTimeout(() => {
       const currentPath =
         `${window.location.pathname}${window.location.search}${window.location.hash}` || '/'
-      startBiatecOidcSignIn(currentPath, true)
+      void startBiatecOidcSignIn(currentPath, true)
     }, delay)
   }
 
-  function getBiatecTokenFromCallback(): BiatecCallbackSession {
+  interface BiatecTokenResponse {
+    access_token?: string
+    id_token?: string
+    expires_in?: number
+    token_type?: string
+  }
+
+  // Public client (PKCE) token exchange: no client_secret, client authentication
+  // happens via the code_verifier proving possession of the original request.
+  async function exchangeAuthorizationCode(code: string, codeVerifier: string, redirectUri: string) {
+    const body = new URLSearchParams()
+    body.set('grant_type', 'authorization_code')
+    body.set('code', code)
+    body.set('redirect_uri', redirectUri)
+    body.set('client_id', BIATEC_OIDC_CLIENT_ID)
+    body.set('code_verifier', codeVerifier)
+
+    const response = await fetch(BIATEC_OIDC_TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to exchange the Biatec authorization code for a token.')
+    }
+
+    return (await response.json()) as BiatecTokenResponse
+  }
+
+  async function getBiatecTokenFromCallback(): Promise<BiatecCallbackSession> {
     const url = new URL(window.location.href)
     const query = url.searchParams
     const hash = window.location.hash.startsWith('#')
@@ -275,15 +327,21 @@ export const useAuthStore = defineStore('masterAuth', () => {
       throw new Error(description || `OIDC login failed: ${oidcError}`)
     }
 
-    const tokenValue = readParam('id_token', 'access_token', 'token', 'jwt')
+    const code = readParam('code')
     const returnedState = readParam('state')
-    if (!tokenValue || !returnedState) {
+    if (!code || !returnedState) {
       throw new Error('OIDC callback is missing required parameters.')
     }
 
     const pendingState = getStoredOidcState()
     if (!pendingState || pendingState.state !== returnedState) {
       throw new Error('OIDC state validation failed. Please try signing in again.')
+    }
+
+    const tokenResponse = await exchangeAuthorizationCode(code, pendingState.codeVerifier, getConfiguredRedirectUri())
+    const tokenValue = tokenResponse.id_token
+    if (!tokenValue) {
+      throw new Error('No ID token was returned from Biatec authentication.')
     }
 
     const tokenPayload = parseJwtPayload(tokenValue)
@@ -308,10 +366,10 @@ export const useAuthStore = defineStore('masterAuth', () => {
     }
 
     const exp = typeof tokenPayload.exp === 'number' ? tokenPayload.exp : null
-    const expiresIn = Number(readParam('expires_in') || '')
+    const expiresIn = tokenResponse.expires_in
     const expiresAtUtc = exp
       ? new Date(exp * 1000).toISOString()
-      : Number.isFinite(expiresIn) && expiresIn > 0
+      : typeof expiresIn === 'number' && expiresIn > 0
         ? new Date(Date.now() + expiresIn * 1000).toISOString()
         : new Date(Date.now() + 120 * 60 * 1000).toISOString()
 
@@ -342,7 +400,7 @@ export const useAuthStore = defineStore('masterAuth', () => {
     // Skip end_session — the Biatec IdP session is still valid.
     // prompt=consent re-shows the Google consent screen without requiring
     // a post_logout_redirect_uri in the server allowlist.
-    startBiatecOidcSignIn(redirectPath, { prompt: 'consent' })
+    void startBiatecOidcSignIn(redirectPath, { prompt: 'consent' })
     return true
   }
 
@@ -446,15 +504,18 @@ export const useAuthStore = defineStore('masterAuth', () => {
     }
   }
 
-  function startBiatecOidcSignIn(redirectPath = '/', options?: boolean | BiatecSignInOptions) {
+  async function startBiatecOidcSignIn(redirectPath = '/', options?: boolean | BiatecSignInOptions) {
     const normalizedOptions = normalizeBiatecSignInOptions(options)
     const state = generateOidcRandom(32)
     const nonce = generateOidcRandom(32)
+    const codeVerifier = createPkceCodeVerifier()
+    const codeChallenge = await createPkceCodeChallenge(codeVerifier)
 
     const stateRecord: OidcStateRecord = {
       state,
       nonce,
       redirectPath: normalizeRedirectPath(redirectPath),
+      codeVerifier,
     }
     sessionStorage.setItem(OIDC_STATE_KEY, JSON.stringify(stateRecord))
 
@@ -462,10 +523,11 @@ export const useAuthStore = defineStore('masterAuth', () => {
     authorizeUrl.searchParams.set('client_id', BIATEC_OIDC_CLIENT_ID)
     authorizeUrl.searchParams.set('redirect_uri', getConfiguredRedirectUri())
     authorizeUrl.searchParams.set('scope', BIATEC_OIDC_SCOPE)
-    authorizeUrl.searchParams.set('response_type', 'id_token')
-    authorizeUrl.searchParams.set('response_mode', 'query')
+    authorizeUrl.searchParams.set('response_type', 'code')
     authorizeUrl.searchParams.set('state', state)
     authorizeUrl.searchParams.set('nonce', nonce)
+    authorizeUrl.searchParams.set('code_challenge', codeChallenge)
+    authorizeUrl.searchParams.set('code_challenge_method', 'S256')
     if (normalizedOptions.prompt) {
       authorizeUrl.searchParams.set('prompt', normalizedOptions.prompt)
     } else if (normalizedOptions.silentPrompt) {
@@ -476,7 +538,7 @@ export const useAuthStore = defineStore('masterAuth', () => {
   }
 
   async function completeBiatecOidcSignIn() {
-    const callbackSession = getBiatecTokenFromCallback()
+    const callbackSession = await getBiatecTokenFromCallback()
     await establishCookieSession(callbackSession.token)
     token.value = callbackSession.token
     player.value = null

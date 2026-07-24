@@ -71,10 +71,10 @@ async function handleSubmit() {
   }
 }
 
-function handleBiatecSignIn() {
+async function handleBiatecSignIn() {
   formError.value = null
   const redirectPath = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
-  auth.startBiatecOidcSignIn(redirectPath, requiresConsentRetry.value ? { prompt: 'consent' } : undefined)
+  await auth.startBiatecOidcSignIn(redirectPath, requiresConsentRetry.value ? { prompt: 'consent' } : undefined)
 }
 
 // When password auth is disabled and there is no consent-retry hint, automatically

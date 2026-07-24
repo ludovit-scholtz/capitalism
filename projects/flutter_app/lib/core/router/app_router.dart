@@ -67,386 +67,565 @@ GoRouter createAppRouter({
   http.Client? httpClient,
   http.Client? passwordResetHttpClient,
   WebAuthenticator? webAuthenticator,
+  http.Client? oidcHttpClient,
   bool? passwordAuthEnabled,
   AccountContextService? accountContextService,
-}) => GoRouter(
-  initialLocation: '/',
-  routes: [
-    ShellRoute(
-      builder: (context, state, child) =>
-          AppShell(urlOpener: urlOpener, accountContextService: accountContextService, child: child),
-      routes: [
-        GoRoute(
-          path: '/',
-          builder: (context, state) => HomeScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+}) {
+  BiatecOidcService buildOidcService() =>
+      webAuthenticator != null || oidcHttpClient != null
+          ? BiatecOidcService(
+              authenticator:
+                  webAuthenticator ?? const FlutterWebAuthenticator(),
+              httpClient: oidcHttpClient,
+            )
+          : const BiatecOidcService();
+
+  return GoRouter(
+    initialLocation: '/',
+    routes: [
+      ShellRoute(
+        builder: (context, state, child) => AppShell(
+            urlOpener: urlOpener,
+            accountContextService: accountContextService,
+            child: child),
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (context, state) => HomeScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/login',
-          builder: (context, state) => LoginScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
-            redirectPath: state.uri.queryParameters['redirect'] ?? '/',
-            passwordAuthEnabled: passwordAuthEnabled,
+          GoRoute(
+            path: '/login',
+            builder: (context, state) => LoginScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+              redirectPath: state.uri.queryParameters['redirect'] ?? '/',
+              passwordAuthEnabled: passwordAuthEnabled,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/forgot-password',
-          builder: (context, state) => ForgotPasswordScreen(
-            passwordResetService: passwordResetHttpClient != null
-                ? PasswordResetService(client: passwordResetHttpClient)
-                : null,
+          GoRoute(
+            path: '/forgot-password',
+            builder: (context, state) => ForgotPasswordScreen(
+              passwordResetService: passwordResetHttpClient != null
+                  ? PasswordResetService(client: passwordResetHttpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/reset-password',
-          builder: (context, state) => ResetPasswordScreen(
-            token: state.uri.queryParameters['token'],
-            passwordResetService: passwordResetHttpClient != null
-                ? PasswordResetService(client: passwordResetHttpClient)
-                : null,
+          GoRoute(
+            path: '/reset-password',
+            builder: (context, state) => ResetPasswordScreen(
+              token: state.uri.queryParameters['token'],
+              passwordResetService: passwordResetHttpClient != null
+                  ? PasswordResetService(client: passwordResetHttpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/auth/callback',
-          builder: (context, state) => AuthCallbackScreen(
-            oidcService: webAuthenticator != null ? BiatecOidcService(authenticator: webAuthenticator) : const BiatecOidcService(),
-            providerError: state.uri.queryParameters['error'],
-            providerErrorDescription: state.uri.queryParameters['error_description'],
-            redirectPath: state.uri.queryParameters['redirect'] ?? '/',
+          GoRoute(
+            path: '/auth/callback',
+            builder: (context, state) => AuthCallbackScreen(
+              oidcService: buildOidcService(),
+              providerError: state.uri.queryParameters['error'],
+              providerErrorDescription:
+                  state.uri.queryParameters['error_description'],
+              redirectPath: state.uri.queryParameters['redirect'] ?? '/',
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/onboarding',
-          builder: (context, state) => OnboardingScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
-            oidcService: webAuthenticator != null ? BiatecOidcService(authenticator: webAuthenticator) : const BiatecOidcService(),
+          GoRoute(
+            path: '/onboarding',
+            builder: (context, state) => OnboardingScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+              oidcService: buildOidcService(),
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/dashboard',
-          builder: (context, state) => DashboardScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/dashboard',
+            builder: (context, state) => DashboardScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/news',
-          builder: (context, state) => NewsScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/news',
+            builder: (context, state) => NewsScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/notifications',
-          builder: (context, state) => NotificationsScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/notifications',
+            builder: (context, state) => NotificationsScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/contracts',
-          builder: (context, state) => ContractsScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/contracts',
+            builder: (context, state) => ContractsScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/leaderboard',
-          builder: (context, state) => LeaderboardScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/leaderboard',
+            builder: (context, state) => LeaderboardScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/player/:id',
-          builder: (context, state) => PlayerProfileScreen(
-            playerId: state.pathParameters['id']!,
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/player/:id',
+            builder: (context, state) => PlayerProfileScreen(
+              playerId: state.pathParameters['id']!,
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/cities',
-          builder: (context, state) => CitiesScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/cities',
+            builder: (context, state) => CitiesScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/map',
-          builder: (context, state) => WorldMapScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/map',
+            builder: (context, state) => WorldMapScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/buildings/market',
-          builder: (context, state) => BuildingMarketScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/buildings/market',
+            builder: (context, state) => BuildingMarketScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/encyclopedia',
-          builder: (context, state) => EncyclopediaScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/encyclopedia',
+            builder: (context, state) => EncyclopediaScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/encyclopedia/topic/:topicSlug',
-          builder: (context, state) => EncyclopediaScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/encyclopedia/topic/:topicSlug',
+            builder: (context, state) => EncyclopediaScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/encyclopedia/resource/:slug',
-          builder: (context, state) => ResourceDetailScreen(
-            slug: state.pathParameters['slug']!,
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/encyclopedia/resource/:slug',
+            builder: (context, state) => ResourceDetailScreen(
+              slug: state.pathParameters['slug']!,
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/exchange',
-          builder: (context, state) => GlobalExchangeScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/exchange',
+            builder: (context, state) => GlobalExchangeScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/stocks',
-          builder: (context, state) => StockExchangeScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/stocks',
+            builder: (context, state) => StockExchangeScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/stock/trade/:companyId',
-          builder: (context, state) => StockTradingScreen(
-            companyId: state.pathParameters['companyId']!,
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/stock/trade/:companyId',
+            builder: (context, state) => StockTradingScreen(
+              companyId: state.pathParameters['companyId']!,
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/forex',
-          builder: (context, state) => ForexExchangeScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/forex',
+            builder: (context, state) => ForexExchangeScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/buy-building/:companyId',
-          builder: (context, state) => BuyBuildingScreen(
-            companyId: state.pathParameters['companyId']!,
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/buy-building/:companyId',
+            builder: (context, state) => BuyBuildingScreen(
+              companyId: state.pathParameters['companyId']!,
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/building/:id',
-          builder: (context, state) => BuildingDetailScreen(
-            buildingId: state.pathParameters['id']!,
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/building/:id',
+            builder: (context, state) => BuildingDetailScreen(
+              buildingId: state.pathParameters['id']!,
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/building/:id/sell',
-          builder: (context, state) => SellBuildingScreen(
-            buildingId: state.pathParameters['id']!,
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/building/:id/sell',
+            builder: (context, state) => SellBuildingScreen(
+              buildingId: state.pathParameters['id']!,
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(path: '/city/:cityId', redirect: (context, state) => '${state.uri.path}/overview'),
-        GoRoute(
-          path: '/city/:cityId/overview',
-          builder: (context, state) => CityOverviewScreen(
-            cityId: state.pathParameters['cityId']!,
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+              path: '/city/:cityId',
+              redirect: (context, state) => '${state.uri.path}/overview'),
+          GoRoute(
+            path: '/city/:cityId/overview',
+            builder: (context, state) => CityOverviewScreen(
+              cityId: state.pathParameters['cityId']!,
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/city/:cityId/economy',
-          builder: (context, state) => CityEconomyScreen(
-            cityId: state.pathParameters['cityId']!,
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/city/:cityId/economy',
+            builder: (context, state) => CityEconomyScreen(
+              cityId: state.pathParameters['cityId']!,
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/city/:cityId/buildings',
-          builder: (context, state) => CityBuildingsScreen(
-            cityId: state.pathParameters['cityId']!,
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/city/:cityId/buildings',
+            builder: (context, state) => CityBuildingsScreen(
+              cityId: state.pathParameters['cityId']!,
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/city/:cityId/market',
-          builder: (context, state) => CityMarketScreen(
-            cityId: state.pathParameters['cityId']!,
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/city/:cityId/market',
+            builder: (context, state) => CityMarketScreen(
+              cityId: state.pathParameters['cityId']!,
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/city/:cityId/contracts',
-          builder: (context, state) => CityContractsScreen(
-            cityId: state.pathParameters['cityId']!,
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/city/:cityId/contracts',
+            builder: (context, state) => CityContractsScreen(
+              cityId: state.pathParameters['cityId']!,
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/city/:cityId/competitors',
-          builder: (context, state) => CityCompetitorsScreen(
-            cityId: state.pathParameters['cityId']!,
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/city/:cityId/competitors',
+            builder: (context, state) => CityCompetitorsScreen(
+              cityId: state.pathParameters['cityId']!,
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/ledger/:companyId',
-          builder: (context, state) => LedgerScreen(
-            companyId: state.pathParameters['companyId']!,
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/ledger/:companyId',
+            builder: (context, state) => LedgerScreen(
+              companyId: state.pathParameters['companyId']!,
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/company/:companyId/contracts',
-          builder: (context, state) => CompanyContractsScreen(
-            companyId: state.pathParameters['companyId']!,
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/company/:companyId/contracts',
+            builder: (context, state) => CompanyContractsScreen(
+              companyId: state.pathParameters['companyId']!,
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/company/:companyId/settings',
-          builder: (context, state) => CompanySettingsScreen(
-            companyId: state.pathParameters['companyId']!,
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/company/:companyId/settings',
+            builder: (context, state) => CompanySettingsScreen(
+              companyId: state.pathParameters['companyId']!,
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/company/:companyId/research',
-          builder: (context, state) => CompanyResearchScreen(
-            companyId: state.pathParameters['companyId']!,
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/company/:companyId/research',
+            builder: (context, state) => CompanyResearchScreen(
+              companyId: state.pathParameters['companyId']!,
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/banking',
-          builder: (context, state) => LoanMarketplaceScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/banking',
+            builder: (context, state) => LoanMarketplaceScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/bank/:buildingId',
-          builder: (context, state) => BankManagementScreen(
-            bankBuildingId: state.pathParameters['buildingId']!,
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/bank/:buildingId',
+            builder: (context, state) => BankManagementScreen(
+              bankBuildingId: state.pathParameters['buildingId']!,
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/bank/:buildingId/request-loan',
-          builder: (context, state) => BankLoanRequestScreen(
-            bankBuildingId: state.pathParameters['buildingId']!,
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/bank/:buildingId/request-loan',
+            builder: (context, state) => BankLoanRequestScreen(
+              bankBuildingId: state.pathParameters['buildingId']!,
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/personal-ledger',
-          builder: (context, state) => PersonalLedgerScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/personal-ledger',
+            builder: (context, state) => PersonalLedgerScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/market-intelligence',
-          builder: (context, state) => MarketIntelligenceScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/market-intelligence',
+            builder: (context, state) => MarketIntelligenceScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/market',
-          builder: (context, state) => MarketDashboardScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/market',
+            builder: (context, state) => MarketDashboardScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/energy-market',
-          builder: (context, state) => EnergyMarketScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/energy-market',
+            builder: (context, state) => EnergyMarketScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/market/events',
-          builder: (context, state) => GlobalEventsScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/market/events',
+            builder: (context, state) => GlobalEventsScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/marketing-analytics',
-          builder: (context, state) => MarketingAnalyticsScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/marketing-analytics',
+            builder: (context, state) => MarketingAnalyticsScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/bank-statement',
-          builder: (context, state) => BankStatementScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/bank-statement',
+            builder: (context, state) => BankStatementScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/bank-statement/:companyId',
-          builder: (context, state) => BankStatementScreen(
-            companyId: state.pathParameters['companyId'],
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/bank-statement/:companyId',
+            builder: (context, state) => BankStatementScreen(
+              companyId: state.pathParameters['companyId'],
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/trade-routes',
-          builder: (context, state) => TradeRoutesScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/trade-routes',
+            builder: (context, state) => TradeRoutesScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/tutorial',
-          builder: (context, state) => TutorialScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/tutorial',
+            builder: (context, state) => TutorialScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/operations/statistics',
-          builder: (context, state) => OperationsOverviewScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/operations/statistics',
+            builder: (context, state) => OperationsOverviewScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/operations/statistics/money-flow',
-          builder: (context, state) => OperationsMoneyFlowScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/operations/statistics/money-flow',
+            builder: (context, state) => OperationsMoneyFlowScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/operations/statistics/product-analytics',
-          builder: (context, state) => OperationsProductAnalyticsScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/operations/statistics/product-analytics',
+            builder: (context, state) => OperationsProductAnalyticsScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/operations/statistics/news',
-          builder: (context, state) => OperationsNewsScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/operations/statistics/news',
+            builder: (context, state) => OperationsNewsScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/operations/statistics/players',
-          builder: (context, state) => OperationsPlayersScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/operations/statistics/players',
+            builder: (context, state) => OperationsPlayersScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/operations/statistics/players/:id',
-          builder: (context, state) => OperationsPlayerDetailScreen(
-            playerId: state.pathParameters['id']!,
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/operations/statistics/players/:id',
+            builder: (context, state) => OperationsPlayerDetailScreen(
+              playerId: state.pathParameters['id']!,
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/servers',
-          builder: (context, state) => GameServerSelectionScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/servers',
+            builder: (context, state) => GameServerSelectionScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(
-          path: '/bounties',
-          builder: (context, state) => BountyHistoryScreen(
-            graphQlService: httpClient != null ? GraphQlService(context.read<AuthState>(), client: httpClient) : null,
+          GoRoute(
+            path: '/bounties',
+            builder: (context, state) => BountyHistoryScreen(
+              graphQlService: httpClient != null
+                  ? GraphQlService(context.read<AuthState>(),
+                      client: httpClient)
+                  : null,
+            ),
           ),
-        ),
-        GoRoute(path: '/about', builder: (context, state) => const AboutScreen()),
-        GoRoute(path: '/about/dev-info', builder: (context, state) => const DevInfoScreen()),
-      ],
-    ),
-  ],
-);
+          GoRoute(
+              path: '/about', builder: (context, state) => const AboutScreen()),
+          GoRoute(
+              path: '/about/dev-info',
+              builder: (context, state) => const DevInfoScreen()),
+        ],
+      ),
+    ],
+  );
+}

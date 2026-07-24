@@ -14,12 +14,22 @@ function makeOidcToken(nonce: string) {
     JSON.stringify({
       nonce,
       iss: 'https://google.biatec.io',
-      aud: 'capitalism',
+      aud: 'capitalism-pkce',
       exp: Math.floor(Date.now() / 1000) + 3600,
     }),
   )
 
   return `${header}.${payload}.signature`
+}
+
+async function mockOidcTokenExchange(page: Parameters<typeof test>[0]['page'], idToken: string) {
+  await page.route('https://google.biatec.io/token', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id_token: idToken, access_token: idToken, expires_in: 3600 }),
+    })
+  })
 }
 
 test('OIDC callback persists only the provider marker and survives a reload on the redirected route', async ({ page }) => {
@@ -39,10 +49,12 @@ test('OIDC callback persists only the provider marker and survives a reload on t
 
   const oidcState = 'oidc-state-1'
   const oidcNonce = 'oidc-nonce-1'
+  const oidcCodeVerifier = 'oidc-code-verifier-1'
   const oidcToken = makeOidcToken(oidcNonce)
   const state = setupMockApi(page, { players: [player] })
   state.currentUserId = player.id
   state.currentToken = oidcToken
+  await mockOidcTokenExchange(page, oidcToken)
 
   await page.addInitScript(
     ({ pendingState }) => {
@@ -53,11 +65,12 @@ test('OIDC callback persists only the provider marker and survives a reload on t
         state: oidcState,
         nonce: oidcNonce,
         redirectPath: '/dashboard',
+        codeVerifier: oidcCodeVerifier,
       },
     },
   )
 
-  await page.goto(`/auth/callback?state=${encodeURIComponent(oidcState)}&id_token=${encodeURIComponent(oidcToken)}`)
+  await page.goto(`/auth/callback?state=${encodeURIComponent(oidcState)}&code=oidc-auth-code-1`)
 
   await expect(page).toHaveURL(/\/dashboard$/)
   await expect(page.locator('.tick-clock-widget')).toBeVisible()
@@ -97,10 +110,12 @@ test('OIDC callback does not depend on optional master session bootstrap', async
 
   const oidcState = 'oidc-state-optional-master'
   const oidcNonce = 'oidc-nonce-optional-master'
+  const oidcCodeVerifier = 'oidc-code-verifier-optional-master'
   const oidcToken = makeOidcToken(oidcNonce)
   const state = setupMockApi(page, { players: [player] })
   state.currentUserId = player.id
   state.currentToken = oidcToken
+  await mockOidcTokenExchange(page, oidcToken)
 
   await page.route('**/auth/session', async (route) => {
     const url = route.request().url()
@@ -121,11 +136,12 @@ test('OIDC callback does not depend on optional master session bootstrap', async
         state: oidcState,
         nonce: oidcNonce,
         redirectPath: '/dashboard',
+        codeVerifier: oidcCodeVerifier,
       },
     },
   )
 
-  await page.goto(`/auth/callback?state=${encodeURIComponent(oidcState)}&id_token=${encodeURIComponent(oidcToken)}`)
+  await page.goto(`/auth/callback?state=${encodeURIComponent(oidcState)}&code=oidc-auth-code-optional-master`)
 
   // Core assertion: OIDC login succeeds even when master session is unavailable or not configured
   await expect(page).toHaveURL(/\/dashboard$/)
@@ -149,16 +165,20 @@ test('OIDC callback shows an error instead of restarting sign-in when game sessi
 
   const oidcState = 'oidc-state-session-fail'
   const oidcNonce = 'oidc-nonce-session-fail'
+  const oidcCodeVerifier = 'oidc-code-verifier-session-fail'
   const oidcToken = makeOidcToken(oidcNonce)
   const state = setupMockApi(page, { players: [player] })
   state.currentUserId = player.id
   state.currentToken = oidcToken
 
   let oidcRestartAttempted = false
-  await page.route('https://google.biatec.io/**', async (route) => {
+  // Only the /authorize endpoint indicates a sign-in restart; the legitimate
+  // PKCE code exchange against /token must still be allowed to succeed below.
+  await page.route('https://google.biatec.io/authorize', async (route) => {
     oidcRestartAttempted = true
     await route.fulfill({ status: 200, body: 'unexpected oidc retry' })
   })
+  await mockOidcTokenExchange(page, oidcToken)
   await page.route('**/auth/session', async (route) => {
     await route.fulfill({ status: 401, body: 'unauthorized' })
   })
@@ -172,11 +192,12 @@ test('OIDC callback shows an error instead of restarting sign-in when game sessi
         state: oidcState,
         nonce: oidcNonce,
         redirectPath: '/dashboard',
+        codeVerifier: oidcCodeVerifier,
       },
     },
   )
 
-  await page.goto(`/auth/callback?state=${encodeURIComponent(oidcState)}&id_token=${encodeURIComponent(oidcToken)}`)
+  await page.goto(`/auth/callback?state=${encodeURIComponent(oidcState)}&code=oidc-auth-code-session-fail`)
 
   await expect(page).toHaveURL(/\/auth\/callback\?state=/)
   await expect(page.getByRole('alert')).toContainText('Failed to establish secure session.')

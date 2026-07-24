@@ -1,47 +1,91 @@
+import 'dart:convert';
+
 import 'package:capitalism_app/core/auth/biatec_oidc_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 import 'support/fake_id_token.dart';
 import 'support/fake_web_authenticator.dart';
 
 int _futureExpirySeconds() => DateTime.now().add(const Duration(hours: 1)).millisecondsSinceEpoch ~/ 1000;
 
+/// Mock token endpoint standing in for `BiatecOidcConfig.tokenUrl`. Returns
+/// the id_token supplied by [idTokenForRequest] for every POST, mirroring the
+/// server exchanging a PKCE authorization code for a token.
+http.Client _mockTokenClient(String Function(Map<String, String> body) idTokenForRequest, {int statusCode = 200, int? expiresIn}) {
+  return MockClient((request) async {
+    final body = Uri.splitQueryString(request.body);
+    if (statusCode != 200) {
+      return http.Response('token exchange failed', statusCode);
+    }
+    final idToken = idTokenForRequest(body);
+    return http.Response(
+      jsonEncode({'id_token': idToken, 'access_token': idToken, if (expiresIn != null) 'expires_in': expiresIn}),
+      200,
+      headers: {'content-type': 'application/json'},
+    );
+  });
+}
+
 void main() {
   group('BiatecOidcService', () {
     test('resolves the token when state, nonce, issuer and audience all check out', () async {
       late Uri capturedUrl;
+      String? capturedNonce;
       final authenticator = FakeWebAuthenticator((authorizeUrl) {
         capturedUrl = authorizeUrl;
         final state = authorizeUrl.queryParameters['state']!;
-        final nonce = authorizeUrl.queryParameters['nonce']!;
-        final token = buildFakeIdToken({
-          'nonce': nonce,
-          'iss': 'https://google.biatec.io',
-          'aud': 'capitalism',
-          'exp': _futureExpirySeconds(),
-        });
-        return '${authorizeUrl.queryParameters['redirect_uri']}?state=$state&id_token=$token';
+        capturedNonce = authorizeUrl.queryParameters['nonce']!;
+        return '${authorizeUrl.queryParameters['redirect_uri']}?state=$state&code=auth-code-123';
       });
+      final httpClient = _mockTokenClient(
+        (_) => buildFakeIdToken({
+          'nonce': capturedNonce,
+          'iss': 'https://google.biatec.io',
+          'aud': 'capitalism-pkce',
+          'exp': _futureExpirySeconds(),
+        }),
+      );
 
-      final result = await BiatecOidcService(authenticator: authenticator).signIn();
+      final result = await BiatecOidcService(authenticator: authenticator, httpClient: httpClient).signIn();
 
       expect(result.token, isNotEmpty);
-      expect(capturedUrl.queryParameters['response_type'], 'id_token');
-      expect(capturedUrl.queryParameters['response_mode'], 'query');
-      expect(capturedUrl.queryParameters['client_id'], 'capitalism');
+      expect(capturedUrl.queryParameters['response_type'], 'code');
+      expect(capturedUrl.queryParameters['code_challenge'], isNotEmpty);
+      expect(capturedUrl.queryParameters['code_challenge_method'], 'S256');
+      expect(capturedUrl.queryParameters['client_id'], 'capitalism-pkce');
       expect(result.expiresAtUtc.isAfter(DateTime.now().toUtc()), isTrue);
+    });
+
+    test('sends the code_verifier matching the code_challenge to the token endpoint', () async {
+      String? capturedCodeVerifier;
+      final authenticator = FakeWebAuthenticator((authorizeUrl) {
+        final state = authorizeUrl.queryParameters['state']!;
+        return '${authorizeUrl.queryParameters['redirect_uri']}?state=$state&code=auth-code-123';
+      });
+      final httpClient = _mockTokenClient((body) {
+        capturedCodeVerifier = body['code_verifier'];
+        expect(body['grant_type'], 'authorization_code');
+        expect(body['code'], 'auth-code-123');
+        expect(body['client_id'], 'capitalism-pkce');
+        return buildFakeIdToken({'iss': 'https://google.biatec.io', 'aud': 'capitalism-pkce'});
+      });
+
+      await BiatecOidcService(authenticator: authenticator, httpClient: httpClient).signIn();
+
+      expect(capturedCodeVerifier, isNotEmpty);
     });
 
     test('throws when the callback state does not match', () async {
       final authenticator = FakeWebAuthenticator((authorizeUrl) {
-        final nonce = authorizeUrl.queryParameters['nonce']!;
-        final token = buildFakeIdToken({'nonce': nonce, 'iss': 'https://google.biatec.io', 'aud': 'capitalism'});
-        return '${authorizeUrl.queryParameters['redirect_uri']}?state=wrong-state&id_token=$token';
+        return '${authorizeUrl.queryParameters['redirect_uri']}?state=wrong-state&code=auth-code-123';
       });
+      final httpClient = _mockTokenClient((_) => buildFakeIdToken({'iss': 'https://google.biatec.io', 'aud': 'capitalism-pkce'}));
 
       await expectLater(
-        BiatecOidcService(authenticator: authenticator).signIn(),
+        BiatecOidcService(authenticator: authenticator, httpClient: httpClient).signIn(),
         throwsA(isA<BiatecOidcException>().having((e) => e.message, 'message', contains('state validation'))),
       );
     });
@@ -49,16 +93,14 @@ void main() {
     test('throws when the id_token nonce does not match', () async {
       final authenticator = FakeWebAuthenticator((authorizeUrl) {
         final state = authorizeUrl.queryParameters['state']!;
-        final token = buildFakeIdToken({
-          'nonce': 'wrong-nonce',
-          'iss': 'https://google.biatec.io',
-          'aud': 'capitalism',
-        });
-        return '${authorizeUrl.queryParameters['redirect_uri']}?state=$state&id_token=$token';
+        return '${authorizeUrl.queryParameters['redirect_uri']}?state=$state&code=auth-code-123';
       });
+      final httpClient = _mockTokenClient(
+        (_) => buildFakeIdToken({'nonce': 'wrong-nonce', 'iss': 'https://google.biatec.io', 'aud': 'capitalism-pkce'}),
+      );
 
       await expectLater(
-        BiatecOidcService(authenticator: authenticator).signIn(),
+        BiatecOidcService(authenticator: authenticator, httpClient: httpClient).signIn(),
         throwsA(isA<BiatecOidcException>().having((e) => e.message, 'message', contains('nonce validation'))),
       );
     });
@@ -66,13 +108,12 @@ void main() {
     test('throws when the issuer is not in the allow-list', () async {
       final authenticator = FakeWebAuthenticator((authorizeUrl) {
         final state = authorizeUrl.queryParameters['state']!;
-        final nonce = authorizeUrl.queryParameters['nonce']!;
-        final token = buildFakeIdToken({'nonce': nonce, 'iss': 'https://evil.example', 'aud': 'capitalism'});
-        return '${authorizeUrl.queryParameters['redirect_uri']}?state=$state&id_token=$token';
+        return '${authorizeUrl.queryParameters['redirect_uri']}?state=$state&code=auth-code-123';
       });
+      final httpClient = _mockTokenClient((_) => buildFakeIdToken({'iss': 'https://evil.example', 'aud': 'capitalism-pkce'}));
 
       await expectLater(
-        BiatecOidcService(authenticator: authenticator).signIn(),
+        BiatecOidcService(authenticator: authenticator, httpClient: httpClient).signIn(),
         throwsA(isA<BiatecOidcException>().having((e) => e.message, 'message', contains('issuer validation'))),
       );
     });
@@ -80,18 +121,26 @@ void main() {
     test('throws when the audience does not match', () async {
       final authenticator = FakeWebAuthenticator((authorizeUrl) {
         final state = authorizeUrl.queryParameters['state']!;
-        final nonce = authorizeUrl.queryParameters['nonce']!;
-        final token = buildFakeIdToken({
-          'nonce': nonce,
-          'iss': 'https://google.biatec.io',
-          'aud': 'someone-else',
-        });
-        return '${authorizeUrl.queryParameters['redirect_uri']}?state=$state&id_token=$token';
+        return '${authorizeUrl.queryParameters['redirect_uri']}?state=$state&code=auth-code-123';
       });
+      final httpClient = _mockTokenClient((_) => buildFakeIdToken({'iss': 'https://google.biatec.io', 'aud': 'someone-else'}));
 
       await expectLater(
-        BiatecOidcService(authenticator: authenticator).signIn(),
+        BiatecOidcService(authenticator: authenticator, httpClient: httpClient).signIn(),
         throwsA(isA<BiatecOidcException>().having((e) => e.message, 'message', contains('audience validation'))),
+      );
+    });
+
+    test('throws when the token endpoint rejects the code exchange', () async {
+      final authenticator = FakeWebAuthenticator((authorizeUrl) {
+        final state = authorizeUrl.queryParameters['state']!;
+        return '${authorizeUrl.queryParameters['redirect_uri']}?state=$state&code=auth-code-123';
+      });
+      final httpClient = _mockTokenClient((_) => '', statusCode: 400);
+
+      await expectLater(
+        BiatecOidcService(authenticator: authenticator, httpClient: httpClient).signIn(),
+        throwsA(isA<BiatecOidcException>().having((e) => e.message, 'message', contains('exchange'))),
       );
     });
 
@@ -124,15 +173,10 @@ void main() {
           final authenticator = FakeWebAuthenticator((authorizeUrl) {
             capturedUrl = authorizeUrl;
             final state = authorizeUrl.queryParameters['state']!;
-            final nonce = authorizeUrl.queryParameters['nonce']!;
-            final token = buildFakeIdToken({
-              'nonce': nonce,
-              'iss': 'https://google.biatec.io',
-              'aud': 'capitalism',
-            });
-            return '${authorizeUrl.queryParameters['redirect_uri']}?state=$state&id_token=$token';
+            return '${authorizeUrl.queryParameters['redirect_uri']}?state=$state&code=auth-code-123';
           });
-          await BiatecOidcService(authenticator: authenticator).signIn();
+          final httpClient = _mockTokenClient((_) => buildFakeIdToken({'iss': 'https://google.biatec.io', 'aud': 'capitalism-pkce'}));
+          await BiatecOidcService(authenticator: authenticator, httpClient: httpClient).signIn();
           return capturedUrl.queryParameters['redirect_uri']!;
         } finally {
           debugDefaultTargetPlatformOverride = previous;

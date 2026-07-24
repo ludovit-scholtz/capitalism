@@ -3,6 +3,7 @@ export interface RuntimeAppConfig {
   masterGraphqlUrl?: string | null
   masterWebUrl?: string | null
   biatecOidcAuthorizeUrl?: string | null
+  biatecOidcTokenUrl?: string | null
   biatecOidcEndSessionUrl?: string | null
   biatecOidcClientId?: string | null
   biatecOidcRedirectUri?: string | null

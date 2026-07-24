@@ -7,6 +7,7 @@ window.__capitalismRuntimeConfig__ = {
   masterGraphqlUrl: "${APP_MASTER_GRAPHQL_URL:-}",
   masterWebUrl: "${APP_MASTER_WEB_URL:-}",
   biatecOidcAuthorizeUrl: "${APP_BIATEC_OIDC_AUTHORIZE_URL:-}",
+  biatecOidcTokenUrl: "${APP_BIATEC_OIDC_TOKEN_URL:-}",
   biatecOidcEndSessionUrl: "${APP_BIATEC_OIDC_END_SESSION_URL:-}",
   biatecOidcClientId: "${APP_BIATEC_OIDC_CLIENT_ID:-}",
   biatecOidcRedirectUri: "${APP_BIATEC_OIDC_REDIRECT_URI:-}",

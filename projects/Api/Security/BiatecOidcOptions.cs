@@ -14,7 +14,7 @@ public sealed class BiatecOidcOptions
     public string? Issuer { get; init; }
 
     [Required]
-    public string Audience { get; init; } = "capitalism";
+    public string Audience { get; init; } = "capitalism-pkce";
 
     public bool RequireHttpsMetadata { get; init; } = true;
 }

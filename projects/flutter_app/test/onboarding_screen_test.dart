@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:capitalism_app/core/auth/auth_state.dart';
 import 'package:capitalism_app/core/auth/biatec_oidc_service.dart';
 import 'package:capitalism_app/core/auth/web_authenticator.dart';
@@ -7,6 +9,8 @@ import 'package:capitalism_app/features/onboarding/onboarding_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
 
 import 'support/fake_id_token.dart';
@@ -75,17 +79,29 @@ const _lots = [
   ),
 ];
 
+// The last id_token minted by `_successfulCallbackFor`, served back by
+// `_oidcTokenClient()` to stand in for the real PKCE code-exchange response.
+String? _lastMintedIdToken;
+
 String _successfulCallbackFor(Uri authorizeUrl) {
   final state = authorizeUrl.queryParameters['state']!;
   final nonce = authorizeUrl.queryParameters['nonce']!;
-  final token = buildFakeIdToken({
+  _lastMintedIdToken = buildFakeIdToken({
     'nonce': nonce,
     'iss': 'https://google.biatec.io',
-    'aud': 'capitalism',
+    'aud': 'capitalism-pkce',
     'exp': DateTime.now().add(const Duration(hours: 1)).millisecondsSinceEpoch ~/ 1000,
   });
-  return '${authorizeUrl.queryParameters['redirect_uri']}?state=$state&id_token=$token';
+  return '${authorizeUrl.queryParameters['redirect_uri']}?state=$state&code=test-oidc-code';
 }
+
+http.Client _oidcTokenClient() => MockClient((request) async {
+  return http.Response(
+    jsonEncode({'id_token': _lastMintedIdToken}),
+    200,
+    headers: {'content-type': 'application/json'},
+  );
+});
 
 Future<void> _pumpOnboarding(
   WidgetTester tester, {
@@ -101,7 +117,10 @@ Future<void> _pumpOnboarding(
         builder: (context, state) => Scaffold(
           body: OnboardingScreen(
             onboardingService: service,
-            oidcService: BiatecOidcService(authenticator: webAuthenticator ?? FakeWebAuthenticator(_successfulCallbackFor)),
+            oidcService: BiatecOidcService(
+              authenticator: webAuthenticator ?? FakeWebAuthenticator(_successfulCallbackFor),
+              httpClient: _oidcTokenClient(),
+            ),
           ),
         ),
       ),

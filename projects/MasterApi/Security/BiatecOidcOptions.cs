@@ -10,7 +10,7 @@ public sealed class BiatecOidcOptions
 
     public string Issuer { get; set; } = "https://google.biatec.io";
 
-    public string Audience { get; set; } = "capitalism";
+    public string Audience { get; set; } = "capitalism-pkce";
 
     public bool RequireHttpsMetadata { get; set; } = true;
 }

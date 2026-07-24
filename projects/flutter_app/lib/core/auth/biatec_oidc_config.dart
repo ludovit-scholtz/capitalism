@@ -9,11 +9,16 @@ class BiatecOidcConfig {
     defaultValue: 'https://google.biatec.io/authorize',
   );
 
-  static const String clientId = String.fromEnvironment('BIATEC_OIDC_CLIENT_ID', defaultValue: 'capitalism');
+  static const String tokenUrl = String.fromEnvironment(
+    'BIATEC_OIDC_TOKEN_URL',
+    defaultValue: 'https://google.biatec.io/token',
+  );
 
-  static const String scope = String.fromEnvironment('BIATEC_OIDC_SCOPE', defaultValue: 'openid');
+  static const String clientId = String.fromEnvironment('BIATEC_OIDC_CLIENT_ID', defaultValue: 'capitalism-pkce');
 
-  static const String audience = String.fromEnvironment('BIATEC_OIDC_AUDIENCE', defaultValue: 'capitalism');
+  static const String scope = String.fromEnvironment('BIATEC_OIDC_SCOPE', defaultValue: 'openid profile email');
+
+  static const String audience = String.fromEnvironment('BIATEC_OIDC_AUDIENCE', defaultValue: 'capitalism-pkce');
 
   static const String _allowedIssuersRaw = String.fromEnvironment(
     'BIATEC_OIDC_ALLOWED_ISSUERS',

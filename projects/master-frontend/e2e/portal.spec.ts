@@ -315,12 +315,14 @@ test.describe('Login page', () => {
     ])
 
     const url = new URL(request.url())
-    expect(url.searchParams.get('client_id')).toBe('capitalism')
+    expect(url.searchParams.get('client_id')).toBe('capitalism-pkce')
     expect(url.searchParams.get('redirect_uri')).toContain('/auth/callback')
-    expect(url.searchParams.get('response_type')).toBe('id_token')
+    expect(url.searchParams.get('response_type')).toBe('code')
     expect(url.searchParams.get('scope')).toContain('openid')
     expect(url.searchParams.get('state')).toBeTruthy()
     expect(url.searchParams.get('nonce')).toBeTruthy()
+    expect(url.searchParams.get('code_challenge')).toBeTruthy()
+    expect(url.searchParams.get('code_challenge_method')).toBe('S256')
   })
 })
 

@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import '../services/app_logger.dart';
 import 'biatec_oidc_config.dart';
@@ -24,20 +26,25 @@ class BiatecOidcException implements Exception {
 }
 
 /// Native complement to `startBiatecOidcSignIn`/`completeBiatecOidcSignIn` in
-/// `projects/frontend/src/stores/auth.ts`. Runs the same implicit-flow OIDC
-/// exchange (`response_type=id_token`, `response_mode=query`) via an in-app
-/// browser tab (Custom Tabs on Android, `ASWebAuthenticationSession` on iOS,
-/// system browser + loopback listener on Windows/Linux) instead of a
-/// same-origin browser redirect, and performs the same client-side
-/// state/nonce/issuer/audience checks the web store does before trusting the
-/// returned id_token. The id_token becomes this app's Bearer token directly
-/// (see AuthState) — no separate token-exchange call to our backend is
-/// needed, matching the web flow.
+/// `projects/frontend/src/stores/auth.ts`. Runs the same authorization-code +
+/// PKCE flow (`response_type=code`, `code_challenge_method=S256`) via an
+/// in-app browser tab (Custom Tabs on Android, `ASWebAuthenticationSession`
+/// on iOS, system browser + loopback listener on Windows/Linux) instead of a
+/// same-origin browser redirect, then exchanges the returned code directly
+/// from the device against `BiatecOidcConfig.tokenUrl` (public client, no
+/// client_secret — the code_verifier proves possession of the original
+/// request), and performs the same client-side state/nonce/issuer/audience
+/// checks the web store does before trusting the returned id_token. The
+/// id_token becomes this app's Bearer token directly (see AuthState) — no
+/// separate token-exchange call to our backend is needed, matching the web
+/// flow.
 class BiatecOidcService {
-  const BiatecOidcService({WebAuthenticator authenticator = const FlutterWebAuthenticator()})
-    : _authenticator = authenticator;
+  const BiatecOidcService({WebAuthenticator authenticator = const FlutterWebAuthenticator(), http.Client? httpClient})
+    : _authenticator = authenticator,
+      _httpClient = httpClient;
 
   final WebAuthenticator _authenticator;
+  final http.Client? _httpClient;
 
   bool get _isDesktop =>
       !kIsWeb && (defaultTargetPlatform == TargetPlatform.windows || defaultTargetPlatform == TargetPlatform.linux);
@@ -54,16 +61,19 @@ class BiatecOidcService {
   Future<BiatecOidcResult> signIn() async {
     final state = _randomBase64Url();
     final nonce = _randomBase64Url();
+    final codeVerifier = _randomBase64Url();
+    final codeChallenge = _codeChallenge(codeVerifier);
 
     final authorizeUrl = Uri.parse(BiatecOidcConfig.authorizeUrl).replace(
       queryParameters: {
         'client_id': BiatecOidcConfig.clientId,
         'redirect_uri': _redirectUri,
         'scope': BiatecOidcConfig.scope,
-        'response_type': 'id_token',
-        'response_mode': 'query',
+        'response_type': 'code',
         'state': state,
         'nonce': nonce,
+        'code_challenge': codeChallenge,
+        'code_challenge_method': 'S256',
       },
     );
 
@@ -78,12 +88,13 @@ class BiatecOidcService {
       throw BiatecOidcException('OIDC sign-in was cancelled or failed to start.');
     }
 
-    final result = _handleCallback(callbackUrl, expectedState: state, expectedNonce: nonce);
+    final code = _extractAuthorizationCode(callbackUrl, expectedState: state);
+    final result = await _exchangeAuthorizationCode(code, codeVerifier: codeVerifier, expectedNonce: nonce);
     AppLogger.instance.info('OIDC sign-in succeeded, token expires at ${result.expiresAtUtc.toIso8601String()}', tag: 'OIDC');
     return result;
   }
 
-  BiatecOidcResult _handleCallback(String callbackUrl, {required String expectedState, required String expectedNonce}) {
+  String _extractAuthorizationCode(String callbackUrl, {required String expectedState}) {
     final params = Uri.parse(callbackUrl).queryParameters;
 
     final errorCode = params['error'];
@@ -98,10 +109,48 @@ class BiatecOidcService {
       throw BiatecOidcException('OIDC state validation failed. Please try signing in again.');
     }
 
-    final token = params['id_token'] ?? params['access_token'] ?? params['token'] ?? params['jwt'];
+    final code = params['code'];
+    if (code == null) {
+      AppLogger.instance.error('OIDC callback carried no authorization code', null, null, 'OIDC');
+      throw BiatecOidcException('No authorization code was returned from Biatec authentication.');
+    }
+
+    return code;
+  }
+
+  // Public client (PKCE) token exchange: no client_secret, client authentication
+  // happens via code_verifier proving possession of the original request.
+  Future<BiatecOidcResult> _exchangeAuthorizationCode(String code, {required String codeVerifier, required String expectedNonce}) async {
+    final client = _httpClient ?? http.Client();
+    http.Response response;
+    try {
+      response = await client.post(
+        Uri.parse(BiatecOidcConfig.tokenUrl),
+        headers: const {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: {
+          'grant_type': 'authorization_code',
+          'code': code,
+          'redirect_uri': _redirectUri,
+          'client_id': BiatecOidcConfig.clientId,
+          'code_verifier': codeVerifier,
+        },
+      );
+    } finally {
+      if (_httpClient == null) {
+        client.close();
+      }
+    }
+
+    if (response.statusCode != 200) {
+      AppLogger.instance.error('OIDC token exchange failed with status ${response.statusCode}', response.body, null, 'OIDC');
+      throw BiatecOidcException('Failed to exchange the Biatec authorization code for a token.');
+    }
+
+    final tokenResponse = jsonDecode(response.body) as Map<String, dynamic>;
+    final token = tokenResponse['id_token'] as String?;
     if (token == null) {
-      AppLogger.instance.error('OIDC callback carried no token', null, null, 'OIDC');
-      throw BiatecOidcException('No token was returned from Biatec authentication.');
+      AppLogger.instance.error('OIDC token response carried no id_token', null, null, 'OIDC');
+      throw BiatecOidcException('No ID token was returned from Biatec authentication.');
     }
 
     final payload = _decodeJwtPayload(token);
@@ -130,9 +179,12 @@ class BiatecOidcService {
     }
 
     final exp = payload['exp'];
+    final expiresIn = tokenResponse['expires_in'];
     final expiresAtUtc = exp is int
         ? DateTime.fromMillisecondsSinceEpoch(exp * 1000, isUtc: true)
-        : DateTime.now().toUtc().add(const Duration(minutes: 120));
+        : expiresIn is int
+            ? DateTime.now().toUtc().add(Duration(seconds: expiresIn))
+            : DateTime.now().toUtc().add(const Duration(minutes: 120));
 
     return BiatecOidcResult(token: token, expiresAtUtc: expiresAtUtc);
   }
@@ -141,6 +193,12 @@ class BiatecOidcService {
     final random = Random.secure();
     final bytes = List<int>.generate(32, (_) => random.nextInt(256));
     return base64Url.encode(bytes).replaceAll('=', '');
+  }
+
+  // PKCE (RFC 7636): code_challenge = BASE64URL(SHA256(code_verifier)).
+  String _codeChallenge(String codeVerifier) {
+    final digest = sha256.convert(utf8.encode(codeVerifier));
+    return base64Url.encode(digest.bytes).replaceAll('=', '');
   }
 
   Map<String, dynamic> _decodeJwtPayload(String token) {
