@@ -143,6 +143,25 @@ void main() {
       expect(state.loading, isFalse);
     });
 
+    test('refresh still populates cities and companies when only the active-account fetch fails', () async {
+      // Regression test: a single Future.wait used to discard successful
+      // city/company results whenever the account fetch failed, blanking
+      // out the whole switcher instead of degrading gracefully.
+      final state = AccountContextState(storage: InMemorySelectedCityStorage());
+      final service = FakeAccountContextService(
+        companies: const [_companyOne, _companyTwo],
+        cities: const [_cityA, _cityB],
+        activeAccountError: Exception('account query timed out'),
+      );
+
+      await state.refresh(service);
+
+      expect(state.companies, [_companyOne, _companyTwo]);
+      expect(state.cities, [_cityA, _cityB]);
+      expect(state.error, isNotNull);
+      expect(state.loading, isFalse);
+    });
+
     test('clearAccount resets server-derived state but keeps the selected city', () async {
       final storage = InMemorySelectedCityStorage();
       await storage.write('city-a');

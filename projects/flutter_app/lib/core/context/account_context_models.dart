@@ -30,7 +30,10 @@ class ContextCompanyOption {
 }
 
 /// The authenticated player's current acting-account context, mirroring
-/// `PersonAccountResult`'s context fields (`Api/Types/Query.Auth.cs`).
+/// `Player`'s lightweight `me` query fields (`Api/Types/Query.Auth.cs`'s
+/// `GetMe`) — the same cheap, no-auth-heavy-computation query the web's
+/// `stores/auth.ts` `fetchMe()`/`PLAYER_SELECTION` uses for this UI, rather
+/// than the heavy `personAccount` query (portfolio/dividends/trades).
 class ActiveAccountInfo {
   const ActiveAccountInfo({
     required this.playerId,
@@ -49,9 +52,9 @@ class ActiveAccountInfo {
   final String? activeCompanyId;
 
   factory ActiveAccountInfo.fromJson(Map<String, dynamic> json) => ActiveAccountInfo(
-    playerId: json['playerId'] as String,
+    playerId: json['id'] as String,
     displayName: (json['displayName'] as String?) ?? '',
-    availableCash: (json['availableCash'] as num?)?.toDouble() ?? 0,
+    availableCash: (json['personalCash'] as num?)?.toDouble() ?? 0,
     activeAccountType: (json['activeAccountType'] as String?) ?? 'PERSON',
     activeCompanyId: json['activeCompanyId'] as String?,
   );

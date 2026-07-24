@@ -65,21 +65,41 @@ class AccountContextState extends ChangeNotifier {
   /// Refetches the active account, owned companies, and city list, then
   /// re-runs the city auto-select heuristic if the stored city no longer
   /// makes sense for the (possibly just-switched) active context.
+  ///
+  /// Each fetch is independent and best-effort — mirroring
+  /// `ContextSwitcher.vue`'s `loadCities` (wrapped in its own try/catch so a
+  /// slow/failing city load never blocks the rest of the UI). Previously all
+  /// three calls were joined with a single `Future.wait`, so one failure
+  /// (e.g. the account fetch) discarded successful city/company results too
+  /// and blanked out the whole switcher.
   Future<void> refresh(AccountContextService service) async {
     loading = true;
     error = null;
     notifyListeners();
+
+    var hadFailure = false;
+
     try {
-      final results = await Future.wait([service.fetchActiveAccount(), service.fetchMyCompanies(), service.fetchCities()]);
-      activeAccount = results[0] as ActiveAccountInfo;
-      companies = results[1] as List<ContextCompanyOption>;
-      cities = results[2] as List<ContextCityOption>;
-      await _autoSelectCityIfNeeded();
-      loading = false;
+      activeAccount = await service.fetchActiveAccount();
     } catch (_) {
-      error = 'Could not load your account context.';
-      loading = false;
+      hadFailure = true;
     }
+
+    try {
+      companies = await service.fetchMyCompanies();
+    } catch (_) {
+      hadFailure = true;
+    }
+
+    try {
+      cities = await service.fetchCities();
+    } catch (_) {
+      hadFailure = true;
+    }
+
+    await _autoSelectCityIfNeeded();
+    loading = false;
+    error = hadFailure ? 'Could not load some of your account context.' : null;
     notifyListeners();
   }
 

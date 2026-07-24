@@ -3,7 +3,7 @@ import 'account_context_models.dart';
 
 const _activeAccountQuery = r'''
   query ActiveAccountContext {
-    personAccount { playerId displayName availableCash activeAccountType activeCompanyId }
+    me { id displayName personalCash activeAccountType activeCompanyId }
   }
 ''';
 
@@ -31,7 +31,7 @@ class AccountContextService {
 
   Future<ActiveAccountInfo> fetchActiveAccount() async {
     final result = await _graphQlService.request(_activeAccountQuery);
-    return ActiveAccountInfo.fromJson(result['personAccount'] as Map<String, dynamic>);
+    return ActiveAccountInfo.fromJson(result['me'] as Map<String, dynamic>);
   }
 
   Future<List<ContextCompanyOption>> fetchMyCompanies() async {
