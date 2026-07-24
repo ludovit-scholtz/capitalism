@@ -60,7 +60,7 @@ String _successfulCallbackFor(Uri authorizeUrl) {
 
 http.Client _oidcTokenClient() => MockClient((request) async {
   return http.Response(
-    jsonEncode({'id_token': _lastMintedIdToken}),
+    jsonEncode({'idToken': _lastMintedIdToken}),
     200,
     headers: {'content-type': 'application/json'},
   );

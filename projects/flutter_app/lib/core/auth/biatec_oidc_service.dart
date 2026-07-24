@@ -147,9 +147,9 @@ class BiatecOidcService {
     }
 
     final tokenResponse = jsonDecode(response.body) as Map<String, dynamic>;
-    final token = tokenResponse['id_token'] as String?;
+    final token = tokenResponse['idToken'] as String?;
     if (token == null) {
-      AppLogger.instance.error('OIDC token response carried no id_token', null, null, 'OIDC');
+      AppLogger.instance.error('OIDC token response carried no idToken', null, null, 'OIDC');
       throw BiatecOidcException('No ID token was returned from Biatec authentication.');
     }
 
@@ -179,7 +179,7 @@ class BiatecOidcService {
     }
 
     final exp = payload['exp'];
-    final expiresIn = tokenResponse['expires_in'];
+    final expiresIn = tokenResponse['expiresIn'];
     final expiresAtUtc = exp is int
         ? DateTime.fromMillisecondsSinceEpoch(exp * 1000, isUtc: true)
         : expiresIn is int

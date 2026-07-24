@@ -274,10 +274,10 @@ export const useAuthStore = defineStore('masterAuth', () => {
   }
 
   interface BiatecTokenResponse {
-    access_token?: string
-    id_token?: string
-    expires_in?: number
-    token_type?: string
+    accessToken?: string
+    idToken?: string
+    expiresIn?: number
+    tokenType?: string
   }
 
   // Public client (PKCE) token exchange: no client_secret, client authentication
@@ -339,7 +339,7 @@ export const useAuthStore = defineStore('masterAuth', () => {
     }
 
     const tokenResponse = await exchangeAuthorizationCode(code, pendingState.codeVerifier, getConfiguredRedirectUri())
-    const tokenValue = tokenResponse.id_token
+    const tokenValue = tokenResponse.idToken
     if (!tokenValue) {
       throw new Error('No ID token was returned from Biatec authentication.')
     }
@@ -366,7 +366,7 @@ export const useAuthStore = defineStore('masterAuth', () => {
     }
 
     const exp = typeof tokenPayload.exp === 'number' ? tokenPayload.exp : null
-    const expiresIn = tokenResponse.expires_in
+    const expiresIn = tokenResponse.expiresIn
     const expiresAtUtc = exp
       ? new Date(exp * 1000).toISOString()
       : typeof expiresIn === 'number' && expiresIn > 0

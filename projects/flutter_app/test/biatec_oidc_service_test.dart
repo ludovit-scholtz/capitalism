@@ -22,7 +22,7 @@ http.Client _mockTokenClient(String Function(Map<String, String> body) idTokenFo
     }
     final idToken = idTokenForRequest(body);
     return http.Response(
-      jsonEncode({'id_token': idToken, 'access_token': idToken, if (expiresIn != null) 'expires_in': expiresIn}),
+      jsonEncode({'idToken': idToken, 'accessToken': idToken, if (expiresIn != null) 'expiresIn': expiresIn}),
       200,
       headers: {'content-type': 'application/json'},
     );

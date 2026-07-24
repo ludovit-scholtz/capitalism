@@ -187,7 +187,7 @@ describe('useAuthStore', () => {
       if (typeof url === 'string' && url.includes('/token')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ id_token: idToken, access_token: 'access-token', expires_in: 3600 }),
+          json: () => Promise.resolve({ idToken: idToken, accessToken: 'access-token', expiresIn: 3600 }),
         })
       }
       return Promise.resolve({ ok: true })

@@ -323,10 +323,10 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   interface BiatecTokenResponse {
-    access_token?: string
-    id_token?: string
-    expires_in?: number
-    token_type?: string
+    accessToken?: string
+    idToken?: string
+    expiresIn?: number
+    tokenType?: string
   }
 
   // Public client (PKCE) token exchange: no client_secret, client authentication
@@ -386,13 +386,13 @@ export const useAuthStore = defineStore('auth', () => {
     const { code, pendingState } = getAuthorizationCodeFromCallback()
     const tokenResponse = await exchangeAuthorizationCode(code, pendingState.codeVerifier, getConfiguredRedirectUri())
 
-    const idToken = tokenResponse.id_token
+    const idToken = tokenResponse.idToken
     if (!idToken) {
       throw new Error('No ID token was returned from Biatec authentication.')
     }
 
     const tokenPayload = validateBiatecIdToken(idToken, pendingState)
-    const expiresAtUtc = resolveTokenExpiryUtc(tokenPayload, tokenResponse.expires_in)
+    const expiresAtUtc = resolveTokenExpiryUtc(tokenPayload, tokenResponse.expiresIn)
 
     return {
       token: idToken,
