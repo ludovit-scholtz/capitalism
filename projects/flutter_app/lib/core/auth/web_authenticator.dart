@@ -5,14 +5,18 @@ import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 /// (Custom Tabs / ASWebAuthenticationSession / loopback server, none of
 /// which are available under `flutter test`).
 abstract class WebAuthenticator {
-  Future<String> authenticate({required String url, required String callbackUrlScheme});
+  Future<String> authenticate({required String url, required String callbackUrlScheme, bool useWebview = true});
 }
 
 class FlutterWebAuthenticator implements WebAuthenticator {
   const FlutterWebAuthenticator();
 
   @override
-  Future<String> authenticate({required String url, required String callbackUrlScheme}) {
-    return FlutterWebAuth2.authenticate(url: url, callbackUrlScheme: callbackUrlScheme);
+  Future<String> authenticate({required String url, required String callbackUrlScheme, bool useWebview = true}) {
+    return FlutterWebAuth2.authenticate(
+      url: url,
+      callbackUrlScheme: callbackUrlScheme,
+      options: FlutterWebAuth2Options(useWebview: useWebview),
+    );
   }
 }

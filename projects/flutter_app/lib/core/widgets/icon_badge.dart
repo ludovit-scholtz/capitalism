@@ -10,7 +10,7 @@ import '../theme/app_spacing.dart';
 class IconBadge extends StatelessWidget {
   const IconBadge({super.key, required this.icon, this.color, this.size = 40, this.iconSize = 18});
 
-  final IconData icon;
+  final FaIconData icon;
   final Color? color;
   final double size;
   final double iconSize;
@@ -38,7 +38,7 @@ class IconBadge extends StatelessWidget {
 class SectionHeading extends StatelessWidget {
   const SectionHeading({super.key, required this.icon, required this.title, this.color, this.trailing});
 
-  final IconData icon;
+  final FaIconData icon;
   final String title;
   final Color? color;
   final Widget? trailing;

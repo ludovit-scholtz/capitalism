@@ -121,7 +121,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('50').last);
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(AppIcons.chevronRight));
+      await tester.tap(find.byIcon(AppIcons.chevronRight.data));
       await tester.pumpAndSettle();
 
       expect(service.lastBankStatementArgs?['offset'], 50);

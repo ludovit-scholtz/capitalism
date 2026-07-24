@@ -9,7 +9,7 @@ class FakeWebAuthenticator implements WebAuthenticator {
   final String Function(Uri authorizeUrl) responder;
 
   @override
-  Future<String> authenticate({required String url, required String callbackUrlScheme}) async {
+  Future<String> authenticate({required String url, required String callbackUrlScheme, bool useWebview = true}) async {
     return responder(Uri.parse(url));
   }
 }

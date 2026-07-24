@@ -146,7 +146,7 @@ void main() {
 
       expect(find.textContaining('Buyer Co'), findsOneWidget);
 
-      await tester.tap(find.byIcon(AppIcons.check));
+      await tester.tap(find.byIcon(AppIcons.check.data));
       await tester.pumpAndSettle();
 
       expect(service.acceptedOfferIds, ['offer-1']);

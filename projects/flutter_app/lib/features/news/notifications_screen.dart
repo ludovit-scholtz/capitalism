@@ -13,7 +13,7 @@ import '../../core/theme/app_icons.dart';
 import 'notification_models.dart';
 import 'notifications_service.dart';
 
-IconData _iconFor(String type) {
+FaIconData _iconFor(String type) {
   switch (type) {
     case 'SHIPMENT_ARRIVED':
       return AppIcons.checkCircle;

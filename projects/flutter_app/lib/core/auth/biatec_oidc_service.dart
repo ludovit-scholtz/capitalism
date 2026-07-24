@@ -82,6 +82,17 @@ class BiatecOidcService {
       callbackUrl = await _authenticator.authenticate(
         url: authorizeUrl.toString(),
         callbackUrlScheme: _callbackUrlScheme,
+        // flutter_web_auth_2 defaults to an embedded-WebView flow on
+        // Windows/Linux, which matches the callback by comparing
+        // Uri.scheme (e.g. "http") against callbackUrlScheme verbatim — but
+        // ours is the full "http://localhost:{port}" loopback URL required
+        // by the server-based flow below, so under the WebView flow that
+        // comparison never matches and the embedded browser instead tries
+        // to actually load http://localhost:{port}, which nothing is
+        // listening on (ERR_CONNECTION_REFUSED). useWebview: false forces
+        // the loopback-HttpServer implementation the desktop redirect URI
+        // was designed for, opening the system browser instead.
+        useWebview: false,
       );
     } catch (e, stackTrace) {
       AppLogger.instance.error('OIDC authenticate() was cancelled or failed to start', e, stackTrace, 'OIDC');

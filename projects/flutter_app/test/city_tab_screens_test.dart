@@ -140,7 +140,7 @@ void main() {
       final service = FakeCityTabService(lots: [_ownedLot]);
 
       await _pump(tester, (s) => CityBuildingsScreen(cityId: 'city-1', cityTabService: s), service: service);
-      await tester.tap(find.byIcon(AppIcons.arrowRight));
+      await tester.tap(find.byIcon(AppIcons.arrowRight.data));
       await tester.pumpAndSettle();
 
       expect(find.text('Building building-42'), findsOneWidget);

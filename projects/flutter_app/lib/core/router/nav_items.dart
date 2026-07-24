@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../theme/app_icons.dart';
 
@@ -17,7 +17,7 @@ class NavItem {
   });
 
   final String label;
-  final IconData icon;
+  final FaIconData icon;
 
   /// Empty when the item does not navigate to a route (e.g. it opens a
   /// panel or an external link instead).
