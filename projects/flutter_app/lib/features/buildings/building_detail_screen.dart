@@ -1,28 +1,34 @@
 // Port of `projects/frontend/src/views/BuildingDetailView.vue` (via
 // `useBuildingDetail.ts`, ~5600 lines on the web). Covers: building
-// overview, the read-only unit list (non-grid building types), the full
-// grid editor for grid-eligible types (view + edit mode, placing/removing
-// units, 8-directional links, per-unit config, upgrade preview, inventory
-// visualization, clipboard, draft-change summary, starter layouts, and
-// chain-completeness warnings/status — see `building_grid_draft_controller.dart`
-// and its sibling files for exactly what each ROADMAP item covers and any
-// documented trims), and the two original quick-action mutations
-// (`scheduleUnitUpgrade`, `updatePublicSalesPrice`) for non-grid types.
+// overview, the full grid editor for grid-eligible types (view + edit mode,
+// placing/removing units, 8-directional links, per-unit config, upgrade
+// preview, inventory visualization, clipboard, draft-change summary,
+// starter layouts, and chain-completeness warnings/status — see
+// `building_grid_draft_controller.dart` and its sibling files for exactly
+// what each ROADMAP item covers), the two original quick-action mutations
+// (`scheduleUnitUpgrade`, `updatePublicSalesPrice`) for the flat-list
+// fallback, and the four building-type-specific management panels:
+// - `BuildingPropertyPanel` (APARTMENT/COMMERCIAL — rent scheduling,
+//   occupancy/market-rate guidance, revenue history).
+// - `BuildingMediaHousePanel` (MEDIA_HOUSE — campaign unit config, content
+//   budget, upgrade, city rankings).
+// - `BuildingResearchPanel` (RESEARCH_DEVELOPMENT — company-wide brand
+//   quality/awareness progress, sibling to that type's grid).
+// - `BuildingPowerPlantPanel` (POWER_PLANT — dispatch, priority, spot-market
+//   listing, fuel reserve, P&L, sibling to that type's grid).
+// Each panel file documents its own trims in its header comment.
 //
 // Explicitly NOT ported (documented, not oversights — see
 // `.github/copilot-instructions.md` → Flutter mobile app for the full list
 // this was scoped against):
-// - Media house, power plant, and rent-scheduling panels and their
-//   mutations (`setMediaHouseContentBudget`, `upgradeMediaHouse`,
-//   `configureMediaHouseUnit`, `setRentPerSqm`, `setPlantDispatch`,
-//   `setPowerPriority`, `listEnergyForSale`, `cancelEnergyListing`,
-//   `setMaxEnergyBidPrice`).
 // - `flushStorage`, `setPublicSalesInventoryAlertThreshold`,
 //   `removeDestroyedBuilding`.
-// - All analytics/history panels (`mediaHouseAnalytics`, `publicSalesAnalytics`,
-//   `buildingUnitResourceHistories`, `buildingFinancialTimeline`,
-//   `powerPlantAnalytics`, `unitProductAnalytics`, `buildingRecentActivity`,
-//   `buildingSupplyChain`, market-event banners, tutorial overlays).
+// - The Media House/Power Plant deep analytics dashboards
+//   (`mediaHouseAnalytics`, `powerPlantAnalytics.timeline`),
+//   `publicSalesAnalytics`, `buildingUnitResourceHistories`,
+//   `buildingFinancialTimeline`, `unitProductAnalytics`,
+//   `buildingRecentActivity`, `buildingSupplyChain`, market-event banners,
+//   tutorial overlays.
 // - Global Exchange sourcing/vendor-selector flow for PURCHASE units.
 //
 // Selling/destroying a building lives on its own screen (`/building/:id/sell`
@@ -48,6 +54,12 @@ import 'building_draft_summary_panel.dart';
 import 'building_grid_draft_controller.dart';
 import 'building_grid_editor.dart';
 import 'building_grid_models.dart';
+import 'building_media_house_panel.dart';
+import 'building_panel_models.dart';
+import 'building_panel_service.dart';
+import 'building_power_plant_panel.dart';
+import 'building_property_panel.dart';
+import 'building_research_panel.dart';
 import 'building_starter_layout_banner.dart';
 import 'building_unit_clipboard.dart';
 import 'building_unit_config_sheet.dart';
@@ -65,12 +77,15 @@ class BuildingDetailScreen extends StatefulWidget {
     required this.buildingId,
     GraphQlService? graphQlService,
     BuildingDetailService? buildingDetailService,
+    BuildingPanelService? buildingPanelService,
   }) : _injectedGraphQlService = graphQlService,
-       _injectedBuildingDetailService = buildingDetailService;
+       _injectedBuildingDetailService = buildingDetailService,
+       _injectedBuildingPanelService = buildingPanelService;
 
   final String buildingId;
   final GraphQlService? _injectedGraphQlService;
   final BuildingDetailService? _injectedBuildingDetailService;
+  final BuildingPanelService? _injectedBuildingPanelService;
 
   @override
   State<BuildingDetailScreen> createState() => _BuildingDetailScreenState();
@@ -78,6 +93,7 @@ class BuildingDetailScreen extends StatefulWidget {
 
 class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
   late final BuildingDetailService _service;
+  late final BuildingPanelService _panelService;
   final BuildingGridDraftController _controller = BuildingGridDraftController();
 
   bool _loading = true;
@@ -86,12 +102,22 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
   Map<String, String> _productNames = const {};
   final Set<String> _actionLoadingIds = {};
 
+  ApartmentBuildingDetail? _apartmentDetail;
+  List<CompanyBrand> _companyBrands = const [];
+  bool _researchLoading = false;
+  PowerPlantAnalytics? _powerPlantAnalytics;
+  CityPowerBalance? _cityPowerBalance;
+  List<CityMediaHouse> _cityMediaHouses = const [];
+  List<MediaHouseUnitConfig> _mediaHouseUnits = const [];
+  Map<String, String> _ownedCompanyNames = const {};
+
   @override
   void initState() {
     super.initState();
     final auth = context.read<AuthState>();
     final graphQlService = widget._injectedGraphQlService ?? GraphQlService(auth);
     _service = widget._injectedBuildingDetailService ?? BuildingDetailService(graphQlService);
+    _panelService = widget._injectedBuildingPanelService ?? BuildingPanelService(graphQlService);
     // Deferred past this build: recordVisit's notifyListeners() would
     // otherwise fire synchronously during this widget's own initState/mount,
     // which trips "setState() called during build" for the RecentBuildingState
@@ -136,6 +162,7 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
       });
       if (building != null) {
         _controller.loadFrom(building.withCityFxRate(fxRate), catalog: catalog, companyCash: cash);
+        await _loadPanelData(building);
       } else {
         _controller.building = null;
       }
@@ -145,6 +172,50 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
         _error = 'Could not load this building. Please try again.';
         _loading = false;
       });
+    }
+  }
+
+  /// Loads whichever building-type-specific panel data applies — at most
+  /// one of these branches does real work per building.
+  Future<void> _loadPanelData(BuildingDetail building) async {
+    switch (building.type) {
+      case 'APARTMENT':
+      case 'COMMERCIAL':
+        final detail = await _panelService.fetchApartmentBuildingDetail(building.id);
+        if (mounted) setState(() => _apartmentDetail = detail);
+      case 'RESEARCH_DEVELOPMENT':
+        setState(() => _researchLoading = true);
+        final brands = await _panelService.fetchCompanyBrands(building.companyId);
+        if (mounted) {
+          setState(() {
+            _companyBrands = brands;
+            _researchLoading = false;
+          });
+        }
+      case 'POWER_PLANT':
+        final results = await Future.wait([
+          _panelService.fetchPowerPlantAnalytics(building.id),
+          building.cityId == null ? Future.value(null) : _panelService.fetchCityPowerBalance(building.cityId!),
+        ]);
+        if (mounted) {
+          setState(() {
+            _powerPlantAnalytics = results[0] as PowerPlantAnalytics?;
+            _cityPowerBalance = results[1] as CityPowerBalance?;
+          });
+        }
+      case 'MEDIA_HOUSE':
+        final results = await Future.wait([
+          building.cityId == null ? Future.value(<CityMediaHouse>[]) : _panelService.fetchCityMediaHouses(building.cityId!),
+          _panelService.fetchMediaHouseUnits(building.id),
+          _service.fetchOwnedCompanyNames(),
+        ]);
+        if (mounted) {
+          setState(() {
+            _cityMediaHouses = results[0] as List<CityMediaHouse>;
+            _mediaHouseUnits = results[1] as List<MediaHouseUnitConfig>;
+            _ownedCompanyNames = results[2] as Map<String, String>;
+          });
+        }
     }
   }
 
@@ -288,6 +359,53 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
     }
   }
 
+  Future<void> _handlePanelAction(Future<void> Function() action, {bool reload = true}) async {
+    try {
+      await action();
+      if (reload) await _load();
+    } catch (e) {
+      if (mounted) {
+        final message = e is GraphQlException ? e.message : 'Something went wrong. Please try again.';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      }
+    }
+  }
+
+  Future<void> _scheduleRent(double rentPerSqm) =>
+      _handlePanelAction(() => _panelService.setRentPerSqm(buildingId: widget.buildingId, rentPerSqm: rentPerSqm));
+
+  Future<void> _setDispatch(int dispatchPercent) =>
+      _handlePanelAction(() => _panelService.setPlantDispatch(buildingId: widget.buildingId, dispatchTargetPercent: dispatchPercent));
+
+  Future<void> _setPriority(int priority) => _handlePanelAction(() => _panelService.setPowerPriority(buildingId: widget.buildingId, priority: priority));
+
+  Future<void> _listEnergy(double pricePerKwh, double capacityKw) =>
+      _handlePanelAction(() => _panelService.listEnergyForSale(buildingId: widget.buildingId, pricePerKwhLocal: pricePerKwh, capacityKw: capacityKw));
+
+  Future<void> _cancelEnergyListing(String listingId) => _handlePanelAction(() => _panelService.cancelEnergyListing(listingId));
+
+  Future<void> _saveMediaHouseBudget(double budgetPerTick) =>
+      _handlePanelAction(() => _panelService.setMediaHouseContentBudget(buildingId: widget.buildingId, contentBudgetPerTick: budgetPerTick));
+
+  Future<void> _upgradeMediaHouse() => _handlePanelAction(() => _panelService.upgradeMediaHouse(widget.buildingId));
+
+  Future<void> _saveMediaHouseUnitConfig({
+    required String? unitId,
+    required String targetCompanyId,
+    required String mediaType,
+    required double campaignBudgetPerTick,
+    required bool isActive,
+  }) => _handlePanelAction(
+    () => _panelService.configureMediaHouseUnit(
+      buildingId: widget.buildingId,
+      unitId: unitId,
+      targetCompanyId: targetCompanyId,
+      mediaType: mediaType,
+      campaignBudgetPerTick: campaignBudgetPerTick,
+      isActive: isActive,
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -375,6 +493,29 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
             const SizedBox(height: 12),
             ConfigWarningsBanner(warnings: configWarnings),
           ],
+          // Sibling panels — rendered above the grid, matching web's
+          // `BuildingPowerPlantPanel`/`BuildingResearchPanel` placement
+          // right after config warnings and before the starter banners.
+          if (building.type == 'POWER_PLANT') ...[
+            const SizedBox(height: 12),
+            BuildingPowerPlantPanel(
+              building: building,
+              analytics: _powerPlantAnalytics,
+              cityPowerBalance: _cityPowerBalance,
+              onSetDispatch: _setDispatch,
+              onSetPriority: _setPriority,
+              onListEnergy: _listEnergy,
+              onCancelListing: _cancelEnergyListing,
+            ),
+          ],
+          if (building.type == 'RESEARCH_DEVELOPMENT') ...[
+            const SizedBox(height: 12),
+            BuildingResearchPanel(
+              brands: _companyBrands,
+              loading: _researchLoading,
+              hasConfiguredRdUnits: validationUnits.any((u) => u.unitType == 'PRODUCT_QUALITY' || u.unitType == 'BRAND_QUALITY'),
+            ),
+          ],
           if (showStarterBanner) ...[
             const SizedBox(height: 12),
             StarterLayoutBanner(
@@ -387,23 +528,35 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
           if (isGridBuilding && !isEditing && !showStarterBanner && building.type == 'SALES_SHOP')
             ShopChainStatusPanel(units: validationUnits),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(child: Text('Units', style: theme.textTheme.titleMedium)),
-              if (isGridBuilding && !isEditing)
-                TextButton(onPressed: _controller.startEditing, child: const Text('Edit Building')),
-            ],
-          ),
-          const SizedBox(height: 8),
-          if (isGridBuilding && isEditing)
-            BuildingGridEditor(controller: _controller, itemNameFor: _itemNameForIds, onCellTap: _onCellTap)
-          else if (isGridBuilding)
-            BuildingUnitGrid(
-              units: building.units,
-              itemNameFor: _itemNameFor,
-              actionLoadingIds: _actionLoadingIds,
-              onUpgrade: (unit) => _upgradeUnit(unit),
-              onUpdatePrice: (unit) => _updatePrice(unit),
+          if (isGridBuilding) ...[
+            Row(
+              children: [
+                Expanded(child: Text('Units', style: theme.textTheme.titleMedium)),
+                if (!isEditing) TextButton(onPressed: _controller.startEditing, child: const Text('Edit Building')),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (isEditing)
+              BuildingGridEditor(controller: _controller, itemNameFor: _itemNameForIds, onCellTap: _onCellTap)
+            else
+              BuildingUnitGrid(
+                units: building.units,
+                itemNameFor: _itemNameFor,
+                actionLoadingIds: _actionLoadingIds,
+                onUpgrade: (unit) => _upgradeUnit(unit),
+                onUpdatePrice: (unit) => _updatePrice(unit),
+              ),
+          ] else if (building.type == 'APARTMENT' || building.type == 'COMMERCIAL')
+            BuildingPropertyPanel(building: building, detail: _apartmentDetail, onScheduleRent: _scheduleRent)
+          else if (building.type == 'MEDIA_HOUSE')
+            BuildingMediaHousePanel(
+              building: building,
+              units: _mediaHouseUnits,
+              cityMediaHouses: _cityMediaHouses,
+              ownedCompanyNames: _ownedCompanyNames,
+              onSaveBudget: _saveMediaHouseBudget,
+              onUpgrade: _upgradeMediaHouse,
+              onSaveUnitConfig: _saveMediaHouseUnitConfig,
             )
           else if (building.units.isEmpty)
             const Text('No units configured yet.')

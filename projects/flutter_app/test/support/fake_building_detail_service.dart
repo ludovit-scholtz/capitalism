@@ -17,6 +17,7 @@ class FakeBuildingDetailService implements BuildingDetailService {
     this.actionError,
     this.storeConfigurationError,
     this.cancelConfigurationError,
+    this.ownedCompanyNames = const {},
   });
 
   final BuildingDetail? building;
@@ -32,6 +33,7 @@ class FakeBuildingDetailService implements BuildingDetailService {
   final Object? actionError;
   final Object? storeConfigurationError;
   final Object? cancelConfigurationError;
+  final Map<String, String> ownedCompanyNames;
 
   final List<String> calls = [];
   final List<String> upgradedUnitIds = [];
@@ -115,5 +117,11 @@ class FakeBuildingDetailService implements BuildingDetailService {
   Future<List<BuildingUnitInventorySummary>> fetchInventorySummaries(String buildingId) async {
     calls.add('fetchInventorySummaries');
     return inventorySummaries;
+  }
+
+  @override
+  Future<Map<String, String>> fetchOwnedCompanyNames() async {
+    calls.add('fetchOwnedCompanyNames');
+    return ownedCompanyNames;
   }
 }

@@ -235,6 +235,26 @@ class BuildingDetail {
     required this.pendingConfiguration,
     this.cityId,
     this.cityFxRate = 1,
+    // APARTMENT/COMMERCIAL property fields.
+    this.pricePerSqm,
+    this.pendingPricePerSqm,
+    this.pendingPriceActivationTick,
+    this.totalAreaSqm,
+    this.cityReferenceRentPerSqm,
+    this.adjustedMarketRentPerSqm,
+    this.populationIndex,
+    // MEDIA_HOUSE fields.
+    this.mediaType,
+    this.contentValue,
+    this.contentBudgetPerTick,
+    this.isGovernmentOwned = false,
+    // POWER_PLANT fields.
+    this.powerPlantType,
+    this.powerOutput,
+    this.dispatchTargetPercent,
+    this.powerPriority,
+    this.maxEnergyBidPrice,
+    this.fuelReserveMwh,
   });
 
   final String id;
@@ -254,6 +274,26 @@ class BuildingDetail {
   /// `useBuildingDetail.ts`.
   final double cityFxRate;
 
+  final double? pricePerSqm;
+  final double? pendingPricePerSqm;
+  final int? pendingPriceActivationTick;
+  final double? totalAreaSqm;
+  final double? cityReferenceRentPerSqm;
+  final double? adjustedMarketRentPerSqm;
+  final double? populationIndex;
+
+  final String? mediaType;
+  final double? contentValue;
+  final double? contentBudgetPerTick;
+  final bool isGovernmentOwned;
+
+  final String? powerPlantType;
+  final double? powerOutput;
+  final int? dispatchTargetPercent;
+  final int? powerPriority;
+  final double? maxEnergyBidPrice;
+  final double? fuelReserveMwh;
+
   factory BuildingDetail.fromJson(Map<String, dynamic> json, {required String companyId}) => BuildingDetail(
     id: json['id'] as String,
     companyId: companyId,
@@ -271,6 +311,23 @@ class BuildingDetail {
         : PendingBuildingConfiguration.fromJson(json['pendingConfiguration'] as Map<String, dynamic>),
     cityId: json['cityId'] as String?,
     cityFxRate: (json['cityFxRate'] as num?)?.toDouble() ?? 1,
+    pricePerSqm: (json['pricePerSqm'] as num?)?.toDouble(),
+    pendingPricePerSqm: (json['pendingPricePerSqm'] as num?)?.toDouble(),
+    pendingPriceActivationTick: (json['pendingPriceActivationTick'] as num?)?.toInt(),
+    totalAreaSqm: (json['totalAreaSqm'] as num?)?.toDouble(),
+    cityReferenceRentPerSqm: (json['cityReferenceRentPerSqm'] as num?)?.toDouble(),
+    adjustedMarketRentPerSqm: (json['adjustedMarketRentPerSqm'] as num?)?.toDouble(),
+    populationIndex: (json['populationIndex'] as num?)?.toDouble(),
+    mediaType: json['mediaType'] as String?,
+    contentValue: (json['contentValue'] as num?)?.toDouble(),
+    contentBudgetPerTick: (json['contentBudgetPerTick'] as num?)?.toDouble(),
+    isGovernmentOwned: json['isGovernmentOwned'] as bool? ?? false,
+    powerPlantType: json['powerPlantType'] as String?,
+    powerOutput: (json['powerOutput'] as num?)?.toDouble(),
+    dispatchTargetPercent: (json['dispatchTargetPercent'] as num?)?.toInt(),
+    powerPriority: (json['powerPriority'] as num?)?.toInt(),
+    maxEnergyBidPrice: (json['maxEnergyBidPrice'] as num?)?.toDouble(),
+    fuelReserveMwh: (json['fuelReserveMwh'] as num?)?.toDouble(),
   );
 
   /// `cityFxRate` isn't part of the `Building` GraphQL type — it's resolved
@@ -289,5 +346,22 @@ class BuildingDetail {
     pendingConfiguration: pendingConfiguration,
     cityId: cityId,
     cityFxRate: rate,
+    pricePerSqm: pricePerSqm,
+    pendingPricePerSqm: pendingPricePerSqm,
+    pendingPriceActivationTick: pendingPriceActivationTick,
+    totalAreaSqm: totalAreaSqm,
+    cityReferenceRentPerSqm: cityReferenceRentPerSqm,
+    adjustedMarketRentPerSqm: adjustedMarketRentPerSqm,
+    populationIndex: populationIndex,
+    mediaType: mediaType,
+    contentValue: contentValue,
+    contentBudgetPerTick: contentBudgetPerTick,
+    isGovernmentOwned: isGovernmentOwned,
+    powerPlantType: powerPlantType,
+    powerOutput: powerOutput,
+    dispatchTargetPercent: dispatchTargetPercent,
+    powerPriority: powerPriority,
+    maxEnergyBidPrice: maxEnergyBidPrice,
+    fuelReserveMwh: fuelReserveMwh,
   );
 }

@@ -16,13 +16,22 @@ const _pendingUnitFieldsFragment = r'''
   linkUp linkDown linkLeft linkRight linkUpLeft linkUpRight linkDownLeft linkDownRight
 ''';
 
+const _buildingTypeSpecificFieldsFragment = r'''
+  pricePerSqm pendingPricePerSqm pendingPriceActivationTick totalAreaSqm
+  cityReferenceRentPerSqm adjustedMarketRentPerSqm populationIndex
+  mediaType contentValue contentBudgetPerTick isGovernmentOwned
+  powerPlantType powerOutput dispatchTargetPercent powerPriority maxEnergyBidPrice fuelReserveMwh
+''';
+
 const _myCompaniesQuery = '''
   query BuildingDetailMyCompanies {
     myCompanies {
       id
+      name
       cash
       buildings {
         id name type level powerStatus occupancyPercent isForSale cityId
+        $_buildingTypeSpecificFieldsFragment
         units { $_unitFieldsFragment }
         pendingConfiguration {
           id appliesAtTick totalTicksRequired blockReason
@@ -131,6 +140,18 @@ class BuildingDetailService {
       }
     }
     return null;
+  }
+
+  /// The player's own companies (`id` -> `name`), used by panels that let
+  /// the player pick a target company (e.g. Media House campaign unit
+  /// config).
+  Future<Map<String, String>> fetchOwnedCompanyNames() async {
+    final result = await _graphQlService.request(_myCompaniesQuery);
+    final companies = result['myCompanies'] as List<dynamic>? ?? const [];
+    return {
+      for (final c in companies)
+        (c as Map<String, dynamic>)['id'] as String: (c['name'] as String?) ?? 'Company',
+    };
   }
 
   /// Returns `(resourceTypeNamesById, productTypeNamesById)`.
