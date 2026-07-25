@@ -7,13 +7,19 @@
 // actions (`scheduleUnitUpgrade`, `updatePublicSalesPrice` for PUBLIC_SALES
 // units) — both real mutations, not mocked.
 //
+// Units for grid-eligible building types (everything except APARTMENT/
+// COMMERCIAL/MEDIA_HOUSE — see `isMultiUnitBuilding` in
+// `BuildingDetailView.vue`) render via `BuildingUnitGrid`, a read-only port
+// of the web's 4x4 `gridX`/`gridY` layout (see that file's header comment
+// for exactly what is and isn't ported).
+//
 // Explicitly NOT ported (documented, not oversights — see
 // `.github/copilot-instructions.md` → Flutter mobile app for the full list
 // this was scoped against):
-// - The drag/link-cycle grid unit editor and `storeBuildingConfiguration` /
-//   `cancelBuildingConfiguration` (adding/removing/reconfiguring units) —
-//   this is the web's core desktop UX and needs a genuinely different touch
-//   interaction design, not a 1:1 port.
+// - Adding/removing/reconfiguring units, the 8-directional link editor, and
+//   `storeBuildingConfiguration`/`cancelBuildingConfiguration` — this is the
+//   web's core desktop UX and needs a genuinely different touch interaction
+//   design, not a 1:1 port. Tracked as its own set of ROADMAP items.
 // - Media house, power plant, and rent-scheduling panels and their
 //   mutations (`setMediaHouseContentBudget`, `upgradeMediaHouse`,
 //   `configureMediaHouseUnit`, `setRentPerSqm`, `setPlantDispatch`,
@@ -43,6 +49,12 @@ import '../../core/graphql/graphql_service.dart';
 import '../../core/theme/app_icons.dart';
 import 'building_detail_models.dart';
 import 'building_detail_service.dart';
+import 'building_unit_grid.dart';
+
+/// Mirrors `isMultiUnitBuilding` in `BuildingDetailView.vue` — these three
+/// building types manage a single implicit unit via their own dedicated
+/// panels rather than the 4x4 grid, on both web and here.
+bool _isMultiUnitBuildingType(String type) => type != 'APARTMENT' && type != 'COMMERCIAL' && type != 'MEDIA_HOUSE';
 
 class BuildingDetailScreen extends StatefulWidget {
   const BuildingDetailScreen({
@@ -235,6 +247,14 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
           const SizedBox(height: 8),
           if (building.units.isEmpty)
             const Text('No units configured yet.')
+          else if (_isMultiUnitBuildingType(building.type))
+            BuildingUnitGrid(
+              units: building.units,
+              itemNameFor: _itemNameFor,
+              actionLoadingIds: _actionLoadingIds,
+              onUpgrade: (unit) => _upgradeUnit(unit),
+              onUpdatePrice: (unit) => _updatePrice(unit),
+            )
           else
             for (final unit in building.units)
               Card(

@@ -18,6 +18,8 @@ const _salesUnit = BuildingUnitDetail(
   resourceTypeId: null,
   productTypeId: 'product-1',
   minPrice: 10,
+  gridX: 0,
+  gridY: 0,
 );
 
 const _building = BuildingDetail(
@@ -86,11 +88,13 @@ void main() {
       expect(find.text('Could not load this building. Please try again.'), findsOneWidget);
     });
 
-    testWidgets('tapping upgrade calls scheduleUnitUpgrade', (tester) async {
+    testWidgets('tapping a grid cell then Upgrade calls scheduleUnitUpgrade', (tester) async {
       final service = FakeBuildingDetailService(building: _building);
 
       await _pumpBuildingDetail(tester, service: service);
-      await tester.tap(find.byTooltip('Upgrade'));
+      await tester.tap(find.byKey(const ValueKey('cell-unit-unit-1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Upgrade'));
       await tester.pumpAndSettle();
 
       expect(service.upgradedUnitIds, ['unit-1']);
@@ -100,7 +104,9 @@ void main() {
       final service = FakeBuildingDetailService(building: _building);
 
       await _pumpBuildingDetail(tester, service: service);
-      await tester.tap(find.byTooltip('Update price'));
+      await tester.tap(find.byKey(const ValueKey('cell-unit-unit-1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Update price'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), '15');
       await tester.tap(find.widgetWithText(FilledButton, 'Save'));

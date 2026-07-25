@@ -7,7 +7,7 @@ const _myCompaniesQuery = r'''
       id
       buildings {
         id name type level powerStatus occupancyPercent isForSale
-        units { id unitType level resourceTypeId productTypeId minPrice }
+        units { id unitType level resourceTypeId productTypeId minPrice gridX gridY }
         pendingConfiguration { id appliesAtTick totalTicksRequired blockReason }
       }
     }

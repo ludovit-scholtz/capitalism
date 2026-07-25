@@ -12,6 +12,8 @@ class BuildingUnitDetail {
     required this.resourceTypeId,
     required this.productTypeId,
     required this.minPrice,
+    required this.gridX,
+    required this.gridY,
   });
 
   final String id;
@@ -21,6 +23,12 @@ class BuildingUnitDetail {
   final String? productTypeId;
   final double? minPrice;
 
+  /// Position within the building's 4x4 unit grid, each 0..3. Mirrors
+  /// `BuildingUnit.GridX`/`GridY` on the backend and `gridX`/`gridY` in
+  /// `projects/frontend/src/types/building.ts` — see `BuildingUnitGrid.vue`.
+  final int gridX;
+  final int gridY;
+
   factory BuildingUnitDetail.fromJson(Map<String, dynamic> json) => BuildingUnitDetail(
     id: json['id'] as String,
     unitType: (json['unitType'] as String?) ?? '',
@@ -28,6 +36,8 @@ class BuildingUnitDetail {
     resourceTypeId: json['resourceTypeId'] as String?,
     productTypeId: json['productTypeId'] as String?,
     minPrice: (json['minPrice'] as num?)?.toDouble(),
+    gridX: (json['gridX'] as num?)?.toInt() ?? 0,
+    gridY: (json['gridY'] as num?)?.toInt() ?? 0,
   );
 }
 
