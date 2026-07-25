@@ -37,11 +37,17 @@ Future<void> _pump(
   // never settles while one is on screen — callers exercising the loading
   // state must pass false and drive a single `pump()` instead.
   bool settle = true,
+  Size surfaceSize = const Size(800, 2000),
+  double textScale = 1,
 }) async {
-  await tester.binding.setSurfaceSize(const Size(800, 2000));
+  await tester.binding.setSurfaceSize(surfaceSize);
   addTearDown(() => tester.binding.setSurfaceSize(null));
   await tester.pumpWidget(
     MaterialApp(
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(size: surfaceSize, textScaler: TextScaler.linear(textScale)),
+        child: child!,
+      ),
       home: Scaffold(
         body: BuildingUnitGrid(
           units: units,
@@ -117,6 +123,28 @@ void main() {
         find.descendant(of: find.byKey(const ValueKey('cell-unit-unit-1')), matching: find.byType(CircularProgressIndicator)),
         findsOneWidget,
       );
+    });
+
+    testWidgets('fits and scrolls horizontally on a narrow phone width without overflowing', (tester) async {
+      // Smallest realistic phone width (e.g. iPhone SE). Cells use a fixed
+      // pixel size and the grid scrolls horizontally rather than shrinking
+      // cells below what their content needs — this guards against the
+      // RenderFlex overflow a flexible/Expanded cell would hit here.
+      await _pump(tester, units: const [_manufacturing, _publicSales], surfaceSize: const Size(320, 700));
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(SingleChildScrollView), findsOneWidget);
+
+      final scrollable = find.byType(SingleChildScrollView);
+      await tester.drag(scrollable, const Offset(-200, 0));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('does not overflow at a large accessibility text scale', (tester) async {
+      await _pump(tester, units: const [_manufacturing, _publicSales], surfaceSize: const Size(360, 800), textScale: 1.4);
+
+      expect(tester.takeException(), isNull);
     });
   });
 }

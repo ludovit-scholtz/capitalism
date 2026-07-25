@@ -127,37 +127,57 @@ class BuildingUnitGrid extends StatelessWidget {
     );
   }
 
+  // Fixed pixel cell size rather than one derived from screen width: with a
+  // flexible/`Expanded` cell, narrow phones (or a large accessibility text
+  // scale) shrink cells below what the monogram + two text lines need,
+  // producing a RenderFlex overflow. The web has the same problem on narrow
+  // viewports and solves it the same way — `BuildingUnitGrid.layout.css`
+  // gives the grid a `min-width: 330px` and lets it scroll horizontally
+  // below the 640px breakpoint instead of shrinking cells. Mirrored here: a
+  // fixed total grid width wrapped in a horizontal `SingleChildScrollView`,
+  // which only actually scrolls when the viewport is narrower than that.
+  static const double _cellSize = 88;
+
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        for (var y = 0; y < 4; y++)
-          Padding(
-            padding: EdgeInsets.only(bottom: y < 3 ? AppSpacing.sm : 0),
-            child: Row(
-              children: [
-                for (var x = 0; x < 4; x++)
-                  Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.only(right: x < 3 ? AppSpacing.sm : 0),
-                      child: Builder(
-                        builder: (context) {
-                          final unit = _unitAt(x, y);
-                          return _GridCell(
-                            key: ValueKey('cell-$x-$y'),
-                            unit: unit,
-                            itemNameFor: itemNameFor,
-                            isLoading: unit != null && actionLoadingIds.contains(unit.id),
-                            onTap: unit == null ? null : () => _openCellSheet(context, unit),
-                          );
-                        },
+    const totalWidth = _cellSize * 4 + AppSpacing.sm * 3;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: SizedBox(
+        width: totalWidth,
+        child: Column(
+          children: [
+            for (var y = 0; y < 4; y++)
+              Padding(
+                padding: EdgeInsets.only(bottom: y < 3 ? AppSpacing.sm : 0),
+                child: Row(
+                  children: [
+                    for (var x = 0; x < 4; x++)
+                      Padding(
+                        padding: EdgeInsets.only(right: x < 3 ? AppSpacing.sm : 0),
+                        child: Builder(
+                          builder: (context) {
+                            final unit = _unitAt(x, y);
+                            return SizedBox(
+                              width: _cellSize,
+                              height: _cellSize,
+                              child: _GridCell(
+                                key: ValueKey('cell-$x-$y'),
+                                unit: unit,
+                                itemNameFor: itemNameFor,
+                                isLoading: unit != null && actionLoadingIds.contains(unit.id),
+                                onTap: unit == null ? null : () => _openCellSheet(context, unit),
+                              ),
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-      ],
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -176,67 +196,57 @@ class _GridCell extends StatelessWidget {
     final unit = this.unit;
 
     if (unit == null) {
-      return AspectRatio(
-        aspectRatio: 1,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border.all(color: theme.colorScheme.outlineVariant),
-            borderRadius: BorderRadius.circular(AppRadius.md),
-          ),
-          child: Center(child: Icon(Icons.add, color: theme.colorScheme.outlineVariant, size: 18)),
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border.all(color: theme.colorScheme.outlineVariant),
+          borderRadius: BorderRadius.circular(AppRadius.md),
         ),
+        child: Center(child: Icon(Icons.add, color: theme.colorScheme.outlineVariant, size: 18)),
       );
     }
 
     final itemName = itemNameFor(unit);
     final accent = unitTypeColors[unit.unitType] ?? theme.colorScheme.primary;
 
-    return AspectRatio(
-      aspectRatio: 1,
-      child: Material(
-        color: theme.colorScheme.surfaceContainer,
+    return Material(
+      color: theme.colorScheme.surfaceContainer,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: InkWell(
+        key: ValueKey('cell-unit-${unit.id}'),
         borderRadius: BorderRadius.circular(AppRadius.md),
-        child: InkWell(
-          key: ValueKey('cell-unit-${unit.id}'),
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.all(AppSpacing.xs),
-            decoration: BoxDecoration(
-              border: Border.all(color: accent.withValues(alpha: 0.7), width: 2),
-              borderRadius: BorderRadius.circular(AppRadius.md),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (isLoading)
-                  const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                else
-                  CircleAvatar(
-                    radius: 10,
-                    backgroundColor: accent.withValues(alpha: 0.2),
-                    child: Text(
-                      unitTypeShortLabel(unit.unitType).characters.first.toUpperCase(),
-                      style: theme.textTheme.labelSmall?.copyWith(color: accent, fontWeight: FontWeight.bold),
-                    ),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.xs),
+          decoration: BoxDecoration(
+            border: Border.all(color: accent.withValues(alpha: 0.7), width: 2),
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isLoading)
+                const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              else
+                CircleAvatar(
+                  radius: 10,
+                  backgroundColor: accent.withValues(alpha: 0.2),
+                  child: Text(
+                    unitTypeShortLabel(unit.unitType).characters.first.toUpperCase(),
+                    style: theme.textTheme.labelSmall?.copyWith(color: accent, fontWeight: FontWeight.bold),
                   ),
-                const SizedBox(height: 4),
+                ),
+              const SizedBox(height: 4),
+              Text('Lvl ${unit.level}', style: theme.textTheme.labelSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+              if (itemName.isNotEmpty)
                 Text(
-                  'Lvl ${unit.level}',
+                  itemName,
                   style: theme.textTheme.labelSmall,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                 ),
-                if (itemName.isNotEmpty)
-                  Text(
-                    itemName,
-                    style: theme.textTheme.labelSmall,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                  ),
-              ],
-            ),
+            ],
           ),
         ),
       ),

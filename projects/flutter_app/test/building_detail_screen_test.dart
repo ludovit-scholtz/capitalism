@@ -24,6 +24,7 @@ const _salesUnit = BuildingUnitDetail(
 
 const _building = BuildingDetail(
   id: 'building-1',
+  companyId: 'company-1',
   name: 'Main Factory',
   type: 'FACTORY',
   level: 2,
