@@ -169,8 +169,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       final payload = data[_isRegister ? 'register' : 'login'] as Map<String, dynamic>;
-      final expiresAtUtc = DateTime.tryParse(payload['expiresAtUtc'] as String? ?? '');
-      await auth.setToken(payload['token'] as String, expiresAtUtc: expiresAtUtc, provider: AuthProvider.local);
+      await auth.setToken(payload['token'] as String);
       if (!mounted) return;
       context.go('/');
     } on GraphQlException catch (e) {
@@ -581,7 +580,7 @@ class _AuthCallbackScreenState extends State<AuthCallbackScreen> {
     final auth = context.read<AuthState>();
     try {
       final result = await widget.oidcService.signIn();
-      await auth.setToken(result.token, expiresAtUtc: result.expiresAtUtc, provider: AuthProvider.biatecOidc);
+      await auth.setToken(result.token);
       if (!mounted) return;
       context.go(widget.redirectPath);
     } on BiatecOidcException catch (e) {

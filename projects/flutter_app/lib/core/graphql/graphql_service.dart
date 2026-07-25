@@ -123,9 +123,15 @@ class GraphQlService {
       final extensions = firstError['extensions'] as Map<String, dynamic>?;
       final message = errors.map((error) => (error as Map<String, dynamic>)['message']).join('; ');
       final code = extensions?['code'] as String?;
-      AppLogger.instance.error('$opName -> GraphQL error', message, null, 'GraphQL');
-
       final expiry = _authState.expiresAtUtc;
+      AppLogger.instance.error(
+        '$opName -> GraphQL error (code=${code ?? 'none'}, tokenProvider=${_authState.provider}, '
+        'tokenExpiresAtUtc=${expiry?.toIso8601String() ?? 'unknown'})',
+        message,
+        null,
+        'GraphQL',
+      );
+
       final looksExpired = expiry == null || !expiry.isAfter(DateTime.now().toUtc());
       if (code == _authNotAuthorizedCode && looksExpired && _authState.isAuthenticated) {
         AppLogger.instance.warning('$opName -> treating as expired session, logging out', tag: 'GraphQL');

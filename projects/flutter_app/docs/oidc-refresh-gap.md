@@ -17,9 +17,21 @@ spec-compliant fix.
 
 ## What was implemented (client-side workaround)
 
-- `AuthState` (`lib/core/auth/auth_state.dart`) now persists `expiresAtUtc`
-  and the auth `provider` (`local` vs `biatec_oidc`) alongside the token
-  (`lib/core/auth/token_storage.dart`).
+- `AuthState` (`lib/core/auth/auth_state.dart`) now derives `expiresAtUtc`
+  and the auth `provider` (`local` vs `biatec_oidc`) by decoding the Bearer
+  JWT's own `exp`/`iss` claims, rather than tracking them as separately
+  persisted state. This was a deliberate second pass: the first version
+  stored `expiresAtUtc`/`provider` as extra `flutter_secure_storage` keys
+  written only by `setToken()`, which meant a session stored *before* this
+  feature existed restored with both fields `null` on `restoreSession()`
+  and silently defaulted to `provider: local` — permanently disabling the
+  proactive renewal check for exactly the sessions that needed it most (a
+  real report: a player still authenticated from the day before got a
+  stream of `AUTH_NOT_AUTHORIZED` errors because their pre-existing OIDC
+  session was misclassified as local). Deriving both values directly from
+  the token's own claims on every `restoreSession()`/`setToken()` call is
+  self-healing — it doesn't matter when or how the token was stored, only
+  what's actually inside it.
 - `GraphQlService.request()` (`lib/core/graphql/graphql_service.dart`)
   calls `AuthState.ensureFreshToken()` before every request, which renews
   the token if it's within 60 seconds of expiry (or already expired)
