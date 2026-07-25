@@ -14,15 +14,79 @@
 //   way the web router does elsewhere either.
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
 import '../../core/theme/app_icons.dart';
+import '../../core/utils/catalog_image_url.dart';
 import 'encyclopedia_models.dart';
 import 'encyclopedia_service.dart';
+
+/// Catalog picture for an encyclopedia entry, backed by the game API
+/// (`Api/wwwroot/images/products`, see `catalog_image_url.dart`). Falls back
+/// to a generic icon if the picture can't be fetched (unknown slug, offline).
+///
+/// Fetches the SVG source via [http.Client] and renders it with
+/// [SvgPicture.string] rather than `SvgPicture.network`, which decodes on a
+/// background isolate whose parse errors surface after the widget (and any
+/// test pumping it) has already torn down — a real failure this ran into
+/// under `flutter test` against an unreachable API host.
+class _CatalogImage extends StatefulWidget {
+  const _CatalogImage({required this.slug, required this.size, http.Client? httpClient}) : _httpClient = httpClient;
+
+  final String slug;
+  final double size;
+  final http.Client? _httpClient;
+
+  @override
+  State<_CatalogImage> createState() => _CatalogImageState();
+}
+
+class _CatalogImageState extends State<_CatalogImage> {
+  late final http.Client _client = widget._httpClient ?? http.Client();
+  late Future<String> _svgSource = _load();
+
+  Future<String> _load() async {
+    final response = await _client.get(Uri.parse(catalogImageUrl(widget.slug)));
+    if (response.statusCode != 200) {
+      throw Exception('Failed to load catalog image for "${widget.slug}" (${response.statusCode})');
+    }
+    return response.body;
+  }
+
+  @override
+  void didUpdateWidget(covariant _CatalogImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.slug != widget.slug) {
+      setState(() => _svgSource = _load());
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: widget.size,
+      height: widget.size,
+      child: FutureBuilder<String>(
+        future: _svgSource,
+        builder: (context, snapshot) {
+          if (snapshot.hasError || (snapshot.connectionState == ConnectionState.done && !snapshot.hasData)) {
+            return FaIcon(FontAwesomeIcons.box, size: widget.size * 0.7);
+          }
+          if (!snapshot.hasData) {
+            return const SizedBox.shrink();
+          }
+          return SvgPicture.string(snapshot.data!, width: widget.size, height: widget.size);
+        },
+      ),
+    );
+  }
+}
 
 class EncyclopediaScreen extends StatefulWidget {
   const EncyclopediaScreen({super.key, GraphQlService? graphQlService, EncyclopediaService? encyclopediaService})
@@ -136,6 +200,7 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
               key: ValueKey('encyclopedia-${entry.slug}'),
               margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
+                leading: _CatalogImage(slug: entry.slug, size: 40),
                 title: Text(entry.name),
                 subtitle: Text([entry.kind, if (entry.category != null) entry.category!].join(' · ')),
                 trailing: entry.isProOnly ? const Chip(label: Text('⭐ Pro')) : null,
@@ -249,6 +314,8 @@ class _ResourceDetailScreenState extends State<ResourceDetailScreen> {
       padding: const EdgeInsets.all(24),
       children: [
         TextButton(onPressed: () => context.go('/encyclopedia'), child: const Text('← Back to encyclopedia')),
+        Center(child: _CatalogImage(slug: entry.slug, size: 96)),
+        const SizedBox(height: 8),
         Row(
           children: [
             Expanded(child: Text(entry.name, style: theme.textTheme.headlineSmall)),
@@ -325,11 +392,13 @@ class _RecipeCard extends StatelessWidget {
               children: [
                 for (final input in recipe.inputs)
                   ActionChip(
+                    avatar: _CatalogImage(slug: input.slug, size: 16),
                     label: Text('${input.name} × ${input.quantity}${input.unitSymbol ?? ''}'),
                     onPressed: () => context.go('/encyclopedia/resource/${input.slug}'),
                   ),
                 const FaIcon(AppIcons.arrowRight, size: 16),
                 ActionChip(
+                  avatar: _CatalogImage(slug: recipe.output.slug, size: 16),
                   label: Text(recipe.output.name),
                   onPressed: () => context.go('/encyclopedia/resource/${recipe.output.slug}'),
                 ),

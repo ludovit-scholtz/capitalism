@@ -1,17 +1,17 @@
-const catalogImageModules = import.meta.glob('../assets/products/*.svg', { eager: true, import: 'default' }) as Record<string, string>
+import { resolveApiBaseUrl, resolveGameGraphqlUrl } from './runtimeGraphqlUrl'
 
-const catalogImagesBySlug = Object.fromEntries(
-  Object.entries(catalogImageModules).map(([path, url]) => [
-    path
-      .split('/')
-      .pop()
-      ?.replace(/\.svg$/i, '') ?? path,
-    url,
-  ]),
-) as Record<string, string>
+// Catalog artwork is hosted by the game API (see `Api/wwwroot/images/products`)
+// instead of being bundled with the frontend, so every deployment shares one
+// set of pictures and the API can control caching for them.
+const CATALOG_IMAGE_PATH = '/images/products'
 
-const INLINE_FALLBACK_IMAGE = `data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Crect width='256' height='256' rx='34' fill='%231f2937'/%3E%3Cpath d='M62 91l66-38 66 38v74l-66 38-66-38z' fill='%23e5e7eb'/%3E%3Cpath d='M62 91l66 38 66-38M128 129v74' stroke='%2364748b' stroke-width='9' fill='none'/%3E%3Ccircle cx='128' cy='129' r='18' fill='%2394a3b8'/%3E%3C/svg%3E`
-const CATALOG_FALLBACK_IMAGE = catalogImagesBySlug.fallback ?? INLINE_FALLBACK_IMAGE
+function resolveCatalogImageBaseUrl(): string {
+  return resolveApiBaseUrl(resolveGameGraphqlUrl(import.meta.env.VITE_GRAPHQL_URL))
+}
+
+function buildCatalogImageUrl(slug: string): string {
+  return `${resolveCatalogImageBaseUrl()}${CATALOG_IMAGE_PATH}/${slug}.svg`
+}
 
 export const RESOURCE_IMAGE_SLUGS = ['chemical-minerals', 'coal', 'cotton', 'gold', 'grain', 'iron-ore', 'silicon', 'wood'] as const
 
@@ -168,23 +168,35 @@ export const PRODUCT_IMAGE_SLUGS = [
 
 const RESOURCE_IMAGE_SLUG_SET = new Set<string>(RESOURCE_IMAGE_SLUGS)
 const PRODUCT_IMAGE_SLUG_SET = new Set<string>(PRODUCT_IMAGE_SLUGS)
+// Both categories are served from the same backend folder by convention, so a
+// slug from either list resolves to a real file regardless of which lookup
+// function is called with it (mirrors the pre-migration bundled-asset lookup).
+const ALL_IMAGE_SLUG_SET = new Set<string>([...RESOURCE_IMAGE_SLUGS, ...PRODUCT_IMAGE_SLUGS])
 
 export function getCatalogFallbackImageUrl(): string {
-  return CATALOG_FALLBACK_IMAGE
+  return buildCatalogImageUrl('fallback')
 }
 
 export function hasResourceCatalogImage(slug: string): boolean {
-  return RESOURCE_IMAGE_SLUG_SET.has(slug) && Boolean(catalogImagesBySlug[slug])
+  return RESOURCE_IMAGE_SLUG_SET.has(slug)
 }
 
 export function hasProductCatalogImage(slug: string): boolean {
-  return PRODUCT_IMAGE_SLUG_SET.has(slug) && Boolean(catalogImagesBySlug[slug])
+  return PRODUCT_IMAGE_SLUG_SET.has(slug)
 }
 
 export function getResourceCatalogImageUrl(slug: string, existingImageUrl: string | null): string {
-  return catalogImagesBySlug[slug] ?? existingImageUrl ?? CATALOG_FALLBACK_IMAGE
+  if (ALL_IMAGE_SLUG_SET.has(slug)) {
+    return buildCatalogImageUrl(slug)
+  }
+
+  return existingImageUrl ?? getCatalogFallbackImageUrl()
 }
 
 export function getProductCatalogImageUrl(slug: string): string {
-  return catalogImagesBySlug[slug] ?? CATALOG_FALLBACK_IMAGE
+  if (ALL_IMAGE_SLUG_SET.has(slug)) {
+    return buildCatalogImageUrl(slug)
+  }
+
+  return getCatalogFallbackImageUrl()
 }

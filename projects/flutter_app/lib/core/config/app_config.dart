@@ -52,6 +52,12 @@ class AppConfig {
 
   static void resetGraphqlUrl() => _graphqlUrl = _environment.defaultGameGraphqlUrl;
 
+  /// Game API origin with the trailing `/graphql` stripped, for non-GraphQL
+  /// endpoints such as the catalog image static-file host
+  /// (`Api/wwwroot/images`, see `catalog_image_url.dart`). Mirrors
+  /// [masterApiBaseUrl] and the web frontend's `resolveApiBaseUrl`.
+  static String get gameApiBaseUrl => graphqlUrl.replaceFirst(RegExp(r'/graphql/?$'), '');
+
   static const String _masterGraphqlUrlOverride = String.fromEnvironment('MASTER_GRAPHQL_URL');
 
   /// Master API endpoint — the source of truth for the registered

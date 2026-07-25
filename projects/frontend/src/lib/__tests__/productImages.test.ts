@@ -10,10 +10,12 @@ import {
   RESOURCE_IMAGE_SLUGS,
 } from '../productImages'
 
-const assetDir = new URL('../../assets/products/', import.meta.url)
+// Catalog artwork now lives on the game API (`Api/wwwroot/images/products`)
+// instead of being bundled with the frontend - see productImages.ts.
+const assetDir = new URL('../../../../Api/wwwroot/images/products/', import.meta.url)
 
 function expectSvgImageUrl(url: string) {
-  expect(url).toMatch(/\.svg|data:image\/svg\+xml/i)
+  expect(url).toMatch(/\/images\/products\/[^/]+\.svg$/i)
 }
 
 describe('productImages mapping', () => {
@@ -93,7 +95,7 @@ describe('productImages mapping', () => {
     }
   })
 
-  it('keeps one dedicated file per seeded slug', () => {
+  it('keeps one dedicated file per seeded slug on the game API', () => {
     for (const slug of RESOURCE_IMAGE_SLUGS) {
       expect(existsSync(new URL(`${slug}.svg`, assetDir))).toBe(true)
     }
@@ -165,7 +167,7 @@ describe('productImages mapping', () => {
     }
   })
 
-  it('keeps the catalog asset directory SVG-only with one mapped asset plus fallback', () => {
+  it('keeps the API catalog asset directory SVG-only with one mapped asset plus fallback', () => {
     const files = readdirSync(assetDir)
     const svgFiles = files.filter((file) => file.endsWith('.svg')).sort()
     const legacyWebpFiles = files.filter((file) => file.endsWith('.webp'))
@@ -173,5 +175,10 @@ describe('productImages mapping', () => {
 
     expect(legacyWebpFiles).toEqual([])
     expect(svgFiles).toEqual(expectedSvgFiles)
+  })
+
+  it('no longer bundles catalog artwork with the frontend', () => {
+    const frontendAssetDir = new URL('../../assets/products/', import.meta.url)
+    expect(existsSync(frontendAssetDir)).toBe(false)
   })
 })

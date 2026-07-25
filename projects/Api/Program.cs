@@ -556,6 +556,14 @@ public class Program
             app.UseForwardedHeaders();
         }
 
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            OnPrepareResponse = context =>
+            {
+                context.Context.Response.Headers.CacheControl = "public, max-age=86400";
+            },
+        });
+
         app.UseCors("frontend");
         app.UseWebSockets();
         app.UseMiddleware<AuthRateLimitMiddleware>();
