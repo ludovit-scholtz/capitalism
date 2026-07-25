@@ -1,4 +1,5 @@
 import 'package:capitalism_app/core/auth/auth_state.dart';
+import 'package:capitalism_app/core/context/recent_building_state.dart';
 import 'package:capitalism_app/features/buildings/building_detail_models.dart';
 import 'package:capitalism_app/features/buildings/building_detail_screen.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'support/fake_building_detail_service.dart';
+import 'support/in_memory_selected_building_storage.dart';
 import 'support/in_memory_token_storage.dart';
 
 const _salesUnit = BuildingUnitDetail(
@@ -49,7 +51,15 @@ Future<GoRouter> _pumpBuildingDetail(WidgetTester tester, {required FakeBuilding
     ],
   );
   await tester.pumpWidget(
-    ChangeNotifierProvider<AuthState>.value(value: auth, child: MaterialApp.router(routerConfig: router)),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AuthState>.value(value: auth),
+        ChangeNotifierProvider<RecentBuildingState>.value(
+          value: RecentBuildingState(storage: InMemorySelectedBuildingStorage()),
+        ),
+      ],
+      child: MaterialApp.router(routerConfig: router),
+    ),
   );
   await tester.pumpAndSettle();
   return router;

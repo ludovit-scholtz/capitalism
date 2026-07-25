@@ -30,12 +30,15 @@
 // Selling/destroying a building lives on its own screen (`/building/:id/sell`
 // — `SellBuildingScreen`), linked from here rather than duplicated.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
+import '../../core/context/recent_building_state.dart';
 import '../../core/graphql/graphql_service.dart';
 import '../../core/theme/app_icons.dart';
 import 'building_detail_models.dart';
@@ -74,6 +77,14 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
     final auth = context.read<AuthState>();
     final graphQlService = widget._injectedGraphQlService ?? GraphQlService(auth);
     _service = widget._injectedBuildingDetailService ?? BuildingDetailService(graphQlService);
+    // Deferred past this build: recordVisit's notifyListeners() would
+    // otherwise fire synchronously during this widget's own initState/mount,
+    // which trips "setState() called during build" for the RecentBuildingState
+    // provider scope above it in the tree.
+    final recentBuildingState = context.read<RecentBuildingState>();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(recentBuildingState.recordVisit(widget.buildingId));
+    });
     _load();
   }
 

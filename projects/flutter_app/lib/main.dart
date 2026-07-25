@@ -7,6 +7,7 @@ import 'core/auth/auth_state.dart';
 import 'core/config/app_environment_state.dart';
 import 'core/config/game_server_state.dart';
 import 'core/context/account_context_state.dart';
+import 'core/context/recent_building_state.dart';
 import 'core/graphql/graphql_service.dart';
 import 'core/services/app_logger.dart';
 import 'features/servers/game_server_service.dart';
@@ -33,11 +34,13 @@ Future<void> main() async {
   final environmentState = AppEnvironmentState();
   final gameServerState = GameServerState();
   final accountContextState = AccountContextState();
+  final recentBuildingState = RecentBuildingState();
   await Future.wait([
     authState.restoreSession(),
     environmentState.restoreSelection(),
     gameServerState.restoreSelection(),
     accountContextState.restoreSelectedCity(),
+    recentBuildingState.restoreLastBuilding(),
   ]);
   AppLogger.instance.info(
     'Session restored: authenticated=${authState.isAuthenticated}, environment=${environmentState.environment.label}, '
@@ -59,6 +62,7 @@ Future<void> main() async {
         ChangeNotifierProvider<AppEnvironmentState>.value(value: environmentState),
         ChangeNotifierProvider<GameServerState>.value(value: gameServerState),
         ChangeNotifierProvider<AccountContextState>.value(value: accountContextState),
+        ChangeNotifierProvider<RecentBuildingState>.value(value: recentBuildingState),
       ],
       child: CapitalismApp(),
     ),

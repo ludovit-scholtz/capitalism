@@ -7,6 +7,7 @@ import 'package:capitalism_app/core/config/app_environment_state.dart';
 import 'package:capitalism_app/core/config/game_server_state.dart';
 import 'package:capitalism_app/core/context/account_context_service.dart';
 import 'package:capitalism_app/core/context/account_context_state.dart';
+import 'package:capitalism_app/core/context/recent_building_state.dart';
 import 'package:capitalism_app/core/router/app_router.dart';
 import 'package:capitalism_app/core/services/url_opener.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +18,7 @@ import 'package:provider/provider.dart';
 
 import 'fake_account_context_service.dart';
 import 'fake_graphql_client.dart';
+import 'in_memory_selected_building_storage.dart';
 import 'in_memory_selected_city_storage.dart';
 import 'in_memory_selected_environment_storage.dart';
 import 'in_memory_selected_game_server_storage.dart';
@@ -71,6 +73,7 @@ Future<AuthState> pumpCapitalismApp(
   final environmentState = AppEnvironmentState(storage: InMemorySelectedEnvironmentStorage());
   final gameServerState = GameServerState(storage: InMemorySelectedGameServerStorage());
   final accountContextState = AccountContextState(storage: InMemorySelectedCityStorage());
+  final recentBuildingState = RecentBuildingState(storage: InMemorySelectedBuildingStorage());
 
   await tester.pumpWidget(
     MultiProvider(
@@ -79,6 +82,7 @@ Future<AuthState> pumpCapitalismApp(
         ChangeNotifierProvider<AppEnvironmentState>.value(value: environmentState),
         ChangeNotifierProvider<GameServerState>.value(value: gameServerState),
         ChangeNotifierProvider<AccountContextState>.value(value: accountContextState),
+        ChangeNotifierProvider<RecentBuildingState>.value(value: recentBuildingState),
       ],
       child: CapitalismApp(
         router:

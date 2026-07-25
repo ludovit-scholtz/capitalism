@@ -59,7 +59,7 @@ void main() {
       expect(find.byType(Drawer), findsNothing);
     });
 
-    testWidgets('bottom nav switches between Home, Exchange and News and highlights the active tab', (
+    testWidgets('bottom nav switches between Home, Stocks and News and highlights the active tab', (
       tester,
     ) async {
       await pumpCapitalismApp(tester);
@@ -70,21 +70,27 @@ void main() {
       // the harness's generic fake HTTP client doesn't shape a
       // `gameNewsFeed` response, so it lands on the screen's own error state.
       expect(find.text('Could not load the news feed. Please try again.'), findsOneWidget);
-      expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 3);
+      expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 6);
 
-      await tester.tap(_bottomNavLabel('Exchange'));
+      await tester.tap(_bottomNavLabel('Stocks'));
       await tester.pumpAndSettle();
-      // GlobalExchangeScreen is real and GraphQL-backed now; the harness's
-      // generic fake client doesn't shape a `cities` response, so no
-      // destination city gets selected and the Resources tab shows its
-      // empty state — still proves the navigation itself works.
-      expect(find.text('No offers available for this city.'), findsOneWidget);
-      expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 2);
+      expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 5);
 
       await tester.tap(_bottomNavLabel('Home'));
       await tester.pumpAndSettle();
       expect(find.text('Get Started'), findsOneWidget);
       expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 0);
+    });
+
+    testWidgets('bottom nav Last Building tab falls back to the building market when nothing was visited yet', (
+      tester,
+    ) async {
+      await pumpCapitalismApp(tester);
+
+      await tester.tap(_bottomNavLabel('Last Building'));
+      await tester.pumpAndSettle();
+
+      expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 2);
     });
 
     testWidgets('signing in reveals auth-only nav items, changes the Home CTA, and reaches the Dashboard', (
