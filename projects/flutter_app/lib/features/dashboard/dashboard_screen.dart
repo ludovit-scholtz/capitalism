@@ -10,10 +10,13 @@
 // revenue/cost/profit ledger panel or supply-chain unit-status panel, no
 // currency-code-aware formatting (cash is shown with a plain `$` prefix,
 // not the ledger-derived `primaryCurrencyCode`), and no live tick-based
-// auto-polling refresh (that needs a shared game-state/tick subscription
-// this app doesn't have yet) — a pull-to-refresh instead re-fetches
-// silently, matching the spirit of the web's "no loading-spinner flash on
-// background refresh" behavior without needing tick polling.
+// auto-polling refresh of this screen's own data — a pull-to-refresh
+// instead re-fetches silently, matching the spirit of the web's "no
+// loading-spinner flash on background refresh" behavior without needing
+// tick polling. A shared tick clock (`core/game_state/game_state_state.dart`)
+// does now exist app-wide, driving the nav bar's balance/tick indicator
+// (`core/widgets/game_status_bar.dart`) — this screen just doesn't
+// subscribe to it itself yet.
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';

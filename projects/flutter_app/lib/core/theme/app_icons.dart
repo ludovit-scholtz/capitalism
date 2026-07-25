@@ -85,4 +85,5 @@ class AppIcons {
   static const business = FontAwesomeIcons.briefcase;
   static const sell = FontAwesomeIcons.tag;
   static const upgrade = FontAwesomeIcons.arrowUp;
+  static const wallet = FontAwesomeIcons.wallet;
 }

@@ -40,6 +40,7 @@ import '../auth/biatec_oidc_service.dart';
 import '../auth/password_reset_service.dart';
 import '../auth/web_authenticator.dart';
 import '../context/account_context_service.dart';
+import '../game_state/game_state_service.dart';
 import '../graphql/graphql_service.dart';
 import '../services/url_opener.dart';
 import '../widgets/app_shell.dart';
@@ -70,6 +71,7 @@ GoRouter createAppRouter({
   http.Client? oidcHttpClient,
   bool? passwordAuthEnabled,
   AccountContextService? accountContextService,
+  GameStateService? gameStateService,
 }) {
   BiatecOidcService buildOidcService() =>
       webAuthenticator != null || oidcHttpClient != null
@@ -87,6 +89,7 @@ GoRouter createAppRouter({
         builder: (context, state, child) => AppShell(
             urlOpener: urlOpener,
             accountContextService: accountContextService,
+            gameStateService: gameStateService,
             child: child),
         routes: [
           GoRoute(

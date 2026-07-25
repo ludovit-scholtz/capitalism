@@ -9,12 +9,14 @@ import '../../features/chat/chat_panel.dart';
 import '../auth/auth_state.dart';
 import '../context/account_context_service.dart';
 import '../context/recent_building_state.dart';
+import '../game_state/game_state_service.dart';
 import '../router/nav_items.dart';
 import '../services/url_opener.dart';
 import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
 import '../theme/cosmic_background.dart';
 import 'context_switcher.dart';
+import 'game_status_bar.dart';
 import 'icon_badge.dart';
 
 /// Persistent chrome (app bar, drawer, bottom nav) wrapped around every
@@ -28,6 +30,7 @@ class AppShell extends StatelessWidget {
     required this.child,
     this.urlOpener = const ExternalUrlOpener(),
     this.accountContextService,
+    this.gameStateService,
   });
 
   final Widget child;
@@ -40,10 +43,34 @@ class AppShell extends StatelessWidget {
   /// of hitting a real backend, same pattern as [urlOpener].
   final AccountContextService? accountContextService;
 
+  /// Injectable so tests can fake [GameStatusBar]'s GraphQL calls, same
+  /// pattern as [accountContextService].
+  final GameStateService? gameStateService;
+
+  /// Below this width the [ContextSwitcher] moves out of the app bar and
+  /// into the drawer, leaving only the balance/tick [GameStatusBar] in the
+  /// bar itself. Matches the web's `lg` (1024px) breakpoint
+  /// (`AppHeader.vue`), the point at which it collapses its full nav into a
+  /// hamburger menu.
+  static const double _wideScreenBreakpoint = 1024;
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthState>();
 
+    // Read available width from the incoming layout constraints rather than
+    // `MediaQuery.sizeOf` — in `flutter test`, `WidgetTester.binding.
+    // setSurfaceSize` (this app's established viewport-sizing convention;
+    // see `test/support/app_harness.dart`) only changes the constraints
+    // reaching the render tree, not `MediaQuery`'s underlying `FlutterView`,
+    // so a MediaQuery-based breakpoint would silently never see anything but
+    // the default 800x600 test viewport.
+    return LayoutBuilder(
+      builder: (context, constraints) => _buildScaffold(context, auth, constraints.maxWidth >= _wideScreenBreakpoint),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context, AuthState auth, bool isWideScreen) {
     return CosmicBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
@@ -53,12 +80,17 @@ class AppShell extends StatelessWidget {
             children: [
               const FaIcon(AppIcons.brandMark, color: AppTheme.neonCyan, size: 20),
               const SizedBox(width: 10),
-              if (auth.isAuthenticated)
+              if (auth.isAuthenticated && isWideScreen)
                 Flexible(child: ContextSwitcher(accountContextService: accountContextService))
-              else
+              else if (!auth.isAuthenticated)
                 const Text('CAPITALISM'),
             ],
           ),
+          actions: [
+            if (auth.isAuthenticated)
+              GameStatusBar(gameStateService: gameStateService, accountContextService: accountContextService),
+            const SizedBox(width: 12),
+          ],
         ),
         drawer: Drawer(
           child: SafeArea(
@@ -87,6 +119,18 @@ class AppShell extends StatelessWidget {
                     ],
                   ),
                 ),
+                // On narrow screens the app bar has no room for the context
+                // switcher (it's occupied by the balance/tick status chips),
+                // so it moves here instead — still the same control/widget,
+                // just relocated.
+                if (auth.isAuthenticated && !isWideScreen)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: ContextSwitcher(accountContextService: accountContextService),
+                    ),
+                  ),
                 for (final section in navSections) ...[
                   if (_visibleItems(section, auth).isNotEmpty) ...[
                     Padding(

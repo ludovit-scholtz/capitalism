@@ -8,6 +8,8 @@ import 'package:capitalism_app/core/config/game_server_state.dart';
 import 'package:capitalism_app/core/context/account_context_service.dart';
 import 'package:capitalism_app/core/context/account_context_state.dart';
 import 'package:capitalism_app/core/context/recent_building_state.dart';
+import 'package:capitalism_app/core/game_state/game_state_service.dart';
+import 'package:capitalism_app/core/game_state/game_state_state.dart';
 import 'package:capitalism_app/core/router/app_router.dart';
 import 'package:capitalism_app/core/services/url_opener.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +19,7 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
 import 'fake_account_context_service.dart';
+import 'fake_game_state_service.dart';
 import 'fake_graphql_client.dart';
 import 'in_memory_selected_building_storage.dart';
 import 'in_memory_selected_city_storage.dart';
@@ -33,10 +36,12 @@ import 'in_memory_token_storage.dart';
 /// [router] directly (e.g. via [createAppRouter]) when a test needs to keep
 /// a reference to it for `router.go(...)` navigation afterwards.
 ///
-/// Uses a taller-than-default virtual screen because the drawer's
+/// Defaults to a taller-than-default virtual screen because the drawer's
 /// `ListView` only mounts children within the viewport + cache extent, even
 /// for a non-lazy `ListView(children: ...)` — items below the default
-/// 800x600 test viewport would otherwise be invisible to `find.text`.
+/// 800x600 test viewport would otherwise be invisible to `find.text`. The
+/// default width (800) is below [AppShell]'s wide-screen breakpoint
+/// (1024) — pass a wider [surfaceSize] to exercise the wide-screen layout.
 Future<AuthState> pumpCapitalismApp(
   WidgetTester tester, {
   bool authenticated = false,
@@ -47,9 +52,11 @@ Future<AuthState> pumpCapitalismApp(
   WebAuthenticator? webAuthenticator,
   bool? passwordAuthEnabled,
   AccountContextService? accountContextService,
+  GameStateService? gameStateService,
   GoRouter? router,
+  Size surfaceSize = const Size(800, 2400),
 }) async {
-  await tester.binding.setSurfaceSize(const Size(800, 2400));
+  await tester.binding.setSurfaceSize(surfaceSize);
   addTearDown(() => tester.binding.setSurfaceSize(null));
 
   // AppConfig's environment/graphqlUrl are process-wide static state (see
@@ -74,6 +81,8 @@ Future<AuthState> pumpCapitalismApp(
   final gameServerState = GameServerState(storage: InMemorySelectedGameServerStorage());
   final accountContextState = AccountContextState(storage: InMemorySelectedCityStorage());
   final recentBuildingState = RecentBuildingState(storage: InMemorySelectedBuildingStorage());
+  final gameStateState = GameStateState();
+  addTearDown(gameStateState.dispose);
 
   await tester.pumpWidget(
     MultiProvider(
@@ -83,6 +92,7 @@ Future<AuthState> pumpCapitalismApp(
         ChangeNotifierProvider<GameServerState>.value(value: gameServerState),
         ChangeNotifierProvider<AccountContextState>.value(value: accountContextState),
         ChangeNotifierProvider<RecentBuildingState>.value(value: recentBuildingState),
+        ChangeNotifierProvider<GameStateState>.value(value: gameStateState),
       ],
       child: CapitalismApp(
         router:
@@ -94,6 +104,7 @@ Future<AuthState> pumpCapitalismApp(
               webAuthenticator: webAuthenticator,
               passwordAuthEnabled: passwordAuthEnabled,
               accountContextService: accountContextService ?? FakeAccountContextService(),
+              gameStateService: gameStateService ?? FakeGameStateService(),
             ),
       ),
     ),
