@@ -110,3 +110,51 @@ The scaffold in `projects/flutter_app` (routing, nav drawer, theming, i18n plumb
 - [x] Implement the Operations News screen (`lib/features/operations/operations_screens.dart` `OperationsNewsScreen`, mirrors `OperationsNewsView.vue`): the real `gameNewsFeed(includeDrafts: true)` query, read-only (the web's full compose/edit/publish CMS form via `upsertGamesEntry` is not ported).
 - [x] Implement the Operations Players screen (`lib/features/operations/operations_screens.dart` `OperationsPlayersScreen`, mirrors `OperationsPlayersView.vue`): reuses `gameAdminDashboard.players` (no dedicated players query exists server-side, matching the web) with search filtering and tap-through to player detail.
 - [x] Implement the Operations Player Detail screen (`lib/features/operations/operations_screens.dart` `OperationsPlayerDetailScreen`, mirrors `OperationsPlayerDetailView.vue`): looks up the player from `gameAdminDashboard.players` by ID (matching the web's client-side lookup — no dedicated single-player query exists either). Trimmed: no impersonation, admin-role-toggle, or chat-visibility-toggle actions — this screen is view-only.
+
+### Flutter mobile app — Building Detail is not functionally playable yet
+
+The web's `BuildingDetailView.vue` (via `useBuildingDetail.ts`, ~5600 lines) is the core gameplay loop — laying out and wiring a factory/shop. `building_detail_screen.dart` currently only renders a flat read-only unit list with two quick-action mutations; none of the actual factory-building gameplay below exists on mobile yet, so buildings are not fun/playable on the Flutter app the way they are on web.
+
+- [ ] Port the 4×4 grid unit editor (`gridIndexes = [0,1,2,3]` in `useBuildingDetail.ts`, rendered by `BuildingUnitGrid.vue`) — Flutter has no grid at all, just a `ListView` of units.
+- [ ] Implement placing a new unit on an empty grid cell (tap-to-open unit picker with per-type cost preview, mirroring `BuildingEditingSidebar.vue`'s `showUnitPicker`/`placeUnit`) — there is currently no way to add a unit to a building on mobile.
+- [ ] Implement the 8-directional unit link system: horizontal, vertical, and both diagonals (`linkUp`/`linkDown`/`linkLeft`/`linkRight`/`linkUpLeft`/`linkUpRight`/`linkDownLeft`/`linkDownRight`, toggled via `toggleHorizontalLink`/`toggleVerticalLink`/`togglePrimaryDiagonalLink`/`toggleSecondaryDiagonalLink`) — this is the "directional links" mechanic that connects purchase→manufacturing→storage→sales units, and it is entirely absent from Flutter.
+- [ ] Port link-state/flow arrow visuals (`UnitLinkArrow.vue`, `DiagonalConnector.vue`, `getHorizontalLinkStateFor`/`isHorizontalLinkLive`) so players can see which units are wired together and which links are actively carrying flow.
+- [ ] Implement the planned/draft grid separate from the active (applied) grid, with `storeBuildingConfiguration`/`cancelBuildingConfiguration` mutations, instead of the current two isolated one-shot mutations (`scheduleUnitUpgrade`, `updatePublicSalesPrice`) with no draft/preview/save/cancel cycle.
+- [ ] Add per-unit configuration editing (Config/Energy/Performance/Maintenance tabs from `UnitConfigurationTabView.vue` + `BuildingUnitConfigFields.vue`): resource/product selection, min/max price, min quality, marketing budget/brand scope, B2B suggested-price hints — Flutter shows unit type/level/item name only, with no way to edit any of it.
+- [ ] Add a "remove unit from grid" action (`removeUnit`/config-tab remove button) — currently units can only be upgraded, never removed or replaced.
+- [ ] Show draft-change summaries before committing (link changes list, unit added/removed/replaced list, total ticks, total construction cost, projected company cash after apply).
+- [ ] Implement per-unit upgrade preview (`unitUpgradeInfo`: current/next level, storage capacity delta, labor cost delta, energy cost delta) before confirming — today's "Upgrade" button has no preview of what it does.
+- [ ] Add unit inventory/capacity visualization per cell (fill bar with last-tick inflow/outflow segments, quantity/capacity, sourcing cost, average quality) — Flutter shows no inventory state at all, just the configured item name.
+- [ ] Implement unit clipboard copy/paste (desktop Ctrl+C/Ctrl+V and mobile copy/paste buttons, per `unitClipboard.ts`) to speed up laying out repeated unit configurations.
+- [ ] Port supply-chain completeness validation and status panel (`buildingChainValidation.ts` reachability check + `BuildingChainStatusPanel.vue`) so mobile players get "your production chain isn't connected end-to-end" guidance like web does.
+- [ ] Implement the starter-layout one-click setup banners (`applyStarterLayout`/`applyShopStarterLayout`) that guide new players through configuring their first factory/shop.
+- [ ] Port the Media House control panel (content budget, channel/unit config, competitor/effectiveness/brand analytics, income history — `BuildingMediaHousePanel.vue`, `setMediaHouseContentBudget`/`upgradeMediaHouse`/`configureMediaHouseUnit`) — MEDIA_HOUSE buildings have no dedicated management UI on mobile.
+- [ ] Port the Power Plant control panel (dispatch % slider, power priority, spot-market energy listing/cancel/max-bid-price, analytics — `BuildingPowerPlantPanel.vue`, `setPlantDispatch`/`setPowerPriority`/`listEnergyForSale`/`cancelEnergyListing`/`setMaxEnergyBidPrice`).
+- [ ] Port the Research & Development panel (per-unit brand quality overview — `BuildingResearchPanel.vue`).
+- [ ] Port the Apartment/Commercial property panel (rent-per-sqm setting, occupancy detail — `BuildingPropertyPanel.vue`, `setRentPerSqm`, `apartmentBuildingDetail`).
+- [ ] Add PUBLIC_SALES-specific tools: sales analytics, low-inventory alert threshold, and "flush storage" (`publicSalesAnalytics`, `setPublicSalesInventoryAlertThreshold`, `flushStorage`).
+- [ ] Add the Global Exchange sourcing/vendor-selector for PURCHASE units (cross-city offer comparison with transit cost/quality/blocked-price hints — `sourcingCandidates`/`globalExchangeOffers`/`procurementPreview`).
+- [ ] Add building analytics panels: unit resource history charts, financial timeline, recent activity feed, and the supply-chain diagram (`buildingUnitResourceHistories`, `buildingFinancialTimeline`, `buildingRecentActivity`, `buildingSupplyChain`, `unitProductAnalytics`).
+- [ ] Surface active market-event banners scoped to the building's city (`getActiveMarketEvents`) and first-time-user grid-editor tutorial tooltips.
+- [ ] Add the "remove destroyed building" action (`removeDestroyedBuilding`) for destroyed buildings still listed on the dashboard.
+
+### Flutter mobile app — other documented feature-parity gaps vs. web
+
+Every screen implemented so far documents its own trims in-file and in the checklist above; this groups the gameplay-relevant ones (cosmetic-only trims like flag icons or chart styling are omitted) so they can be tracked and picked off individually. The goal is functional parity — the same things must be doable from a phone as from a desktop browser.
+
+- [ ] Dashboard: add the "Launch New Company" flow, Pro subscription panel, per-city power-grid balance summary, per-building revenue/cost/profit ledger + supply-chain status panel, and live tick-based auto-refresh (`DashboardView.vue`'s 5-tab layout vs. the current single-scroll list).
+- [ ] Onboarding: replace the list-based lot picker with the interactive map + district-name/population-index recommended-lot heuristic, add FX-accurate currency conversion, wordlist-based company/person name generation, and the auto-polled first-sale-mission celebration panel; wire up real Pro-subscription gating instead of always blocking Pro industries.
+- [ ] World Map / Buy Building / City Buildings tab: replace the plain sortable lot lists with the interactive map (marker pins, fly-to, distance-to-existing-buildings) used on web in all three flows.
+- [ ] Buy Building: add BANK-specific follow-up setup (`setBankRates`/`initiateBaseDeposit`), POWER_PLANT subtype selection, and MEDIA_HOUSE channel-type selection during purchase.
+- [ ] Building Market: add the offer negotiation-note field and auto-refresh-and-retry UX on `OFFER_VERSION_CONFLICT`.
+- [ ] Encyclopedia: port the 5 static guide tabs (onboarding, factory-layout, sales-shop, forex-trading, stock-exchange help) beyond the current resources-only catalog tab.
+- [ ] Stocks: add the inline per-row trade panel so buying/selling doesn't require navigating to a separate screen.
+- [ ] City Economy tab: port the economic-cycle, weather, power-grid-balance, and 365-tick economic-history dashboards.
+- [ ] City Market tab: add the top-selling-products demand panel and the city media-houses section.
+- [ ] Ledger: add per-category drill-down rows, cross-city shipment tracking, the city-unlock expansion panel, and multi-year history tables.
+- [ ] Company Settings: expose the `proposeDividend` form in the UI (mutation is already wired in the service).
+- [ ] Personal Ledger: add the endgame race progress bar/leaderboard with milestone toasts, and the interest-payments history table with its ALL/INTEREST/DIVIDEND filter.
+- [ ] Market Dashboard: add the price-history chart panel per product.
+- [ ] Player Profile: add bio/display-name editing and the session-security panel for the player's own profile.
+- [ ] Operations screens: wire up player impersonation, admin-role grants, NPC competitor pause/resume, ending the game shard, chat-visibility toggling, and the News screen's compose/edit/publish CMS form — currently every Operations screen is deliberately read-only.
+- [ ] Leaderboard: highlight the signed-in player's own row once `AuthState` tracks the player's id, and persist the selected tab/page in the URL like web does.
