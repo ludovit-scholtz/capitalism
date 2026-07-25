@@ -58,7 +58,21 @@ class BiatecOidcService {
   /// to. On Android/iOS it's a bare custom URL scheme name.
   String get _callbackUrlScheme => _isDesktop ? _redirectUri : BiatecOidcConfig.mobileCallbackScheme;
 
-  Future<BiatecOidcResult> signIn() async {
+  /// [silent] mirrors the web store's `startBiatecOidcSignIn(path, { silentPrompt: true })`
+  /// (`projects/frontend/src/stores/auth.ts`): it adds the standard OIDC
+  /// `prompt=none` parameter (OpenID Connect Core 1.0 §3.1.2.1), asking the
+  /// provider to respond immediately using the caller's existing IdP session
+  /// instead of showing a login UI. Custom Tabs (Android) and
+  /// `ASWebAuthenticationSession` (iOS) share cookies with the system
+  /// browser, so if the player still has a live Biatec session this
+  /// completes without any visible UI; on Windows/Linux the system browser
+  /// window may flash briefly before redirecting back. If the provider has
+  /// no active session, per spec it redirects back immediately with
+  /// `error=login_required` (surfaced here as a [BiatecOidcException])
+  /// rather than prompting — callers must not treat that as "cancelled by
+  /// the user". See `docs/oidc-refresh-gap.md` for what Biatec's OIDC
+  /// provider needs to support for a fully spec-compliant refresh flow.
+  Future<BiatecOidcResult> signIn({bool silent = false}) async {
     final state = _randomBase64Url();
     final nonce = _randomBase64Url();
     final codeVerifier = _randomBase64Url();
@@ -74,6 +88,7 @@ class BiatecOidcService {
         'nonce': nonce,
         'code_challenge': codeChallenge,
         'code_challenge_method': 'S256',
+        if (silent) 'prompt': 'none',
       },
     );
 

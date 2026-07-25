@@ -28,11 +28,30 @@ class GraphQlService {
   final AuthState _authState;
   final http.Client _client;
 
+  /// HotChocolate's default `[Authorize]`-failure code. NOTE: the backend
+  /// reuses this same code both for "no/expired/invalid token" AND for
+  /// "authenticated but doesn't satisfy a role-based policy" (see
+  /// `Api.Tests/GlobalEventTests.cs`, which accepts either
+  /// `ADMIN_ACCESS_REQUIRED` or `AUTH_NOT_AUTHORIZED` for an admin-gated
+  /// field hit by a non-admin player) — so this code alone is not proof the
+  /// session is dead. We only treat it as a session failure (and force a
+  /// logout) when [AuthState]'s locally tracked expiry corroborates it, so
+  /// an authenticated-but-unprivileged request doesn't get the player
+  /// spuriously logged out.
+  static const _authNotAuthorizedCode = 'AUTH_NOT_AUTHORIZED';
+
   Future<Map<String, dynamic>> request(
     String query, {
     Map<String, dynamic>? variables,
     String? endpoint,
   }) async {
+    // Proactively renew a near-expiry Biatec-OIDC token before it fails a
+    // real request — the mobile equivalent of the web store's timer-based
+    // `scheduleTokenRenewal` (`stores/auth.ts`), but checked on demand per
+    // request instead of on a background Timer (see AuthState's doc
+    // comment for why).
+    await _authState.ensureFreshToken();
+
     final headers = <String, String>{'Content-Type': 'application/json'};
     final token = _authState.token;
     if (token != null && token.isNotEmpty) {
@@ -83,13 +102,37 @@ class GraphQlService {
       throw GraphQlException('Received an unexpected response from the server.');
     }
 
+    // A revoked session (see `AuthenticationService`'s `session_revoked`
+    // `OnChallenge` handler in `projects/Api/Program.cs`) short-circuits the
+    // GraphQL pipeline entirely and returns a plain `{error, message}` JSON
+    // body with HTTP 401 instead of a normal `{data, errors}` GraphQL
+    // response — handle it before looking at `decoded['errors']`, or it
+    // silently falls through as an empty successful response.
+    if (response.statusCode == 401) {
+      final message = decoded['message'] as String? ?? 'Your session has ended. Please log in again.';
+      AppLogger.instance.warning('$opName -> HTTP 401 ($message), logging out', tag: 'GraphQL');
+      if (_authState.isAuthenticated) {
+        await _authState.logout();
+      }
+      throw GraphQlException(message, decoded['error'] as String? ?? 'AUTH_SESSION_EXPIRED');
+    }
+
     final errors = decoded['errors'] as List<dynamic>?;
     if (errors != null && errors.isNotEmpty) {
       final firstError = errors.first as Map<String, dynamic>;
       final extensions = firstError['extensions'] as Map<String, dynamic>?;
       final message = errors.map((error) => (error as Map<String, dynamic>)['message']).join('; ');
+      final code = extensions?['code'] as String?;
       AppLogger.instance.error('$opName -> GraphQL error', message, null, 'GraphQL');
-      throw GraphQlException(message, extensions?['code'] as String?);
+
+      final expiry = _authState.expiresAtUtc;
+      final looksExpired = expiry == null || !expiry.isAfter(DateTime.now().toUtc());
+      if (code == _authNotAuthorizedCode && looksExpired && _authState.isAuthenticated) {
+        AppLogger.instance.warning('$opName -> treating as expired session, logging out', tag: 'GraphQL');
+        await _authState.logout();
+      }
+
+      throw GraphQlException(message, code);
     }
 
     AppLogger.instance.debug('$opName -> OK', tag: 'GraphQL');

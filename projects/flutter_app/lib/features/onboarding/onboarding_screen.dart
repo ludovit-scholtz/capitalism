@@ -374,7 +374,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final auth = context.read<AuthState>();
     try {
       final oidcResult = await widget.oidcService.signIn();
-      await auth.setToken(oidcResult.token);
+      await auth.setToken(oidcResult.token, expiresAtUtc: oidcResult.expiresAtUtc, provider: AuthProvider.biatecOidc);
 
       final authedGraphQlService = widget._injectedGraphQlService ?? GraphQlService(auth);
       final authedService = widget._injectedOnboardingService ?? OnboardingService(authedGraphQlService);
