@@ -7,7 +7,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import 'support/fake_building_analytics_service.dart';
 import 'support/fake_building_detail_service.dart';
+import 'support/fake_building_sales_service.dart';
+import 'support/fake_building_sourcing_service.dart';
+import 'support/fake_tutorial_service.dart';
 import 'support/in_memory_selected_building_storage.dart';
 import 'support/in_memory_token_storage.dart';
 
@@ -45,7 +49,16 @@ Future<GoRouter> _pumpBuildingDetail(WidgetTester tester, {required FakeBuilding
     routes: [
       GoRoute(
         path: '/',
-        builder: (context, state) => Scaffold(body: BuildingDetailScreen(buildingId: 'building-1', buildingDetailService: service)),
+        builder: (context, state) => Scaffold(
+          body: BuildingDetailScreen(
+            buildingId: 'building-1',
+            buildingDetailService: service,
+            tutorialService: FakeTutorialService(),
+            buildingSalesService: FakeBuildingSalesService(),
+            buildingSourcingService: FakeBuildingSourcingService(),
+            buildingAnalyticsService: FakeBuildingAnalyticsService(),
+          ),
+        ),
       ),
       GoRoute(
         path: '/building/:id/sell',

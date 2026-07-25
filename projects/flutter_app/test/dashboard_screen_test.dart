@@ -1,4 +1,5 @@
 import 'package:capitalism_app/core/auth/auth_state.dart';
+import 'package:capitalism_app/core/graphql/graphql_service.dart';
 import 'package:capitalism_app/features/dashboard/dashboard_models.dart';
 import 'package:capitalism_app/features/dashboard/dashboard_screen.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,24 @@ import 'package:provider/provider.dart';
 
 import 'support/fake_dashboard_service.dart';
 import 'support/in_memory_token_storage.dart';
+
+const _destroyedBuilding = DashboardBuilding(
+  id: 'building-3',
+  name: 'Old Warehouse',
+  type: 'FACTORY',
+  level: 1,
+  powerStatus: 'POWERED',
+  destroyedAtUtc: '2026-01-01T00:00:00Z',
+  hasDefaultedCollateralLoan: false,
+  unitCount: 0,
+);
+
+const _companyWithDestroyed = DashboardCompany(
+  id: 'company-2',
+  name: 'Rust Belt Holdings',
+  cash: 500,
+  buildings: [_destroyedBuilding],
+);
 
 const _company = DashboardCompany(
   id: 'company-1',
@@ -45,7 +64,7 @@ Future<GoRouter> _pumpDashboard(
   final router = GoRouter(
     initialLocation: '/',
     routes: [
-      GoRoute(path: '/', builder: (context, state) => DashboardScreen(dashboardService: service)),
+      GoRoute(path: '/', builder: (context, state) => Scaffold(body: DashboardScreen(dashboardService: service))),
       GoRoute(path: '/login', builder: (context, state) => const Scaffold(body: Center(child: Text('Login Screen')))),
       GoRoute(
         path: '/onboarding',
@@ -189,6 +208,78 @@ void main() {
       expect(service.fetchDashboardDataCallCount, 2);
       // Still showing the dashboard content, not a full-screen loading spinner.
       expect(find.text('Acme Furnishings'), findsOneWidget);
+    });
+
+    testWidgets('a destroyed building shows a remove action; a healthy one does not', (tester) async {
+      final auth = AuthState(storage: InMemoryTokenStorage());
+      await auth.setToken('test-token');
+      final service = FakeDashboardService(
+        data: const DashboardData(companies: [_company, _companyWithDestroyed], currentTick: 1, taxRate: 15, pendingActions: []),
+      );
+
+      await _pumpDashboard(tester, auth: auth, service: service);
+
+      expect(find.text('Old Warehouse'), findsOneWidget);
+      expect(find.text('Destroyed'), findsOneWidget);
+      expect(find.byTooltip('Remove from dashboard'), findsOneWidget);
+    });
+
+    testWidgets('confirming removal calls the service and drops the tile from the list', (tester) async {
+      final auth = AuthState(storage: InMemoryTokenStorage());
+      await auth.setToken('test-token');
+      final service = FakeDashboardService(
+        data: const DashboardData(companies: [_companyWithDestroyed], currentTick: 1, taxRate: 15, pendingActions: []),
+      );
+
+      await _pumpDashboard(tester, auth: auth, service: service);
+
+      await tester.tap(find.byTooltip('Remove from dashboard'));
+      await tester.pumpAndSettle();
+      expect(find.text('Remove destroyed building?'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Remove'));
+      await tester.pumpAndSettle();
+
+      expect(service.calls, contains('removeDestroyedBuilding'));
+      expect(service.lastRemovedBuildingId, 'building-3');
+      expect(find.text('Old Warehouse'), findsNothing);
+    });
+
+    testWidgets('cancelling the confirm dialog does not call the service or remove the tile', (tester) async {
+      final auth = AuthState(storage: InMemoryTokenStorage());
+      await auth.setToken('test-token');
+      final service = FakeDashboardService(
+        data: const DashboardData(companies: [_companyWithDestroyed], currentTick: 1, taxRate: 15, pendingActions: []),
+      );
+
+      await _pumpDashboard(tester, auth: auth, service: service);
+
+      await tester.tap(find.byTooltip('Remove from dashboard'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(service.calls, isNot(contains('removeDestroyedBuilding')));
+      expect(find.text('Old Warehouse'), findsOneWidget);
+    });
+
+    testWidgets('a server error while removing shows a SnackBar and keeps the tile', (tester) async {
+      final auth = AuthState(storage: InMemoryTokenStorage());
+      await auth.setToken('test-token');
+      final service = FakeDashboardService(
+        data: const DashboardData(companies: [_companyWithDestroyed], currentTick: 1, taxRate: 15, pendingActions: []),
+        removeDestroyedBuildingError: GraphQlException('Building is still under review.', 'CANNOT_REMOVE'),
+      );
+
+      await _pumpDashboard(tester, auth: auth, service: service);
+
+      await tester.tap(find.byTooltip('Remove from dashboard'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Remove'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Building is still under review.'), findsOneWidget);
+      expect(find.text('Old Warehouse'), findsOneWidget);
     });
   });
 }

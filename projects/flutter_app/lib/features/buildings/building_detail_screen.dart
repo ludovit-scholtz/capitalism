@@ -46,11 +46,15 @@ import '../../core/context/recent_building_state.dart';
 import '../../core/graphql/graphql_service.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/theme/app_spacing.dart';
+import '../tutorial/tutorial_service.dart';
+import 'building_analytics_models.dart';
+import 'building_analytics_service.dart';
 import 'building_chain_status_panel.dart';
 import 'building_chain_validation.dart';
 import 'building_detail_models.dart';
 import 'building_detail_service.dart';
 import 'building_draft_summary_panel.dart';
+import 'building_financial_timeline_panel.dart';
 import 'building_grid_draft_controller.dart';
 import 'building_grid_editor.dart';
 import 'building_grid_models.dart';
@@ -59,8 +63,13 @@ import 'building_panel_models.dart';
 import 'building_panel_service.dart';
 import 'building_power_plant_panel.dart';
 import 'building_property_panel.dart';
+import 'building_recent_activity_panel.dart';
 import 'building_research_panel.dart';
+import 'building_sales_service.dart';
+import 'building_sourcing_service.dart';
 import 'building_starter_layout_banner.dart';
+import 'building_supply_chain_diagram.dart';
+import 'building_tutorial_overlay.dart';
 import 'building_unit_clipboard.dart';
 import 'building_unit_config_sheet.dart';
 import 'building_unit_grid.dart';
@@ -78,14 +87,26 @@ class BuildingDetailScreen extends StatefulWidget {
     GraphQlService? graphQlService,
     BuildingDetailService? buildingDetailService,
     BuildingPanelService? buildingPanelService,
+    TutorialService? tutorialService,
+    BuildingSalesService? buildingSalesService,
+    BuildingSourcingService? buildingSourcingService,
+    BuildingAnalyticsService? buildingAnalyticsService,
   }) : _injectedGraphQlService = graphQlService,
        _injectedBuildingDetailService = buildingDetailService,
-       _injectedBuildingPanelService = buildingPanelService;
+       _injectedBuildingPanelService = buildingPanelService,
+       _injectedTutorialService = tutorialService,
+       _injectedBuildingSalesService = buildingSalesService,
+       _injectedBuildingSourcingService = buildingSourcingService,
+       _injectedBuildingAnalyticsService = buildingAnalyticsService;
 
   final String buildingId;
   final GraphQlService? _injectedGraphQlService;
   final BuildingDetailService? _injectedBuildingDetailService;
   final BuildingPanelService? _injectedBuildingPanelService;
+  final TutorialService? _injectedTutorialService;
+  final BuildingSalesService? _injectedBuildingSalesService;
+  final BuildingSourcingService? _injectedBuildingSourcingService;
+  final BuildingAnalyticsService? _injectedBuildingAnalyticsService;
 
   @override
   State<BuildingDetailScreen> createState() => _BuildingDetailScreenState();
@@ -94,6 +115,10 @@ class BuildingDetailScreen extends StatefulWidget {
 class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
   late final BuildingDetailService _service;
   late final BuildingPanelService _panelService;
+  late final TutorialService _tutorialService;
+  late final BuildingSalesService _salesService;
+  late final BuildingSourcingService _sourcingService;
+  late final BuildingAnalyticsService _analyticsService;
   final BuildingGridDraftController _controller = BuildingGridDraftController();
 
   bool _loading = true;
@@ -111,6 +136,13 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
   List<MediaHouseUnitConfig> _mediaHouseUnits = const [];
   Map<String, String> _ownedCompanyNames = const {};
 
+  // Building-level analytics (ROADMAP 137) — fetched once per load, view
+  // mode only, alongside the per-unit-type panel data above.
+  BuildingFinancialTimeline? _financialTimeline;
+  List<BuildingRecentActivityEvent> _recentActivity = const [];
+  BuildingSupplyChainDiagram? _supplyChain;
+  List<UnitResourceHistoryPoint> _unitResourceHistories = const [];
+
   @override
   void initState() {
     super.initState();
@@ -118,6 +150,10 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
     final graphQlService = widget._injectedGraphQlService ?? GraphQlService(auth);
     _service = widget._injectedBuildingDetailService ?? BuildingDetailService(graphQlService);
     _panelService = widget._injectedBuildingPanelService ?? BuildingPanelService(graphQlService);
+    _tutorialService = widget._injectedTutorialService ?? TutorialService(graphQlService);
+    _salesService = widget._injectedBuildingSalesService ?? BuildingSalesService(graphQlService);
+    _sourcingService = widget._injectedBuildingSourcingService ?? BuildingSourcingService(graphQlService);
+    _analyticsService = widget._injectedBuildingAnalyticsService ?? BuildingAnalyticsService(graphQlService);
     // Deferred past this build: recordVisit's notifyListeners() would
     // otherwise fire synchronously during this widget's own initState/mount,
     // which trips "setState() called during build" for the RecentBuildingState
@@ -163,6 +199,7 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
       if (building != null) {
         _controller.loadFrom(building.withCityFxRate(fxRate), catalog: catalog, companyCash: cash);
         await _loadPanelData(building);
+        unawaited(_loadBuildingAnalytics(building));
       } else {
         _controller.building = null;
       }
@@ -216,6 +253,34 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
             _ownedCompanyNames = results[2] as Map<String, String>;
           });
         }
+    }
+  }
+
+  /// Building-level analytics (ROADMAP 137) — always fetches the financial
+  /// timeline + recent activity, and the supply-chain diagram for FACTORY
+  /// buildings only (matching web's `building.type === 'FACTORY'` guard on
+  /// `loadSupplyChain`). Loaded additively alongside `_loadPanelData` rather
+  /// than blocking it — a failure here shouldn't prevent the building from
+  /// being usable, so failures are swallowed and simply leave the relevant
+  /// panel empty.
+  Future<void> _loadBuildingAnalytics(BuildingDetail building) async {
+    try {
+      final futures = <Future<Object?>>[
+        _analyticsService.fetchFinancialTimeline(building.id),
+        _analyticsService.fetchRecentActivity(building.id),
+        building.type == 'FACTORY' ? _analyticsService.fetchSupplyChain(building.id) : Future.value(null),
+        _analyticsService.fetchUnitResourceHistories(building.id),
+      ];
+      final results = await Future.wait(futures);
+      if (!mounted) return;
+      setState(() {
+        _financialTimeline = results[0] as BuildingFinancialTimeline?;
+        _recentActivity = (results[1] as List<BuildingRecentActivityEvent>?) ?? const [];
+        _supplyChain = results[2] as BuildingSupplyChainDiagram?;
+        _unitResourceHistories = (results[3] as List<UnitResourceHistoryPoint>?) ?? const [];
+      });
+    } catch (_) {
+      // Non-critical — analytics panels just stay in their empty state.
     }
   }
 
@@ -301,9 +366,14 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
       builder: (_) => UnitConfigSheet(
         controller: _controller,
         service: _service,
+        salesService: _salesService,
+        sourcingService: _sourcingService,
+        analyticsService: _analyticsService,
         unit: unit,
         resourceNames: _resourceNames,
         productNames: _productNames,
+        unitResourceHistories: _unitResourceHistories,
+        cityId: _controller.building?.cityId,
         onChanged: () => _controller.notify(),
         onRemove: () => _controller.removeDraftUnit(x, y),
       ),
@@ -444,7 +514,7 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
     final validationUnits = isEditing ? _controller.draftUnits : (pending != null ? _controller.pendingUnits : _controller.activeUnits);
     final configWarnings = isGridBuilding ? getConfigWarnings(building.type, validationUnits) : const <ChainWarning>[];
 
-    return RefreshIndicator(
+    final content = RefreshIndicator(
       onRefresh: _load,
       child: ListView(
         padding: const EdgeInsets.all(24),
@@ -527,6 +597,19 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
             ProductionChainStatusPanel(units: validationUnits),
           if (isGridBuilding && !isEditing && !showStarterBanner && building.type == 'SALES_SHOP')
             ShopChainStatusPanel(units: validationUnits),
+          // Building-level analytics (ROADMAP 137) — view mode only, matching
+          // web's placement of the Overview/Supply Chain tabs above the unit
+          // list rather than mixed into the editable grid.
+          if (!isEditing) ...[
+            const SizedBox(height: 12),
+            BuildingFinancialTimelinePanel(timeline: _financialTimeline),
+            const SizedBox(height: 12),
+            BuildingRecentActivityPanel(events: _recentActivity),
+            if (building.type == 'FACTORY') ...[
+              const SizedBox(height: 12),
+              BuildingSupplyChainDiagramView(diagram: _supplyChain),
+            ],
+          ],
           const SizedBox(height: 16),
           if (isGridBuilding) ...[
             Row(
@@ -603,6 +686,13 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
           ),
         ],
       ),
+    );
+
+    return BuildingDetailTutorialOverlay(
+      tutorialService: _tutorialService,
+      isEditing: isEditing,
+      isGridBuilding: isGridBuilding,
+      child: content,
     );
   }
 }

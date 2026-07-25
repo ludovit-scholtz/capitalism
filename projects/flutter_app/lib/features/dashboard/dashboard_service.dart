@@ -18,6 +18,15 @@ const _dashboardDataQuery = r'''
   }
 ''';
 
+/// Mirrors `useBuildingDetail.ts`'s `removeDestroyedBuilding()` — on mobile
+/// this is triggered from the dashboard tile directly rather than requiring
+/// a trip through the building detail screen (ROADMAP 139).
+const _removeDestroyedBuildingMutation = r'''
+  mutation RemoveDestroyedBuilding($input: RemoveDestroyedBuildingInput!) {
+    removeDestroyedBuilding(input: $input) { id }
+  }
+''';
+
 /// GraphQL calls for the Dashboard screen, matching the exact operation
 /// names/fields `DashboardView.vue`'s initial combined query uses (`myCompanies`
 /// and `myPendingActions` are bare top-level auth-scoped fields, not nested
@@ -53,6 +62,15 @@ class DashboardService {
       currentTick: (gameState?['currentTick'] as num?)?.toInt() ?? 0,
       taxRate: (gameState?['taxRate'] as num?)?.toDouble() ?? 0,
       pendingActions: pendingActions,
+    );
+  }
+
+  Future<void> removeDestroyedBuilding(String buildingId) {
+    return _graphQlService.request(
+      _removeDestroyedBuildingMutation,
+      variables: {
+        'input': {'buildingId': buildingId},
+      },
     );
   }
 }

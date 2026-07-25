@@ -22,31 +22,57 @@
 //   sourcing-candidate panel. These map to their own separate ROADMAP items
 //   (Global Exchange sourcing/vendor-selector, Media House control panel).
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_spacing.dart';
+import '../exchange/forex_models.dart' show MarketEvent;
+import 'building_analytics_models.dart';
+import 'building_analytics_service.dart';
 import 'building_detail_service.dart';
 import 'building_grid_draft_controller.dart';
 import 'building_grid_models.dart';
 import 'building_inventory_fill_bar.dart';
+import 'building_public_sales_panel.dart';
+import 'building_sales_models.dart';
+import 'building_sales_service.dart';
+import 'building_sourcing_models.dart';
+import 'building_sourcing_panel.dart';
+import 'building_sourcing_service.dart';
+import 'building_unit_history_panel.dart';
 
 class UnitConfigSheet extends StatefulWidget {
   const UnitConfigSheet({
     super.key,
     required this.controller,
     required this.service,
+    required this.salesService,
+    required this.sourcingService,
+    required this.analyticsService,
     required this.unit,
     required this.resourceNames,
     required this.productNames,
+    required this.unitResourceHistories,
+    required this.cityId,
     required this.onChanged,
     required this.onRemove,
   });
 
   final BuildingGridDraftController controller;
   final BuildingDetailService service;
+  final BuildingSalesService salesService;
+  final BuildingSourcingService sourcingService;
+  final BuildingAnalyticsService analyticsService;
   final EditableGridUnit unit;
   final Map<String, String> resourceNames;
   final Map<String, String> productNames;
+
+  /// Full building-wide resource history (fetched once per building load),
+  /// filtered to this unit's id in [build] — avoids re-querying
+  /// `buildingUnitResourceHistories` on every sheet open.
+  final List<UnitResourceHistoryPoint> unitResourceHistories;
+  final String? cityId;
   final VoidCallback onChanged;
   final VoidCallback onRemove;
 
@@ -58,6 +84,27 @@ class _UnitConfigSheetState extends State<UnitConfigSheet> {
   UnitUpgradeInfo? _upgradeInfo;
   BuildingUnitInventorySummary? _inventory;
   bool _loadingExtras = true;
+
+  // PUBLIC_SALES tools (ROADMAP 135).
+  PublicSalesAnalytics? _publicSalesAnalytics;
+  List<MarketEvent> _marketEvents = const [];
+  bool _salesLoading = false;
+
+  // Global Exchange sourcing (ROADMAP 136).
+  ProcurementPreview? _procurementPreview;
+  List<SourcingCandidate> _sourcingCandidates = const [];
+  bool _sourcingLoading = false;
+
+  // Per-unit product analytics (ROADMAP 137, MANUFACTURING only).
+  UnitProductAnalytics? _productAnalytics;
+  bool _productAnalyticsLoading = false;
+
+  // Flush-storage also applies to STORAGE/MINING/MANUFACTURING on web, not
+  // just PUBLIC_SALES (which gets its own button inside
+  // `PublicSalesToolsPanel`) — this is that button's loading flag.
+  bool _flushingOther = false;
+
+  static const _flushableUnitTypes = {'STORAGE', 'MINING', 'MANUFACTURING'};
 
   bool get _isPersistedUnit => !widget.unit.id.startsWith('draft-');
 
@@ -95,6 +142,100 @@ class _UnitConfigSheetState extends State<UnitConfigSheet> {
     } catch (_) {
       if (mounted) setState(() => _loadingExtras = false);
     }
+    unawaited(_loadTypeSpecificExtras());
+  }
+
+  Future<void> _loadTypeSpecificExtras() async {
+    switch (widget.unit.unitType) {
+      case 'PUBLIC_SALES':
+        setState(() => _salesLoading = true);
+        try {
+          final results = await Future.wait([
+            widget.salesService.fetchPublicSalesAnalytics(widget.unit.id),
+            widget.salesService.fetchActiveMarketEvents(widget.cityId),
+          ]);
+          if (mounted) {
+            setState(() {
+              _publicSalesAnalytics = results[0] as PublicSalesAnalytics?;
+              _marketEvents = results[1] as List<MarketEvent>;
+              _salesLoading = false;
+            });
+          }
+        } catch (_) {
+          if (mounted) setState(() => _salesLoading = false);
+        }
+      case 'PURCHASE':
+        setState(() => _sourcingLoading = true);
+        try {
+          final results = await Future.wait([
+            widget.sourcingService.fetchProcurementPreview(widget.unit.id),
+            widget.sourcingService.fetchSourcingCandidates(widget.unit.id),
+          ]);
+          if (mounted) {
+            setState(() {
+              _procurementPreview = results[0] as ProcurementPreview?;
+              _sourcingCandidates = results[1] as List<SourcingCandidate>;
+              _sourcingLoading = false;
+            });
+          }
+        } catch (_) {
+          if (mounted) setState(() => _sourcingLoading = false);
+        }
+      case 'MANUFACTURING':
+        setState(() => _productAnalyticsLoading = true);
+        try {
+          final analytics = await widget.analyticsService.fetchUnitProductAnalytics(widget.unit.id);
+          if (mounted) {
+            setState(() {
+              _productAnalytics = analytics;
+              _productAnalyticsLoading = false;
+            });
+          }
+        } catch (_) {
+          if (mounted) setState(() => _productAnalyticsLoading = false);
+        }
+    }
+  }
+
+  Future<void> _saveInventoryThreshold(double? threshold) async {
+    await widget.salesService.setInventoryAlertThreshold(buildingUnitId: widget.unit.id, threshold: threshold);
+    widget.unit.lowInventoryAlertThreshold = threshold;
+    widget.onChanged();
+  }
+
+  Future<void> _flushStorage() async {
+    final result = await widget.salesService.flushStorage(widget.unit.id);
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Discarded ${result.discardedItemCount} item(s) worth ${result.totalDiscardedValue.toStringAsFixed(0)}.')));
+    }
+    widget.onChanged();
+    await _loadExtras();
+  }
+
+  Future<void> _confirmAndFlushOther() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Discard all inventory?'),
+        content: const Text('This permanently discards everything currently stored in this unit. This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Yes, Discard All')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _flushingOther = true);
+    try {
+      await _flushStorage();
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not flush storage. Please try again.')));
+    } finally {
+      if (mounted) setState(() => _flushingOther = false);
+    }
   }
 
   void _notify() {
@@ -128,6 +269,30 @@ class _UnitConfigSheetState extends State<UnitConfigSheet> {
             ],
             if (_upgradeInfo != null) ...[const SizedBox(height: AppSpacing.md), _upgradePreviewCard(theme, _upgradeInfo!)],
             if (_loadingExtras) const Padding(padding: EdgeInsets.symmetric(vertical: AppSpacing.md), child: LinearProgressIndicator()),
+            if (_isPersistedUnit) UnitResourceHistoryPanel(history: widget.unitResourceHistories.where((p) => p.buildingUnitId == unit.id).toList()),
+            if (_isPersistedUnit && unit.unitType == 'PUBLIC_SALES')
+              PublicSalesToolsPanel(
+                analytics: _publicSalesAnalytics,
+                analyticsLoading: _salesLoading,
+                marketEvents: _marketEvents,
+                currentThreshold: unit.lowInventoryAlertThreshold,
+                onSaveThreshold: _saveInventoryThreshold,
+                onFlushStorage: _flushStorage,
+              ),
+            if (_isPersistedUnit && unit.unitType == 'PURCHASE')
+              SourcingComparisonPanel(preview: _procurementPreview, candidates: _sourcingCandidates, loading: _sourcingLoading),
+            if (_isPersistedUnit && unit.unitType == 'MANUFACTURING')
+              UnitProductAnalyticsPanel(analytics: _productAnalytics, loading: _productAnalyticsLoading),
+            if (_isPersistedUnit && _flushableUnitTypes.contains(unit.unitType)) ...[
+              const SizedBox(height: AppSpacing.md),
+              OutlinedButton.icon(
+                icon: _flushingOther
+                    ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.delete_sweep_outlined, size: 18),
+                label: const Text('Discard All Inventory'),
+                onPressed: _flushingOther ? null : _confirmAndFlushOther,
+              ),
+            ],
             const SizedBox(height: AppSpacing.md),
             OutlinedButton.icon(
               icon: const Icon(Icons.delete_outline, size: 18),

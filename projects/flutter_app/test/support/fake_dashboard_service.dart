@@ -9,14 +9,17 @@ class FakeDashboardService implements DashboardService {
     this.onboardingCompleted = true,
     this.data = const DashboardData(companies: [], currentTick: 100, taxRate: 15, pendingActions: []),
     this.fetchDataError,
+    this.removeDestroyedBuildingError,
   });
 
   final bool? onboardingCompleted;
   final DashboardData data;
   final Object? fetchDataError;
+  final Object? removeDestroyedBuildingError;
 
   final List<String> calls = [];
   int fetchDashboardDataCallCount = 0;
+  String? lastRemovedBuildingId;
 
   @override
   Future<bool?> fetchOnboardingCompleted() async {
@@ -30,5 +33,12 @@ class FakeDashboardService implements DashboardService {
     fetchDashboardDataCallCount++;
     if (fetchDataError != null) throw fetchDataError!;
     return data;
+  }
+
+  @override
+  Future<void> removeDestroyedBuilding(String buildingId) async {
+    calls.add('removeDestroyedBuilding');
+    lastRemovedBuildingId = buildingId;
+    if (removeDestroyedBuildingError != null) throw removeDestroyedBuildingError!;
   }
 }

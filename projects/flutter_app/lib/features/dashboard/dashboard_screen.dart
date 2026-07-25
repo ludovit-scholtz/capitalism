@@ -48,6 +48,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _loading = true;
   String? _error;
   DashboardData? _data;
+  final Set<String> _removingBuildingIds = {};
 
   @override
   void initState() {
@@ -108,6 +109,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  /// Removes a destroyed building from the dashboard (ROADMAP 139), mirroring
+  /// `removeDestroyedBuilding` on web but triggered straight from the tile.
+  /// Optimistically drops the building from the in-memory list on success —
+  /// there's nothing else on this screen that depends on it — and shows a
+  /// `SnackBar` on failure rather than disturbing the rest of the list.
+  Future<void> _removeBuilding(String companyId, String buildingId) async {
+    setState(() => _removingBuildingIds.add(buildingId));
+    try {
+      await _service.removeDestroyedBuilding(buildingId);
+      if (!mounted) return;
+      final data = _data!;
+      setState(() {
+        _data = DashboardData(
+          companies: [
+            for (final company in data.companies)
+              company.id == companyId
+                  ? DashboardCompany(
+                      id: company.id,
+                      name: company.name,
+                      cash: company.cash,
+                      buildings: company.buildings.where((b) => b.id != buildingId).toList(),
+                    )
+                  : company,
+          ],
+          currentTick: data.currentTick,
+          taxRate: data.taxRate,
+          pendingActions: data.pendingActions,
+        );
+      });
+    } catch (e) {
+      if (mounted) {
+        final message = e is GraphQlException ? e.message : 'Could not remove this building. Please try again.';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      }
+    } finally {
+      if (mounted) setState(() => _removingBuildingIds.remove(buildingId));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -160,7 +200,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 16),
-          for (final company in data.companies) DashboardCompanyCard(company: company),
+          for (final company in data.companies)
+            DashboardCompanyCard(
+              company: company,
+              onRemoveBuilding: (buildingId) => _removeBuilding(company.id, buildingId),
+              removingBuildingIds: _removingBuildingIds,
+            ),
           DashboardPendingActionsSection(actions: data.pendingActions),
         ],
       ),
