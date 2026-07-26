@@ -6,13 +6,13 @@ import '../../core/theme/app_icons.dart';
 import '../../core/widgets/icon_badge.dart';
 import 'onboarding_models.dart';
 
-/// Mirrors the core of step 7 in `OnboardingView.vue`: a completion summary
-/// plus navigation onward. Deliberately trimmed from the web version: no
-/// auto-polled first-sale-mission detection/celebration panel (that relies
-/// on `useTickRefresh` polling a live backend — out of scope for this pass),
-/// no per-industry price-benchmark "configure guide" cards. The "mark
-/// complete" button still calls the real `completeFirstSaleMilestone`
-/// mutation.
+/// Mirrors the core of step 7 in `OnboardingView.vue`: a completion summary,
+/// the auto-polled first-sale-mission celebration panel, and navigation
+/// onward. Deliberately trimmed from the web version: no per-industry
+/// price-benchmark "configure guide" cards. The "mark complete" button still
+/// calls the real `completeFirstSaleMilestone` mutation as a manual
+/// fallback, even though `OnboardingScreen` now auto-fires it once
+/// [missionStatus] reports `FIRST_SALE_RECORDED`.
 class OnboardingCompleteStep extends StatelessWidget {
   const OnboardingCompleteStep({
     super.key,
@@ -23,6 +23,8 @@ class OnboardingCompleteStep extends StatelessWidget {
     required this.savingProgress,
     required this.completingMilestone,
     required this.milestoneCompleted,
+    required this.formatMoney,
+    this.missionStatus,
     this.error,
   });
 
@@ -33,6 +35,17 @@ class OnboardingCompleteStep extends StatelessWidget {
   final bool savingProgress;
   final bool completingMilestone;
   final bool milestoneCompleted;
+
+  /// Formats an amount already denominated in the given currency code (the
+  /// completion result's `companyCash`/`cityCurrencyCode` are already the
+  /// real, backend-computed local-currency balance — no conversion needed
+  /// here, only symbol/decimals formatting).
+  final String Function(double amount, String currencyCode) formatMoney;
+
+  /// Latest tick-polled first-sale-mission status, if any has been fetched
+  /// yet (`OnboardingScreen._refreshFirstSaleMission`). `null` until the
+  /// first tick after arriving on this step.
+  final FirstSaleMissionStatus? missionStatus;
   final String? error;
 
   @override
@@ -72,13 +85,47 @@ class OnboardingCompleteStep extends StatelessWidget {
                     const SizedBox(height: 8),
                     Text('Cash on hand', style: theme.textTheme.labelMedium),
                     Text(
-                      '${result!.companyCash.toStringAsFixed(0)} ${result!.cityCurrencyCode}',
+                      formatMoney(result!.companyCash, result!.cityCurrencyCode),
                       style: theme.textTheme.titleMedium,
                     ),
                   ],
                 ),
               ),
             ),
+          if (missionStatus?.firstSaleRevenue != null) ...[
+            const SizedBox(height: 12),
+            Card(
+              key: const Key('first-sale-celebration'),
+              color: theme.colorScheme.primaryContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const FaIcon(AppIcons.celebration, size: 18),
+                        const SizedBox(width: 8),
+                        Text('First sale recorded!', style: theme.textTheme.titleMedium),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if (missionStatus!.firstSaleProductName != null)
+                      Text(
+                        '${missionStatus!.firstSaleProductName}'
+                        '${missionStatus!.firstSaleQuantity != null ? ' · ${missionStatus!.firstSaleQuantity!.toStringAsFixed(0)} units' : ''}',
+                      ),
+                    Text('Revenue: ${formatMoney(missionStatus!.firstSaleRevenue!, result?.cityCurrencyCode ?? 'USD')}'),
+                    if (missionStatus!.firstSalePricePerUnit != null)
+                      Text(
+                        'Price per unit: ${formatMoney(missionStatus!.firstSalePricePerUnit!, result?.cityCurrencyCode ?? 'USD')}',
+                      ),
+                    if (missionStatus!.firstSaleTick != null) Text('Tick ${missionStatus!.firstSaleTick}'),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           if (isGuestMode) ...[
             const Text('Sign in with Biatec to save this progress to a real account.'),

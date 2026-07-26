@@ -4,20 +4,27 @@
 // Deliberately trimmed from the web (documented, not oversights):
 // - No country flag images (`CountryFlag.vue`) — the country code is shown
 //   as plain text instead, avoiding a flag-icon asset/package dependency.
-// - World Map: the interactive Leaflet map (marker pins, fly-to, tile
-//   layer) is replaced by a plain sortable list of cities with the same
-//   unlock/progress data, the same simplification precedent set by the
-//   Onboarding wizard's list-based lot picker (see `onboarding_steps.dart`)
-//   — no mapping library dependency added for one screen.
+//
+// World Map now renders a real interactive map (`CapitalismMapView`,
+// OpenStreetMap tiles via `flutter_map`, mirroring `WorldMapView.vue`'s
+// Leaflet setup): city markers scaled by population, colored by unlock
+// status, with an animated fly-to on selection (the one map among
+// Onboarding/Buy Building/City Buildings that gets real Leaflet-`flyTo`-style
+// animation, matching web). A `ChoiceChip` row below the map is kept as a
+// precise, thumb-friendly alternative to tapping small map pins — mobile UX
+// improvement beyond web's desktop-oriented sidebar list, not a trim.
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart' show TileProvider;
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
 import '../../core/theme/app_icons.dart';
+import '../../core/widgets/capitalism_map_view.dart';
 import 'cities_models.dart';
 import 'cities_service.dart';
 
@@ -197,12 +204,20 @@ class _MetricTile extends StatelessWidget {
 }
 
 class WorldMapScreen extends StatefulWidget {
-  const WorldMapScreen({super.key, GraphQlService? graphQlService, CitiesService? citiesService})
-    : _injectedGraphQlService = graphQlService,
-      _injectedCitiesService = citiesService;
+  const WorldMapScreen({
+    super.key,
+    GraphQlService? graphQlService,
+    CitiesService? citiesService,
+    this.tileProvider,
+  }) : _injectedGraphQlService = graphQlService,
+       _injectedCitiesService = citiesService;
 
   final GraphQlService? _injectedGraphQlService;
   final CitiesService? _injectedCitiesService;
+
+  /// Injectable so widget tests never hit real OSM tile servers — see
+  /// `test/support/fake_tile_provider.dart`.
+  final TileProvider? tileProvider;
 
   @override
   State<WorldMapScreen> createState() => _WorldMapScreenState();
@@ -287,24 +302,52 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
       }
     }
 
+    final theme = Theme.of(context);
+
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        Text('World Map', style: Theme.of(context).textTheme.headlineSmall),
+        Text('World Map', style: theme.textTheme.headlineSmall),
         const SizedBox(height: 4),
-        Text('Expand your empire into new cities.', style: Theme.of(context).textTheme.bodyMedium),
+        Text('Expand your empire into new cities.', style: theme.textTheme.bodyMedium),
         const SizedBox(height: 16),
-        for (final city in _cities)
-          Card(
-            key: ValueKey('expansion-city-${city.id}'),
-            color: city.id == _selectedId ? Theme.of(context).colorScheme.surfaceContainerHigh : null,
-            child: ListTile(
-              leading: FaIcon(city.isUnlocked ? AppIcons.lockOpen : AppIcons.lock, size: 18),
-              title: Text(city.name),
-              subtitle: Text(city.currencyCode),
-              onTap: () => setState(() => _selectedId = city.id),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: SizedBox(
+            height: 320,
+            child: CapitalismMapView(
+              tileProvider: widget.tileProvider,
+              flyToTarget: selected != null ? LatLng(selected.latitude, selected.longitude) : null,
+              flyToZoom: 6,
+              markers: [
+                for (final city in _cities)
+                  CapitalismMapMarker(
+                    id: city.id,
+                    position: LatLng(city.latitude, city.longitude),
+                    color: city.isUnlocked ? theme.colorScheme.primary : const Color(0xFF94A3B8),
+                    size: city.mapMarkerSize,
+                    tooltip: city.name,
+                    onTap: () => setState(() => _selectedId = city.id),
+                  ),
+              ],
             ),
           ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final city in _cities)
+              ChoiceChip(
+                key: ValueKey('expansion-city-${city.id}'),
+                avatar: FaIcon(city.isUnlocked ? AppIcons.lockOpen : AppIcons.lock, size: 14),
+                label: Text(city.name),
+                selected: city.id == _selectedId,
+                onSelected: (_) => setState(() => _selectedId = city.id),
+              ),
+          ],
+        ),
         if (selected != null) ...[
           const SizedBox(height: 16),
           Builder(

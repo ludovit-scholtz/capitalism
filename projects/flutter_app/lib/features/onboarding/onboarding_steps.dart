@@ -1,10 +1,22 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart' show TileProvider;
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../core/theme/app_icons.dart';
+import '../../core/widgets/capitalism_map_view.dart';
 import 'onboarding_models.dart';
+import 'onboarding_recommendation.dart';
+
+CityLot? _findLot(List<CityLot> lots, String? id) {
+  if (id == null) return null;
+  for (final lot in lots) {
+    if (lot.id == id) return lot;
+  }
+  return null;
+}
 
 /// Web's `OnboardingLotSelector` uses this same simplified approximation
 /// (not true haversine) for both city-center and factory-to-shop distance.
@@ -12,17 +24,6 @@ double approxDistanceKm(double lat1, double lon1, double lat2, double lon2) {
   final dLat = lat1 - lat2;
   final dLon = lon1 - lon2;
   return math.sqrt(dLat * dLat + dLon * dLon) * 111;
-}
-
-/// Simplified stand-in for the web's `getRecommendedFactoryLotIds`/
-/// `getRecommendedShopLotIds` (district-name-regex + population-index
-/// heuristics): the two cheapest unowned suitable lots, sorted ascending by
-/// price. Good enough to reproduce the "recommended badge, pre-selected"
-/// behavior without porting the exact district-matching rules.
-List<String> recommendedLotIds(List<CityLot> lots, String buildingType) {
-  final candidates = lots.where((l) => !l.isOwned && l.suitableFor(buildingType)).toList()
-    ..sort((a, b) => a.price.compareTo(b.price));
-  return candidates.take(2).map((l) => l.id).toList();
 }
 
 class OnboardingStepScaffold extends StatelessWidget {
@@ -140,10 +141,20 @@ class OnboardingIndustryStep extends StatelessWidget {
 }
 
 class OnboardingProductStep extends StatelessWidget {
-  const OnboardingProductStep({super.key, required this.products, required this.onSelect, this.error});
+  const OnboardingProductStep({
+    super.key,
+    required this.products,
+    required this.onSelect,
+    required this.formatBasePrice,
+    this.error,
+  });
 
   final List<OnboardingProductType> products;
   final ValueChanged<String> onSelect;
+
+  /// Converts a product's USD-nominal `basePrice` into the selected city's
+  /// currency and formats it (see `onboarding_fx.dart`).
+  final String Function(double basePrice) formatBasePrice;
   final String? error;
 
   @override
@@ -160,7 +171,7 @@ class OnboardingProductStep extends StatelessWidget {
                 key: ValueKey('product-${product.id}'),
                 title: Text(product.name),
                 subtitle: Text(
-                  '\$${product.basePrice.toStringAsFixed(2)} · ${product.baseCraftTicks} ticks to craft'
+                  '${formatBasePrice(product.basePrice)} · ${product.baseCraftTicks} ticks to craft'
                   '${product.recipes.isNotEmpty ? ' · needs ${product.recipes.map((r) => r.ingredientName).join(', ')}' : ''}',
                 ),
                 trailing: const FaIcon(AppIcons.chevronRight, size: 16),
@@ -174,9 +185,13 @@ class OnboardingProductStep extends StatelessWidget {
 }
 
 class OnboardingIpoStep extends StatelessWidget {
-  const OnboardingIpoStep({super.key, required this.onSelect, this.error});
+  const OnboardingIpoStep({super.key, required this.onSelect, required this.formatUsdWhole, this.error});
 
   final ValueChanged<double> onSelect;
+
+  /// Converts a USD-nominal whole-unit amount (founder contribution, raise
+  /// target) into the selected city's currency and formats it.
+  final String Function(double usdAmount) formatUsdWhole;
   final String? error;
 
   @override
@@ -184,7 +199,7 @@ class OnboardingIpoStep extends StatelessWidget {
     return OnboardingStepScaffold(
       title: 'Choose your IPO plan',
       subtitle:
-          'Founder contribution is a fixed \$${onboardingFounderContribution.toStringAsFixed(0)}. '
+          'Founder contribution is a fixed ${formatUsdWhole(onboardingFounderContribution)}. '
           'The raise target is additional public capital.',
       error: error,
       child: Column(
@@ -195,7 +210,7 @@ class OnboardingIpoStep extends StatelessWidget {
                 key: ValueKey('ipo-${plan.raiseTarget}'),
                 title: Text(plan.label),
                 subtitle: Text(
-                  'Raise \$${plan.raiseTarget.toStringAsFixed(0)} · '
+                  'Raise ${formatUsdWhole(plan.raiseTarget)} · '
                   'you keep ${(plan.founderOwnershipRatio * 100).toStringAsFixed(0)}% ownership',
                 ),
                 trailing: const FaIcon(AppIcons.chevronRight, size: 16),
@@ -221,7 +236,9 @@ class OnboardingLotStep extends StatelessWidget {
     required this.onPurchase,
     required this.purchaseLabel,
     required this.submitting,
+    required this.formatAmount,
     this.referenceLot,
+    this.tileProvider,
     this.error,
   });
 
@@ -238,11 +255,36 @@ class OnboardingLotStep extends StatelessWidget {
   final CityLot? referenceLot;
   final String? error;
 
+  /// Injectable so widget tests never hit real OSM tile servers — see
+  /// `test/support/fake_tile_provider.dart`.
+  final TileProvider? tileProvider;
+
+  /// Formats an amount already denominated in the selected city's currency
+  /// (available cash, lot prices — both already local-currency from the
+  /// backend). No conversion, symbol/decimals only.
+  final String Function(double amount) formatAmount;
+
+  /// Marker color mirroring web's `OnboardingLotSelector.getMarkerColor`:
+  /// selected (blue) > owned (gray) > recommended-and-affordable (green) >
+  /// affordable-only (orange) > neither (gray).
+  Color _markerColor(CityLot lot, List<String> recommended) {
+    if (selectedLotId == lot.id) return CapitalismMapColors.selected;
+    if (lot.isOwned) return CapitalismMapColors.ownedByNpc;
+    final affordable = lot.price <= availableCash;
+    if (recommended.contains(lot.id) && affordable) return CapitalismMapColors.available;
+    if (affordable) return CapitalismMapColors.affordableOnly;
+    return CapitalismMapColors.ownedByNpc;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final suitable = lots.where((l) => l.suitableFor(buildingType)).toList();
-    final recommended = recommendedLotIds(lots, buildingType);
+    final available = availableLotsFor(lots, buildingType);
+    final recommended = buildingType == 'FACTORY'
+        ? recommendedFactoryLotIds(available)
+        : recommendedShopLotIds(available, factoryLot: referenceLot);
+    final selectedLot = _findLot(suitable, selectedLotId);
 
     return OnboardingStepScaffold(
       title: title,
@@ -251,9 +293,34 @@ class OnboardingLotStep extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Available cash: \$${availableCash.toStringAsFixed(0)}', style: theme.textTheme.titleMedium),
+          Text('Available cash: ${formatAmount(availableCash)}', style: theme.textTheme.titleMedium),
           const SizedBox(height: 12),
-          if (suitable.isEmpty) const Text('No suitable lots are available in this city right now.'),
+          if (suitable.isEmpty)
+            const Text('No suitable lots are available in this city right now.')
+          else ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                height: 260,
+                child: CapitalismMapView(
+                  tileProvider: tileProvider,
+                  flyToTarget: selectedLot != null ? LatLng(selectedLot.latitude, selectedLot.longitude) : null,
+                  markers: [
+                    for (final lot in suitable)
+                      CapitalismMapMarker(
+                        id: lot.id,
+                        position: LatLng(lot.latitude, lot.longitude),
+                        color: _markerColor(lot, recommended),
+                        size: selectedLotId == lot.id ? 20 : 14,
+                        tooltip: lot.name,
+                        onTap: lot.isOwned ? null : () => onSelect(lot.id),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           for (final lot in suitable)
             Card(
               color: selectedLotId == lot.id ? theme.colorScheme.primaryContainer : null,
@@ -264,7 +331,7 @@ class OnboardingLotStep extends StatelessWidget {
                 subtitle: Text(
                   [
                     lot.district,
-                    '\$${lot.price.toStringAsFixed(0)}',
+                    formatAmount(lot.price),
                     if (lot.isOwned) 'Already owned',
                     if (referenceLot != null)
                       '${approxDistanceKm(lot.latitude, lot.longitude, referenceLot!.latitude, referenceLot!.longitude).toStringAsFixed(1)} km from factory',

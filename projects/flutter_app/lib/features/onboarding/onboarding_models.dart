@@ -191,6 +191,7 @@ class OnboardingResumeState {
     required this.onboardingFactoryLotId,
     required this.onboardingShopBuildingId,
     required this.onboardingFirstSaleCompletedAtUtc,
+    this.proSubscriptionEndsAtUtc,
   });
 
   final String? onboardingCompletedAtUtc;
@@ -201,6 +202,7 @@ class OnboardingResumeState {
   final String? onboardingFactoryLotId;
   final String? onboardingShopBuildingId;
   final String? onboardingFirstSaleCompletedAtUtc;
+  final String? proSubscriptionEndsAtUtc;
 
   factory OnboardingResumeState.fromJson(Map<String, dynamic> json) => OnboardingResumeState(
     onboardingCompletedAtUtc: json['onboardingCompletedAtUtc'] as String?,
@@ -211,6 +213,7 @@ class OnboardingResumeState {
     onboardingFactoryLotId: json['onboardingFactoryLotId'] as String?,
     onboardingShopBuildingId: json['onboardingShopBuildingId'] as String?,
     onboardingFirstSaleCompletedAtUtc: json['onboardingFirstSaleCompletedAtUtc'] as String?,
+    proSubscriptionEndsAtUtc: json['proSubscriptionEndsAtUtc'] as String?,
   );
 }
 
@@ -262,6 +265,46 @@ class OnboardingCompletionResult {
       cityCurrencyCode: (json['cityCurrencyCode'] as String?) ?? 'USD',
     );
   }
+}
+
+/// Mirrors web's `FirstSaleMission` (`firstSaleMission` query). `phase` is a
+/// server enum-as-string: NO_SHOP | CONFIGURE_SHOP | AWAITING_FIRST_SALE |
+/// FIRST_SALE_RECORDED | ALREADY_COMPLETED. `blockers` values: BUILDING_UNDER_CONSTRUCTION
+/// | PUBLIC_SALES_UNIT_MISSING | PRICE_NOT_SET | NO_INVENTORY.
+class FirstSaleMissionStatus {
+  const FirstSaleMissionStatus({
+    required this.phase,
+    required this.shopBuildingId,
+    required this.shopName,
+    required this.blockers,
+    required this.firstSaleRevenue,
+    required this.firstSaleProductName,
+    required this.firstSaleTick,
+    required this.firstSaleQuantity,
+    required this.firstSalePricePerUnit,
+  });
+
+  final String phase;
+  final String? shopBuildingId;
+  final String? shopName;
+  final List<String> blockers;
+  final double? firstSaleRevenue;
+  final String? firstSaleProductName;
+  final int? firstSaleTick;
+  final double? firstSaleQuantity;
+  final double? firstSalePricePerUnit;
+
+  factory FirstSaleMissionStatus.fromJson(Map<String, dynamic> json) => FirstSaleMissionStatus(
+    phase: (json['phase'] as String?) ?? 'NO_SHOP',
+    shopBuildingId: json['shopBuildingId'] as String?,
+    shopName: json['shopName'] as String?,
+    blockers: _stringList(json['blockers']),
+    firstSaleRevenue: (json['firstSaleRevenue'] as num?)?.toDouble(),
+    firstSaleProductName: json['firstSaleProductName'] as String?,
+    firstSaleTick: (json['firstSaleTick'] as num?)?.toInt(),
+    firstSaleQuantity: (json['firstSaleQuantity'] as num?)?.toDouble(),
+    firstSalePricePerUnit: (json['firstSalePricePerUnit'] as num?)?.toDouble(),
+  );
 }
 
 /// Fixed IPO plan choices — hardcoded on the web too (`OnboardingView.vue`),

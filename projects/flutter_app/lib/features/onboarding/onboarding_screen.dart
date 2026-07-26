@@ -1,23 +1,31 @@
-// Ported from `projects/frontend/src/views/OnboardingView.vue`. Deliberately
-// trimmed from the web version (documented at each point below and in
-// ROADMAP.md): a list-based lot picker instead of the interactive map, a
-// simplified two-cheapest-unowned-lots "recommended" heuristic instead of
-// the district-name-regex + population-index rules, no FX-precise currency
-// conversion (USD-equivalent figures shown directly), simple local
-// company/person name generation instead of the exact web wordlists, and no
-// auto-polled first-sale-mission celebration panel.
+// Ported from `projects/frontend/src/views/OnboardingView.vue`. Real
+// district-name/population-index lot recommendations (`onboarding_recommendation.dart`),
+// wordlist-based company/person name generation (`onboarding_company_name.dart`,
+// `onboarding_personal_name.dart`), FX-accurate currency conversion
+// (`onboarding_fx.dart`), real Pro-subscription gating (`_visibleIndustries`,
+// filtering Pro-only industries out of the list entirely for guests/non-Pro
+// players rather than showing-then-blocking), the auto-polled
+// first-sale-mission celebration panel (tick-driven via the app-wide
+// `GameStateState`, same silent-refresh pattern as `GameStatusBar`), and the
+// interactive map-based lot picker (`OnboardingLotStep`, `CapitalismMapView`)
+// are now ported to match web.
 
-import 'dart:math';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart' show TileProvider;
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/auth/biatec_oidc_service.dart';
+import '../../core/game_state/game_state_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import 'onboarding_company_name.dart';
 import 'onboarding_complete_step.dart';
+import 'onboarding_fx.dart';
 import 'onboarding_models.dart';
+import 'onboarding_personal_name.dart';
 import 'onboarding_service.dart';
 import 'onboarding_steps.dart';
 
@@ -26,20 +34,6 @@ T? _firstWhereOrNull<T>(Iterable<T> items, bool Function(T) test) {
     if (test(item)) return item;
   }
   return null;
-}
-
-String _generateCompanyName() {
-  const adjectives = ['Northgate', 'Silverline', 'Ironbridge', 'Bluewater', 'Redstone', 'Golden Valley'];
-  const suffixes = ['Holdings', 'Industries', 'Group', 'Ventures', 'Co.'];
-  final rand = Random();
-  return '${adjectives[rand.nextInt(adjectives.length)]} ${suffixes[rand.nextInt(suffixes.length)]}';
-}
-
-String _generatePersonalAccountName() {
-  const firstNames = ['Alex', 'Jordan', 'Sam', 'Taylor', 'Morgan', 'Casey'];
-  const lastNames = ['Carter', 'Reed', 'Bennett', 'Hayes', 'Brooks', 'Foster'];
-  final rand = Random();
-  return '${firstNames[rand.nextInt(firstNames.length)]} ${lastNames[rand.nextInt(lastNames.length)]}';
 }
 
 String? friendlyOnboardingError(String? code) {
@@ -68,6 +62,7 @@ class OnboardingScreen extends StatefulWidget {
     this.oidcService = const BiatecOidcService(),
     String? initialCompanyName,
     String? initialPersonalAccountName,
+    this.tileProvider,
   }) : _injectedGraphQlService = graphQlService,
        _injectedOnboardingService = onboardingService,
        _initialCompanyName = initialCompanyName,
@@ -79,6 +74,10 @@ class OnboardingScreen extends StatefulWidget {
   final String? _initialCompanyName;
   final String? _initialPersonalAccountName;
 
+  /// Injectable so widget tests never hit real OSM tile servers — see
+  /// `test/support/fake_tile_provider.dart`.
+  final TileProvider? tileProvider;
+
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
@@ -87,8 +86,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   late GraphQlService _graphQlService;
   late OnboardingService _service;
   late bool _isGuestMode;
-  late final String _companyName;
+  late String _companyName;
   late final String _personalAccountName;
+  late final bool _companyNameInjected;
 
   int _step = 1;
   bool _loadingCatalog = true;
@@ -98,6 +98,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   StarterIndustries _starterIndustries = const StarterIndustries(industries: [], proOnlyIndustries: []);
   List<OnboardingProductType> _products = const [];
   List<CityLot> _cityLots = const [];
+  OnboardingFxRates _fxRates = OnboardingFxRates.empty;
 
   String? _selectedCityId;
   String? _selectedIndustry;
@@ -113,10 +114,48 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   bool _completingMilestone = false;
   bool _milestoneCompleted = false;
   String? _stepError;
+  String? _proSubscriptionEndsAtUtc;
 
   OnboardingCompletionResult? _completionResult;
+  FirstSaleMissionStatus? _firstSaleMission;
 
-  double get _startingCash => onboardingFounderContribution + (_selectedIpoRaiseTarget ?? 200000);
+  late final GameStateState _gameStateState;
+  int? _lastSeenTick;
+
+  /// Mirrors web's `auth.isProSubscriber`: a non-null expiry strictly in the
+  /// future. Guests (no resume state fetched at all) are never subscribers.
+  bool get _isProSubscriber {
+    final endsAt = _proSubscriptionEndsAtUtc;
+    if (endsAt == null) return false;
+    final parsed = DateTime.tryParse(endsAt);
+    return parsed != null && parsed.isAfter(DateTime.now().toUtc());
+  }
+
+  /// Industries offered to the player: Pro-only industries are filtered out
+  /// entirely for guests and non-Pro authenticated players (never shown,
+  /// not shown-then-blocked), matching web's `visibleIndustries`.
+  List<String> get _visibleIndustries => _isProSubscriber
+      ? _starterIndustries.industries
+      : _starterIndustries.industries.where((i) => !_starterIndustries.proOnlyIndustries.contains(i)).toList();
+
+  String get _cityCurrencyCode => _selectedCity?.currencyCode ?? 'USD';
+
+  /// Formats an amount already denominated in the selected city's currency
+  /// (lot prices, company cash) — no conversion, symbol/decimals only.
+  String _formatLocal(double amount) => formatOnboardingCurrency(amount, _cityCurrencyCode);
+
+  /// Converts a USD-nominal amount (product base prices, IPO plan figures)
+  /// into the selected city's currency, then formats it. Mirrors web's
+  /// `getProductLocalPrice`/`cityUsdFxRate`-based display computeds.
+  String _formatUsd(double usdAmount, {bool wholeUnits = false}) =>
+      formatOnboardingCurrency(_fxRates.usdToLocal(usdAmount, _cityCurrencyCode, wholeUnits: wholeUnits), _cityCurrencyCode);
+
+  /// Starting cash converted into the selected city's currency — mirrors
+  /// web's `companyStartingCash`. Must stay local-currency-denominated since
+  /// it's compared directly against `lot.price`, which the backend already
+  /// generates in local currency (`LandService.ComputeAppraisedPrice`).
+  double get _startingCash =>
+      _fxRates.usdToLocal(onboardingFounderContribution + (_selectedIpoRaiseTarget ?? 200000), _cityCurrencyCode, wholeUnits: true);
 
   OnboardingCity? get _selectedCity => _selectedCityId == null
       ? null
@@ -133,9 +172,52 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _graphQlService = widget._injectedGraphQlService ?? GraphQlService(auth);
     _service = widget._injectedOnboardingService ?? OnboardingService(_graphQlService);
     _isGuestMode = !auth.isAuthenticated;
-    _companyName = widget._initialCompanyName ?? _generateCompanyName();
-    _personalAccountName = widget._initialPersonalAccountName ?? _generatePersonalAccountName();
+    _companyNameInjected = widget._initialCompanyName != null;
+    // No industry is selected yet at this point — this is a placeholder,
+    // regenerated in `_selectIndustry` once the industry (and thus the
+    // themed wordlist) is known, mirroring web's reset-on-industry-change
+    // behavior (`resetNameSession` watcher in `OnboardingView.vue`).
+    _companyName = widget._initialCompanyName ?? generateOnboardingCompanyName('');
+    _personalAccountName = widget._initialPersonalAccountName ?? generatePersonalAccountName();
+    _gameStateState = context.read<GameStateState>();
+    _gameStateState.addListener(_onGameStateChanged);
     _bootstrap();
+  }
+
+  @override
+  void dispose() {
+    _gameStateState.removeListener(_onGameStateChanged);
+    super.dispose();
+  }
+
+  /// Mirrors web's `useTickRefresh`-driven first-sale-mission poll
+  /// (`OnboardingView.vue`): only while on the completion step, for an
+  /// authenticated player, before the milestone is already marked complete.
+  /// `GameStatusBar` (mounted in `AppShell`'s app bar whenever authenticated)
+  /// owns the actual tick-polling timer — this only listens for the
+  /// resulting `currentTick` changes, exactly like `GameStatusBar`'s own
+  /// `_onGameStateChanged`.
+  void _onGameStateChanged() {
+    final tick = _gameStateState.gameState?.currentTick;
+    if (tick == null || tick == _lastSeenTick) return;
+    _lastSeenTick = tick;
+    if (_step != 7 || _isGuestMode || _milestoneCompleted) return;
+    unawaited(_refreshFirstSaleMission());
+  }
+
+  Future<void> _refreshFirstSaleMission() async {
+    try {
+      final mission = await _service.fetchFirstSaleMission();
+      if (!mounted) return;
+      setState(() => _firstSaleMission = mission);
+      if (mission.phase == 'FIRST_SALE_RECORDED' && !_milestoneCompleted && !_completingMilestone) {
+        await _markMilestoneComplete();
+      }
+    } catch (_) {
+      // Best-effort silent refresh — a transient failure here shouldn't
+      // interrupt the player or show an error, mirroring web's tick-refresh
+      // error isolation.
+    }
   }
 
   Future<void> _bootstrap() async {
@@ -158,6 +240,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
       final cities = await _service.fetchCities();
       final starterIndustries = await _service.fetchStarterIndustries();
+      // Best-effort: a failed FX fetch falls back to `OnboardingFxRates.empty`
+      // (identity conversion, i.e. plain USD figures), not a fatal load error.
+      final fxRates = await _service.fetchFxRates().catchError((_) => OnboardingFxRates.empty);
 
       String? resumedCityId;
       String? resumedIndustry;
@@ -189,11 +274,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       setState(() {
         _cities = cities;
         _starterIndustries = starterIndustries;
+        _fxRates = fxRates;
         _cityLots = cityLots;
         _products = products;
         if (resumedCityId != null) _selectedCityId = resumedCityId;
         if (resumedIndustry != null) _selectedIndustry = resumedIndustry;
         if (resumedFactoryLotId != null) _selectedFactoryLotId = resumedFactoryLotId;
+        _proSubscriptionEndsAtUtc = resume?.proSubscriptionEndsAtUtc;
         _step = resumedStep;
         _milestoneCompleted = resumedMilestoneCompleted;
         _loadingCatalog = false;
@@ -218,12 +305,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _selectIndustry(String industry) {
-    if (_starterIndustries.proOnlyIndustries.contains(industry)) {
+    // Defense-in-depth only: `_visibleIndustries` already excludes Pro-only
+    // industries for non-subscribers, so this should be unreachable through
+    // normal UI interaction — kept in case a subscription lapses between
+    // list render and tap.
+    if (!_isProSubscriber && _starterIndustries.proOnlyIndustries.contains(industry)) {
       setState(() => _stepError = friendlyOnboardingError('PRO_SUBSCRIPTION_REQUIRED'));
       return;
     }
     setState(() {
       _selectedIndustry = industry;
+      if (!_companyNameInjected) {
+        resetCompanyNameSession('$industry:${_selectedCityId ?? ''}');
+        _companyName = generateOnboardingCompanyName(industry);
+      }
       _selectedProductId = null;
       _selectedIpoRaiseTarget = null;
       _step = 3;
@@ -466,19 +561,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         return OnboardingCityStep(cities: _cities, onSelect: _selectCity, error: _stepError);
       case 2:
         return OnboardingIndustryStep(
-          industries: _starterIndustries.industries,
-          proOnlyIndustries: _starterIndustries.proOnlyIndustries,
+          industries: _visibleIndustries,
+          proOnlyIndustries: _isProSubscriber ? _starterIndustries.proOnlyIndustries : const [],
           onSelect: _selectIndustry,
           error: _stepError,
         );
       case 3:
-        return OnboardingProductStep(products: _products, onSelect: _selectProduct, error: _stepError);
+        return OnboardingProductStep(
+          products: _products,
+          onSelect: _selectProduct,
+          formatBasePrice: (basePrice) => _formatUsd(basePrice),
+          error: _stepError,
+        );
       case 4:
-        return OnboardingIpoStep(onSelect: _selectIpoPlan, error: _stepError);
+        return OnboardingIpoStep(onSelect: _selectIpoPlan, formatUsdWhole: (amount) => _formatUsd(amount, wholeUnits: true), error: _stepError);
       case 5:
         return OnboardingLotStep(
           title: 'Purchase your factory lot',
-          subtitle: '$_companyName (owner: $_personalAccountName) · starting cash \$${_startingCash.toStringAsFixed(0)}',
+          subtitle: '$_companyName (owner: $_personalAccountName) · starting cash ${_formatLocal(_startingCash)}',
           lots: _cityLots,
           buildingType: 'FACTORY',
           availableCash: _startingCash,
@@ -487,12 +587,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           onPurchase: _purchaseFactory,
           purchaseLabel: 'Purchase Factory',
           submitting: _submittingFactory,
+          formatAmount: _formatLocal,
+          tileProvider: widget.tileProvider,
           error: _stepError,
         );
       case 6:
         return OnboardingLotStep(
           title: 'Purchase your sales shop lot',
-          subtitle: 'Factory purchased · available cash \$${_companyCash.toStringAsFixed(0)}',
+          subtitle: 'Factory purchased · available cash ${_formatLocal(_companyCash)}',
           lots: _cityLots,
           buildingType: 'SALES_SHOP',
           availableCash: _companyCash,
@@ -502,6 +604,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           purchaseLabel: 'Purchase Shop',
           submitting: _submittingShop,
           referenceLot: _selectedFactoryLot,
+          formatAmount: _formatLocal,
+          tileProvider: widget.tileProvider,
           error: _stepError,
         );
       case 7:
@@ -514,6 +618,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           savingProgress: _savingProgress,
           completingMilestone: _completingMilestone,
           milestoneCompleted: _milestoneCompleted,
+          formatMoney: formatOnboardingCurrency,
+          missionStatus: _firstSaleMission,
           error: _stepError,
         );
     }

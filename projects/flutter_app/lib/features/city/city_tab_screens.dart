@@ -9,21 +9,28 @@
 //   history dashboards (`EconomyCycleWidget`, `CityPowerPlanningSection`,
 //   `HealthIndicatorsPanel`) — five distinct analytics subsystems, shown
 //   only as basic city stats here.
-// - Buildings tab: the interactive map (`CityMapContent.vue`) is a plain
-//   sortable lot list instead — consistent with World Map/Buy Building's
-//   list-based lot pickers elsewhere in this app.
+// - Buildings tab: renders a real interactive map (`CapitalismMapView`,
+//   mirroring `CityMapContent.vue`'s Leaflet setup) alongside the existing
+//   sortable lot list (kept as a thumb-friendly selector, same pattern as
+//   World Map/Buy Building). Marker coloring is a simplified two-state
+//   available/owned (web additionally distinguishes "yours" vs "NPC-owned"
+//   via `playerCompanyIds`/`npcCompanyIds`, which this app's `CityLot`
+//   model doesn't carry) — a scoped simplification, not an oversight.
 // - Market tab: shows the city's resource-abundance list (already fetched
 //   for the Cities screen) rather than porting `CityDemandPanel`'s
 //   top-selling-products analytics or `CityMediaHousesSection`.
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart' show TileProvider;
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
 import '../../core/theme/app_icons.dart';
+import '../../core/widgets/capitalism_map_view.dart';
 import '../buildings/buy_building_models.dart';
 import '../cities/cities_models.dart';
 import 'city_tab_models.dart';
@@ -229,7 +236,17 @@ class _CityEconomyScreenState extends _CityTabScreenState<CityEconomyScreen> {
 // ── Buildings ────────────────────────────────────────────────────────────
 
 class CityBuildingsScreen extends _CityTabScreen {
-  const CityBuildingsScreen({super.key, required super.cityId, super.graphQlService, super.cityTabService});
+  const CityBuildingsScreen({
+    super.key,
+    required super.cityId,
+    super.graphQlService,
+    super.cityTabService,
+    this.tileProvider,
+  });
+
+  /// Injectable so widget tests never hit real OSM tile servers — see
+  /// `test/support/fake_tile_provider.dart`.
+  final TileProvider? tileProvider;
 
   @override
   State<CityBuildingsScreen> createState() => _CityBuildingsScreenState();
@@ -240,6 +257,7 @@ class _CityBuildingsScreenState extends _CityTabScreenState<CityBuildingsScreen>
   String? _error;
   List<CityLot> _lots = const [];
   bool _showAvailableOnly = false;
+  String? _selectedLotId;
 
   @override
   void initState() {
@@ -274,6 +292,14 @@ class _CityBuildingsScreenState extends _CityTabScreenState<CityBuildingsScreen>
     if (_error != null) return buildError(_error!, _load);
 
     final lots = _showAvailableOnly ? _lots.where((lot) => lot.isAvailable).toList() : _lots;
+    CityLot? selected;
+    for (final lot in lots) {
+      if (lot.id == _selectedLotId) {
+        selected = lot;
+        break;
+      }
+    }
+
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -284,13 +310,41 @@ class _CityBuildingsScreenState extends _CityTabScreenState<CityBuildingsScreen>
           value: _showAvailableOnly,
           onChanged: (value) => setState(() => _showAvailableOnly = value),
         ),
+        if (lots.isNotEmpty) ...[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              height: 280,
+              child: CapitalismMapView(
+                tileProvider: widget.tileProvider,
+                flyToTarget: selected != null ? LatLng(selected.latitude, selected.longitude) : null,
+                markers: [
+                  for (final lot in lots)
+                    CapitalismMapMarker(
+                      id: lot.id,
+                      position: LatLng(lot.latitude, lot.longitude),
+                      color: lot.id == _selectedLotId
+                          ? CapitalismMapColors.selected
+                          : (lot.isAvailable ? CapitalismMapColors.available : CapitalismMapColors.ownedByOther),
+                      size: lot.id == _selectedLotId ? 20 : 14,
+                      tooltip: lot.name ?? lot.district,
+                      onTap: () => setState(() => _selectedLotId = lot.id),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         for (final lot in lots)
           Card(
             key: ValueKey('city-lot-${lot.id}'),
+            color: lot.id == _selectedLotId ? Theme.of(context).colorScheme.primaryContainer : null,
             margin: const EdgeInsets.only(bottom: 8),
             child: ListTile(
               title: Text(lot.name ?? lot.district ?? 'Lot'),
               subtitle: Text(lot.isAvailable ? 'Available · ${lot.price.toStringAsFixed(0)}' : 'Owned'),
+              onTap: () => setState(() => _selectedLotId = lot.id),
               trailing: !lot.isAvailable && lot.buildingId != null
                   ? IconButton(icon: const FaIcon(AppIcons.arrowRight, size: 16), onPressed: () => context.go('/building/${lot.buildingId}'))
                   : null,

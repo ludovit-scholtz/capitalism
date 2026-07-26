@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:capitalism_app/core/auth/auth_state.dart';
 import 'package:capitalism_app/core/auth/biatec_oidc_service.dart';
 import 'package:capitalism_app/core/auth/web_authenticator.dart';
+import 'package:capitalism_app/core/game_state/game_state_model.dart';
+import 'package:capitalism_app/core/game_state/game_state_state.dart';
 import 'package:capitalism_app/core/graphql/graphql_service.dart';
 import 'package:capitalism_app/features/onboarding/onboarding_models.dart';
 import 'package:capitalism_app/features/onboarding/onboarding_screen.dart';
@@ -15,6 +17,7 @@ import 'package:provider/provider.dart';
 
 import 'support/fake_id_token.dart';
 import 'support/fake_onboarding_service.dart';
+import 'support/fake_tile_provider.dart';
 import 'support/fake_web_authenticator.dart';
 import 'support/in_memory_token_storage.dart';
 
@@ -108,6 +111,7 @@ Future<void> _pumpOnboarding(
   required AuthState auth,
   required FakeOnboardingService service,
   WebAuthenticator? webAuthenticator,
+  GameStateState? gameStateState,
 }) async {
   final router = GoRouter(
     initialLocation: '/',
@@ -121,6 +125,7 @@ Future<void> _pumpOnboarding(
               authenticator: webAuthenticator ?? FakeWebAuthenticator(_successfulCallbackFor),
               httpClient: _oidcTokenClient(),
             ),
+            tileProvider: FakeTileProvider(),
           ),
         ),
       ),
@@ -132,7 +137,13 @@ Future<void> _pumpOnboarding(
   );
 
   await tester.pumpWidget(
-    ChangeNotifierProvider<AuthState>.value(value: auth, child: MaterialApp.router(routerConfig: router)),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AuthState>.value(value: auth),
+        ChangeNotifierProvider<GameStateState>.value(value: gameStateState ?? GameStateState()),
+      ],
+      child: MaterialApp.router(routerConfig: router),
+    ),
   );
   await tester.pumpAndSettle();
 }
@@ -183,26 +194,113 @@ void main() {
       expect(find.text('Mark milestone complete'), findsOneWidget);
     });
 
-    testWidgets('blocks selecting a Pro-only industry with a friendly error and does not load its products', (
-      tester,
-    ) async {
+    testWidgets('renders product and IPO plan prices in the selected city\'s currency', (tester) async {
+      final auth = AuthState(storage: InMemoryTokenStorage());
+      await auth.setToken('test-token');
+      final service = FakeOnboardingService(
+        cities: const [_bratislava], // EUR
+        starterIndustries: const StarterIndustries(industries: ['FURNITURE'], proOnlyIndustries: []),
+        productsByIndustry: const {'FURNITURE': _furnitureProducts},
+      );
+
+      await _pumpOnboarding(tester, auth: auth, service: service);
+      await tester.tap(find.byKey(const Key('city-city-1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('industry-FURNITURE')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byWidgetPredicate((widget) => widget is Text && (widget.data?.contains('€') ?? false)),
+        findsWidgets,
+      );
+      expect(
+        find.byWidgetPredicate((widget) => widget is Text && (widget.data?.contains(r'$') ?? false)),
+        findsNothing,
+      );
+
+      await tester.tap(find.byKey(const Key('product-p1')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byWidgetPredicate((widget) => widget is Text && (widget.data?.contains('€') ?? false)),
+        findsWidgets,
+      );
+    });
+
+    testWidgets('a non-Pro authenticated player never sees a Pro-only industry in the list', (tester) async {
       final auth = AuthState(storage: InMemoryTokenStorage());
       await auth.setToken('test-token');
       final service = FakeOnboardingService(
         cities: const [_bratislava],
         starterIndustries: const StarterIndustries(industries: ['FURNITURE', 'ELECTRONICS'], proOnlyIndustries: ['ELECTRONICS']),
+        // No resumeState is provided, so fetchResumeState() resolves to null —
+        // equivalent to an authenticated player with no active Pro subscription.
       );
 
       await _pumpOnboarding(tester, auth: auth, service: service);
       await tester.tap(find.byKey(const Key('city-city-1')));
       await tester.pumpAndSettle();
 
+      expect(find.byKey(const Key('industry-FURNITURE')), findsOneWidget);
+      expect(find.byKey(const Key('industry-ELECTRONICS')), findsNothing);
+    });
+
+    testWidgets('a Pro subscriber sees and can select a Pro-only industry', (tester) async {
+      final auth = AuthState(storage: InMemoryTokenStorage());
+      await auth.setToken('test-token');
+      final service = FakeOnboardingService(
+        cities: const [_bratislava],
+        starterIndustries: const StarterIndustries(industries: ['FURNITURE', 'ELECTRONICS'], proOnlyIndustries: ['ELECTRONICS']),
+        productsByIndustry: const {'FURNITURE': _furnitureProducts},
+        resumeState: OnboardingResumeState(
+          onboardingCompletedAtUtc: null,
+          onboardingCurrentStep: null,
+          onboardingIndustry: null,
+          onboardingCityId: null,
+          onboardingCompanyId: null,
+          onboardingFactoryLotId: null,
+          onboardingShopBuildingId: null,
+          onboardingFirstSaleCompletedAtUtc: null,
+          proSubscriptionEndsAtUtc: DateTime.now().toUtc().add(const Duration(days: 30)).toIso8601String(),
+        ),
+      );
+
+      await _pumpOnboarding(tester, auth: auth, service: service);
+      await tester.tap(find.byKey(const Key('city-city-1')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('industry-ELECTRONICS')), findsOneWidget);
       await tester.tap(find.byKey(const Key('industry-ELECTRONICS')));
       await tester.pumpAndSettle();
 
-      expect(find.text('This requires a Pro subscription.'), findsOneWidget);
-      expect(find.byKey(const Key('industry-ELECTRONICS')), findsOneWidget); // still on step 2
-      expect(service.calls, isNot(contains('fetchProducts:ELECTRONICS')));
+      expect(find.text('This requires a Pro subscription.'), findsNothing);
+      expect(service.calls, contains('fetchProducts:ELECTRONICS'));
+    });
+
+    testWidgets('a lapsed Pro subscription (expiry in the past) is treated as non-Pro', (tester) async {
+      final auth = AuthState(storage: InMemoryTokenStorage());
+      await auth.setToken('test-token');
+      final service = FakeOnboardingService(
+        cities: const [_bratislava],
+        starterIndustries: const StarterIndustries(industries: ['FURNITURE', 'ELECTRONICS'], proOnlyIndustries: ['ELECTRONICS']),
+        resumeState: OnboardingResumeState(
+          onboardingCompletedAtUtc: null,
+          onboardingCurrentStep: null,
+          onboardingIndustry: null,
+          onboardingCityId: null,
+          onboardingCompanyId: null,
+          onboardingFactoryLotId: null,
+          onboardingShopBuildingId: null,
+          onboardingFirstSaleCompletedAtUtc: null,
+          proSubscriptionEndsAtUtc: DateTime.now().toUtc().subtract(const Duration(days: 1)).toIso8601String(),
+        ),
+      );
+
+      await _pumpOnboarding(tester, auth: auth, service: service);
+      await tester.tap(find.byKey(const Key('city-city-1')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('industry-ELECTRONICS')), findsNothing);
     });
 
     testWidgets('LOT_ALREADY_OWNED on factory purchase clears the selection and reloads lots', (tester) async {
@@ -312,9 +410,109 @@ void main() {
       expect(find.text('Go to Dashboard'), findsOneWidget);
       expect(find.text('Mark milestone complete'), findsNothing);
     });
+
+    testWidgets(
+      'auto-polls the first-sale mission on tick change and auto-completes the milestone once recorded',
+      (tester) async {
+        final auth = AuthState(storage: InMemoryTokenStorage());
+        await auth.setToken('test-token');
+        final service = FakeOnboardingService(
+          resumeState: const OnboardingResumeState(
+            onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+            onboardingCurrentStep: null,
+            onboardingIndustry: null,
+            onboardingCityId: null,
+            onboardingCompanyId: null,
+            onboardingFactoryLotId: null,
+            onboardingShopBuildingId: 'shop-1',
+            onboardingFirstSaleCompletedAtUtc: null,
+          ),
+          firstSaleMissionStatuses: const [
+            FirstSaleMissionStatus(
+              phase: 'AWAITING_FIRST_SALE',
+              shopBuildingId: 'shop-1',
+              shopName: 'Corner Shop',
+              blockers: [],
+              firstSaleRevenue: null,
+              firstSaleProductName: null,
+              firstSaleTick: null,
+              firstSaleQuantity: null,
+              firstSalePricePerUnit: null,
+            ),
+            FirstSaleMissionStatus(
+              phase: 'FIRST_SALE_RECORDED',
+              shopBuildingId: 'shop-1',
+              shopName: 'Corner Shop',
+              blockers: [],
+              firstSaleRevenue: 45.0,
+              firstSaleProductName: 'Wooden Chair',
+              firstSaleTick: 12,
+              firstSaleQuantity: 1,
+              firstSalePricePerUnit: 45.0,
+            ),
+          ],
+        );
+        final gameStateState = GameStateState();
+
+        await _pumpOnboarding(tester, auth: auth, service: service, gameStateState: gameStateState);
+
+        expect(find.text('Mark milestone complete'), findsOneWidget);
+        expect(service.calls, isNot(contains('fetchFirstSaleMission')));
+
+        // First tick change: AWAITING_FIRST_SALE — no full-screen spinner
+        // flash while this silent background refresh runs.
+        gameStateState.gameState = const GameStateModel(
+          currentTick: 1,
+          lastTickAtUtc: null,
+          tickIntervalSeconds: 10,
+          taxRate: 0,
+        );
+        gameStateState.notifyListeners();
+        await tester.pump();
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+        await tester.pumpAndSettle();
+
+        expect(service.calls.where((c) => c == 'fetchFirstSaleMission').length, 1);
+        expect(find.text('Mark milestone complete'), findsOneWidget);
+        expect(service.calls, isNot(contains('completeFirstSaleMilestone')));
+
+        // Second tick change: FIRST_SALE_RECORDED — auto-fires the mutation
+        // and shows the celebration card.
+        gameStateState.gameState = const GameStateModel(
+          currentTick: 2,
+          lastTickAtUtc: null,
+          tickIntervalSeconds: 10,
+          taxRate: 0,
+        );
+        gameStateState.notifyListeners();
+        await tester.pumpAndSettle();
+
+        expect(service.calls.where((c) => c == 'fetchFirstSaleMission').length, 2);
+        expect(service.calls, contains('completeFirstSaleMilestone'));
+        expect(find.byKey(const Key('first-sale-celebration')), findsOneWidget);
+        expect(find.textContaining('Wooden Chair'), findsOneWidget);
+        expect(find.text('Go to Dashboard'), findsOneWidget);
+        expect(find.text('Mark milestone complete'), findsNothing);
+      },
+    );
   });
 
   group('OnboardingScreen — guest', () {
+    testWidgets('never sees a Pro-only industry in the list', (tester) async {
+      final auth = AuthState(storage: InMemoryTokenStorage()); // never authenticated
+      final service = FakeOnboardingService(
+        cities: const [_bratislava],
+        starterIndustries: const StarterIndustries(industries: ['FURNITURE', 'ELECTRONICS'], proOnlyIndustries: ['ELECTRONICS']),
+      );
+
+      await _pumpOnboarding(tester, auth: auth, service: service);
+      await tester.tap(find.byKey(const Key('city-city-1')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('industry-FURNITURE')), findsOneWidget);
+      expect(find.byKey(const Key('industry-ELECTRONICS')), findsNothing);
+    });
+
     testWidgets('makes no purchase mutation calls until Save Progress, which migrates via both mutations', (
       tester,
     ) async {

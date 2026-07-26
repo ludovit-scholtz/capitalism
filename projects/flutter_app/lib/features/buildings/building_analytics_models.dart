@@ -175,6 +175,36 @@ class BuildingSupplyChainDiagram {
   );
 }
 
+/// Per-unit operational status for the dashboard's supply-chain strip
+/// (`Query.Operations.cs`'s `buildingUnitOperationalStatuses`) — distinct
+/// from `SupplyChainUnitSummary` above (a different, richer query backing
+/// the building-detail 4x4 diagram). `status`: ACTIVE | IDLE | BLOCKED |
+/// FULL | UNCONFIGURED. `blockedCode`: NO_INPUTS | OUTPUT_FULL |
+/// NO_INVENTORY | PRICE_TOO_HIGH | UNCONFIGURED | AWAITING_STOCK | NO_DEMAND.
+class BuildingUnitOperationalStatus {
+  const BuildingUnitOperationalStatus({
+    required this.buildingUnitId,
+    required this.status,
+    required this.blockedCode,
+    required this.blockedReason,
+    required this.idleTicks,
+  });
+
+  final String buildingUnitId;
+  final String status;
+  final String? blockedCode;
+  final String? blockedReason;
+  final int idleTicks;
+
+  factory BuildingUnitOperationalStatus.fromJson(Map<String, dynamic> json) => BuildingUnitOperationalStatus(
+    buildingUnitId: json['buildingUnitId'] as String,
+    status: (json['status'] as String?) ?? 'UNCONFIGURED',
+    blockedCode: json['blockedCode'] as String?,
+    blockedReason: json['blockedReason'] as String?,
+    idleTicks: (json['idleTicks'] as num?)?.toInt() ?? 0,
+  );
+}
+
 class UnitProductTickSnapshot {
   const UnitProductTickSnapshot({
     required this.tick,

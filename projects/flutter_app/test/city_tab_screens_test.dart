@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'support/fake_city_tab_service.dart';
+import 'support/fake_tile_provider.dart';
 import 'support/in_memory_token_storage.dart';
 
 const _city = City(
@@ -30,6 +31,8 @@ const _availableLot = CityLot(
   suitableTypes: ['FACTORY'],
   ownerCompanyId: null,
   buildingId: null,
+  latitude: 40.71,
+  longitude: -74.00,
 );
 
 const _ownedLot = CityLot(
@@ -40,6 +43,8 @@ const _ownedLot = CityLot(
   suitableTypes: ['FACTORY'],
   ownerCompanyId: 'someone',
   buildingId: 'building-42',
+  latitude: 40.72,
+  longitude: -74.01,
 );
 
 const _competitor = CityCompetitor(
@@ -124,7 +129,11 @@ void main() {
     testWidgets('shows lots and toggling filters to available only', (tester) async {
       final service = FakeCityTabService(lots: [_availableLot, _ownedLot]);
 
-      await _pump(tester, (s) => CityBuildingsScreen(cityId: 'city-1', cityTabService: s), service: service);
+      await _pump(
+        tester,
+        (s) => CityBuildingsScreen(cityId: 'city-1', cityTabService: s, tileProvider: FakeTileProvider()),
+        service: service,
+      );
 
       expect(find.text('Riverside Plot'), findsOneWidget);
       expect(find.text('Taken Plot'), findsOneWidget);
@@ -139,11 +148,34 @@ void main() {
     testWidgets('tapping an owned lot navigates to its building', (tester) async {
       final service = FakeCityTabService(lots: [_ownedLot]);
 
-      await _pump(tester, (s) => CityBuildingsScreen(cityId: 'city-1', cityTabService: s), service: service);
+      await _pump(
+        tester,
+        (s) => CityBuildingsScreen(cityId: 'city-1', cityTabService: s, tileProvider: FakeTileProvider()),
+        service: service,
+      );
       await tester.tap(find.byIcon(AppIcons.arrowRight.data));
       await tester.pumpAndSettle();
 
       expect(find.text('Building building-42'), findsOneWidget);
+    });
+
+    testWidgets('renders a map marker per lot and tapping one highlights it in the list', (tester) async {
+      final service = FakeCityTabService(lots: [_availableLot, _ownedLot]);
+
+      await _pump(
+        tester,
+        (s) => CityBuildingsScreen(cityId: 'city-1', cityTabService: s, tileProvider: FakeTileProvider()),
+        service: service,
+      );
+
+      expect(find.byKey(const Key('map-marker-lot-1')), findsOneWidget);
+      expect(find.byKey(const Key('map-marker-lot-2')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('map-marker-lot-2')));
+      await tester.pumpAndSettle();
+
+      final card = tester.widget<Card>(find.byKey(const Key('city-lot-lot-2')));
+      expect(card.color, isNotNull);
     });
   });
 

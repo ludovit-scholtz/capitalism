@@ -88,6 +88,8 @@ class ExpansionCity {
     required this.name,
     required this.countryCode,
     required this.currencyCode,
+    required this.latitude,
+    required this.longitude,
     required this.population,
     required this.isUnlocked,
     required this.availableLandPlots,
@@ -102,6 +104,8 @@ class ExpansionCity {
   final String name;
   final String countryCode;
   final String currencyCode;
+  final double latitude;
+  final double longitude;
   final int population;
   final bool isUnlocked;
   final int availableLandPlots;
@@ -116,6 +120,8 @@ class ExpansionCity {
     name: (json['name'] as String?) ?? '',
     countryCode: (json['countryCode'] as String?) ?? '',
     currencyCode: (json['currencyCode'] as String?) ?? 'EUR',
+    latitude: (json['latitude'] as num?)?.toDouble() ?? 0,
+    longitude: (json['longitude'] as num?)?.toDouble() ?? 0,
     population: (json['population'] as num?)?.toInt() ?? 0,
     isUnlocked: json['isUnlocked'] as bool? ?? true,
     availableLandPlots: (json['availableLandPlots'] as num?)?.toInt() ?? 0,
@@ -125,4 +131,17 @@ class ExpansionCity {
     currentNetWorth: (json['currentNetWorth'] as num?)?.toDouble() ?? 0,
     progressPercent: (json['progressPercent'] as num?)?.toInt() ?? 100,
   );
+
+  /// Marker size scaled linearly by population, mirroring web's
+  /// `markerSizeForPopulation` (14px @ ≤300k, 30px @ ≥5.3M).
+  double get mapMarkerSize {
+    const minSize = 14.0;
+    const maxSize = 30.0;
+    const minPopulation = 300000.0;
+    const maxPopulation = 5300000.0;
+    if (population <= minPopulation) return minSize;
+    if (population >= maxPopulation) return maxSize;
+    final t = (population - minPopulation) / (maxPopulation - minPopulation);
+    return minSize + (maxSize - minSize) * t;
+  }
 }

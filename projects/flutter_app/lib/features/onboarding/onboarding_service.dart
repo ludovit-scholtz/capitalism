@@ -1,4 +1,5 @@
 import '../../core/graphql/graphql_service.dart';
+import 'onboarding_fx.dart';
 import 'onboarding_models.dart';
 
 const _citiesQuery = r'''
@@ -33,6 +34,12 @@ const _productsQuery = r'''
   }
 ''';
 
+const _eurFxRatesQuery = r'''
+  query EurFxRates {
+    eurFxRates { currencyCode rate }
+  }
+''';
+
 const _resumeStateQuery = r'''
   query OnboardingResumeState {
     me {
@@ -44,6 +51,7 @@ const _resumeStateQuery = r'''
       onboardingFactoryLotId
       onboardingShopBuildingId
       onboardingFirstSaleCompletedAtUtc
+      proSubscriptionEndsAtUtc
     }
   }
 ''';
@@ -64,6 +72,14 @@ const _finishOnboardingMutation = r'''
       salesShop { id name type }
       selectedProduct { name industry basePrice }
       cityCurrencyCode
+    }
+  }
+''';
+
+const _firstSaleMissionQuery = r'''
+  query FirstSaleMission {
+    firstSaleMission {
+      phase shopBuildingId shopName blockers firstSaleRevenue firstSaleProductName firstSaleTick firstSaleQuantity firstSalePricePerUnit
     }
   }
 ''';
@@ -110,6 +126,14 @@ class OnboardingService {
         .toList();
   }
 
+  Future<OnboardingFxRates> fetchFxRates() async {
+    final data = await _graphQlService.request(_eurFxRatesQuery);
+    final rates = ((data['eurFxRates'] as List<dynamic>?) ?? const [])
+        .map((r) => EurFxRate.fromJson(r as Map<String, dynamic>))
+        .toList();
+    return OnboardingFxRates(rates);
+  }
+
   /// Returns null for a guest (unauthenticated) caller — there is no
   /// resumable server state until a player exists.
   Future<OnboardingResumeState?> fetchResumeState() async {
@@ -149,6 +173,11 @@ class OnboardingService {
       },
     );
     return OnboardingCompletionResult.fromJson(data['finishOnboarding'] as Map<String, dynamic>);
+  }
+
+  Future<FirstSaleMissionStatus> fetchFirstSaleMission() async {
+    final data = await _graphQlService.request(_firstSaleMissionQuery);
+    return FirstSaleMissionStatus.fromJson(data['firstSaleMission'] as Map<String, dynamic>);
   }
 
   Future<void> completeFirstSaleMilestone() async {

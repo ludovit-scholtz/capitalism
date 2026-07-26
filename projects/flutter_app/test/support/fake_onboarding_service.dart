@@ -1,4 +1,5 @@
 import 'package:capitalism_app/core/graphql/graphql_service.dart';
+import 'package:capitalism_app/features/onboarding/onboarding_fx.dart';
 import 'package:capitalism_app/features/onboarding/onboarding_models.dart';
 import 'package:capitalism_app/features/onboarding/onboarding_service.dart';
 
@@ -14,24 +15,35 @@ class FakeOnboardingService implements OnboardingService {
     this.starterIndustries = const StarterIndustries(industries: [], proOnlyIndustries: []),
     this.productsByIndustry = const {},
     this.lotsByCity = const {},
+    this.fxRates = OnboardingFxRates.empty,
     this.resumeState,
     this.startOnboardingCompanyResult,
     this.startOnboardingCompanyError,
     this.finishOnboardingResult,
     this.finishOnboardingError,
     this.completeFirstSaleMilestoneError,
+    this.firstSaleMissionStatuses = const [],
   });
 
   final List<OnboardingCity> cities;
   final StarterIndustries starterIndustries;
   final Map<String, List<OnboardingProductType>> productsByIndustry;
   final Map<String, List<CityLot>> lotsByCity;
+  final OnboardingFxRates fxRates;
   final OnboardingResumeState? resumeState;
   final StartOnboardingCompanyResult? startOnboardingCompanyResult;
   final GraphQlException? startOnboardingCompanyError;
   final OnboardingCompletionResult? finishOnboardingResult;
   final GraphQlException? finishOnboardingError;
   final GraphQlException? completeFirstSaleMilestoneError;
+
+  /// Successive results returned by [fetchFirstSaleMission] calls, in order
+  /// (the last entry repeats once exhausted) — lets a test simulate a
+  /// mission progressing across ticks, e.g. AWAITING_FIRST_SALE then
+  /// FIRST_SALE_RECORDED.
+  final List<FirstSaleMissionStatus> firstSaleMissionStatuses;
+
+  int _fetchFirstSaleMissionCallCount = 0;
 
   final List<String> calls = [];
 
@@ -57,6 +69,12 @@ class FakeOnboardingService implements OnboardingService {
   Future<List<OnboardingProductType>> fetchProducts(String industry) async {
     calls.add('fetchProducts:$industry');
     return productsByIndustry[industry] ?? const [];
+  }
+
+  @override
+  Future<OnboardingFxRates> fetchFxRates() async {
+    calls.add('fetchFxRates');
+    return fxRates;
   }
 
   @override
@@ -92,6 +110,29 @@ class FakeOnboardingService implements OnboardingService {
           selectedProductName: 'Wooden Chair',
           cityCurrencyCode: 'USD',
         );
+  }
+
+  @override
+  Future<FirstSaleMissionStatus> fetchFirstSaleMission() async {
+    calls.add('fetchFirstSaleMission');
+    if (firstSaleMissionStatuses.isEmpty) {
+      return const FirstSaleMissionStatus(
+        phase: 'NO_SHOP',
+        shopBuildingId: null,
+        shopName: null,
+        blockers: [],
+        firstSaleRevenue: null,
+        firstSaleProductName: null,
+        firstSaleTick: null,
+        firstSaleQuantity: null,
+        firstSalePricePerUnit: null,
+      );
+    }
+    final index = _fetchFirstSaleMissionCallCount < firstSaleMissionStatuses.length
+        ? _fetchFirstSaleMissionCallCount
+        : firstSaleMissionStatuses.length - 1;
+    _fetchFirstSaleMissionCallCount++;
+    return firstSaleMissionStatuses[index];
   }
 
   @override

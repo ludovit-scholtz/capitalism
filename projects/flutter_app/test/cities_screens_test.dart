@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'support/fake_cities_service.dart';
+import 'support/fake_tile_provider.dart';
 import 'support/in_memory_token_storage.dart';
 
 const _bigCity = City(
@@ -90,6 +91,8 @@ void main() {
       name: 'Metropolis',
       countryCode: 'US',
       currencyCode: 'USD',
+      latitude: 40.7128,
+      longitude: -74.0060,
       population: 5200000,
       isUnlocked: true,
       availableLandPlots: 10,
@@ -105,6 +108,8 @@ void main() {
       name: 'Newtown',
       countryCode: 'DE',
       currencyCode: 'EUR',
+      latitude: 52.5200,
+      longitude: 13.4050,
       population: 800000,
       isUnlocked: false,
       availableLandPlots: 4,
@@ -123,7 +128,11 @@ void main() {
       final router = GoRouter(
         initialLocation: '/',
         routes: [
-          GoRoute(path: '/', builder: (context, state) => Scaffold(body: WorldMapScreen(citiesService: service))),
+          GoRoute(
+            path: '/',
+            builder: (context, state) =>
+                Scaffold(body: WorldMapScreen(citiesService: service, tileProvider: FakeTileProvider())),
+          ),
           GoRoute(
             path: '/city/:cityId',
             builder: (context, state) => Scaffold(body: Text('City ${state.pathParameters['cityId']}')),
@@ -196,6 +205,21 @@ void main() {
       await pumpWorldMap(tester, service: service);
 
       expect(find.text('Could not load the world map. Please try again.'), findsOneWidget);
+    });
+
+    testWidgets('renders a map marker per city and tapping one selects that city', (tester) async {
+      final service = FakeCitiesService(expansionCities: [unlockedCity, lockedCity]);
+
+      await pumpWorldMap(tester, service: service);
+
+      expect(find.byKey(const Key('map-marker-city-1')), findsOneWidget);
+      expect(find.byKey(const Key('map-marker-city-2')), findsOneWidget);
+      expect(find.text('Population: 5.2M'), findsOneWidget); // unlockedCity selected by default
+
+      await tester.tap(find.byKey(const Key('map-marker-city-2')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('40% toward unlocking'), findsOneWidget);
     });
   });
 }

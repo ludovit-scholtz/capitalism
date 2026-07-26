@@ -5,12 +5,14 @@ class FakeBuyBuildingService implements BuyBuildingService {
   FakeBuyBuildingService({
     this.cities = const [],
     this.lotsByCity = const {},
+    this.myBuildingLocations = const [],
     this.citiesError,
     this.purchaseError,
   });
 
   final List<Map<String, String>> cities;
   final Map<String, List<CityLot>> lotsByCity;
+  final List<OwnedBuildingLocation> myBuildingLocations;
   final Object? citiesError;
   final Object? purchaseError;
 
@@ -34,6 +36,12 @@ class FakeBuyBuildingService implements BuyBuildingService {
   Future<List<Map<String, String>>> fetchMyCompanies() async {
     calls.add('fetchMyCompanies');
     return const [];
+  }
+
+  @override
+  Future<List<OwnedBuildingLocation>> fetchMyBuildingLocations(String companyId) async {
+    calls.add('fetchMyBuildingLocations');
+    return myBuildingLocations;
   }
 
   @override

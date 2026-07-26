@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'support/fake_buy_building_service.dart';
+import 'support/fake_tile_provider.dart';
 import 'support/in_memory_token_storage.dart';
 
 const _availableLot = CityLot(
@@ -17,6 +18,8 @@ const _availableLot = CityLot(
   suitableTypes: ['FACTORY'],
   ownerCompanyId: null,
   buildingId: null,
+  latitude: 48.15,
+  longitude: 17.11,
 );
 
 const _ownedLot = CityLot(
@@ -27,6 +30,8 @@ const _ownedLot = CityLot(
   suitableTypes: ['FACTORY'],
   ownerCompanyId: 'someone-else',
   buildingId: 'building-99',
+  latitude: 48.16,
+  longitude: 17.12,
 );
 
 Future<GoRouter> _pumpBuyBuilding(WidgetTester tester, {required FakeBuyBuildingService service}) async {
@@ -39,7 +44,9 @@ Future<GoRouter> _pumpBuyBuilding(WidgetTester tester, {required FakeBuyBuilding
     routes: [
       GoRoute(
         path: '/',
-        builder: (context, state) => Scaffold(body: BuyBuildingScreen(companyId: 'company-1', buyBuildingService: service)),
+        builder: (context, state) => Scaffold(
+          body: BuyBuildingScreen(companyId: 'company-1', buyBuildingService: service, tileProvider: FakeTileProvider()),
+        ),
       ),
       GoRoute(path: '/dashboard', builder: (context, state) => const Scaffold(body: Text('Dashboard Screen'))),
     ],
@@ -103,6 +110,51 @@ void main() {
       await _pumpBuyBuilding(tester, service: service);
 
       expect(find.text('Could not load cities. Please try again.'), findsOneWidget);
+    });
+
+    testWidgets('lot step renders map markers and the nearest-existing-buildings distance list', (tester) async {
+      final service = FakeBuyBuildingService(
+        cities: const [
+          {'id': 'city-1', 'name': 'Metropolis'},
+        ],
+        lotsByCity: {
+          'city-1': [_availableLot, _ownedLot],
+        },
+        myBuildingLocations: const [
+          OwnedBuildingLocation(
+            id: 'building-1',
+            name: 'My Warehouse',
+            type: 'STORAGE',
+            cityId: 'city-1',
+            latitude: 48.1502,
+            longitude: 17.1105,
+          ),
+        ],
+      );
+
+      await _pumpBuyBuilding(tester, service: service);
+      await tester.tap(find.text('Metropolis'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Next'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('FACTORY'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Next'));
+      await tester.pumpAndSettle();
+
+      // Only the available, suitable lot gets a marker.
+      expect(find.byKey(const Key('map-marker-lot-lot-1')), findsOneWidget);
+      expect(find.byKey(const Key('map-marker-lot-lot-2')), findsNothing);
+      expect(find.byKey(const Key('map-marker-building-building-1')), findsOneWidget);
+
+      // No lot selected yet — no distance list.
+      expect(find.text('Nearest existing buildings'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('map-marker-lot-lot-1')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nearest existing buildings'), findsOneWidget);
+      expect(find.textContaining('My Warehouse (STORAGE)'), findsOneWidget);
     });
   });
 }

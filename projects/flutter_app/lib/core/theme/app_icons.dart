@@ -86,4 +86,16 @@ class AppIcons {
   static const sell = FontAwesomeIcons.tag;
   static const upgrade = FontAwesomeIcons.arrowUp;
   static const wallet = FontAwesomeIcons.wallet;
+
+  // Building unit types (dashboard supply-chain strip)
+  static const unitPurchase = FontAwesomeIcons.cartShopping;
+  static const unitMining = FontAwesomeIcons.mound;
+  static const unitManufacturing = FontAwesomeIcons.gear;
+  static const unitStorage = FontAwesomeIcons.boxesStacked;
+  static const unitB2bSales = FontAwesomeIcons.handshake;
+  static const unitPublicSales = FontAwesomeIcons.tag;
+  static const unitBranding = FontAwesomeIcons.palette;
+  static const unitMarketing = FontAwesomeIcons.bullhorn;
+  static const unitProductQuality = FontAwesomeIcons.flask;
+  static const unitBrandQuality = FontAwesomeIcons.star;
 }

@@ -71,6 +71,14 @@ class AppConfig {
   /// no GraphQL mutation for either — see `MasterApi/Program.cs`).
   static String get masterApiBaseUrl => masterGraphqlUrl.replaceFirst(RegExp(r'/graphql/?$'), '');
 
+  static const String _masterWebUrlOverride = String.fromEnvironment('MASTER_WEB_URL');
+
+  /// Master web portal URL — the Dashboard Pro tab's "Open Portal" deep
+  /// link. Derived from [environment] unless overridden via
+  /// `--dart-define=MASTER_WEB_URL=...`, mirroring [masterGraphqlUrl]'s
+  /// override pattern exactly.
+  static String get masterWebUrl => _masterWebUrlOverride.isNotEmpty ? _masterWebUrlOverride : _environment.masterWebUrl;
+
   /// Mirrors `VITE_AUTH_PASSWORD_ENABLED` in the web frontend, which also
   /// defaults to **disabled** — production shows Biatec-OIDC-only sign-in by
   /// default, and email/password is opt-in via env var for dev/testing.

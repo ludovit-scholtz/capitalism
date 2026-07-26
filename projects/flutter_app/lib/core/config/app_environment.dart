@@ -31,6 +31,16 @@ enum AppEnvironment {
   /// is no single correct default there — `null` means "none known yet".
   String? get defaultGameGraphqlUrl => this == AppEnvironment.local ? 'http://localhost:44356/graphql' : null;
 
+  /// Master web portal (the separate `projects/master-frontend` app) — used
+  /// by the Dashboard's Pro tab to deep-link out to subscription management.
+  /// Mirrors the web's `resolveMasterWebUrl`/`deriveMasterWebUrl` (same
+  /// `api.` → `www.` domain swap as [masterGraphqlUrl]'s own derivation).
+  String get masterWebUrl => switch (this) {
+    AppEnvironment.local => 'http://localhost:5174',
+    AppEnvironment.stage => 'https://www.stage.capitalism5.com',
+    AppEnvironment.prod => 'https://www.capitalism5.com',
+  };
+
   static AppEnvironment fromName(String? name) =>
       AppEnvironment.values.firstWhere((e) => e.name == name, orElse: () => AppEnvironment.stage);
 }

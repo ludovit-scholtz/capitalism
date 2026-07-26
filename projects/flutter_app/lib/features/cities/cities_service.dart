@@ -13,7 +13,7 @@ const _citiesQuery = r'''
 const _expansionCitiesQuery = r'''
   query WorldMapCities {
     getCities {
-      id name countryCode currencyCode population isUnlocked
+      id name countryCode currencyCode latitude longitude population isUnlocked
       availableLandPlots activeCompanyCount topResourceName
       requiredNetWorth currentNetWorth progressPercent
     }

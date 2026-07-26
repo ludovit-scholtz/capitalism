@@ -18,6 +18,12 @@ const _myCompaniesQuery = r'''
   query BuyBuildingMyCompanies { me { companies { id name } } }
 ''';
 
+const _myBuildingLocationsQuery = r'''
+  query BuyBuildingMyBuildingLocations {
+    myCompanies { id buildings { id name type cityId latitude longitude } }
+  }
+''';
+
 const _purchaseLotMutation = r'''
   mutation PurchaseLot($input: PurchaseLotInput!) {
     purchaseLot(input: $input) { building { id name type level } }
@@ -54,6 +60,22 @@ class BuyBuildingService {
     return companies
         .map((e) => {'id': (e as Map<String, dynamic>)['id'] as String, 'name': e['name'] as String})
         .toList();
+  }
+
+  /// Coordinates of every building the given company already owns — used to
+  /// render "distance to existing buildings" on the lot map. Mirrors web's
+  /// `cityPlayerBuildings` (`myCompanies { buildings { ... latitude longitude } }`).
+  Future<List<OwnedBuildingLocation>> fetchMyBuildingLocations(String companyId) async {
+    final result = await _graphQlService.request(_myBuildingLocationsQuery);
+    final companies = (result['myCompanies'] as List<dynamic>?) ?? const [];
+    for (final company in companies) {
+      final map = company as Map<String, dynamic>;
+      if (map['id'] == companyId) {
+        final buildings = (map['buildings'] as List<dynamic>?) ?? const [];
+        return buildings.map((b) => OwnedBuildingLocation.fromJson(b as Map<String, dynamic>)).toList();
+      }
+    }
+    return const [];
   }
 
   Future<void> purchaseLot({
