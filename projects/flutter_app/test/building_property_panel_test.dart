@@ -1,8 +1,12 @@
+import 'package:capitalism_app/core/i18n/locale_state.dart';
 import 'package:capitalism_app/features/buildings/building_detail_models.dart';
 import 'package:capitalism_app/features/buildings/building_panel_models.dart';
 import 'package:capitalism_app/features/buildings/building_property_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+
+import 'support/in_memory_selected_locale_storage.dart';
 
 const _apartment = BuildingDetail(
   id: 'building-1',
@@ -42,13 +46,16 @@ const _detail = ApartmentBuildingDetail(
 Future<double?> _pump(WidgetTester tester, {BuildingDetail building = _apartment, ApartmentBuildingDetail? detail = _detail}) async {
   double? scheduled;
   await tester.pumpWidget(
-    MaterialApp(
-      home: Scaffold(
-        body: SingleChildScrollView(
-          child: BuildingPropertyPanel(
-            building: building,
-            detail: detail,
-            onScheduleRent: (rent) async => scheduled = rent,
+    ChangeNotifierProvider<LocaleState>.value(
+      value: LocaleState(storage: InMemorySelectedLocaleStorage()),
+      child: MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: BuildingPropertyPanel(
+              building: building,
+              detail: detail,
+              onScheduleRent: (rent) async => scheduled = rent,
+            ),
           ),
         ),
       ),
@@ -96,9 +103,12 @@ void main() {
     testWidgets('Set Rent opens a dialog and schedules the entered rent', (tester) async {
       double? scheduled;
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: BuildingPropertyPanel(building: _apartment, detail: _detail, onScheduleRent: (rent) async => scheduled = rent),
+        ChangeNotifierProvider<LocaleState>.value(
+          value: LocaleState(storage: InMemorySelectedLocaleStorage()),
+          child: MaterialApp(
+            home: Scaffold(
+              body: BuildingPropertyPanel(building: _apartment, detail: _detail, onScheduleRent: (rent) async => scheduled = rent),
+            ),
           ),
         ),
       );

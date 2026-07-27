@@ -1,4 +1,5 @@
 import 'package:capitalism_app/core/auth/auth_state.dart';
+import 'package:capitalism_app/core/i18n/locale_state.dart';
 import 'package:capitalism_app/features/leaderboard/leaderboard_models.dart';
 import 'package:capitalism_app/features/leaderboard/leaderboard_screens.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'support/fake_leaderboard_service.dart';
+import 'support/in_memory_selected_locale_storage.dart';
 import 'support/in_memory_token_storage.dart';
 
 const _alice = PlayerRanking(
@@ -61,7 +63,13 @@ Future<GoRouter> _pumpLeaderboard(WidgetTester tester, {required FakeLeaderboard
     ],
   );
   await tester.pumpWidget(
-    ChangeNotifierProvider<AuthState>.value(value: auth, child: MaterialApp.router(routerConfig: router)),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AuthState>.value(value: auth),
+        ChangeNotifierProvider<LocaleState>.value(value: LocaleState(storage: InMemorySelectedLocaleStorage())),
+      ],
+      child: MaterialApp.router(routerConfig: router),
+    ),
   );
   await tester.pumpAndSettle();
   return router;
@@ -115,8 +123,11 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final auth = AuthState(storage: InMemoryTokenStorage());
       await tester.pumpWidget(
-        ChangeNotifierProvider<AuthState>.value(
-          value: auth,
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<AuthState>.value(value: auth),
+            ChangeNotifierProvider<LocaleState>.value(value: LocaleState(storage: InMemorySelectedLocaleStorage())),
+          ],
           child: MaterialApp(home: Scaffold(body: PlayerProfileScreen(playerId: playerId, leaderboardService: service))),
         ),
       );

@@ -25,17 +25,19 @@ import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/i18n/locale_state.dart';
 import '../../core/theme/app_icons.dart';
+import '../../core/utils/app_number_format.dart';
+import '../../core/widgets/game_tick_time.dart';
 import 'leaderboard_models.dart';
 import 'leaderboard_service.dart';
 
-String _formatCompact(double value) {
-  final absValue = value.abs();
-  if (absValue >= 1e9) return '\$${(value / 1e9).toStringAsFixed(2)}B';
-  if (absValue >= 1e6) return '\$${(value / 1e6).toStringAsFixed(2)}M';
-  if (absValue >= 1e3) return '\$${(value / 1e3).toStringAsFixed(1)}K';
-  return '\$${value.toStringAsFixed(0)}';
-}
+/// Locale-aware compact USD wealth display — mirrors `formatCompactMoney` on
+/// the web. Threaded through `context` (rather than a plain `languageCode`
+/// param) since every call site already has one available in its own
+/// `build`.
+String _formatCompact(BuildContext context, double value) =>
+    AppNumberFormat.compactMoney(value, languageCode: context.watch<LocaleState>().languageCode);
 
 const _pageSize = 10;
 
@@ -270,10 +272,10 @@ class _EndgameBenchmarkCard extends StatelessWidget {
           children: [
             Text('🏆 Race to the top', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
-            Text('Target: ${_formatCompact(endgame.winningThresholdUsd)}'),
+            Text('Target: ${_formatCompact(context, endgame.winningThresholdUsd)}'),
             if (topPlayer != null) ...[
               const SizedBox(height: 8),
-              Text('${topPlayer!.alias} is leading with ${_formatCompact(topPlayer!.totalWealthUsd)}'),
+              Text('${topPlayer!.alias} is leading with ${_formatCompact(context, topPlayer!.totalWealthUsd)}'),
             ],
           ],
         ),
@@ -310,8 +312,11 @@ class _PlayerRankCard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(_formatCompact(player.totalWealthUsd), style: Theme.of(context).textTheme.titleSmall),
-            Text('💵 ${_formatCompact(player.personalCash)} · 📈 ${_formatCompact(player.sharesValue)}', style: Theme.of(context).textTheme.bodySmall),
+            Text(_formatCompact(context, player.totalWealthUsd), style: Theme.of(context).textTheme.titleSmall),
+            Text(
+              '💵 ${_formatCompact(context, player.personalCash)} · 📈 ${_formatCompact(context, player.sharesValue)}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
           ],
         ),
       ),
@@ -338,7 +343,7 @@ class _CompanyRankCard extends StatelessWidget {
         ),
         title: Text(company.companyName, overflow: TextOverflow.ellipsis),
         subtitle: Text('Owned by ${company.ownerAlias} · ${company.buildingCount} buildings'),
-        trailing: Text(_formatCompact(company.totalWealthUsd), style: Theme.of(context).textTheme.titleSmall),
+        trailing: Text(_formatCompact(context, company.totalWealthUsd), style: Theme.of(context).textTheme.titleSmall),
       ),
     );
   }
@@ -552,7 +557,7 @@ class _QuickStatsRow extends StatelessWidget {
       children: [
         stat(profile.leaderboardRank > 0 ? rankBadge(profile.leaderboardRank) : '—', 'Global rank'),
         const SizedBox(width: 8),
-        stat(_formatCompact(profile.totalWealthUsd), 'Total wealth'),
+        stat(_formatCompact(context, profile.totalWealthUsd), 'Total wealth'),
         const SizedBox(width: 8),
         stat('${profile.companyCount}', 'Companies'),
         const SizedBox(width: 8),
@@ -604,7 +609,7 @@ class _OverviewTab extends StatelessWidget {
                 Text('📦 SALES STATS', style: theme.textTheme.labelLarge),
                 const SizedBox(height: 8),
                 Text('Total products sold: ${profile.totalProductsSold.toStringAsFixed(0)}'),
-                Text('Company equity: ${_formatCompact(profile.totalCompanyEquityUsd)}'),
+                Text('Company equity: ${_formatCompact(context, profile.totalCompanyEquityUsd)}'),
               ],
             ),
           ),
@@ -618,8 +623,12 @@ class _OverviewTab extends StatelessWidget {
               children: [
                 Text('🏆 HALL OF FAME', style: theme.textTheme.labelLarge),
                 const SizedBox(height: 8),
-                Text('Highest single-tick revenue: ${hof.highestSingleTickRevenue > 0 ? _formatCompact(hof.highestSingleTickRevenue) : '—'}'),
-                Text('Largest acquisition: ${hof.largestBuildingAcquisitionPrice > 0 ? _formatCompact(hof.largestBuildingAcquisitionPrice) : '—'}'),
+                Text(
+                  'Highest single-tick revenue: ${hof.highestSingleTickRevenue > 0 ? _formatCompact(context, hof.highestSingleTickRevenue) : '—'}',
+                ),
+                Text(
+                  'Largest acquisition: ${hof.largestBuildingAcquisitionPrice > 0 ? _formatCompact(context, hof.largestBuildingAcquisitionPrice) : '—'}',
+                ),
                 Text('Highest brand quality: ${hof.highestBrandQuality > 0 ? '${(hof.highestBrandQuality * 100).round()}%' : '—'}'),
                 Text('Account age: ${hof.accountAgeTicks} ticks'),
               ],
@@ -667,8 +676,8 @@ class _RankHistoryTab extends StatelessWidget {
         for (final snapshot in snapshots.reversed)
           ListTile(
             dense: true,
-            title: Text('Rank #${snapshot.leaderboardRank} · ${_formatCompact(snapshot.wealthUsd)}'),
-            subtitle: Text('Tick ${snapshot.snapshotTick}'),
+            title: Text('Rank #${snapshot.leaderboardRank} · ${_formatCompact(context, snapshot.wealthUsd)}'),
+            subtitle: GameTickTime(snapshot.snapshotTick),
             trailing: snapshot.positionChange == null
                 ? null
                 : Text(snapshot.positionChange! > 0 ? '▲${snapshot.positionChange}' : (snapshot.positionChange! < 0 ? '▼${-snapshot.positionChange!}' : '–')),

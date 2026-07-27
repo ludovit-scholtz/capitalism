@@ -5,7 +5,10 @@ import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/i18n/locale_state.dart';
 import '../../core/theme/app_icons.dart';
+import '../../core/utils/app_number_format.dart';
+import '../../core/utils/game_time.dart';
 
 /// Mirrors `HomeView.vue`: hero section, game status cards (tick, tax
 /// rate), a leaderboard preview, and an auth-state-dependent CTA. The web
@@ -160,9 +163,16 @@ class _StatusCards extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final languageCode = context.watch<LocaleState>().languageCode;
     return Row(
       children: [
-        Expanded(child: _StatCard(label: 'Tick', value: '${status.currentTick}')),
+        Expanded(
+          child: _StatCard(
+            label: 'Time',
+            value: formatGameTickTime(status.currentTick, languageCode),
+            tooltip: 'Tick ${status.currentTick}',
+          ),
+        ),
         const SizedBox(width: 12),
         Expanded(child: _StatCard(label: 'Tax Rate', value: '${status.taxRate.toStringAsFixed(1)}%')),
       ],
@@ -171,15 +181,18 @@ class _StatusCards extends StatelessWidget {
 }
 
 class _StatCard extends StatelessWidget {
-  const _StatCard({required this.label, required this.value});
+  const _StatCard({required this.label, required this.value, this.tooltip});
 
   final String label;
   final String value;
 
+  /// Shown on hover/long-press — used for the tick card's raw tick number.
+  final String? tooltip;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Card(
+    final card = Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -192,6 +205,7 @@ class _StatCard extends StatelessWidget {
         ),
       ),
     );
+    return tooltip == null ? card : Tooltip(message: tooltip!, child: card);
   }
 }
 
@@ -203,6 +217,7 @@ class _LeaderboardPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final languageCode = context.watch<LocaleState>().languageCode;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -222,7 +237,7 @@ class _LeaderboardPreview extends StatelessWidget {
                 contentPadding: EdgeInsets.zero,
                 leading: const FaIcon(AppIcons.leaderboard, size: 18),
                 title: Text(player.displayName),
-                trailing: Text('\$${player.totalWealthUsd.toStringAsFixed(0)}'),
+                trailing: Text(AppNumberFormat.compactMoney(player.totalWealthUsd, languageCode: languageCode)),
               ),
           ],
         ),

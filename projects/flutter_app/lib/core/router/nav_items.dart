@@ -108,6 +108,7 @@ const List<NavSection> navSections = <NavSection>[
   NavSection(
     title: 'App',
     items: [
+      NavItem(label: 'Settings', route: '/settings', icon: AppIcons.settings),
       NavItem(label: 'About', route: '/about', icon: AppIcons.about),
     ],
   ),

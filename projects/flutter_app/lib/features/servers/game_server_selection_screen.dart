@@ -13,8 +13,10 @@ import 'package:provider/provider.dart';
 import '../../core/auth/auth_state.dart';
 import '../../core/config/game_server_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/i18n/locale_state.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/game_time.dart';
 import '../../core/widgets/icon_badge.dart';
 import 'game_server_models.dart';
 import 'game_server_service.dart';
@@ -131,6 +133,7 @@ class _GameServerCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final languageCode = context.watch<LocaleState>().languageCode;
     return Card(
       key: ValueKey('game-server-${server.serverKey}'),
       margin: const EdgeInsets.only(bottom: 12),
@@ -174,9 +177,12 @@ class _GameServerCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Text(
-              '${server.playerCount} players · ${server.companyCount} companies · tick ${server.currentTick}',
-              style: theme.textTheme.bodySmall,
+            Tooltip(
+              message: 'Tick ${server.currentTick}',
+              child: Text(
+                '${server.playerCount} players · ${server.companyCount} companies · ${formatGameTickTime(server.currentTick, languageCode)}',
+                style: theme.textTheme.bodySmall,
+              ),
             ),
             const SizedBox(height: 12),
             SizedBox(

@@ -11,6 +11,8 @@ import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/i18n/locale_state.dart';
+import '../../core/utils/game_time.dart';
 import '../../core/widgets/sparkline_chart.dart';
 import 'stock_models.dart';
 import 'stock_service.dart';
@@ -187,6 +189,7 @@ class _StockTradingScreenState extends State<StockTradingScreen> {
     final listing = _listing!;
     final theme = Theme.of(context);
     final orderBook = _orderBook!;
+    final languageCode = context.watch<LocaleState>().languageCode;
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -291,7 +294,13 @@ class _StockTradingScreenState extends State<StockTradingScreen> {
             const Text('No trades yet.')
           else
             for (final trade in _tradeHistory.take(10))
-              Text('${trade.price.toStringAsFixed(2)} × ${trade.quantity.toStringAsFixed(0)} (tick ${trade.executedAtTick})'),
+              Tooltip(
+                message: 'Tick ${trade.executedAtTick}',
+                child: Text(
+                  '${trade.price.toStringAsFixed(2)} × ${trade.quantity.toStringAsFixed(0)} '
+                  '(${formatGameTickTime(trade.executedAtTick, languageCode)})',
+                ),
+              ),
           const SizedBox(height: 16),
           Text('Shareholders', style: theme.textTheme.titleMedium),
           if (_shareholders != null)

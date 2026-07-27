@@ -21,6 +21,7 @@ import '../../core/auth/auth_state.dart';
 import '../../core/auth/biatec_oidc_service.dart';
 import '../../core/game_state/game_state_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/i18n/locale_state.dart';
 import 'onboarding_company_name.dart';
 import 'onboarding_complete_step.dart';
 import 'onboarding_fx.dart';
@@ -142,13 +143,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   /// Formats an amount already denominated in the selected city's currency
   /// (lot prices, company cash) — no conversion, symbol/decimals only.
-  String _formatLocal(double amount) => formatOnboardingCurrency(amount, _cityCurrencyCode);
+  String _formatLocal(double amount) =>
+      formatOnboardingCurrency(amount, _cityCurrencyCode, context.read<LocaleState>().languageCode);
 
   /// Converts a USD-nominal amount (product base prices, IPO plan figures)
   /// into the selected city's currency, then formats it. Mirrors web's
   /// `getProductLocalPrice`/`cityUsdFxRate`-based display computeds.
-  String _formatUsd(double usdAmount, {bool wholeUnits = false}) =>
-      formatOnboardingCurrency(_fxRates.usdToLocal(usdAmount, _cityCurrencyCode, wholeUnits: wholeUnits), _cityCurrencyCode);
+  String _formatUsd(double usdAmount, {bool wholeUnits = false}) => formatOnboardingCurrency(
+    _fxRates.usdToLocal(usdAmount, _cityCurrencyCode, wholeUnits: wholeUnits),
+    _cityCurrencyCode,
+    context.read<LocaleState>().languageCode,
+  );
+
+  /// Matches `OnboardingCompleteStep.formatMoney`'s `(amount, currencyCode)`
+  /// callback shape — the completion step already knows its own currency
+  /// code (`result.cityCurrencyCode`), so this only adds the app language.
+  String _formatMoneyForCompletionStep(double amount, String currencyCode) =>
+      formatOnboardingCurrency(amount, currencyCode, context.read<LocaleState>().languageCode);
 
   /// Starting cash converted into the selected city's currency — mirrors
   /// web's `companyStartingCash`. Must stay local-currency-denominated since
@@ -618,7 +629,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           savingProgress: _savingProgress,
           completingMilestone: _completingMilestone,
           milestoneCompleted: _milestoneCompleted,
-          formatMoney: formatOnboardingCurrency,
+          formatMoney: _formatMoneyForCompletionStep,
           missionStatus: _firstSaleMission,
           error: _stepError,
         );

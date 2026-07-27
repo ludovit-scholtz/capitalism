@@ -17,8 +17,11 @@ import '../context/account_context_state.dart';
 import '../game_state/game_state_service.dart';
 import '../game_state/game_state_state.dart';
 import '../graphql/graphql_service.dart';
+import '../i18n/locale_state.dart';
 import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
+import '../utils/app_number_format.dart';
+import '../utils/game_time.dart';
 
 class GameStatusBar extends StatefulWidget {
   const GameStatusBar({super.key, GameStateService? gameStateService, AccountContextService? accountContextService})
@@ -136,6 +139,7 @@ class _GameStatusBarState extends State<GameStatusBar> {
   Widget build(BuildContext context) {
     final accountContext = context.watch<AccountContextState>();
     final gameState = context.watch<GameStateState>().gameState;
+    final languageCode = context.watch<LocaleState>().languageCode;
 
     final balance = accountContext.isCompanyMode
         ? accountContext.activeCompany?.cash
@@ -147,13 +151,14 @@ class _GameStatusBarState extends State<GameStatusBar> {
         _StatusChip(
           key: const Key('nav-balance-chip'),
           icon: AppIcons.wallet,
-          label: balance != null ? '\$${balance.toStringAsFixed(0)}' : '—',
+          label: balance != null ? AppNumberFormat.compactMoney(balance, languageCode: languageCode) : '—',
         ),
         const SizedBox(width: 8),
         _StatusChip(
           key: const Key('nav-tick-chip'),
           icon: AppIcons.clock,
-          label: gameState != null ? 'Tick ${gameState.currentTick}' : '—',
+          label: gameState != null ? formatGameTickTime(gameState.currentTick, languageCode) : '—',
+          tooltip: gameState != null ? 'Tick ${gameState.currentTick}' : null,
           progressPercent: gameState != null ? _progressPercent : null,
         ),
       ],
@@ -162,7 +167,7 @@ class _GameStatusBarState extends State<GameStatusBar> {
 }
 
 class _StatusChip extends StatelessWidget {
-  const _StatusChip({super.key, required this.icon, required this.label, this.progressPercent});
+  const _StatusChip({super.key, required this.icon, required this.label, this.progressPercent, this.tooltip});
 
   final FaIconData icon;
   final String label;
@@ -171,9 +176,14 @@ class _StatusChip extends StatelessWidget {
   /// toward the next tick (0-1), mirroring `GameTimeChip.vue`.
   final double? progressPercent;
 
+  /// Shown on hover (desktop/web) or long-press (mobile) — used for the tick
+  /// chip's raw tick number, kept out of the always-visible label per
+  /// player-facing UI convention (see `GameTickTime`).
+  final String? tooltip;
+
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final chip = Container(
       height: 32,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
@@ -209,5 +219,7 @@ class _StatusChip extends StatelessWidget {
         ],
       ),
     );
+
+    return tooltip == null ? chip : Tooltip(message: tooltip!, child: chip);
   }
 }

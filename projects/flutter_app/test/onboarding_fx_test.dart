@@ -67,12 +67,19 @@ void main() {
 
   group('formatOnboardingCurrency', () {
     test('formats a USD amount with a dollar sign', () {
-      expect(formatOnboardingCurrency(1234.5, 'USD'), contains('1,234.50'));
-      expect(formatOnboardingCurrency(1234.5, 'USD'), contains(r'$'));
+      expect(formatOnboardingCurrency(1234.5, 'USD', 'en'), contains('1,234.50'));
+      expect(formatOnboardingCurrency(1234.5, 'USD', 'en'), contains(r'$'));
     });
 
     test('formats a EUR amount with a euro sign', () {
-      expect(formatOnboardingCurrency(1234.5, 'EUR'), contains('€'));
+      expect(formatOnboardingCurrency(1234.5, 'EUR', 'en'), contains('€'));
+    });
+
+    test('formats using the requested app language, not a hardcoded locale', () {
+      // sk_SK groups with a non-breaking space and uses a comma decimal
+      // separator instead of en_US's comma-grouped, dot-decimal style.
+      expect(formatOnboardingCurrency(1234.5, 'EUR', 'sk'), contains(','));
+      expect(formatOnboardingCurrency(1234.5, 'EUR', 'sk'), isNot(contains('1,234.50')));
     });
   });
 }

@@ -23,6 +23,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/i18n/locale_state.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/widgets/capitalism_map_view.dart';
 import 'cities_models.dart';
@@ -122,6 +123,7 @@ class _CityCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final languageCode = context.watch<LocaleState>().languageCode;
     return Card(
       key: ValueKey('city-${city.id}'),
       margin: const EdgeInsets.only(bottom: 12),
@@ -141,7 +143,7 @@ class _CityCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: _MetricTile(label: 'POPULATION', value: formatPopulation(city.population)),
+                  child: _MetricTile(label: 'POPULATION', value: formatPopulation(city.population, languageCode)),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -376,6 +378,7 @@ class _CityDetailCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final languageCode = context.watch<LocaleState>().languageCode;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -384,7 +387,7 @@ class _CityDetailCard extends StatelessWidget {
           children: [
             Text(city.name, style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
-            Text('Population: ${formatPopulation(city.population)}'),
+            Text('Population: ${formatPopulation(city.population, languageCode)}'),
             Text('Currency: ${city.currencyCode}'),
             Text('Available land: ${city.availableLandPlots}'),
             Text('Competition: ${city.activeCompanyCount} companies'),

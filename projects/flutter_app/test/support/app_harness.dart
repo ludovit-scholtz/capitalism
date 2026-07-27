@@ -10,12 +10,14 @@ import 'package:capitalism_app/core/context/account_context_state.dart';
 import 'package:capitalism_app/core/context/recent_building_state.dart';
 import 'package:capitalism_app/core/game_state/game_state_service.dart';
 import 'package:capitalism_app/core/game_state/game_state_state.dart';
+import 'package:capitalism_app/core/i18n/locale_state.dart';
 import 'package:capitalism_app/core/router/app_router.dart';
 import 'package:capitalism_app/core/services/url_opener.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
 import 'fake_account_context_service.dart';
@@ -25,7 +27,22 @@ import 'in_memory_selected_building_storage.dart';
 import 'in_memory_selected_city_storage.dart';
 import 'in_memory_selected_environment_storage.dart';
 import 'in_memory_selected_game_server_storage.dart';
+import 'in_memory_selected_locale_storage.dart';
 import 'in_memory_token_storage.dart';
+
+/// `DateFormat` needs its locale symbol data loaded before formatting any
+/// non-'en' locale (see `main.dart`'s own `initializeDateFormatting()` call)
+/// — `flutter test` never runs `main()`, so tests that switch the app
+/// language via `LocaleState` need the same call. Guarded since it's
+/// otherwise redundant work on every one of this harness's many call sites
+/// across the suite.
+bool _localeDataInitialized = false;
+
+Future<void> _ensureLocaleDataInitialized() async {
+  if (_localeDataInitialized) return;
+  await initializeDateFormatting();
+  _localeDataInitialized = true;
+}
 
 /// Pumps a real [CapitalismApp] with a fresh [AuthState] and a fresh
 /// [createAppRouter] instance (never the shared default singleton, which
@@ -58,6 +75,7 @@ Future<AuthState> pumpCapitalismApp(
 }) async {
   await tester.binding.setSurfaceSize(surfaceSize);
   addTearDown(() => tester.binding.setSurfaceSize(null));
+  await _ensureLocaleDataInitialized();
 
   // AppConfig's environment/graphqlUrl are process-wide static state (see
   // `app_config.dart`) rather than something threaded through the widget
@@ -83,6 +101,7 @@ Future<AuthState> pumpCapitalismApp(
   final recentBuildingState = RecentBuildingState(storage: InMemorySelectedBuildingStorage());
   final gameStateState = GameStateState();
   addTearDown(gameStateState.dispose);
+  final localeState = LocaleState(storage: InMemorySelectedLocaleStorage());
 
   await tester.pumpWidget(
     MultiProvider(
@@ -93,6 +112,7 @@ Future<AuthState> pumpCapitalismApp(
         ChangeNotifierProvider<AccountContextState>.value(value: accountContextState),
         ChangeNotifierProvider<RecentBuildingState>.value(value: recentBuildingState),
         ChangeNotifierProvider<GameStateState>.value(value: gameStateState),
+        ChangeNotifierProvider<LocaleState>.value(value: localeState),
       ],
       child: CapitalismApp(
         router:

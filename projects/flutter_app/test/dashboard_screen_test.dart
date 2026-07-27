@@ -2,6 +2,7 @@ import 'package:capitalism_app/core/auth/auth_state.dart';
 import 'package:capitalism_app/core/game_state/game_state_model.dart';
 import 'package:capitalism_app/core/game_state/game_state_state.dart';
 import 'package:capitalism_app/core/graphql/graphql_service.dart';
+import 'package:capitalism_app/core/i18n/locale_state.dart';
 import 'package:capitalism_app/core/services/url_opener.dart';
 import 'package:capitalism_app/features/buildings/building_analytics_models.dart';
 import 'package:capitalism_app/features/buildings/building_panel_models.dart';
@@ -15,6 +16,7 @@ import 'package:provider/provider.dart';
 
 import 'support/fake_dashboard_service.dart';
 import 'support/fake_url_opener.dart';
+import 'support/in_memory_selected_locale_storage.dart';
 import 'support/in_memory_token_storage.dart';
 
 const _destroyedBuilding = DashboardBuilding(
@@ -154,6 +156,7 @@ Future<GoRouter> _pumpDashboard(
       providers: [
         ChangeNotifierProvider<AuthState>.value(value: auth),
         ChangeNotifierProvider<GameStateState>.value(value: gameStateState ?? GameStateState()),
+        ChangeNotifierProvider<LocaleState>.value(value: LocaleState(storage: InMemorySelectedLocaleStorage())),
       ],
       child: MaterialApp.router(routerConfig: router),
     ),

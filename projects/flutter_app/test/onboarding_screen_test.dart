@@ -6,6 +6,7 @@ import 'package:capitalism_app/core/auth/web_authenticator.dart';
 import 'package:capitalism_app/core/game_state/game_state_model.dart';
 import 'package:capitalism_app/core/game_state/game_state_state.dart';
 import 'package:capitalism_app/core/graphql/graphql_service.dart';
+import 'package:capitalism_app/core/i18n/locale_state.dart';
 import 'package:capitalism_app/features/onboarding/onboarding_models.dart';
 import 'package:capitalism_app/features/onboarding/onboarding_screen.dart';
 import 'package:flutter/material.dart';
@@ -19,6 +20,7 @@ import 'support/fake_id_token.dart';
 import 'support/fake_onboarding_service.dart';
 import 'support/fake_tile_provider.dart';
 import 'support/fake_web_authenticator.dart';
+import 'support/in_memory_selected_locale_storage.dart';
 import 'support/in_memory_token_storage.dart';
 
 const _bratislava = OnboardingCity(
@@ -141,6 +143,7 @@ Future<void> _pumpOnboarding(
       providers: [
         ChangeNotifierProvider<AuthState>.value(value: auth),
         ChangeNotifierProvider<GameStateState>.value(value: gameStateState ?? GameStateState()),
+        ChangeNotifierProvider<LocaleState>.value(value: LocaleState(storage: InMemorySelectedLocaleStorage())),
       ],
       child: MaterialApp.router(routerConfig: router),
     ),

@@ -16,6 +16,8 @@ import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/i18n/locale_state.dart';
+import '../../core/utils/game_time.dart';
 import 'banking_models.dart';
 import 'banking_service.dart';
 
@@ -230,6 +232,7 @@ class _BankManagementScreenState extends State<BankManagementScreen> {
 
     final bankInfo = _bankInfo!;
     final theme = Theme.of(context);
+    final languageCode = context.watch<LocaleState>().languageCode;
 
     return ListView(
       padding: const EdgeInsets.all(24),
@@ -237,12 +240,12 @@ class _BankManagementScreenState extends State<BankManagementScreen> {
         Text(bankInfo.bankBuildingName, style: theme.textTheme.headlineSmall),
         Text('${bankInfo.totalDeposits.toStringAsFixed(0)} ${bankInfo.cityCurrencyCode} in deposits', style: theme.textTheme.bodyMedium),
         const SizedBox(height: 16),
-        if (_isOwner) ..._buildOwnerView(theme, bankInfo) else ..._buildCustomerView(theme),
+        if (_isOwner) ..._buildOwnerView(theme, bankInfo, languageCode) else ..._buildCustomerView(theme),
       ],
     );
   }
 
-  List<Widget> _buildOwnerView(ThemeData theme, BankInfo bankInfo) {
+  List<Widget> _buildOwnerView(ThemeData theme, BankInfo bankInfo, String languageCode) {
     return [
       Text('Liquidity', style: theme.textTheme.titleMedium),
       Card(
@@ -281,7 +284,13 @@ class _BankManagementScreenState extends State<BankManagementScreen> {
       if (bankInfo.pendingDepositInterestRatePercent != null)
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Text('Pending: ${bankInfo.pendingDepositInterestRatePercent!.toStringAsFixed(1)}% at tick ${bankInfo.pendingDepositRateEffectiveTick}'),
+          child: Tooltip(
+            message: 'Tick ${bankInfo.pendingDepositRateEffectiveTick ?? '—'}',
+            child: Text(
+              'Pending: ${bankInfo.pendingDepositInterestRatePercent!.toStringAsFixed(1)}% at '
+              '${bankInfo.pendingDepositRateEffectiveTick != null ? formatGameTickTime(bankInfo.pendingDepositRateEffectiveTick!, languageCode) : '—'}',
+            ),
+          ),
         ),
       TextField(
         controller: _scheduledRateController,
@@ -302,7 +311,12 @@ class _BankManagementScreenState extends State<BankManagementScreen> {
             ListTile(
               dense: true,
               title: Text('${entry.previousRatePercent.toStringAsFixed(1)}% → ${entry.newRatePercent.toStringAsFixed(1)}%'),
-              subtitle: Text('Tick ${entry.effectiveTick} · ${entry.isApplied ? 'Applied' : 'Pending'}'),
+              subtitle: Tooltip(
+                message: 'Tick ${entry.effectiveTick}',
+                child: Text(
+                  '${formatGameTickTime(entry.effectiveTick, languageCode)} · ${entry.isApplied ? 'Applied' : 'Pending'}',
+                ),
+              ),
             ),
       ],
       const SizedBox(height: 16),

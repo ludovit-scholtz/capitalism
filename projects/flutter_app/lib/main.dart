@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
 import 'app.dart';
@@ -10,11 +11,21 @@ import 'core/context/account_context_state.dart';
 import 'core/context/recent_building_state.dart';
 import 'core/game_state/game_state_state.dart';
 import 'core/graphql/graphql_service.dart';
+import 'core/i18n/locale_state.dart';
 import 'core/services/app_logger.dart';
 import 'features/servers/game_server_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // `DateFormat` (used by `game_time.dart` for locale-aware in-game
+  // timestamps) throws `LocaleDataException` for any non-'en' locale until
+  // its symbol data is loaded — unlike `NumberFormat`, which works
+  // out-of-the-box for every locale. Loading it once up front here decouples
+  // our own app-language selection (`LocaleState`) from Flutter's own
+  // `GlobalMaterialLocalizations` delegate load timing, which only covers
+  // the locale passed to `MaterialApp.locale`.
+  await initializeDateFormatting();
 
   // Route framework-level and otherwise-uncaught errors into AppLogger so
   // they show up on the Dev Info screen, not just the (often unavailable to
@@ -37,12 +48,14 @@ Future<void> main() async {
   final accountContextState = AccountContextState();
   final recentBuildingState = RecentBuildingState();
   final gameStateState = GameStateState();
+  final localeState = LocaleState();
   await Future.wait([
     authState.restoreSession(),
     environmentState.restoreSelection(),
     gameServerState.restoreSelection(),
     accountContextState.restoreSelectedCity(),
     recentBuildingState.restoreLastBuilding(),
+    localeState.restoreSelection(),
   ]);
   AppLogger.instance.info(
     'Session restored: authenticated=${authState.isAuthenticated}, environment=${environmentState.environment.label}, '
@@ -66,6 +79,7 @@ Future<void> main() async {
         ChangeNotifierProvider<AccountContextState>.value(value: accountContextState),
         ChangeNotifierProvider<RecentBuildingState>.value(value: recentBuildingState),
         ChangeNotifierProvider<GameStateState>.value(value: gameStateState),
+        ChangeNotifierProvider<LocaleState>.value(value: localeState),
       ],
       child: CapitalismApp(),
     ),

@@ -3,6 +3,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_icons.dart';
+import '../../core/widgets/game_tick_time.dart';
 import '../../core/widgets/icon_badge.dart';
 import 'onboarding_models.dart';
 
@@ -120,7 +121,7 @@ class OnboardingCompleteStep extends StatelessWidget {
                       Text(
                         'Price per unit: ${formatMoney(missionStatus!.firstSalePricePerUnit!, result?.cityCurrencyCode ?? 'USD')}',
                       ),
-                    if (missionStatus!.firstSaleTick != null) Text('Tick ${missionStatus!.firstSaleTick}'),
+                    if (missionStatus!.firstSaleTick != null) GameTickTime(missionStatus!.firstSaleTick!),
                   ],
                 ),
               ),

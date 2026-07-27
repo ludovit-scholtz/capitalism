@@ -1,4 +1,5 @@
 import 'package:capitalism_app/core/auth/auth_state.dart';
+import 'package:capitalism_app/core/i18n/locale_state.dart';
 import 'package:capitalism_app/features/banking/bank_management_screen.dart';
 import 'package:capitalism_app/features/banking/banking_models.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:provider/provider.dart';
 
 import 'support/banking_fixtures.dart';
 import 'support/fake_banking_service.dart';
+import 'support/in_memory_selected_locale_storage.dart';
 import 'support/in_memory_token_storage.dart';
 
 Future<void> _pump(WidgetTester tester, Widget widget) async {
@@ -26,7 +28,13 @@ Future<void> _pump(WidgetTester tester, Widget widget) async {
     ],
   );
   await tester.pumpWidget(
-    ChangeNotifierProvider<AuthState>.value(value: auth, child: MaterialApp.router(routerConfig: router)),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AuthState>.value(value: auth),
+        ChangeNotifierProvider<LocaleState>.value(value: LocaleState(storage: InMemorySelectedLocaleStorage())),
+      ],
+      child: MaterialApp.router(routerConfig: router),
+    ),
   );
   await tester.pumpAndSettle();
 }

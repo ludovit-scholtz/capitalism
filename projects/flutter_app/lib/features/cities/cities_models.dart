@@ -6,6 +6,8 @@
 // `CityExpansionOverview`, note the distinct GraphQL name from the plain
 // `cities` query above — the web calls this one for the expansion map).
 
+import '../../core/utils/app_number_format.dart';
+
 class CityResourceAbundance {
   const CityResourceAbundance({required this.abundance, required this.resourceName, required this.resourceSlug});
 
@@ -75,12 +77,10 @@ const Map<String, String> cityResourceIcons = {
 
 String cityResourceIcon(String slug) => cityResourceIcons[slug] ?? '📦';
 
-/// Formats a population count like the web's `formatPopulation`.
-String formatPopulation(int population) {
-  if (population >= 1000000) return '${(population / 1000000).toStringAsFixed(1)}M';
-  if (population >= 1000) return '${(population / 1000).toStringAsFixed(0)}K';
-  return '$population';
-}
+/// Formats a population count as a locale-aware compact number — matches
+/// `formatCompactNumber` on the web.
+String formatPopulation(int population, String languageCode) =>
+    AppNumberFormat.compactNumber(population, languageCode: languageCode);
 
 class ExpansionCity {
   const ExpansionCity({

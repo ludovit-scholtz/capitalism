@@ -22,7 +22,7 @@ void main() {
       expect(find.widgetWithText(AppBar, 'CAPITALISM'), findsOneWidget);
       expect(find.byType(NavigationBar), findsOneWidget);
       expect(find.text('Get Started'), findsOneWidget);
-      expect(find.text('Tick'), findsOneWidget);
+      expect(find.text('Time'), findsOneWidget);
     });
 
     testWidgets('drawer hides auth-only items and the Administration section when signed out', (tester) async {

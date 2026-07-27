@@ -1,4 +1,5 @@
 import 'package:capitalism_app/core/auth/auth_state.dart';
+import 'package:capitalism_app/core/i18n/locale_state.dart';
 import 'package:capitalism_app/core/theme/app_icons.dart';
 import 'package:capitalism_app/features/buildings/buy_building_models.dart';
 import 'package:capitalism_app/features/cities/cities_models.dart';
@@ -11,6 +12,7 @@ import 'package:provider/provider.dart';
 
 import 'support/fake_city_tab_service.dart';
 import 'support/fake_tile_provider.dart';
+import 'support/in_memory_selected_locale_storage.dart';
 import 'support/in_memory_token_storage.dart';
 
 const _city = City(
@@ -88,7 +90,13 @@ Future<GoRouter> _pump(WidgetTester tester, Widget Function(FakeCityTabService) 
     ],
   );
   await tester.pumpWidget(
-    ChangeNotifierProvider<AuthState>.value(value: auth, child: MaterialApp.router(routerConfig: router)),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AuthState>.value(value: auth),
+        ChangeNotifierProvider<LocaleState>.value(value: LocaleState(storage: InMemorySelectedLocaleStorage())),
+      ],
+      child: MaterialApp.router(routerConfig: router),
+    ),
   );
   await tester.pumpAndSettle();
   return router;

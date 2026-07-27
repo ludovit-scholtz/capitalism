@@ -43,8 +43,8 @@ void main() {
       expect(find.byKey(const Key('context-switcher-trigger')), findsOneWidget);
       expect(find.byKey(const Key('nav-balance-chip')), findsOneWidget);
       expect(find.byKey(const Key('nav-tick-chip')), findsOneWidget);
-      expect(find.text('\$4200'), findsOneWidget);
-      expect(find.text('Tick 42'), findsOneWidget);
+      expect(find.text('\$4.2K'), findsOneWidget);
+      expect(find.text('Jan 2, 2000 18:00'), findsOneWidget);
 
       // Not duplicated into the drawer on wide screens.
       await _openDrawer(tester);
@@ -83,8 +83,8 @@ void main() {
       expect(find.byKey(const Key('context-switcher-trigger')), findsNothing);
       expect(find.byKey(const Key('nav-balance-chip')), findsOneWidget);
       expect(find.byKey(const Key('nav-tick-chip')), findsOneWidget);
-      expect(find.text('\$1000'), findsOneWidget);
-      expect(find.text('Tick 7'), findsOneWidget);
+      expect(find.text('\$1K'), findsOneWidget);
+      expect(find.text('Jan 1, 2000 07:00'), findsOneWidget);
 
       await _openDrawer(tester);
       expect(find.byKey(const Key('context-switcher-trigger')), findsOneWidget);
@@ -118,7 +118,7 @@ void main() {
         ),
       );
 
-      expect(find.text('\$7777'), findsOneWidget);
+      expect(find.text('\$7.78K'), findsOneWidget);
     });
   });
 }

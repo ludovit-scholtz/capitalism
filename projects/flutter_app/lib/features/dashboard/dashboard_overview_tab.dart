@@ -5,8 +5,10 @@
 // not undone here) by showing one financial card per company instead.
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/i18n/locale_state.dart';
+import '../../core/utils/app_number_format.dart';
 import '../company/company_models.dart';
 import 'dashboard_models.dart';
 
@@ -122,7 +124,8 @@ class _Metric extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final formatted = NumberFormat.simpleCurrency(name: currencyCode).format(value);
+    final languageCode = context.watch<LocaleState>().languageCode;
+    final formatted = AppNumberFormat.money(value, currencyCode: currencyCode, languageCode: languageCode);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

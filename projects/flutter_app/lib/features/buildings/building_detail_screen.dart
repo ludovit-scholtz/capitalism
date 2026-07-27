@@ -55,8 +55,10 @@ import 'package:provider/provider.dart';
 import '../../core/auth/auth_state.dart';
 import '../../core/context/recent_building_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/i18n/locale_state.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/utils/game_time.dart';
 import '../tutorial/tutorial_service.dart';
 import 'building_analytics_models.dart';
 import 'building_analytics_service.dart';
@@ -637,6 +639,7 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
     }
 
     final theme = Theme.of(context);
+    final languageCode = context.watch<LocaleState>().languageCode;
     final pending = building.pendingConfiguration;
     final isGridBuilding = _isMultiUnitBuildingType(building.type);
     final isEditing = _controller.isEditing;
@@ -677,7 +680,13 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Configuration in progress', style: theme.textTheme.titleSmall),
-                    Text('Applies at tick ${pending.appliesAtTick} (${pending.totalTicksRequired} ticks total)'),
+                    Tooltip(
+                      message: 'Tick ${pending.appliesAtTick}',
+                      child: Text(
+                        'Applies at ${formatGameTickTime(pending.appliesAtTick, languageCode)} '
+                        '(${pending.totalTicksRequired} ticks total)',
+                      ),
+                    ),
                     if (pending.blockReason != null) Text('Blocked: ${pending.blockReason}'),
                     if (isGridBuilding && !isEditing) ...[
                       const SizedBox(height: 8),

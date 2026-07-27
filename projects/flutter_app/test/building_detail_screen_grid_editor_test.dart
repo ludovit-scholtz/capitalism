@@ -1,5 +1,6 @@
 import 'package:capitalism_app/core/auth/auth_state.dart';
 import 'package:capitalism_app/core/context/recent_building_state.dart';
+import 'package:capitalism_app/core/i18n/locale_state.dart';
 import 'package:capitalism_app/features/buildings/building_detail_models.dart';
 import 'package:capitalism_app/features/buildings/building_detail_screen.dart';
 import 'package:flutter/material.dart';
@@ -13,6 +14,7 @@ import 'support/fake_building_sales_service.dart';
 import 'support/fake_building_sourcing_service.dart';
 import 'support/fake_tutorial_service.dart';
 import 'support/in_memory_selected_building_storage.dart';
+import 'support/in_memory_selected_locale_storage.dart';
 import 'support/in_memory_token_storage.dart';
 
 const _emptyFactory = BuildingDetail(
@@ -72,6 +74,7 @@ Future<void> _pumpBuildingDetail(WidgetTester tester, {required FakeBuildingDeta
       providers: [
         ChangeNotifierProvider<AuthState>.value(value: auth),
         ChangeNotifierProvider<RecentBuildingState>.value(value: RecentBuildingState(storage: InMemorySelectedBuildingStorage())),
+        ChangeNotifierProvider<LocaleState>.value(value: LocaleState(storage: InMemorySelectedLocaleStorage())),
       ],
       child: MaterialApp.router(routerConfig: router),
     ),

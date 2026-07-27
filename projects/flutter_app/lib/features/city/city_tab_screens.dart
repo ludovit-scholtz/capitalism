@@ -29,6 +29,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/i18n/locale_state.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/widgets/capitalism_map_view.dart';
 import '../buildings/buy_building_models.dart';
@@ -119,6 +120,7 @@ class _CityOverviewScreenState extends _CityTabScreenState<CityOverviewScreen> {
     if (city == null) return const Center(child: Text('City not found.'));
 
     final availableLots = _lots.where((lot) => lot.isAvailable).length;
+    final languageCode = context.watch<LocaleState>().languageCode;
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -127,7 +129,7 @@ class _CityOverviewScreenState extends _CityTabScreenState<CityOverviewScreen> {
         const SizedBox(height: 16),
         Row(
           children: [
-            Expanded(child: _StatCard(label: 'Population', value: formatPopulation(city.population))),
+            Expanded(child: _StatCard(label: 'Population', value: formatPopulation(city.population, languageCode))),
             const SizedBox(width: 8),
             Expanded(child: _StatCard(label: 'Base salary', value: '${city.baseSalaryPerManhour.toStringAsFixed(1)}/h')),
           ],
@@ -215,13 +217,14 @@ class _CityEconomyScreenState extends _CityTabScreenState<CityEconomyScreen> {
     if (city == null) return const Center(child: Text('City not found.'));
 
     final theme = Theme.of(context);
+    final languageCode = context.watch<LocaleState>().languageCode;
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
         Text('Economy', style: theme.textTheme.headlineSmall),
         const SizedBox(height: 8),
         Text('Currency: ${city.currencyCode}'),
-        Text('Population: ${formatPopulation(city.population)}'),
+        Text('Population: ${formatPopulation(city.population, languageCode)}'),
         Text('Base salary: ${city.baseSalaryPerManhour.toStringAsFixed(1)} ${city.currencyCode}/h'),
         const SizedBox(height: 16),
         Text(

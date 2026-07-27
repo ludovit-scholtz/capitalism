@@ -12,8 +12,11 @@
 // information, no custom chart-painting investment for a single curve).
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/i18n/locale_state.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/utils/game_time.dart';
 import 'building_detail_models.dart';
 import 'building_panel_models.dart';
 
@@ -93,6 +96,7 @@ class _BuildingPropertyPanelState extends State<BuildingPropertyPanel> {
     final detail = widget.detail;
     final occupancy = building.occupancyPercent ?? 0;
     final occupiedArea = (_areaSqm * occupancy / 100).round();
+    final languageCode = context.watch<LocaleState>().languageCode;
 
     return Card(
       child: Padding(
@@ -136,9 +140,12 @@ class _BuildingPropertyPanelState extends State<BuildingPropertyPanel> {
                 color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.3),
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.sm),
-                  child: Text(
-                    'Rent change scheduled: ${building.pendingPricePerSqm!.toStringAsFixed(2)} / m² '
-                    'activates at tick ${building.pendingPriceActivationTick}',
+                  child: Tooltip(
+                    message: 'Tick ${building.pendingPriceActivationTick ?? '—'}',
+                    child: Text(
+                      'Rent change scheduled: ${building.pendingPricePerSqm!.toStringAsFixed(2)} / m² activates at '
+                      '${building.pendingPriceActivationTick != null ? formatGameTickTime(building.pendingPriceActivationTick!, languageCode) : '—'}',
+                    ),
                   ),
                 ),
               ),

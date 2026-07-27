@@ -43,8 +43,10 @@ class AppIcons {
   // Administration nav
   static const operations = FontAwesomeIcons.shieldHalved;
 
-  // App / About nav
+  // App / About / Settings nav
   static const about = FontAwesomeIcons.circleInfo;
+  static const settings = FontAwesomeIcons.gear;
+  static const language = FontAwesomeIcons.language;
   static const devInfo = FontAwesomeIcons.bug;
   static const copy = FontAwesomeIcons.copy;
   static const trash = FontAwesomeIcons.trashCan;

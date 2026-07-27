@@ -33,6 +33,7 @@ import '../../features/news/notifications_screen.dart';
 import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/operations/operations_screens.dart';
 import '../../features/servers/game_server_selection_screen.dart';
+import '../../features/settings/settings_screen.dart';
 import '../../features/trade/trade_screens.dart';
 import '../../features/tutorial/tutorial_screen.dart';
 import '../auth/auth_state.dart';
@@ -622,6 +623,8 @@ GoRouter createAppRouter({
                   : null,
             ),
           ),
+          GoRoute(
+              path: '/settings', builder: (context, state) => const SettingsScreen()),
           GoRoute(
               path: '/about', builder: (context, state) => const AboutScreen()),
           GoRoute(

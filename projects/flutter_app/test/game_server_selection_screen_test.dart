@@ -1,6 +1,7 @@
 import 'package:capitalism_app/core/auth/auth_state.dart';
 import 'package:capitalism_app/core/config/app_config.dart';
 import 'package:capitalism_app/core/config/game_server_state.dart';
+import 'package:capitalism_app/core/i18n/locale_state.dart';
 import 'package:capitalism_app/features/servers/game_server_models.dart';
 import 'package:capitalism_app/features/servers/game_server_selection_screen.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +10,7 @@ import 'package:provider/provider.dart';
 
 import 'support/fake_game_server_service.dart';
 import 'support/in_memory_selected_game_server_storage.dart';
+import 'support/in_memory_selected_locale_storage.dart';
 import 'support/in_memory_token_storage.dart';
 
 const _stage = GameServerSummary(
@@ -62,6 +64,7 @@ Future<GameServerState> _pump(WidgetTester tester, {required FakeGameServerServi
       providers: [
         ChangeNotifierProvider<AuthState>.value(value: auth),
         ChangeNotifierProvider<GameServerState>.value(value: gameServerState),
+        ChangeNotifierProvider<LocaleState>.value(value: LocaleState(storage: InMemorySelectedLocaleStorage())),
       ],
       child: MaterialApp(home: Scaffold(body: GameServerSelectionScreen(gameServerService: service))),
     ),
@@ -79,7 +82,7 @@ void main() {
       expect(find.text('Production'), findsOneWidget);
       expect(find.text('Online'), findsOneWidget);
       expect(find.text('Offline'), findsOneWidget);
-      expect(find.text('12 players · 4 companies · tick 500'), findsOneWidget);
+      expect(find.text('12 players · 4 companies · Jan 21, 2000 20:00'), findsOneWidget);
     });
 
     testWidgets('shows error state with Try again on load failure', (tester) async {

@@ -7,7 +7,7 @@
 // raise-target amounts) need converting before display or before being
 // compared against a local-currency lot price.
 
-import 'package:intl/intl.dart';
+import '../../core/utils/app_number_format.dart';
 
 class EurFxRate {
   const EurFxRate({required this.currencyCode, required this.rate});
@@ -58,5 +58,5 @@ class OnboardingFxRates {
 /// Formats an amount already denominated in [currencyCode] — applies
 /// currency symbol/decimal-digit formatting only, no conversion. Use for lot
 /// prices and company cash figures, which are already local-currency values.
-String formatOnboardingCurrency(double localAmount, String currencyCode) =>
-    NumberFormat.simpleCurrency(name: currencyCode).format(localAmount);
+String formatOnboardingCurrency(double localAmount, String currencyCode, String languageCode) =>
+    AppNumberFormat.money(localAmount, currencyCode: currencyCode, languageCode: languageCode);

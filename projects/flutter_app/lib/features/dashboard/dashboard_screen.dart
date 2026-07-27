@@ -29,8 +29,10 @@ import 'package:provider/provider.dart';
 import '../../core/auth/auth_state.dart';
 import '../../core/game_state/game_state_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/i18n/locale_state.dart';
 import '../../core/services/url_opener.dart';
 import '../../core/theme/app_icons.dart';
+import '../../core/utils/game_time.dart';
 import '../../core/widgets/icon_badge.dart';
 import '../buildings/building_analytics_models.dart';
 import '../buildings/building_panel_models.dart';
@@ -357,6 +359,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
 
     final theme = Theme.of(context);
+    final languageCode = context.watch<LocaleState>().languageCode;
 
     return Column(
       children: [
@@ -367,7 +370,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             children: [
               Text('Dashboard', style: theme.textTheme.headlineSmall),
               const SizedBox(height: 4),
-              Text('Tick ${data.currentTick} · Tax ${data.taxRate.toStringAsFixed(1)}%', style: theme.textTheme.bodyMedium),
+              Tooltip(
+                message: 'Tick ${data.currentTick}',
+                child: Text(
+                  '${formatGameTickTime(data.currentTick, languageCode)} · Tax ${data.taxRate.toStringAsFixed(1)}%',
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ),
             ],
           ),
         ),
