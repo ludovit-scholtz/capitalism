@@ -2,6 +2,7 @@ import 'package:capitalism_app/core/auth/auth_state.dart';
 import 'package:capitalism_app/core/context/recent_building_state.dart';
 import 'package:capitalism_app/features/buildings/building_detail_models.dart';
 import 'package:capitalism_app/features/buildings/building_detail_screen.dart';
+import 'package:capitalism_app/features/buildings/building_grid_models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -102,13 +103,54 @@ void main() {
       expect(find.text('Could not load this building. Please try again.'), findsOneWidget);
     });
 
-    testWidgets('tapping a grid cell then Upgrade calls scheduleUnitUpgrade', (tester) async {
-      final service = FakeBuildingDetailService(building: _building);
+    testWidgets('staging then storing an upgrade in edit mode calls scheduleUnitUpgrade', (tester) async {
+      // Upgrade now lives only in edit mode's per-unit Maintenance tab
+      // (matching web — "Unit Upgrade Panel removed from read-only view; it
+      // now lives in edit mode only"), applied via the outer Layouts tab's
+      // Save button rather than a one-shot button on the unit itself.
+      const upgradeInfo = UnitUpgradeInfo(
+        unitId: 'unit-1',
+        unitType: 'PUBLIC_SALES',
+        currentLevel: 1,
+        nextLevel: 2,
+        isMaxLevel: false,
+        isUpgradable: true,
+        upgradeCost: 100,
+        upgradeTicks: 5,
+        currentStat: 1,
+        nextStat: 2,
+        statLabel: 'Throughput',
+        currentLaborHoursPerTick: 1,
+        nextLaborHoursPerTick: 1,
+        currentEnergyMwhPerTick: 1,
+        nextEnergyMwhPerTick: 1,
+        currentLaborCostPerTick: 1,
+        nextLaborCostPerTick: 1,
+        currentEnergyCostPerTick: 1,
+        nextEnergyCostPerTick: 1,
+        currentStorageCapacity: 10,
+        nextStorageCapacity: 20,
+      );
+      final service = FakeBuildingDetailService(building: _building, productNames: {'product-1': 'Steel Beams'}, unitUpgradeInfo: upgradeInfo);
 
       await _pumpBuildingDetail(tester, service: service);
-      await tester.tap(find.byKey(const ValueKey('cell-unit-unit-1')));
+      await tester.tap(find.widgetWithText(TextButton, 'Edit Building'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilledButton, 'Upgrade'));
+      await tester.tap(find.byKey(const ValueKey('draft-cell-unit-unit-1')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('building-tab-maintenance')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Stage Upgrade'));
+      await tester.pumpAndSettle();
+
+      // Close the per-unit pane to get back to the outer edit tabs, then
+      // switch to Layouts to reach the Save button.
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('building-tab-layouts')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Store Upgrade (1 queued)'));
       await tester.pumpAndSettle();
 
       expect(service.upgradedUnitIds, ['unit-1']);
@@ -120,7 +162,10 @@ void main() {
       await _pumpBuildingDetail(tester, service: service);
       await tester.tap(find.byKey(const ValueKey('cell-unit-unit-1')));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Update price'));
+
+      await tester.tap(find.byKey(const ValueKey('building-tab-quickActions')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Update price'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), '15');
       await tester.tap(find.widgetWithText(FilledButton, 'Save'));

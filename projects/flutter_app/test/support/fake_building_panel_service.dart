@@ -9,6 +9,7 @@ class FakeBuildingPanelService implements BuildingPanelService {
     this.cityPowerBalance,
     this.cityMediaHouses = const [],
     this.mediaHouseUnits = const [],
+    this.bankAccount,
     this.actionError,
   });
 
@@ -18,16 +19,19 @@ class FakeBuildingPanelService implements BuildingPanelService {
   final CityPowerBalance? cityPowerBalance;
   final List<CityMediaHouse> cityMediaHouses;
   final List<MediaHouseUnitConfig> mediaHouseUnits;
+  final BuildingBankAccountInfo? bankAccount;
   final Object? actionError;
 
   final List<String> calls = [];
   double? lastRentPerSqm;
   int? lastDispatchPercent;
   int? lastPriority;
+  double? lastMaxBidPrice;
   (double price, double capacity)? lastListing;
   String? lastCancelledListingId;
   double? lastContentBudget;
   Map<String, dynamic>? lastUnitConfig;
+  double? lastAlertThreshold;
 
   @override
   Future<ApartmentBuildingDetail?> fetchApartmentBuildingDetail(String buildingId) async {
@@ -72,6 +76,26 @@ class FakeBuildingPanelService implements BuildingPanelService {
     calls.add('setPowerPriority');
     if (actionError != null) throw actionError!;
     lastPriority = priority;
+  }
+
+  @override
+  Future<void> setMaxEnergyBidPrice({required String buildingId, required double? maxBidPricePerKwh}) async {
+    calls.add('setMaxEnergyBidPrice');
+    if (actionError != null) throw actionError!;
+    lastMaxBidPrice = maxBidPricePerKwh;
+  }
+
+  @override
+  Future<BuildingBankAccountInfo?> fetchBuildingBankAccount(String buildingId) async {
+    calls.add('fetchBuildingBankAccount');
+    return bankAccount;
+  }
+
+  @override
+  Future<void> setBankAccountAlertThreshold({required String bankAccountId, required double? minBalanceThreshold}) async {
+    calls.add('setBankAccountAlertThreshold');
+    if (actionError != null) throw actionError!;
+    lastAlertThreshold = minBalanceThreshold;
   }
 
   @override

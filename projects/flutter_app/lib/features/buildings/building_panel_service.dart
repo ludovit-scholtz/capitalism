@@ -63,6 +63,12 @@ const _setPowerPriorityMutation = r'''
   }
 ''';
 
+const _setMaxEnergyBidPriceMutation = r'''
+  mutation SetMaxEnergyBidPrice($input: SetMaxEnergyBidPriceInput!) {
+    setMaxEnergyBidPrice(input: $input) { id maxEnergyBidPrice }
+  }
+''';
+
 const _listEnergyForSaleMutation = r'''
   mutation ListEnergyForSale($input: ListEnergyForSaleInput!) {
     listEnergyForSale(input: $input) { listingId }
@@ -106,6 +112,23 @@ const _upgradeMediaHouseMutation = r'''
 const _configureMediaHouseUnitMutation = r'''
   mutation ConfigureMediaHouseUnit($input: ConfigureMediaHouseUnitInput!) {
     configureMediaHouseUnit(input: $input) { id }
+  }
+''';
+
+// --- Building bank account ---------------------------------------------
+
+const _buildingBankAccountQuery = r'''
+  query BuildingBankAccount($buildingId: UUID!) {
+    buildingBankAccount(buildingId: $buildingId) {
+      buildingId buildingName cityName currencyCode hasBankAccount bankAccountId
+      accountNumber balance alertMinBalanceThreshold isSuspendedForFunds suspendedReason
+    }
+  }
+''';
+
+const _setBankAccountAlertThresholdMutation = r'''
+  mutation SetBankAccountAlertThreshold($input: SetBankAccountAlertThresholdInput!) {
+    setBankAccountAlertThreshold(input: $input) { bankAccountId alertMinBalanceThreshold }
   }
 ''';
 
@@ -167,6 +190,15 @@ class BuildingPanelService {
       _setPowerPriorityMutation,
       variables: {
         'input': {'buildingId': buildingId, 'priority': priority},
+      },
+    );
+  }
+
+  Future<void> setMaxEnergyBidPrice({required String buildingId, required double? maxBidPricePerKwh}) {
+    return _graphQlService.request(
+      _setMaxEnergyBidPriceMutation,
+      variables: {
+        'input': {'buildingId': buildingId, 'maxBidPricePerKwh': maxBidPricePerKwh},
       },
     );
   }
@@ -241,6 +273,23 @@ class BuildingPanelService {
           'campaignBudgetPerTick': campaignBudgetPerTick,
           'isActive': isActive,
         },
+      },
+    );
+  }
+
+  // --- Bank account ---------------------------------------------------------
+
+  Future<BuildingBankAccountInfo?> fetchBuildingBankAccount(String buildingId) async {
+    final result = await _graphQlService.request(_buildingBankAccountQuery, variables: {'buildingId': buildingId});
+    final info = result['buildingBankAccount'] as Map<String, dynamic>?;
+    return info == null ? null : BuildingBankAccountInfo.fromJson(info);
+  }
+
+  Future<void> setBankAccountAlertThreshold({required String bankAccountId, required double? minBalanceThreshold}) {
+    return _graphQlService.request(
+      _setBankAccountAlertThresholdMutation,
+      variables: {
+        'input': {'bankAccountId': bankAccountId, 'minBalanceThreshold': minBalanceThreshold},
       },
     );
   }

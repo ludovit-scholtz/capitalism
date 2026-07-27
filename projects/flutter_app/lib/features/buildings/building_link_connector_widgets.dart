@@ -23,6 +23,7 @@ class LinkConnectorButton extends StatelessWidget {
     required this.onTap,
     this.size = 32,
     this.thickness = 88,
+    this.dimWhenDisabled = true,
   });
 
   final LinkOrientation orientation;
@@ -38,12 +39,19 @@ class LinkConnectorButton extends StatelessWidget {
   /// connector visually spans the same row/column).
   final double thickness;
 
+  /// When `canToggle` is false, whether to render at reduced opacity. The
+  /// editor uses this to mean "disabled" (no adjacent cell to link to); the
+  /// read-only grid passes `false` here since every connector is
+  /// non-interactive there but should still show its live flow state at
+  /// full opacity rather than looking disabled.
+  final bool dimWhenDisabled;
+
   @override
   Widget build(BuildContext context) {
     final width = orientation == LinkOrientation.horizontal ? size : thickness;
     final height = orientation == LinkOrientation.horizontal ? thickness : size;
     return Opacity(
-      opacity: canToggle ? 1 : 0.28,
+      opacity: (!canToggle && dimWhenDisabled) ? 0.28 : 1,
       child: SizedBox(
         width: width,
         height: height,
@@ -141,6 +149,7 @@ class DiagonalConnectorWidget extends StatelessWidget {
     required this.onTogglePrimary,
     required this.onToggleSecondary,
     this.size = 32,
+    this.dimWhenDisabled = true,
   });
 
   final LinkState primaryState;
@@ -151,11 +160,14 @@ class DiagonalConnectorWidget extends StatelessWidget {
   final VoidCallback onToggleSecondary;
   final double size;
 
+  /// See `LinkConnectorButton.dimWhenDisabled`.
+  final bool dimWhenDisabled;
+
   @override
   Widget build(BuildContext context) {
     final disabled = !canTogglePrimary && !canToggleSecondary;
     return Opacity(
-      opacity: disabled ? 0.28 : 1,
+      opacity: disabled && dimWhenDisabled ? 0.28 : 1,
       child: SizedBox(
         width: size,
         height: size,

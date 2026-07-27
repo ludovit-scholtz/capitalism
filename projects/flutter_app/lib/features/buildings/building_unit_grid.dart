@@ -2,33 +2,28 @@
 // (`gridIndexes = [0,1,2,3]` in `useBuildingDetail.ts`, rendered by
 // `BuildingUnitGrid.vue`'s "Active Configuration" grid). Renders units at
 // their `gridX`/`gridY` (each 0..3) instead of a flat list, so the physical
-// layout matches what the player configured on web.
+// layout matches what the player configured on web. Cell/connector sizing
+// is width-aware (`building_grid_sizing.dart`) so the grid — including the
+// 8-directional link arrows between cells — scales to fit the left column
+// of the responsive two-column Building Detail layout on wide screens,
+// matching web's "grid fit to the page" behavior, and only falls back to a
+// fixed size + horizontal scroll below a legible minimum cell size.
 //
-// Explicitly NOT ported here (tracked as their own separate ROADMAP items,
-// since they are large, independent features in their own right):
-// - Placing a unit on an empty cell (ROADMAP: "Implement placing a new unit
-//   on an empty grid cell") — empty cells render but are non-interactive.
-// - The 8-directional link system and its connector/arrow visuals
-//   (ROADMAP: "Implement the 8-directional unit link system", "Port
-//   link-state/flow arrow visuals").
-// - The draft/planned grid, `storeBuildingConfiguration`/
-//   `cancelBuildingConfiguration`, and per-unit Config/Energy/Performance/
-//   Maintenance editing tabs (ROADMAP items covering the planning grid and
-//   per-unit configuration editing).
-// - Inventory fill bars / inflow-outflow visualization (ROADMAP: "Add unit
-//   inventory/capacity visualization per cell").
-//
-// This screen keeps the two quick actions the flat list already had
-// (`scheduleUnitUpgrade`, `updatePublicSalesPrice`) but moves them behind a
-// tap-to-open bottom sheet per cell, since a 4x4 grid on a phone screen has
-// no room for inline icon buttons the way the desktop web layout does.
+// Tapping an occupied cell calls [onUnitTap] — the screen decides whether
+// that opens a bottom sheet (narrow screens) or updates the inline
+// right-column selection (wide screens), mirroring `selectedCell` driving
+// `BuildingReadonlySidebar` on web. Placing a unit on an empty cell remains
+// edit-mode-only (`BuildingGridEditor`); empty cells here stay
+// non-interactive.
 
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
-import '../../core/theme/app_icons.dart';
 import '../../core/theme/app_spacing.dart';
 import 'building_detail_models.dart';
+import 'building_grid_models.dart';
+import 'building_grid_sizing.dart';
+import 'building_link_connector_widgets.dart';
+import 'building_link_helpers.dart';
 
 /// Mirrors `unitColors` in `useBuildingDetail.ts` — a distinct hue per unit
 /// type used to tint grid cells/legend entries.
@@ -60,15 +55,13 @@ class BuildingUnitGrid extends StatelessWidget {
     required this.units,
     required this.itemNameFor,
     required this.actionLoadingIds,
-    required this.onUpgrade,
-    required this.onUpdatePrice,
+    required this.onUnitTap,
   });
 
   final List<BuildingUnitDetail> units;
   final String Function(BuildingUnitDetail unit) itemNameFor;
   final Set<String> actionLoadingIds;
-  final void Function(BuildingUnitDetail unit) onUpgrade;
-  final void Function(BuildingUnitDetail unit) onUpdatePrice;
+  final void Function(BuildingUnitDetail unit) onUnitTap;
 
   BuildingUnitDetail? _unitAt(int x, int y) {
     for (final unit in units) {
@@ -77,107 +70,90 @@ class BuildingUnitGrid extends StatelessWidget {
     return null;
   }
 
-  void _openCellSheet(BuildContext context, BuildingUnitDetail unit) {
-    final itemName = itemNameFor(unit);
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (sheetContext) {
-        final theme = Theme.of(sheetContext);
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('${unit.unitType} · Level ${unit.level}', style: theme.textTheme.titleMedium),
-                if (itemName.isNotEmpty) ...[const SizedBox(height: 4), Text(itemName, style: theme.textTheme.bodyMedium)],
-                const SizedBox(height: AppSpacing.md),
-                Row(
-                  children: [
-                    if (unit.unitType == 'PUBLIC_SALES')
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const FaIcon(AppIcons.sell, size: 16),
-                          label: const Text('Update price'),
-                          onPressed: () {
-                            Navigator.of(sheetContext).pop();
-                            onUpdatePrice(unit);
-                          },
-                        ),
-                      ),
-                    if (unit.unitType == 'PUBLIC_SALES') const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: FilledButton.icon(
-                        icon: const FaIcon(AppIcons.upgrade, size: 16),
-                        label: const Text('Upgrade'),
-                        onPressed: () {
-                          Navigator.of(sheetContext).pop();
-                          onUpgrade(unit);
-                        },
-                      ),
-                    ),
-                  ],
-                ),
+  @override
+  Widget build(BuildContext context) {
+    final linkUnits = units.map(EditableGridUnit.fromActive).toList();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final sizing = computeGridSizing(constraints.maxWidth);
+        final grid = SizedBox(
+          width: sizing.totalWidth,
+          child: Column(
+            children: [
+              for (var y = 0; y < 4; y++) ...[
+                _unitRow(context, y, sizing, linkUnits),
+                if (y < 3) _connectorRow(linkUnits, y, sizing),
               ],
-            ),
+            ],
           ),
         );
+        if (!sizing.scrollable) return grid;
+        return SingleChildScrollView(scrollDirection: Axis.horizontal, child: grid);
       },
     );
   }
 
-  // Fixed pixel cell size rather than one derived from screen width: with a
-  // flexible/`Expanded` cell, narrow phones (or a large accessibility text
-  // scale) shrink cells below what the monogram + two text lines need,
-  // producing a RenderFlex overflow. The web has the same problem on narrow
-  // viewports and solves it the same way — `BuildingUnitGrid.layout.css`
-  // gives the grid a `min-width: 330px` and lets it scroll horizontally
-  // below the 640px breakpoint instead of shrinking cells. Mirrored here: a
-  // fixed total grid width wrapped in a horizontal `SingleChildScrollView`,
-  // which only actually scrolls when the viewport is narrower than that.
-  static const double _cellSize = 88;
+  Widget _unitRow(BuildContext context, int y, GridSizing sizing, List<EditableGridUnit> linkUnits) {
+    return Row(
+      children: [
+        for (var x = 0; x < 4; x++) ...[
+          SizedBox(
+            width: sizing.cellSize,
+            height: sizing.cellSize,
+            child: Builder(
+              builder: (context) {
+                final unit = _unitAt(x, y);
+                return _GridCell(
+                  key: ValueKey('cell-$x-$y'),
+                  unit: unit,
+                  itemNameFor: itemNameFor,
+                  isLoading: unit != null && actionLoadingIds.contains(unit.id),
+                  onTap: unit == null ? null : () => onUnitTap(unit),
+                );
+              },
+            ),
+          ),
+          if (x < 3)
+            LinkConnectorButton(
+              orientation: LinkOrientation.horizontal,
+              state: getHorizontalLinkState(linkUnits, x, y),
+              canToggle: false,
+              dimWhenDisabled: false,
+              size: sizing.connectorSize,
+              thickness: sizing.cellSize,
+              onTap: () {},
+            ),
+        ],
+      ],
+    );
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    const totalWidth = _cellSize * 4 + AppSpacing.sm * 3;
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SizedBox(
-        width: totalWidth,
-        child: Column(
-          children: [
-            for (var y = 0; y < 4; y++)
-              Padding(
-                padding: EdgeInsets.only(bottom: y < 3 ? AppSpacing.sm : 0),
-                child: Row(
-                  children: [
-                    for (var x = 0; x < 4; x++)
-                      Padding(
-                        padding: EdgeInsets.only(right: x < 3 ? AppSpacing.sm : 0),
-                        child: Builder(
-                          builder: (context) {
-                            final unit = _unitAt(x, y);
-                            return SizedBox(
-                              width: _cellSize,
-                              height: _cellSize,
-                              child: _GridCell(
-                                key: ValueKey('cell-$x-$y'),
-                                unit: unit,
-                                itemNameFor: itemNameFor,
-                                isLoading: unit != null && actionLoadingIds.contains(unit.id),
-                                onTap: unit == null ? null : () => _openCellSheet(context, unit),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ),
+  Widget _connectorRow(List<EditableGridUnit> linkUnits, int y, GridSizing sizing) {
+    return Row(
+      children: [
+        for (var x = 0; x < 4; x++) ...[
+          LinkConnectorButton(
+            orientation: LinkOrientation.vertical,
+            state: getVerticalLinkState(linkUnits, x, y),
+            canToggle: false,
+            dimWhenDisabled: false,
+            size: sizing.connectorSize,
+            thickness: sizing.cellSize,
+            onTap: () {},
+          ),
+          if (x < 3)
+            DiagonalConnectorWidget(
+              primaryState: getPrimaryDiagonalLinkState(linkUnits, x, y),
+              secondaryState: getSecondaryDiagonalLinkState(linkUnits, x, y),
+              canTogglePrimary: false,
+              canToggleSecondary: false,
+              dimWhenDisabled: false,
+              size: sizing.connectorSize,
+              onTogglePrimary: () {},
+              onToggleSecondary: () {},
+            ),
+        ],
+      ],
     );
   }
 }
@@ -221,32 +197,42 @@ class _GridCell extends StatelessWidget {
             border: Border.all(color: accent.withValues(alpha: 0.7), width: 2),
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (isLoading)
-                const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
-              else
-                CircleAvatar(
-                  radius: 10,
-                  backgroundColor: accent.withValues(alpha: 0.2),
-                  child: Text(
-                    unitTypeShortLabel(unit.unitType).characters.first.toUpperCase(),
-                    style: theme.textTheme.labelSmall?.copyWith(color: accent, fontWeight: FontWeight.bold),
+          // `FittedBox` rather than a fixed minimum cell size: cells now
+          // scale down to fit the available column width
+          // (`building_grid_sizing.dart`), and combined with a large
+          // accessibility text scale a small-but-legible cell can still be
+          // too small for two lines of scaled text — scaling the whole
+          // content block down (rather than throwing a RenderFlex overflow)
+          // keeps every cell size/text-scale combination safe.
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isLoading)
+                  const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                else
+                  CircleAvatar(
+                    radius: 10,
+                    backgroundColor: accent.withValues(alpha: 0.2),
+                    child: Text(
+                      unitTypeShortLabel(unit.unitType).characters.first.toUpperCase(),
+                      style: theme.textTheme.labelSmall?.copyWith(color: accent, fontWeight: FontWeight.bold),
+                    ),
                   ),
-                ),
-              const SizedBox(height: 4),
-              Text('Lvl ${unit.level}', style: theme.textTheme.labelSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
-              if (itemName.isNotEmpty)
-                Text(
-                  itemName,
-                  style: theme.textTheme.labelSmall,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                ),
-            ],
+                const SizedBox(height: 4),
+                Text('Lvl ${unit.level}', style: theme.textTheme.labelSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+                if (itemName.isNotEmpty)
+                  Text(
+                    itemName,
+                    style: theme.textTheme.labelSmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
+              ],
+            ),
           ),
         ),
       ),

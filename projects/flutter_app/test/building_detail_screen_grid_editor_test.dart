@@ -90,6 +90,11 @@ void main() {
       await tester.tap(find.widgetWithText(FilledButton, 'Apply Starter Layout'));
       await tester.pumpAndSettle();
 
+      // Save/Cancel now live on the outer edit tabs' Layouts tab
+      // (`BuildingEditingTabs`), not always-visible.
+      await tester.tap(find.byKey(const ValueKey('building-tab-layouts')));
+      await tester.pumpAndSettle();
+
       expect(find.text('Store Configuration'), findsOneWidget);
       expect(find.byKey(const ValueKey('draft-cell-unit-draft-starter-0-0')), findsOneWidget);
       expect(find.byKey(const ValueKey('draft-cell-unit-draft-starter-3-0')), findsOneWidget);
@@ -111,6 +116,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('draft-cell-1-0')), findsNothing); // now occupied, different key
+
+      // On this narrow surface width the stacked area below the grid
+      // always shows the outer edit tabs (per-unit panes only appear in
+      // the tap-to-open sheet here) — switch to Layouts for Save.
+      await tester.tap(find.byKey(const ValueKey('building-tab-layouts')));
+      await tester.pumpAndSettle();
       expect(find.text('Store Configuration'), findsOneWidget);
 
       await tester.tap(find.widgetWithText(FilledButton, 'Store Configuration'));
@@ -132,6 +143,8 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('picker-STORAGE')));
       await tester.pumpAndSettle();
 
+      await tester.tap(find.byKey(const ValueKey('building-tab-layouts')));
+      await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(OutlinedButton, 'Cancel'));
       await tester.pumpAndSettle();
 

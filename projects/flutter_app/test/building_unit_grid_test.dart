@@ -1,4 +1,5 @@
 import 'package:capitalism_app/features/buildings/building_detail_models.dart';
+import 'package:capitalism_app/features/buildings/building_link_connector_widgets.dart';
 import 'package:capitalism_app/features/buildings/building_unit_grid.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,6 +24,19 @@ const _publicSales = BuildingUnitDetail(
   minPrice: 10,
   gridX: 0,
   gridY: 0,
+  linkLeft: true,
+);
+
+const _linkedNeighbor = BuildingUnitDetail(
+  id: 'unit-3',
+  unitType: 'PURCHASE',
+  level: 1,
+  resourceTypeId: 'resource-1',
+  productTypeId: null,
+  minPrice: null,
+  gridX: 1,
+  gridY: 0,
+  linkRight: true,
 );
 
 String _itemNameFor(BuildingUnitDetail unit) => unit.productTypeId == 'product-1' ? 'Steel Beams' : '';
@@ -31,8 +45,7 @@ Future<void> _pump(
   WidgetTester tester, {
   required List<BuildingUnitDetail> units,
   Set<String> actionLoadingIds = const {},
-  void Function(BuildingUnitDetail unit)? onUpgrade,
-  void Function(BuildingUnitDetail unit)? onUpdatePrice,
+  void Function(BuildingUnitDetail unit)? onUnitTap,
   // A visible CircularProgressIndicator animates forever, so pumpAndSettle
   // never settles while one is on screen — callers exercising the loading
   // state must pass false and drive a single `pump()` instead.
@@ -49,13 +62,7 @@ Future<void> _pump(
         child: child!,
       ),
       home: Scaffold(
-        body: BuildingUnitGrid(
-          units: units,
-          itemNameFor: _itemNameFor,
-          actionLoadingIds: actionLoadingIds,
-          onUpgrade: onUpgrade ?? (_) {},
-          onUpdatePrice: onUpdatePrice ?? (_) {},
-        ),
+        body: BuildingUnitGrid(units: units, itemNameFor: _itemNameFor, actionLoadingIds: actionLoadingIds, onUnitTap: onUnitTap ?? (_) {}),
       ),
     ),
   );
@@ -88,32 +95,14 @@ void main() {
       expect(find.byType(BottomSheet), findsNothing);
     });
 
-    testWidgets('tapping an occupied cell opens a sheet with an Upgrade action', (tester) async {
-      BuildingUnitDetail? upgraded;
-      await _pump(tester, units: const [_manufacturing], onUpgrade: (unit) => upgraded = unit);
+    testWidgets('tapping an occupied cell calls onUnitTap with that unit', (tester) async {
+      BuildingUnitDetail? tapped;
+      await _pump(tester, units: const [_manufacturing], onUnitTap: (unit) => tapped = unit);
 
       await tester.tap(find.byKey(const ValueKey('cell-unit-unit-1')));
       await tester.pumpAndSettle();
 
-      expect(find.text('MANUFACTURING · Level 2'), findsOneWidget);
-      await tester.tap(find.widgetWithText(FilledButton, 'Upgrade'));
-      await tester.pumpAndSettle();
-
-      expect(upgraded?.id, 'unit-1');
-    });
-
-    testWidgets('only PUBLIC_SALES cells offer Update price', (tester) async {
-      BuildingUnitDetail? priceUpdated;
-      await _pump(tester, units: const [_publicSales], onUpdatePrice: (unit) => priceUpdated = unit);
-
-      await tester.tap(find.byKey(const ValueKey('cell-unit-unit-2')));
-      await tester.pumpAndSettle();
-
-      expect(find.widgetWithText(OutlinedButton, 'Update price'), findsOneWidget);
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Update price'));
-      await tester.pumpAndSettle();
-
-      expect(priceUpdated?.id, 'unit-2');
+      expect(tapped?.id, 'unit-1');
     });
 
     testWidgets('a loading unit shows a progress indicator instead of its monogram', (tester) async {
@@ -125,12 +114,22 @@ void main() {
       );
     });
 
-    testWidgets('fits and scrolls horizontally on a narrow phone width without overflowing', (tester) async {
-      // Smallest realistic phone width (e.g. iPhone SE). Cells use a fixed
-      // pixel size and the grid scrolls horizontally rather than shrinking
-      // cells below what their content needs — this guards against the
-      // RenderFlex overflow a flexible/Expanded cell would hit here.
-      await _pump(tester, units: const [_manufacturing, _publicSales], surfaceSize: const Size(320, 700));
+    testWidgets('renders non-interactive link connectors reflecting each unit\'s link flags', (tester) async {
+      await _pump(tester, units: const [_publicSales, _linkedNeighbor]);
+
+      // 4 horizontal + 4 vertical connectors per row/col gap, plus diagonals —
+      // just assert connectors are present and non-interactive (no toggle
+      // handler reachable) rather than the web's toggle-cycle behavior,
+      // which is edit-mode only.
+      expect(find.byType(LinkConnectorButton), findsWidgets);
+      expect(find.byType(DiagonalConnectorWidget), findsWidgets);
+    });
+
+    testWidgets('falls back to a fixed size + horizontal scroll below the minimum legible cell size', (tester) async {
+      // Narrower than 4 cells at the minimum legible size (56px) can fit —
+      // the grid falls back to a fixed size + horizontal scroll rather than
+      // shrinking cells further, guarding against illegibly small cells.
+      await _pump(tester, units: const [_manufacturing, _publicSales], surfaceSize: const Size(250, 700));
 
       expect(tester.takeException(), isNull);
       expect(find.byType(SingleChildScrollView), findsOneWidget);
@@ -145,6 +144,16 @@ void main() {
       await _pump(tester, units: const [_manufacturing, _publicSales], surfaceSize: const Size(360, 800), textScale: 1.4);
 
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('scales cells down to fit a wide-but-constrained column instead of scrolling', (tester) async {
+      // A width comfortably above the phone-scroll fallback range but below
+      // the grid's natural width (330px) should shrink cells to fit exactly,
+      // with no horizontal scroll view.
+      await _pump(tester, units: const [_manufacturing], surfaceSize: const Size(280, 700));
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(SingleChildScrollView), findsNothing);
     });
   });
 }

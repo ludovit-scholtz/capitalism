@@ -123,6 +123,53 @@ class CompanyBrand {
   );
 }
 
+/// `buildingBankAccount(buildingId)` — the building's own bank account,
+/// distinct from a player's `BANK`-type building (every building carries
+/// one operating account). Mirrors `BuildingBankAccountPanel.vue`'s query
+/// shape, trimmed to the balance/threshold summary this tab needs (no
+/// statement browsing, no cross-account reassignment controls).
+class BuildingBankAccountInfo {
+  const BuildingBankAccountInfo({
+    required this.buildingId,
+    required this.buildingName,
+    required this.cityName,
+    required this.currencyCode,
+    required this.hasBankAccount,
+    required this.balance,
+    required this.isSuspendedForFunds,
+    this.bankAccountId,
+    this.accountNumber,
+    this.alertMinBalanceThreshold,
+    this.suspendedReason,
+  });
+
+  final String buildingId;
+  final String buildingName;
+  final String? cityName;
+  final String currencyCode;
+  final bool hasBankAccount;
+  final String? bankAccountId;
+  final String? accountNumber;
+  final double balance;
+  final double? alertMinBalanceThreshold;
+  final bool isSuspendedForFunds;
+  final String? suspendedReason;
+
+  factory BuildingBankAccountInfo.fromJson(Map<String, dynamic> json) => BuildingBankAccountInfo(
+    buildingId: json['buildingId'] as String,
+    buildingName: (json['buildingName'] as String?) ?? '',
+    cityName: json['cityName'] as String?,
+    currencyCode: (json['currencyCode'] as String?) ?? 'EUR',
+    hasBankAccount: json['hasBankAccount'] as bool? ?? false,
+    bankAccountId: json['bankAccountId'] as String?,
+    accountNumber: json['accountNumber'] as String?,
+    balance: (json['balance'] as num?)?.toDouble() ?? 0,
+    alertMinBalanceThreshold: (json['alertMinBalanceThreshold'] as num?)?.toDouble(),
+    isSuspendedForFunds: json['isSuspendedForFunds'] as bool? ?? false,
+    suspendedReason: json['suspendedReason'] as String?,
+  );
+}
+
 class EnergyListing {
   const EnergyListing({
     required this.listingId,

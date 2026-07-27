@@ -1,35 +1,46 @@
 // Port of `projects/frontend/src/views/BuildingDetailView.vue` (via
-// `useBuildingDetail.ts`, ~5600 lines on the web). Covers: building
-// overview, the full grid editor for grid-eligible types (view + edit mode,
-// placing/removing units, 8-directional links, per-unit config, upgrade
-// preview, inventory visualization, clipboard, draft-change summary,
-// starter layouts, and chain-completeness warnings/status — see
-// `building_grid_draft_controller.dart` and its sibling files for exactly
-// what each ROADMAP item covers), the two original quick-action mutations
-// (`scheduleUnitUpgrade`, `updatePublicSalesPrice`) for the flat-list
-// fallback, and the four building-type-specific management panels:
-// - `BuildingPropertyPanel` (APARTMENT/COMMERCIAL — rent scheduling,
-//   occupancy/market-rate guidance, revenue history).
-// - `BuildingMediaHousePanel` (MEDIA_HOUSE — campaign unit config, content
-//   budget, upgrade, city rankings).
-// - `BuildingResearchPanel` (RESEARCH_DEVELOPMENT — company-wide brand
-//   quality/awareness progress, sibling to that type's grid).
-// - `BuildingPowerPlantPanel` (POWER_PLANT — dispatch, priority, spot-market
-//   listing, fuel reserve, P&L, sibling to that type's grid).
-// Each panel file documents its own trims in its header comment.
+// `useBuildingDetail.ts`, ~5600 lines on the web). For grid-eligible
+// building types (every type except APARTMENT/COMMERCIAL/MEDIA_HOUSE — see
+// `_isMultiUnitBuildingType`), this now mirrors the web's responsive
+// two-column layout and tab structure, not just a flattened single column:
+// - `LayoutBuilder`-driven two-column split at ≥1024px (grid left, a
+//   contextual sidebar right), collapsing to one stacked column below that
+//   — matches `BuildingDetailView.vue`'s `grid-template-columns` split and
+//   its `max-[1024px]` collapse. See `_wideScreenBreakpoint` and
+//   `_sidebarContent`.
+// - The right column (wide) / stacked area (narrow) shows one of three
+//   mutually-exclusive tab-based panes, mirroring
+//   `BuildingOverviewSidebar`/`BuildingReadonlySidebar`/
+//   `BuildingEditingSidebar`: `BuildingOverviewSidebar` (Overview/Supply
+//   Chain/Bank Account, default), `BuildingUnitViewTabs` (a selected unit,
+//   view mode), or `BuildingEditingTabs`/`BuildingUnitEditPane` (edit mode,
+//   outer Basic Data/Energy/Bank Account/Layouts tabs, or a selected
+//   unit's Config/Energy/Performance/Maintenance tabs).
+// - On narrow screens, per-unit selection instead opens a bottom sheet
+//   (`BuildingUnitViewSheet`/`UnitConfigSheet`) containing the same tab
+//   widgets — common mobile pattern, but with real tab navigation inside
+//   instead of one long scroll (see those files' header comments).
+// - The 4x4 grid itself (`BuildingUnitGrid`/`BuildingGridEditor`) scales its
+//   cell/connector sizing to fit the available column width
+//   (`building_grid_sizing.dart`) rather than always relying on horizontal
+//   scroll, and the read-only grid now also renders the same non-interactive
+//   link/flow arrows as the editor (previously editor-only).
+//
+// Also covers the four building-type-specific management panels
+// (`BuildingPropertyPanel`, `BuildingMediaHousePanel`,
+// `BuildingResearchPanel`, `BuildingPowerPlantPanel` — each documents its
+// own trims in its header comment) and the flat-list fallback's two
+// quick-action mutations (`scheduleUnitUpgrade`, `updatePublicSalesPrice`).
 //
 // Explicitly NOT ported (documented, not oversights — see
 // `.github/copilot-instructions.md` → Flutter mobile app for the full list
-// this was scoped against):
-// - `flushStorage`, `setPublicSalesInventoryAlertThreshold`,
-//   `removeDestroyedBuilding`.
-// - The Media House/Power Plant deep analytics dashboards
-//   (`mediaHouseAnalytics`, `powerPlantAnalytics.timeline`),
-//   `publicSalesAnalytics`, `buildingUnitResourceHistories`,
-//   `buildingFinancialTimeline`, `unitProductAnalytics`,
-//   `buildingRecentActivity`, `buildingSupplyChain`, market-event banners,
-//   tutorial overlays.
-// - Global Exchange sourcing/vendor-selector flow for PURCHASE units.
+// this was scoped against): `removeDestroyedBuilding`; the Media
+// House/Power Plant deep analytics dashboards (`mediaHouseAnalytics`,
+// `powerPlantAnalytics.timeline`); Global Exchange sourcing/vendor-selector
+// flow for PURCHASE units; and web's `BuildingLayoutsTab.vue` named-layout
+// save/load library (local + cloud storage, mini-grid previews) — a
+// materially separate feature from this screen's layout/tabs, see
+// `building_editing_tabs.dart`'s header comment.
 //
 // Selling/destroying a building lives on its own screen (`/building/:id/sell`
 // — `SellBuildingScreen`), linked from here rather than duplicated.
@@ -53,27 +64,27 @@ import 'building_chain_status_panel.dart';
 import 'building_chain_validation.dart';
 import 'building_detail_models.dart';
 import 'building_detail_service.dart';
-import 'building_draft_summary_panel.dart';
-import 'building_financial_timeline_panel.dart';
+import 'building_editing_tabs.dart';
 import 'building_grid_draft_controller.dart';
 import 'building_grid_editor.dart';
 import 'building_grid_models.dart';
 import 'building_media_house_panel.dart';
+import 'building_overview_sidebar.dart';
 import 'building_panel_models.dart';
 import 'building_panel_service.dart';
 import 'building_power_plant_panel.dart';
 import 'building_property_panel.dart';
-import 'building_recent_activity_panel.dart';
 import 'building_research_panel.dart';
 import 'building_sales_service.dart';
 import 'building_sourcing_service.dart';
 import 'building_starter_layout_banner.dart';
-import 'building_supply_chain_diagram.dart';
 import 'building_tutorial_overlay.dart';
 import 'building_unit_clipboard.dart';
 import 'building_unit_config_sheet.dart';
+import 'building_unit_edit_tabs.dart';
 import 'building_unit_grid.dart';
 import 'building_unit_picker_sheet.dart';
+import 'building_unit_view_tabs.dart';
 
 /// Mirrors `isMultiUnitBuilding` in `BuildingDetailView.vue` — these three
 /// building types manage a single implicit unit via their own dedicated
@@ -126,6 +137,18 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
   Map<String, String> _resourceNames = const {};
   Map<String, String> _productNames = const {};
   final Set<String> _actionLoadingIds = {};
+
+  /// View-mode selected unit — the wide-screen (≥1024px) counterpart to
+  /// opening `BuildingUnitViewSheet` on narrow screens. Edit-mode selection
+  /// lives on `_controller.selectedCell` instead (it's part of the draft
+  /// state machine and needs to survive across grid mutations); this is
+  /// separate because view-mode selection is purely a screen-local UI
+  /// concern with no draft/save semantics.
+  BuildingUnitDetail? _selectedViewUnit;
+
+  /// Matches `app_shell.dart`'s `_wideScreenBreakpoint` and the web's
+  /// `min-[1024px]` collapse point for the building-detail two-column grid.
+  static const double _wideScreenBreakpoint = 1024;
 
   ApartmentBuildingDetail? _apartmentDetail;
   List<CompanyBrand> _companyBrands = const [];
@@ -180,6 +203,7 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
     setState(() {
       _loading = true;
       _error = null;
+      _selectedViewUnit = null;
     });
     try {
       final building = await _service.fetchBuilding(widget.buildingId);
@@ -366,26 +390,61 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
       builder: (_) => UnitConfigSheet(
         controller: _controller,
         service: _service,
-        salesService: _salesService,
-        sourcingService: _sourcingService,
-        analyticsService: _analyticsService,
+        panelService: _panelService,
         unit: unit,
         resourceNames: _resourceNames,
         productNames: _productNames,
-        unitResourceHistories: _unitResourceHistories,
-        cityId: _controller.building?.cityId,
         onChanged: () => _controller.notify(),
         onRemove: () => _controller.removeDraftUnit(x, y),
       ),
-    );
+    ).whenComplete(() {
+      // However the sheet was dismissed (close button, swipe, tap-outside),
+      // clear the selection — `selectedCell` only drives the wide-screen
+      // inline pane (`_sidebarContent` gates it on `isWide`), so leaving it
+      // set here would be stale state with no visible effect on narrow
+      // screens, but would surface unexpectedly if the window is then
+      // resized wide.
+      _controller.selectedCell = null;
+      _controller.notify();
+    });
   }
 
-  void _onCellTap(int x, int y) {
+  /// [isWide] mirrors whether the two-column layout is currently active —
+  /// on wide screens the right column already re-renders off
+  /// `controller.selectedCell`/`showUnitPicker` (set by
+  /// `BuildingGridEditor` before this callback runs), so no sheet is
+  /// needed; on narrow screens a sheet is the only way to reach the
+  /// selected cell's controls.
+  void _onCellTap(int x, int y, {required bool isWide}) {
     if (_controller.showUnitPicker) {
       _openUnitPicker();
-    } else {
+    } else if (!isWide) {
       _openUnitConfigSheet(x, y);
     }
+  }
+
+  void _onViewUnitTap(BuildingUnitDetail unit, {required bool isWide}) {
+    if (isWide) {
+      setState(() => _selectedViewUnit = _selectedViewUnit?.id == unit.id ? null : unit);
+      return;
+    }
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => BuildingUnitViewSheet(
+        unit: unit,
+        buildingId: _controller.building!.id,
+        cityId: _controller.building?.cityId,
+        itemNameFor: _itemNameFor,
+        unitResourceHistories: _unitResourceHistories,
+        service: _service,
+        salesService: _salesService,
+        sourcingService: _sourcingService,
+        analyticsService: _analyticsService,
+        onUpdatePrice: _updatePrice,
+        isPriceUpdating: _actionLoadingIds.contains(unit.id),
+      ),
+    );
   }
 
   Future<void> _save() async {
@@ -475,6 +534,81 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
       isActive: isActive,
     ),
   );
+
+  /// Right-column (wide screens) / stacked-below-grid (narrow screens)
+  /// sidebar content — mutually exclusive variants mirroring
+  /// `showEditingSidebar`/`showReadonlySidebar`/`showOverviewSidebar` in
+  /// `useBuildingDetail.ts`. On narrow screens, per-unit selection is
+  /// handled entirely by the bottom sheet (`_onCellTap`/`_onViewUnitTap`) —
+  /// [isWide] gates the per-unit panes out of this stacked area there, so a
+  /// selected cell doesn't render its pane both inline *and* in the sheet
+  /// simultaneously. Returns `null` when a unit-picker sheet is the only
+  /// relevant surface (always a sheet regardless of screen width — picking
+  /// a unit type is a short, one-off modal interaction on web too).
+  Widget? _sidebarContent(BuildingDetail building, bool isEditing, {required bool isWide}) {
+    if (isEditing) {
+      final selected = isWide ? _controller.selectedCell : null;
+      if (selected != null && !_controller.showUnitPicker) {
+        final unit = _controller.draftUnitAt(selected.x, selected.y);
+        if (unit != null) {
+          return BuildingUnitEditPane(
+            key: ValueKey('edit-pane-${unit.id}'),
+            controller: _controller,
+            service: _service,
+            panelService: _panelService,
+            unit: unit,
+            resourceNames: _resourceNames,
+            productNames: _productNames,
+            onChanged: () => _controller.notify(),
+            onRemove: () => _controller.removeDraftUnit(selected.x, selected.y),
+            onClose: () {
+              _controller.selectedCell = null;
+              _controller.notify();
+            },
+          );
+        }
+      }
+      if (selected != null && _controller.showUnitPicker) return null;
+      return BuildingEditingTabs(
+        controller: _controller,
+        panelService: _panelService,
+        onSave: _save,
+        onCancel: _controller.cancelEditing,
+        onCopy: _copyUnit,
+        onPaste: _pasteUnit,
+      );
+    }
+
+    // `_selectedViewUnit` is only ever set from the wide-screen path
+    // (`_onViewUnitTap`), but gate on `isWide` here too for the same reason
+    // as the edit-mode branch above: defensive against future callers.
+    final selectedUnit = isWide ? _selectedViewUnit : null;
+    if (selectedUnit != null) {
+      return BuildingUnitViewTabs(
+        key: ValueKey('view-tabs-${selectedUnit.id}'),
+        unit: selectedUnit,
+        buildingId: building.id,
+        cityId: building.cityId,
+        itemNameFor: _itemNameFor,
+        unitResourceHistories: _unitResourceHistories,
+        service: _service,
+        salesService: _salesService,
+        sourcingService: _sourcingService,
+        analyticsService: _analyticsService,
+        onUpdatePrice: _updatePrice,
+        isPriceUpdating: _actionLoadingIds.contains(selectedUnit.id),
+        onClose: () => setState(() => _selectedViewUnit = null),
+      );
+    }
+    return BuildingOverviewSidebar(
+      buildingId: building.id,
+      buildingType: building.type,
+      financialTimeline: _financialTimeline,
+      recentActivity: _recentActivity,
+      supplyChain: _supplyChain,
+      panelService: _panelService,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -597,19 +731,6 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
             ProductionChainStatusPanel(units: validationUnits),
           if (isGridBuilding && !isEditing && !showStarterBanner && building.type == 'SALES_SHOP')
             ShopChainStatusPanel(units: validationUnits),
-          // Building-level analytics (ROADMAP 137) — view mode only, matching
-          // web's placement of the Overview/Supply Chain tabs above the unit
-          // list rather than mixed into the editable grid.
-          if (!isEditing) ...[
-            const SizedBox(height: 12),
-            BuildingFinancialTimelinePanel(timeline: _financialTimeline),
-            const SizedBox(height: 12),
-            BuildingRecentActivityPanel(events: _recentActivity),
-            if (building.type == 'FACTORY') ...[
-              const SizedBox(height: 12),
-              BuildingSupplyChainDiagramView(diagram: _supplyChain),
-            ],
-          ],
           const SizedBox(height: 16),
           if (isGridBuilding) ...[
             Row(
@@ -619,16 +740,41 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
               ],
             ),
             const SizedBox(height: 8),
-            if (isEditing)
-              BuildingGridEditor(controller: _controller, itemNameFor: _itemNameForIds, onCellTap: _onCellTap)
-            else
-              BuildingUnitGrid(
-                units: building.units,
-                itemNameFor: _itemNameFor,
-                actionLoadingIds: _actionLoadingIds,
-                onUpgrade: (unit) => _upgradeUnit(unit),
-                onUpdatePrice: (unit) => _updatePrice(unit),
-              ),
+            // Two-column layout (grid left, contextual sidebar right) at
+            // ≥1024px — mirrors `BuildingDetailView.vue`'s
+            // `grid-template-columns` split and its collapse breakpoint.
+            // Below that, the grid and sidebar stack in one column, and
+            // selecting a cell opens a bottom sheet instead of updating the
+            // sidebar inline (see `_onCellTap`/`_onViewUnitTap`).
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isWide = constraints.maxWidth >= _wideScreenBreakpoint;
+                final grid = isEditing
+                    ? BuildingGridEditor(controller: _controller, itemNameFor: _itemNameForIds, onCellTap: (x, y) => _onCellTap(x, y, isWide: isWide))
+                    : BuildingUnitGrid(
+                        units: building.units,
+                        itemNameFor: _itemNameFor,
+                        actionLoadingIds: _actionLoadingIds,
+                        onUnitTap: (unit) => _onViewUnitTap(unit, isWide: isWide),
+                      );
+                final sidebar = _sidebarContent(building, isEditing, isWide: isWide);
+
+                if (!isWide) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [grid, if (sidebar != null) ...[const SizedBox(height: AppSpacing.md), sidebar]],
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: grid),
+                    const SizedBox(width: 24),
+                    if (sidebar != null) SizedBox(width: 400, child: sidebar),
+                  ],
+                );
+              },
+            ),
           ] else if (building.type == 'APARTMENT' || building.type == 'COMMERCIAL')
             BuildingPropertyPanel(building: building, detail: _apartmentDetail, onScheduleRent: _scheduleRent)
           else if (building.type == 'MEDIA_HOUSE')
@@ -669,16 +815,6 @@ class _BuildingDetailScreenState extends State<BuildingDetailScreen> {
                   ),
                 ),
               ),
-          if (isEditing) ...[
-            const SizedBox(height: AppSpacing.md),
-            BuildingDraftSummaryPanel(
-              controller: _controller,
-              onSave: _save,
-              onCancel: _controller.cancelEditing,
-              onCopy: _copyUnit,
-              onPaste: _pasteUnit,
-            ),
-          ],
           const SizedBox(height: 20),
           OutlinedButton(
             onPressed: () => context.go('/building/${building.id}/sell'),
