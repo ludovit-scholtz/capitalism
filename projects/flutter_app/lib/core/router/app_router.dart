@@ -189,6 +189,8 @@ GoRouter createAppRouter({
           GoRoute(
             path: '/leaderboard',
             builder: (context, state) => LeaderboardScreen(
+              initialTab: state.uri.queryParameters['tab'],
+              initialPage: int.tryParse(state.uri.queryParameters['page'] ?? ''),
               graphQlService: httpClient != null
                   ? GraphQlService(context.read<AuthState>(),
                       client: httpClient)

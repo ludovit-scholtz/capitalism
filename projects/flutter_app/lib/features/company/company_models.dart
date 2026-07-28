@@ -22,6 +22,38 @@ class CompanyLedger {
     required this.totalOtherCosts,
     required this.netIncome,
     required this.totalAssets,
+    this.isCurrentGameYear = true,
+    this.primaryCurrencySymbol,
+    this.hasMixedCurrencies = false,
+    this.totalGovernmentContractRevenue = 0,
+    this.totalMediaHouseIncome = 0,
+    this.totalRentIncome = 0,
+    this.totalPropertyMaintenance = 0,
+    this.taxableIncome = 0,
+    this.estimatedIncomeTax = 0,
+    this.totalDepositInterestReceived = 0,
+    this.totalDepositInterestPaid = 0,
+    this.totalLoanInterestIncome = 0,
+    this.totalLoanInterestExpense = 0,
+    this.propertyValue = 0,
+    this.propertyAppreciation = 0,
+    this.buildingValue = 0,
+    this.inventoryValue = 0,
+    this.totalDepositsPlaced = 0,
+    this.totalPropertyPurchases = 0,
+    this.totalStockPurchaseCashOut = 0,
+    this.totalStockSaleCashIn = 0,
+    this.cashFromOperations = 0,
+    this.cashFromInvestments = 0,
+    this.cashFromBanking = 0,
+    this.firstRecordedTick = 0,
+    this.lastRecordedTick = 0,
+    this.incomeTaxDueAtTick = 0,
+    this.incomeTaxDueGameTimeUtc,
+    this.incomeTaxDueGameYear = 0,
+    this.isIncomeTaxSettled = false,
+    this.buildingSummaries = const [],
+    this.history = const [],
   });
 
   final String companyName;
@@ -38,6 +70,38 @@ class CompanyLedger {
   final double totalOtherCosts;
   final double netIncome;
   final double totalAssets;
+  final bool isCurrentGameYear;
+  final String? primaryCurrencySymbol;
+  final bool hasMixedCurrencies;
+  final double totalGovernmentContractRevenue;
+  final double totalMediaHouseIncome;
+  final double totalRentIncome;
+  final double totalPropertyMaintenance;
+  final double taxableIncome;
+  final double estimatedIncomeTax;
+  final double totalDepositInterestReceived;
+  final double totalDepositInterestPaid;
+  final double totalLoanInterestIncome;
+  final double totalLoanInterestExpense;
+  final double propertyValue;
+  final double propertyAppreciation;
+  final double buildingValue;
+  final double inventoryValue;
+  final double totalDepositsPlaced;
+  final double totalPropertyPurchases;
+  final double totalStockPurchaseCashOut;
+  final double totalStockSaleCashIn;
+  final double cashFromOperations;
+  final double cashFromInvestments;
+  final double cashFromBanking;
+  final int firstRecordedTick;
+  final int lastRecordedTick;
+  final int incomeTaxDueAtTick;
+  final String? incomeTaxDueGameTimeUtc;
+  final int incomeTaxDueGameYear;
+  final bool isIncomeTaxSettled;
+  final List<BuildingLedgerSummary> buildingSummaries;
+  final List<CompanyLedgerHistoryYear> history;
 
   factory CompanyLedger.fromJson(Map<String, dynamic> json) => CompanyLedger(
     companyName: (json['companyName'] as String?) ?? '',
@@ -54,24 +118,93 @@ class CompanyLedger {
     totalOtherCosts: (json['totalOtherCosts'] as num?)?.toDouble() ?? 0,
     netIncome: (json['netIncome'] as num?)?.toDouble() ?? 0,
     totalAssets: (json['totalAssets'] as num?)?.toDouble() ?? 0,
+    isCurrentGameYear: json['isCurrentGameYear'] as bool? ?? true,
+    primaryCurrencySymbol: json['primaryCurrencySymbol'] as String?,
+    hasMixedCurrencies: json['hasMixedCurrencies'] as bool? ?? false,
+    totalGovernmentContractRevenue: (json['totalGovernmentContractRevenue'] as num?)?.toDouble() ?? 0,
+    totalMediaHouseIncome: (json['totalMediaHouseIncome'] as num?)?.toDouble() ?? 0,
+    totalRentIncome: (json['totalRentIncome'] as num?)?.toDouble() ?? 0,
+    totalPropertyMaintenance: (json['totalPropertyMaintenance'] as num?)?.toDouble() ?? 0,
+    taxableIncome: (json['taxableIncome'] as num?)?.toDouble() ?? 0,
+    estimatedIncomeTax: (json['estimatedIncomeTax'] as num?)?.toDouble() ?? 0,
+    totalDepositInterestReceived: (json['totalDepositInterestReceived'] as num?)?.toDouble() ?? 0,
+    totalDepositInterestPaid: (json['totalDepositInterestPaid'] as num?)?.toDouble() ?? 0,
+    totalLoanInterestIncome: (json['totalLoanInterestIncome'] as num?)?.toDouble() ?? 0,
+    totalLoanInterestExpense: (json['totalLoanInterestExpense'] as num?)?.toDouble() ?? 0,
+    propertyValue: (json['propertyValue'] as num?)?.toDouble() ?? 0,
+    propertyAppreciation: (json['propertyAppreciation'] as num?)?.toDouble() ?? 0,
+    buildingValue: (json['buildingValue'] as num?)?.toDouble() ?? 0,
+    inventoryValue: (json['inventoryValue'] as num?)?.toDouble() ?? 0,
+    totalDepositsPlaced: (json['totalDepositsPlaced'] as num?)?.toDouble() ?? 0,
+    totalPropertyPurchases: (json['totalPropertyPurchases'] as num?)?.toDouble() ?? 0,
+    totalStockPurchaseCashOut: (json['totalStockPurchaseCashOut'] as num?)?.toDouble() ?? 0,
+    totalStockSaleCashIn: (json['totalStockSaleCashIn'] as num?)?.toDouble() ?? 0,
+    cashFromOperations: (json['cashFromOperations'] as num?)?.toDouble() ?? 0,
+    cashFromInvestments: (json['cashFromInvestments'] as num?)?.toDouble() ?? 0,
+    cashFromBanking: (json['cashFromBanking'] as num?)?.toDouble() ?? 0,
+    firstRecordedTick: (json['firstRecordedTick'] as num?)?.toInt() ?? 0,
+    lastRecordedTick: (json['lastRecordedTick'] as num?)?.toInt() ?? 0,
+    incomeTaxDueAtTick: (json['incomeTaxDueAtTick'] as num?)?.toInt() ?? 0,
+    incomeTaxDueGameTimeUtc: json['incomeTaxDueGameTimeUtc'] as String?,
+    incomeTaxDueGameYear: (json['incomeTaxDueGameYear'] as num?)?.toInt() ?? 0,
+    isIncomeTaxSettled: json['isIncomeTaxSettled'] as bool? ?? false,
+    buildingSummaries: ((json['buildingSummaries'] as List<dynamic>?) ?? const [])
+        .map((e) => BuildingLedgerSummary.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    history: ((json['history'] as List<dynamic>?) ?? const [])
+        .map((e) => CompanyLedgerHistoryYear.fromJson(e as Map<String, dynamic>))
+        .toList(),
   );
 }
 
-class CityFinancialBreakdown {
-  const CityFinancialBreakdown({required this.cityName, required this.currencyCode, required this.revenue, required this.costs, required this.profit});
+class BuildingLedgerSummary {
+  const BuildingLedgerSummary({
+    required this.buildingId,
+    required this.buildingName,
+    required this.buildingType,
+    required this.revenue,
+    required this.costs,
+    required this.currencyCode,
+  });
 
-  final String cityName;
-  final String currencyCode;
+  final String buildingId;
+  final String buildingName;
+  final String buildingType;
   final double revenue;
   final double costs;
-  final double profit;
+  final String currencyCode;
 
-  factory CityFinancialBreakdown.fromJson(Map<String, dynamic> json) => CityFinancialBreakdown(
-    cityName: (json['cityName'] as String?) ?? '',
-    currencyCode: (json['currencyCode'] as String?) ?? 'EUR',
+  factory BuildingLedgerSummary.fromJson(Map<String, dynamic> json) => BuildingLedgerSummary(
+    buildingId: json['buildingId'] as String,
+    buildingName: (json['buildingName'] as String?) ?? '',
+    buildingType: (json['buildingType'] as String?) ?? '',
     revenue: (json['revenue'] as num?)?.toDouble() ?? 0,
     costs: (json['costs'] as num?)?.toDouble() ?? 0,
-    profit: (json['profit'] as num?)?.toDouble() ?? 0,
+    currencyCode: (json['currencyCode'] as String?) ?? 'EUR',
+  );
+}
+
+class CompanyLedgerHistoryYear {
+  const CompanyLedgerHistoryYear({
+    required this.gameYear,
+    required this.isCurrentGameYear,
+    required this.netIncome,
+    required this.firstRecordedTick,
+    required this.lastRecordedTick,
+  });
+
+  final int gameYear;
+  final bool isCurrentGameYear;
+  final double netIncome;
+  final int firstRecordedTick;
+  final int lastRecordedTick;
+
+  factory CompanyLedgerHistoryYear.fromJson(Map<String, dynamic> json) => CompanyLedgerHistoryYear(
+    gameYear: (json['gameYear'] as num?)?.toInt() ?? 0,
+    isCurrentGameYear: json['isCurrentGameYear'] as bool? ?? false,
+    netIncome: (json['netIncome'] as num?)?.toDouble() ?? 0,
+    firstRecordedTick: (json['firstRecordedTick'] as num?)?.toInt() ?? 0,
+    lastRecordedTick: (json['lastRecordedTick'] as num?)?.toInt() ?? 0,
   );
 }
 
@@ -155,6 +288,7 @@ class PendingDividendProposal {
     required this.forVotes,
     required this.againstVotes,
     required this.myVoteChoice,
+    this.votingCloseTick = 0,
   });
 
   final String id;
@@ -163,6 +297,15 @@ class PendingDividendProposal {
   final int forVotes;
   final int againstVotes;
   final String? myVoteChoice;
+  final int votingCloseTick;
+
+  int get totalVotes => forVotes + againstVotes;
+
+  /// Matches `pendingDividendApprovePct` in
+  /// `projects/frontend/src/views/CompanySettingsView.vue`.
+  int get approvePercent => totalVotes <= 0 ? 0 : ((forVotes / totalVotes) * 100).round();
+
+  int get rejectPercent => totalVotes <= 0 ? 0 : (100 - approvePercent).clamp(0, 100);
 
   factory PendingDividendProposal.fromJson(Map<String, dynamic> json) => PendingDividendProposal(
     id: json['id'] as String,
@@ -171,6 +314,7 @@ class PendingDividendProposal {
     forVotes: (json['forVotes'] as num?)?.toInt() ?? 0,
     againstVotes: (json['againstVotes'] as num?)?.toInt() ?? 0,
     myVoteChoice: json['myVoteChoice'] as String?,
+    votingCloseTick: (json['votingCloseTick'] as num?)?.toInt() ?? 0,
   );
 }
 

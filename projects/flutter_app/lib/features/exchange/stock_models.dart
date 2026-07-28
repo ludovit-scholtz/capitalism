@@ -15,6 +15,8 @@ class StockListing {
     required this.dailyChangePercent,
     required this.marketValue,
     required this.playerOwnedShares,
+    this.bidPrice = 0,
+    this.askPrice = 0,
     this.canProposeDividend = false,
     this.canClaimControl = false,
     this.canMerge = false,
@@ -29,6 +31,11 @@ class StockListing {
   final double dailyChangePercent;
   final double marketValue;
   final double playerOwnedShares;
+
+  /// The inline trade panel buys at [askPrice] and sells at [bidPrice] —
+  /// matches web's `StockMarketListingRow.vue` (`buyAt`/`sellAt` labels).
+  final double bidPrice;
+  final double askPrice;
 
   /// Combined ownership (own + controlled-company shares) `> 50%` or the
   /// caller already runs the company — matches `canProposeDividend` on
@@ -53,6 +60,8 @@ class StockListing {
     dailyChangePercent: (json['dailyChangePercent'] as num?)?.toDouble() ?? 0,
     marketValue: (json['marketValue'] as num?)?.toDouble() ?? 0,
     playerOwnedShares: (json['playerOwnedShares'] as num?)?.toDouble() ?? 0,
+    bidPrice: (json['bidPrice'] as num?)?.toDouble() ?? 0,
+    askPrice: (json['askPrice'] as num?)?.toDouble() ?? 0,
     canProposeDividend: json['canProposeDividend'] as bool? ?? false,
     canClaimControl: json['canClaimControl'] as bool? ?? false,
     canMerge: json['canMerge'] as bool? ?? false,

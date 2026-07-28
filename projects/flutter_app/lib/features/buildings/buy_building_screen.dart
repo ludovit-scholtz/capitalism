@@ -1,5 +1,8 @@
 // Ported from `projects/frontend/src/views/BuyBuildingView.vue` +
-// `BuyBuildingSteps.vue`.
+// `BuyBuildingSteps.vue`. The POWER_PLANT subtype picker has no equivalent
+// in either of those files — `BuyBuildingSteps.vue` never grew one — so
+// it's ported instead from `CityLotDetailPanel.vue` (the map-based "buy from
+// a lot" flow, which does support it), reusing the same option list/labels.
 //
 // The lot step now renders a real interactive map (`CapitalismMapView`) with
 // lot markers, the player's existing-building markers, and a
@@ -8,12 +11,6 @@
 // the plain sortable list is kept alongside it as a precise, thumb-friendly
 // alternative to tapping small map pins on a phone (mobile-UX improvement,
 // not a web-parity requirement).
-//
-// Deliberately trimmed from the web (documented, not oversights):
-// - No BANK-specific follow-up (`setBankRates`/`initiateBaseDeposit`), no
-//   POWER_PLANT subtype or MEDIA_HOUSE channel-type selection — those
-//   inputs are accepted by the mutation but ignored for other building
-//   types, and this first pass only covers the common path.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart' show TileProvider;
@@ -24,8 +21,12 @@ import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../../core/i18n/locale_state.dart';
 import '../../core/theme/app_icons.dart';
+import '../../core/utils/app_number_format.dart';
 import '../../core/widgets/capitalism_map_view.dart';
+import '../banking/banking_models.dart';
+import '../banking/banking_service.dart';
 import 'buy_building_distance.dart';
 import 'buy_building_models.dart';
 import 'buy_building_service.dart';
@@ -36,13 +37,20 @@ class BuyBuildingScreen extends StatefulWidget {
     required this.companyId,
     GraphQlService? graphQlService,
     BuyBuildingService? buyBuildingService,
+    BankingService? bankingService,
     this.tileProvider,
   }) : _injectedGraphQlService = graphQlService,
-       _injectedBuyBuildingService = buyBuildingService;
+       _injectedBuyBuildingService = buyBuildingService,
+       _injectedBankingService = bankingService;
 
   final String companyId;
   final GraphQlService? _injectedGraphQlService;
   final BuyBuildingService? _injectedBuyBuildingService;
+
+  /// Used for the BANK-specific follow-up mutations after purchase
+  /// (`initiateBaseDeposit`/`setBankRates`) — `BuyBuildingService` doesn't
+  /// duplicate those, `BankingService` already owns them.
+  final BankingService? _injectedBankingService;
 
   /// Injectable so widget tests never hit real OSM tile servers — see
   /// `test/support/fake_tile_provider.dart`.
@@ -54,16 +62,23 @@ class BuyBuildingScreen extends StatefulWidget {
 
 class _BuyBuildingScreenState extends State<BuyBuildingScreen> {
   late final BuyBuildingService _service;
+  late final BankingService _bankingService;
 
   bool _loading = true;
   String? _error;
-  List<Map<String, String>> _cities = const [];
+  List<BuyBuildingCity> _cities = const [];
 
   int _step = 0;
   String? _cityId;
   String? _buildingType;
   CityLot? _selectedLot;
   final _nameController = TextEditingController();
+
+  String? _selectedMediaType;
+  String? _selectedPowerPlantType;
+  final _depositRateController = TextEditingController(text: '3');
+  final _lendingRateController = TextEditingController(text: '8');
+  List<PlayerBankAccount> _companyBankAccounts = const [];
 
   bool _lotsLoading = false;
   List<CityLot> _lots = const [];
@@ -76,13 +91,42 @@ class _BuyBuildingScreenState extends State<BuyBuildingScreen> {
     final auth = context.read<AuthState>();
     final graphQlService = widget._injectedGraphQlService ?? GraphQlService(auth);
     _service = widget._injectedBuyBuildingService ?? BuyBuildingService(graphQlService);
+    _bankingService = widget._injectedBankingService ?? BankingService(graphQlService);
     _load();
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _depositRateController.dispose();
+    _lendingRateController.dispose();
     super.dispose();
+  }
+
+  BuyBuildingCity? get _selectedCity {
+    final cityId = _cityId;
+    if (cityId == null) return null;
+    for (final city in _cities) {
+      if (city.id == cityId) return city;
+    }
+    return null;
+  }
+
+  /// Company bank balance in the selected city's currency, summed across
+  /// every company-owned account in that currency — mirrors
+  /// `companyBankBalanceInCityCurrency` in `BuyBuildingSteps.vue`.
+  double get _companyBankBalanceInCityCurrency {
+    final currencyCode = _selectedCity?.currencyCode.toUpperCase();
+    if (currencyCode == null) return 0;
+    return _companyBankAccounts
+        .where((a) => a.ownerType == 'COMPANY' && a.companyId == widget.companyId && a.currencyCode.toUpperCase() == currencyCode)
+        .fold<double>(0, (sum, a) => sum + a.balance);
+  }
+
+  bool get _companyHasBankCapital {
+    final currencyCode = _selectedCity?.currencyCode;
+    if (currencyCode == null) return false;
+    return _companyBankBalanceInCityCurrency >= bankBaseCapitalRequired(currencyCode);
   }
 
   Future<void> _load() async {
@@ -103,6 +147,13 @@ class _BuyBuildingScreenState extends State<BuyBuildingScreen> {
         _error = 'Could not load cities. Please try again.';
         _loading = false;
       });
+    }
+    try {
+      final accounts = await _bankingService.fetchMyBankAccounts();
+      if (mounted) setState(() => _companyBankAccounts = accounts);
+    } catch (_) {
+      // Best-effort — the BANK capital check simply shows "insufficient"
+      // until this succeeds; it never blocks non-BANK purchases.
     }
   }
 
@@ -132,14 +183,38 @@ class _BuyBuildingScreenState extends State<BuyBuildingScreen> {
   Future<void> _purchase() async {
     final lot = _selectedLot;
     if (lot == null || _buildingType == null) return;
+    if (_buildingType == 'BANK' && !_companyHasBankCapital) return;
     setState(() => _purchasing = true);
     try {
-      await _service.purchaseLot(
+      final buildingId = await _service.purchaseLot(
         companyId: widget.companyId,
         lotId: lot.id,
         buildingType: _buildingType!,
         buildingName: _nameController.text.trim().isEmpty ? null : _nameController.text.trim(),
+        mediaType: _selectedMediaType,
+        powerPlantType: _selectedPowerPlantType,
       );
+
+      if (_buildingType == 'BANK') {
+        // Best-effort, matching web's swallowed-error behavior — a failure
+        // here shouldn't undo the purchase itself; the owner can still
+        // configure rates/deposit later from Bank Management.
+        try {
+          await _bankingService.initiateBaseDeposit(buildingId);
+        } catch (_) {
+          // Non-fatal.
+        }
+        try {
+          await _bankingService.setBankRates(
+            bankBuildingId: buildingId,
+            depositRate: double.tryParse(_depositRateController.text) ?? 3,
+            lendingRate: double.tryParse(_lendingRateController.text) ?? 8,
+          );
+        } catch (_) {
+          // Non-fatal.
+        }
+      }
+
       if (mounted) context.go('/dashboard');
     } catch (_) {
       if (mounted) {
@@ -190,11 +265,11 @@ class _BuyBuildingScreenState extends State<BuyBuildingScreen> {
       const SizedBox(height: 8),
       for (final city in _cities)
         ListTile(
-          key: ValueKey('city-${city['id']}'),
-          selected: _cityId == city['id'],
-          leading: FaIcon(_cityId == city['id'] ? AppIcons.radioChecked : AppIcons.radioUnchecked, size: 18),
-          title: Text(city['name']!),
-          onTap: () => setState(() => _cityId = city['id']),
+          key: ValueKey('city-${city.id}'),
+          selected: _cityId == city.id,
+          leading: FaIcon(_cityId == city.id ? AppIcons.radioChecked : AppIcons.radioUnchecked, size: 18),
+          title: Text(city.name),
+          onTap: () => setState(() => _cityId = city.id),
         ),
       const SizedBox(height: 12),
       FilledButton(
@@ -208,9 +283,17 @@ class _BuyBuildingScreenState extends State<BuyBuildingScreen> {
     ];
   }
 
+  bool get _typeStepComplete {
+    if (_buildingType == 'MEDIA_HOUSE') return _selectedMediaType != null;
+    if (_buildingType == 'POWER_PLANT') return _selectedPowerPlantType != null;
+    return true;
+  }
+
   List<Widget> _buildTypeStep() {
+    final theme = Theme.of(context);
+    final languageCode = context.watch<LocaleState>().languageCode;
     return [
-      Text('2. Choose a building type', style: Theme.of(context).textTheme.titleMedium),
+      Text('2. Choose a building type', style: theme.textTheme.titleMedium),
       const SizedBox(height: 8),
       for (final type in buildingTypes)
         ListTile(
@@ -218,15 +301,22 @@ class _BuyBuildingScreenState extends State<BuyBuildingScreen> {
           selected: _buildingType == type,
           leading: FaIcon(_buildingType == type ? AppIcons.radioChecked : AppIcons.radioUnchecked, size: 18),
           title: Text(type),
-          onTap: () => setState(() => _buildingType = type),
+          onTap: () => setState(() {
+            _buildingType = type;
+            if (type != 'MEDIA_HOUSE') _selectedMediaType = null;
+            if (type != 'POWER_PLANT') _selectedPowerPlantType = null;
+          }),
         ),
+      if (_buildingType == 'MEDIA_HOUSE') ..._buildMediaTypeSelector(theme),
+      if (_buildingType == 'POWER_PLANT') ..._buildPowerPlantTypeSelector(theme),
+      if (_buildingType == 'BANK') ..._buildBankSetupSection(theme, languageCode),
       const SizedBox(height: 12),
       Row(
         children: [
           OutlinedButton(onPressed: () => setState(() => _step = 0), child: const Text('Back')),
           const SizedBox(width: 8),
           FilledButton(
-            onPressed: _buildingType == null
+            onPressed: _buildingType == null || !_typeStepComplete
                 ? null
                 : () {
                     setState(() => _step = 2);
@@ -235,6 +325,125 @@ class _BuyBuildingScreenState extends State<BuyBuildingScreen> {
             child: const Text('Next'),
           ),
         ],
+      ),
+    ];
+  }
+
+  List<Widget> _buildMediaTypeSelector(ThemeData theme) {
+    return [
+      const SizedBox(height: 12),
+      Text('Media channel type', style: theme.textTheme.labelLarge),
+      const SizedBox(height: 4),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final option in mediaHouseChannelTypes)
+            ChoiceChip(
+              key: ValueKey('media-type-${option.code}'),
+              label: Text('${option.icon} ${option.label} (${option.multiplierLabel})'),
+              selected: _selectedMediaType == option.code,
+              onSelected: (_) => setState(() => _selectedMediaType = option.code),
+            ),
+        ],
+      ),
+      if (_selectedMediaType == null)
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text('Select a channel type to continue.', style: theme.textTheme.bodySmall),
+        ),
+    ];
+  }
+
+  List<Widget> _buildPowerPlantTypeSelector(ThemeData theme) {
+    return [
+      const SizedBox(height: 12),
+      Text('Power plant subtype', style: theme.textTheme.labelLarge),
+      const SizedBox(height: 4),
+      for (final option in powerPlantTypeOptions)
+        Card(
+          key: ValueKey('power-plant-type-${option.code}'),
+          color: _selectedPowerPlantType == option.code ? theme.colorScheme.primaryContainer : null,
+          child: ListTile(
+            selected: _selectedPowerPlantType == option.code,
+            leading: FaIcon(
+              _selectedPowerPlantType == option.code ? AppIcons.radioChecked : AppIcons.radioUnchecked,
+              size: 18,
+            ),
+            title: Text('${option.label} · ${option.outputMw} MW'),
+            subtitle: Text('${option.description} ${option.isRenewable ? '(renewable)' : '(fuel-based)'}'),
+            onTap: () => setState(() => _selectedPowerPlantType = option.code),
+          ),
+        ),
+      if (_selectedPowerPlantType == null)
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text('Select a subtype to continue.', style: theme.textTheme.bodySmall),
+        ),
+    ];
+  }
+
+  List<Widget> _buildBankSetupSection(ThemeData theme, String languageCode) {
+    final currencyCode = _selectedCity?.currencyCode ?? 'EUR';
+    final required = bankBaseCapitalRequired(currencyCode);
+    final hasCapital = _companyHasBankCapital;
+    return [
+      const SizedBox(height: 16),
+      Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('🏦 Bank setup', style: theme.textTheme.titleSmall),
+              const SizedBox(height: 8),
+              const Text(
+                'A new bank needs base capital before it can start operating, plus '
+                'deposit/lending rates for its first customers.',
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(
+                    hasCapital ? Icons.check_circle : Icons.warning_amber,
+                    color: hasCapital ? Colors.green : theme.colorScheme.error,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Base capital required: ${AppNumberFormat.money(required, currencyCode: currencyCode, languageCode: languageCode)}'
+                      '${hasCapital ? ' — sufficient' : ' — insufficient (have ${AppNumberFormat.money(_companyBankBalanceInCityCurrency, currencyCode: currencyCode, languageCode: languageCode)})'}',
+                      key: const Key('bank-capital-check'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      key: const Key('bank-deposit-rate'),
+                      controller: _depositRateController,
+                      decoration: const InputDecoration(labelText: 'Deposit rate (%)'),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      key: const Key('bank-lending-rate'),
+                      controller: _lendingRateController,
+                      decoration: const InputDecoration(labelText: 'Lending rate (%)'),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     ];
   }
@@ -328,21 +537,34 @@ class _BuyBuildingScreenState extends State<BuyBuildingScreen> {
   }
 
   List<Widget> _buildConfirmStep() {
+    final theme = Theme.of(context);
+    final isBank = _buildingType == 'BANK';
+    final bankBlocked = isBank && !_companyHasBankCapital;
     return [
-      Text('4. Confirm purchase', style: Theme.of(context).textTheme.titleMedium),
+      Text('4. Confirm purchase', style: theme.textTheme.titleMedium),
       const SizedBox(height: 8),
       Text('Lot: ${_selectedLot?.name ?? _selectedLot?.district ?? _selectedLot?.id}'),
       Text('Price: ${_selectedLot?.price.toStringAsFixed(0)}'),
       Text('Type: $_buildingType'),
+      if (_selectedMediaType != null) Text('Channel type: $_selectedMediaType'),
+      if (_selectedPowerPlantType != null) Text('Subtype: $_selectedPowerPlantType'),
       const SizedBox(height: 12),
       TextField(controller: _nameController, decoration: const InputDecoration(labelText: 'Building name (optional)')),
+      if (bankBlocked) ...[
+        const SizedBox(height: 12),
+        Text(
+          'This company does not have enough bank capital in this city\'s currency yet — '
+          'go back and check the bank setup requirement.',
+          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+        ),
+      ],
       const SizedBox(height: 12),
       Row(
         children: [
           OutlinedButton(onPressed: () => setState(() => _step = 2), child: const Text('Back')),
           const SizedBox(width: 8),
           FilledButton(
-            onPressed: _purchasing ? null : _purchase,
+            onPressed: _purchasing || bankBlocked ? null : _purchase,
             child: Text(_purchasing ? 'Purchasing…' : 'Purchase'),
           ),
         ],

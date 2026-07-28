@@ -8,19 +8,24 @@ class FakeBuyBuildingService implements BuyBuildingService {
     this.myBuildingLocations = const [],
     this.citiesError,
     this.purchaseError,
+    this.purchasedBuildingId = 'building-new',
   });
 
-  final List<Map<String, String>> cities;
+  final List<BuyBuildingCity> cities;
   final Map<String, List<CityLot>> lotsByCity;
   final List<OwnedBuildingLocation> myBuildingLocations;
   final Object? citiesError;
   final Object? purchaseError;
 
+  /// Id returned from [purchaseLot] on success — the screen threads it into
+  /// the BANK-specific follow-up mutations.
+  final String purchasedBuildingId;
+
   final List<String> calls = [];
   Map<String, dynamic>? lastPurchaseArgs;
 
   @override
-  Future<List<Map<String, String>>> fetchCities() async {
+  Future<List<BuyBuildingCity>> fetchCities() async {
     calls.add('fetchCities');
     if (citiesError != null) throw citiesError!;
     return cities;
@@ -45,14 +50,24 @@ class FakeBuyBuildingService implements BuyBuildingService {
   }
 
   @override
-  Future<void> purchaseLot({
+  Future<String> purchaseLot({
     required String companyId,
     required String lotId,
     required String buildingType,
     String? buildingName,
+    String? mediaType,
+    String? powerPlantType,
   }) async {
     calls.add('purchaseLot');
     if (purchaseError != null) throw purchaseError!;
-    lastPurchaseArgs = {'companyId': companyId, 'lotId': lotId, 'buildingType': buildingType, 'buildingName': buildingName};
+    lastPurchaseArgs = {
+      'companyId': companyId,
+      'lotId': lotId,
+      'buildingType': buildingType,
+      'buildingName': buildingName,
+      'mediaType': mediaType,
+      'powerPlantType': powerPlantType,
+    };
+    return purchasedBuildingId;
   }
 }

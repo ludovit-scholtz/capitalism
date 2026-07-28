@@ -13,6 +13,7 @@ class FakeMarketService implements MarketService {
     this.eventHistory = const [],
     this.myCompanies = const [],
     this.campaignAnalytics,
+    this.priceHistory = const [],
     this.loadError,
     this.actionError,
   });
@@ -21,6 +22,7 @@ class FakeMarketService implements MarketService {
   final Map<String, MarketIntelligence> intelligenceByCity;
   final Map<String, MarketOverview> overviewByCity;
   final List<CompetitorQuality> competitors;
+  final List<MarketPriceHistoryPoint> priceHistory;
   final Map<String, List<EnergyListing>> energyListingsByCity;
   final List<Map<String, String>> myPowerPlants;
   final List<GlobalEvent> activeEvents;
@@ -57,6 +59,13 @@ class FakeMarketService implements MarketService {
   Future<List<CompetitorQuality>> fetchCompetitorIntelligence({required String cityId, required String productTypeId}) async {
     calls.add('fetchCompetitorIntelligence');
     return competitors;
+  }
+
+  @override
+  Future<List<MarketPriceHistoryPoint>> fetchPriceHistory({required String cityId, required String productTypeId, int lastNTicks = 100}) async {
+    calls.add('fetchPriceHistory');
+    if (loadError != null) throw loadError!;
+    return priceHistory;
   }
 
   @override

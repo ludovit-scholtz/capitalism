@@ -1,10 +1,4 @@
 // Ported from `projects/frontend/src/views/BuildingMarketView.vue`.
-// Trimmed: no negotiation-note field on the Make Offer dialog (the mutation
-// supports one, but it's optional and secondary to price); no
-// optimistic-concurrency retry-with-refresh UX on `OFFER_VERSION_CONFLICT`
-// beyond a plain error snackbar — the underlying mutation call is still the
-// real, version-checked one, just without the web's auto-refresh-and-retry
-// affordance.
 
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -120,6 +114,7 @@ class _BuildingMarketScreenState extends State<BuildingMarketScreen> {
     final activeCompanyId = context.read<AccountContextState>().activeCompanyId;
     String buyerCompanyId = companies.any((c) => c['id'] == activeCompanyId) ? activeCompanyId! : companies.first['id']!;
     final priceController = TextEditingController(text: building.askingPrice?.toStringAsFixed(0) ?? '');
+    final noteController = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
@@ -139,6 +134,11 @@ class _BuildingMarketScreenState extends State<BuildingMarketScreen> {
                 decoration: const InputDecoration(labelText: 'Offered price'),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
               ),
+              TextField(
+                controller: noteController,
+                decoration: const InputDecoration(labelText: 'Note to seller (optional)'),
+                maxLines: 2,
+              ),
             ],
           ),
           actions: [
@@ -155,6 +155,7 @@ class _BuildingMarketScreenState extends State<BuildingMarketScreen> {
         buildingId: building.id,
         buyerCompanyId: buyerCompanyId,
         offeredPrice: double.tryParse(priceController.text) ?? 0,
+        negotiationNote: noteController.text.trim().isEmpty ? null : noteController.text.trim(),
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Offer sent.')));
@@ -166,6 +167,12 @@ class _BuildingMarketScreenState extends State<BuildingMarketScreen> {
     }
   }
 
+  /// On `OFFER_VERSION_CONFLICT` (another action already resolved this
+  /// offer, invalidating our optimistic-concurrency `offerVersion`), refetch
+  /// both tabs so the UI reflects the real, current state before the player
+  /// tries again — mirrors `isOfferVersionConflict`/`offerConflictRefreshing`
+  /// in `BuildingMarketView.vue`, using a `SnackBar` (which times out on its
+  /// own) instead of the web's manually-timed banner.
   Future<void> _respondToOffer(BuildingOffer offer, bool accept) async {
     setState(() => _actionLoadingIds.add(offer.id));
     try {
@@ -175,6 +182,17 @@ class _BuildingMarketScreenState extends State<BuildingMarketScreen> {
         await _service.rejectOffer(offerId: offer.id, offerVersion: offer.offerVersion);
       }
       await _loadListings();
+    } on GraphQlException catch (e) {
+      if (e.code == 'OFFER_VERSION_CONFLICT') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('This offer changed — refreshing…')),
+          );
+        }
+        await Future.wait([_loadListings(), _loadMarket()]);
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Action failed. Please try again.')));
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Action failed. Please try again.')));
@@ -294,17 +312,30 @@ class _BuildingMarketScreenState extends State<BuildingMarketScreen> {
                   for (final offer in listing.offers.where((o) => o.status == 'PENDING'))
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4),
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(child: Text('${offer.buyerCompanyName ?? offer.buyerDisplayName ?? 'Buyer'}: ${offer.offeredPrice.toStringAsFixed(0)}')),
-                          IconButton(
-                            icon: const FaIcon(AppIcons.check, size: 16),
-                            onPressed: _actionLoadingIds.contains(offer.id) ? null : () => _respondToOffer(offer, true),
+                          Row(
+                            children: [
+                              Expanded(child: Text('${offer.buyerCompanyName ?? offer.buyerDisplayName ?? 'Buyer'}: ${offer.offeredPrice.toStringAsFixed(0)}')),
+                              IconButton(
+                                icon: const FaIcon(AppIcons.check, size: 16),
+                                onPressed: _actionLoadingIds.contains(offer.id) ? null : () => _respondToOffer(offer, true),
+                              ),
+                              IconButton(
+                                icon: const FaIcon(AppIcons.close, size: 16),
+                                onPressed: _actionLoadingIds.contains(offer.id) ? null : () => _respondToOffer(offer, false),
+                              ),
+                            ],
                           ),
-                          IconButton(
-                            icon: const FaIcon(AppIcons.close, size: 16),
-                            onPressed: _actionLoadingIds.contains(offer.id) ? null : () => _respondToOffer(offer, false),
-                          ),
+                          if (offer.negotiationNote != null && offer.negotiationNote!.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 4, bottom: 4),
+                              child: Text(
+                                '"${offer.negotiationNote}"',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic),
+                              ),
+                            ),
                         ],
                       ),
                     ),

@@ -14,6 +14,7 @@ class GameAdminPlayer {
     required this.companyCount,
     required this.cityNames,
     required this.lastLoginAtUtc,
+    this.isInvisibleInChat = false,
   });
 
   final String id;
@@ -25,6 +26,7 @@ class GameAdminPlayer {
   final int companyCount;
   final List<String> cityNames;
   final String? lastLoginAtUtc;
+  final bool isInvisibleInChat;
 
   factory GameAdminPlayer.fromJson(Map<String, dynamic> json) => GameAdminPlayer(
     id: json['id'] as String,
@@ -36,6 +38,64 @@ class GameAdminPlayer {
     companyCount: (json['companyCount'] as num?)?.toInt() ?? 0,
     cityNames: ((json['cityNames'] as List<dynamic>?) ?? const []).cast<String>(),
     lastLoginAtUtc: json['lastLoginAtUtc'] as String?,
+    isInvisibleInChat: json['isInvisibleInChat'] as bool? ?? false,
+  );
+}
+
+class GameAdminSessionInfo {
+  const GameAdminSessionInfo({
+    required this.canAccessAdminDashboard,
+    required this.isRootAdministrator,
+    required this.hasGlobalAdminRole,
+    required this.isImpersonating,
+    required this.adminActorDisplayName,
+    required this.effectivePlayerDisplayName,
+  });
+
+  final bool canAccessAdminDashboard;
+  final bool isRootAdministrator;
+  final bool hasGlobalAdminRole;
+  final bool isImpersonating;
+  final String? adminActorDisplayName;
+  final String? effectivePlayerDisplayName;
+
+  factory GameAdminSessionInfo.fromJson(Map<String, dynamic> json) => GameAdminSessionInfo(
+    canAccessAdminDashboard: json['canAccessAdminDashboard'] as bool? ?? false,
+    isRootAdministrator: json['isRootAdministrator'] as bool? ?? false,
+    hasGlobalAdminRole: json['hasGlobalAdminRole'] as bool? ?? false,
+    isImpersonating: json['isImpersonating'] as bool? ?? false,
+    adminActorDisplayName: (json['adminActor'] as Map<String, dynamic>?)?['displayName'] as String?,
+    effectivePlayerDisplayName: (json['effectivePlayer'] as Map<String, dynamic>?)?['displayName'] as String?,
+  );
+}
+
+class NpcCompanySummary {
+  const NpcCompanySummary({
+    required this.id,
+    required this.name,
+    required this.archetype,
+    required this.difficultyLevel,
+    required this.homeCityName,
+    required this.isActive,
+    required this.buildingCount,
+  });
+
+  final String id;
+  final String name;
+  final String archetype;
+  final int difficultyLevel;
+  final String homeCityName;
+  final bool isActive;
+  final int buildingCount;
+
+  factory NpcCompanySummary.fromJson(Map<String, dynamic> json) => NpcCompanySummary(
+    id: json['id'] as String,
+    name: (json['name'] as String?) ?? '',
+    archetype: (json['archetype'] as String?) ?? '',
+    difficultyLevel: (json['difficultyLevel'] as num?)?.toInt() ?? 1,
+    homeCityName: (json['homeCityName'] as String?) ?? '',
+    isActive: json['isActive'] as bool? ?? true,
+    buildingCount: (json['buildingCount'] as num?)?.toInt() ?? 0,
   );
 }
 
@@ -138,16 +198,18 @@ class ProductAnalyticsRow {
 }
 
 class AdminNewsLocalization {
-  const AdminNewsLocalization({required this.locale, required this.title, required this.summary});
+  const AdminNewsLocalization({required this.locale, required this.title, required this.summary, this.htmlContent = ''});
 
   final String locale;
   final String title;
   final String? summary;
+  final String htmlContent;
 
   factory AdminNewsLocalization.fromJson(Map<String, dynamic> json) => AdminNewsLocalization(
     locale: (json['locale'] as String?) ?? 'en',
     title: (json['title'] as String?) ?? '',
     summary: json['summary'] as String?,
+    htmlContent: (json['htmlContent'] as String?) ?? '',
   );
 }
 

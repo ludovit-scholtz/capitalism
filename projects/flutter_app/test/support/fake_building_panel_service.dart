@@ -115,6 +115,7 @@ class FakeBuildingPanelService implements BuildingPanelService {
   @override
   Future<List<CityMediaHouse>> fetchCityMediaHouses(String cityId) async {
     calls.add('fetchCityMediaHouses');
+    if (actionError != null) throw actionError!;
     return cityMediaHouses;
   }
 

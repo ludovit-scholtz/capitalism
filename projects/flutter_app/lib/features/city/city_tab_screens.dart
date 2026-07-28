@@ -2,13 +2,13 @@
 // web these are nested tab components sharing one parent view's fetched
 // state (`CityMapView.vue`); here each is its own go_router screen and
 // fetches its own data — a reasonable adaptation to this app's routing
-// model, not a functional trim.
+// model, not a functional trim. The shared loading/error/service bootstrap
+// lives in `city_tab_base.dart`; `CityEconomyScreen` (economic-cycle,
+// weather, power-grid, and health dashboards) lives in its own
+// `city_economy_screen.dart` and is re-exported below to keep this file
+// under the 500-line budget.
 //
 // Deliberately trimmed (documented per-tab below):
-// - Economy tab: skips the economic-cycle/weather/power-balance/economic-
-//   history dashboards (`EconomyCycleWidget`, `CityPowerPlanningSection`,
-//   `HealthIndicatorsPanel`) — five distinct analytics subsystems, shown
-//   only as basic city stats here.
 // - Buildings tab: renders a real interactive map (`CapitalismMapView`,
 //   mirroring `CityMapContent.vue`'s Leaflet setup) alongside the existing
 //   sortable lot list (kept as a thumb-friendly selector, same pattern as
@@ -27,58 +27,27 @@ import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/auth/auth_state.dart';
-import '../../core/graphql/graphql_service.dart';
 import '../../core/i18n/locale_state.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/widgets/capitalism_map_view.dart';
 import '../buildings/buy_building_models.dart';
 import '../cities/cities_models.dart';
+import 'city_tab_base.dart';
 import 'city_tab_models.dart';
-import 'city_tab_service.dart';
 
-abstract class _CityTabScreen extends StatefulWidget {
-  const _CityTabScreen({super.key, required this.cityId, this.graphQlService, this.cityTabService});
-
-  final String cityId;
-  final GraphQlService? graphQlService;
-  final CityTabService? cityTabService;
-}
-
-abstract class _CityTabScreenState<T extends _CityTabScreen> extends State<T> {
-  late final CityTabService service;
-
-  @override
-  void initState() {
-    super.initState();
-    final auth = context.read<AuthState>();
-    final graphQlService = widget.graphQlService ?? GraphQlService(auth);
-    service = widget.cityTabService ?? CityTabService(graphQlService);
-  }
-
-  Widget buildLoading() => const Center(child: CircularProgressIndicator());
-
-  Widget buildError(String message, VoidCallback onRetry) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [Text(message), const SizedBox(height: 12), OutlinedButton(onPressed: onRetry, child: const Text('Try again'))],
-      ),
-    ),
-  );
-}
+export 'city_economy_screen.dart' show CityEconomyScreen;
+export 'city_market_screen.dart' show CityMarketScreen;
 
 // ── Overview ─────────────────────────────────────────────────────────────
 
-class CityOverviewScreen extends _CityTabScreen {
+class CityOverviewScreen extends CityTabScreen {
   const CityOverviewScreen({super.key, required super.cityId, super.graphQlService, super.cityTabService});
 
   @override
   State<CityOverviewScreen> createState() => _CityOverviewScreenState();
 }
 
-class _CityOverviewScreenState extends _CityTabScreenState<CityOverviewScreen> {
+class _CityOverviewScreenState extends CityTabScreenState<CityOverviewScreen> {
   bool _loading = true;
   String? _error;
   City? _city;
@@ -168,77 +137,9 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-// ── Economy ──────────────────────────────────────────────────────────────
-
-class CityEconomyScreen extends _CityTabScreen {
-  const CityEconomyScreen({super.key, required super.cityId, super.graphQlService, super.cityTabService});
-
-  @override
-  State<CityEconomyScreen> createState() => _CityEconomyScreenState();
-}
-
-class _CityEconomyScreenState extends _CityTabScreenState<CityEconomyScreen> {
-  bool _loading = true;
-  String? _error;
-  City? _city;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final city = await service.fetchCity(widget.cityId);
-      if (!mounted) return;
-      setState(() {
-        _city = city;
-        _loading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _error = 'Could not load this city. Please try again.';
-        _loading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_loading) return buildLoading();
-    if (_error != null) return buildError(_error!, _load);
-    final city = _city;
-    if (city == null) return const Center(child: Text('City not found.'));
-
-    final theme = Theme.of(context);
-    final languageCode = context.watch<LocaleState>().languageCode;
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        Text('Economy', style: theme.textTheme.headlineSmall),
-        const SizedBox(height: 8),
-        Text('Currency: ${city.currencyCode}'),
-        Text('Population: ${formatPopulation(city.population, languageCode)}'),
-        Text('Base salary: ${city.baseSalaryPerManhour.toStringAsFixed(1)} ${city.currencyCode}/h'),
-        const SizedBox(height: 16),
-        Text(
-          'Detailed economic cycle, weather, and power-grid dashboards are not yet available on mobile.',
-          style: theme.textTheme.bodySmall,
-        ),
-      ],
-    );
-  }
-}
-
 // ── Buildings ────────────────────────────────────────────────────────────
 
-class CityBuildingsScreen extends _CityTabScreen {
+class CityBuildingsScreen extends CityTabScreen {
   const CityBuildingsScreen({
     super.key,
     required super.cityId,
@@ -255,7 +156,7 @@ class CityBuildingsScreen extends _CityTabScreen {
   State<CityBuildingsScreen> createState() => _CityBuildingsScreenState();
 }
 
-class _CityBuildingsScreenState extends _CityTabScreenState<CityBuildingsScreen> {
+class _CityBuildingsScreenState extends CityTabScreenState<CityBuildingsScreen> {
   bool _loading = true;
   String? _error;
   List<CityLot> _lots = const [];
@@ -358,86 +259,16 @@ class _CityBuildingsScreenState extends _CityTabScreenState<CityBuildingsScreen>
   }
 }
 
-// ── Market ───────────────────────────────────────────────────────────────
-
-class CityMarketScreen extends _CityTabScreen {
-  const CityMarketScreen({super.key, required super.cityId, super.graphQlService, super.cityTabService});
-
-  @override
-  State<CityMarketScreen> createState() => _CityMarketScreenState();
-}
-
-class _CityMarketScreenState extends _CityTabScreenState<CityMarketScreen> {
-  bool _loading = true;
-  String? _error;
-  City? _city;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final city = await service.fetchCity(widget.cityId);
-      if (!mounted) return;
-      setState(() {
-        _city = city;
-        _loading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _error = 'Could not load the market. Please try again.';
-        _loading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_loading) return buildLoading();
-    if (_error != null) return buildError(_error!, _load);
-    final city = _city;
-    if (city == null) return const Center(child: Text('City not found.'));
-
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        Text('Local Resources', style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 8),
-        if (city.resources.isEmpty)
-          const Text('No local resources recorded for this city.')
-        else
-          for (final resource in [...city.resources]..sort((a, b) => b.abundance.compareTo(a.abundance)))
-            Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: Text(cityResourceIcon(resource.resourceSlug), style: const TextStyle(fontSize: 20)),
-                title: Text(resource.resourceName),
-                trailing: Text('${(resource.abundance * 100).round()}%'),
-              ),
-            ),
-      ],
-    );
-  }
-}
-
 // ── Contracts ────────────────────────────────────────────────────────────
 
-class CityContractsScreen extends _CityTabScreen {
+class CityContractsScreen extends CityTabScreen {
   const CityContractsScreen({super.key, required super.cityId, super.graphQlService, super.cityTabService});
 
   @override
   State<CityContractsScreen> createState() => _CityContractsScreenState();
 }
 
-class _CityContractsScreenState extends _CityTabScreenState<CityContractsScreen> {
+class _CityContractsScreenState extends CityTabScreenState<CityContractsScreen> {
   bool _loading = true;
   String? _error;
   List<GovernmentContractCard> _contracts = const [];
@@ -571,14 +402,14 @@ class _CityContractsScreenState extends _CityTabScreenState<CityContractsScreen>
 
 // ── Competitors ──────────────────────────────────────────────────────────
 
-class CityCompetitorsScreen extends _CityTabScreen {
+class CityCompetitorsScreen extends CityTabScreen {
   const CityCompetitorsScreen({super.key, required super.cityId, super.graphQlService, super.cityTabService});
 
   @override
   State<CityCompetitorsScreen> createState() => _CityCompetitorsScreenState();
 }
 
-class _CityCompetitorsScreenState extends _CityTabScreenState<CityCompetitorsScreen> {
+class _CityCompetitorsScreenState extends CityTabScreenState<CityCompetitorsScreen> {
   bool _loading = true;
   String? _error;
   List<CityCompetitor> _competitors = const [];

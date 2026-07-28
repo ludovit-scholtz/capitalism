@@ -19,6 +19,8 @@ const _listing = StockListing(
   dailyChangePercent: 3.2,
   marketValue: 1000000,
   playerOwnedShares: 10,
+  bidPrice: 42.0,
+  askPrice: 43.0,
 );
 
 const _controllableListing = StockListing(
@@ -151,6 +153,60 @@ void main() {
 
       expect(service.lastReplaceCeoArgs, {'companyId': 'company-2', 'newCeoPlayerId': 'player-42'});
       expect(find.text('You are now the CEO of Rival Corp.'), findsOneWidget);
+    });
+
+    testWidgets('inline trade panel is collapsed by default and expands on Trade', (tester) async {
+      final service = FakeStockService(listings: [_listing]);
+
+      await _pumpStockExchange(tester, service: service);
+      expect(find.byKey(const Key('trade-buy-company-1')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('trade-toggle-company-1')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ask: 43.00'), findsOneWidget);
+      expect(find.text('Bid: 42.00'), findsOneWidget);
+      expect(find.byKey(const Key('trade-buy-company-1')), findsOneWidget);
+      expect(find.byKey(const Key('trade-sell-company-1')), findsOneWidget);
+    });
+
+    testWidgets('buying inline calls buyShares with the entered quantity and selected account, without navigating away', (tester) async {
+      final service = FakeStockService(
+        listings: [_listing],
+        bankAccounts: const [
+          {'id': 'account-1', 'currencyCode': 'USD'},
+        ],
+      );
+
+      await _pumpStockExchange(tester, service: service);
+      await tester.tap(find.byKey(const Key('trade-toggle-company-1')));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byKey(const Key('trade-quantity-company-1')), '5');
+      await tester.tap(find.byKey(const Key('trade-buy-company-1')));
+      await tester.pumpAndSettle();
+
+      expect(service.lastBuyArgs?['companyId'], 'company-1');
+      expect(service.lastBuyArgs?['shareCount'], 5.0);
+      expect(service.lastBuyArgs?['bankAccountId'], 'account-1');
+      expect(find.text('Bought 5 shares of ACME.'), findsOneWidget);
+      // Still on the exchange screen — no navigation to the trade desk.
+      expect(find.text('Acme Corp (ACME)'), findsOneWidget);
+    });
+
+    testWidgets('selling inline calls sellShares and shows a failure message on error', (tester) async {
+      final service = FakeStockService(listings: [_listing], tradeError: Exception('down'));
+
+      await _pumpStockExchange(tester, service: service);
+      await tester.tap(find.byKey(const Key('trade-toggle-company-1')));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byKey(const Key('trade-quantity-company-1')), '2');
+      await tester.tap(find.byKey(const Key('trade-sell-company-1')));
+      await tester.pumpAndSettle();
+
+      expect(service.calls, contains('sellShares'));
+      expect(find.text('Could not complete this trade.'), findsOneWidget);
     });
 
     testWidgets('merging picks a destination company and calls mergeCompany', (tester) async {

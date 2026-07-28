@@ -8,25 +8,6 @@ import 'package:provider/provider.dart';
 import 'support/fake_company_service.dart';
 import 'support/in_memory_token_storage.dart';
 
-const _ledger = CompanyLedger(
-  companyName: 'Acme Corp',
-  gameYear: 2026,
-  currentCash: 50000,
-  primaryCurrencyCode: 'EUR',
-  totalRevenue: 100000,
-  totalPurchasingCosts: 20000,
-  totalShippingCosts: 5000,
-  totalLaborCosts: 15000,
-  totalEnergyCosts: 3000,
-  totalMarketingCosts: 2000,
-  totalTaxPaid: 10000,
-  totalOtherCosts: 1000,
-  netIncome: 44000,
-  totalAssets: 200000,
-);
-
-const _cityBreakdown = CityFinancialBreakdown(cityName: 'Metropolis', currencyCode: 'EUR', revenue: 80000, costs: 40000, profit: 40000);
-
 const _awardedContract = CompanyContractCard(
   id: 'contract-1',
   title: 'Steel Supply',
@@ -51,6 +32,18 @@ const _settings = CompanySettings(
   pendingDividendProposal: PendingDividendProposal(id: 'proposal-1', dividendPercent: 15, ticksRemaining: 10, forVotes: 3, againstVotes: 1, myVoteChoice: null),
 );
 
+const _settingsNoProposal = CompanySettings(
+  companyName: 'Acme Corp',
+  dividendPayoutRatio: 0.2,
+  administrationOverheadRate: 0.05,
+  ageFactor: 1.1,
+  assetFactor: 1.2,
+  citySalarySettings: [
+    CitySalarySetting(cityId: 'city-1', cityName: 'Metropolis', currencyCode: 'EUR', baseSalaryPerManhour: 10, salaryMultiplier: 1.0),
+  ],
+  pendingDividendProposal: null,
+);
+
 const _brandOverview = BrandQualityOverview(
   totalResearchBudgetUsd: 5000,
   brands: [CompanyBrand(id: 'brand-1', name: 'SuperBrand', productName: 'Steel Beams', quality: 0.8, marketingQuality: 0.7, combinedBrandQuality: 0.75, accumulatedResearchBudget: 2000)],
@@ -68,25 +61,6 @@ Future<void> _pump(WidgetTester tester, Widget widget) async {
 }
 
 void main() {
-  group('LedgerScreen', () {
-    testWidgets('shows P&L summary and city breakdown', (tester) async {
-      final service = FakeCompanyService(ledger: _ledger, cityBreakdown: const [_cityBreakdown]);
-
-      await _pump(tester, LedgerScreen(companyId: 'company-1', companyService: service));
-
-      expect(find.text('Acme Corp Ledger'), findsOneWidget);
-      expect(find.text('Metropolis'), findsOneWidget);
-    });
-
-    testWidgets('shows error state with Try again on load failure', (tester) async {
-      final service = FakeCompanyService(ledgerError: Exception('down'));
-
-      await _pump(tester, LedgerScreen(companyId: 'company-1', companyService: service));
-
-      expect(find.text('Could not load the ledger. Please try again.'), findsOneWidget);
-    });
-  });
-
   group('CompanyContractsScreen', () {
     testWidgets('shows awarded contract with shipping form and bid history', (tester) async {
       final service = FakeCompanyService(contracts: const [_awardedContract], bids: const [_bid]);
@@ -124,6 +98,37 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(service.lastVoteApprove, isTrue);
+    });
+
+    testWidgets('shows the pending proposal vote split', (tester) async {
+      final service = FakeCompanyService(settings: _settings);
+
+      await _pump(tester, CompanySettingsScreen(companyId: 'company-1', companyService: service));
+
+      expect(find.textContaining('Approve 75%'), findsOneWidget);
+      expect(find.textContaining('Voting closes at tick'), findsOneWidget);
+    });
+
+    testWidgets('proposing a dividend submits the entered percent when none is pending', (tester) async {
+      final service = FakeCompanyService(settings: _settingsNoProposal);
+
+      await _pump(tester, CompanySettingsScreen(companyId: 'company-1', companyService: service));
+      expect(find.text('No pending dividend proposal.'), findsOneWidget);
+
+      await tester.enterText(find.byKey(const ValueKey('dividend-proposal-field')), '25');
+      await tester.tap(find.widgetWithText(FilledButton, 'Propose dividend'));
+      await tester.pumpAndSettle();
+
+      expect(service.lastProposedDividendPercent, 25);
+    });
+
+    testWidgets('propose-dividend button is disabled while a proposal is pending', (tester) async {
+      final service = FakeCompanyService(settings: _settings);
+
+      await _pump(tester, CompanySettingsScreen(companyId: 'company-1', companyService: service));
+
+      final button = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Propose dividend'));
+      expect(button.onPressed, isNull);
     });
   });
 

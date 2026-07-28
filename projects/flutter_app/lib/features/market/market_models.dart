@@ -93,6 +93,30 @@ class MarketOverview {
   );
 }
 
+class MarketPriceHistoryPoint {
+  const MarketPriceHistoryPoint({
+    required this.tick,
+    required this.clearingPrice,
+    required this.totalVolume,
+    required this.totalRevenue,
+    required this.sellerCount,
+  });
+
+  final int tick;
+  final double clearingPrice;
+  final double totalVolume;
+  final double totalRevenue;
+  final int sellerCount;
+
+  factory MarketPriceHistoryPoint.fromJson(Map<String, dynamic> json) => MarketPriceHistoryPoint(
+    tick: (json['tick'] as num?)?.toInt() ?? 0,
+    clearingPrice: (json['clearingPrice'] as num?)?.toDouble() ?? 0,
+    totalVolume: (json['totalVolume'] as num?)?.toDouble() ?? 0,
+    totalRevenue: (json['totalRevenue'] as num?)?.toDouble() ?? 0,
+    sellerCount: (json['sellerCount'] as num?)?.toInt() ?? 0,
+  );
+}
+
 class CompetitorQuality {
   const CompetitorQuality({required this.companyName, required this.qualityLevel, required this.pricePremiumPct, required this.isOwnCompany});
 

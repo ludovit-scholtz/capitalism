@@ -26,6 +26,14 @@ const _marketOverviewQuery = r'''
   }
 ''';
 
+const _marketPriceHistoryQuery = r'''
+  query MarketPriceHistory($cityId: UUID!, $productTypeId: UUID!, $lastNTicks: Int!) {
+    marketPriceHistory(cityId: $cityId, productTypeId: $productTypeId, lastNTicks: $lastNTicks) {
+      tick clearingPrice totalVolume totalRevenue sellerCount
+    }
+  }
+''';
+
 const _competitorIntelligenceQuery = r'''
   query CompetitorIntelligence($cityId: UUID!, $productTypeId: UUID!) {
     competitorQualityIntelligence(cityId: $cityId, productTypeId: $productTypeId) {
@@ -129,6 +137,15 @@ class MarketService {
     final overviews = result['marketOverview'] as List<dynamic>? ?? const [];
     final match = overviews.cast<Map<String, dynamic>>().where((o) => o['cityId'] == cityId);
     return MarketOverview.fromJson(match.isNotEmpty ? match.first : (overviews.isNotEmpty ? overviews.first as Map<String, dynamic> : {'cityId': cityId, 'products': []}));
+  }
+
+  Future<List<MarketPriceHistoryPoint>> fetchPriceHistory({required String cityId, required String productTypeId, int lastNTicks = 100}) async {
+    final result = await _graphQlService.request(
+      _marketPriceHistoryQuery,
+      variables: {'cityId': cityId, 'productTypeId': productTypeId, 'lastNTicks': lastNTicks},
+    );
+    final list = result['marketPriceHistory'] as List<dynamic>? ?? const [];
+    return list.map((e) => MarketPriceHistoryPoint.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<List<CompetitorQuality>> fetchCompetitorIntelligence({required String cityId, required String productTypeId}) async {

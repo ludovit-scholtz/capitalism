@@ -78,6 +78,7 @@ class BuildingOffer {
     required this.status,
     required this.buyerCompanyName,
     required this.buyerDisplayName,
+    required this.negotiationNote,
   });
 
   final String id;
@@ -89,6 +90,10 @@ class BuildingOffer {
   final String? buyerCompanyName;
   final String? buyerDisplayName;
 
+  /// Optional free-text message the buyer attached to the offer — mirrors
+  /// `MakeOfferOnBuildingInput.NegotiationNote`.
+  final String? negotiationNote;
+
   factory BuildingOffer.fromJson(Map<String, dynamic> json) {
     final buyerCompany = json['buyerCompany'] as Map<String, dynamic>?;
     final buyerPlayer = json['buyerPlayer'] as Map<String, dynamic>?;
@@ -99,6 +104,7 @@ class BuildingOffer {
       status: (json['status'] as String?) ?? 'PENDING',
       buyerCompanyName: buyerCompany?['name'] as String?,
       buyerDisplayName: buyerPlayer?['displayName'] as String?,
+      negotiationNote: json['negotiationNote'] as String?,
     );
   }
 }

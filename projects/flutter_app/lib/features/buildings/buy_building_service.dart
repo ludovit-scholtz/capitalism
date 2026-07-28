@@ -31,21 +31,21 @@ const _purchaseLotMutation = r'''
 ''';
 
 /// GraphQL calls for the Buy Building screen, matching
-/// `projects/frontend/src/views/BuyBuildingView.vue`'s core contract.
-/// Trimmed (documented in the screen): no bank-specific follow-up
-/// mutations (`setBankRates`/`initiateBaseDeposit`), no power-plant-type or
-/// media-type sub-selection.
+/// `projects/frontend/src/views/BuyBuildingView.vue`'s core contract, plus
+/// the POWER_PLANT-subtype picker ported from `CityLotDetailPanel.vue` (the
+/// dedicated Buy Building screen itself never grew one on the web). The
+/// BANK-specific follow-up (`setBankRates`/`initiateBaseDeposit`) reuses
+/// `BankingService` from `buy_building_screen.dart` rather than duplicating
+/// those mutations here.
 class BuyBuildingService {
   const BuyBuildingService(this._graphQlService);
 
   final GraphQlService _graphQlService;
 
-  Future<List<Map<String, String>>> fetchCities() async {
+  Future<List<BuyBuildingCity>> fetchCities() async {
     final result = await _graphQlService.request(_citiesQuery);
     final list = result['cities'] as List<dynamic>? ?? const [];
-    return list
-        .map((e) => {'id': (e as Map<String, dynamic>)['id'] as String, 'name': e['name'] as String})
-        .toList();
+    return list.map((e) => BuyBuildingCity.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<List<CityLot>> fetchLots(String cityId) async {
@@ -78,13 +78,18 @@ class BuyBuildingService {
     return const [];
   }
 
-  Future<void> purchaseLot({
+  /// Returns the id of the newly built building — used by the screen to
+  /// chain the BANK-specific follow-up mutations (`initiateBaseDeposit` /
+  /// `setBankRates`) after a successful purchase.
+  Future<String> purchaseLot({
     required String companyId,
     required String lotId,
     required String buildingType,
     String? buildingName,
-  }) {
-    return _graphQlService.request(
+    String? mediaType,
+    String? powerPlantType,
+  }) async {
+    final result = await _graphQlService.request(
       _purchaseLotMutation,
       variables: {
         'input': {
@@ -92,8 +97,11 @@ class BuyBuildingService {
           'lotId': lotId,
           'buildingType': buildingType,
           'buildingName': buildingName,
+          'mediaType': buildingType == 'MEDIA_HOUSE' ? mediaType : null,
+          'powerPlantType': buildingType == 'POWER_PLANT' ? powerPlantType : null,
         },
       },
     );
+    return (result['purchaseLot'] as Map<String, dynamic>)['building']['id'] as String;
   }
 }

@@ -1,4 +1,5 @@
 import 'package:capitalism_app/core/auth/auth_state.dart';
+import 'package:capitalism_app/core/i18n/locale_state.dart';
 import 'package:capitalism_app/features/market/market_models.dart';
 import 'package:capitalism_app/features/market/market_screens.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import 'support/fake_market_service.dart';
+import 'support/in_memory_selected_locale_storage.dart';
 import 'support/in_memory_token_storage.dart';
 
 const _seller = MarketIntelSeller(rank: 1, displayName: 'Acme Corp', askingPricePerUnit: 12.5, marketShare: 0.4);
@@ -71,7 +73,13 @@ Future<void> _pump(WidgetTester tester, Widget widget) async {
   final auth = AuthState(storage: InMemoryTokenStorage());
   await auth.setToken('test-token');
   await tester.pumpWidget(
-    ChangeNotifierProvider<AuthState>.value(value: auth, child: MaterialApp(home: Scaffold(body: widget))),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AuthState>.value(value: auth),
+        ChangeNotifierProvider<LocaleState>.value(value: LocaleState(storage: InMemorySelectedLocaleStorage())),
+      ],
+      child: MaterialApp(home: Scaffold(body: widget)),
+    ),
   );
   await tester.pumpAndSettle();
 }
@@ -118,6 +126,43 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Acme Corp'), findsOneWidget);
+    });
+
+    testWidgets('shows the price-history panel with per-tick rows when a product is selected', (tester) async {
+      final service = FakeMarketService(
+        cities: const [
+          {'id': 'city-1', 'name': 'Metropolis'},
+        ],
+        overviewByCity: const {'city-1': _overview},
+        priceHistory: const [
+          MarketPriceHistoryPoint(tick: 100, clearingPrice: 12.5, totalVolume: 80, totalRevenue: 1000, sellerCount: 3),
+          MarketPriceHistoryPoint(tick: 110, clearingPrice: 13.0, totalVolume: 90, totalRevenue: 1170, sellerCount: 4),
+        ],
+      );
+
+      await _pump(tester, MarketDashboardScreen(marketService: service));
+      await tester.tap(find.text('Steel Beams'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Price history'), findsOneWidget);
+      expect(find.text('#110'), findsOneWidget);
+      expect(find.text('#100'), findsOneWidget);
+      expect(find.text('4 sellers'), findsOneWidget);
+    });
+
+    testWidgets('shows an empty state when there is no price history', (tester) async {
+      final service = FakeMarketService(
+        cities: const [
+          {'id': 'city-1', 'name': 'Metropolis'},
+        ],
+        overviewByCity: const {'city-1': _overview},
+      );
+
+      await _pump(tester, MarketDashboardScreen(marketService: service));
+      await tester.tap(find.text('Steel Beams'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No price history recorded yet.'), findsOneWidget);
     });
   });
 

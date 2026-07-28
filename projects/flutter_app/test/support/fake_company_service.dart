@@ -3,26 +3,20 @@ import 'package:capitalism_app/features/company/company_service.dart';
 
 class FakeCompanyService implements CompanyService {
   FakeCompanyService({
-    this.ledger,
-    this.cityBreakdown = const [],
     this.contracts = const [],
     this.bids = const [],
     this.settings,
     this.brandOverview,
-    this.ledgerError,
     this.contractsError,
     this.settingsError,
     this.researchError,
     this.actionError,
   });
 
-  final CompanyLedger? ledger;
-  final List<CityFinancialBreakdown> cityBreakdown;
   final List<CompanyContractCard> contracts;
   final List<ContractBid> bids;
   final CompanySettings? settings;
   final BrandQualityOverview? brandOverview;
-  final Object? ledgerError;
   final Object? contractsError;
   final Object? settingsError;
   final Object? researchError;
@@ -31,14 +25,8 @@ class FakeCompanyService implements CompanyService {
   final List<String> calls = [];
   Map<String, dynamic>? lastFulfillArgs;
   Map<String, dynamic>? lastUpdateSettingsArgs;
+  double? lastProposedDividendPercent;
   bool? lastVoteApprove;
-
-  @override
-  Future<(CompanyLedger, List<CityFinancialBreakdown>)> fetchLedger(String companyId, {int? gameYear}) async {
-    calls.add('fetchLedger');
-    if (ledgerError != null) throw ledgerError!;
-    return (ledger!, cityBreakdown);
-  }
 
   @override
   Future<(List<CompanyContractCard>, List<ContractBid>)> fetchCompanyContracts(String companyId) async {
@@ -76,6 +64,8 @@ class FakeCompanyService implements CompanyService {
   @override
   Future<void> proposeDividend({required String companyId, required double dividendPercent}) async {
     calls.add('proposeDividend');
+    if (actionError != null) throw actionError!;
+    lastProposedDividendPercent = dividendPercent;
   }
 
   @override

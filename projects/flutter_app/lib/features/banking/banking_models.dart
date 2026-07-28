@@ -101,7 +101,9 @@ class PlayerBankAccount {
     required this.accountNumber,
     required this.currencyCode,
     required this.balance,
+    required this.companyId,
     required this.companyName,
+    required this.ownerType,
     required this.bankBuildingId,
     required this.isDepositAccount,
   });
@@ -110,7 +112,14 @@ class PlayerBankAccount {
   final String? accountNumber;
   final String currencyCode;
   final double balance;
+  final String? companyId;
   final String? companyName;
+
+  /// `'PERSON'` or `'COMPANY'` — matches `BankAccount.OwnerType` on the
+  /// backend. Needed (alongside [companyId]) to sum a specific company's
+  /// balance in a given currency, e.g. the Buy Building screen's BANK
+  /// base-capital check.
+  final String? ownerType;
   final String? bankBuildingId;
   final bool isDepositAccount;
 
@@ -119,7 +128,9 @@ class PlayerBankAccount {
     accountNumber: json['accountNumber'] as String?,
     currencyCode: (json['currencyCode'] as String?) ?? 'EUR',
     balance: (json['balance'] as num?)?.toDouble() ?? 0,
+    companyId: json['companyId'] as String?,
     companyName: json['companyName'] as String?,
+    ownerType: json['ownerType'] as String?,
     bankBuildingId: json['bankBuildingId'] as String?,
     isDepositAccount: json['isDepositAccount'] as bool? ?? false,
   );

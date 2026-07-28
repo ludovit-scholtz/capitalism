@@ -15,6 +15,8 @@ class TradeRoute {
     required this.expectedArrivalTick,
     required this.status,
     required this.failureReason,
+    this.scheduledDepartureTick = 0,
+    this.transitTicks = 0,
   });
 
   final String id;
@@ -30,6 +32,8 @@ class TradeRoute {
   /// `SCHEDULED`, `IN_TRANSIT`, `COMPLETED`, or `FAILED`.
   final String status;
   final String? failureReason;
+  final int scheduledDepartureTick;
+  final int transitTicks;
 
   String get itemName => productTypeName ?? resourceTypeName ?? 'Unknown item';
 
@@ -45,5 +49,7 @@ class TradeRoute {
     expectedArrivalTick: (json['expectedArrivalTick'] as num?)?.toInt() ?? 0,
     status: (json['status'] as String?) ?? 'SCHEDULED',
     failureReason: json['failureReason'] as String?,
+    scheduledDepartureTick: (json['scheduledDepartureTick'] as num?)?.toInt() ?? 0,
+    transitTicks: (json['transitTicks'] as num?)?.toInt() ?? 0,
   );
 }

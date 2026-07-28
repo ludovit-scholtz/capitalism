@@ -259,6 +259,7 @@ class CityPowerBalance {
     required this.reserveMw,
     required this.reservePercent,
     required this.status,
+    this.powerPlantCount = 0,
   });
 
   final double totalSupplyMw;
@@ -267,12 +268,18 @@ class CityPowerBalance {
   final double reservePercent;
   final String status; // BALANCED | CONSTRAINED | CRITICAL
 
+  /// `0` means the city has no power plants yet — still running on the
+  /// legacy (pre-power-grid) unmetered supply, matching web's "Legacy grid"
+  /// badge in `CityPowerPlanningSection.vue`.
+  final int powerPlantCount;
+
   factory CityPowerBalance.fromJson(Map<String, dynamic> json) => CityPowerBalance(
     totalSupplyMw: (json['totalSupplyMw'] as num?)?.toDouble() ?? 0,
     totalDemandMw: (json['totalDemandMw'] as num?)?.toDouble() ?? 0,
     reserveMw: (json['reserveMw'] as num?)?.toDouble() ?? 0,
     reservePercent: (json['reservePercent'] as num?)?.toDouble() ?? 0,
     status: (json['status'] as String?) ?? 'BALANCED',
+    powerPlantCount: (json['powerPlantCount'] as num?)?.toInt() ?? 0,
   );
 }
 
@@ -284,6 +291,9 @@ class CityMediaHouse {
     required this.ownerCompanyName,
     required this.contentRanking,
     required this.isGovernmentOwned,
+    this.effectivenessMultiplier = 1,
+    this.powerStatus,
+    this.isUnderConstruction = false,
   });
 
   final String id;
@@ -292,6 +302,9 @@ class CityMediaHouse {
   final String? ownerCompanyName;
   final double contentRanking;
   final bool isGovernmentOwned;
+  final double effectivenessMultiplier;
+  final String? powerStatus;
+  final bool isUnderConstruction;
 
   factory CityMediaHouse.fromJson(Map<String, dynamic> json) => CityMediaHouse(
     id: json['id'] as String,
@@ -300,6 +313,9 @@ class CityMediaHouse {
     ownerCompanyName: json['ownerCompanyName'] as String?,
     contentRanking: (json['contentRanking'] as num?)?.toDouble() ?? 0,
     isGovernmentOwned: json['isGovernmentOwned'] as bool? ?? false,
+    effectivenessMultiplier: (json['effectivenessMultiplier'] as num?)?.toDouble() ?? 1,
+    powerStatus: json['powerStatus'] as String?,
+    isUnderConstruction: json['isUnderConstruction'] as bool? ?? false,
   );
 }
 

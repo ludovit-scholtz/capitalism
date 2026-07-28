@@ -118,6 +118,54 @@ void main() {
 
       expect(find.text('Base price: 5.00'), findsOneWidget);
     });
+
+    testWidgets('switching to a guide topic shows its static content instead of the resources catalog', (tester) async {
+      final service = FakeEncyclopediaService(entries: [_ironOre]);
+
+      await _pumpEncyclopedia(tester, service: service);
+      expect(find.text('Iron Ore'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('encyclopedia-topic-onboarding-help')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Onboarding Help'), findsOneWidget);
+      expect(find.text('Step 1 - Choose your city'), findsOneWidget);
+      expect(find.text('Iron Ore'), findsNothing);
+      expect(find.text('Search'), findsNothing);
+    });
+
+    testWidgets('each of the 5 guide topics shows its title, topics checklist, and cards', (tester) async {
+      final service = FakeEncyclopediaService(entries: [_ironOre]);
+      await _pumpEncyclopedia(tester, service: service);
+
+      const expectations = {
+        'encyclopedia-topic-onboarding-help': 'Onboarding Help',
+        'encyclopedia-topic-factory-layout-help': 'Factory Layout Help',
+        'encyclopedia-topic-sales-shop-help': 'Sales Shop Setup Walkthrough',
+        'encyclopedia-topic-forex-trading-help': 'Forex Trading Walkthrough',
+        'encyclopedia-topic-stock-exchange-help': 'Stock Exchange Walkthrough',
+      };
+
+      for (final entry in expectations.entries) {
+        await tester.tap(find.byKey(Key(entry.key)));
+        await tester.pumpAndSettle();
+        expect(find.text(entry.value), findsOneWidget, reason: entry.key);
+      }
+    });
+
+    testWidgets('switching back to Resources definition restores the catalog', (tester) async {
+      final service = FakeEncyclopediaService(entries: [_ironOre]);
+
+      await _pumpEncyclopedia(tester, service: service);
+      await tester.tap(find.byKey(const Key('encyclopedia-topic-forex-trading-help')));
+      await tester.pumpAndSettle();
+      expect(find.text('Iron Ore'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('encyclopedia-topic-resources-definition')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Iron Ore'), findsOneWidget);
+    });
   });
 
   group('ResourceDetailScreen', () {

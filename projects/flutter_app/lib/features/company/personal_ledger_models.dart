@@ -19,16 +19,65 @@ class PersonalShareholding {
 }
 
 class PersonalDividendPayment {
-  const PersonalDividendPayment({required this.companyName, required this.totalAmount, required this.gameYear});
+  const PersonalDividendPayment({
+    this.id = '',
+    required this.companyName,
+    required this.totalAmount,
+    required this.gameYear,
+    this.recordedAtTick = 0,
+    this.recordedAtUtc = '',
+    this.description,
+  });
 
+  final String id;
   final String companyName;
   final double totalAmount;
   final int gameYear;
+  final int recordedAtTick;
+  final String recordedAtUtc;
+  final String? description;
 
   factory PersonalDividendPayment.fromJson(Map<String, dynamic> json) => PersonalDividendPayment(
+    id: (json['id'] as String?) ?? '',
     companyName: (json['companyName'] as String?) ?? '',
     totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0,
     gameYear: (json['gameYear'] as num?)?.toInt() ?? 0,
+    recordedAtTick: (json['recordedAtTick'] as num?)?.toInt() ?? 0,
+    recordedAtUtc: (json['recordedAtUtc'] as String?) ?? '',
+    description: json['description'] as String?,
+  );
+}
+
+class PersonalInterestPayment {
+  const PersonalInterestPayment({
+    required this.id,
+    required this.companyName,
+    required this.amount,
+    required this.recordedAtTick,
+    required this.recordedAtUtc,
+    required this.currencyCode,
+    this.bankBuildingName,
+    this.description,
+  });
+
+  final String id;
+  final String companyName;
+  final double amount;
+  final int recordedAtTick;
+  final String recordedAtUtc;
+  final String currencyCode;
+  final String? bankBuildingName;
+  final String? description;
+
+  factory PersonalInterestPayment.fromJson(Map<String, dynamic> json) => PersonalInterestPayment(
+    id: json['id'] as String,
+    companyName: (json['companyName'] as String?) ?? '',
+    amount: (json['amount'] as num?)?.toDouble() ?? 0,
+    recordedAtTick: (json['recordedAtTick'] as num?)?.toInt() ?? 0,
+    recordedAtUtc: (json['recordedAtUtc'] as String?) ?? '',
+    currencyCode: (json['currencyCode'] as String?) ?? 'EUR',
+    bankBuildingName: json['bankBuildingName'] as String?,
+    description: json['description'] as String?,
   );
 }
 
@@ -60,6 +109,7 @@ class PersonAccount {
     required this.shareholdings,
     required this.dividendPayments,
     required this.stockTrades,
+    this.interestPayments = const [],
   });
 
   final String displayName;
@@ -70,6 +120,7 @@ class PersonAccount {
   final List<PersonalShareholding> shareholdings;
   final List<PersonalDividendPayment> dividendPayments;
   final List<PersonalStockTrade> stockTrades;
+  final List<PersonalInterestPayment> interestPayments;
 
   factory PersonAccount.fromJson(Map<String, dynamic> json) => PersonAccount(
     displayName: (json['displayName'] as String?) ?? '',
@@ -85,6 +136,9 @@ class PersonAccount {
         .toList(),
     stockTrades: ((json['stockTrades'] as List<dynamic>?) ?? const [])
         .map((e) => PersonalStockTrade.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    interestPayments: ((json['interestPayments'] as List<dynamic>?) ?? const [])
+        .map((e) => PersonalInterestPayment.fromJson(e as Map<String, dynamic>))
         .toList(),
   );
 }

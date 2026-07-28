@@ -1,14 +1,14 @@
 // Ported from `projects/frontend/src/views/ManufacturingEncyclopediaView.vue`
-// and `ResourceDetailView.vue`.
+// and `ResourceDetailView.vue`. The 5 static guide topics (onboarding-help,
+// factory-layout-help, sales-shop-help, forex-trading-help,
+// stock-exchange-help) live in `encyclopedia_guide_data.dart` +
+// `encyclopedia_guide_tab.dart` — kept in separate files to stay under this
+// file's 500-line budget.
 //
 // Deliberately trimmed from the web (documented, not oversights):
-// - Only the GraphQL-backed "resources-definition" catalog tab is ported.
-//   The web's other 5 topic tabs (onboarding-help, factory-layout-help,
-//   sales-shop-help, forex-trading-help, stock-exchange-help) render static
-//   local guide content with clickable fullscreen images from
-//   `encyclopediaGuideData.ts` — no GraphQL, purely illustrative reference
-//   material, not core gameplay. Skipped rather than porting a large static
-//   content data file.
+// - Guide cards are text-only — the web's clickable fullscreen
+//   `/onboarding-help/*.png` etc. screenshots aren't bundled as Flutter
+//   assets.
 // - No `showPro` URL-persisted toggle — the Pro-only filter is local
 //   widget state instead, since this app doesn't persist query params the
 //   way the web router does elsewhere either.
@@ -24,6 +24,8 @@ import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/utils/catalog_image_url.dart';
+import 'encyclopedia_guide_data.dart';
+import 'encyclopedia_guide_tab.dart';
 import 'encyclopedia_models.dart';
 import 'encyclopedia_service.dart';
 
@@ -109,6 +111,11 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
   String _search = '';
   String _kindFilter = 'ALL';
 
+  /// One of `encyclopediaGuideTopics`' slugs, or `'resources-definition'`
+  /// for the GraphQL-backed catalog tab — mirrors `selectedTopic` in
+  /// `ManufacturingEncyclopediaView.vue`, minus the URL persistence.
+  String _selectedTopic = 'resources-definition';
+
   @override
   void initState() {
     super.initState();
@@ -147,23 +154,51 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
     }).toList();
   }
 
-  @override
-  Widget build(BuildContext context) {
+  static const _topicNavEntries = [
+    ...encyclopediaGuideTopics,
+    // A bare 'Resources definition' entry, matching `topicMenu`'s trailing
+    // slot in `ManufacturingEncyclopediaView.vue` — deliberately not an
+    // `EncyclopediaGuideTopic` since it's GraphQL-backed, not static.
+  ];
+
+  Widget _buildTopicNav() {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final topic in _topicNavEntries)
+          ChoiceChip(
+            key: ValueKey('encyclopedia-topic-${topic.slug}'),
+            label: Text(topic.navLabel),
+            selected: _selectedTopic == topic.slug,
+            onSelected: (_) => setState(() => _selectedTopic = topic.slug),
+          ),
+        ChoiceChip(
+          key: const ValueKey('encyclopedia-topic-resources-definition'),
+          label: const Text('Resources definition'),
+          selected: _selectedTopic == 'resources-definition',
+          onSelected: (_) => setState(() => _selectedTopic = 'resources-definition'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildResourcesTab() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 48),
+        child: Center(child: CircularProgressIndicator()),
+      );
     }
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(_error!),
-              const SizedBox(height: 12),
-              OutlinedButton(onPressed: _load, child: const Text('Try again')),
-            ],
-          ),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Column(
+          children: [
+            Text(_error!),
+            const SizedBox(height: 12),
+            OutlinedButton(onPressed: _load, child: const Text('Try again')),
+          ],
         ),
       );
     }
@@ -172,11 +207,9 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
     final productCount = _entries.where((e) => e.kind == 'PRODUCT').length;
     final filtered = _filtered;
 
-    return ListView(
-      padding: const EdgeInsets.all(24),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Manufacturing Encyclopedia', style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 4),
         Text('$resourceCount resources · $productCount products', style: Theme.of(context).textTheme.bodyMedium),
         const SizedBox(height: 16),
         TextField(
@@ -207,6 +240,28 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
                 onTap: () => context.go('/encyclopedia/resource/${entry.slug}'),
               ),
             ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    EncyclopediaGuideTopic? guideTopic;
+    for (final topic in encyclopediaGuideTopics) {
+      if (topic.slug == _selectedTopic) {
+        guideTopic = topic;
+        break;
+      }
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        Text('Manufacturing Encyclopedia', style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 16),
+        _buildTopicNav(),
+        const SizedBox(height: 20),
+        if (guideTopic != null) EncyclopediaGuideTab(topic: guideTopic) else _buildResourcesTab(),
       ],
     );
   }

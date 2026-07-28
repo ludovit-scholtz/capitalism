@@ -52,10 +52,20 @@ class FakeBuildingMarketService implements BuildingMarketService {
   }
 
   @override
-  Future<void> makeOffer({required String buildingId, required String buyerCompanyId, required double offeredPrice}) async {
+  Future<void> makeOffer({
+    required String buildingId,
+    required String buyerCompanyId,
+    required double offeredPrice,
+    String? negotiationNote,
+  }) async {
     calls.add('makeOffer');
     if (actionError != null) throw actionError!;
-    lastOfferArgs = {'buildingId': buildingId, 'buyerCompanyId': buyerCompanyId, 'offeredPrice': offeredPrice};
+    lastOfferArgs = {
+      'buildingId': buildingId,
+      'buyerCompanyId': buyerCompanyId,
+      'offeredPrice': offeredPrice,
+      'negotiationNote': negotiationNote,
+    };
   }
 
   @override

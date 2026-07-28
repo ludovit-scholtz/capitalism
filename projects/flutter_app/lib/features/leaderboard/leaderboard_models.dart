@@ -258,6 +258,32 @@ class PlayerBadge {
   );
 }
 
+/// One active login session, returned by the game API's `/auth/sessions`
+/// REST endpoint (not GraphQL — see `Api/Program.cs`).
+class PlayerSession {
+  const PlayerSession({
+    required this.jti,
+    required this.device,
+    required this.ipAddress,
+    required this.lastSeenAtUtc,
+    required this.isCurrent,
+  });
+
+  final String jti;
+  final String device;
+  final String ipAddress;
+  final String lastSeenAtUtc;
+  final bool isCurrent;
+
+  factory PlayerSession.fromJson(Map<String, dynamic> json) => PlayerSession(
+    jti: (json['jti'] as String?) ?? '',
+    device: (json['device'] as String?) ?? 'Unknown device',
+    ipAddress: (json['ipAddress'] as String?) ?? '—',
+    lastSeenAtUtc: (json['lastSeenAtUtc'] as String?) ?? '',
+    isCurrent: json['isCurrent'] as bool? ?? false,
+  );
+}
+
 class PlayerRankSnapshot {
   const PlayerRankSnapshot({
     required this.snapshotTick,

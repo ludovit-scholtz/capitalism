@@ -1,9 +1,13 @@
-// Ported from `projects/frontend/src/views/PersonalLedgerView.vue`.
-// Deliberately trimmed: no endgame race progress bar/leaderboard or
-// milestone toast notifications (tied to a separate `endgameStore`), and
-// no interest-payments history table with its ALL/INTEREST/DIVIDEND
-// filter — the core wealth summary, shareholdings, dividends, and stock
-// trades are real and GraphQL-backed.
+// Ported from `projects/frontend/src/views/PersonalLedgerView.vue`: the
+// core wealth summary, shareholdings, dividends, and stock trades; the
+// "Race to the Top" endgame benchmark card (`personal_ledger_race_card.dart`,
+// fed by `LeaderboardService.fetchEndgameStatus()` — reused rather than
+// duplicated, matching the web's separate `endgameStore`); milestone toast
+// notifications (shown via `SnackBar`, the natural Flutter analogue of the
+// web's toast, when net worth crosses 1/10/25/50/75/90% of the winning
+// threshold — tracked per-session in `_triggeredMilestones`, mirroring
+// `endgameStore.checkMilestones`); and the passive-income history panel
+// with its ALL/INTEREST/DIVIDEND filter (`personal_ledger_income_panel.dart`).
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -11,16 +15,37 @@ import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import '../leaderboard/leaderboard_models.dart';
+import '../leaderboard/leaderboard_service.dart';
+import 'personal_ledger_income_panel.dart';
 import 'personal_ledger_models.dart';
+import 'personal_ledger_race_card.dart';
 import 'personal_ledger_service.dart';
 
+/// Fraction of the winning threshold → toast message, ported from
+/// `MILESTONE_TOAST_KEYS` in `PersonalLedgerView.vue`.
+final _milestoneToasts = <double, String>{
+  0.01: "🎉 You've reached 1% of the winning threshold!",
+  0.1: "🔥 You've crossed 10% of the winning threshold!",
+  0.25: "🚀 You're 25% of the way to victory!",
+  0.5: '⚡ Halfway there — 50% of the benchmark reached!',
+  0.75: "💪 75% of the winning threshold — you're in striking range!",
+  0.9: '🏁 90% reached — the finish line is in sight!',
+};
+
 class PersonalLedgerScreen extends StatefulWidget {
-  const PersonalLedgerScreen({super.key, GraphQlService? graphQlService, PersonalLedgerService? personalLedgerService})
-    : _injectedGraphQlService = graphQlService,
-      _injectedPersonalLedgerService = personalLedgerService;
+  const PersonalLedgerScreen({
+    super.key,
+    GraphQlService? graphQlService,
+    PersonalLedgerService? personalLedgerService,
+    LeaderboardService? leaderboardService,
+  }) : _injectedGraphQlService = graphQlService,
+       _injectedPersonalLedgerService = personalLedgerService,
+       _injectedLeaderboardService = leaderboardService;
 
   final GraphQlService? _injectedGraphQlService;
   final PersonalLedgerService? _injectedPersonalLedgerService;
+  final LeaderboardService? _injectedLeaderboardService;
 
   @override
   State<PersonalLedgerScreen> createState() => _PersonalLedgerScreenState();
@@ -28,11 +53,14 @@ class PersonalLedgerScreen extends StatefulWidget {
 
 class _PersonalLedgerScreenState extends State<PersonalLedgerScreen> {
   late final PersonalLedgerService _service;
+  late final LeaderboardService _leaderboardService;
   late final bool _isAuthenticated;
 
   bool _loading = true;
   String? _error;
   PersonAccount? _account;
+  EndgameStatus? _endgame;
+  final Set<double> _triggeredMilestones = {};
 
   @override
   void initState() {
@@ -41,6 +69,7 @@ class _PersonalLedgerScreenState extends State<PersonalLedgerScreen> {
     _isAuthenticated = auth.isAuthenticated;
     final graphQlService = widget._injectedGraphQlService ?? GraphQlService(auth);
     _service = widget._injectedPersonalLedgerService ?? PersonalLedgerService(graphQlService);
+    _leaderboardService = widget._injectedLeaderboardService ?? LeaderboardService(graphQlService);
     if (_isAuthenticated) {
       _load();
     } else {
@@ -54,18 +83,32 @@ class _PersonalLedgerScreenState extends State<PersonalLedgerScreen> {
       _error = null;
     });
     try {
-      final account = await _service.fetchPersonAccount();
+      final results = await Future.wait([_service.fetchPersonAccount(), _leaderboardService.fetchEndgameStatus()]);
       if (!mounted) return;
+      final account = results[0] as PersonAccount?;
+      final endgame = results[1] as EndgameStatus?;
       setState(() {
         _account = account;
+        _endgame = endgame;
         _loading = false;
       });
+      if (account != null && endgame != null) _checkMilestones(account.totalNetWealth, endgame.winningThresholdUsd);
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _error = 'Could not load your personal ledger. Please try again.';
         _loading = false;
       });
+    }
+  }
+
+  void _checkMilestones(double netWorthUsd, double thresholdUsd) {
+    if (thresholdUsd <= 0) return;
+    final ratio = netWorthUsd / thresholdUsd;
+    for (final milestone in _milestoneToasts.keys) {
+      if (ratio >= milestone && _triggeredMilestones.add(milestone)) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_milestoneToasts[milestone]!)));
+      }
     }
   }
 
@@ -149,6 +192,12 @@ class _PersonalLedgerScreenState extends State<PersonalLedgerScreen> {
                 title: Text('${trade.direction} ${trade.companyName}'),
                 trailing: Text('${trade.shareCount.toStringAsFixed(0)} @ ${trade.totalValue.toStringAsFixed(2)}'),
               ),
+          if (_endgame != null) ...[
+            const SizedBox(height: 16),
+            PersonalLedgerRaceCard(endgame: _endgame!, playerNetWorthUsd: account.totalNetWealth),
+          ],
+          const SizedBox(height: 16),
+          PersonalLedgerIncomePanel(dividendPayments: account.dividendPayments, interestPayments: account.interestPayments),
         ],
       ),
     );

@@ -29,6 +29,8 @@ const _dashboard = GameAdminDashboard(
   players: [_player],
 );
 
+const _npc = NpcCompanySummary(id: 'npc-1', name: 'Acme NPC', archetype: 'CONGLOMERATE', difficultyLevel: 2, homeCityName: 'Metropolis', isActive: true, buildingCount: 3);
+
 const _statistics = OperationsStatistics(
   totalInflow: 10000,
   totalOutflow: 8000,
@@ -77,6 +79,55 @@ void main() {
       expect(find.text('Administrators only.'), findsOneWidget);
       expect(service.calls.contains('fetchDashboard'), isFalse);
     });
+
+    testWidgets('shows an impersonation banner and can stop impersonating', (tester) async {
+      final service = FakeOperationsService(
+        dashboard: _dashboard,
+        isImpersonating: true,
+        adminActorDisplayName: 'AdminUser',
+        effectivePlayerDisplayName: 'Alice',
+      );
+
+      await _pump(tester, OperationsOverviewScreen(operationsService: service));
+
+      expect(find.textContaining('Impersonating Alice'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('stop-impersonating-button')));
+      await tester.pumpAndSettle();
+
+      expect(service.calls.contains('stopImpersonation'), isTrue);
+    });
+
+    testWidgets('shows NPC companies and can pause/resume them', (tester) async {
+      final service = FakeOperationsService(dashboard: _dashboard, npcCompanies: const [_npc]);
+
+      await _pump(tester, OperationsOverviewScreen(operationsService: service));
+
+      expect(find.text('Acme NPC'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Pause'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Pause'));
+      await tester.pumpAndSettle();
+
+      expect(service.lastPausedNpcId, 'npc-1');
+    });
+
+    testWidgets('end shard requires confirmation before calling the mutation', (tester) async {
+      final service = FakeOperationsService(dashboard: _dashboard);
+
+      await _pump(tester, OperationsOverviewScreen(operationsService: service));
+
+      await tester.tap(find.byKey(const ValueKey('end-shard-button')));
+      await tester.pumpAndSettle();
+
+      expect(service.calls.contains('endShardManually'), isFalse);
+
+      await tester.enterText(find.byKey(const ValueKey('end-shard-reason-field')), 'Testing');
+      await tester.tap(find.byKey(const ValueKey('end-shard-confirm-button')));
+      await tester.pumpAndSettle();
+
+      expect(service.lastEndShardReason, 'Testing');
+    });
   });
 
   group('OperationsMoneyFlowScreen', () {
@@ -108,6 +159,41 @@ void main() {
 
       expect(find.text('New Feature'), findsOneWidget);
       expect(find.text('DRAFT'), findsOneWidget);
+    });
+
+    testWidgets('composing a new entry calls upsertGameNewsEntry with the entered title', (tester) async {
+      final service = FakeOperationsService(newsFeed: const [_newsEntry]);
+
+      await _pump(tester, OperationsNewsScreen(operationsService: service));
+
+      await tester.tap(find.byKey(const ValueKey('new-news-entry-button')));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byKey(const ValueKey('news-title-en')), 'Big Announcement');
+      await tester.tap(find.byKey(const ValueKey('save-news-entry-button')));
+      await tester.pumpAndSettle();
+
+      expect(service.lastNewsEntry?['entryId'], isNull);
+      final localizations = service.lastNewsEntry?['localizations'] as List<Map<String, String>>?;
+      expect(localizations?.first['title'], 'Big Announcement');
+    });
+
+    testWidgets('tapping an existing entry pre-fills the editor for updating', (tester) async {
+      final service = FakeOperationsService(newsFeed: const [_newsEntry]);
+
+      await _pump(tester, OperationsNewsScreen(operationsService: service));
+
+      await tester.tap(find.text('New Feature'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit news entry'), findsOneWidget);
+      final titleField = tester.widget<TextField>(find.byKey(const ValueKey('news-title-en')));
+      expect(titleField.controller?.text, 'New Feature');
+
+      await tester.tap(find.byKey(const ValueKey('save-news-entry-button')));
+      await tester.pumpAndSettle();
+
+      expect(service.lastNewsEntry?['entryId'], 'news-1');
     });
   });
 
@@ -141,6 +227,61 @@ void main() {
       await _pump(tester, OperationsPlayerDetailScreen(playerId: 'unknown', operationsService: service));
 
       expect(find.text('Player not found.'), findsOneWidget);
+    });
+
+    testWidgets('hides root-administrator actions for a non-root admin', (tester) async {
+      final service = FakeOperationsService(dashboard: _dashboard);
+
+      await _pump(tester, OperationsPlayerDetailScreen(playerId: 'player-1', operationsService: service));
+
+      expect(find.byKey(const ValueKey('impersonate-button')), findsOneWidget);
+      expect(find.byKey(const ValueKey('invisible-in-chat-switch')), findsOneWidget);
+      expect(find.byKey(const ValueKey('local-admin-switch')), findsNothing);
+      expect(find.byKey(const ValueKey('grant-global-admin-button')), findsNothing);
+    });
+
+    testWidgets('impersonating a player applies the returned token', (tester) async {
+      final service = FakeOperationsService(dashboard: _dashboard, impersonationToken: 'impersonation-token');
+
+      await _pump(tester, OperationsPlayerDetailScreen(playerId: 'player-1', operationsService: service));
+
+      await tester.tap(find.byKey(const ValueKey('impersonate-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Impersonate'));
+      await tester.pumpAndSettle();
+
+      expect(service.calls.contains('startImpersonation'), isTrue);
+    });
+
+    testWidgets('toggling chat visibility calls setPlayerInvisibleInChat', (tester) async {
+      final service = FakeOperationsService(dashboard: _dashboard);
+
+      await _pump(tester, OperationsPlayerDetailScreen(playerId: 'player-1', operationsService: service));
+
+      await tester.tap(find.byKey(const ValueKey('invisible-in-chat-switch')));
+      await tester.pumpAndSettle();
+
+      expect(service.lastInvisibleInChatArgs, {'playerId': 'player-1', 'isInvisible': true});
+    });
+
+    testWidgets('root administrators see and can use admin-role actions', (tester) async {
+      final service = FakeOperationsService(dashboard: _dashboard, isRootAdministrator: true);
+
+      await _pump(tester, OperationsPlayerDetailScreen(playerId: 'player-1', operationsService: service));
+
+      expect(find.byKey(const ValueKey('local-admin-switch')), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('local-admin-switch')));
+      await tester.pumpAndSettle();
+      expect(service.lastLocalAdminArgs, {'playerId': 'player-1', 'isAdmin': true});
+
+      await tester.tap(find.byKey(const ValueKey('grant-global-admin-button')));
+      await tester.pumpAndSettle();
+      expect(service.lastGrantedGlobalAdminEmail, 'alice@example.com');
+
+      await tester.tap(find.byKey(const ValueKey('revoke-global-admin-button')));
+      await tester.pumpAndSettle();
+      expect(service.lastRevokedGlobalAdminEmail, 'alice@example.com');
     });
   });
 }

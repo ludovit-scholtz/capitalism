@@ -93,11 +93,21 @@ class BuildingMarketService {
         .toList();
   }
 
-  Future<void> makeOffer({required String buildingId, required String buyerCompanyId, required double offeredPrice}) {
+  Future<void> makeOffer({
+    required String buildingId,
+    required String buyerCompanyId,
+    required double offeredPrice,
+    String? negotiationNote,
+  }) {
     return _graphQlService.request(
       _makeOfferMutation,
       variables: {
-        'input': {'buildingId': buildingId, 'buyerCompanyId': buyerCompanyId, 'offeredPrice': offeredPrice},
+        'input': {
+          'buildingId': buildingId,
+          'buyerCompanyId': buyerCompanyId,
+          'offeredPrice': offeredPrice,
+          'negotiationNote': negotiationNote,
+        },
       },
     );
   }

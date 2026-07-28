@@ -1,16 +1,19 @@
 // Ported from `projects/frontend/src/views/MarketIntelligenceView.vue`,
-// `MarketDashboardView.vue`, `EnergyMarketView.vue`, `GlobalEventsPanel.vue`,
-// and `MarketingAnalyticsView.vue`.
+// `EnergyMarketView.vue`, `GlobalEventsPanel.vue`, and
+// `MarketingAnalyticsView.vue`.
 //
-// Deliberately trimmed (documented per-screen below): Market Dashboard
-// skips the price-history chart panel (list instead, no charting
-// dependency); Energy Market fetches all cities' listings in parallel and
-// filters client-side instead of the web's per-city N+1 query loop — same
-// data, better mobile network behavior; Global Events' admin "Trigger
-// Event" button is a non-functional stub even on the web, so it's not
-// ported at all; Marketing Analytics shows the raw per-unit rows table
-// without `MarketingAnalyticsContent.vue`'s trend/recommendation badge
-// styling.
+// Market Dashboard (`MarketDashboardView.vue`) lives in its own
+// `market_dashboard_screen.dart` — large enough (plus its price-history
+// panel) to warrant the same dedicated-file treatment as other split
+// screens.
+//
+// Deliberately trimmed (documented per-screen below): Energy Market
+// fetches all cities' listings in parallel and filters client-side instead
+// of the web's per-city N+1 query loop — same data, better mobile network
+// behavior; Global Events' admin "Trigger Event" button is a
+// non-functional stub even on the web, so it's not ported at all;
+// Marketing Analytics shows the raw per-unit rows table without
+// `MarketingAnalyticsContent.vue`'s trend/recommendation badge styling.
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -19,6 +22,9 @@ import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
 import 'market_models.dart';
 import 'market_service.dart';
+
+export 'market_dashboard_screen.dart' show MarketDashboardScreen;
+export 'marketing_analytics_screen.dart' show MarketingAnalyticsScreen;
 
 class MarketIntelligenceScreen extends StatefulWidget {
   const MarketIntelligenceScreen({super.key, GraphQlService? graphQlService, MarketService? marketService})
@@ -130,157 +136,6 @@ class _MarketIntelligenceScreenState extends State<MarketIntelligenceScreen> {
                       ),
                   ],
                 ),
-              ),
-            ),
-      ],
-    );
-  }
-}
-
-class MarketDashboardScreen extends StatefulWidget {
-  const MarketDashboardScreen({super.key, GraphQlService? graphQlService, MarketService? marketService})
-    : _injectedGraphQlService = graphQlService,
-      _injectedMarketService = marketService;
-
-  final GraphQlService? _injectedGraphQlService;
-  final MarketService? _injectedMarketService;
-
-  @override
-  State<MarketDashboardScreen> createState() => _MarketDashboardScreenState();
-}
-
-class _MarketDashboardScreenState extends State<MarketDashboardScreen> {
-  late final MarketService _service;
-
-  bool _loading = true;
-  String? _error;
-  List<Map<String, String>> _cities = const [];
-  String? _cityId;
-  MarketOverview? _overview;
-  String? _selectedProductId;
-  List<CompetitorQuality> _competitors = const [];
-
-  @override
-  void initState() {
-    super.initState();
-    final auth = context.read<AuthState>();
-    final graphQlService = widget._injectedGraphQlService ?? GraphQlService(auth);
-    _service = widget._injectedMarketService ?? MarketService(graphQlService);
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final cities = await _service.fetchCities();
-      if (!mounted) return;
-      final cityId = _cityId ?? (cities.isNotEmpty ? cities.first['id'] : null);
-      MarketOverview? overview;
-      if (cityId != null) overview = await _service.fetchMarketOverview(cityId);
-      if (!mounted) return;
-      setState(() {
-        _cities = cities;
-        _cityId = cityId;
-        _overview = overview;
-        _loading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _error = 'Could not load the market dashboard. Please try again.';
-        _loading = false;
-      });
-    }
-  }
-
-  Future<void> _selectProduct(MarketOverviewProduct product) async {
-    if (_selectedProductId == product.productTypeId) {
-      setState(() {
-        _selectedProductId = null;
-        _competitors = const [];
-      });
-      return;
-    }
-    setState(() => _selectedProductId = product.productTypeId);
-    try {
-      final competitors = await _service.fetchCompetitorIntelligence(cityId: _cityId!, productTypeId: product.productTypeId);
-      if (mounted) setState(() => _competitors = competitors);
-    } catch (_) {
-      // Keep the row selected without competitor detail on failure.
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
-    if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [Text(_error!), const SizedBox(height: 12), OutlinedButton(onPressed: _load, child: const Text('Try again'))],
-          ),
-        ),
-      );
-    }
-
-    final overview = _overview;
-    final theme = Theme.of(context);
-
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        Text('Market Dashboard', style: theme.textTheme.headlineSmall),
-        const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
-          initialValue: _cityId,
-          decoration: const InputDecoration(labelText: 'City'),
-          items: [for (final city in _cities) DropdownMenuItem(value: city['id'], child: Text(city['name']!))],
-          onChanged: (value) {
-            setState(() {
-              _cityId = value;
-              _selectedProductId = null;
-            });
-            _load();
-          },
-        ),
-        const SizedBox(height: 16),
-        if (overview == null || overview.products.isEmpty)
-          const Text('No market activity recorded for this city yet.')
-        else
-          for (final product in overview.products)
-            Card(
-              key: ValueKey('market-product-${product.productTypeId}'),
-              margin: const EdgeInsets.only(bottom: 8),
-              child: Column(
-                children: [
-                  ListTile(
-                    title: Text(product.productName),
-                    subtitle: Text('Sold ${product.totalQuantitySold.toStringAsFixed(0)} of ${product.totalDemand.toStringAsFixed(0)} demanded (${(product.satisfactionRate * 100).toStringAsFixed(0)}%)'),
-                    trailing: Text(product.averageClearingPrice.toStringAsFixed(2)),
-                    onTap: () => _selectProduct(product),
-                  ),
-                  if (_selectedProductId == product.productTypeId)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (_competitors.isEmpty)
-                            const Text('No competitor data.')
-                          else
-                            for (final competitor in _competitors)
-                              Text(
-                                '${competitor.companyName}${competitor.isOwnCompany ? ' (you)' : ''} — quality ${(competitor.qualityLevel * 100).toStringAsFixed(0)}%, ${competitor.pricePremiumPct >= 0 ? '+' : ''}${competitor.pricePremiumPct.toStringAsFixed(1)}% price',
-                              ),
-                        ],
-                      ),
-                    ),
-                ],
               ),
             ),
       ],
@@ -562,126 +417,3 @@ class _GlobalEventsScreenState extends State<GlobalEventsScreen> {
   }
 }
 
-class MarketingAnalyticsScreen extends StatefulWidget {
-  const MarketingAnalyticsScreen({super.key, GraphQlService? graphQlService, MarketService? marketService})
-    : _injectedGraphQlService = graphQlService,
-      _injectedMarketService = marketService;
-
-  final GraphQlService? _injectedGraphQlService;
-  final MarketService? _injectedMarketService;
-
-  @override
-  State<MarketingAnalyticsScreen> createState() => _MarketingAnalyticsScreenState();
-}
-
-class _MarketingAnalyticsScreenState extends State<MarketingAnalyticsScreen> {
-  late final MarketService _service;
-
-  bool _loading = true;
-  String? _error;
-  List<Map<String, String>> _companies = const [];
-  String? _companyId;
-  CampaignAnalytics? _analytics;
-
-  @override
-  void initState() {
-    super.initState();
-    final auth = context.read<AuthState>();
-    final graphQlService = widget._injectedGraphQlService ?? GraphQlService(auth);
-    _service = widget._injectedMarketService ?? MarketService(graphQlService);
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final companies = await _service.fetchMyCompanies();
-      if (!mounted) return;
-      final companyId = _companyId ?? (companies.isNotEmpty ? companies.first['id'] : null);
-      CampaignAnalytics? analytics;
-      if (companyId != null) analytics = await _service.fetchCampaignAnalytics(companyId);
-      if (!mounted) return;
-      setState(() {
-        _companies = companies;
-        _companyId = companyId;
-        _analytics = analytics;
-        _loading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _error = 'Could not load marketing analytics. Please try again.';
-        _loading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
-    if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [Text(_error!), const SizedBox(height: 12), OutlinedButton(onPressed: _load, child: const Text('Try again'))],
-          ),
-        ),
-      );
-    }
-
-    final analytics = _analytics;
-    final theme = Theme.of(context);
-
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        Text('Marketing Analytics', style: theme.textTheme.headlineSmall),
-        if (_companies.length > 1) ...[
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            initialValue: _companyId,
-            decoration: const InputDecoration(labelText: 'Company'),
-            items: [for (final company in _companies) DropdownMenuItem(value: company['id'], child: Text(company['name']!))],
-            onChanged: (value) {
-              setState(() => _companyId = value);
-              _load();
-            },
-          ),
-        ],
-        const SizedBox(height: 16),
-        if (analytics == null)
-          const Text('No campaign data available.')
-        else ...[
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Revenue: ${analytics.totalRevenue.toStringAsFixed(0)} · Marketing spend: ${analytics.totalMarketingSpend.toStringAsFixed(0)}'),
-                  if (analytics.bestPerformingProduct != null) Text('Top product: ${analytics.bestPerformingProduct}'),
-                  if (analytics.globalRecommendation != null) Text(analytics.globalRecommendation!),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          for (final row in analytics.rows)
-            Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                title: Text('${row.productName} · ${row.buildingName}'),
-                subtitle: Text('${row.cityName} · awareness ${(row.brandAwareness * 100).toStringAsFixed(0)}% · quality ${(row.brandQuality * 100).toStringAsFixed(0)}%'),
-                trailing: Text(row.revenueLastTicks.toStringAsFixed(0)),
-              ),
-            ),
-        ],
-      ],
-    );
-  }
-}

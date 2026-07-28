@@ -16,7 +16,9 @@ const _account = PlayerBankAccount(
   accountNumber: '001',
   currencyCode: 'EUR',
   balance: 5000,
+  companyId: 'company-1',
   companyName: 'Acme Corp',
+  ownerType: 'COMPANY',
   bankBuildingId: 'bank-1',
   isDepositAccount: false,
 );

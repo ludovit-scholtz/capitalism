@@ -47,7 +47,7 @@ const _powerPlantAnalyticsQuery = r'''
 
 const _cityPowerBalanceQuery = r'''
   query CityPowerBalance($cityId: UUID!) {
-    cityPowerBalance(cityId: $cityId) { totalSupplyMw totalDemandMw reserveMw reservePercent status }
+    cityPowerBalance(cityId: $cityId) { totalSupplyMw totalDemandMw reserveMw reservePercent status powerPlantCount }
   }
 ''';
 
@@ -85,6 +85,7 @@ const _cityMediaHousesQuery = r'''
   query CityMediaHouses($cityId: UUID!) {
     cityMediaHouses(cityId: $cityId) {
       id name mediaType ownerCompanyName contentRanking isGovernmentOwned
+      effectivenessMultiplier powerStatus isUnderConstruction
     }
   }
 ''';

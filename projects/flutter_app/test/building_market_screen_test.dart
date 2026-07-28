@@ -1,6 +1,7 @@
 import 'package:capitalism_app/core/auth/auth_state.dart';
 import 'package:capitalism_app/core/context/account_context_models.dart';
 import 'package:capitalism_app/core/context/account_context_state.dart';
+import 'package:capitalism_app/core/graphql/graphql_service.dart';
 import 'package:capitalism_app/core/theme/app_icons.dart';
 import 'package:capitalism_app/features/buildings/building_market_models.dart';
 import 'package:capitalism_app/features/buildings/building_market_screen.dart';
@@ -34,6 +35,7 @@ const _pendingOffer = BuildingOffer(
   status: 'PENDING',
   buyerCompanyName: 'Buyer Co',
   buyerDisplayName: 'Carol',
+  negotiationNote: 'Willing to close quickly.',
 );
 
 const _myListing = MyBuildingListing(building: _forSaleBuilding, offers: [_pendingOffer]);
@@ -150,6 +152,55 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(service.acceptedOfferIds, ['offer-1']);
+    });
+
+    testWidgets('My Listings tab shows the offer\'s negotiation note', (tester) async {
+      final service = FakeBuildingMarketService(myListings: [_myListing]);
+
+      await _pumpMarket(tester, service: service);
+      await tester.tap(find.widgetWithText(ChoiceChip, 'My Listings'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Willing to close quickly.'), findsOneWidget);
+    });
+
+    testWidgets('Make Offer dialog sends the entered negotiation note', (tester) async {
+      final service = FakeBuildingMarketService(
+        market: [_forSaleBuilding],
+        myCompanies: const [
+          {'id': 'company-1', 'name': 'My Company'},
+        ],
+      );
+
+      await _pumpMarket(tester, service: service);
+      await tester.tap(find.text('Downtown Factory'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.widgetWithText(TextField, 'Note to seller (optional)'), 'Please respond soon.');
+      await tester.tap(find.widgetWithText(FilledButton, 'Send offer'));
+      await tester.pumpAndSettle();
+
+      expect(service.lastOfferArgs?['negotiationNote'], 'Please respond soon.');
+    });
+
+    testWidgets('OFFER_VERSION_CONFLICT on accept shows a refreshing snackbar and reloads both tabs', (tester) async {
+      final service = FakeBuildingMarketService(
+        market: [_forSaleBuilding],
+        myListings: [_myListing],
+        actionError: GraphQlException('Offer version conflict', 'OFFER_VERSION_CONFLICT'),
+      );
+
+      await _pumpMarket(tester, service: service);
+      await tester.tap(find.widgetWithText(ChoiceChip, 'My Listings'));
+      await tester.pumpAndSettle();
+      service.calls.clear();
+
+      await tester.tap(find.byIcon(AppIcons.check.data));
+      await tester.pumpAndSettle();
+
+      expect(find.text('This offer changed — refreshing…'), findsOneWidget);
+      expect(service.calls, containsAll(['acceptOffer', 'fetchMyListings', 'fetchMarket']));
+      expect(service.acceptedOfferIds, isEmpty);
     });
   });
 }

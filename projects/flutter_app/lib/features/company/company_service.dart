@@ -1,19 +1,6 @@
 import '../../core/graphql/graphql_service.dart';
 import 'company_models.dart';
 
-const _ledgerQuery = r'''
-  query GetCompanyLedger($companyId: UUID!, $gameYear: Int) {
-    companyLedger(companyId: $companyId, gameYear: $gameYear) {
-      companyId companyName gameYear isCurrentGameYear currentCash primaryCurrencyCode
-      totalRevenue totalPurchasingCosts totalShippingCosts totalLaborCosts totalEnergyCosts
-      totalMarketingCosts totalTaxPaid totalOtherCosts netIncome totalAssets
-    }
-    companyCityFinancialBreakdown(companyId: $companyId, gameYear: $gameYear) {
-      cityId cityName currencyCode revenue costs profit
-    }
-  }
-''';
-
 const _companyContractsQuery = r'''
   query CompanyContracts($companyId: UUID!) {
     companyContracts(companyId: $companyId) {
@@ -70,25 +57,13 @@ const _brandQualityQuery = r'''
   }
 ''';
 
-/// GraphQL calls for the Ledger, Company Contracts, Company Settings, and
-/// Company Research screens. Ledger is deliberately trimmed — see
-/// `ledger_screen.dart`'s top-of-file comment — the web's
-/// `LedgerMainContent.vue` (1002 lines) adds drill-down rows, cross-city
-/// shipment tracking, city-unlock progress, and multi-year history that
-/// aren't ported here.
+/// GraphQL calls for the Company Contracts, Company Settings, and Company
+/// Research screens. The Ledger screen has its own `LedgerService`
+/// (`ledger_service.dart`) since its query is much larger.
 class CompanyService {
   const CompanyService(this._graphQlService);
 
   final GraphQlService _graphQlService;
-
-  Future<(CompanyLedger, List<CityFinancialBreakdown>)> fetchLedger(String companyId, {int? gameYear}) async {
-    final result = await _graphQlService.request(_ledgerQuery, variables: {'companyId': companyId, 'gameYear': gameYear});
-    final ledger = CompanyLedger.fromJson(result['companyLedger'] as Map<String, dynamic>);
-    final breakdown = (result['companyCityFinancialBreakdown'] as List<dynamic>? ?? const [])
-        .map((e) => CityFinancialBreakdown.fromJson(e as Map<String, dynamic>))
-        .toList();
-    return (ledger, breakdown);
-  }
 
   Future<(List<CompanyContractCard>, List<ContractBid>)> fetchCompanyContracts(String companyId) async {
     final result = await _graphQlService.request(_companyContractsQuery, variables: {'companyId': companyId});

@@ -1,22 +1,23 @@
-// Ported from `projects/frontend/src/views/LeaderboardView.vue` and
-// `PlayerProfileView.vue` (+ `components/profile/PlayerProfileTabsContent.vue`).
+// Ported from `projects/frontend/src/views/LeaderboardView.vue`.
 //
-// Deliberately trimmed from the web (all documented, not oversights):
-// - No "active player" highlighting / "You" badge on leaderboard rows — the
-//   web compares against `auth.player.id`, but `AuthState` here only stores
-//   the bearer token, not the decoded player id (nothing else needed it yet).
-// - No external "View master ranking" link and no page-query-param
-//   persistence (`?tab=&page=`) — mobile navigation doesn't share URLs the
-//   same way.
-// - Player Profile: bio/display-name editing and the session-security panel
-//   (list active sessions, log out all devices) are read-only-profile web
-//   features that write via the Master API and REST session endpoints — not
-//   ported; this screen only ever renders someone else's or your own public
-//   profile, matching the "view" half of the web screen.
-// - Rank History tab renders the same snapshot data as a simple list instead
-//   of `RankHistoryChart.vue`'s SVG chart (no charting dependency added).
-// - CSV/PDF stats export (`exportCsv`/`exportPdf`) isn't ported — desktop
-//   file-download/print flows with no direct mobile equivalent.
+// Player Profile (`PlayerProfileView.vue` +
+// `components/profile/PlayerProfileTabsContent.vue`) lives in its own
+// `player_profile_screen.dart` — large enough (plus bio/display-name
+// editing and the session-security panel) to warrant the same
+// dedicated-file treatment as other split screens.
+//
+// The signed-in player's own row is now highlighted (background tint +
+// "You" chip, matching the web's `isActivePlayer` styling) — the player id
+// comes from `PlayerProfileService.fetchMyPlayerId()` (`me { id }`, reused
+// from the Player Profile screen rather than duplicating the query).
+//
+// Tab and page are persisted to the URL (`?tab=&page=`, 1-indexed to match
+// the web) via `context.go` on every change, and read back via the
+// `initialTab`/`initialPage` constructor params the router passes from
+// `state.uri.queryParameters` — matching `LeaderboardView.vue`'s
+// `getInitialTab`/`parsePageQuery`, including auto-jumping to the page
+// containing the player's own rank when no explicit `page` param is given
+// (`calculateRankPage`). Trimmed: no external "View master ranking" link.
 
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -25,29 +26,38 @@ import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
-import '../../core/i18n/locale_state.dart';
 import '../../core/theme/app_icons.dart';
-import '../../core/utils/app_number_format.dart';
-import '../../core/widgets/game_tick_time.dart';
+import 'leaderboard_format.dart';
 import 'leaderboard_models.dart';
 import 'leaderboard_service.dart';
+import 'player_profile_service.dart';
 
-/// Locale-aware compact USD wealth display — mirrors `formatCompactMoney` on
-/// the web. Threaded through `context` (rather than a plain `languageCode`
-/// param) since every call site already has one available in its own
-/// `build`.
-String _formatCompact(BuildContext context, double value) =>
-    AppNumberFormat.compactMoney(value, languageCode: context.watch<LocaleState>().languageCode);
+export 'leaderboard_format.dart' show formatCompactWealth;
+export 'player_profile_screen.dart' show PlayerProfileScreen;
 
 const _pageSize = 10;
 
 class LeaderboardScreen extends StatefulWidget {
-  const LeaderboardScreen({super.key, GraphQlService? graphQlService, LeaderboardService? leaderboardService})
-    : _injectedGraphQlService = graphQlService,
-      _injectedLeaderboardService = leaderboardService;
+  const LeaderboardScreen({
+    super.key,
+    this.initialTab,
+    this.initialPage,
+    GraphQlService? graphQlService,
+    LeaderboardService? leaderboardService,
+    PlayerProfileService? playerProfileService,
+  }) : _injectedGraphQlService = graphQlService,
+       _injectedLeaderboardService = leaderboardService,
+       _injectedPlayerProfileService = playerProfileService;
+
+  /// `'players'` or `'companies'` — from the URL's `?tab=` query param.
+  final String? initialTab;
+
+  /// 1-indexed, matching the web — from the URL's `?page=` query param.
+  final int? initialPage;
 
   final GraphQlService? _injectedGraphQlService;
   final LeaderboardService? _injectedLeaderboardService;
+  final PlayerProfileService? _injectedPlayerProfileService;
 
   @override
   State<LeaderboardScreen> createState() => _LeaderboardScreenState();
@@ -55,9 +65,12 @@ class LeaderboardScreen extends StatefulWidget {
 
 class _LeaderboardScreenState extends State<LeaderboardScreen> {
   late final LeaderboardService _service;
+  late final PlayerProfileService _profileService;
 
-  String _tab = 'players';
-  int _page = 0;
+  late String _tab;
+  late int _page;
+  bool _hasExplicitPage = false;
+  String? _myPlayerId;
 
   bool _playerLoading = true;
   String? _playerError;
@@ -73,11 +86,22 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   @override
   void initState() {
     super.initState();
+    _tab = widget.initialTab == 'companies' ? 'companies' : 'players';
+    _hasExplicitPage = widget.initialPage != null;
+    _page = ((widget.initialPage ?? 1) - 1).clamp(0, 1 << 30);
     final auth = context.read<AuthState>();
     final graphQlService = widget._injectedGraphQlService ?? GraphQlService(auth);
     _service = widget._injectedLeaderboardService ?? LeaderboardService(graphQlService);
+    _profileService = widget._injectedPlayerProfileService ?? PlayerProfileService(graphQlService, auth);
     _loadPlayers();
     _loadEndgame();
+    _loadMyPlayerId();
+    if (_tab == 'companies') _loadCompanies();
+  }
+
+  Future<void> _loadMyPlayerId() async {
+    final id = await _profileService.fetchMyPlayerId();
+    if (mounted) setState(() => _myPlayerId = id);
   }
 
   Future<void> _loadPlayers() async {
@@ -92,6 +116,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         _players = players;
         _playerLoading = false;
       });
+      _maybeJumpToOwnPage();
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -114,6 +139,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         _companyLoaded = true;
         _companyLoading = false;
       });
+      _maybeJumpToOwnPage();
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -128,14 +154,42 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     if (mounted) setState(() => _endgame = endgame);
   }
 
+  /// Matches `calculateRankPage`/the web's "jump to my own row" behavior on
+  /// first load — only when the URL didn't already specify a page.
+  void _maybeJumpToOwnPage() {
+    final myPlayerId = _myPlayerId;
+    if (_hasExplicitPage || myPlayerId == null) return;
+    final rows = _tab == 'companies' ? _companies.map((c) => c.playerId) : _players.map((p) => p.playerId);
+    final index = rows.toList().indexOf(myPlayerId);
+    if (index < 0) return;
+    setState(() => _page = index ~/ _pageSize);
+  }
+
   void _selectTab(String tab) {
     setState(() {
       _tab = tab;
       _page = 0;
+      _hasExplicitPage = false;
     });
     if (tab == 'companies' && !_companyLoaded && !_companyLoading) {
       _loadCompanies();
+    } else {
+      _maybeJumpToOwnPage();
     }
+    _syncUrl();
+  }
+
+  void _selectPage(int page) {
+    setState(() {
+      _page = page;
+      _hasExplicitPage = true;
+    });
+    _syncUrl();
+  }
+
+  void _syncUrl() {
+    final uri = Uri(path: '/leaderboard', queryParameters: {'tab': _tab, 'page': '${_page + 1}'});
+    context.go(uri.toString());
   }
 
   int get _totalRows => _tab == 'companies' ? _companies.length : _players.length;
@@ -203,7 +257,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     final pageItems = _players.skip(page * _pageSize).take(_pageSize).toList();
     return [
       for (var i = 0; i < pageItems.length; i++)
-        _PlayerRankCard(rank: page * _pageSize + i + 1, player: pageItems[i]),
+        _PlayerRankCard(rank: page * _pageSize + i + 1, player: pageItems[i], isOwnRow: pageItems[i].playerId == _myPlayerId),
       _buildPager(page),
     ];
   }
@@ -232,7 +286,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     final pageItems = _companies.skip(page * _pageSize).take(_pageSize).toList();
     return [
       for (var i = 0; i < pageItems.length; i++)
-        _CompanyRankCard(rank: page * _pageSize + i + 1, company: pageItems[i]),
+        _CompanyRankCard(rank: page * _pageSize + i + 1, company: pageItems[i], isOwnRow: pageItems[i].playerId == _myPlayerId),
       _buildPager(page),
     ];
   }
@@ -244,10 +298,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          IconButton(onPressed: page > 0 ? () => setState(() => _page = page - 1) : null, icon: const FaIcon(AppIcons.chevronLeft, size: 16)),
+          IconButton(onPressed: page > 0 ? () => _selectPage(page - 1) : null, icon: const FaIcon(AppIcons.chevronLeft, size: 16)),
           Text('${page + 1} / $_totalPages'),
           IconButton(
-            onPressed: page < _totalPages - 1 ? () => setState(() => _page = page + 1) : null,
+            onPressed: page < _totalPages - 1 ? () => _selectPage(page + 1) : null,
             icon: const FaIcon(AppIcons.chevronRight, size: 16),
           ),
         ],
@@ -272,10 +326,10 @@ class _EndgameBenchmarkCard extends StatelessWidget {
           children: [
             Text('🏆 Race to the top', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
-            Text('Target: ${_formatCompact(context, endgame.winningThresholdUsd)}'),
+            Text('Target: ${formatCompactWealth(context, endgame.winningThresholdUsd)}'),
             if (topPlayer != null) ...[
               const SizedBox(height: 8),
-              Text('${topPlayer!.alias} is leading with ${_formatCompact(context, topPlayer!.totalWealthUsd)}'),
+              Text('${topPlayer!.alias} is leading with ${formatCompactWealth(context, topPlayer!.totalWealthUsd)}'),
             ],
           ],
         ),
@@ -285,26 +339,40 @@ class _EndgameBenchmarkCard extends StatelessWidget {
 }
 
 class _PlayerRankCard extends StatelessWidget {
-  const _PlayerRankCard({required this.rank, required this.player});
+  const _PlayerRankCard({required this.rank, required this.player, this.isOwnRow = false});
 
   final int rank;
   final PlayerRanking player;
+  final bool isOwnRow;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Card(
       key: ValueKey('player-rank-${player.playerId}'),
       margin: const EdgeInsets.only(bottom: 8),
+      color: isOwnRow ? theme.colorScheme.primaryContainer : null,
+      shape: isOwnRow ? RoundedRectangleBorder(side: BorderSide(color: theme.colorScheme.primary, width: 2), borderRadius: BorderRadius.circular(12)) : null,
       child: ListTile(
         onTap: () => context.go('/player/${player.playerId}'),
         leading: SizedBox(
           width: 40,
-          child: Center(child: Text(rankBadge(rank), style: Theme.of(context).textTheme.titleMedium)),
+          child: Center(child: Text(rankBadge(rank), style: theme.textTheme.titleMedium)),
         ),
         title: Row(
           children: [
             Flexible(child: Text(player.alias, overflow: TextOverflow.ellipsis)),
             for (final badge in player.badgeTypes.take(3)) Padding(padding: const EdgeInsets.only(left: 4), child: Text(profileBadgeIcon(badge))),
+            if (isOwnRow)
+              const Padding(
+                padding: EdgeInsets.only(left: 6),
+                child: Chip(
+                  key: ValueKey('own-row-you-chip'),
+                  label: Text('You', style: TextStyle(fontSize: 11)),
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
           ],
         ),
         subtitle: Text('${player.companyCount} companies'),
@@ -312,10 +380,10 @@ class _PlayerRankCard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(_formatCompact(context, player.totalWealthUsd), style: Theme.of(context).textTheme.titleSmall),
+            Text(formatCompactWealth(context, player.totalWealthUsd), style: theme.textTheme.titleSmall),
             Text(
-              '💵 ${_formatCompact(context, player.personalCash)} · 📈 ${_formatCompact(context, player.sharesValue)}',
-              style: Theme.of(context).textTheme.bodySmall,
+              '💵 ${formatCompactWealth(context, player.personalCash)} · 📈 ${formatCompactWealth(context, player.sharesValue)}',
+              style: theme.textTheme.bodySmall,
             ),
           ],
         ),
@@ -325,364 +393,44 @@ class _PlayerRankCard extends StatelessWidget {
 }
 
 class _CompanyRankCard extends StatelessWidget {
-  const _CompanyRankCard({required this.rank, required this.company});
+  const _CompanyRankCard({required this.rank, required this.company, this.isOwnRow = false});
 
   final int rank;
   final CompanyRanking company;
+  final bool isOwnRow;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Card(
       key: ValueKey('company-rank-${company.companyId}'),
       margin: const EdgeInsets.only(bottom: 8),
+      color: isOwnRow ? theme.colorScheme.primaryContainer : null,
+      shape: isOwnRow ? RoundedRectangleBorder(side: BorderSide(color: theme.colorScheme.primary, width: 2), borderRadius: BorderRadius.circular(12)) : null,
       child: ListTile(
         onTap: () => context.go('/player/${company.playerId}'),
         leading: SizedBox(
           width: 40,
-          child: Center(child: Text(rankBadge(rank), style: Theme.of(context).textTheme.titleMedium)),
+          child: Center(child: Text(rankBadge(rank), style: theme.textTheme.titleMedium)),
         ),
-        title: Text(company.companyName, overflow: TextOverflow.ellipsis),
-        subtitle: Text('Owned by ${company.ownerAlias} · ${company.buildingCount} buildings'),
-        trailing: Text(_formatCompact(context, company.totalWealthUsd), style: Theme.of(context).textTheme.titleSmall),
-      ),
-    );
-  }
-}
-
-class PlayerProfileScreen extends StatefulWidget {
-  const PlayerProfileScreen({
-    super.key,
-    required this.playerId,
-    GraphQlService? graphQlService,
-    LeaderboardService? leaderboardService,
-  }) : _injectedGraphQlService = graphQlService,
-       _injectedLeaderboardService = leaderboardService;
-
-  final String playerId;
-  final GraphQlService? _injectedGraphQlService;
-  final LeaderboardService? _injectedLeaderboardService;
-
-  @override
-  State<PlayerProfileScreen> createState() => _PlayerProfileScreenState();
-}
-
-class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
-  late final LeaderboardService _service;
-
-  bool _loading = true;
-  String? _error;
-  PlayerProfile? _profile;
-
-  String _tab = 'overview';
-  bool _badgesLoading = false;
-  bool _badgesLoaded = false;
-  List<PlayerBadge> _badges = const [];
-  bool _rankHistoryLoading = false;
-  bool _rankHistoryLoaded = false;
-  List<PlayerRankSnapshot> _rankHistory = const [];
-
-  @override
-  void initState() {
-    super.initState();
-    final auth = context.read<AuthState>();
-    final graphQlService = widget._injectedGraphQlService ?? GraphQlService(auth);
-    _service = widget._injectedLeaderboardService ?? LeaderboardService(graphQlService);
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final profile = await _service.fetchPlayerProfile(widget.playerId);
-      if (!mounted) return;
-      setState(() {
-        _profile = profile;
-        _loading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _error = 'Could not load this profile. Please try again.';
-        _loading = false;
-      });
-    }
-  }
-
-  Future<void> _selectTab(String tab) async {
-    setState(() => _tab = tab);
-    if (tab == 'achievements' && !_badgesLoaded && !_badgesLoading) {
-      setState(() => _badgesLoading = true);
-      try {
-        final badges = await _service.fetchPlayerBadges(widget.playerId);
-        if (mounted) setState(() => _badges = badges);
-      } catch (_) {
-        // Swallowed, matching the web's silent badges-empty fallback.
-      } finally {
-        if (mounted) {
-          setState(() {
-            _badgesLoaded = true;
-            _badgesLoading = false;
-          });
-        }
-      }
-    } else if (tab == 'rank-history' && !_rankHistoryLoaded && !_rankHistoryLoading) {
-      setState(() => _rankHistoryLoading = true);
-      try {
-        final history = await _service.fetchRankHistory(widget.playerId);
-        if (mounted) setState(() => _rankHistory = history);
-      } catch (_) {
-        // Swallowed, matching the web's silent rank-history-empty fallback.
-      } finally {
-        if (mounted) {
-          setState(() {
-            _rankHistoryLoaded = true;
-            _rankHistoryLoading = false;
-          });
-        }
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(_error!),
-              const SizedBox(height: 12),
-              OutlinedButton(onPressed: _load, child: const Text('Try again')),
-            ],
-          ),
-        ),
-      );
-    }
-    final profile = _profile;
-    if (profile == null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Player not found.'),
-              const SizedBox(height: 12),
-              OutlinedButton(onPressed: () => context.go('/leaderboard'), child: const Text('Back to leaderboard')),
-            ],
-          ),
-        ),
-      );
-    }
-
-    final theme = Theme.of(context);
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        title: Row(
           children: [
-            Expanded(
-              child: Text(profile.displayName, style: theme.textTheme.headlineSmall),
-            ),
-            if (profile.hasProSubscription) const Chip(label: Text('⭐ Pro')),
-          ],
-        ),
-        Text('Joined ${profile.joinGameYear}', style: theme.textTheme.bodySmall),
-        if (profile.leaderboardRank > 0) ...[
-          const SizedBox(height: 8),
-          Text(rankBadge(profile.leaderboardRank), style: theme.textTheme.titleLarge),
-        ],
-        if (profile.bio != null && profile.bio!.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text('"${profile.bio}"', style: theme.textTheme.bodyMedium!.copyWith(fontStyle: FontStyle.italic)),
-        ],
-        const SizedBox(height: 20),
-        _QuickStatsRow(profile: profile),
-        const SizedBox(height: 20),
-        Row(
-          children: [
-            for (final entry in const {'overview': '📊 Overview', 'achievements': '🏅 Achievements', 'rank-history': '📈 Rank History'}.entries)
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  child: ChoiceChip(label: Text(entry.value), selected: _tab == entry.key, onSelected: (_) => _selectTab(entry.key)),
+            Flexible(child: Text(company.companyName, overflow: TextOverflow.ellipsis)),
+            if (isOwnRow)
+              const Padding(
+                padding: EdgeInsets.only(left: 6),
+                child: Chip(
+                  key: ValueKey('own-row-you-chip'),
+                  label: Text('You', style: TextStyle(fontSize: 11)),
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ),
           ],
         ),
-        const SizedBox(height: 16),
-        if (_tab == 'overview') _OverviewTab(profile: profile),
-        if (_tab == 'achievements') _AchievementsTab(loading: _badgesLoading, badges: _badges),
-        if (_tab == 'rank-history') _RankHistoryTab(loading: _rankHistoryLoading, snapshots: _rankHistory),
-        const SizedBox(height: 20),
-        Center(
-          child: TextButton(onPressed: () => context.go('/leaderboard'), child: const Text('← Back to leaderboard')),
-        ),
-      ],
-    );
-  }
-}
-
-class _QuickStatsRow extends StatelessWidget {
-  const _QuickStatsRow({required this.profile});
-
-  final PlayerProfile profile;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    Widget stat(String value, String label) => Expanded(
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            children: [
-              Text(value, style: theme.textTheme.titleMedium),
-              Text(label, style: theme.textTheme.labelSmall),
-            ],
-          ),
-        ),
+        subtitle: Text('Owned by ${company.ownerAlias} · ${company.buildingCount} buildings'),
+        trailing: Text(formatCompactWealth(context, company.totalWealthUsd), style: theme.textTheme.titleSmall),
       ),
-    );
-    return Row(
-      children: [
-        stat(profile.leaderboardRank > 0 ? rankBadge(profile.leaderboardRank) : '—', 'Global rank'),
-        const SizedBox(width: 8),
-        stat(_formatCompact(context, profile.totalWealthUsd), 'Total wealth'),
-        const SizedBox(width: 8),
-        stat('${profile.companyCount}', 'Companies'),
-        const SizedBox(width: 8),
-        stat('${profile.citiesWithBuildings}', 'Cities'),
-      ],
-    );
-  }
-}
-
-class _OverviewTab extends StatelessWidget {
-  const _OverviewTab({required this.profile});
-
-  final PlayerProfile profile;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final hof = profile.hallOfFame;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('🏭 INDUSTRIES', style: theme.textTheme.labelLarge),
-                const SizedBox(height: 8),
-                if (profile.activeBuildingTypes.isEmpty)
-                  const Text('No active industries yet.')
-                else
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [for (final type in profile.activeBuildingTypes) Chip(label: Text(type))],
-                  ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('📦 SALES STATS', style: theme.textTheme.labelLarge),
-                const SizedBox(height: 8),
-                Text('Total products sold: ${profile.totalProductsSold.toStringAsFixed(0)}'),
-                Text('Company equity: ${_formatCompact(context, profile.totalCompanyEquityUsd)}'),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('🏆 HALL OF FAME', style: theme.textTheme.labelLarge),
-                const SizedBox(height: 8),
-                Text(
-                  'Highest single-tick revenue: ${hof.highestSingleTickRevenue > 0 ? _formatCompact(context, hof.highestSingleTickRevenue) : '—'}',
-                ),
-                Text(
-                  'Largest acquisition: ${hof.largestBuildingAcquisitionPrice > 0 ? _formatCompact(context, hof.largestBuildingAcquisitionPrice) : '—'}',
-                ),
-                Text('Highest brand quality: ${hof.highestBrandQuality > 0 ? '${(hof.highestBrandQuality * 100).round()}%' : '—'}'),
-                Text('Account age: ${hof.accountAgeTicks} ticks'),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _AchievementsTab extends StatelessWidget {
-  const _AchievementsTab({required this.loading, required this.badges});
-
-  final bool loading;
-  final List<PlayerBadge> badges;
-
-  @override
-  Widget build(BuildContext context) {
-    if (loading) return const Center(child: CircularProgressIndicator());
-    if (badges.isEmpty) return const Text('No badges unlocked yet.');
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        for (final badge in badges)
-          Chip(avatar: Text(profileBadgeIcon(badge.badgeType)), label: Text(badge.badgeType)),
-      ],
-    );
-  }
-}
-
-class _RankHistoryTab extends StatelessWidget {
-  const _RankHistoryTab({required this.loading, required this.snapshots});
-
-  final bool loading;
-  final List<PlayerRankSnapshot> snapshots;
-
-  @override
-  Widget build(BuildContext context) {
-    if (loading) return const Center(child: CircularProgressIndicator());
-    if (snapshots.isEmpty) return const Text('No rank history yet.');
-    return Column(
-      children: [
-        for (final snapshot in snapshots.reversed)
-          ListTile(
-            dense: true,
-            title: Text('Rank #${snapshot.leaderboardRank} · ${_formatCompact(context, snapshot.wealthUsd)}'),
-            subtitle: GameTickTime(snapshot.snapshotTick),
-            trailing: snapshot.positionChange == null
-                ? null
-                : Text(snapshot.positionChange! > 0 ? '▲${snapshot.positionChange}' : (snapshot.positionChange! < 0 ? '▼${-snapshot.positionChange!}' : '–')),
-          ),
-      ],
     );
   }
 }

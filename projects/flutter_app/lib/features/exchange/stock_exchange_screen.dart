@@ -1,12 +1,12 @@
 // Ported from `projects/frontend/src/views/StockExchangeView.vue`, including
 // dividend proposal/voting (`proposeDividend`/`voteDividendProposal`),
-// company merger (`mergeCompany`), and CEO replacement/hostile takeover
-// (`replaceCEO`).
-//
-// Deliberately still trimmed: the web's inline per-row expandable trade
-// panel — buying/selling shares lives on the Stock Trading screen
-// (`/stock/trade/:companyId`) instead of inline here, a reasonable
-// adaptation to mobile's narrower layout rather than a lost feature.
+// company merger (`mergeCompany`), CEO replacement/hostile takeover
+// (`replaceCEO`), and the inline per-row expandable buy/sell trade panel
+// (`stock_exchange_trade_panel.dart`, ported from
+// `StockMarketListingRow.vue`) so trading doesn't require navigating to the
+// separate Stock Trading screen — that screen (`/stock/trade/:companyId`,
+// still linked from each row) remains the fuller price-history/order-book/
+// shareholders view.
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -14,6 +14,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/graphql/graphql_service.dart';
+import 'stock_exchange_trade_panel.dart';
 import 'stock_models.dart';
 import 'stock_service.dart';
 
@@ -287,6 +288,7 @@ class _StockExchangeScreenState extends State<StockExchangeScreen> {
                       ),
                       onTap: () => context.go('/stock/trade/${listing.companyId}'),
                     ),
+                    StockExchangeTradePanel(listing: listing, stockService: _service),
                     if (listing.canProposeDividend || listing.canClaimControl || listing.canMerge)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),

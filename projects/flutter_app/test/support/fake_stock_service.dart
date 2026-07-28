@@ -70,14 +70,14 @@ class FakeStockService implements StockService {
   Future<void> buyShares({required String companyId, required double shareCount, String? bankAccountId}) async {
     calls.add('buyShares');
     if (tradeError != null) throw tradeError!;
-    lastBuyArgs = {'companyId': companyId, 'shareCount': shareCount};
+    lastBuyArgs = {'companyId': companyId, 'shareCount': shareCount, 'bankAccountId': bankAccountId};
   }
 
   @override
   Future<void> sellShares({required String companyId, required double shareCount, String? bankAccountId}) async {
     calls.add('sellShares');
     if (tradeError != null) throw tradeError!;
-    lastSellArgs = {'companyId': companyId, 'shareCount': shareCount};
+    lastSellArgs = {'companyId': companyId, 'shareCount': shareCount, 'bankAccountId': bankAccountId};
   }
 
   @override

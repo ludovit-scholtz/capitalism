@@ -26,7 +26,9 @@ const _myAccount = PlayerBankAccount(
   accountNumber: '001',
   currencyCode: 'EUR',
   balance: 500,
+  companyId: 'company-1',
   companyName: 'My Company',
+  ownerType: 'COMPANY',
   bankBuildingId: 'bank-1',
   isDepositAccount: true,
 );
