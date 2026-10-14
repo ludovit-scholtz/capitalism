@@ -467,6 +467,24 @@ void main() {
       await tester.pumpAndSettle();
     });
 
+    testWidgets('a company the server has no ledger for shows the neutral empty text, not an error with Retry', (
+      tester,
+    ) async {
+      final auth = AuthState(storage: InMemoryTokenStorage());
+      await auth.setToken('test-token');
+      final service = FakeDashboardService(
+        data: const DashboardData(companies: [_company], currentTick: 1, taxRate: 15, pendingActions: []),
+      );
+      service.ledgerNulls.add('company-1');
+
+      await _pumpDashboard(tester, auth: auth, service: service);
+
+      final card = find.byKey(const Key('overview-ledger-company-1'));
+      expect(find.descendant(of: card, matching: find.text('No financial data yet.')), findsOneWidget);
+      expect(find.descendant(of: card, matching: find.text('Could not load financial data.')), findsNothing);
+      expect(find.descendant(of: card, matching: find.text('Retry')), findsNothing);
+    });
+
     testWidgets('a ledger that fails to load shows an error with Retry instead of an endless spinner', (tester) async {
       final auth = AuthState(storage: InMemoryTokenStorage());
       await auth.setToken('test-token');

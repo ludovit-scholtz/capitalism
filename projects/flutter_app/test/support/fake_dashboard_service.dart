@@ -63,6 +63,9 @@ class FakeDashboardService implements DashboardService {
   /// let a retry succeed.
   final Map<String, Object> ledgerErrors = {};
 
+  /// Companies for which the server answers `companyLedger: null`.
+  final Set<String> ledgerNulls = {};
+
   /// Per-company queue of responses consumed one per call (at call time, so a
   /// slow earlier call keeps the response it was given). Falls back to
   /// [ledgersByCompanyId] when empty.
@@ -96,7 +99,7 @@ class FakeDashboardService implements DashboardService {
   }
 
   @override
-  Future<CompanyLedger> fetchCompanyOverviewLedger(String companyId) async {
+  Future<CompanyLedger?> fetchCompanyOverviewLedger(String companyId) async {
     calls.add('fetchCompanyOverviewLedger');
     fetchCompanyOverviewLedgerCallCount++;
     final gate = ledgerGates[companyId];
@@ -105,6 +108,7 @@ class FakeDashboardService implements DashboardService {
     if (gate != null) await gate.future;
     final error = ledgerErrors[companyId];
     if (error != null) throw error;
+    if (ledgerNulls.contains(companyId)) return null;
     return queued ??
         ledgersByCompanyId[companyId] ??
         const CompanyLedger(

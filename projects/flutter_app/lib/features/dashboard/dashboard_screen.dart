@@ -308,7 +308,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       if (!mounted || _ledgerRequestSeq[companyId] != seq) return;
       setState(() {
         _inFlightLedgerIds.remove(companyId);
-        _ledgers = {..._ledgers, companyId: ledger};
+        // No ledger for this company (null) simply leaves its card on "No financial data yet."
+        if (ledger != null) {
+          _ledgers = {..._ledgers, companyId: ledger};
+        } else {
+          _ledgers = {for (final entry in _ledgers.entries) if (entry.key != companyId) entry.key: entry.value};
+        }
         _failedLedgerIds.remove(companyId);
         _loadingLedgerIds.remove(companyId);
       });
