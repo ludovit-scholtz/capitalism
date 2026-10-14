@@ -37,7 +37,7 @@ import '../../core/widgets/icon_badge.dart';
 import '../../core/widgets/state_view.dart';
 import '../buildings/building_analytics_models.dart';
 import '../buildings/building_panel_models.dart';
-import '../company/company_models.dart';
+import 'dashboard_ledger_loader.dart';
 import 'dashboard_models.dart';
 import 'dashboard_new_company_card.dart';
 import 'dashboard_overview_tab.dart';
@@ -67,6 +67,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
   late final DashboardService _service;
+  late final DashboardLedgerLoader _ledgerLoader;
   late final TabController _tabController;
   late final GameStateState _gameStateState;
   int? _lastSeenTick;
@@ -75,23 +76,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   String? _error;
   DashboardData? _data;
   final Set<String> _removingBuildingIds = {};
-
-  Map<String, CompanyLedger> _ledgers = {};
-  final Set<String> _loadingLedgerIds = {};
-  final Set<String> _failedLedgerIds = {};
-
-  /// Companies with a ledger request currently running (see [_loadLedger]).
-  final Set<String> _inFlightLedgerIds = {};
-
-  /// Latest ledger request number per company. A response is applied only if it
-  /// belongs to the newest request, so a slow older call (initial load, tick
-  /// refresh, Retry) can never overwrite fresher numbers or clear the skeleton
-  /// of a request that is still running.
-  final Map<String, int> _ledgerRequestSeq = {};
-
-  /// Monotonic across all companies, so a company that leaves and later
-  /// re-enters the list can never reuse a number an old in-flight request holds.
-  int _ledgerRequestCounter = 0;
 
   AdditionalCompanyPrerequisites? _newCompanyPrerequisites;
   List<NewCompanyCity> _newCompanyCities = const [];
@@ -108,6 +92,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final auth = context.read<AuthState>();
     final graphQlService = widget._injectedGraphQlService ?? GraphQlService(auth);
     _service = widget._injectedDashboardService ?? DashboardService(graphQlService);
+    _ledgerLoader = DashboardLedgerLoader(_service)..addListener(_onLedgersChanged);
     _tabController = TabController(length: 5, vsync: this);
     _gameStateState = context.read<GameStateState>();
     _gameStateState.addListener(_onGameStateChanged);
@@ -122,6 +107,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   @override
   void dispose() {
     _gameStateState.removeListener(_onGameStateChanged);
+    _ledgerLoader.dispose();
     _tabController.dispose();
     super.dispose();
   }
@@ -163,7 +149,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         _data = data;
         _loading = false;
       });
-      unawaited(_loadLedgers(data.companies));
+      unawaited(_ledgerLoader.loadAll([for (final c in data.companies) c.id]));
       unawaited(_loadNewCompanyPrerequisites());
       unawaited(_loadBuildingAnalytics(data.companies));
       unawaited(_loadProSubscriptionStatus());
@@ -262,69 +248,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     context.go('/buy-building/${result.id}');
   }
 
-  /// Best-effort, per-company: one company's ledger failing to load doesn't
-  /// blank the others' financial cards.
-  ///
-  /// Companies load in parallel and each card updates as soon as its own
-  /// ledger arrives, so a slow company never delays (or hides) the others.
-  Future<void> _loadLedgers(List<DashboardCompany> companies, {bool isRefresh = false}) async {
-    final ids = {for (final company in companies) company.id};
-    // Forget everything about companies that no longer exist (e.g. merged away),
-    // for silent refreshes too; keep the rest while refetching.
-    setState(() {
-      _ledgers = {for (final entry in _ledgers.entries) if (ids.contains(entry.key)) entry.key: entry.value};
-      _loadingLedgerIds.retainAll(ids);
-      _failedLedgerIds.retainAll(ids);
-      _inFlightLedgerIds.retainAll(ids);
-      _ledgerRequestSeq.removeWhere((id, _) => !ids.contains(id));
-    });
-    await Future.wait([for (final id in ids) _loadLedger(id, silent: isRefresh)]);
-  }
-
-  /// Loads one company's ledger. [silent] (pull-to-refresh / tick refresh)
-  /// keeps whatever is already on screen instead of flashing a skeleton or
-  /// replacing good data with an error.
-  Future<void> _loadLedger(String companyId, {bool silent = false}) async {
-    if (!mounted) return;
-    // A silent refresh (server tick, pull-to-refresh) never starts a second request while one is
-    // already running for that company: it would discard the running one and, when the server is
-    // slower than the tick interval, pile up requests so no response is ever shown.
-    if (silent && _inFlightLedgerIds.contains(companyId)) return;
-
-    final seq = _ledgerRequestSeq[companyId] = ++_ledgerRequestCounter;
-    _inFlightLedgerIds.add(companyId);
-    // A user-initiated load (first open, Retry) shows the skeleton. A silent refresh leaves a card
-    // with data or an error as it is, so ticks never make it flicker; it only shows the skeleton
-    // for a company that has nothing to show yet (e.g. one that just appeared).
-    final showSkeleton = !silent || (!_ledgers.containsKey(companyId) && !_failedLedgerIds.contains(companyId));
-    if (showSkeleton) {
-      setState(() {
-        _loadingLedgerIds.add(companyId);
-        _failedLedgerIds.remove(companyId);
-      });
-    }
-    try {
-      final ledger = await _service.fetchCompanyOverviewLedger(companyId);
-      if (!mounted || _ledgerRequestSeq[companyId] != seq) return;
-      setState(() {
-        _inFlightLedgerIds.remove(companyId);
-        // No ledger for this company (null) simply leaves its card on "No financial data yet."
-        if (ledger != null) {
-          _ledgers = {..._ledgers, companyId: ledger};
-        } else {
-          _ledgers = {for (final entry in _ledgers.entries) if (entry.key != companyId) entry.key: entry.value};
-        }
-        _failedLedgerIds.remove(companyId);
-        _loadingLedgerIds.remove(companyId);
-      });
-    } catch (_) {
-      if (!mounted || _ledgerRequestSeq[companyId] != seq) return;
-      setState(() {
-        _inFlightLedgerIds.remove(companyId);
-        _loadingLedgerIds.remove(companyId);
-        if (!_ledgers.containsKey(companyId)) _failedLedgerIds.add(companyId);
-      });
-    }
+  void _onLedgersChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _silentRefresh() async {
@@ -332,7 +257,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       final data = await _service.fetchDashboardData();
       if (!mounted) return;
       setState(() => _data = data);
-      unawaited(_loadLedgers(data.companies, isRefresh: true));
+      unawaited(_ledgerLoader.loadAll([for (final c in data.companies) c.id], silent: true));
       unawaited(_loadBuildingAnalytics(data.companies));
     } catch (_) {
       // Silent refresh failures are ignored — the last good data stays
@@ -448,10 +373,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 onRefresh: _silentRefresh,
                 child: DashboardOverviewTab(
                   companies: data.companies,
-                  ledgers: _ledgers,
-                  loadingLedgerIds: _loadingLedgerIds,
-                  failedLedgerIds: _failedLedgerIds,
-                  onRetryLedger: (companyId) => unawaited(_loadLedger(companyId)),
+                  ledgers: _ledgerLoader.ledgers,
+                  loadingLedgerIds: _ledgerLoader.loadingIds,
+                  failedLedgerIds: _ledgerLoader.failedIds,
+                  onRetryLedger: (companyId) => unawaited(_ledgerLoader.load(companyId)),
                   newCompanyCard: DashboardNewCompanyCard(
                     prerequisites: _newCompanyPrerequisites,
                     cities: _newCompanyCities,

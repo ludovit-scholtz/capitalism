@@ -483,6 +483,19 @@ void main() {
       expect(find.descendant(of: card, matching: find.text('No financial data yet.')), findsOneWidget);
       expect(find.descendant(of: card, matching: find.text('Could not load financial data.')), findsNothing);
       expect(find.descendant(of: card, matching: find.text('Retry')), findsNothing);
+
+      // A later (slow) refresh must not flip the card into a skeleton and back.
+      service.ledgerGates['company-1'] = Completer<void>();
+      await tester.fling(find.text('Financial summary'), const Offset(0, 300), 1000);
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(service.fetchCompanyOverviewLedgerCallCount, 2);
+      expect(find.descendant(of: card, matching: find.text('No financial data yet.')), findsOneWidget);
+      expect(find.descendant(of: card, matching: find.byType(SkeletonBox)), findsNothing);
+
+      service.ledgerGates['company-1']!.complete();
+      await tester.pumpAndSettle();
     });
 
     testWidgets('a ledger that fails to load shows an error with Retry instead of an endless spinner', (tester) async {
