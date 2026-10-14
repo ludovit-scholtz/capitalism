@@ -311,6 +311,15 @@ public sealed class GlobalEventTests : IClassFixture<ApiWebApplicationFactory>
         Assert.Equal("INVALID_EVENT_TYPE", typeError.GetProperty("extensions").GetProperty("code").GetString());
         Assert.Contains("NOT_A_REAL_TYPE", typeError.GetProperty("message").GetString());
 
+        var invalidSeverity = await ExecuteGraphQlAsync(
+            client,
+            TriggerMutation,
+            new { type = "TRADE_WAR", sev = "NOT_A_SEVERITY", title = "t" },
+            adminToken);
+        var severityError = invalidSeverity.GetProperty("errors")[0];
+        Assert.Equal("INVALID_SEVERITY", severityError.GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Contains("NOT_A_SEVERITY", severityError.GetProperty("message").GetString());
+
         var unknownEvent = await ExecuteGraphQlAsync(
             client,
             $"mutation {{ resolveGlobalEvent(id: \"{Guid.NewGuid()}\") {{ id }} }}",
