@@ -216,6 +216,22 @@ void main() {
       expect(find.text('Onboarding Screen'), findsOneWidget);
     });
 
+    testWidgets('settled company cash keeps its cents', (tester) async {
+      final auth = AuthState(storage: InMemoryTokenStorage());
+      await auth.setToken('test-token');
+      final service = FakeDashboardService(
+        data: const DashboardData(
+          companies: [DashboardCompany(id: 'company-c', name: 'Cents Co', cash: 12.5, buildings: [])],
+          currentTick: 1,
+          taxRate: 15,
+          pendingActions: [],
+        ),
+      );
+      await _pumpDashboard(tester, auth: auth, service: service);
+      await _selectTab(tester, 'Buildings');
+      expect(find.text(r'$12.50'), findsOneWidget);
+    });
+
     testWidgets('shows skeleton placeholders (not a spinner) while loading', (tester) async {
       final auth = AuthState(storage: InMemoryTokenStorage());
       await auth.setToken('test-token');

@@ -111,6 +111,33 @@ void main() {
       expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 3);
     });
 
+    testWidgets('route matching is segment-safe and covers stock trade', (tester) async {
+      final router = createAppRouter();
+      await pumpCapitalismApp(tester, authenticated: true, router: router);
+      router.go('/market-intelligence');
+      await _pumpFrames(tester);
+      expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 4);
+      router.go('/marketing-analytics');
+      await _pumpFrames(tester);
+      expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 4);
+      router.go('/stock/trade/abc');
+      await _pumpFrames(tester);
+      expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 3);
+    });
+
+    testWidgets('signed-out Markets tab opens public Stocks instead of the auth-only Forex', (tester) async {
+      await pumpCapitalismApp(tester);
+      await tester.tap(_bottomNavLabel('Markets'));
+      await _pumpFrames(tester);
+      expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 3);
+    });
+
+    testWidgets('a short but wide window does not overflow the NavigationRail', (tester) async {
+      await pumpCapitalismApp(tester, authenticated: true, surfaceSize: const Size(1280, 360));
+      expect(tester.takeException(), isNull);
+      expect(find.byType(NavigationRail), findsOneWidget);
+    });
+
     testWidgets('More tab opens the full drawer without navigating', (tester) async {
       await pumpCapitalismApp(tester);
 

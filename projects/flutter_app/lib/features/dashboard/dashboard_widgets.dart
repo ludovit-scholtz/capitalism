@@ -85,7 +85,7 @@ class DashboardCompanyCard extends StatelessWidget {
                     value: company.cash,
                     // Whole units only: mid-tween values would otherwise flicker between
                     // whole-dollar and cents formatting.
-                    builder: (v) => AppNumberFormat.money(v.roundToDouble(), languageCode: languageCode),
+                    builder: (v) => AppNumberFormat.money(v == company.cash ? v : v.roundToDouble(), languageCode: languageCode),
                   ),
                 ),
               ),
