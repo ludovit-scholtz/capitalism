@@ -34,11 +34,11 @@ public sealed partial class Mutation
             .ToListAsync();
 
         var targetCompany = companies.FirstOrDefault(c => c.Id == input.TargetCompanyId)
-            ?? throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Target company not found.")
-                    .SetCode("COMPANY_NOT_FOUND")
-                    .Build());
+            ?? throw objectAuthorization.Deny(
+                userId,
+                "company",
+                input.TargetCompanyId,
+                ObjectAuthorizationService.NotFoundReason);
 
         var destinationCompany = companies.FirstOrDefault(c => c.Id == input.DestinationCompanyId);
         if (destinationCompany is null || destinationCompany.PlayerId != userId)

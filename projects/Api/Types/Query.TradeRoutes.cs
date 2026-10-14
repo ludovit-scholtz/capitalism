@@ -93,13 +93,11 @@ public sealed partial class Query
 
         if (route is null || (route.Company.PlayerId != player.Id && player.Role != PlayerRole.Admin))
         {
-            // Missing and foreign routes look identical to the caller (null); the real reason is audit-logged.
-            _ = objectAuthorization.Deny(
+            throw objectAuthorization.Deny(
                 player.Id,
                 "trade_route",
                 routeId,
                 route is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
-            return null;
         }
 
         return MapRouteToResult(route);

@@ -44,7 +44,7 @@ public sealed partial class Mutation
         if (company is null || (company.PlayerId != player.Id && player.Role != PlayerRole.Admin))
         {
             // Logs the real reason; the payload is identical for missing and foreign companies.
-            _ = objectAuthorization.Deny(player.Id, "company", input.CompanyId, company is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
+            objectAuthorization.LogDenied(player.Id, "company", input.CompanyId, company is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
             return CreateTradeRoutePayload.Fail(
                 ObjectAuthorizationService.FriendlyMessage,
                 ObjectAuthorizationService.NotFoundOrNotOwnedCode);

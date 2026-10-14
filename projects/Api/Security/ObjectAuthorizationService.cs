@@ -55,10 +55,17 @@ public sealed class ObjectAuthorizationService(
         Guid actorUserId,
         string requestedObjectType,
         Guid requestedObjectId,
-        string actualFailureReason) =>
-        BuildAndLogDeniedException(actorUserId, requestedObjectType, requestedObjectId, actualFailureReason);
+        string actualFailureReason)
+    {
+        LogDenied(actorUserId, requestedObjectType, requestedObjectId, actualFailureReason);
+        return BuildDeniedException();
+    }
 
-    private GraphQLException BuildAndLogDeniedException(
+    /// <summary>
+    /// Writes the structured security audit event only, for call sites that report the denial
+    /// through a payload instead of throwing.
+    /// </summary>
+    public void LogDenied(
         Guid actorUserId,
         string requestedObjectType,
         Guid requestedObjectId,
@@ -76,11 +83,19 @@ public sealed class ObjectAuthorizationService(
                 requestedObjectId,
                 actualFailureReason,
             });
+    }
 
-        return new GraphQLException(
+    private static GraphQLException BuildDeniedException() =>
+        new(
             ErrorBuilder.New()
                 .SetMessage(FriendlyMessage)
                 .SetCode(NotFoundOrNotOwnedCode)
                 .Build());
-    }
+
+    private GraphQLException BuildAndLogDeniedException(
+        Guid actorUserId,
+        string requestedObjectType,
+        Guid requestedObjectId,
+        string actualFailureReason) =>
+        Deny(actorUserId, requestedObjectType, requestedObjectId, actualFailureReason);
 }

@@ -5003,7 +5003,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           return route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify({ errors: [{ extensions: { code: 'NOT_CEO' }, message: 'Only the acting CEO can propose dividend changes.' }] }),
+            body: JSON.stringify({ errors: [{ extensions: { code: 'FORBIDDEN' }, message: "You don't have permission to perform this action." }] }),
           })
         }
 
