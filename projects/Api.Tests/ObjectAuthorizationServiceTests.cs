@@ -62,6 +62,29 @@ public sealed class ObjectAuthorizationServiceTests
         Assert.Equal(apiKeyId, GetNullableGuidProperty(securityEvent, "apiKeyId"));
     }
 
+    [Fact]
+    public void Deny_ReturnsUnifiedError_AndLogsRealReason()
+    {
+        var logger = new CapturingLogger<ObjectAuthorizationService>();
+        var accessor = new HttpContextAccessor { HttpContext = new DefaultHttpContext() };
+        var service = new ObjectAuthorizationService(logger, accessor);
+        var actorId = Guid.NewGuid();
+        var objectId = Guid.NewGuid();
+
+        var notFound = service.Deny(actorId, "gold_amm_position", objectId, ObjectAuthorizationService.NotFoundReason);
+        var notOwned = service.Deny(actorId, "gold_amm_position", objectId, ObjectAuthorizationService.NotOwnedReason);
+
+        // Indistinguishable to the caller...
+        Assert.Equal(notFound.Errors.Single().Code, notOwned.Errors.Single().Code);
+        Assert.Equal(notFound.Errors.Single().Message, notOwned.Errors.Single().Message);
+        Assert.Equal(ObjectAuthorizationService.NotFoundOrNotOwnedCode, notOwned.Errors.Single().Code);
+        // ...while the audit log keeps the real reason for each.
+        var reasons = logger.AllSecurityEvents().Select(e => GetProperty<string>(e, "actualFailureReason")).ToArray();
+        Assert.Equal(
+            [ObjectAuthorizationService.NotFoundReason, ObjectAuthorizationService.NotOwnedReason],
+            reasons);
+    }
+
     private static T GetProperty<T>(object source, string propertyName)
     {
         var property = source.GetType().GetProperty(propertyName)
@@ -121,6 +144,8 @@ public sealed class ObjectAuthorizationServiceTests
         }
 
         public object SingleSecurityEvent() => Assert.Single(_securityEvents);
+
+        public IReadOnlyList<object> AllSecurityEvents() => _securityEvents;
 
         private sealed class NoopScope : IDisposable
         {

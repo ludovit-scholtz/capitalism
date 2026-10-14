@@ -440,7 +440,7 @@ public sealed class DividendGovernanceIntegrationTests
             new { input = new { companyId, dividendPercent = 35m } },
             otherToken);
         var error = result.GetProperty("errors")[0];
-        Assert.Equal("NOT_CEO", error.GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal("FORBIDDEN", error.GetProperty("extensions").GetProperty("code").GetString());
     }
 
     [Fact]

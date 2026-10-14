@@ -77,8 +77,8 @@ public sealed partial class Mutation
     /// Deposit accounts held at a bank building must be closed via <c>closeBankAccount</c>.
     /// </summary>
     /// <remarks>
-    /// Rejected with <c>ACCOUNT_NOT_FOUND</c> if the account does not exist or is already closed.
-    /// Rejected with <c>UNAUTHORIZED</c> if the caller does not own the account.
+    /// Rejected with <c>FORBIDDEN</c> (identical response, real reason audit-logged) if the account does not exist,
+    /// is already closed, or is not owned by the caller.
     /// Rejected with <c>NON_ZERO_BALANCE</c> if the balance is not exactly zero.
     /// Rejected with <c>GOVERNMENT_ACCOUNT</c> if the account is a government system account.
     /// Rejected with <c>ACCOUNT_IN_USE</c> if the account is still assigned as the active bank account for one or more buildings.
@@ -88,7 +88,8 @@ public sealed partial class Mutation
     public async Task<CloseCompanyBankAccountResult> CloseCompanyBankAccount(
         CloseCompanyBankAccountInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
@@ -98,21 +99,13 @@ public sealed partial class Mutation
 
         if (account is null)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Bank account not found or already closed.")
-                    .SetCode("ACCOUNT_NOT_FOUND")
-                    .Build());
+            throw objectAuthorization.Deny(userId, "bank_account", input.BankAccountId, ObjectAuthorizationService.NotFoundReason);
         }
 
         // Only company-owned accounts can be closed via this mutation.
         if (account.Company?.PlayerId != userId)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("You do not own this bank account.")
-                    .SetCode("UNAUTHORIZED")
-                    .Build());
+            throw objectAuthorization.Deny(userId, "bank_account", input.BankAccountId, ObjectAuthorizationService.NotOwnedReason);
         }
 
         // Deposit accounts (held at a bank building) are managed by closeBankAccount.

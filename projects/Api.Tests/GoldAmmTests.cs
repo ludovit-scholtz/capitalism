@@ -397,7 +397,25 @@ public sealed class GoldAmmTests
             "mutation RemoveLiq($input: RemoveGoldAmmLiquidityInput!) { removeGoldAmmLiquidity(input: $input) { fiatReturned } }",
             new { input = new { positionId = Guid.Parse(positionId), shareFraction = 1.0m } }, token2);
 
-        Assert.Equal("UNAUTHORIZED", GetError(result));
+        Assert.Equal("FORBIDDEN", GetError(result));
+    }
+
+    [Fact]
+    public async Task RemoveGoldAmmLiquidity_UnknownPosition_IsIndistinguishableFromForeignPosition()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, "lp-probe@test.com");
+
+        var result = await ExecuteGraphQlAsync(client,
+            "mutation RemoveLiq($input: RemoveGoldAmmLiquidityInput!) { removeGoldAmmLiquidity(input: $input) { fiatReturned } }",
+            new { input = new { positionId = Guid.NewGuid(), shareFraction = 1.0m } }, token);
+
+        // Same code as the foreign-position case above (no POSITION_NOT_FOUND / UNAUTHORIZED split).
+        Assert.Equal("FORBIDDEN", GetError(result));
+        Assert.Equal(
+            "You don't have permission to perform this action.",
+            result.GetProperty("errors")[0].GetProperty("message").GetString());
     }
 
     #endregion

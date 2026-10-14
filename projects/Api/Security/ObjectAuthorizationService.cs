@@ -27,7 +27,7 @@ public sealed class ObjectAuthorizationService(
         var entity = await loadEntityAsync(cancellationToken);
         if (entity is null)
         {
-            throw BuildAndLogDeniedException(
+            throw Deny(
                 actorUserId,
                 requestedObjectType,
                 requestedObjectId,
@@ -36,7 +36,7 @@ public sealed class ObjectAuthorizationService(
 
         if (!isOwnedByActor(entity))
         {
-            throw BuildAndLogDeniedException(
+            throw Deny(
                 actorUserId,
                 requestedObjectType,
                 requestedObjectId,
@@ -46,7 +46,26 @@ public sealed class ObjectAuthorizationService(
         return entity;
     }
 
-    private GraphQLException BuildAndLogDeniedException(
+    /// <summary>
+    /// Logs a structured security audit event with the real failure reason and returns the
+    /// uniform client-facing error. Use at resolver sites that load an object and then check
+    /// ownership, so "missing" and "not yours" are indistinguishable to the caller.
+    /// </summary>
+    public GraphQLException Deny(
+        Guid actorUserId,
+        string requestedObjectType,
+        Guid requestedObjectId,
+        string actualFailureReason)
+    {
+        LogDenied(actorUserId, requestedObjectType, requestedObjectId, actualFailureReason);
+        return BuildDeniedException();
+    }
+
+    /// <summary>
+    /// Writes the structured security audit event only, for call sites that report the denial
+    /// through a payload instead of throwing.
+    /// </summary>
+    public void LogDenied(
         Guid actorUserId,
         string requestedObjectType,
         Guid requestedObjectId,
@@ -64,11 +83,12 @@ public sealed class ObjectAuthorizationService(
                 requestedObjectId,
                 actualFailureReason,
             });
+    }
 
-        return new GraphQLException(
+    private static GraphQLException BuildDeniedException() =>
+        new(
             ErrorBuilder.New()
                 .SetMessage(FriendlyMessage)
                 .SetCode(NotFoundOrNotOwnedCode)
                 .Build());
-    }
 }

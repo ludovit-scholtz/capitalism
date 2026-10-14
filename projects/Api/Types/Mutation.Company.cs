@@ -167,24 +167,16 @@ public sealed partial class Mutation
     public async Task<CompanyCitySalarySetting> SetCompanySalaryLevel(
         SetCompanySalaryLevelInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
         var company = await db.Companies
             .Include(candidate => candidate.CitySalarySettings)
-            .FirstOrDefaultAsync(candidate => candidate.Id == input.CompanyId)
-            ?? throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Company not found.")
-                    .SetCode("COMPANY_NOT_FOUND")
-                    .Build());
-        if (company.PlayerId != userId)
+            .FirstOrDefaultAsync(candidate => candidate.Id == input.CompanyId);
+        if (company is null || company.PlayerId != userId)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Only company owner can set salary levels.")
-                    .SetCode("NOT_OWNER")
-                    .Build());
+            throw objectAuthorization.Deny(userId, "company", input.CompanyId, company is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
         }
 
         var cityExists = await db.Cities.AnyAsync(city => city.Id == input.CityId);

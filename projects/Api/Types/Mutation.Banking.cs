@@ -309,7 +309,8 @@ public sealed partial class Mutation
     public async Task<BankDepositSummary> CloseBankAccount(
         CloseBankAccountInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
@@ -321,21 +322,13 @@ public sealed partial class Mutation
 
         if (deposit is null)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Active bank account not found.")
-                    .SetCode("DEPOSIT_NOT_FOUND")
-                    .Build());
+            throw objectAuthorization.Deny(userId, "bank_account", input.DepositId, ObjectAuthorizationService.NotFoundReason);
         }
 
         var depositorCompany = deposit.Company;
         if (depositorCompany?.PlayerId != userId)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("You do not own the depositor company.")
-                    .SetCode("UNAUTHORIZED")
-                    .Build());
+            throw objectAuthorization.Deny(userId, "bank_account", input.DepositId, ObjectAuthorizationService.NotOwnedReason);
         }
 
         if (deposit.IsBaseCapitalDeposit)

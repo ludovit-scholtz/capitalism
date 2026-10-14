@@ -10,20 +10,18 @@ namespace Api.Types;
 
 public sealed partial class Mutation
 {
-    private const long DividendVotingWindowTicks = 10;
-    private const long DividendPolicyVotingWindowTicks = GameConstants.TicksPerDay * 5;
-
     [Authorize]
     public async Task<DividendProposalResult> ProposeDividend(
         ProposeDividendInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         // New governance-policy contract:
         // proposeDividend(companyId, dividendPercent) + voteDividend(companyId, vote)
         if (input.CompanyId.HasValue || input.DividendPercent.HasValue)
         {
-            return await ProposeDividendPolicyAsync(input, db, httpContextAccessor);
+            return await ProposeDividendPolicyAsync(input, db, httpContextAccessor, objectAuthorization);
         }
 
         // Legacy per-share payout proposal contract used by stock-exchange flow:
@@ -359,75 +357,6 @@ public sealed partial class Mutation
                     .SetCode("INVALID_DIVIDEND_VOTE_CHOICE")
                     .Build()),
         };
-    }
-
-    private async Task<DividendProposalResult> ProposeDividendPolicyAsync(
-        ProposeDividendInput input,
-        AppDbContext db,
-        IHttpContextAccessor httpContextAccessor)
-    {
-        if (!input.CompanyId.HasValue || !input.DividendPercent.HasValue)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("companyId and dividendPercent are required.")
-                    .SetCode("INVALID_DIVIDEND_PROPOSAL_INPUT")
-                    .Build());
-        }
-
-        var company = await db.Companies
-            .FirstOrDefaultAsync(candidate => candidate.Id == input.CompanyId.Value)
-            ?? throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Company not found.")
-                    .SetCode("COMPANY_NOT_FOUND")
-                    .Build());
-        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
-        if (company.PlayerId != userId)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Only the acting CEO can propose dividend changes.")
-                    .SetCode("NOT_CEO")
-                    .Build());
-        }
-
-        var currentTick = await GetCurrentTickAsync(db);
-        var hasOpenProposal = await db.DividendProposals.AnyAsync(proposal =>
-            proposal.CompanyId == company.Id
-            && proposal.Status == DividendProposalStatus.Voting
-            && proposal.TotalPayout <= 0m
-            && proposal.VotingCloseTick >= currentTick);
-        if (hasOpenProposal)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("There is already a pending dividend proposal.")
-                    .SetCode("PROPOSAL_ALREADY_PENDING")
-                    .Build());
-        }
-
-        var ratio = decimal.Round(
-            Math.Clamp(input.DividendPercent.Value, 0m, 100m) / 100m,
-            4,
-            MidpointRounding.AwayFromZero);
-        var proposal = new DividendProposal
-        {
-            Id = Guid.NewGuid(),
-            CompanyId = company.Id,
-            StockSymbol = StockSymbolCodec.FromCompanyId(company.Id),
-            ProposedByAccountId = userId,
-            ProposedByAccountType = "PERSON",
-            DividendPerShare = ratio,
-            TotalPayout = 0m,
-            Status = DividendProposalStatus.Voting,
-            ProposedAtTick = currentTick,
-            VotingOpenTick = currentTick,
-            VotingCloseTick = currentTick + DividendPolicyVotingWindowTicks,
-        };
-        db.DividendProposals.Add(proposal);
-        await db.SaveChangesAsync();
-        return MapDividendProposalResult(proposal, 0m, 0m, currentTick, null);
     }
 
     private async Task ResolveDividendPolicyProposalAsync(AppDbContext db, DividendProposal proposal, long currentTick)
