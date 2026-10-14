@@ -107,7 +107,9 @@ void main() {
 
     // Trigger a real network failure through the News screen so
     // GraphQlService logs it.
-    await tester.tap(find.text('News'));
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ListTile, 'News'));
     await tester.pumpAndSettle();
     expect(find.text('Could not load the news feed. Please try again.'), findsOneWidget);
 

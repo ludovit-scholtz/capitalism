@@ -1,15 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/i18n/locale_state.dart';
 import '../../core/theme/app_icons.dart';
+import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/app_number_format.dart';
+import '../../core/widgets/animated_number.dart';
+import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/icon_badge.dart';
+import '../../core/widgets/stat_tile.dart';
 import '../buildings/building_analytics_models.dart';
 import '../buildings/building_panel_models.dart';
 import 'dashboard_models.dart';
 import 'dashboard_power_balance_chip.dart';
 import 'dashboard_supply_chain_strip.dart';
+import 'quick_action_tile.dart';
 
 class DashboardCompanyCard extends StatelessWidget {
   const DashboardCompanyCard({
@@ -46,62 +54,103 @@ class DashboardCompanyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cityIds = {for (final b in company.buildings) if (b.cityId.isNotEmpty) b.cityId}.toList();
+    final cityIds = {
+      for (final b in company.buildings)
+        if (b.cityId.isNotEmpty) b.cityId
+    }.toList();
 
-    return Card(
+    final languageCode = context.watch<LocaleState>().languageCode;
+    return GlassCard(
       key: ValueKey('company-card-${company.id}'),
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(company.name, style: theme.textTheme.titleLarge),
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const IconBadge(icon: AppIcons.business, size: 40, iconSize: 18),
+              const SizedBox(width: AppSpacing.sm + 4),
+              Expanded(child: Text(company.name, style: theme.textTheme.titleLarge, overflow: TextOverflow.ellipsis)),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              Expanded(
+                child: StatTile(
+                  label: 'Cash',
+                  icon: Icons.account_balance_wallet_outlined,
+                  color: AppTheme.neonGreen,
+                  valueWidget: AnimatedNumber(
+                    value: company.cash,
+                    // Whole units only: mid-tween values would otherwise flicker between
+                    // whole-dollar and cents formatting.
+                    builder: (v) => AppNumberFormat.money(v == company.cash ? v : v.roundToDouble(), languageCode: languageCode),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: StatTile(
+                  label: 'Buildings',
+                  icon: Icons.apartment_outlined,
+                  color: AppTheme.neonViolet,
+                  value: AppNumberFormat.number(company.buildings.length, languageCode: languageCode),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              QuickActionTile(
+                icon: AppIcons.buildingMarket,
+                label: 'Buy Building',
+                onTap: () => context.go('/buy-building/${company.id}'),
+              ),
+              QuickActionTile(
+                icon: AppIcons.bankStatement,
+                label: 'Ledger',
+                onTap: () => context.go('/ledger/${company.id}'),
+              ),
+              QuickActionTile(
+                icon: AppIcons.contracts,
+                label: 'Contracts',
+                onTap: () => context.go('/company/${company.id}/contracts'),
+              ),
+              QuickActionTile(
+                icon: AppIcons.upgrade,
+                label: 'Research',
+                onTap: () => context.go('/company/${company.id}/research'),
+              ),
+              QuickActionTile(
+                icon: AppIcons.settings,
+                label: 'Settings',
+                onTap: () => context.go('/company/${company.id}/settings'),
+              ),
+            ],
+          ),
+          if (company.buildings.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text('Buildings', style: theme.textTheme.titleMedium),
             const SizedBox(height: 4),
-            Text('Cash: \$${company.cash.toStringAsFixed(0)} · ${company.buildings.length} building(s)'),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                OutlinedButton(
-                  onPressed: () => context.go('/buy-building/${company.id}'),
-                  child: const Text('Buy Building'),
-                ),
-                OutlinedButton(onPressed: () => context.go('/ledger/${company.id}'), child: const Text('Ledger')),
-                OutlinedButton(
-                  onPressed: () => context.go('/company/${company.id}/contracts'),
-                  child: const Text('Contracts'),
-                ),
-                OutlinedButton(
-                  onPressed: () => context.go('/company/${company.id}/research'),
-                  child: const Text('Research'),
-                ),
-                OutlinedButton(
-                  onPressed: () => context.go('/company/${company.id}/settings'),
-                  child: const Text('Settings'),
-                ),
-              ],
-            ),
-            if (company.buildings.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Text('Buildings', style: theme.textTheme.titleMedium),
-              const SizedBox(height: 4),
-              for (final building in company.buildings)
-                DashboardBuildingTile(
-                  building: building,
-                  removing: removingBuildingIds.contains(building.id),
-                  onRemove: onRemoveBuilding == null ? null : () => onRemoveBuilding!(building.id),
-                  financials: buildingFinancials[building.id],
-                  unitStatuses: unitStatuses[building.id] ?? const [],
-                ),
-              if (cityIds.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                for (final cityId in cityIds) DashboardPowerBalanceChip(cityId: cityId, balance: cityPowerBalances[cityId]),
-              ],
+            for (final building in company.buildings)
+              DashboardBuildingTile(
+                building: building,
+                removing: removingBuildingIds.contains(building.id),
+                onRemove: onRemoveBuilding == null ? null : () => onRemoveBuilding!(building.id),
+                financials: buildingFinancials[building.id],
+                unitStatuses: unitStatuses[building.id] ?? const [],
+              ),
+            if (cityIds.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              for (final cityId in cityIds)
+                DashboardPowerBalanceChip(cityId: cityId, balance: cityPowerBalances[cityId]),
             ],
           ],
-        ),
+        ],
       ),
     );
   }
@@ -138,7 +187,8 @@ class DashboardBuildingTile extends StatelessWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Remove destroyed building?'),
-        content: Text('"${building.name}" was destroyed and can be removed from your dashboard. This cannot be undone.'),
+        content:
+            Text('"${building.name}" was destroyed and can be removed from your dashboard. This cannot be undone.'),
         actions: [
           TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
           FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Remove')),
@@ -229,13 +279,14 @@ class _FinancialStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final languageCode = context.watch<LocaleState>().languageCode;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(label, style: theme.textTheme.labelSmall),
         Text(
-          '\$${value.toStringAsFixed(0)}',
+          AppNumberFormat.compactMoney(value, languageCode: languageCode),
           style: (emphasize ? theme.textTheme.labelLarge : theme.textTheme.labelMedium)?.copyWith(
             color: emphasize ? (value >= 0 ? Colors.green : theme.colorScheme.error) : null,
           ),

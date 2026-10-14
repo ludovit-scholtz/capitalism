@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -154,23 +155,71 @@ class AppShell extends StatelessWidget {
             ),
           ),
         ),
-        body: child,
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _bottomIndexFor(GoRouterState.of(context).uri.toString()),
-          destinations: const [
-            NavigationDestination(icon: FaIcon(AppIcons.home, size: 20), label: 'Home'),
-            NavigationDestination(icon: FaIcon(AppIcons.dashboard, size: 20), label: 'Dashboard'),
-            NavigationDestination(icon: FaIcon(AppIcons.factory, size: 20), label: 'Last Building'),
-            NavigationDestination(icon: FaIcon(AppIcons.bankStatement, size: 20), label: 'Bank Statement'),
-            NavigationDestination(icon: FaIcon(AppIcons.forex, size: 20), label: 'Forex'),
-            NavigationDestination(icon: FaIcon(AppIcons.stocks, size: 20), label: 'Stocks'),
-            NavigationDestination(icon: FaIcon(AppIcons.news, size: 20), label: 'News'),
+        body: Row(
+          children: [
+            if (isWideScreen) ...[
+              Builder(
+                builder: (ctx) => LayoutBuilder(
+                  builder: (_, constraints) => SingleChildScrollView(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                      child: IntrinsicHeight(
+                        child: NavigationRail(
+                          selectedIndex: _destinationIndexFor(GoRouterState.of(ctx).uri.path),
+                          labelType: NavigationRailLabelType.all,
+                          backgroundColor: Colors.transparent,
+                          destinations: [
+                            for (final d in _destinations)
+                              NavigationRailDestination(icon: FaIcon(d.icon, size: 20), label: Text(d.label)),
+                          ],
+                          onDestinationSelected: (index) => _handleBottomTap(ctx, index),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const VerticalDivider(width: 1),
+            ],
+            // Keyed so the active screen keeps its state when a resize or
+            // rotation crosses the wide-screen breakpoint.
+            Expanded(key: const ValueKey('shell-body'), child: child),
           ],
-          onDestinationSelected: (index) => _handleBottomTap(context, index),
         ),
+        bottomNavigationBar: isWideScreen
+            ? null
+            : Builder(
+                builder: (ctx) => NavigationBar(
+                  selectedIndex: _destinationIndexFor(GoRouterState.of(ctx).uri.path),
+                  destinations: [
+                    for (final d in _destinations)
+                      NavigationDestination(icon: FaIcon(d.icon, size: 20), label: d.label),
+                  ],
+                  onDestinationSelected: (index) => _handleBottomTap(ctx, index),
+                ),
+              ),
       ),
     );
   }
+
+  /// The five primary destinations (Material 3 allows 3-5). Everything else
+  /// lives behind "More", which opens the drawer. Each destination owns its
+  /// navigation so reordering the list can't desync labels from routes.
+  static final _destinations = <_ShellDestination>[
+    _ShellDestination('Home', AppIcons.home, (ctx) => ctx.go('/')),
+    _ShellDestination('Dashboard', AppIcons.dashboard, (ctx) => ctx.go('/dashboard')),
+    _ShellDestination('Buildings', AppIcons.factory, (ctx) {
+      final lastBuildingId = ctx.read<RecentBuildingState>().lastBuildingId;
+      ctx.go(lastBuildingId != null ? '/building/$lastBuildingId' : '/buildings/market');
+    }),
+    // Forex is auth-only; signed-out players get the public Stocks screen.
+    _ShellDestination(
+      'Markets',
+      AppIcons.forex,
+      (ctx) => ctx.go(ctx.read<AuthState>().isAuthenticated ? '/forex' : '/stocks'),
+    ),
+    _ShellDestination('More', AppIcons.menu, (ctx) => Scaffold.of(ctx).openDrawer()),
+  ];
 
   List<NavItem> _visibleItems(NavSection section, AuthState auth) {
     return section.items
@@ -194,32 +243,30 @@ class AppShell extends StatelessWidget {
   }
 
   void _handleBottomTap(BuildContext context, int index) {
-    switch (index) {
-      case 0:
-        context.go('/');
-      case 1:
-        context.go('/dashboard');
-      case 2:
-        final lastBuildingId = context.read<RecentBuildingState>().lastBuildingId;
-        context.go(lastBuildingId != null ? '/building/$lastBuildingId' : '/buildings/market');
-      case 3:
-        context.go('/bank-statement');
-      case 4:
-        context.go('/forex');
-      case 5:
-        context.go('/stocks');
-      case 6:
-        context.go('/news');
-    }
+    unawaited(HapticFeedback.selectionClick());
+    _destinations[index].onSelected(context);
   }
 
-  int _bottomIndexFor(String location) {
-    if (location.startsWith('/dashboard')) return 1;
-    if (location.startsWith('/building')) return 2;
-    if (location.startsWith('/bank-statement')) return 3;
-    if (location.startsWith('/forex')) return 4;
-    if (location.startsWith('/stocks')) return 5;
-    if (location.startsWith('/news')) return 6;
-    return 0;
+  /// True when [location] is [prefix] or a sub-route of it (segment-safe, so
+  /// `/market` does not match `/market-intelligence`).
+  static bool _isUnder(String location, String prefix) => location == prefix || location.startsWith('$prefix/');
+
+  int _destinationIndexFor(String location) {
+    bool under(List<String> prefixes) => prefixes.any((p) => _isUnder(location, p));
+    if (under(['/dashboard'])) return 1;
+    if (under(['/building', '/buildings'])) return 2;
+    if (under(['/forex', '/stocks', '/stock', '/market', '/exchange', '/energy-market'])) return 3;
+    if (location == '/' || under(['/login', '/register', '/auth', '/onboarding', '/forgot-password', '/reset-password'])) {
+      return 0;
+    }
+    return 4;
   }
+}
+
+class _ShellDestination {
+  const _ShellDestination(this.label, this.icon, this.onSelected);
+
+  final String label;
+  final FaIconData icon;
+  final void Function(BuildContext context) onSelected;
 }

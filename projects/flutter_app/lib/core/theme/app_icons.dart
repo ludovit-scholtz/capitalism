@@ -14,6 +14,7 @@ class AppIcons {
 
   // Main nav
   static const home = FontAwesomeIcons.house;
+  static const menu = FontAwesomeIcons.ellipsis;
   static const dashboard = FontAwesomeIcons.gaugeHigh;
   static const leaderboard = FontAwesomeIcons.trophy;
   static const cities = FontAwesomeIcons.city;

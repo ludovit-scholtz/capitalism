@@ -34,6 +34,7 @@ import '../../core/services/url_opener.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/utils/game_time.dart';
 import '../../core/widgets/icon_badge.dart';
+import '../../core/widgets/state_view.dart';
 import '../buildings/building_analytics_models.dart';
 import '../buildings/building_panel_models.dart';
 import '../company/company_models.dart';
@@ -321,22 +322,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const StateView.loading();
     }
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(_error!),
-              const SizedBox(height: 12),
-              OutlinedButton(onPressed: _bootstrap, child: const Text('Try Again')),
-            ],
-          ),
-        ),
-      );
+      return StateView.error(message: _error!, onRetry: _bootstrap, retryLabel: 'Try Again');
     }
 
     final data = _data!;
