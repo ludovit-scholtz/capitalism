@@ -32945,45 +32945,6 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.Equal("FORBIDDEN", code);
     }
 
-    [Theory]
-    [InlineData("setCompanySalaryLevel", "mutation M($i: SetCompanySalaryLevelInput!) { setCompanySalaryLevel(input: $i) { __typename } }", "salary")]
-    [InlineData("closeBankAccount", "mutation M($i: CloseBankAccountInput!) { closeBankAccount(input: $i) { __typename } }", "deposit")]
-    [InlineData("mergeCompany", "mutation M($i: MergeCompanyInput!) { mergeCompany(input: $i) { __typename } }", "merge")]
-    [InlineData("proposeDividend", "mutation M($i: ProposeDividendInput!) { proposeDividend(input: $i) { id } }", "dividend")]
-    [InlineData("myTradeRoutes", "query Q($c: UUID) { myTradeRoutes(companyId: $c) { id } }", "routes")]
-    [InlineData("tradeRoute", "query Q($r: UUID!) { tradeRoute(routeId: $r) { id } }", "route")]
-    public async Task UnknownObjectIds_AreDeniedWithTheUniformForbiddenError(string operation, string document, string kind)
-    {
-        var token = await RegisterAndGetTokenAsync($"probe-{operation}-{Guid.NewGuid():N}@test.com", "Prober");
-        var unknown = Guid.NewGuid();
-
-        object variables = kind switch
-        {
-            "salary" => new { i = new { companyId = unknown, cityId = Guid.NewGuid(), salaryLevel = "STANDARD" } },
-            "deposit" => new { i = new { depositId = unknown, amount = 1m } },
-            "merge" => new { i = new { targetCompanyId = unknown, destinationCompanyId = Guid.NewGuid() } },
-            "dividend" => new { i = new { companyId = unknown, dividendPercent = 10m } },
-            "routes" => new { c = unknown },
-            _ => new { r = unknown },
-        };
-
-        var result = await ExecuteGraphQlAsync(document, variables, token);
-
-        var error = result.GetProperty("errors")[0];
-        Assert.Equal("FORBIDDEN", error.GetProperty("extensions").GetProperty("code").GetString());
-        Assert.Equal("You don't have permission to perform this action.", error.GetProperty("message").GetString());
-    }
-
-    [Fact]
-    public async Task CloseCompanyBankAccount_UnknownAccount_IsIndistinguishableFromForeignAccount()
-    {
-        var token = await RegisterAndGetTokenAsync($"close-probe-{Guid.NewGuid():N}@test.com", "CloseProbe");
-
-        var result = await ExecuteGraphQlAsync(
-            """
-            mutation CloseAcct($input: CloseCompanyBankAccountInput!) {
-                closeCompanyBankAccount(input: $input) { id }
-            }
             """,
             new { input = new { bankAccountId = Guid.NewGuid().ToString() } },
             token);

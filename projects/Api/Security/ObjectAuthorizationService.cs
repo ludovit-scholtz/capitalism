@@ -27,7 +27,7 @@ public sealed class ObjectAuthorizationService(
         var entity = await loadEntityAsync(cancellationToken);
         if (entity is null)
         {
-            throw BuildAndLogDeniedException(
+            throw Deny(
                 actorUserId,
                 requestedObjectType,
                 requestedObjectId,
@@ -36,7 +36,7 @@ public sealed class ObjectAuthorizationService(
 
         if (!isOwnedByActor(entity))
         {
-            throw BuildAndLogDeniedException(
+            throw Deny(
                 actorUserId,
                 requestedObjectType,
                 requestedObjectId,
@@ -91,11 +91,4 @@ public sealed class ObjectAuthorizationService(
                 .SetMessage(FriendlyMessage)
                 .SetCode(NotFoundOrNotOwnedCode)
                 .Build());
-
-    private GraphQLException BuildAndLogDeniedException(
-        Guid actorUserId,
-        string requestedObjectType,
-        Guid requestedObjectId,
-        string actualFailureReason) =>
-        Deny(actorUserId, requestedObjectType, requestedObjectId, actualFailureReason);
 }
