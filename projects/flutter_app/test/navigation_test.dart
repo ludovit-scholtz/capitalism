@@ -92,6 +92,14 @@ void main() {
       expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 4);
     });
 
+    testWidgets('Home stays highlighted when the root route carries a query string', (tester) async {
+      final router = createAppRouter();
+      await pumpCapitalismApp(tester, router: router);
+      router.go('/?ref=push');
+      await tester.pumpAndSettle();
+      expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 0);
+    });
+
     testWidgets('More tab opens the full drawer without navigating', (tester) async {
       await pumpCapitalismApp(tester);
 

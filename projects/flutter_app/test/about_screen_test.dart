@@ -10,23 +10,23 @@ import 'package:http/testing.dart';
 import 'support/app_harness.dart';
 
 Map<String, dynamic> _serverJson({required String key, required bool online}) => {
-      'id': key,
-      'serverKey': key,
-      'displayName': key,
-      'description': '',
-      'region': 'local',
-      'environment': 'local',
-      'backendUrl': 'http://localhost:44356',
-      'graphqlUrl': 'http://localhost:44356/graphql',
-      'frontendUrl': '',
-      'version': '1.0.0',
-      'playerCount': 0,
-      'companyCount': 0,
-      'currentTick': 0,
-      'registeredAtUtc': '2026-01-01T00:00:00Z',
-      'lastHeartbeatAtUtc': '2026-01-01T00:00:00Z',
-      'isOnline': online,
-    };
+  'id': key,
+  'serverKey': key,
+  'displayName': key,
+  'description': '',
+  'region': 'local',
+  'environment': 'local',
+  'backendUrl': 'http://localhost:44356',
+  'graphqlUrl': 'http://localhost:44356/graphql',
+  'frontendUrl': '',
+  'version': '1.0.0',
+  'playerCount': 0,
+  'companyCount': 0,
+  'currentTick': 0,
+  'registeredAtUtc': '2026-01-01T00:00:00Z',
+  'lastHeartbeatAtUtc': '2026-01-01T00:00:00Z',
+  'isOnline': online,
+};
 
 /// Serves both the Home screen's status query and the Master API's
 /// `GetGameServers` query, so switching environments can auto-reconnect.

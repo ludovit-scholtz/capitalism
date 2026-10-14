@@ -12,7 +12,7 @@ final _backendDirs = ['../Api', '../MasterApi'];
 /// `public ... Name(` resolver methods in `Query*.cs` / `Mutation*.cs`.
 Map<String, Set<String>> _backendFields() {
   final out = {'query': <String>{}, 'mutation': <String>{}};
-  final method = RegExp(r'public\s+(?:static\s+)?(?:async\s+)?[\w<>\[\]?,.\s]+?\s+(\w+)\s*\(');
+  final method = RegExp(r'public\s+(?!static\b)(?:async\s+)?[\w<>\[\]?,.\s]+?\s+(\w+)\s*\(');
   final gqlName = RegExp(r'\[GraphQLName\("(\w+)"\)\]');
   for (final dir in _backendDirs) {
     final root = Directory(dir);
@@ -59,7 +59,8 @@ class _Op {
 /// Extracts `r'''query|mutation ... '''` documents and their depth-1 fields.
 List<_Op> _appOperations() {
   final ops = <_Op>[];
-  final doc = RegExp(r"r'''\s*((?:query|mutation)\b.*?)'''", dotAll: true);
+  // Raw or plain, ''' or """ delimited documents.
+  final doc = RegExp(r'''r?(?:'{3}|"{3})\s*((?:query|mutation)\b.*?)(?:'{3}|"{3})''', dotAll: true);
   for (final f in Directory('lib').listSync(recursive: true).whereType<File>()) {
     if (!f.path.endsWith('.dart')) continue;
     final src = f.readAsStringSync();
@@ -75,7 +76,8 @@ List<_Op> _appOperations() {
 
 List<String> _rootFields(String text) {
   // Drop the `(...)` variable definitions of the operation itself.
-  var s = text;
+  // Directives like `@include(if: $x)` are not fields.
+  var s = text.replaceAll(RegExp(r'@\w+(\([^)]*\))?'), '');
   final firstBrace = s.indexOf('{');
   s = s.substring(firstBrace + 1);
   final fields = <String>[];

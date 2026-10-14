@@ -51,8 +51,8 @@ class DashboardScreen extends StatefulWidget {
     GraphQlService? graphQlService,
     DashboardService? dashboardService,
     this.urlOpener = const ExternalUrlOpener(),
-  })  : _injectedGraphQlService = graphQlService,
-        _injectedDashboardService = dashboardService;
+  }) : _injectedGraphQlService = graphQlService,
+       _injectedDashboardService = dashboardService;
 
   final GraphQlService? _injectedGraphQlService;
   final DashboardService? _injectedDashboardService;
@@ -242,10 +242,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   /// Launches the new company, then routes to `/buy-building/:companyId` —
   /// see the top-of-file comment on the deliberate deviation from web's
   /// (non-functional) `/onboarding?companyId=` redirect.
-  Future<void> _launchNewCompany(
-      {required String companyName, required String cityId, required double ipoRaiseTarget}) async {
-    final result =
-        await _service.startAdditionalCompany(companyName: companyName, cityId: cityId, ipoRaiseTarget: ipoRaiseTarget);
+  Future<void> _launchNewCompany({required String companyName, required String cityId, required double ipoRaiseTarget}) async {
+    final result = await _service.startAdditionalCompany(companyName: companyName, cityId: cityId, ipoRaiseTarget: ipoRaiseTarget);
     if (!mounted) return;
     context.go('/buy-building/${result.id}');
   }

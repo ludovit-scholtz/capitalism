@@ -39,7 +39,8 @@ class StateView extends StatelessWidget {
     if (_kind == _StateKind.loading) {
       return Semantics(
         label: 'Loading',
-        child: const Padding(
+        child: const SingleChildScrollView(
+          physics: NeverScrollableScrollPhysics(),
           padding: EdgeInsets.all(AppSpacing.md),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

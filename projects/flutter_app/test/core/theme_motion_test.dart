@@ -20,5 +20,7 @@ void main() {
     final style = AppTheme.dark.filledButtonTheme.style!;
     final size = style.minimumSize!.resolve({});
     expect(size!.height, greaterThanOrEqualTo(48));
+    final outlined = AppTheme.dark.outlinedButtonTheme.style!.minimumSize!.resolve({});
+    expect(outlined!.height, greaterThanOrEqualTo(48));
   });
 }

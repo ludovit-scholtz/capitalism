@@ -18,34 +18,30 @@ class StatTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final accent = color ?? theme.colorScheme.primary;
-    return Semantics(
-      container: true,
-      label: value == null ? label : '$label $value',
-      child: ExcludeSemantics(
-        child: Container(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          decoration: BoxDecoration(
-            color: accent.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(color: accent.withValues(alpha: 0.28)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  if (icon != null) ...[Icon(icon, size: 14, color: accent), const SizedBox(width: AppSpacing.xs + 2)],
-                  Flexible(child: Text(label, style: theme.textTheme.labelSmall, overflow: TextOverflow.ellipsis)),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              DefaultTextStyle.merge(
-                style: theme.textTheme.titleLarge?.copyWith(color: accent),
-                child: valueWidget ?? Text(value!, overflow: TextOverflow.ellipsis),
-              ),
-            ],
-          ),
+    return MergeSemantics(
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: accent.withValues(alpha: 0.28)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                if (icon != null) ...[Icon(icon, size: 14, color: accent), const SizedBox(width: AppSpacing.xs + 2)],
+                Flexible(child: Text(label, style: theme.textTheme.labelSmall, overflow: TextOverflow.ellipsis)),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            DefaultTextStyle.merge(
+              style: theme.textTheme.titleLarge?.copyWith(color: accent),
+              child: valueWidget ?? Text(value!, overflow: TextOverflow.ellipsis),
+            ),
+          ],
         ),
       ),
     );

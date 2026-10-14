@@ -243,6 +243,13 @@ void main() {
       for (final label in ['Buy Building', 'Ledger', 'Contracts', 'Research', 'Settings']) {
         expect(find.widgetWithText(QuickActionTile, label), findsOneWidget, reason: label);
       }
+      final handle = tester.ensureSemantics();
+      expect(
+        tester.getSemantics(
+            find.descendant(of: find.widgetWithText(QuickActionTile, 'Ledger'), matching: find.text('Ledger'))),
+        matchesSemantics(label: 'Ledger', isButton: true, hasTapAction: true, hasFocusAction: true, isFocusable: true),
+      );
+      handle.dispose();
       await tester.tap(find.widgetWithText(QuickActionTile, 'Buy Building'));
       await tester.pumpAndSettle();
       expect(find.text('Buy Building company-1'), findsOneWidget);

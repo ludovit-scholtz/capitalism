@@ -25,9 +25,15 @@ void main() {
       expect(taps, 1);
     });
 
-    testWidgets('exposes button semantics only when tappable', (tester) async {
+    testWidgets('is not an InkWell when static, and exposes a tap action when tappable', (tester) async {
+      final handle = tester.ensureSemantics();
       await tester.pumpWidget(_host(const GlassCard(child: Text('static'))));
       expect(find.byType(InkWell), findsNothing);
+
+      await tester.pumpWidget(_host(GlassCard(onTap: () {}, child: const Text('tap me'))));
+      expect(tester.getSemantics(find.text('tap me')),
+          matchesSemantics(hasTapAction: true, hasFocusAction: true, isFocusable: true, label: 'tap me'));
+      handle.dispose();
     });
   });
 
@@ -81,6 +87,15 @@ void main() {
       expect(find.text(r'$1.2K'), findsOneWidget);
     });
 
+    testWidgets('announces the value when built with valueWidget (e.g. AnimatedNumber)', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(
+        _host(StatTile(label: 'Cash', valueWidget: AnimatedNumber(value: 42, builder: (v) => '\$${v.round()}'))),
+      );
+      expect(find.bySemanticsLabel(RegExp(r'Cash.*\$42', dotAll: true)), findsOneWidget);
+      handle.dispose();
+    });
+
     testWidgets('merges label and value into one semantics node', (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(_host(const StatTile(label: 'Cash', value: '5', icon: Icons.attach_money)));
@@ -94,6 +109,11 @@ void main() {
       await tester.pumpWidget(_host(const StateView.loading()));
       expect(find.byType(SkeletonBox), findsWidgets);
       expect(find.byType(CircularProgressIndicator), findsNothing);
+    });
+
+    testWidgets('loading does not overflow in a short viewport (landscape phone)', (tester) async {
+      await tester.pumpWidget(_host(const SizedBox(height: 200, child: StateView.loading())));
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('empty shows title and message', (tester) async {

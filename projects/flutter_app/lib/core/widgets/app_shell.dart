@@ -160,7 +160,7 @@ class AppShell extends StatelessWidget {
                 children: [
                   Builder(
                     builder: (ctx) => NavigationRail(
-                      selectedIndex: _destinationIndexFor(GoRouterState.of(ctx).uri.toString()),
+                      selectedIndex: _destinationIndexFor(GoRouterState.of(ctx).uri.path),
                       labelType: NavigationRailLabelType.all,
                       backgroundColor: Colors.transparent,
                       destinations: [
@@ -179,7 +179,7 @@ class AppShell extends StatelessWidget {
             ? null
             : Builder(
                 builder: (ctx) => NavigationBar(
-                  selectedIndex: _destinationIndexFor(GoRouterState.of(ctx).uri.toString()),
+                  selectedIndex: _destinationIndexFor(GoRouterState.of(ctx).uri.path),
                   destinations: [
                     for (final d in _destinations)
                       NavigationDestination(icon: FaIcon(d.icon, size: 20), label: d.label),
