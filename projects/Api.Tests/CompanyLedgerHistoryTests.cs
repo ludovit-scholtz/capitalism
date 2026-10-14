@@ -2,6 +2,7 @@ using Api.Data;
 using Api.Data.Entities;
 using Api.Tests.Infrastructure;
 using Api.Utilities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Api.Tests;
@@ -14,7 +15,7 @@ namespace Api.Tests;
 /// </summary>
 public sealed class CompanyLedgerHistoryTests
 {
-    private const long TicksPerYear = 24 * 365;
+    private const long TicksPerYear = Api.Engine.GameConstants.TicksPerYear;
 
     private const string Query = """
         query Ledger($companyId: UUID!) {
@@ -44,6 +45,25 @@ public sealed class CompanyLedgerHistoryTests
         Description = "history test",
         RecordedAtUtc = DateTime.UtcNow,
     };
+
+    [Fact]
+    public void HistoryAggregateQuery_TranslatesToGroupedSqlForNpgsql()
+    {
+        // The unit tests run on the InMemory provider, which evaluates LINQ on the client and would hide a
+        // query PostgreSQL cannot translate. Building the SQL with the Npgsql provider (no connection is
+        // opened) proves the production query translates and is grouped in the database.
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql("Host=localhost;Database=ledger-query-translation;Username=test;Password=test")
+            .Options;
+        using var dbContext = new AppDbContext(options);
+
+        var sql = Api.Types.Query.HistoryAggregateQuery(dbContext.LedgerEntries, Guid.NewGuid()).ToQueryString();
+
+        Assert.Contains("GROUP BY", sql, StringComparison.Ordinal);
+        Assert.Contains("SUM(", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("MIN(", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("MAX(", sql, StringComparison.OrdinalIgnoreCase);
+    }
 
     [Fact]
     public async Task History_AggregatesEachGameYearLikeRowByRowAccounting()

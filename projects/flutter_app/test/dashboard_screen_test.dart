@@ -395,21 +395,21 @@ void main() {
       final auth = AuthState(storage: InMemoryTokenStorage());
       await auth.setToken('test-token');
       CompanyLedger ledger(double revenue) => CompanyLedger(
-        companyName: 'Acme Furnishings',
-        gameYear: 5,
-        currentCash: 1,
-        primaryCurrencyCode: 'USD',
-        totalRevenue: revenue,
-        totalPurchasingCosts: 0,
-        totalShippingCosts: 0,
-        totalLaborCosts: 0,
-        totalEnergyCosts: 0,
-        totalMarketingCosts: 0,
-        totalTaxPaid: 0,
-        totalOtherCosts: 0,
-        netIncome: 1,
-        totalAssets: 1,
-      );
+            companyName: 'Acme Furnishings',
+            gameYear: 5,
+            currentCash: 1,
+            primaryCurrencyCode: 'USD',
+            totalRevenue: revenue,
+            totalPurchasingCosts: 0,
+            totalShippingCosts: 0,
+            totalLaborCosts: 0,
+            totalEnergyCosts: 0,
+            totalMarketingCosts: 0,
+            totalTaxPaid: 0,
+            totalOtherCosts: 0,
+            netIncome: 1,
+            totalAssets: 1,
+          );
       final service = FakeDashboardService(
         data: const DashboardData(companies: [_company], currentTick: 1, taxRate: 15, pendingActions: []),
       );
@@ -437,6 +437,33 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.descendant(of: card, matching: find.textContaining('2,222')), findsOneWidget);
       expect(find.descendant(of: card, matching: find.textContaining('1,111')), findsNothing);
+    });
+
+    testWidgets('a silent refresh keeps a failed ledger card on its error instead of flashing a skeleton',
+        (tester) async {
+      final auth = AuthState(storage: InMemoryTokenStorage());
+      await auth.setToken('test-token');
+      final service = FakeDashboardService(
+        data: const DashboardData(companies: [_company], currentTick: 1, taxRate: 15, pendingActions: []),
+      );
+      service.ledgerErrors['company-1'] = Exception('still down');
+
+      await _pumpDashboard(tester, auth: auth, service: service);
+      final card = find.byKey(const Key('overview-ledger-company-1'));
+      expect(find.descendant(of: card, matching: find.text('Could not load financial data.')), findsOneWidget);
+
+      // The next refresh is slow; while it runs the card must keep showing the error + Retry.
+      service.ledgerGates['company-1'] = Completer<void>();
+      await tester.fling(find.text('Financial summary'), const Offset(0, 300), 1000);
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(service.fetchCompanyOverviewLedgerCallCount, 2);
+      expect(find.descendant(of: card, matching: find.text('Could not load financial data.')), findsOneWidget);
+      expect(find.descendant(of: card, matching: find.byType(SkeletonBox)), findsNothing);
+
+      service.ledgerGates['company-1']!.complete();
+      await tester.pumpAndSettle();
     });
 
     testWidgets('a ledger that fails to load shows an error with Retry instead of an endless spinner', (tester) async {

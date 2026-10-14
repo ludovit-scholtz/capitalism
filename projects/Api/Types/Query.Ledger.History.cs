@@ -1,10 +1,35 @@
 using Api.Data.Entities;
+using Api.Engine;
 using Api.Utilities;
 
 namespace Api.Types;
 
 public sealed partial class Query
 {
+    /// <summary>One database-side group: a game year (0-based index), category and sign of a company's ledger rows.</summary>
+    internal sealed record LedgerYearAggregateRow(long YearIndex, string Category, decimal Total, long FirstTick, long LastTick);
+
+    /// <summary>
+    /// Groups a company's ledger rows per game year / category / sign (positive vs non-positive amounts) in the
+    /// database. Kept as one named query so a test can prove it translates for PostgreSQL (the unit tests run on
+    /// the InMemory provider, which would not notice an untranslatable expression).
+    /// </summary>
+    internal static IQueryable<LedgerYearAggregateRow> HistoryAggregateQuery(IQueryable<LedgerEntry> ledgerEntries, Guid companyId) =>
+        ledgerEntries
+            .Where(e => e.CompanyId == companyId)
+            .GroupBy(e => new
+            {
+                YearIndex = (e.RecordedAtTick < 0L ? 0L : e.RecordedAtTick) / GameConstants.TicksPerYear,
+                e.Category,
+                IsPositive = e.Amount > 0m,
+            })
+            .Select(group => new LedgerYearAggregateRow(
+                group.Key.YearIndex,
+                group.Key.Category,
+                group.Sum(e => e.Amount),
+                group.Min(e => e.RecordedAtTick),
+                group.Max(e => e.RecordedAtTick)));
+
     /// <summary>
     /// Pre-aggregated ledger rows of one game year: the sum of all amounts of one category and sign
     /// (positive or non-positive) plus the first and last tick among those rows.

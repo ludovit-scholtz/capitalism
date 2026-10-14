@@ -31,6 +31,7 @@ public sealed partial class Query
             .AsNoTracking()
             .Include(c => c.BankAccounts)
             .Include(c => c.Buildings).ThenInclude(b => b.City)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(c => c.Id == companyId && c.PlayerId == userId);
 
         if (company is null) return null;
@@ -63,24 +64,7 @@ public sealed partial class Query
         // History only needs per game-year / category / sign sums plus the first and last tick, so the
         // database aggregates it. Loading every ledger row of the company on each request made this query
         // (and the dashboard's Financial summary) slower the longer a company had been playing.
-        var historyAggregates = await db.LedgerEntries
-            .AsNoTracking()
-            .Where(e => e.CompanyId == companyId)
-            .GroupBy(e => new
-            {
-                YearIndex = (e.RecordedAtTick < 0L ? 0L : e.RecordedAtTick) / GameConstants.TicksPerYear,
-                e.Category,
-                IsPositive = e.Amount > 0m,
-            })
-            .Select(group => new
-            {
-                group.Key.YearIndex,
-                group.Key.Category,
-                Total = group.Sum(e => e.Amount),
-                FirstTick = group.Min(e => e.RecordedAtTick),
-                LastTick = group.Max(e => e.RecordedAtTick),
-            })
-            .ToListAsync();
+        var historyAggregates = await HistoryAggregateQuery(db.LedgerEntries.AsNoTracking(), companyId).ToListAsync();
 
         var totalRevenue = LedgerCalculator.GetTotalRevenue(entries);
         var totalGovernmentContractRevenue = entries

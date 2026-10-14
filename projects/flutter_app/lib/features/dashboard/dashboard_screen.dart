@@ -86,6 +86,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   /// of a request that is still running.
   final Map<String, int> _ledgerRequestSeq = {};
 
+  /// Monotonic across all companies, so a company that leaves and later
+  /// re-enters the list can never reuse a number an old in-flight request holds.
+  int _ledgerRequestCounter = 0;
+
   AdditionalCompanyPrerequisites? _newCompanyPrerequisites;
   List<NewCompanyCity> _newCompanyCities = const [];
 
@@ -278,8 +282,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   /// replacing good data with an error.
   Future<void> _loadLedger(String companyId, {bool silent = false}) async {
     if (!mounted) return;
-    final seq = _ledgerRequestSeq[companyId] = (_ledgerRequestSeq[companyId] ?? 0) + 1;
-    if (!silent || !_ledgers.containsKey(companyId)) {
+    final seq = _ledgerRequestSeq[companyId] = ++_ledgerRequestCounter;
+    // Only a user-initiated load (first open, Retry) shows the skeleton. A silent
+    // refresh leaves the card as it is — data, error + Retry, or the skeleton that
+    // is already showing — so a tick refresh never makes a card flicker.
+    if (!silent) {
       setState(() {
         _loadingLedgerIds.add(companyId);
         _failedLedgerIds.remove(companyId);
