@@ -3,7 +3,6 @@ using Api.Data.Entities;
 using Api.Engine;
 using Api.Security;
 using Api.Utilities;
-using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 namespace Api.Types;

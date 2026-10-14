@@ -9182,7 +9182,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
       const vars = body.variables?.input as { positionId: string; shareFraction: number } | undefined
       const pool = state.goldAmmPools.find((p) => p.myPosition?.id === vars?.positionId)
-      if (!pool || !pool.myPosition) return routeJsonError('Position not found.', 'POSITION_NOT_FOUND')
+      if (!pool || !pool.myPosition) return routeJsonError("You don't have permission to perform this action.", 'FORBIDDEN')
       const fraction = Math.min(1, Math.max(0, vars?.shareFraction ?? 1))
       const sharesToRemove = pool.myPosition.liquidityShares * fraction
       const fiatReturned = (sharesToRemove / pool.totalLiquidityShares) * pool.fiatReserve
@@ -11082,7 +11082,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             status: 200,
             contentType: 'application/json',
             body: JSON.stringify({
-              errors: [{ message: 'Bank account not found or already closed.', extensions: { code: 'ACCOUNT_NOT_FOUND' } }],
+              errors: [{ message: "You don't have permission to perform this action.", extensions: { code: 'FORBIDDEN' } }],
             }),
           })
         }
@@ -11115,7 +11115,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          errors: [{ message: 'Bank account not found or already closed.', extensions: { code: 'ACCOUNT_NOT_FOUND' } }],
+          errors: [{ message: "You don't have permission to perform this action.", extensions: { code: 'FORBIDDEN' } }],
         }),
       })
     }
