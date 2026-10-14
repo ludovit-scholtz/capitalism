@@ -36,11 +36,12 @@ class _UnreadableStorage implements FlutterSecureStorage {
 }
 
 void main() {
-  test('an unreadable stored token reads as signed out and is cleared, not thrown', () async {
+  test('an unreadable stored token reads as signed out without throwing or deleting it', () async {
     final raw = _UnreadableStorage();
     final storage = SecureTokenStorage(storage: raw);
 
     expect(await storage.read(), isNull);
-    expect(raw.deleted, isTrue);
+    // A transient keystore failure must not wipe a valid session.
+    expect(raw.deleted, isFalse);
   });
 }

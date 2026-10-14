@@ -29,12 +29,11 @@ class SecureTokenStorage implements TokenStorage {
       return await _storage.read(key: _key);
     } catch (_) {
       // Existing data can become undecryptable (e.g. a token written by an
-      // older flutter_secure_storage whose legacy ciphers were removed).
-      // Treat that as "signed out" and clear it so the player simply logs in
-      // again instead of the app failing at startup.
-      try {
-        await _storage.delete(key: _key);
-      } catch (_) {}
+      // older flutter_secure_storage whose legacy ciphers were removed), or
+      // the keystore may be briefly unavailable. Treat both as "signed out"
+      // for this launch rather than failing at startup. The stored value is
+      // deliberately NOT deleted: a transient error must not wipe a valid
+      // session, and a successful sign-in overwrites any unreadable value.
       return null;
     }
   }
