@@ -17,13 +17,14 @@ public sealed partial class Mutation
     public async Task<DividendProposalResult> ProposeDividend(
         ProposeDividendInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         // New governance-policy contract:
         // proposeDividend(companyId, dividendPercent) + voteDividend(companyId, vote)
         if (input.CompanyId.HasValue || input.DividendPercent.HasValue)
         {
-            return await ProposeDividendPolicyAsync(input, db, httpContextAccessor);
+            return await ProposeDividendPolicyAsync(input, db, httpContextAccessor, objectAuthorization);
         }
 
         // Legacy per-share payout proposal contract used by stock-exchange flow:
@@ -364,7 +365,8 @@ public sealed partial class Mutation
     private async Task<DividendProposalResult> ProposeDividendPolicyAsync(
         ProposeDividendInput input,
         AppDbContext db,
-        IHttpContextAccessor httpContextAccessor)
+        IHttpContextAccessor httpContextAccessor,
+        ObjectAuthorizationService objectAuthorization)
     {
         if (!input.CompanyId.HasValue || !input.DividendPercent.HasValue)
         {
@@ -376,20 +378,15 @@ public sealed partial class Mutation
         }
 
         var company = await db.Companies
-            .FirstOrDefaultAsync(candidate => candidate.Id == input.CompanyId.Value)
-            ?? throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Company not found.")
-                    .SetCode("COMPANY_NOT_FOUND")
-                    .Build());
+            .FirstOrDefaultAsync(candidate => candidate.Id == input.CompanyId.Value);
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
-        if (company.PlayerId != userId)
+        if (company is null || company.PlayerId != userId)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Only the acting CEO can propose dividend changes.")
-                    .SetCode("NOT_CEO")
-                    .Build());
+            throw objectAuthorization.Deny(
+                userId,
+                "company",
+                input.CompanyId.Value,
+                company is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
         }
 
         var currentTick = await GetCurrentTickAsync(db);

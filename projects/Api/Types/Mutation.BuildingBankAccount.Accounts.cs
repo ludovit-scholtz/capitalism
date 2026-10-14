@@ -88,7 +88,8 @@ public sealed partial class Mutation
     public async Task<CloseCompanyBankAccountResult> CloseCompanyBankAccount(
         CloseCompanyBankAccountInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
@@ -98,21 +99,13 @@ public sealed partial class Mutation
 
         if (account is null)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Bank account not found or already closed.")
-                    .SetCode("ACCOUNT_NOT_FOUND")
-                    .Build());
+            throw objectAuthorization.Deny(userId, "bank_account", input.BankAccountId, ObjectAuthorizationService.NotFoundReason);
         }
 
         // Only company-owned accounts can be closed via this mutation.
         if (account.Company?.PlayerId != userId)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("You do not own this bank account.")
-                    .SetCode("UNAUTHORIZED")
-                    .Build());
+            throw objectAuthorization.Deny(userId, "bank_account", input.BankAccountId, ObjectAuthorizationService.NotOwnedReason);
         }
 
         // Deposit accounts (held at a bank building) are managed by closeBankAccount.

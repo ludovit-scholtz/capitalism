@@ -202,7 +202,8 @@ public sealed partial class Mutation
     public async Task<GoldAmmRemoveLiquidityResult> RemoveGoldAmmLiquidity(
         RemoveGoldAmmLiquidityInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var playerId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
@@ -215,11 +216,10 @@ public sealed partial class Mutation
 
         var position = await db.GoldAmmPositions
             .Include(p => p.Pool)
-            .FirstOrDefaultAsync(p => p.Id == input.PositionId)
-            ?? throw new GraphQLException(new Error("Position not found.", "POSITION_NOT_FOUND"));
+            .FirstOrDefaultAsync(p => p.Id == input.PositionId);
 
-        if (position.PlayerId != playerId)
-            throw new GraphQLException(new Error("You do not own this position.", "UNAUTHORIZED"));
+        if (position is null || position.PlayerId != playerId)
+            throw objectAuthorization.Deny(playerId, "gold_amm_position", input.PositionId, position is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
 
         var pool = position.Pool;
         var sharesToRemove = Math.Round(position.LiquidityShares * input.ShareFraction, 8);

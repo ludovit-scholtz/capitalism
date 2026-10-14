@@ -29,6 +29,7 @@ public sealed partial class Mutation
         CreateTradeRouteInput input,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization,
         CancellationToken cancellationToken)
     {
         var player = await db.Players
@@ -40,11 +41,14 @@ public sealed partial class Mutation
             .Include(c => c.BankAccounts.Where(a => a.ClosedAtUtc == null))
             .FirstOrDefaultAsync(c => c.Id == input.CompanyId, cancellationToken);
 
-        if (company is null)
-            return CreateTradeRoutePayload.Fail("Company not found.", "COMPANY_NOT_FOUND");
-
-        if (company.PlayerId != player.Id && player.Role != PlayerRole.Admin)
-            return CreateTradeRoutePayload.Fail("You do not own this company.", "ACCESS_DENIED");
+        if (company is null || (company.PlayerId != player.Id && player.Role != PlayerRole.Admin))
+        {
+            // Logs the real reason; the payload is identical for missing and foreign companies.
+            _ = objectAuthorization.Deny(player.Id, "company", input.CompanyId, company is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
+            return CreateTradeRoutePayload.Fail(
+                ObjectAuthorizationService.FriendlyMessage,
+                ObjectAuthorizationService.NotFoundOrNotOwnedCode);
+        }
 
         // ── Validate source building + unit ───────────────────────────────────────
         var sourceBuilding = await db.Buildings

@@ -46,6 +46,18 @@ public sealed class ObjectAuthorizationService(
         return entity;
     }
 
+    /// <summary>
+    /// Logs a structured security audit event with the real failure reason and returns the
+    /// uniform client-facing error. Use at resolver sites that load an object and then check
+    /// ownership, so "missing" and "not yours" are indistinguishable to the caller.
+    /// </summary>
+    public GraphQLException Deny(
+        Guid actorUserId,
+        string requestedObjectType,
+        Guid requestedObjectId,
+        string actualFailureReason) =>
+        BuildAndLogDeniedException(actorUserId, requestedObjectType, requestedObjectId, actualFailureReason);
+
     private GraphQLException BuildAndLogDeniedException(
         Guid actorUserId,
         string requestedObjectType,

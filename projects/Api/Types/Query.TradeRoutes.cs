@@ -23,7 +23,8 @@ public sealed partial class Query
     public async Task<List<TradeRouteResult>> GetMyTradeRoutes(
         Guid? companyId,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
         var player = await db.Players.FirstOrDefaultAsync(p => p.Id == userId, CancellationToken.None)
@@ -41,11 +42,12 @@ public sealed partial class Query
         {
             // Only allow the player who owns the company or an admin.
             var company = await db.Companies.FirstOrDefaultAsync(c => c.Id == companyId.Value, CancellationToken.None);
-            if (company is null)
-                throw new GraphQLException(ErrorBuilder.New().SetMessage("Company not found.").SetCode("COMPANY_NOT_FOUND").Build());
-
-            if (company.PlayerId != player.Id && player.Role != PlayerRole.Admin)
-                throw new GraphQLException(ErrorBuilder.New().SetMessage("Access denied.").SetCode("ACCESS_DENIED").Build());
+            if (company is null || (company.PlayerId != player.Id && player.Role != PlayerRole.Admin))
+                throw objectAuthorization.Deny(
+                    player.Id,
+                    "company",
+                    companyId.Value,
+                    company is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
 
             routesQuery = routesQuery.Where(r => r.CompanyId == companyId.Value);
         }
@@ -72,7 +74,8 @@ public sealed partial class Query
     public async Task<TradeRouteResult?> GetTradeRoute(
         Guid routeId,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
         var player = await db.Players.FirstOrDefaultAsync(p => p.Id == userId, CancellationToken.None)
@@ -88,10 +91,16 @@ public sealed partial class Query
             .Include(r => r.ResourceType)
             .FirstOrDefaultAsync(CancellationToken.None);
 
-        if (route is null) return null;
-
-        if (route.Company.PlayerId != player.Id && player.Role != PlayerRole.Admin)
-            throw new GraphQLException(ErrorBuilder.New().SetMessage("Access denied.").SetCode("ACCESS_DENIED").Build());
+        if (route is null || (route.Company.PlayerId != player.Id && player.Role != PlayerRole.Admin))
+        {
+            // Missing and foreign routes look identical to the caller (null); the real reason is audit-logged.
+            _ = objectAuthorization.Deny(
+                player.Id,
+                "trade_route",
+                routeId,
+                route is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
+            return null;
+        }
 
         return MapRouteToResult(route);
     }
@@ -104,8 +113,9 @@ public sealed partial class Query
     public Task<List<TradeRouteResult>> GetCrossCityShipments(
         Guid? companyId,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
-        => GetMyTradeRoutes(companyId, db, httpContextAccessor);
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
+        => GetMyTradeRoutes(companyId, db, httpContextAccessor, objectAuthorization);
 
     /// <summary>
     /// Estimates the shipping cost and transit time for a prospective trade route.

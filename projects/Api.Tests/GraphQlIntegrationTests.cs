@@ -32942,7 +32942,25 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var errors = result.GetProperty("errors");
         Assert.True(errors.GetArrayLength() > 0, "Closing another player's account should fail.");
         var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
-        Assert.Equal("UNAUTHORIZED", code);
+        Assert.Equal("FORBIDDEN", code);
+    }
+
+    [Fact]
+    public async Task CloseCompanyBankAccount_UnknownAccount_IsIndistinguishableFromForeignAccount()
+    {
+        var token = await RegisterAndGetTokenAsync($"close-probe-{Guid.NewGuid():N}@test.com", "CloseProbe");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation CloseAcct($input: CloseCompanyBankAccountInput!) {
+                closeCompanyBankAccount(input: $input) { id }
+            }
+            """,
+            new { input = new { bankAccountId = Guid.NewGuid().ToString() } },
+            token);
+
+        var error = result.GetProperty("errors")[0];
+        Assert.Equal("FORBIDDEN", error.GetProperty("extensions").GetProperty("code").GetString());
     }
 
     [Fact]

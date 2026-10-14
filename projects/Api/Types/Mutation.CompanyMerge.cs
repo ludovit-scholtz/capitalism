@@ -24,7 +24,8 @@ public sealed partial class Mutation
     public async Task<MergeCompanyResult> MergeCompany(
         MergeCompanyInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
@@ -39,20 +40,14 @@ public sealed partial class Mutation
                     .SetCode("COMPANY_NOT_FOUND")
                     .Build());
 
-        var destinationCompany = companies.FirstOrDefault(c => c.Id == input.DestinationCompanyId)
-            ?? throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Destination company not found.")
-                    .SetCode("DESTINATION_COMPANY_NOT_FOUND")
-                    .Build());
-
-        if (destinationCompany.PlayerId != userId)
+        var destinationCompany = companies.FirstOrDefault(c => c.Id == input.DestinationCompanyId);
+        if (destinationCompany is null || destinationCompany.PlayerId != userId)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("You must directly control the destination company.")
-                    .SetCode("DESTINATION_NOT_CONTROLLED")
-                    .Build());
+            throw objectAuthorization.Deny(
+                userId,
+                "company",
+                input.DestinationCompanyId,
+                destinationCompany is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
         }
 
         if (targetCompany.Id == destinationCompany.Id)
