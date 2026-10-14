@@ -124,6 +124,15 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('error and empty states do not overflow in a short viewport', (tester) async {
+      await tester.pumpWidget(
+        _host(SizedBox(height: 120, child: StateView.error(message: 'Boom', onRetry: () {}))),
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(_host(const SizedBox(height: 120, child: StateView.empty(title: 'None', message: 'x'))));
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('empty shows title and message', (tester) async {
       await tester.pumpWidget(_host(const StateView.empty(title: 'Nothing here', message: 'Build something')));
       expect(find.text('Nothing here'), findsOneWidget);

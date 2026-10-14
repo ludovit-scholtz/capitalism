@@ -60,24 +60,35 @@ class StateView extends StatelessWidget {
 
     final isError = _kind == _StateKind.error;
     final color = isError ? theme.colorScheme.error : theme.colorScheme.onSurfaceVariant;
-    return Center(
-      child: Padding(
+    // Centred when there is room, scrollable when there isn't (landscape).
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 48, color: color),
-            const SizedBox(height: AppSpacing.md),
-            if (title != null) Text(title!, style: theme.textTheme.titleMedium, textAlign: TextAlign.center),
-            if (message != null) ...[
-              const SizedBox(height: AppSpacing.xs),
-              Text(message!, style: theme.textTheme.bodyMedium, textAlign: TextAlign.center),
-            ],
-            if (isError && onRetry != null) ...[
-              const SizedBox(height: AppSpacing.md),
-              FilledButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh, size: 18), label: Text(retryLabel)),
-            ],
-          ],
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: constraints.hasBoundedHeight
+                ? (constraints.maxHeight - 2 * AppSpacing.lg).clamp(0, double.infinity)
+                : 0,
+          ),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 48, color: color),
+                const SizedBox(height: AppSpacing.md),
+                if (title != null) Text(title!, style: theme.textTheme.titleMedium, textAlign: TextAlign.center),
+                if (message != null) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(message!, style: theme.textTheme.bodyMedium, textAlign: TextAlign.center),
+                ],
+                if (isError && onRetry != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  FilledButton.icon(
+                      onPressed: onRetry, icon: const Icon(Icons.refresh, size: 18), label: Text(retryLabel)),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );
