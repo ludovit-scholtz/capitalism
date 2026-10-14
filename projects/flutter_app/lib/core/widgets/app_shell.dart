@@ -160,7 +160,7 @@ class AppShell extends StatelessWidget {
             if (isWideScreen) ...[
               Builder(
                 builder: (ctx) => LayoutBuilder(
-                  builder: (context, constraints) => SingleChildScrollView(
+                  builder: (_, constraints) => SingleChildScrollView(
                     child: ConstrainedBox(
                       constraints: BoxConstraints(minHeight: constraints.maxHeight),
                       child: IntrinsicHeight(
@@ -256,9 +256,7 @@ class AppShell extends StatelessWidget {
     if (under(['/dashboard'])) return 1;
     if (under(['/building', '/buildings'])) return 2;
     if (under(['/forex', '/stocks', '/stock', '/market', '/exchange', '/energy-market'])) return 3;
-    if (location.isEmpty ||
-        location == '/' ||
-        under(['/login', '/register', '/auth', '/onboarding', '/forgot-password', '/reset-password'])) {
+    if (location == '/' || under(['/login', '/register', '/auth', '/onboarding', '/forgot-password', '/reset-password'])) {
       return 0;
     }
     return 4;
