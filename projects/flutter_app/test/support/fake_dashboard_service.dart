@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:capitalism_app/features/buildings/building_analytics_models.dart';
 import 'package:capitalism_app/features/buildings/building_panel_models.dart';
 import 'package:capitalism_app/features/company/company_models.dart';
@@ -53,6 +55,14 @@ class FakeDashboardService implements DashboardService {
   final Object? cityPowerBalanceError;
   final String? proSubscriptionEndsAtUtc;
 
+  /// Per-company gates: when present, [fetchCompanyOverviewLedger] waits for
+  /// the gate before answering, so tests can control which ledger arrives first.
+  final Map<String, Completer<void>> ledgerGates = {};
+
+  /// Per-company failures for [fetchCompanyOverviewLedger]; remove an entry to
+  /// let a retry succeed.
+  final Map<String, Object> ledgerErrors = {};
+
   final List<String> calls = [];
   int fetchDashboardDataCallCount = 0;
   int fetchCompanyOverviewLedgerCallCount = 0;
@@ -84,6 +94,10 @@ class FakeDashboardService implements DashboardService {
   Future<CompanyLedger> fetchCompanyOverviewLedger(String companyId) async {
     calls.add('fetchCompanyOverviewLedger');
     fetchCompanyOverviewLedgerCallCount++;
+    final gate = ledgerGates[companyId];
+    if (gate != null) await gate.future;
+    final error = ledgerErrors[companyId];
+    if (error != null) throw error;
     return ledgersByCompanyId[companyId] ??
         const CompanyLedger(
           companyName: '',

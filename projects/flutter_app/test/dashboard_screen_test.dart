@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:capitalism_app/core/widgets/skeleton.dart';
 import 'package:capitalism_app/core/widgets/stat_tile.dart';
 import 'package:capitalism_app/core/widgets/state_view.dart';
@@ -333,6 +335,100 @@ void main() {
       expect(find.descendant(of: overviewCard, matching: find.textContaining('10,000')), findsOneWidget);
       expect(find.descendant(of: overviewCard, matching: find.textContaining('6,000')), findsOneWidget);
       expect(find.text('Next steps'), findsOneWidget);
+    });
+
+    testWidgets('Overview loads every company ledger in parallel and shows each card as soon as it arrives', (
+      tester,
+    ) async {
+      final auth = AuthState(storage: InMemoryTokenStorage());
+      await auth.setToken('test-token');
+      final service = FakeDashboardService(
+        data: const DashboardData(
+          companies: [_company, _companyWithUnits],
+          currentTick: 1,
+          taxRate: 15,
+          pendingActions: [],
+        ),
+        ledgersByCompanyId: const {
+          'company-9': CompanyLedger(
+            companyName: 'Unit Co',
+            gameYear: 5,
+            currentCash: 1000,
+            primaryCurrencyCode: 'USD',
+            totalRevenue: 7777,
+            totalPurchasingCosts: 0,
+            totalShippingCosts: 0,
+            totalLaborCosts: 0,
+            totalEnergyCosts: 0,
+            totalMarketingCosts: 0,
+            totalTaxPaid: 0,
+            totalOtherCosts: 0,
+            netIncome: 7000,
+            totalAssets: 1000,
+          ),
+        },
+      );
+      service.ledgerGates['company-1'] = Completer<void>(); // company-1 stays slow
+      service.ledgerGates['company-9'] = Completer<void>();
+
+      await _pumpDashboard(tester, auth: auth, service: service, settle: false);
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // Both requests are in flight at once (not one after the other).
+      expect(service.fetchCompanyOverviewLedgerCallCount, 2);
+
+      service.ledgerGates['company-9']!.complete();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // The finished company shows its numbers while the slow one still shows a skeleton.
+      final fast = find.byKey(const Key('overview-ledger-company-9'));
+      final slow = find.byKey(const Key('overview-ledger-company-1'));
+      expect(find.descendant(of: fast, matching: find.textContaining('7,777')), findsOneWidget);
+      expect(find.descendant(of: slow, matching: find.byType(SkeletonBox)), findsWidgets);
+      expect(find.descendant(of: slow, matching: find.text('No financial data yet.')), findsNothing);
+
+      service.ledgerGates['company-1']!.complete();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('a ledger that fails to load shows an error with Retry instead of an endless spinner', (tester) async {
+      final auth = AuthState(storage: InMemoryTokenStorage());
+      await auth.setToken('test-token');
+      final service = FakeDashboardService(
+        data: const DashboardData(companies: [_company], currentTick: 1, taxRate: 15, pendingActions: []),
+        ledgersByCompanyId: const {
+          'company-1': CompanyLedger(
+            companyName: 'Acme Furnishings',
+            gameYear: 5,
+            currentCash: 12345,
+            primaryCurrencyCode: 'USD',
+            totalRevenue: 4242,
+            totalPurchasingCosts: 0,
+            totalShippingCosts: 0,
+            totalLaborCosts: 0,
+            totalEnergyCosts: 0,
+            totalMarketingCosts: 0,
+            totalTaxPaid: 0,
+            totalOtherCosts: 0,
+            netIncome: 4000,
+            totalAssets: 1,
+          ),
+        },
+      );
+      service.ledgerErrors['company-1'] = Exception('timed out');
+
+      await _pumpDashboard(tester, auth: auth, service: service);
+
+      final card = find.byKey(const Key('overview-ledger-company-1'));
+      expect(find.descendant(of: card, matching: find.text('Could not load financial data.')), findsOneWidget);
+      expect(find.descendant(of: card, matching: find.text('No financial data yet.')), findsNothing);
+
+      service.ledgerErrors.clear();
+      await tester.tap(find.descendant(of: card, matching: find.text('Retry')));
+      await tester.pumpAndSettle();
+
+      expect(find.descendant(of: card, matching: find.textContaining('4,242')), findsOneWidget);
+      expect(find.text('Could not load financial data.'), findsNothing);
     });
 
     testWidgets('Overview tab shows the Launch New Company checklist with the CTA disabled when unmet', (tester) async {

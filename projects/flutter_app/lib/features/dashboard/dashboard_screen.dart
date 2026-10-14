@@ -77,7 +77,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   final Set<String> _removingBuildingIds = {};
 
   Map<String, CompanyLedger> _ledgers = {};
-  bool _ledgersLoading = false;
+  final Set<String> _loadingLedgerIds = {};
+  final Set<String> _failedLedgerIds = {};
 
   AdditionalCompanyPrerequisites? _newCompanyPrerequisites;
   List<NewCompanyCity> _newCompanyCities = const [];
@@ -250,21 +251,46 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   /// Best-effort, per-company: one company's ledger failing to load doesn't
   /// blank the others' financial cards.
+  ///
+  /// Companies load in parallel and each card updates as soon as its own
+  /// ledger arrives, so a slow company never delays (or hides) the others.
   Future<void> _loadLedgers(List<DashboardCompany> companies, {bool isRefresh = false}) async {
-    if (!isRefresh) setState(() => _ledgersLoading = true);
-    final results = <String, CompanyLedger>{};
-    for (final company in companies) {
-      try {
-        results[company.id] = await _service.fetchCompanyOverviewLedger(company.id);
-      } catch (_) {
-        // Best-effort — see doc comment above.
-      }
+    final ids = {for (final company in companies) company.id};
+    if (!isRefresh) {
+      setState(() {
+        // Drop ledgers of companies that no longer exist; keep the rest while refetching.
+        _ledgers = {for (final entry in _ledgers.entries) if (ids.contains(entry.key)) entry.key: entry.value};
+      });
     }
+    await Future.wait([for (final id in ids) _loadLedger(id, silent: isRefresh)]);
+  }
+
+  /// Loads one company's ledger. [silent] (pull-to-refresh / tick refresh)
+  /// keeps whatever is already on screen instead of flashing a skeleton or
+  /// replacing good data with an error.
+  Future<void> _loadLedger(String companyId, {bool silent = false}) async {
     if (!mounted) return;
-    setState(() {
-      _ledgers = results;
-      _ledgersLoading = false;
-    });
+    if (!silent || !_ledgers.containsKey(companyId)) {
+      setState(() {
+        _loadingLedgerIds.add(companyId);
+        _failedLedgerIds.remove(companyId);
+      });
+    }
+    try {
+      final ledger = await _service.fetchCompanyOverviewLedger(companyId);
+      if (!mounted) return;
+      setState(() {
+        _ledgers = {..._ledgers, companyId: ledger};
+        _failedLedgerIds.remove(companyId);
+        _loadingLedgerIds.remove(companyId);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingLedgerIds.remove(companyId);
+        if (!_ledgers.containsKey(companyId)) _failedLedgerIds.add(companyId);
+      });
+    }
   }
 
   Future<void> _silentRefresh() async {
@@ -389,7 +415,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 child: DashboardOverviewTab(
                   companies: data.companies,
                   ledgers: _ledgers,
-                  ledgersLoading: _ledgersLoading,
+                  loadingLedgerIds: _loadingLedgerIds,
+                  failedLedgerIds: _failedLedgerIds,
+                  onRetryLedger: (companyId) => unawaited(_loadLedger(companyId)),
                   newCompanyCard: DashboardNewCompanyCard(
                     prerequisites: _newCompanyPrerequisites,
                     cities: _newCompanyCities,

@@ -60,12 +60,26 @@ public sealed partial class Query
             .Where(e => e.CompanyId == companyId && e.RecordedAtTick >= startTick && e.RecordedAtTick <= endTick)
             .ToListAsync();
 
-        // For history years we only need lightweight aggregates: tick + category + amount.
-        // Load all entries but project only the columns needed for grouping.
-        var historyProjection = await db.LedgerEntries
+        // History only needs per game-year / category / sign sums plus the first and last tick, so the
+        // database aggregates it. Loading every ledger row of the company on each request made this query
+        // (and the dashboard's Financial summary) slower the longer a company had been playing.
+        var historyAggregates = await db.LedgerEntries
             .AsNoTracking()
             .Where(e => e.CompanyId == companyId)
-            .Select(e => new { e.RecordedAtTick, e.Category, e.Amount })
+            .GroupBy(e => new
+            {
+                YearIndex = (e.RecordedAtTick < 0L ? 0L : e.RecordedAtTick) / GameConstants.TicksPerYear,
+                e.Category,
+                IsPositive = e.Amount > 0m,
+            })
+            .Select(group => new
+            {
+                group.Key.YearIndex,
+                group.Key.Category,
+                Total = group.Sum(e => e.Amount),
+                FirstTick = group.Min(e => e.RecordedAtTick),
+                LastTick = group.Max(e => e.RecordedAtTick),
+            })
             .ToListAsync();
 
         var totalRevenue = LedgerCalculator.GetTotalRevenue(entries);
@@ -149,11 +163,18 @@ public sealed partial class Query
         var primaryCurrencyCode = buildingCurrencies.Count == 1 ? buildingCurrencies[0] : "EUR";
 
         // Build history from the lightweight projection — no in-memory entity hydration needed.
-        var history = historyProjection
-            .GroupBy(e => GameTime.GetGameYear(e.RecordedAtTick))
+        // Each aggregate expands to two synthetic rows: (first tick, category, sum) and (last tick, category, 0).
+        // The builder only sums amounts per category/sign and takes min/max ticks, so this is equivalent to
+        // feeding it every original row.
+        var history = historyAggregates
+            .GroupBy(item => GameConstants.GameStartYear + (int)item.YearIndex)
             .Select(group => BuildCompanyLedgerHistoryYearFromProjection(
                 group.Key, currentGameYear, gameState?.TaxRate ?? 0m,
-                group.Select(e => (e.RecordedAtTick, e.Category, e.Amount)).ToList()))
+                group.SelectMany(item => new[]
+                {
+                    (item.FirstTick, item.Category, item.Total),
+                    (item.LastTick, item.Category, 0m),
+                }).ToList()))
             .ToDictionary(item => item.GameYear);
 
         if (!history.ContainsKey(currentGameYear))

@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "io.biatec" "\0"
-            VALUE "FileDescription", "capitalism_app" "\0"
+            VALUE "FileDescription", "Capitalism" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "capitalism_app" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 io.biatec. All rights reserved." "\0"
             VALUE "OriginalFilename", "capitalism_app.exe" "\0"
-            VALUE "ProductName", "capitalism_app" "\0"
+            VALUE "ProductName", "Capitalism" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

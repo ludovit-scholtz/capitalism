@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/i18n/locale_state.dart';
 import '../../core/utils/app_number_format.dart';
+import '../../core/widgets/skeleton.dart';
 import '../company/company_models.dart';
 import 'dashboard_models.dart';
 
@@ -17,13 +18,22 @@ class DashboardOverviewTab extends StatelessWidget {
     super.key,
     required this.companies,
     required this.ledgers,
-    required this.ledgersLoading,
+    this.loadingLedgerIds = const {},
+    this.failedLedgerIds = const {},
+    this.onRetryLedger,
     this.newCompanyCard,
   });
 
   final List<DashboardCompany> companies;
   final Map<String, CompanyLedger> ledgers;
-  final bool ledgersLoading;
+
+  /// Companies whose ledger request is still in flight — each shows its own
+  /// skeleton, so one slow company never hides the others.
+  final Set<String> loadingLedgerIds;
+
+  /// Companies whose ledger request failed — each shows an error with Retry.
+  final Set<String> failedLedgerIds;
+  final void Function(String companyId)? onRetryLedger;
 
   /// Slot for the Launch-New-Company CTA card, wired in a later phase.
   final Widget? newCompanyCard;
@@ -44,13 +54,17 @@ class DashboardOverviewTab extends StatelessWidget {
       children: [
         Text('Financial summary', style: theme.textTheme.titleMedium),
         const SizedBox(height: 12),
-        if (ledgersLoading)
-          const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()))
-        else
-          for (final company in companies) ...[
-            _CompanyFinancialCard(key: ValueKey('overview-ledger-${company.id}'), company: company, ledger: ledgers[company.id]),
-            const SizedBox(height: 12),
-          ],
+        for (final company in companies) ...[
+          _CompanyFinancialCard(
+            key: ValueKey('overview-ledger-${company.id}'),
+            company: company,
+            ledger: ledgers[company.id],
+            loading: loadingLedgerIds.contains(company.id),
+            failed: failedLedgerIds.contains(company.id),
+            onRetry: onRetryLedger == null ? null : () => onRetryLedger!(company.id),
+          ),
+          const SizedBox(height: 12),
+        ],
         _StarterGuidanceCard(totalBuildings: totalBuildings),
         if (newCompanyCard != null) ...[const SizedBox(height: 16), newCompanyCard!],
       ],
@@ -68,10 +82,20 @@ double _totalCosts(CompanyLedger ledger) =>
     ledger.totalOtherCosts;
 
 class _CompanyFinancialCard extends StatelessWidget {
-  const _CompanyFinancialCard({super.key, required this.company, required this.ledger});
+  const _CompanyFinancialCard({
+    super.key,
+    required this.company,
+    required this.ledger,
+    required this.loading,
+    required this.failed,
+    required this.onRetry,
+  });
 
   final DashboardCompany company;
   final CompanyLedger? ledger;
+  final bool loading;
+  final bool failed;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -85,7 +109,24 @@ class _CompanyFinancialCard extends StatelessWidget {
           children: [
             Text(company.name, style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
-            if (ledgerValue == null)
+            if (ledgerValue == null && loading)
+              const Row(
+                children: [
+                  Expanded(child: SkeletonBox(height: 36)),
+                  SizedBox(width: 12),
+                  Expanded(child: SkeletonBox(height: 36)),
+                  SizedBox(width: 12),
+                  Expanded(child: SkeletonBox(height: 36)),
+                ],
+              )
+            else if (ledgerValue == null && failed)
+              Row(
+                children: [
+                  Expanded(child: Text('Could not load financial data.', style: theme.textTheme.bodySmall)),
+                  if (onRetry != null) TextButton(onPressed: onRetry, child: const Text('Retry')),
+                ],
+              )
+            else if (ledgerValue == null)
               Text('No financial data yet.', style: theme.textTheme.bodySmall)
             else
               Row(

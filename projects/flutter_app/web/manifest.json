@@ -1,6 +1,6 @@
 {
-    "name": "capitalism_app",
-    "short_name": "capitalism_app",
+    "name": "Capitalism",
+    "short_name": "Capitalism",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0047FF",
