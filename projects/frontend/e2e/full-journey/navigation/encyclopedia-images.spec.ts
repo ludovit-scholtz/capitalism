@@ -138,6 +138,9 @@ test.describe('Encyclopedia product and resource images', () => {
 
     await productImage.evaluate((node: Element) => {
       const image = node as HTMLImageElement
+      // The handler swaps to the fallback only once per element (loop guard). The card's real
+      // image may already have failed in this environment, so start from a clean element.
+      delete image.dataset.catalogFallbackApplied
       image.src = '/does-not-exist.webp'
     })
 

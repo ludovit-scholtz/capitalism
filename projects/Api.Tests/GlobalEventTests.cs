@@ -296,6 +296,31 @@ public sealed class GlobalEventTests : IClassFixture<ApiWebApplicationFactory>
     }
 
     [Fact]
+    public async Task GlobalEventErrors_CarryMachineReadableCodeAndHumanMessage()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var adminToken = await MakeAdminAsync(factory, client);
+
+        var invalidType = await ExecuteGraphQlAsync(
+            client,
+            TriggerMutation,
+            new { type = "NOT_A_REAL_TYPE", sev = "MINOR", title = "t" },
+            adminToken);
+        var typeError = invalidType.GetProperty("errors")[0];
+        Assert.Equal("INVALID_EVENT_TYPE", typeError.GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Contains("NOT_A_REAL_TYPE", typeError.GetProperty("message").GetString());
+
+        var unknownEvent = await ExecuteGraphQlAsync(
+            client,
+            $"mutation {{ resolveGlobalEvent(id: \"{Guid.NewGuid()}\") {{ id }} }}",
+            token: adminToken);
+        var notFound = unknownEvent.GetProperty("errors")[0];
+        Assert.Equal("EVENT_NOT_FOUND", notFound.GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal("Global event not found.", notFound.GetProperty("message").GetString());
+    }
+
+    [Fact]
     public async Task ResolveGlobalEvent_WhenNonAdmin_ReturnsAuthError()
     {
         var token = await RegisterAndGetTokenAsync();
