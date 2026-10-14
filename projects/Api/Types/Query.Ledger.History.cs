@@ -31,12 +31,6 @@ public sealed partial class Query
                 group.Max(e => e.RecordedAtTick)));
 
     /// <summary>
-    /// Pre-aggregated ledger rows of one game year: the sum of all amounts of one category and sign
-    /// (positive or non-positive) plus the first and last tick among those rows.
-    /// </summary>
-    private readonly record struct LedgerHistoryAggregate(string Category, decimal Total, long FirstTick, long LastTick);
-
-    /// <summary>
     /// Builds a ledger history year summary from database-side aggregates, so a company's whole ledger
     /// never has to be loaded into memory. A "positive" aggregate has Total &gt; 0 and a "negative" one
     /// Total &lt; 0, which matches the previous row-by-row Amount &gt; 0 / &lt; 0 filters.
@@ -45,7 +39,7 @@ public sealed partial class Query
         int gameYear,
         int currentGameYear,
         decimal taxRate,
-        IReadOnlyCollection<LedgerHistoryAggregate> aggregates)
+        IReadOnlyCollection<LedgerYearAggregateRow> aggregates)
     {
         var totalRevenue = aggregates.Where(e => (e.Category == LedgerCategory.Revenue || e.Category == LedgerCategory.GovernmentContractRevenue) && e.Total > 0).Sum(e => e.Total);
         var totalMediaHouseIncome = aggregates.Where(e => e.Category == LedgerCategory.MediaHouseIncome && e.Total > 0).Sum(e => e.Total);

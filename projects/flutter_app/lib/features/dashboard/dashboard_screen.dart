@@ -80,6 +80,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   final Set<String> _loadingLedgerIds = {};
   final Set<String> _failedLedgerIds = {};
 
+  /// Companies with a ledger request currently running (see [_loadLedger]).
+  final Set<String> _inFlightLedgerIds = {};
+
   /// Latest ledger request number per company. A response is applied only if it
   /// belongs to the newest request, so a slow older call (initial load, tick
   /// refresh, Retry) can never overwrite fresher numbers or clear the skeleton
@@ -272,6 +275,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       _ledgers = {for (final entry in _ledgers.entries) if (ids.contains(entry.key)) entry.key: entry.value};
       _loadingLedgerIds.retainAll(ids);
       _failedLedgerIds.retainAll(ids);
+      _inFlightLedgerIds.retainAll(ids);
       _ledgerRequestSeq.removeWhere((id, _) => !ids.contains(id));
     });
     await Future.wait([for (final id in ids) _loadLedger(id, silent: isRefresh)]);
@@ -282,11 +286,18 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   /// replacing good data with an error.
   Future<void> _loadLedger(String companyId, {bool silent = false}) async {
     if (!mounted) return;
+    // A silent refresh (server tick, pull-to-refresh) never starts a second request while one is
+    // already running for that company: it would discard the running one and, when the server is
+    // slower than the tick interval, pile up requests so no response is ever shown.
+    if (silent && _inFlightLedgerIds.contains(companyId)) return;
+
     final seq = _ledgerRequestSeq[companyId] = ++_ledgerRequestCounter;
-    // Only a user-initiated load (first open, Retry) shows the skeleton. A silent
-    // refresh leaves the card as it is — data, error + Retry, or the skeleton that
-    // is already showing — so a tick refresh never makes a card flicker.
-    if (!silent) {
+    _inFlightLedgerIds.add(companyId);
+    // A user-initiated load (first open, Retry) shows the skeleton. A silent refresh leaves a card
+    // with data or an error as it is, so ticks never make it flicker; it only shows the skeleton
+    // for a company that has nothing to show yet (e.g. one that just appeared).
+    final showSkeleton = !silent || (!_ledgers.containsKey(companyId) && !_failedLedgerIds.contains(companyId));
+    if (showSkeleton) {
       setState(() {
         _loadingLedgerIds.add(companyId);
         _failedLedgerIds.remove(companyId);
@@ -296,6 +307,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       final ledger = await _service.fetchCompanyOverviewLedger(companyId);
       if (!mounted || _ledgerRequestSeq[companyId] != seq) return;
       setState(() {
+        _inFlightLedgerIds.remove(companyId);
         _ledgers = {..._ledgers, companyId: ledger};
         _failedLedgerIds.remove(companyId);
         _loadingLedgerIds.remove(companyId);
@@ -303,6 +315,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     } catch (_) {
       if (!mounted || _ledgerRequestSeq[companyId] != seq) return;
       setState(() {
+        _inFlightLedgerIds.remove(companyId);
         _loadingLedgerIds.remove(companyId);
         if (!_ledgers.containsKey(companyId)) _failedLedgerIds.add(companyId);
       });

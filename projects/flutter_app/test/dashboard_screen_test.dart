@@ -391,15 +391,20 @@ void main() {
       await tester.pumpAndSettle();
     });
 
-    testWidgets('an older slow ledger response never overwrites a newer one', (tester) async {
+    testWidgets('a silent refresh never supersedes or duplicates a ledger request that is still running', (
+      tester,
+    ) async {
       final auth = AuthState(storage: InMemoryTokenStorage());
       await auth.setToken('test-token');
-      CompanyLedger ledger(double revenue) => CompanyLedger(
+      final service = FakeDashboardService(
+        data: const DashboardData(companies: [_company], currentTick: 1, taxRate: 15, pendingActions: []),
+        ledgersByCompanyId: const {
+          'company-1': CompanyLedger(
             companyName: 'Acme Furnishings',
             gameYear: 5,
             currentCash: 1,
             primaryCurrencyCode: 'USD',
-            totalRevenue: revenue,
+            totalRevenue: 3333,
             totalPurchasingCosts: 0,
             totalShippingCosts: 0,
             totalLaborCosts: 0,
@@ -409,11 +414,9 @@ void main() {
             totalOtherCosts: 0,
             netIncome: 1,
             totalAssets: 1,
-          );
-      final service = FakeDashboardService(
-        data: const DashboardData(companies: [_company], currentTick: 1, taxRate: 15, pendingActions: []),
+          ),
+        },
       );
-      service.ledgerQueues['company-1'] = [ledger(1111), ledger(2222)];
       final slowFirstCall = Completer<void>();
       service.ledgerGates['company-1'] = slowFirstCall;
 
@@ -421,22 +424,20 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
       expect(service.fetchCompanyOverviewLedgerCallCount, 1);
 
-      // The second request (pull-to-refresh) is not gated and finishes first.
-      service.ledgerGates.remove('company-1');
+      // Ticks / pull-to-refresh arrive while the (slow) ledger is still loading.
       await tester.fling(find.text('Financial summary'), const Offset(0, 300), 1000);
       // Skeletons animate forever, so settle with bounded pumps.
       for (var i = 0; i < 30; i++) {
         await tester.pump(const Duration(milliseconds: 100));
       }
-      expect(service.fetchCompanyOverviewLedgerCallCount, 2);
-      final card = find.byKey(const Key('overview-ledger-company-1'));
-      expect(find.descendant(of: card, matching: find.textContaining('2,222')), findsOneWidget);
+      // No second request piled up behind the slow one, and the first one is not discarded.
+      expect(service.fetchCompanyOverviewLedgerCallCount, 1);
 
-      // Now the stale first response arrives; it must be ignored.
       slowFirstCall.complete();
       await tester.pumpAndSettle();
-      expect(find.descendant(of: card, matching: find.textContaining('2,222')), findsOneWidget);
-      expect(find.descendant(of: card, matching: find.textContaining('1,111')), findsNothing);
+      final card = find.byKey(const Key('overview-ledger-company-1'));
+      expect(find.descendant(of: card, matching: find.textContaining('3,333')), findsOneWidget);
+      expect(find.descendant(of: card, matching: find.byType(SkeletonBox)), findsNothing);
     });
 
     testWidgets('a silent refresh keeps a failed ledger card on its error instead of flashing a skeleton',

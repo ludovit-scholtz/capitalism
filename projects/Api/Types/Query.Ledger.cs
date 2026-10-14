@@ -5,6 +5,8 @@ using Api.Security;
 using Api.Utilities;
 using HotChocolate.CostAnalysis.Types;
 using HotChocolate.Authorization;
+using HotChocolate.Execution.Processing;
+using HotChocolate.Resolvers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 
@@ -23,9 +25,14 @@ public sealed partial class Query
         int? gameYear,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor,
-        [Service] IMemoryCache cache)
+        [Service] IMemoryCache cache,
+        IResolverContext resolverContext)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        // The per-year history needs an aggregate over the company's whole ledger. Most callers (e.g. the
+        // mobile dashboard's Financial summary) only want the totals, so compute it only when selected.
+        var includeHistory = resolverContext.IsSelected("history");
 
         var company = await db.Companies
             .AsNoTracking()
@@ -45,9 +52,14 @@ public sealed partial class Query
         var isCurrentYear = selectedGameYear == currentGameYear;
 
         // Check cache — historical (non-current) years are immutable so can be cached longer.
-        var cacheKey = $"ledger_{companyId}_{selectedGameYear}";
+        // A summary that includes the history is a superset of one without it, so it can serve both.
+        // A history-less summary is cached under its own key and never served to a request that selects history.
+        var cacheKey = $"ledger_{companyId}_{selectedGameYear}_{(includeHistory ? "h" : "t")}";
+        var fullSummaryCacheKey = $"ledger_{companyId}_{selectedGameYear}_h";
         var cacheDuration = isCurrentYear ? LedgerCurrentYearCacheDuration : LedgerHistoryCacheDuration;
-        if (cache.TryGetValue(cacheKey, out CompanyLedgerSummary? cachedSummary) && cachedSummary is not null)
+        if ((cache.TryGetValue(fullSummaryCacheKey, out CompanyLedgerSummary? cachedSummary)
+                || cache.TryGetValue(cacheKey, out cachedSummary))
+            && cachedSummary is not null)
         {
             return cachedSummary;
         }
@@ -64,7 +76,9 @@ public sealed partial class Query
         // History only needs per game-year / category / sign sums plus the first and last tick, so the
         // database aggregates it. Loading every ledger row of the company on each request made this query
         // (and the dashboard's Financial summary) slower the longer a company had been playing.
-        var historyAggregates = await HistoryAggregateQuery(db.LedgerEntries.AsNoTracking(), companyId).ToListAsync();
+        var historyAggregates = includeHistory
+            ? await HistoryAggregateQuery(db.LedgerEntries.AsNoTracking(), companyId).ToListAsync()
+            : [];
 
         var totalRevenue = LedgerCalculator.GetTotalRevenue(entries);
         var totalGovernmentContractRevenue = entries
@@ -148,15 +162,15 @@ public sealed partial class Query
 
         // Build history from the lightweight projection — no in-memory entity hydration needed.
         var history = historyAggregates
-            .GroupBy(item => GameConstants.GameStartYear + (int)item.YearIndex)
+            .GroupBy(item => GameTime.GetGameYear(item.YearIndex * GameConstants.TicksPerYear))
             .Select(group => BuildCompanyLedgerHistoryYear(
                 group.Key,
                 currentGameYear,
                 gameState?.TaxRate ?? 0m,
-                group.Select(item => new LedgerHistoryAggregate(item.Category, item.Total, item.FirstTick, item.LastTick)).ToList()))
+                group.ToList()))
             .ToDictionary(item => item.GameYear);
 
-        if (!history.ContainsKey(currentGameYear))
+        if (includeHistory && !history.ContainsKey(currentGameYear))
         {
             history[currentGameYear] = BuildCompanyLedgerHistoryYear(currentGameYear, currentGameYear, gameState?.TaxRate ?? 0m, []);
         }

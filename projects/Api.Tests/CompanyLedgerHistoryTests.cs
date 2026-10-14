@@ -65,12 +65,10 @@ public sealed class CompanyLedgerHistoryTests
         Assert.Contains("MAX(", sql, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
-    public async Task History_AggregatesEachGameYearLikeRowByRowAccounting()
+    private static async Task<(string Token, Guid CompanyId)> SeedCompanyWithTwoYearsAsync(
+        ApiWebApplicationFactory factory,
+        HttpClient client)
     {
-        await using var factory = new ApiWebApplicationFactory();
-        var client = factory.CreateClient();
-
         var register = await TestHelpers.ExecuteGraphQlAsync(
             client,
             "mutation Register($input: RegisterInput!) { register(input: $input) { token } }",
@@ -108,6 +106,48 @@ public sealed class CompanyLedgerHistoryTests
                 Entry(companyId, LedgerCategory.LaborCost, -100m, TicksPerYear + 740));
             await db.SaveChangesAsync();
         }
+
+        return (token, companyId);
+    }
+
+    [Fact]
+    public async Task History_IsSkippedWhenNotSelected_AndNeverServedEmptyFromCacheToALaterRequest()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var (token, companyId) = await SeedCompanyWithTwoYearsAsync(factory, client);
+
+        // The dashboard's Financial summary asks for totals only (no `history`).
+        var totalsOnly = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            "query Totals($companyId: UUID!) { companyLedger(companyId: $companyId) { totalRevenue } }",
+            new { companyId },
+            token);
+        Assert.True(totalsOnly.GetProperty("data").GetProperty("companyLedger").ValueKind == System.Text.Json.JsonValueKind.Object);
+
+        // A later request that does select `history` (within the cache window) must still get it.
+        var withHistory = await TestHelpers.ExecuteGraphQlAsync(client, Query, new { companyId }, token);
+        var history = withHistory.GetProperty("data").GetProperty("companyLedger").GetProperty("history");
+        Assert.True(history.GetArrayLength() >= 2, "history must be computed when it is selected, not served empty from cache");
+
+        // And a totals-only request after that still works.
+        var again = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            "query Totals($companyId: UUID!) { companyLedger(companyId: $companyId) { totalRevenue } }",
+            new { companyId },
+            token);
+        Assert.Equal(
+            totalsOnly.GetProperty("data").GetProperty("companyLedger").GetProperty("totalRevenue").GetDecimal(),
+            again.GetProperty("data").GetProperty("companyLedger").GetProperty("totalRevenue").GetDecimal());
+    }
+
+    [Fact]
+    public async Task History_AggregatesEachGameYearLikeRowByRowAccounting()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var (token, companyId) = await SeedCompanyWithTwoYearsAsync(factory, client);
 
         var result = await TestHelpers.ExecuteGraphQlAsync(client, Query, new { companyId }, token);
 
