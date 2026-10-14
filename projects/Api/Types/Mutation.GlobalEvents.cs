@@ -26,11 +26,11 @@ public sealed partial class Mutation
             db, httpContextAccessor.HttpContext.User, ct);
 
         if (!GlobalEventType.All.Contains(input.EventType))
-            throw new GraphQLException(new Error("INVALID_EVENT_TYPE", $"Unknown event type: {input.EventType}"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage($"Unknown event type: {input.EventType}").SetCode("INVALID_EVENT_TYPE").Build());
 
         if (!new[] { GlobalEventSeverity.Minor, GlobalEventSeverity.Moderate, GlobalEventSeverity.Major, GlobalEventSeverity.Catastrophic }
                 .Contains(input.Severity))
-            throw new GraphQLException(new Error("INVALID_SEVERITY", $"Unknown severity: {input.Severity}"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage($"Unknown severity: {input.Severity}").SetCode("INVALID_SEVERITY").Build());
 
         var gameState = await db.GameStates.FirstAsync(ct);
 
@@ -38,7 +38,7 @@ public sealed partial class Mutation
         if (input.AffectedCityId.HasValue)
         {
             affectedCity = await db.Cities.FindAsync([input.AffectedCityId.Value], ct)
-                ?? throw new GraphQLException(new Error("CITY_NOT_FOUND", "Affected city not found."));
+                ?? throw new GraphQLException(ErrorBuilder.New().SetMessage("Affected city not found.").SetCode("CITY_NOT_FOUND").Build());
         }
 
         var adminId = httpContextAccessor.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "unknown";
@@ -81,10 +81,10 @@ public sealed partial class Mutation
             db, httpContextAccessor.HttpContext.User, ct);
 
         var evt = await db.GlobalEvents.FindAsync([id], ct)
-            ?? throw new GraphQLException(new Error("EVENT_NOT_FOUND", "Global event not found."));
+            ?? throw new GraphQLException(ErrorBuilder.New().SetMessage("Global event not found.").SetCode("EVENT_NOT_FOUND").Build());
 
         if (!evt.IsActive)
-            throw new GraphQLException(new Error("EVENT_ALREADY_RESOLVED", "This event is already resolved."));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("This event is already resolved.").SetCode("EVENT_ALREADY_RESOLVED").Build());
 
         evt.IsActive = false;
         evt.ResolvedAtUtc = DateTime.UtcNow;

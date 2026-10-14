@@ -66,14 +66,12 @@ public sealed partial class Mutation
                 : null;
 
             var player = await db.Players.FirstOrDefaultAsync(p => p.Id == playerId)
-                ?? throw new GraphQLException(new Error("Player not found.", "PLAYER_NOT_FOUND"));
+                ?? throw new GraphQLException(ErrorBuilder.New().SetMessage("Player not found.").SetCode("PLAYER_NOT_FOUND").Build());
             var isCompanyContext = player.ActiveAccountType == AccountContextType.Company && player.ActiveCompanyId.HasValue;
 
             if (isCompanyContext && (!input.FromBankAccountId.HasValue || !input.ToBankAccountId.HasValue))
             {
-                throw new GraphQLException(new Error(
-                    "In company context, both source and destination bank accounts must be selected.",
-                    "ACCOUNT_CONTEXT_REQUIRED"));
+                throw new GraphQLException(ErrorBuilder.New().SetMessage("In company context, both source and destination bank accounts must be selected.").SetCode("ACCOUNT_CONTEXT_REQUIRED").Build());
             }
 
             var rate = await Query.ComputeForexRateAsync(db, fromCode, toCode);
@@ -101,17 +99,13 @@ public sealed partial class Mutation
             {
                 // ── Bank-account path (source) ─────────────────────────────
                 var fromAccount = await GetAccountInActiveContextAsync(db, input.FromBankAccountId.Value, player)
-                    ?? throw new GraphQLException(new Error(
-                        ObjectAuthorizationService.FriendlyMessage,
-                        ObjectAuthorizationService.NotFoundOrNotOwnedCode));
+                    ?? throw new GraphQLException(ErrorBuilder.New().SetMessage(ObjectAuthorizationService.FriendlyMessage).SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode).Build());
 
                 if (!string.Equals(fromAccount.CurrencyCode, fromCode, StringComparison.OrdinalIgnoreCase))
-                    throw new GraphQLException(new Error(
-                        $"Source bank account currency ({fromAccount.CurrencyCode}) does not match the requested from-currency ({fromCode}).",
-                        "CURRENCY_MISMATCH"));
+                    throw new GraphQLException(ErrorBuilder.New().SetMessage($"Source bank account currency ({fromAccount.CurrencyCode}) does not match the requested from-currency ({fromCode}).").SetCode("CURRENCY_MISMATCH").Build());
 
                 if (fromAccount.Balance < input.Amount)
-                    throw new GraphQLException(new Error("Insufficient funds.", "INSUFFICIENT_FUNDS"));
+                    throw new GraphQLException(ErrorBuilder.New().SetMessage("Insufficient funds.").SetCode("INSUFFICIENT_FUNDS").Build());
 
                 fromAccount.Balance -= input.Amount;
                 fromCompanyAccount = fromAccount.CompanyId.HasValue ? fromAccount : null;
@@ -120,16 +114,14 @@ public sealed partial class Mutation
             {
                 if (isCompanyContext)
                 {
-                    throw new GraphQLException(new Error(
-                        "In company context, swaps must use selected company bank accounts.",
-                        "ACCOUNT_CONTEXT_REQUIRED"));
+                    throw new GraphQLException(ErrorBuilder.New().SetMessage("In company context, swaps must use selected company bank accounts.").SetCode("ACCOUNT_CONTEXT_REQUIRED").Build());
                 }
 
                 // ── Personal wallet path (source) ──────────────────────────
                 var currentBalance = await Query.GetPersonalBalanceAsync(db, playerId, fromCode);
 
                 if (currentBalance < input.Amount)
-                    throw new GraphQLException(new Error("Insufficient funds.", "INSUFFICIENT_FUNDS"));
+                    throw new GraphQLException(ErrorBuilder.New().SetMessage("Insufficient funds.").SetCode("INSUFFICIENT_FUNDS").Build());
 
                 if (fromCode == PersonalBankAccountService.SettlementCurrencyCode)
                 {
@@ -138,7 +130,7 @@ public sealed partial class Mutation
                 else
                 {
                     var fromBalance = await PersonalBankAccountService.GetTrackedAccountAsync(db, playerId, fromCode)
-                        ?? throw new GraphQLException(new Error("No " + fromCode + " balance found.", "INSUFFICIENT_FUNDS"));
+                        ?? throw new GraphQLException(ErrorBuilder.New().SetMessage("No " + fromCode + " balance found.").SetCode("INSUFFICIENT_FUNDS").Build());
 
                     fromBalance.Balance -= input.Amount;
                 }
@@ -148,14 +140,10 @@ public sealed partial class Mutation
             {
                 // ── Bank-account path (destination) ───────────────────────
                 var toAccount = await GetAccountInActiveContextAsync(db, input.ToBankAccountId.Value, player)
-                    ?? throw new GraphQLException(new Error(
-                        ObjectAuthorizationService.FriendlyMessage,
-                        ObjectAuthorizationService.NotFoundOrNotOwnedCode));
+                    ?? throw new GraphQLException(ErrorBuilder.New().SetMessage(ObjectAuthorizationService.FriendlyMessage).SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode).Build());
 
                 if (!string.Equals(toAccount.CurrencyCode, toCode, StringComparison.OrdinalIgnoreCase))
-                    throw new GraphQLException(new Error(
-                        $"Destination bank account currency ({toAccount.CurrencyCode}) does not match the requested to-currency ({toCode}).",
-                        "CURRENCY_MISMATCH"));
+                    throw new GraphQLException(ErrorBuilder.New().SetMessage($"Destination bank account currency ({toAccount.CurrencyCode}) does not match the requested to-currency ({toCode}).").SetCode("CURRENCY_MISMATCH").Build());
 
                 toAccount.Balance += toAmount;
                 toCompanyAccount = toAccount.CompanyId.HasValue ? toAccount : null;
@@ -164,9 +152,7 @@ public sealed partial class Mutation
             {
                 if (isCompanyContext)
                 {
-                    throw new GraphQLException(new Error(
-                        "In company context, swaps must use selected company bank accounts.",
-                        "ACCOUNT_CONTEXT_REQUIRED"));
+                    throw new GraphQLException(ErrorBuilder.New().SetMessage("In company context, swaps must use selected company bank accounts.").SetCode("ACCOUNT_CONTEXT_REQUIRED").Build());
                 }
 
                 // ── Personal wallet path (destination) ────────────────────
@@ -238,9 +224,7 @@ public sealed partial class Mutation
         }
         catch (DbUpdateConcurrencyException)
         {
-            throw new GraphQLException(new Error(
-                "A concurrent swap was in progress. Please retry your trade.",
-                "CONCURRENT_SWAP_CONFLICT"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("A concurrent swap was in progress. Please retry your trade.").SetCode("CONCURRENT_SWAP_CONFLICT").Build());
         }
 
         // Compute post-swap balances for the result.
@@ -320,26 +304,20 @@ public sealed partial class Mutation
         {
             // Log the rejection before throwing.
             await LogFxSecurityRejectionAsync(db, playerId, quoteNonce, "QUOTE_NONCE_NOT_FOUND");
-            throw new GraphQLException(new Error(
-                "Quote nonce not found. Please request a new quote.",
-                "QUOTE_NONCE_NOT_FOUND"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("Quote nonce not found. Please request a new quote.").SetCode("QUOTE_NONCE_NOT_FOUND").Build());
         }
 
         if (nonceRecord.ConsumedAtUtc.HasValue)
         {
             await LogFxSecurityRejectionAsync(db, playerId, quoteNonce, "QUOTE_ALREADY_USED");
-            throw new GraphQLException(new Error(
-                "This quote has already been used. Please request a new quote.",
-                "QUOTE_ALREADY_USED"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("This quote has already been used. Please request a new quote.").SetCode("QUOTE_ALREADY_USED").Build());
         }
 
         var age = DateTime.UtcNow - nonceRecord.IssuedAtUtc;
         if (age.TotalSeconds > Query.QuoteTtlSeconds)
         {
             await LogFxSecurityRejectionAsync(db, playerId, quoteNonce, "QUOTE_EXPIRED");
-            throw new GraphQLException(new Error(
-                $"Quote expired ({age.TotalSeconds:F0}s old). Please request a fresh quote.",
-                "QUOTE_EXPIRED"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage($"Quote expired ({age.TotalSeconds:F0}s old). Please request a fresh quote.").SetCode("QUOTE_EXPIRED").Build());
         }
 
         // Mark consumed.
@@ -365,11 +343,9 @@ public sealed partial class Mutation
         var deviationBps = Math.Abs((currentRate - quotedRate) / quotedRate) * 10_000m;
         if (deviationBps > acceptedSlippageBps)
         {
-            throw new GraphQLException(new Error(
-                $"Market moved too far. Rate deviation {deviationBps:F1} BPS exceeds your accepted slippage of {acceptedSlippageBps} BPS. " +
+            throw new GraphQLException(ErrorBuilder.New().SetMessage($"Market moved too far. Rate deviation {deviationBps:F1} BPS exceeds your accepted slippage of {acceptedSlippageBps} BPS. " +
                 $"Quoted: {quotedRate:F6} {toCode}/{fromCode}, current: {currentRate:F6}. " +
-                "Please request a new quote or increase your slippage tolerance.",
-                "SLIPPAGE_EXCEEDED"));
+                "Please request a new quote or increase your slippage tolerance.").SetCode("SLIPPAGE_EXCEEDED").Build());
         }
     }
 

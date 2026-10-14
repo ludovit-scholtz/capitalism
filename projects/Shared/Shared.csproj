@@ -7,6 +7,6 @@
     <RootNamespace>Capitalism.Shared</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="HtmlSanitizer" Version="9.0.892" />
+    <PackageReference Include="HtmlSanitizer" Version="9.2.1039" />
   </ItemGroup>
 </Project>

@@ -62,7 +62,7 @@ describe('initSentry', () => {
     const config = sentryInit.mock.calls[0][0]
     expect(config.app).toBe(app)
     expect(config.dsn).toContain('ingest.de.sentry.io')
-    expect(config.sendDefaultPii).toBe(true)
+    expect(config.dataCollection).toEqual({ userInfo: true })
   })
 
   it('does nothing during server-side rendering', () => {

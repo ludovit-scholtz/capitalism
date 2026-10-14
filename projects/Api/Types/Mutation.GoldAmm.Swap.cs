@@ -29,17 +29,15 @@ public sealed partial class Mutation
             : null;
 
         var pool = await db.GoldAmmPools.FirstOrDefaultAsync(p => p.CurrencyCode == currencyCode)
-            ?? throw new GraphQLException(new Error($"No pool for {currencyCode}/XAU.", "POOL_NOT_FOUND"));
+            ?? throw new GraphQLException(ErrorBuilder.New().SetMessage($"No pool for {currencyCode}/XAU.").SetCode("POOL_NOT_FOUND").Build());
 
         if (pool.FiatReserve <= 0 || pool.GoldReserve <= 0)
-            throw new GraphQLException(new Error("Pool has no liquidity.", "INSUFFICIENT_LIQUIDITY"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("Pool has no liquidity.").SetCode("INSUFFICIENT_LIQUIDITY").Build());
 
         var (outputAmount, feeAmount) = Query.ComputeAmmOutput(direction, input.Amount, pool.FiatReserve, pool.GoldReserve);
 
         if (input.MinOutputAmount > 0 && outputAmount < input.MinOutputAmount)
-            throw new GraphQLException(new Error(
-                $"Output {outputAmount:F8} is below your minimum {input.MinOutputAmount:F8}.",
-                "SLIPPAGE_EXCEEDED"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage($"Output {outputAmount:F8} is below your minimum {input.MinOutputAmount:F8}.").SetCode("SLIPPAGE_EXCEEDED").Build());
 
         if (direction == "FIAT_TO_GOLD")
         {
@@ -119,17 +117,17 @@ public sealed partial class Mutation
     {
         var adminId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
         var admin = await db.Players.AsNoTracking().FirstOrDefaultAsync(p => p.Id == adminId)
-            ?? throw new GraphQLException(new Error("Admin not found.", "PLAYER_NOT_FOUND"));
+            ?? throw new GraphQLException(ErrorBuilder.New().SetMessage("Admin not found.").SetCode("PLAYER_NOT_FOUND").Build());
 
         if (admin.Role != "ADMIN")
-            throw new GraphQLException(new Error("Admin role required.", "ADMIN_REQUIRED"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("Admin role required.").SetCode("ADMIN_REQUIRED").Build());
 
         if (input.Balance < 0)
-            throw new GraphQLException(new Error("Balance cannot be negative.", "INVALID_AMOUNT"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("Balance cannot be negative.").SetCode("INVALID_AMOUNT").Build());
 
         var target = await db.Players.AsNoTracking()
             .FirstOrDefaultAsync(p => p.Email == input.PlayerEmail)
-            ?? throw new GraphQLException(new Error($"Player '{input.PlayerEmail}' not found.", "PLAYER_NOT_FOUND"));
+            ?? throw new GraphQLException(ErrorBuilder.New().SetMessage($"Player '{input.PlayerEmail}' not found.").SetCode("PLAYER_NOT_FOUND").Build());
 
         var goldRow = await db.PlayerGoldBalances.FirstOrDefaultAsync(g => g.PlayerId == target.Id);
         if (goldRow == null)
@@ -162,37 +160,33 @@ public sealed partial class Mutation
     {
         if (string.IsNullOrWhiteSpace(currencyCode) || currencyCode.Length != 3 ||
             currencyCode.Equals("XAU", StringComparison.OrdinalIgnoreCase))
-            throw new GraphQLException(new Error("CurrencyCode must be a 3-letter fiat ISO code (not XAU).", "INVALID_CURRENCY_CODE"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("CurrencyCode must be a 3-letter fiat ISO code (not XAU).").SetCode("INVALID_CURRENCY_CODE").Build());
 
         if (fiatAmount <= 0)
-            throw new GraphQLException(new Error("FiatAmount must be > 0.", "INVALID_AMOUNT"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("FiatAmount must be > 0.").SetCode("INVALID_AMOUNT").Build());
 
         if (goldAmount <= 0)
-            throw new GraphQLException(new Error("GoldAmount must be > 0.", "INVALID_AMOUNT"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("GoldAmount must be > 0.").SetCode("INVALID_AMOUNT").Build());
     }
 
     private static async Task AssertSufficientFiat(AppDbContext db, Guid playerId, string currencyCode, decimal required)
     {
         var available = await Query.GetAvailableFiatAsync(db, playerId, currencyCode);
         if (available < required)
-            throw new GraphQLException(new Error(
-                $"Insufficient available {currencyCode}. Available: {available:F4}, required: {required:F4}.",
-                "INSUFFICIENT_FUNDS"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage($"Insufficient available {currencyCode}. Available: {available:F4}, required: {required:F4}.").SetCode("INSUFFICIENT_FUNDS").Build());
     }
 
     private static async Task AssertSufficientGold(AppDbContext db, Guid playerId, decimal required)
     {
         var available = await Query.GetAvailableGoldAsync(db, playerId);
         if (available < required)
-            throw new GraphQLException(new Error(
-                $"Insufficient available gold. Available: {available:F8} XAU, required: {required:F8} XAU.",
-                "INSUFFICIENT_GOLD"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage($"Insufficient available gold. Available: {available:F8} XAU, required: {required:F8} XAU.").SetCode("INSUFFICIENT_GOLD").Build());
     }
 
     private static async Task DeductFiat(AppDbContext db, Guid playerId, string currencyCode, decimal amount)
     {
         var bal = await PersonalBankAccountService.GetTrackedAccountAsync(db, playerId, currencyCode)
-            ?? throw new GraphQLException(new Error($"No {currencyCode} balance found.", "INSUFFICIENT_FUNDS"));
+            ?? throw new GraphQLException(ErrorBuilder.New().SetMessage($"No {currencyCode} balance found.").SetCode("INSUFFICIENT_FUNDS").Build());
 
         bal.Balance -= amount;
     }
@@ -205,7 +199,7 @@ public sealed partial class Mutation
     private static async Task DeductGold(AppDbContext db, Guid playerId, decimal amount)
     {
         var gold = await db.PlayerGoldBalances.FirstOrDefaultAsync(g => g.PlayerId == playerId)
-            ?? throw new GraphQLException(new Error("No gold balance found.", "INSUFFICIENT_GOLD"));
+            ?? throw new GraphQLException(ErrorBuilder.New().SetMessage("No gold balance found.").SetCode("INSUFFICIENT_GOLD").Build());
         gold.Balance -= amount;
         gold.UpdatedAtUtc = DateTime.UtcNow;
     }

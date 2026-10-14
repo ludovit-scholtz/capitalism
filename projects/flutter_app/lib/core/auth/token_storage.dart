@@ -24,7 +24,19 @@ class SecureTokenStorage implements TokenStorage {
   final FlutterSecureStorage _storage;
 
   @override
-  Future<String?> read() => _storage.read(key: _key);
+  Future<String?> read() async {
+    try {
+      return await _storage.read(key: _key);
+    } catch (_) {
+      // Existing data can become undecryptable (e.g. a token written by an
+      // older flutter_secure_storage whose legacy ciphers were removed), or
+      // the keystore may be briefly unavailable. Treat both as "signed out"
+      // for this launch rather than failing at startup. The stored value is
+      // deliberately NOT deleted: a transient error must not wipe a valid
+      // session, and a successful sign-in overwrites any unreadable value.
+      return null;
+    }
+  }
 
   @override
   Future<void> write(String value) => _storage.write(key: _key, value: value);

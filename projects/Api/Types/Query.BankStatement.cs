@@ -56,14 +56,14 @@ public sealed partial class Query
 
         if (!companyId.HasValue)
         {
-            throw new GraphQLException(new Error("Company not found or you do not own it.", "COMPANY_NOT_FOUND"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("Company not found or you do not own it.").SetCode("COMPANY_NOT_FOUND").Build());
         }
 
         var company = await db.Companies
             .AsNoTracking()
             .Include(c => c.Buildings).ThenInclude(b => b.City)
             .FirstOrDefaultAsync(c => c.Id == companyId.Value && c.PlayerId == userId)
-            ?? throw new GraphQLException(new Error("Company not found or you do not own it.", "COMPANY_NOT_FOUND"));
+            ?? throw new GraphQLException(ErrorBuilder.New().SetMessage("Company not found or you do not own it.").SetCode("COMPANY_NOT_FOUND").Build());
 
         string? filterCurrencyCode = null;
         BankAccount? selectedAccount = null;
@@ -74,7 +74,7 @@ public sealed partial class Query
                 .FirstOrDefaultAsync(a => a.Id == accountId.Value && a.CompanyId == companyId.Value);
             if (selectedAccount is null)
             {
-                throw new GraphQLException(new Error("Selected bank account not found for this company.", "ACCOUNT_NOT_FOUND"));
+                throw new GraphQLException(ErrorBuilder.New().SetMessage("Selected bank account not found for this company.").SetCode("ACCOUNT_NOT_FOUND").Build());
             }
 
             filterCurrencyCode = selectedAccount.CurrencyCode;

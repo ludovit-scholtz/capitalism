@@ -45,9 +45,9 @@ export function initSentry(app: App): void {
   Sentry.init({
     app,
     dsn,
-    // Setting this option to true will send default PII data to Sentry.
-    // For example, automatic IP address collection on events.
-    sendDefaultPii: true,
+    // Opt in to default user info (e.g. automatic IP address collection on
+    // events). Sentry 11 replaced `sendDefaultPii` with `dataCollection`.
+    dataCollection: { userInfo: true },
   })
 }
 

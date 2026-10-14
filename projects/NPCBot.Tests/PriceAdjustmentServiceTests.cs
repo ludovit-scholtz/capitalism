@@ -45,7 +45,7 @@ public sealed class PriceAdjustmentServiceTests
     /// <summary>Builds the JSON body the game API returns after a successful price update.</summary>
     private static string OkJson(string id = "u1", decimal price = 47.5m) =>
         "{\"data\":{\"updatePublicSalesPrice\":{\"id\":\"" + id +
-        "\",\"unitType\":\"PUBLIC_SALES\",\"minPrice\":" + price + "}}}";
+        "\",\"unitType\":\"PUBLIC_SALES\",\"minPrice\":" + price.ToString(System.Globalization.CultureInfo.InvariantCulture) + "}}}";
 
     /// <summary>
     /// Creates a <see cref="PriceAdjustmentService"/> wired to a fake HTTP handler.
