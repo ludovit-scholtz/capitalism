@@ -21,8 +21,8 @@ class QuickActionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final accent = color ?? theme.colorScheme.primary;
-    return SizedBox(
-      width: 88,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 88, maxWidth: 120),
       child: Semantics(
         button: true,
         child: Material(

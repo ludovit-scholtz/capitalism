@@ -6,18 +6,18 @@ import 'package:provider/provider.dart';
 import '../../core/i18n/locale_state.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/app_number_format.dart';
 import '../../core/widgets/animated_number.dart';
 import '../../core/widgets/glass_card.dart';
-import '../../core/widgets/stat_tile.dart';
-import '../../core/theme/app_theme.dart';
 import '../../core/widgets/icon_badge.dart';
+import '../../core/widgets/stat_tile.dart';
 import '../buildings/building_analytics_models.dart';
 import '../buildings/building_panel_models.dart';
 import 'dashboard_models.dart';
 import 'dashboard_power_balance_chip.dart';
-import 'quick_action_tile.dart';
 import 'dashboard_supply_chain_strip.dart';
+import 'quick_action_tile.dart';
 
 class DashboardCompanyCard extends StatelessWidget {
   const DashboardCompanyCard({
@@ -83,7 +83,9 @@ class DashboardCompanyCard extends StatelessWidget {
                   color: AppTheme.neonGreen,
                   valueWidget: AnimatedNumber(
                     value: company.cash,
-                    builder: (v) => AppNumberFormat.money(v, languageCode: languageCode),
+                    // Whole units only: mid-tween values would otherwise flicker between
+                    // whole-dollar and cents formatting.
+                    builder: (v) => AppNumberFormat.money(v.roundToDouble(), languageCode: languageCode),
                   ),
                 ),
               ),

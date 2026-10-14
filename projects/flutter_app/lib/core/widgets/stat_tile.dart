@@ -39,7 +39,12 @@ class StatTile extends StatelessWidget {
             const SizedBox(height: AppSpacing.xs),
             DefaultTextStyle.merge(
               style: theme.textTheme.titleLarge?.copyWith(color: accent),
-              child: valueWidget ?? Text(value!, overflow: TextOverflow.ellipsis),
+              softWrap: false,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: valueWidget ?? Text(value!),
+              ),
             ),
           ],
         ),

@@ -242,8 +242,10 @@ class AppShell extends StatelessWidget {
   int _destinationIndexFor(String location) {
     if (location.startsWith('/dashboard')) return 1;
     if (location.startsWith('/building')) return 2;
-    if (location.startsWith('/forex') || location.startsWith('/stocks')) return 3;
-    if (location == '/' || location.isEmpty) return 0;
+    const marketPrefixes = ['/forex', '/stocks', '/market', '/exchange', '/energy'];
+    if (marketPrefixes.any(location.startsWith)) return 3;
+    const preLoginPrefixes = ['/login', '/register', '/auth', '/onboarding', '/forgot-password', '/reset-password'];
+    if (location == '/' || location.isEmpty || preLoginPrefixes.any(location.startsWith)) return 0;
     return 4;
   }
 }

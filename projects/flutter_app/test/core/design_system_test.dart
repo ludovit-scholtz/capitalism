@@ -96,6 +96,14 @@ void main() {
       handle.dispose();
     });
 
+    testWidgets('long values scale down instead of overflowing a narrow tile', (tester) async {
+      await tester.pumpWidget(
+        _host(const Center(child: SizedBox(width: 110, child: StatTile(label: 'Cash', value: r'$1,234,567,890,123.55')))),
+      );
+      expect(tester.takeException(), isNull);
+      expect(tester.getSize(find.byType(StatTile)).width, 110);
+    });
+
     testWidgets('merges label and value into one semantics node', (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(_host(const StatTile(label: 'Cash', value: '5', icon: Icons.attach_money)));

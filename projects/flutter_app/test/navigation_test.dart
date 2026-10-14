@@ -100,6 +100,17 @@ void main() {
       expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 0);
     });
 
+    testWidgets('other market routes keep Markets highlighted; auth routes fall back to Home', (tester) async {
+      final router = createAppRouter();
+      await pumpCapitalismApp(tester, authenticated: true, router: router);
+      router.go('/market');
+      await _pumpFrames(tester);
+      expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 3);
+      router.go('/exchange');
+      await _pumpFrames(tester);
+      expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 3);
+    });
+
     testWidgets('More tab opens the full drawer without navigating', (tester) async {
       await pumpCapitalismApp(tester);
 
