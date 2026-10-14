@@ -5,7 +5,7 @@
     "display": "standalone",
     "background_color": "#0047FF",
     "theme_color": "#0047FF",
-    "description": "A new Flutter project.",
+    "description": "Capitalism - a multiplayer economic strategy game.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

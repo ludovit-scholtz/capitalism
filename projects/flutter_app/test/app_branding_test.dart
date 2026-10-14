@@ -22,6 +22,9 @@ void main() {
     final manifest = read('web/manifest.json');
     expect(manifest, contains('"name": "Capitalism"'));
     expect(manifest, contains('"short_name": "Capitalism"'));
+    // No leftover Flutter template text in the install / share previews.
+    expect(manifest, isNot(contains('A new Flutter project')));
+    expect(html, isNot(contains('A new Flutter project')));
   });
 
   test('Android launcher label and iOS bundle names say Capitalism', () {

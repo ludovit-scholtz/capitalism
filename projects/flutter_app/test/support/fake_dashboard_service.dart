@@ -63,6 +63,11 @@ class FakeDashboardService implements DashboardService {
   /// let a retry succeed.
   final Map<String, Object> ledgerErrors = {};
 
+  /// Per-company queue of responses consumed one per call (at call time, so a
+  /// slow earlier call keeps the response it was given). Falls back to
+  /// [ledgersByCompanyId] when empty.
+  final Map<String, List<CompanyLedger>> ledgerQueues = {};
+
   final List<String> calls = [];
   int fetchDashboardDataCallCount = 0;
   int fetchCompanyOverviewLedgerCallCount = 0;
@@ -95,10 +100,13 @@ class FakeDashboardService implements DashboardService {
     calls.add('fetchCompanyOverviewLedger');
     fetchCompanyOverviewLedgerCallCount++;
     final gate = ledgerGates[companyId];
+    final queue = ledgerQueues[companyId];
+    final queued = (queue != null && queue.isNotEmpty) ? queue.removeAt(0) : null;
     if (gate != null) await gate.future;
     final error = ledgerErrors[companyId];
     if (error != null) throw error;
-    return ledgersByCompanyId[companyId] ??
+    return queued ??
+        ledgersByCompanyId[companyId] ??
         const CompanyLedger(
           companyName: '',
           gameYear: 1,

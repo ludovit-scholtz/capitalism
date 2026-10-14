@@ -80,6 +80,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   final Set<String> _loadingLedgerIds = {};
   final Set<String> _failedLedgerIds = {};
 
+  /// Latest ledger request number per company. A response is applied only if it
+  /// belongs to the newest request, so a slow older call (initial load, tick
+  /// refresh, Retry) can never overwrite fresher numbers or clear the skeleton
+  /// of a request that is still running.
+  final Map<String, int> _ledgerRequestSeq = {};
+
   AdditionalCompanyPrerequisites? _newCompanyPrerequisites;
   List<NewCompanyCity> _newCompanyCities = const [];
 
@@ -256,12 +262,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   /// ledger arrives, so a slow company never delays (or hides) the others.
   Future<void> _loadLedgers(List<DashboardCompany> companies, {bool isRefresh = false}) async {
     final ids = {for (final company in companies) company.id};
-    if (!isRefresh) {
-      setState(() {
-        // Drop ledgers of companies that no longer exist; keep the rest while refetching.
-        _ledgers = {for (final entry in _ledgers.entries) if (ids.contains(entry.key)) entry.key: entry.value};
-      });
-    }
+    // Forget everything about companies that no longer exist (e.g. merged away),
+    // for silent refreshes too; keep the rest while refetching.
+    setState(() {
+      _ledgers = {for (final entry in _ledgers.entries) if (ids.contains(entry.key)) entry.key: entry.value};
+      _loadingLedgerIds.retainAll(ids);
+      _failedLedgerIds.retainAll(ids);
+      _ledgerRequestSeq.removeWhere((id, _) => !ids.contains(id));
+    });
     await Future.wait([for (final id in ids) _loadLedger(id, silent: isRefresh)]);
   }
 
@@ -270,6 +278,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   /// replacing good data with an error.
   Future<void> _loadLedger(String companyId, {bool silent = false}) async {
     if (!mounted) return;
+    final seq = _ledgerRequestSeq[companyId] = (_ledgerRequestSeq[companyId] ?? 0) + 1;
     if (!silent || !_ledgers.containsKey(companyId)) {
       setState(() {
         _loadingLedgerIds.add(companyId);
@@ -278,14 +287,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
     try {
       final ledger = await _service.fetchCompanyOverviewLedger(companyId);
-      if (!mounted) return;
+      if (!mounted || _ledgerRequestSeq[companyId] != seq) return;
       setState(() {
         _ledgers = {..._ledgers, companyId: ledger};
         _failedLedgerIds.remove(companyId);
         _loadingLedgerIds.remove(companyId);
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || _ledgerRequestSeq[companyId] != seq) return;
       setState(() {
         _loadingLedgerIds.remove(companyId);
         if (!_ledgers.containsKey(companyId)) _failedLedgerIds.add(companyId);
