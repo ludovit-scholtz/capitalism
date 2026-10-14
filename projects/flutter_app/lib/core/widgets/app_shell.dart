@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -154,23 +155,51 @@ class AppShell extends StatelessWidget {
             ),
           ),
         ),
-        body: child,
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _bottomIndexFor(GoRouterState.of(context).uri.toString()),
-          destinations: const [
-            NavigationDestination(icon: FaIcon(AppIcons.home, size: 20), label: 'Home'),
-            NavigationDestination(icon: FaIcon(AppIcons.dashboard, size: 20), label: 'Dashboard'),
-            NavigationDestination(icon: FaIcon(AppIcons.factory, size: 20), label: 'Last Building'),
-            NavigationDestination(icon: FaIcon(AppIcons.bankStatement, size: 20), label: 'Bank Statement'),
-            NavigationDestination(icon: FaIcon(AppIcons.forex, size: 20), label: 'Forex'),
-            NavigationDestination(icon: FaIcon(AppIcons.stocks, size: 20), label: 'Stocks'),
-            NavigationDestination(icon: FaIcon(AppIcons.news, size: 20), label: 'News'),
-          ],
-          onDestinationSelected: (index) => _handleBottomTap(context, index),
-        ),
+        body: isWideScreen
+            ? Row(
+                children: [
+                  Builder(
+                    builder: (ctx) => NavigationRail(
+                      selectedIndex: _destinationIndexFor(GoRouterState.of(ctx).uri.toString()),
+                      labelType: NavigationRailLabelType.all,
+                      backgroundColor: Colors.transparent,
+                      destinations: [
+                        for (final d in _destinations)
+                          NavigationRailDestination(icon: FaIcon(d.icon, size: 20), label: Text(d.label)),
+                      ],
+                      onDestinationSelected: (index) => _handleBottomTap(ctx, index),
+                    ),
+                  ),
+                  const VerticalDivider(width: 1),
+                  Expanded(child: child),
+                ],
+              )
+            : child,
+        bottomNavigationBar: isWideScreen
+            ? null
+            : Builder(
+                builder: (ctx) => NavigationBar(
+                  selectedIndex: _destinationIndexFor(GoRouterState.of(ctx).uri.toString()),
+                  destinations: [
+                    for (final d in _destinations)
+                      NavigationDestination(icon: FaIcon(d.icon, size: 20), label: d.label),
+                  ],
+                  onDestinationSelected: (index) => _handleBottomTap(ctx, index),
+                ),
+              ),
       ),
     );
   }
+
+  /// The five primary destinations (Material 3 allows 3-5). Everything else
+  /// lives behind "More", which opens the drawer.
+  static const _destinations = <({String label, FaIconData icon})>[
+    (label: 'Home', icon: AppIcons.home),
+    (label: 'Dashboard', icon: AppIcons.dashboard),
+    (label: 'Buildings', icon: AppIcons.factory),
+    (label: 'Markets', icon: AppIcons.forex),
+    (label: 'More', icon: AppIcons.menu),
+  ];
 
   List<NavItem> _visibleItems(NavSection section, AuthState auth) {
     return section.items
@@ -194,6 +223,7 @@ class AppShell extends StatelessWidget {
   }
 
   void _handleBottomTap(BuildContext context, int index) {
+    unawaited(HapticFeedback.selectionClick());
     switch (index) {
       case 0:
         context.go('/');
@@ -203,23 +233,17 @@ class AppShell extends StatelessWidget {
         final lastBuildingId = context.read<RecentBuildingState>().lastBuildingId;
         context.go(lastBuildingId != null ? '/building/$lastBuildingId' : '/buildings/market');
       case 3:
-        context.go('/bank-statement');
-      case 4:
         context.go('/forex');
-      case 5:
-        context.go('/stocks');
-      case 6:
-        context.go('/news');
+      case 4:
+        Scaffold.of(context).openDrawer();
     }
   }
 
-  int _bottomIndexFor(String location) {
+  int _destinationIndexFor(String location) {
     if (location.startsWith('/dashboard')) return 1;
     if (location.startsWith('/building')) return 2;
-    if (location.startsWith('/bank-statement')) return 3;
-    if (location.startsWith('/forex')) return 4;
-    if (location.startsWith('/stocks')) return 5;
-    if (location.startsWith('/news')) return 6;
-    return 0;
+    if (location.startsWith('/forex') || location.startsWith('/stocks')) return 3;
+    if (location == '/' || location.isEmpty) return 0;
+    return 4;
   }
 }

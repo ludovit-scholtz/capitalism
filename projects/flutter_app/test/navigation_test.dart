@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:capitalism_app/core/router/app_router.dart';
+
 import 'support/app_harness.dart';
 
-Finder _bottomNavLabel(String label) =>
-    find.descendant(of: find.byType(NavigationBar), matching: find.text(label));
+Finder _bottomNavLabel(String label) => find.descendant(of: find.byType(NavigationBar), matching: find.text(label));
 
-Finder _placeholderBodyFor(String sourceView) =>
-    find.text('Not implemented yet. Mirrors $sourceView in the web frontend.');
+/// Bounded pumps for routes whose screens keep a loading animation running.
+Future<void> _pumpFrames(WidgetTester tester) async {
+  for (var i = 0; i < 6; i++) {
+    await tester.pump(const Duration(milliseconds: 200));
+  }
+}
 
 Future<void> _openDrawer(WidgetTester tester) async {
   await tester.tap(find.byIcon(Icons.menu));
@@ -59,38 +64,67 @@ void main() {
       expect(find.byType(Drawer), findsNothing);
     });
 
-    testWidgets('bottom nav switches between Home, Stocks and News and highlights the active tab', (
-      tester,
-    ) async {
-      await pumpCapitalismApp(tester);
+    testWidgets('bottom nav has 5 destinations and highlights the active tab', (tester) async {
+      await pumpCapitalismApp(tester, authenticated: true);
 
-      await tester.tap(_bottomNavLabel('News'));
-      await tester.pumpAndSettle();
-      // NewsScreen is a real GraphQL-backed screen now (not a placeholder);
-      // the harness's generic fake HTTP client doesn't shape a
-      // `gameNewsFeed` response, so it lands on the screen's own error state.
-      expect(find.text('Could not load the news feed. Please try again.'), findsOneWidget);
-      expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 6);
+      expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).destinations, hasLength(5));
 
-      await tester.tap(_bottomNavLabel('Stocks'));
-      await tester.pumpAndSettle();
-      expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 5);
+      await tester.tap(_bottomNavLabel('Markets'));
+      await _pumpFrames(tester);
+      expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 3);
 
       await tester.tap(_bottomNavLabel('Home'));
       await tester.pumpAndSettle();
-      expect(find.text('Get Started'), findsOneWidget);
+      expect(find.text('Go to Dashboard'), findsOneWidget);
       expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 0);
     });
 
-    testWidgets('bottom nav Last Building tab falls back to the building market when nothing was visited yet', (
+    testWidgets('stocks and news routes keep the Markets tab highlighted / fall back to More', (tester) async {
+      final router = createAppRouter();
+      await pumpCapitalismApp(tester, authenticated: true, router: router);
+
+      router.go('/stocks');
+      await _pumpFrames(tester);
+      expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 3);
+
+      router.go('/news');
+      await _pumpFrames(tester);
+      expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 4);
+    });
+
+    testWidgets('More tab opens the full drawer without navigating', (tester) async {
+      await pumpCapitalismApp(tester);
+
+      await tester.tap(_bottomNavLabel('More'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Drawer), findsOneWidget);
+      expect(find.text('ECONOMY'), findsOneWidget);
+      expect(find.text('Get Started'), findsOneWidget);
+    });
+
+    testWidgets('bottom nav Buildings tab falls back to the building market when nothing was visited yet', (
       tester,
     ) async {
       await pumpCapitalismApp(tester);
 
-      await tester.tap(_bottomNavLabel('Last Building'));
+      await tester.tap(_bottomNavLabel('Buildings'));
       await tester.pumpAndSettle();
 
       expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 2);
+    });
+
+    testWidgets('wide screens use a NavigationRail instead of the bottom bar', (tester) async {
+      await pumpCapitalismApp(tester, authenticated: true, surfaceSize: const Size(1280, 2400));
+
+      expect(find.byType(NavigationBar), findsNothing);
+      final rail = find.byType(NavigationRail);
+      expect(rail, findsOneWidget);
+      expect(tester.widget<NavigationRail>(rail).destinations, hasLength(5));
+
+      await tester.tap(find.descendant(of: rail, matching: find.text('Markets')));
+      await _pumpFrames(tester);
+      expect(tester.widget<NavigationRail>(rail).selectedIndex, 3);
     });
 
     testWidgets('signing in reveals auth-only nav items, changes the Home CTA, and reaches the Dashboard', (

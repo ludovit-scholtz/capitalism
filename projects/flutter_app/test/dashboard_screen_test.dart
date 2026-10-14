@@ -1,3 +1,7 @@
+import 'package:capitalism_app/core/widgets/skeleton.dart';
+import 'package:capitalism_app/core/widgets/stat_tile.dart';
+import 'package:capitalism_app/core/widgets/state_view.dart';
+import 'package:capitalism_app/features/dashboard/quick_action_tile.dart';
 import 'package:capitalism_app/core/auth/auth_state.dart';
 import 'package:capitalism_app/core/game_state/game_state_model.dart';
 import 'package:capitalism_app/core/game_state/game_state_state.dart';
@@ -81,7 +85,8 @@ const _buildingWithUnits = DashboardBuilding(
   ],
 );
 
-const _companyWithUnits = DashboardCompany(id: 'company-9', name: 'Unit Co', cash: 1000, buildings: [_buildingWithUnits]);
+const _companyWithUnits =
+    DashboardCompany(id: 'company-9', name: 'Unit Co', cash: 1000, buildings: [_buildingWithUnits]);
 
 const _buildingSameCityA = DashboardBuilding(
   id: 'building-a',
@@ -120,6 +125,7 @@ Future<GoRouter> _pumpDashboard(
   required FakeDashboardService service,
   GameStateState? gameStateState,
   UrlOpener? urlOpener,
+  bool settle = true,
 }) async {
   final router = GoRouter(
     initialLocation: '/',
@@ -161,7 +167,7 @@ Future<GoRouter> _pumpDashboard(
       child: MaterialApp.router(routerConfig: router),
     ),
   );
-  await tester.pumpAndSettle();
+  if (settle) await tester.pumpAndSettle();
   return router;
 }
 
@@ -210,6 +216,38 @@ void main() {
       expect(find.text('Onboarding Screen'), findsOneWidget);
     });
 
+    testWidgets('shows skeleton placeholders (not a spinner) while loading', (tester) async {
+      final auth = AuthState(storage: InMemoryTokenStorage());
+      await auth.setToken('test-token');
+      final service = FakeDashboardService(
+        data: const DashboardData(companies: [_company], currentTick: 1, taxRate: 15, pendingActions: []),
+      );
+
+      await _pumpDashboard(tester, auth: auth, service: service, settle: false);
+
+      expect(find.byType(SkeletonBox), findsWidgets);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      await tester.pump(const Duration(milliseconds: 50));
+    });
+
+    testWidgets('Buildings tab shows icon quick actions that navigate', (tester) async {
+      final auth = AuthState(storage: InMemoryTokenStorage());
+      await auth.setToken('test-token');
+      final service = FakeDashboardService(
+        data: const DashboardData(companies: [_company], currentTick: 1, taxRate: 15, pendingActions: []),
+      );
+
+      await _pumpDashboard(tester, auth: auth, service: service);
+      await _selectTab(tester, 'Buildings');
+
+      for (final label in ['Buy Building', 'Ledger', 'Contracts', 'Research', 'Settings']) {
+        expect(find.widgetWithText(QuickActionTile, label), findsOneWidget, reason: label);
+      }
+      await tester.tap(find.widgetWithText(QuickActionTile, 'Buy Building'));
+      await tester.pumpAndSettle();
+      expect(find.text('Buy Building company-1'), findsOneWidget);
+    });
+
     testWidgets('shows the error state with Try Again on load failure', (tester) async {
       final auth = AuthState(storage: InMemoryTokenStorage());
       await auth.setToken('test-token');
@@ -218,7 +256,8 @@ void main() {
       await _pumpDashboard(tester, auth: auth, service: service);
 
       expect(find.text('Could not load your dashboard. Please try again.'), findsOneWidget);
-      expect(find.widgetWithText(OutlinedButton, 'Try Again'), findsOneWidget);
+      expect(find.text('Try Again'), findsOneWidget);
+      expect(find.byType(StateView), findsOneWidget);
     });
 
     testWidgets('renders all 5 tabs with Overview active by default', (tester) async {
@@ -356,7 +395,8 @@ void main() {
 
       final companyCard = find.byKey(const Key('company-card-company-1'));
       expect(find.descendant(of: companyCard, matching: find.text('Acme Furnishings')), findsOneWidget);
-      expect(find.descendant(of: companyCard, matching: find.textContaining('12345')), findsOneWidget);
+      expect(find.descendant(of: companyCard, matching: find.text(r'$12,345')), findsOneWidget);
+      expect(find.descendant(of: companyCard, matching: find.byType(StatTile)), findsWidgets);
       expect(find.text('Main Factory'), findsOneWidget);
       expect(find.text('City Bank'), findsOneWidget);
       expect(find.text('Loan default'), findsOneWidget);
@@ -388,7 +428,8 @@ void main() {
     testWidgets('tapping a regular building navigates to /building/:id', (tester) async {
       final auth = AuthState(storage: InMemoryTokenStorage());
       await auth.setToken('test-token');
-      final service = FakeDashboardService(data: const DashboardData(companies: [_company], currentTick: 1, taxRate: 15, pendingActions: []));
+      final service = FakeDashboardService(
+          data: const DashboardData(companies: [_company], currentTick: 1, taxRate: 15, pendingActions: []));
 
       await _pumpDashboard(tester, auth: auth, service: service);
       await _selectTab(tester, 'Buildings');
@@ -402,7 +443,8 @@ void main() {
     testWidgets('tapping a BANK building navigates to /bank/:id instead', (tester) async {
       final auth = AuthState(storage: InMemoryTokenStorage());
       await auth.setToken('test-token');
-      final service = FakeDashboardService(data: const DashboardData(companies: [_company], currentTick: 1, taxRate: 15, pendingActions: []));
+      final service = FakeDashboardService(
+          data: const DashboardData(companies: [_company], currentTick: 1, taxRate: 15, pendingActions: []));
 
       await _pumpDashboard(tester, auth: auth, service: service);
       await _selectTab(tester, 'Buildings');
@@ -430,7 +472,8 @@ void main() {
         },
         unitStatusesByBuildingId: const {
           'building-10': [
-            BuildingUnitOperationalStatus(buildingUnitId: 'unit-1', status: 'ACTIVE', blockedCode: null, blockedReason: null, idleTicks: 0),
+            BuildingUnitOperationalStatus(
+                buildingUnitId: 'unit-1', status: 'ACTIVE', blockedCode: null, blockedReason: null, idleTicks: 0),
             BuildingUnitOperationalStatus(
               buildingUnitId: 'unit-2',
               status: 'BLOCKED',
@@ -446,8 +489,8 @@ void main() {
       await _selectTab(tester, 'Buildings');
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('5000'), findsOneWidget);
-      expect(find.textContaining('3000'), findsOneWidget);
+      expect(find.text(r'$5K'), findsOneWidget);
+      expect(find.text(r'$3K'), findsOneWidget);
       expect(find.byKey(const Key('supply-chain-unit-unit-1')), findsOneWidget);
       expect(find.byKey(const Key('supply-chain-unit-unit-2')), findsOneWidget);
       // idleTicks=25 on unit-2 pushes health to RED.
@@ -457,13 +500,16 @@ void main() {
       expect(badge.data, 'RED');
     });
 
-    testWidgets('Buildings tab shows one power-balance chip per distinct city, deduped across buildings', (tester) async {
+    testWidgets('Buildings tab shows one power-balance chip per distinct city, deduped across buildings',
+        (tester) async {
       final auth = AuthState(storage: InMemoryTokenStorage());
       await auth.setToken('test-token');
       final service = FakeDashboardService(
-        data: const DashboardData(companies: [_companyTwoBuildingsSameCity], currentTick: 1, taxRate: 15, pendingActions: []),
+        data: const DashboardData(
+            companies: [_companyTwoBuildingsSameCity], currentTick: 1, taxRate: 15, pendingActions: []),
         powerBalanceByCityId: const {
-          'city-5': CityPowerBalance(totalSupplyMw: 100, totalDemandMw: 80, reserveMw: 20, reservePercent: 25, status: 'BALANCED'),
+          'city-5': CityPowerBalance(
+              totalSupplyMw: 100, totalDemandMw: 80, reserveMw: 20, reservePercent: 25, status: 'BALANCED'),
         },
       );
 
@@ -479,7 +525,8 @@ void main() {
       final auth = AuthState(storage: InMemoryTokenStorage());
       await auth.setToken('test-token');
       final service = FakeDashboardService(
-        data: const DashboardData(companies: [_companyTwoBuildingsSameCity], currentTick: 1, taxRate: 15, pendingActions: []),
+        data: const DashboardData(
+            companies: [_companyTwoBuildingsSameCity], currentTick: 1, taxRate: 15, pendingActions: []),
         cityPowerBalanceError: Exception('city power service down'),
       );
 
@@ -608,7 +655,8 @@ void main() {
       await _pumpDashboard(tester, auth: auth, service: service, gameStateState: gameStateState);
       expect(service.fetchDashboardDataCallCount, 1);
 
-      gameStateState.gameState = const GameStateModel(currentTick: 2, lastTickAtUtc: null, tickIntervalSeconds: 10, taxRate: 15);
+      gameStateState.gameState =
+          const GameStateModel(currentTick: 2, lastTickAtUtc: null, tickIntervalSeconds: 10, taxRate: 15);
       gameStateState.notifyListeners();
       await tester.pump();
       expect(find.byType(CircularProgressIndicator), findsNothing);
@@ -622,12 +670,18 @@ void main() {
       final auth = AuthState(storage: InMemoryTokenStorage());
       await auth.setToken('test-token');
       final service = FakeDashboardService(
-        data: const DashboardData(companies: [_company, _companyWithDestroyed], currentTick: 1, taxRate: 15, pendingActions: []),
+        data: const DashboardData(
+            companies: [_company, _companyWithDestroyed], currentTick: 1, taxRate: 15, pendingActions: []),
       );
 
       await _pumpDashboard(tester, auth: auth, service: service);
       await _selectTab(tester, 'Buildings');
 
+      await tester.scrollUntilVisible(
+        find.text('Old Warehouse'),
+        300,
+        scrollable: find.byWidgetPredicate((w) => w is Scrollable && w.axis == Axis.vertical).first,
+      );
       expect(find.text('Old Warehouse'), findsOneWidget);
       expect(find.text('Destroyed'), findsOneWidget);
       expect(find.byTooltip('Remove from dashboard'), findsOneWidget);

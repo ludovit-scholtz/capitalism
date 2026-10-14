@@ -34,6 +34,7 @@ import '../../core/services/url_opener.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/utils/game_time.dart';
 import '../../core/widgets/icon_badge.dart';
+import '../../core/widgets/state_view.dart';
 import '../buildings/building_analytics_models.dart';
 import '../buildings/building_panel_models.dart';
 import '../company/company_models.dart';
@@ -50,8 +51,8 @@ class DashboardScreen extends StatefulWidget {
     GraphQlService? graphQlService,
     DashboardService? dashboardService,
     this.urlOpener = const ExternalUrlOpener(),
-  }) : _injectedGraphQlService = graphQlService,
-       _injectedDashboardService = dashboardService;
+  })  : _injectedGraphQlService = graphQlService,
+        _injectedDashboardService = dashboardService;
 
   final GraphQlService? _injectedGraphQlService;
   final DashboardService? _injectedDashboardService;
@@ -241,8 +242,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   /// Launches the new company, then routes to `/buy-building/:companyId` —
   /// see the top-of-file comment on the deliberate deviation from web's
   /// (non-functional) `/onboarding?companyId=` redirect.
-  Future<void> _launchNewCompany({required String companyName, required String cityId, required double ipoRaiseTarget}) async {
-    final result = await _service.startAdditionalCompany(companyName: companyName, cityId: cityId, ipoRaiseTarget: ipoRaiseTarget);
+  Future<void> _launchNewCompany(
+      {required String companyName, required String cityId, required double ipoRaiseTarget}) async {
+    final result =
+        await _service.startAdditionalCompany(companyName: companyName, cityId: cityId, ipoRaiseTarget: ipoRaiseTarget);
     if (!mounted) return;
     context.go('/buy-building/${result.id}');
   }
@@ -321,22 +324,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const StateView.loading();
     }
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(_error!),
-              const SizedBox(height: 12),
-              OutlinedButton(onPressed: _bootstrap, child: const Text('Try Again')),
-            ],
-          ),
-        ),
-      );
+      return StateView.error(message: _error!, onRetry: _bootstrap, retryLabel: 'Try Again');
     }
 
     final data = _data!;
