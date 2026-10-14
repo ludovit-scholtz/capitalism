@@ -5,6 +5,8 @@ using Api.Security;
 using Api.Utilities;
 using HotChocolate.CostAnalysis.Types;
 using HotChocolate.Authorization;
+using HotChocolate.Execution.Processing;
+using HotChocolate.Resolvers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 
@@ -23,14 +25,20 @@ public sealed partial class Query
         int? gameYear,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor,
-        [Service] IMemoryCache cache)
+        [Service] IMemoryCache cache,
+        IResolverContext resolverContext)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        // The per-year history needs an aggregate over the company's whole ledger. Most callers (e.g. the
+        // mobile dashboard's Financial summary) only want the totals, so compute it only when selected.
+        var includeHistory = resolverContext.IsSelected("history");
 
         var company = await db.Companies
             .AsNoTracking()
             .Include(c => c.BankAccounts)
             .Include(c => c.Buildings).ThenInclude(b => b.City)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(c => c.Id == companyId && c.PlayerId == userId);
 
         if (company is null) return null;
@@ -44,9 +52,14 @@ public sealed partial class Query
         var isCurrentYear = selectedGameYear == currentGameYear;
 
         // Check cache — historical (non-current) years are immutable so can be cached longer.
-        var cacheKey = $"ledger_{companyId}_{selectedGameYear}";
+        // A summary that includes the history is a superset of one without it, so it can serve both.
+        // A history-less summary is cached under its own key and never served to a request that selects history.
+        var cacheKey = $"ledger_{companyId}_{selectedGameYear}_{(includeHistory ? "h" : "t")}";
+        var fullSummaryCacheKey = $"ledger_{companyId}_{selectedGameYear}_h";
         var cacheDuration = isCurrentYear ? LedgerCurrentYearCacheDuration : LedgerHistoryCacheDuration;
-        if (cache.TryGetValue(cacheKey, out CompanyLedgerSummary? cachedSummary) && cachedSummary is not null)
+        if ((cache.TryGetValue(fullSummaryCacheKey, out CompanyLedgerSummary? cachedSummary)
+                || cache.TryGetValue(cacheKey, out cachedSummary))
+            && cachedSummary is not null)
         {
             return cachedSummary;
         }
@@ -60,13 +73,12 @@ public sealed partial class Query
             .Where(e => e.CompanyId == companyId && e.RecordedAtTick >= startTick && e.RecordedAtTick <= endTick)
             .ToListAsync();
 
-        // For history years we only need lightweight aggregates: tick + category + amount.
-        // Load all entries but project only the columns needed for grouping.
-        var historyProjection = await db.LedgerEntries
-            .AsNoTracking()
-            .Where(e => e.CompanyId == companyId)
-            .Select(e => new { e.RecordedAtTick, e.Category, e.Amount })
-            .ToListAsync();
+        // History only needs per game-year / category / sign sums plus the first and last tick, so the
+        // database aggregates it. Loading every ledger row of the company on each request made this query
+        // (and the dashboard's Financial summary) slower the longer a company had been playing.
+        var historyAggregates = includeHistory
+            ? await HistoryAggregateQuery(db.LedgerEntries.AsNoTracking(), companyId).ToListAsync()
+            : [];
 
         var totalRevenue = LedgerCalculator.GetTotalRevenue(entries);
         var totalGovernmentContractRevenue = entries
@@ -149,16 +161,18 @@ public sealed partial class Query
         var primaryCurrencyCode = buildingCurrencies.Count == 1 ? buildingCurrencies[0] : "EUR";
 
         // Build history from the lightweight projection — no in-memory entity hydration needed.
-        var history = historyProjection
-            .GroupBy(e => GameTime.GetGameYear(e.RecordedAtTick))
-            .Select(group => BuildCompanyLedgerHistoryYearFromProjection(
-                group.Key, currentGameYear, gameState?.TaxRate ?? 0m,
-                group.Select(e => (e.RecordedAtTick, e.Category, e.Amount)).ToList()))
+        var history = historyAggregates
+            .GroupBy(item => GameTime.GetGameYear(item.YearIndex * GameConstants.TicksPerYear))
+            .Select(group => BuildCompanyLedgerHistoryYear(
+                group.Key,
+                currentGameYear,
+                gameState?.TaxRate ?? 0m,
+                group.ToList()))
             .ToDictionary(item => item.GameYear);
 
-        if (!history.ContainsKey(currentGameYear))
+        if (includeHistory && !history.ContainsKey(currentGameYear))
         {
-            history[currentGameYear] = BuildCompanyLedgerHistoryYearFromProjection(currentGameYear, currentGameYear, gameState?.TaxRate ?? 0m, []);
+            history[currentGameYear] = BuildCompanyLedgerHistoryYear(currentGameYear, currentGameYear, gameState?.TaxRate ?? 0m, []);
         }
 
         var incomeTaxDueAtTick = GameTime.GetIncomeTaxDueTickForGameYear(selectedGameYear);
@@ -398,59 +412,6 @@ public sealed partial class Query
         var startTick = GameTime.GetStartTickForGameYear(gameYear);
         var endTick = GameTime.GetEndTickForGameYear(gameYear);
         return tick >= startTick && tick <= endTick;
-    }
-
-    private static CompanyLedgerHistoryYear BuildCompanyLedgerHistoryYear(
-        int gameYear,
-        int currentGameYear,
-        decimal taxRate,
-        List<LedgerEntry> entries)
-    {
-        var projections = entries.Select(e => (e.RecordedAtTick, e.Category, e.Amount)).ToList();
-        return BuildCompanyLedgerHistoryYearFromProjection(gameYear, currentGameYear, taxRate, projections);
-    }
-
-    /// <summary>
-    /// Builds a ledger history year summary from lightweight (RecordedAtTick, Category, Amount) projections,
-    /// avoiding the need to hydrate full LedgerEntry entities for historical data.
-    /// </summary>
-    private static CompanyLedgerHistoryYear BuildCompanyLedgerHistoryYearFromProjection(
-        int gameYear,
-        int currentGameYear,
-        decimal taxRate,
-        List<(long RecordedAtTick, string Category, decimal Amount)> projections)
-    {
-        var totalRevenue = projections.Where(e => (e.Category == LedgerCategory.Revenue || e.Category == LedgerCategory.GovernmentContractRevenue) && e.Amount > 0).Sum(e => e.Amount);
-        var totalMediaHouseIncome = projections.Where(e => e.Category == LedgerCategory.MediaHouseIncome && e.Amount > 0).Sum(e => e.Amount);
-        var totalRentIncome = projections.Where(e => e.Category == LedgerCategory.RentIncome && e.Amount > 0).Sum(e => e.Amount);
-        var totalPropertyMaintenance = Math.Abs(projections.Where(e => e.Category == LedgerCategory.PropertyMaintenance && e.Amount < 0).Sum(e => e.Amount));
-        var totalPurchasingCosts = Math.Abs(projections.Where(e => e.Category == LedgerCategory.PurchasingCost && e.Amount < 0).Sum(e => e.Amount));
-        var totalShippingCosts = Math.Abs(projections.Where(e => e.Category == LedgerCategory.ShippingCost && e.Amount < 0).Sum(e => e.Amount));
-        var totalLaborCosts = Math.Abs(projections.Where(e => e.Category == LedgerCategory.LaborCost && e.Amount < 0).Sum(e => e.Amount));
-        var totalEnergyCosts = Math.Abs(projections.Where(e => e.Category == LedgerCategory.EnergyCost && e.Amount < 0).Sum(e => e.Amount));
-        var totalMarketingCosts = Math.Abs(projections.Where(e => e.Category == LedgerCategory.Marketing && e.Amount < 0).Sum(e => e.Amount));
-        var totalTaxPaid = Math.Abs(projections.Where(e => e.Category == LedgerCategory.Tax && e.Amount < 0).Sum(e => e.Amount));
-        var totalOtherCosts = Math.Abs(projections.Where(e => e.Category == LedgerCategory.Other && e.Amount < 0).Sum(e => e.Amount));
-        // Taxable income = revenue + media house income + rent income minus all deductible operating costs (excluding tax itself).
-        var taxableIncome = Math.Max(totalRevenue + totalMediaHouseIncome + totalRentIncome - totalPurchasingCosts - totalShippingCosts - totalLaborCosts - totalEnergyCosts - totalMarketingCosts - totalPropertyMaintenance, 0m);
-        var estimatedIncomeTax = gameYear == currentGameYear
-            ? GameTime.ComputeEstimatedIncomeTax(taxableIncome, taxRate)
-            : totalTaxPaid;
-
-        return new CompanyLedgerHistoryYear
-        {
-            GameYear = gameYear,
-            IsCurrentGameYear = gameYear == currentGameYear,
-            TotalRevenue = totalRevenue,
-            TotalLaborCosts = totalLaborCosts,
-            TotalEnergyCosts = totalEnergyCosts,
-            NetIncome = totalRevenue + totalMediaHouseIncome + totalRentIncome - totalPurchasingCosts - totalShippingCosts - totalLaborCosts - totalEnergyCosts - totalMarketingCosts - totalPropertyMaintenance - totalTaxPaid - totalOtherCosts,
-            TotalTaxPaid = totalTaxPaid,
-            TaxableIncome = taxableIncome,
-            EstimatedIncomeTax = estimatedIncomeTax,
-            FirstRecordedTick = projections.Count > 0 ? projections.Min(e => e.RecordedAtTick) : 0,
-            LastRecordedTick = projections.Count > 0 ? projections.Max(e => e.RecordedAtTick) : 0,
-        };
     }
 
     private static decimal ComputeCompanyAssetValue(

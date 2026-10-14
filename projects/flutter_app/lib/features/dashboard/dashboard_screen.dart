@@ -37,7 +37,7 @@ import '../../core/widgets/icon_badge.dart';
 import '../../core/widgets/state_view.dart';
 import '../buildings/building_analytics_models.dart';
 import '../buildings/building_panel_models.dart';
-import '../company/company_models.dart';
+import 'dashboard_ledger_loader.dart';
 import 'dashboard_models.dart';
 import 'dashboard_new_company_card.dart';
 import 'dashboard_overview_tab.dart';
@@ -67,6 +67,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
   late final DashboardService _service;
+  late final DashboardLedgerLoader _ledgerLoader;
   late final TabController _tabController;
   late final GameStateState _gameStateState;
   int? _lastSeenTick;
@@ -75,9 +76,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   String? _error;
   DashboardData? _data;
   final Set<String> _removingBuildingIds = {};
-
-  Map<String, CompanyLedger> _ledgers = {};
-  bool _ledgersLoading = false;
 
   AdditionalCompanyPrerequisites? _newCompanyPrerequisites;
   List<NewCompanyCity> _newCompanyCities = const [];
@@ -94,6 +92,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final auth = context.read<AuthState>();
     final graphQlService = widget._injectedGraphQlService ?? GraphQlService(auth);
     _service = widget._injectedDashboardService ?? DashboardService(graphQlService);
+    _ledgerLoader = DashboardLedgerLoader(_service)..addListener(_onLedgersChanged);
     _tabController = TabController(length: 5, vsync: this);
     _gameStateState = context.read<GameStateState>();
     _gameStateState.addListener(_onGameStateChanged);
@@ -108,6 +107,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   @override
   void dispose() {
     _gameStateState.removeListener(_onGameStateChanged);
+    _ledgerLoader.dispose();
     _tabController.dispose();
     super.dispose();
   }
@@ -149,7 +149,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         _data = data;
         _loading = false;
       });
-      unawaited(_loadLedgers(data.companies));
+      unawaited(_ledgerLoader.loadAll([for (final c in data.companies) c.id]));
       unawaited(_loadNewCompanyPrerequisites());
       unawaited(_loadBuildingAnalytics(data.companies));
       unawaited(_loadProSubscriptionStatus());
@@ -248,23 +248,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     context.go('/buy-building/${result.id}');
   }
 
-  /// Best-effort, per-company: one company's ledger failing to load doesn't
-  /// blank the others' financial cards.
-  Future<void> _loadLedgers(List<DashboardCompany> companies, {bool isRefresh = false}) async {
-    if (!isRefresh) setState(() => _ledgersLoading = true);
-    final results = <String, CompanyLedger>{};
-    for (final company in companies) {
-      try {
-        results[company.id] = await _service.fetchCompanyOverviewLedger(company.id);
-      } catch (_) {
-        // Best-effort — see doc comment above.
-      }
-    }
-    if (!mounted) return;
-    setState(() {
-      _ledgers = results;
-      _ledgersLoading = false;
-    });
+  void _onLedgersChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _silentRefresh() async {
@@ -272,7 +257,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       final data = await _service.fetchDashboardData();
       if (!mounted) return;
       setState(() => _data = data);
-      unawaited(_loadLedgers(data.companies, isRefresh: true));
+      unawaited(_ledgerLoader.loadAll([for (final c in data.companies) c.id], silent: true));
       unawaited(_loadBuildingAnalytics(data.companies));
     } catch (_) {
       // Silent refresh failures are ignored — the last good data stays
@@ -388,8 +373,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 onRefresh: _silentRefresh,
                 child: DashboardOverviewTab(
                   companies: data.companies,
-                  ledgers: _ledgers,
-                  ledgersLoading: _ledgersLoading,
+                  ledgers: _ledgerLoader.ledgers,
+                  loadingLedgerIds: _ledgerLoader.loadingIds,
+                  failedLedgerIds: _ledgerLoader.failedIds,
+                  onRetryLedger: (companyId) => unawaited(_ledgerLoader.load(companyId)),
                   newCompanyCard: DashboardNewCompanyCard(
                     prerequisites: _newCompanyPrerequisites,
                     cities: _newCompanyCities,

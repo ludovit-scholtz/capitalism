@@ -141,9 +141,14 @@ class DashboardService {
     );
   }
 
-  Future<CompanyLedger> fetchCompanyOverviewLedger(String companyId) async {
+  /// `null` when the server has no ledger for this company for the caller (it
+  /// does not exist, or is not theirs any more) — a normal "nothing to show",
+  /// not a failure worth retrying.
+  Future<CompanyLedger?> fetchCompanyOverviewLedger(String companyId) async {
     final data = await _graphQlService.request(_companyOverviewLedgerQuery, variables: {'companyId': companyId});
-    return CompanyLedger.fromJson(data['companyLedger'] as Map<String, dynamic>);
+    final ledger = data['companyLedger'];
+    if (ledger == null) return null;
+    return CompanyLedger.fromJson(ledger as Map<String, dynamic>);
   }
 
   Future<(AdditionalCompanyPrerequisites, List<NewCompanyCity>)> fetchAdditionalCompanyPrerequisites() async {
