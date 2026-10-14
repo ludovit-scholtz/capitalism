@@ -31,9 +31,7 @@ public sealed partial class Mutation
 
         var existing = await db.GoldAmmPools.FirstOrDefaultAsync(p => p.CurrencyCode == currencyCode);
         if (existing != null)
-            throw new GraphQLException(new Error(
-                $"A pool for {currencyCode}/XAU already exists. Use addGoldAmmLiquidity to contribute.",
-                "POOL_ALREADY_EXISTS"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage($"A pool for {currencyCode}/XAU already exists. Use addGoldAmmLiquidity to contribute.").SetCode("POOL_ALREADY_EXISTS").Build());
 
         await AssertSufficientFiat(db, playerId, currencyCode, input.FiatAmount);
         await AssertSufficientGold(db, playerId, input.GoldAmount);
@@ -108,7 +106,7 @@ public sealed partial class Mutation
         var playerId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
         if (input.FiatAmount <= 0)
-            throw new GraphQLException(new Error("FiatAmount must be > 0.", "INVALID_AMOUNT"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("FiatAmount must be > 0.").SetCode("INVALID_AMOUNT").Build());
 
         await using var tx = db.Database.IsRelational()
             ? await db.Database.BeginTransactionAsync()
@@ -117,18 +115,16 @@ public sealed partial class Mutation
         var pool = await db.GoldAmmPools
             .Include(p => p.Positions)
             .FirstOrDefaultAsync(p => p.Id == input.PoolId)
-            ?? throw new GraphQLException(new Error("Pool not found.", "POOL_NOT_FOUND"));
+            ?? throw new GraphQLException(ErrorBuilder.New().SetMessage("Pool not found.").SetCode("POOL_NOT_FOUND").Build());
 
         if (pool.FiatReserve <= 0 || pool.GoldReserve <= 0)
-            throw new GraphQLException(new Error("Pool has no liquidity.", "INSUFFICIENT_LIQUIDITY"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("Pool has no liquidity.").SetCode("INSUFFICIENT_LIQUIDITY").Build());
 
         // Gold required proportional to fiat ratio
         var goldRequired = Math.Round(input.FiatAmount / pool.FiatReserve * pool.GoldReserve, 8);
 
         if (input.MaxGoldAmount > 0 && goldRequired > input.MaxGoldAmount)
-            throw new GraphQLException(new Error(
-                $"Required gold ({goldRequired:F8} XAU) exceeds MaxGoldAmount ({input.MaxGoldAmount:F8} XAU).",
-                "SLIPPAGE_EXCEEDED"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage($"Required gold ({goldRequired:F8} XAU) exceeds MaxGoldAmount ({input.MaxGoldAmount:F8} XAU).").SetCode("SLIPPAGE_EXCEEDED").Build());
 
         await AssertSufficientFiat(db, playerId, pool.CurrencyCode, input.FiatAmount);
         await AssertSufficientGold(db, playerId, goldRequired);
@@ -208,7 +204,7 @@ public sealed partial class Mutation
         var playerId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
         if (input.ShareFraction <= 0 || input.ShareFraction > 1)
-            throw new GraphQLException(new Error("ShareFraction must be between 0 (exclusive) and 1 (inclusive).", "INVALID_FRACTION"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("ShareFraction must be between 0 (exclusive) and 1 (inclusive).").SetCode("INVALID_FRACTION").Build());
 
         await using var tx = db.Database.IsRelational()
             ? await db.Database.BeginTransactionAsync()

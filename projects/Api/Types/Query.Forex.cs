@@ -27,7 +27,7 @@ public sealed partial class Query
     {
         var playerId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
         var player = await db.Players.AsNoTracking().FirstOrDefaultAsync(candidate => candidate.Id == playerId)
-            ?? throw new GraphQLException(new Error("Player not found.", "PLAYER_NOT_FOUND"));
+            ?? throw new GraphQLException(ErrorBuilder.New().SetMessage("Player not found.").SetCode("PLAYER_NOT_FOUND").Build());
         ValidateForexInput(input.FromCurrencyCode, input.ToCurrencyCode, input.Amount);
 
         var fromCode = input.FromCurrencyCode.ToUpperInvariant();
@@ -42,9 +42,7 @@ public sealed partial class Query
 
         if (isCompanyContext && (!input.FromBankAccountId.HasValue || !input.ToBankAccountId.HasValue))
         {
-            throw new GraphQLException(new Error(
-                "In company context, both source and destination bank accounts must be selected.",
-                "ACCOUNT_CONTEXT_REQUIRED"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("In company context, both source and destination bank accounts must be selected.").SetCode("ACCOUNT_CONTEXT_REQUIRED").Build());
         }
 
         // Determine available balance: prefer bank account when an ID is provided.
@@ -53,22 +51,16 @@ public sealed partial class Query
         {
             var account = await GetOwnedBankAccountAsync(db, input.FromBankAccountId.Value, player);
             if (account is null)
-                throw new GraphQLException(new Error(
-                    ObjectAuthorizationService.FriendlyMessage,
-                    ObjectAuthorizationService.NotFoundOrNotOwnedCode));
+                throw new GraphQLException(ErrorBuilder.New().SetMessage(ObjectAuthorizationService.FriendlyMessage).SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode).Build());
             if (!string.Equals(account.CurrencyCode, fromCode, StringComparison.OrdinalIgnoreCase))
-                throw new GraphQLException(new Error(
-                    $"Source bank account currency ({account.CurrencyCode}) does not match the requested from-currency ({fromCode}).",
-                    "CURRENCY_MISMATCH"));
+                throw new GraphQLException(ErrorBuilder.New().SetMessage($"Source bank account currency ({account.CurrencyCode}) does not match the requested from-currency ({fromCode}).").SetCode("CURRENCY_MISMATCH").Build());
             availableBalance = account.Balance;
         }
         else
         {
             if (isCompanyContext)
             {
-                throw new GraphQLException(new Error(
-                    "In company context, quotes must use selected company bank accounts.",
-                    "ACCOUNT_CONTEXT_REQUIRED"));
+                throw new GraphQLException(ErrorBuilder.New().SetMessage("In company context, quotes must use selected company bank accounts.").SetCode("ACCOUNT_CONTEXT_REQUIRED").Build());
             }
 
             availableBalance = await GetPersonalBalanceAsync(db, playerId, fromCode);
@@ -79,13 +71,9 @@ public sealed partial class Query
         {
             var toAccount = await GetOwnedBankAccountAsync(db, input.ToBankAccountId.Value, player);
             if (toAccount is null)
-                throw new GraphQLException(new Error(
-                    ObjectAuthorizationService.FriendlyMessage,
-                    ObjectAuthorizationService.NotFoundOrNotOwnedCode));
+                throw new GraphQLException(ErrorBuilder.New().SetMessage(ObjectAuthorizationService.FriendlyMessage).SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode).Build());
             if (!string.Equals(toAccount.CurrencyCode, toCode, StringComparison.OrdinalIgnoreCase))
-                throw new GraphQLException(new Error(
-                    $"Destination bank account currency ({toAccount.CurrencyCode}) does not match the requested to-currency ({toCode}).",
-                    "CURRENCY_MISMATCH"));
+                throw new GraphQLException(ErrorBuilder.New().SetMessage($"Destination bank account currency ({toAccount.CurrencyCode}) does not match the requested to-currency ({toCode}).").SetCode("CURRENCY_MISMATCH").Build());
         }
 
         // Issue a single-use quote nonce and persist it for execution-time validation.
@@ -133,7 +121,7 @@ public sealed partial class Query
         var player = await db.Players
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == playerId)
-            ?? throw new GraphQLException(new Error("Player not found.", "PLAYER_NOT_FOUND"));
+            ?? throw new GraphQLException(ErrorBuilder.New().SetMessage("Player not found.").SetCode("PLAYER_NOT_FOUND").Build());
 
         var nonEurBalances = await db.BankAccounts
             .AsNoTracking()
@@ -236,7 +224,7 @@ public sealed partial class Query
         [Service] AppDbContext db)
     {
         if (string.IsNullOrWhiteSpace(quoteCurrencyCode) || quoteCurrencyCode.Length != 3)
-            throw new GraphQLException(new Error("Quote currency code must be a 3-letter ISO code.", "INVALID_CURRENCY_CODE"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("Quote currency code must be a 3-letter ISO code.").SetCode("INVALID_CURRENCY_CODE").Build());
 
         var limit = Math.Clamp(ticksBack ?? 100, 1, 1_000);
         var code = quoteCurrencyCode.ToUpperInvariant();
@@ -315,7 +303,7 @@ public sealed partial class Query
 
         if (rate == 0)
         {
-            throw new GraphQLException(new Error($"No exchange rate found for currency '{quoteCurrencyCode}'.", "RATE_NOT_FOUND"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage($"No exchange rate found for currency '{quoteCurrencyCode}'.").SetCode("RATE_NOT_FOUND").Build());
         }
 
         return rate;
@@ -327,16 +315,16 @@ public sealed partial class Query
     internal static void ValidateForexInput(string fromCode, string toCode, decimal amount)
     {
         if (string.IsNullOrWhiteSpace(fromCode) || fromCode.Length != 3)
-            throw new GraphQLException(new Error("Source currency code must be a 3-letter ISO code.", "INVALID_CURRENCY_CODE"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("Source currency code must be a 3-letter ISO code.").SetCode("INVALID_CURRENCY_CODE").Build());
 
         if (string.IsNullOrWhiteSpace(toCode) || toCode.Length != 3)
-            throw new GraphQLException(new Error("Target currency code must be a 3-letter ISO code.", "INVALID_CURRENCY_CODE"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("Target currency code must be a 3-letter ISO code.").SetCode("INVALID_CURRENCY_CODE").Build());
 
         if (fromCode.Equals(toCode, StringComparison.OrdinalIgnoreCase))
-            throw new GraphQLException(new Error("Source and target currencies must be different.", "SAME_CURRENCY"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("Source and target currencies must be different.").SetCode("SAME_CURRENCY").Build());
 
         if (amount <= 0)
-            throw new GraphQLException(new Error("Amount must be greater than zero.", "INVALID_AMOUNT"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("Amount must be greater than zero.").SetCode("INVALID_AMOUNT").Build());
     }
 
     /// <summary>

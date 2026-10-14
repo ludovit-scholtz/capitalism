@@ -80,10 +80,10 @@ public sealed partial class Query
 
         var pool = await db.GoldAmmPools.AsNoTracking()
             .FirstOrDefaultAsync(p => p.CurrencyCode == currencyCode)
-            ?? throw new GraphQLException(new Error($"No liquidity pool found for {currencyCode}/XAU.", "POOL_NOT_FOUND"));
+            ?? throw new GraphQLException(ErrorBuilder.New().SetMessage($"No liquidity pool found for {currencyCode}/XAU.").SetCode("POOL_NOT_FOUND").Build());
 
         if (pool.FiatReserve <= 0 || pool.GoldReserve <= 0)
-            throw new GraphQLException(new Error("Pool has no liquidity.", "INSUFFICIENT_LIQUIDITY"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("Pool has no liquidity.").SetCode("INSUFFICIENT_LIQUIDITY").Build());
 
         var (outputAmount, feeAmount) = ComputeAmmOutput(direction, input.Amount, pool.FiatReserve, pool.GoldReserve);
 
@@ -171,7 +171,7 @@ public sealed partial class Query
         catch { }
 
         if (myTradesOnly && !playerId.HasValue)
-            throw new GraphQLException(new Error("Authentication required to view personal trade history.", "UNAUTHORIZED"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("Authentication required to view personal trade history.").SetCode("UNAUTHORIZED").Build());
 
         var effectiveLimit = Math.Clamp(limit <= 0 ? 50 : limit, 1, 200);
         var currency = currencyCode?.ToUpperInvariant();
@@ -255,14 +255,14 @@ public sealed partial class Query
     public static void ValidateGoldAmmInput(string direction, string currencyCode, decimal amount)
     {
         if (direction != "FIAT_TO_GOLD" && direction != "GOLD_TO_FIAT")
-            throw new GraphQLException(new Error("Direction must be 'FIAT_TO_GOLD' or 'GOLD_TO_FIAT'.", "INVALID_DIRECTION"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("Direction must be 'FIAT_TO_GOLD' or 'GOLD_TO_FIAT'.").SetCode("INVALID_DIRECTION").Build());
 
         if (string.IsNullOrWhiteSpace(currencyCode) || currencyCode.Length != 3 ||
             currencyCode.Equals(GoldTokenCode, StringComparison.OrdinalIgnoreCase))
-            throw new GraphQLException(new Error("CurrencyCode must be a 3-letter fiat ISO code (not XAU).", "INVALID_CURRENCY_CODE"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("CurrencyCode must be a 3-letter fiat ISO code (not XAU).").SetCode("INVALID_CURRENCY_CODE").Build());
 
         if (amount <= 0)
-            throw new GraphQLException(new Error("Amount must be greater than zero.", "INVALID_AMOUNT"));
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("Amount must be greater than zero.").SetCode("INVALID_AMOUNT").Build());
     }
 
     // ── Balance helpers ──────────────────────────────────────────────────────────

@@ -43,7 +43,7 @@ public sealed class BotGapCoverageTests
 
     private static string OkJson(string id = "u1", decimal price = 47.5m) =>
         "{\"data\":{\"updatePublicSalesPrice\":{\"id\":\"" + id +
-        "\",\"unitType\":\"PUBLIC_SALES\",\"minPrice\":" + price + "}}}";
+        "\",\"unitType\":\"PUBLIC_SALES\",\"minPrice\":" + price.ToString(System.Globalization.CultureInfo.InvariantCulture) + "}}}";
 
     private static string GraphQLErrorJson(string code = "UNIT_NOT_FOUND") =>
         "{\"errors\":[{\"message\":\"Unit not found.\",\"extensions\":{\"code\":\"" + code + "\"}}]}";

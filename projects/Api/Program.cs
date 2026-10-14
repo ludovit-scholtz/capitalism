@@ -653,13 +653,10 @@ public class Program
             return Results.NoContent();
         }).RequireAuthorization(Policies.Admin);
 
-        app.MapGraphQL().WithOptions(new GraphQLServerOptions
+        app.MapGraphQL().WithOptions(options =>
         {
-            EnableSchemaRequests = builder.Environment.IsDevelopment(),
-            Tool =
-            {
-                Enable = builder.Environment.IsDevelopment(),
-            },
+            options.EnableSchemaRequests = builder.Environment.IsDevelopment();
+            options.Tool.Enable = builder.Environment.IsDevelopment();
         });
 
         if (app.Configuration.GetValue<bool>("Startup:SkipDatabaseInitialization"))

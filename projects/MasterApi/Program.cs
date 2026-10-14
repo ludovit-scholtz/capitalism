@@ -714,13 +714,10 @@ public class Program
             }
         });
 
-        app.MapGraphQL().WithOptions(new GraphQLServerOptions
+        app.MapGraphQL().WithOptions(options =>
         {
-            EnableSchemaRequests = builder.Environment.IsDevelopment(),
-            Tool =
-            {
-                Enable = builder.Environment.IsDevelopment(),
-            },
+            options.EnableSchemaRequests = builder.Environment.IsDevelopment();
+            options.Tool.Enable = builder.Environment.IsDevelopment();
         });
 
         using (var scope = app.Services.CreateScope())
