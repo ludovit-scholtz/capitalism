@@ -22,7 +22,8 @@ public sealed partial class Mutation
     public async Task<TransferFundsResult> TransferFunds(
         TransferFundsInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
         var player = await db.Players
@@ -61,11 +62,11 @@ public sealed partial class Mutation
             || ((fromAccount.Company is null || fromAccount.Company.PlayerId != userId)
                 && fromAccount.PlayerId != userId))
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
-                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
-                    .Build());
+            throw objectAuthorization.Deny(
+                userId,
+                "bank_account",
+                input.FromBankAccountId,
+                fromAccount is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
         }
 
         var toAccount = await db.BankAccounts
@@ -77,11 +78,11 @@ public sealed partial class Mutation
             || ((toAccount.Company is null || toAccount.Company.PlayerId != userId)
                 && toAccount.PlayerId != userId))
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
-                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
-                    .Build());
+            throw objectAuthorization.Deny(
+                userId,
+                "bank_account",
+                input.ToBankAccountId,
+                toAccount is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
         }
 
         var companyContext = player.ActiveAccountType == AccountContextType.Company && player.ActiveCompanyId.HasValue;

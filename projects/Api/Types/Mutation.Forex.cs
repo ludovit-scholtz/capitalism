@@ -37,7 +37,8 @@ public sealed partial class Mutation
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor,
         [Service] IMasterRankingTelemetryService rankingTelemetry,
-        [Service] IOptions<MasterServerRegistrationOptions> masterOptions)
+        [Service] IOptions<MasterServerRegistrationOptions> masterOptions,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var playerId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
@@ -99,7 +100,13 @@ public sealed partial class Mutation
             {
                 // ── Bank-account path (source) ─────────────────────────────
                 var fromAccount = await GetAccountInActiveContextAsync(db, input.FromBankAccountId.Value, player)
-                    ?? throw new GraphQLException(ErrorBuilder.New().SetMessage(ObjectAuthorizationService.FriendlyMessage).SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode).Build());
+                    ?? throw objectAuthorization.Deny(
+                        playerId,
+                        "bank_account",
+                        input.FromBankAccountId.Value,
+                        await db.BankAccounts.AsNoTracking().AnyAsync(a => a.Id == input.FromBankAccountId.Value)
+                            ? ObjectAuthorizationService.NotOwnedReason
+                            : ObjectAuthorizationService.NotFoundReason);
 
                 if (!string.Equals(fromAccount.CurrencyCode, fromCode, StringComparison.OrdinalIgnoreCase))
                     throw new GraphQLException(ErrorBuilder.New().SetMessage($"Source bank account currency ({fromAccount.CurrencyCode}) does not match the requested from-currency ({fromCode}).").SetCode("CURRENCY_MISMATCH").Build());
@@ -140,7 +147,13 @@ public sealed partial class Mutation
             {
                 // ── Bank-account path (destination) ───────────────────────
                 var toAccount = await GetAccountInActiveContextAsync(db, input.ToBankAccountId.Value, player)
-                    ?? throw new GraphQLException(ErrorBuilder.New().SetMessage(ObjectAuthorizationService.FriendlyMessage).SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode).Build());
+                    ?? throw objectAuthorization.Deny(
+                        playerId,
+                        "bank_account",
+                        input.ToBankAccountId.Value,
+                        await db.BankAccounts.AsNoTracking().AnyAsync(a => a.Id == input.ToBankAccountId.Value)
+                            ? ObjectAuthorizationService.NotOwnedReason
+                            : ObjectAuthorizationService.NotFoundReason);
 
                 if (!string.Equals(toAccount.CurrencyCode, toCode, StringComparison.OrdinalIgnoreCase))
                     throw new GraphQLException(ErrorBuilder.New().SetMessage($"Destination bank account currency ({toAccount.CurrencyCode}) does not match the requested to-currency ({toCode}).").SetCode("CURRENCY_MISMATCH").Build());

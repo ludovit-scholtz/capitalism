@@ -417,7 +417,8 @@ public sealed partial class Mutation
     public async Task<Loan> RepayLoanDebt(
         RepayLoanDebtInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
@@ -428,19 +429,11 @@ public sealed partial class Mutation
             .Include(l => l.BankBuilding).ThenInclude(b => b.City)
             .Include(l => l.CollateralBuilding)
             .FirstOrDefaultAsync(l => l.Id == input.LoanId)
-            ?? throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
-                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
-                    .Build());
+            ?? throw objectAuthorization.Deny(userId, "loan", input.LoanId, ObjectAuthorizationService.NotFoundReason);
 
         if (loan.BorrowerCompany.PlayerId != userId)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
-                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
-                    .Build());
+            throw objectAuthorization.Deny(userId, "loan", input.LoanId, ObjectAuthorizationService.NotOwnedReason);
         }
 
         if (loan.Status == LoanStatus.Repaid || loan.RemainingPrincipal <= 0m)

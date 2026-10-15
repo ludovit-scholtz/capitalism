@@ -16,17 +16,21 @@ public sealed partial class Mutation
         SubmitContractBidInput input,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization,
         CancellationToken cancellationToken)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
         var company = await db.Companies
             .AsNoTracking()
-            .FirstOrDefaultAsync(candidate => candidate.Id == input.CompanyId && candidate.PlayerId == userId, cancellationToken)
-            ?? throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
-                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
-                    .Build());
+            .FirstOrDefaultAsync(candidate => candidate.Id == input.CompanyId, cancellationToken);
+        if (company is null || company.PlayerId != userId)
+        {
+            throw objectAuthorization.Deny(
+                userId,
+                "company",
+                input.CompanyId,
+                company is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
+        }
 
         var contract = await db.GovernmentContracts
             .Include(candidate => candidate.ProductType)
@@ -128,6 +132,7 @@ public sealed partial class Mutation
         FulfillContractShipmentInput input,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization,
         CancellationToken cancellationToken)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
@@ -154,12 +159,15 @@ public sealed partial class Mutation
 
         var winnerCompany = await db.Companies
             .AsNoTracking()
-            .FirstOrDefaultAsync(company => company.Id == contract.WinnerCompanyId.Value && company.PlayerId == userId, cancellationToken)
-            ?? throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
-                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
-                    .Build());
+            .FirstOrDefaultAsync(company => company.Id == contract.WinnerCompanyId.Value, cancellationToken);
+        if (winnerCompany is null || winnerCompany.PlayerId != userId)
+        {
+            throw objectAuthorization.Deny(
+                userId,
+                "company",
+                contract.WinnerCompanyId.Value,
+                winnerCompany is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
+        }
 
         var quantity = decimal.Round(input.Quantity, 4, MidpointRounding.AwayFromZero);
         if (quantity <= 0m)

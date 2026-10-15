@@ -14,17 +14,21 @@ public sealed partial class Mutation
         ProposeSupplyContractInput input,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization,
         CancellationToken cancellationToken)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
         var sellerCompany = await db.Companies
             .AsNoTracking()
-            .FirstOrDefaultAsync(company => company.Id == input.SellerCompanyId && company.PlayerId == userId, cancellationToken)
-            ?? throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
-                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
-                    .Build());
+            .FirstOrDefaultAsync(company => company.Id == input.SellerCompanyId, cancellationToken);
+        if (sellerCompany is null || sellerCompany.PlayerId != userId)
+        {
+            throw objectAuthorization.Deny(
+                userId,
+                "company",
+                input.SellerCompanyId,
+                sellerCompany is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
+        }
 
         var buyerCompany = await db.Companies
             .AsNoTracking()
@@ -124,9 +128,10 @@ public sealed partial class Mutation
         CounterProposeSupplyContractInput input,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization,
         CancellationToken cancellationToken)
     {
-        var contract = await EnsurePendingCounterpartyContractAsync(id, db, httpContextAccessor, cancellationToken);
+        var contract = await EnsurePendingCounterpartyContractAsync(id, db, httpContextAccessor, objectAuthorization, cancellationToken);
 
         if (input.QuantityPerTick.HasValue)
         {
@@ -194,6 +199,7 @@ public sealed partial class Mutation
         Guid id,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization,
         CancellationToken cancellationToken)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
@@ -203,8 +209,15 @@ public sealed partial class Mutation
 
         var buyerCompany = await db.Companies
             .AsNoTracking()
-            .FirstOrDefaultAsync(company => company.Id == contract.BuyerCompanyId && company.PlayerId == userId, cancellationToken)
-            ?? throw new GraphQLException(ErrorBuilder.New().SetMessage(ObjectAuthorizationService.FriendlyMessage).SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode).Build());
+            .FirstOrDefaultAsync(company => company.Id == contract.BuyerCompanyId, cancellationToken);
+        if (buyerCompany is null || buyerCompany.PlayerId != userId)
+        {
+            throw objectAuthorization.Deny(
+                userId,
+                "company",
+                contract.BuyerCompanyId,
+                buyerCompany is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
+        }
 
         if (contract.Status != SupplyContractStatus.Pending)
         {
@@ -257,9 +270,10 @@ public sealed partial class Mutation
         Guid id,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization,
         CancellationToken cancellationToken)
     {
-        var contract = await EnsurePendingCounterpartyContractAsync(id, db, httpContextAccessor, cancellationToken);
+        var contract = await EnsurePendingCounterpartyContractAsync(id, db, httpContextAccessor, objectAuthorization, cancellationToken);
         var currentTick = await GetCurrentTickAsync(db);
         contract.Status = SupplyContractStatus.Cancelled;
         contract.CancelledAtTick = currentTick;
@@ -295,6 +309,7 @@ public sealed partial class Mutation
         Guid id,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization,
         CancellationToken cancellationToken)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
@@ -307,7 +322,7 @@ public sealed partial class Mutation
             .Where(company => company.PlayerId == userId && (company.Id == contract.SellerCompanyId || company.Id == contract.BuyerCompanyId))
             .Select(company => new { company.Id, company.PlayerId })
             .FirstOrDefaultAsync(cancellationToken)
-            ?? throw new GraphQLException(ErrorBuilder.New().SetMessage(ObjectAuthorizationService.FriendlyMessage).SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode).Build());
+            ?? throw objectAuthorization.Deny(userId, "supply_contract", id, ObjectAuthorizationService.NotOwnedReason);
 
         if (contract.Status is SupplyContractStatus.Fulfilled or SupplyContractStatus.Cancelled or SupplyContractStatus.Breached)
         {
@@ -366,6 +381,7 @@ public sealed partial class Mutation
         Guid contractId,
         AppDbContext db,
         IHttpContextAccessor httpContextAccessor,
+        ObjectAuthorizationService objectAuthorization,
         CancellationToken cancellationToken)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
@@ -384,7 +400,7 @@ public sealed partial class Mutation
                 cancellationToken);
         if (!actorIsCounterparty)
         {
-            throw new GraphQLException(ErrorBuilder.New().SetMessage(ObjectAuthorizationService.FriendlyMessage).SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode).Build());
+            throw objectAuthorization.Deny(userId, "supply_contract", contractId, ObjectAuthorizationService.NotOwnedReason);
         }
 
         return contract;

@@ -19,7 +19,8 @@ public sealed partial class Mutation
     public async Task<Building> SetBuildingForSale(
         SetBuildingForSaleInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
@@ -30,11 +31,11 @@ public sealed partial class Mutation
 
         if (building is null || building.Company.PlayerId != userId)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
-                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
-                    .Build());
+            throw objectAuthorization.Deny(
+                userId,
+                "building",
+                input.BuildingId,
+                building is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
         }
 
         if (input.IsForSale)
@@ -118,7 +119,8 @@ public sealed partial class Mutation
     public async Task<DestroyBuildingResult> DestroyBuilding(
         DestroyBuildingInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
@@ -130,11 +132,11 @@ public sealed partial class Mutation
 
         if (building is null || building.Company.PlayerId != userId)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
-                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
-                    .Build());
+            throw objectAuthorization.Deny(
+                userId,
+                "building",
+                input.BuildingId,
+                building is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
         }
 
         if (building.DestroyedAtUtc is not null)
@@ -271,7 +273,8 @@ public sealed partial class Mutation
     public async Task<Building> SetRentPerSqm(
         SetRentPerSqmInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
@@ -281,11 +284,11 @@ public sealed partial class Mutation
 
         if (building is null || building.Company.PlayerId != userId)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
-                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
-                    .Build());
+            throw objectAuthorization.Deny(
+                userId,
+                "building",
+                input.BuildingId,
+                building is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
         }
 
         if (building.Type != BuildingType.Apartment && building.Type != BuildingType.Commercial)
@@ -530,7 +533,8 @@ public sealed partial class Mutation
     public async Task<Building> RemoveDestroyedBuilding(
         RemoveDestroyedBuildingInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
@@ -540,11 +544,11 @@ public sealed partial class Mutation
 
         if (building is null || building.Company.PlayerId != userId)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
-                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
-                    .Build());
+            throw objectAuthorization.Deny(
+                userId,
+                "building",
+                input.BuildingId,
+                building is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
         }
 
         if (building.DestroyedAtUtc is null)

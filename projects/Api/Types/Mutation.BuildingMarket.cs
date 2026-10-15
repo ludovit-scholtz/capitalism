@@ -20,7 +20,8 @@ public sealed partial class Mutation
     public async Task<BuildingSaleOffer> MakeOfferOnBuilding(
         MakeOfferOnBuildingInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
@@ -32,11 +33,11 @@ public sealed partial class Mutation
 
         if (building is null || !building.IsForSale || !building.AskingPrice.HasValue)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
-                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
-                    .Build());
+            throw objectAuthorization.Deny(
+                userId,
+                "building",
+                input.BuildingId,
+                building is null ? ObjectAuthorizationService.NotFoundReason : "not_available");
         }
 
         if (building.Company.PlayerId == userId)
@@ -162,7 +163,8 @@ public sealed partial class Mutation
     public async Task<AcceptBuildingOfferResult> AcceptBuildingOffer(
         AcceptBuildingOfferInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
@@ -179,11 +181,11 @@ public sealed partial class Mutation
 
         if (offer is null)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
-                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
-                    .Build());
+            throw objectAuthorization.Deny(
+                userId,
+                "building_sale_offer",
+                input.OfferId,
+                ObjectAuthorizationService.NotFoundReason);
         }
 
         if (offer.Status != BuildingSaleOfferStatus.Pending)
@@ -217,11 +219,11 @@ public sealed partial class Mutation
 
         if (sellerCompany.PlayerId != userId)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
-                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
-                    .Build());
+            throw objectAuthorization.Deny(
+                userId,
+                "building_sale_offer",
+                input.OfferId,
+                ObjectAuthorizationService.NotOwnedReason);
         }
 
         if (!building.IsForSale)
@@ -641,7 +643,8 @@ public sealed partial class Mutation
     public async Task<BuildingSaleOffer> CancelBuildingOffer(
         CancelBuildingOfferInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
@@ -656,11 +659,11 @@ public sealed partial class Mutation
 
         if (offer is null)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
-                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
-                    .Build());
+            throw objectAuthorization.Deny(
+                userId,
+                "building_sale_offer",
+                input.OfferId,
+                ObjectAuthorizationService.NotFoundReason);
         }
 
         if (offer.Status != BuildingSaleOfferStatus.Pending)
@@ -691,11 +694,11 @@ public sealed partial class Mutation
 
         if (offer.Building.Company.PlayerId != userId)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
-                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
-                    .Build());
+            throw objectAuthorization.Deny(
+                userId,
+                "building_sale_offer",
+                input.OfferId,
+                ObjectAuthorizationService.NotOwnedReason);
         }
 
         var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync();
@@ -817,7 +820,8 @@ public sealed partial class Mutation
     public Task<BuildingSaleOffer> RejectBuildingOffer(
         RejectBuildingOfferInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor) =>
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization) =>
         CancelBuildingOffer(
             new CancelBuildingOfferInput
             {
@@ -825,7 +829,8 @@ public sealed partial class Mutation
                 OfferVersion = input.OfferVersion,
             },
             db,
-            httpContextAccessor);
+            httpContextAccessor,
+            objectAuthorization);
 
     private static GraphQLException BuildOfferVersionConflictException() =>
         new(

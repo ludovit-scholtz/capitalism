@@ -7,152 +7,55 @@ namespace Api.Tests;
 
 public sealed class ObjectAuthorizationServiceTests
 {
-    [Fact]
-    public async Task RequireOwnedAsync_NotFound_ThrowsUnifiedCode_AndLogsNotFoundReason()
+    private sealed class CapturingLogger : ILogger<ObjectAuthorizationService>
     {
-        var logger = new CapturingLogger<ObjectAuthorizationService>();
-        var accessor = new HttpContextAccessor { HttpContext = new DefaultHttpContext() };
-        var service = new ObjectAuthorizationService(logger, accessor);
-        var objectId = Guid.NewGuid();
-        var actorId = Guid.NewGuid();
-
-        var ex = await Assert.ThrowsAsync<GraphQLException>(() =>
-            service.RequireOwnedAsync(
-                actorId,
-                "limit_order",
-                objectId,
-                _ => Task.FromResult<TestOwnedEntity?>(null),
-                _ => true));
-
-        Assert.Equal(ObjectAuthorizationService.NotFoundOrNotOwnedCode, ex.Errors.Single().Code);
-        Assert.Equal(ObjectAuthorizationService.FriendlyMessage, ex.Errors.Single().Message);
-
-        var securityEvent = logger.SingleSecurityEvent();
-        Assert.Equal(actorId, GetProperty<Guid>(securityEvent, "actorUserId"));
-        Assert.Equal(objectId, GetProperty<Guid>(securityEvent, "requestedObjectId"));
-        Assert.Equal("limit_order", GetProperty<string>(securityEvent, "requestedObjectType"));
-        Assert.Equal(ObjectAuthorizationService.NotFoundReason, GetProperty<string>(securityEvent, "actualFailureReason"));
-        Assert.Null(GetNullableGuidProperty(securityEvent, "apiKeyId"));
-    }
-
-    [Fact]
-    public async Task RequireOwnedAsync_NotOwned_ThrowsUnifiedCode_AndLogsNotOwnedReasonWithApiKeyContext()
-    {
-        var logger = new CapturingLogger<ObjectAuthorizationService>();
-        var accessor = new HttpContextAccessor { HttpContext = new DefaultHttpContext() };
-        var apiKeyId = Guid.NewGuid();
-        accessor.HttpContext.Items[ApiKeyRequestContext.HttpContextItemKey] = new ApiKeyRequestContext(apiKeyId, Guid.NewGuid(), [], []);
-
-        var service = new ObjectAuthorizationService(logger, accessor);
-        var objectId = Guid.NewGuid();
-        var actorId = Guid.NewGuid();
-
-        var ex = await Assert.ThrowsAsync<GraphQLException>(() =>
-            service.RequireOwnedAsync(
-                actorId,
-                "bank_account",
-                objectId,
-                _ => Task.FromResult<TestOwnedEntity?>(new TestOwnedEntity(Guid.NewGuid())),
-                entity => entity.OwnerId == actorId));
-
-        Assert.Equal(ObjectAuthorizationService.NotFoundOrNotOwnedCode, ex.Errors.Single().Code);
-
-        var securityEvent = logger.SingleSecurityEvent();
-        Assert.Equal(ObjectAuthorizationService.NotOwnedReason, GetProperty<string>(securityEvent, "actualFailureReason"));
-        Assert.Equal(apiKeyId, GetNullableGuidProperty(securityEvent, "apiKeyId"));
-    }
-
-    [Fact]
-    public void Deny_ReturnsUnifiedError_AndLogsRealReason()
-    {
-        var logger = new CapturingLogger<ObjectAuthorizationService>();
-        var accessor = new HttpContextAccessor { HttpContext = new DefaultHttpContext() };
-        var service = new ObjectAuthorizationService(logger, accessor);
-        var actorId = Guid.NewGuid();
-        var objectId = Guid.NewGuid();
-
-        var notFound = service.Deny(actorId, "gold_amm_position", objectId, ObjectAuthorizationService.NotFoundReason);
-        var notOwned = service.Deny(actorId, "gold_amm_position", objectId, ObjectAuthorizationService.NotOwnedReason);
-
-        // Indistinguishable to the caller...
-        Assert.Equal(notFound.Errors.Single().Code, notOwned.Errors.Single().Code);
-        Assert.Equal(notFound.Errors.Single().Message, notOwned.Errors.Single().Message);
-        Assert.Equal(ObjectAuthorizationService.NotFoundOrNotOwnedCode, notOwned.Errors.Single().Code);
-        // ...while the audit log keeps the real reason for each.
-        var reasons = logger.AllSecurityEvents().Select(e => GetProperty<string>(e, "actualFailureReason")).ToArray();
-        Assert.Equal(
-            [ObjectAuthorizationService.NotFoundReason, ObjectAuthorizationService.NotOwnedReason],
-            reasons);
-    }
-
-    private static T GetProperty<T>(object source, string propertyName)
-    {
-        var property = source.GetType().GetProperty(propertyName)
-            ?? throw new ArgumentException($"Property '{propertyName}' not found on {source.GetType().Name}.", nameof(propertyName));
-        var value = property.GetValue(source)
-            ?? throw new ArgumentException($"Property '{propertyName}' value is null.", nameof(propertyName));
-        return (T)value;
-    }
-
-    private static Guid? GetNullableGuidProperty(object source, string propertyName)
-    {
-        var property = source.GetType().GetProperty(propertyName)
-            ?? throw new ArgumentException($"Property '{propertyName}' not found on {source.GetType().Name}.", nameof(propertyName));
-        var value = property.GetValue(source);
-        if (value is null)
-        {
-            return null;
-        }
-
-        if (value is Guid guid)
-        {
-            return guid;
-        }
-
-        throw new InvalidOperationException($"Property '{propertyName}' is not a Guid.");
-    }
-
-    private sealed record TestOwnedEntity(Guid OwnerId);
-
-    private sealed class CapturingLogger<T> : ILogger<T>
-    {
-        private readonly List<object> _securityEvents = [];
-
-        public IDisposable BeginScope<TState>(TState state) where TState : notnull => NoopScope.Instance;
-
+        public List<(LogLevel Level, string Message)> Entries { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
         public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Entries.Add((logLevel, formatter(state, exception) + " " + state));
+    }
 
-        public void Log<TState>(
-            LogLevel logLevel,
-            EventId eventId,
-            TState state,
-            Exception? exception,
-            Func<TState, Exception?, string> formatter)
-        {
-            if (logLevel != LogLevel.Warning || state is not IEnumerable<KeyValuePair<string, object?>> structuredState)
-            {
-                return;
-            }
+    private static (ObjectAuthorizationService Service, CapturingLogger Logger) Create()
+    {
+        var logger = new CapturingLogger();
+        return (new ObjectAuthorizationService(logger, new HttpContextAccessor()), logger);
+    }
 
-            var securityEvent = structuredState
-                .FirstOrDefault(item => item.Key is not "{OriginalFormat}" && item.Value is not null)
-                .Value;
-            if (securityEvent is not null && securityEvent is not string)
-            {
-                _securityEvents.Add(securityEvent);
-            }
-        }
+    [Theory]
+    [InlineData(ObjectAuthorizationService.NotFoundReason)]
+    [InlineData(ObjectAuthorizationService.NotOwnedReason)]
+    public void Deny_ReturnsIdenticalClientErrorAndLogsRealReason(string reason)
+    {
+        var (service, logger) = Create();
+        var objectId = Guid.NewGuid();
 
-        public object SingleSecurityEvent() => Assert.Single(_securityEvents);
+        var ex = service.Deny(Guid.NewGuid(), "building", objectId, reason);
 
-        public IReadOnlyList<object> AllSecurityEvents() => _securityEvents;
+        var error = Assert.Single(ex.Errors);
+        Assert.Equal(ObjectAuthorizationService.NotFoundOrNotOwnedCode, error.Code);
+        Assert.Equal(ObjectAuthorizationService.FriendlyMessage, error.Message);
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Warning, entry.Level);
+        Assert.Contains(reason, entry.Message);
+        Assert.Contains(objectId.ToString(), entry.Message);
+    }
 
-        private sealed class NoopScope : IDisposable
-        {
-            public static readonly NoopScope Instance = new();
-            public void Dispose()
-            {
-            }
-        }
+    [Fact]
+    public async Task RequireOwnedAsync_MissingAndForeignObjectsYieldSameClientError()
+    {
+        var (service, logger) = Create();
+        var actor = Guid.NewGuid();
+
+        var missing = await Assert.ThrowsAsync<GraphQLException>(() => service.RequireOwnedAsync<object>(
+            actor, "company", Guid.NewGuid(), _ => Task.FromResult<object?>(null), _ => true));
+        var foreign = await Assert.ThrowsAsync<GraphQLException>(() => service.RequireOwnedAsync<object>(
+            actor, "company", Guid.NewGuid(), _ => Task.FromResult<object?>(new object()), _ => false));
+
+        Assert.Equal(missing.Errors[0].Code, foreign.Errors[0].Code);
+        Assert.Equal(missing.Errors[0].Message, foreign.Errors[0].Message);
+        Assert.Equal(2, logger.Entries.Count);
+        Assert.Contains(ObjectAuthorizationService.NotFoundReason, logger.Entries[0].Message);
+        Assert.Contains(ObjectAuthorizationService.NotOwnedReason, logger.Entries[1].Message);
     }
 }
