@@ -205,7 +205,7 @@ public sealed partial class Mutation
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
         var contract = await db.SupplyContracts
             .FirstOrDefaultAsync(item => item.Id == id, cancellationToken)
-            ?? throw new GraphQLException(ErrorBuilder.New().SetMessage("Supply contract not found.").SetCode("SUPPLY_CONTRACT_NOT_FOUND").Build());
+            ?? throw objectAuthorization.Deny(userId, "supply_contract", id, ObjectAuthorizationService.NotFoundReason);
 
         var buyerCompany = await db.Companies
             .AsNoTracking()
@@ -315,7 +315,7 @@ public sealed partial class Mutation
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
         var contract = await db.SupplyContracts
             .FirstOrDefaultAsync(item => item.Id == id, cancellationToken)
-            ?? throw new GraphQLException(ErrorBuilder.New().SetMessage("Supply contract not found.").SetCode("SUPPLY_CONTRACT_NOT_FOUND").Build());
+            ?? throw objectAuthorization.Deny(userId, "supply_contract", id, ObjectAuthorizationService.NotFoundReason);
 
         var actorCompany = await db.Companies
             .AsNoTracking()
@@ -386,12 +386,7 @@ public sealed partial class Mutation
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
         var contract = await db.SupplyContracts.FirstOrDefaultAsync(item => item.Id == contractId, cancellationToken)
-            ?? throw new GraphQLException(ErrorBuilder.New().SetMessage("Supply contract not found.").SetCode("SUPPLY_CONTRACT_NOT_FOUND").Build());
-        if (contract.Status != SupplyContractStatus.Pending)
-        {
-            throw new GraphQLException(ErrorBuilder.New().SetMessage("Only pending contracts can be changed.").SetCode("SUPPLY_CONTRACT_NOT_PENDING").Build());
-        }
-
+            ?? throw objectAuthorization.Deny(userId, "supply_contract", contractId, ObjectAuthorizationService.NotFoundReason);
         var actorIsCounterparty = await db.Companies
             .AsNoTracking()
             .AnyAsync(company =>
@@ -401,6 +396,11 @@ public sealed partial class Mutation
         if (!actorIsCounterparty)
         {
             throw objectAuthorization.Deny(userId, "supply_contract", contractId, ObjectAuthorizationService.NotOwnedReason);
+        }
+
+        if (contract.Status != SupplyContractStatus.Pending)
+        {
+            throw new GraphQLException(ErrorBuilder.New().SetMessage("Only pending contracts can be changed.").SetCode("SUPPLY_CONTRACT_NOT_PENDING").Build());
         }
 
         return contract;

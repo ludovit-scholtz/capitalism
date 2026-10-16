@@ -313,5 +313,35 @@ public sealed class SupplyContractsIntegrationTests
         await processor.ProcessTickAsync();
     }
 
+    [Theory]
+    [InlineData("cancelSupplyContract")]
+    [InlineData("rejectSupplyContract")]
+    [InlineData("acceptSupplyContract")]
+    public async Task SupplyContractMutations_MissingAndForeignContract_ReturnIdenticalForbidden(string mutationName)
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var sellerToken = await RegisterAndGetTokenAsync(client, $"supply-idor-seller-{Guid.NewGuid():N}@example.com");
+        var buyerToken = await RegisterAndGetTokenAsync(client, $"supply-idor-buyer-{Guid.NewGuid():N}@example.com");
+        var outsiderToken = await RegisterAndGetTokenAsync(client, $"supply-idor-outsider-{Guid.NewGuid():N}@example.com");
+        var sellerPlayerId = await GetMeIdAsync(client, sellerToken);
+        var buyerPlayerId = await GetMeIdAsync(client, buyerToken);
+        var seeded = await SeedSupplyContextAsync(factory, sellerPlayerId, buyerPlayerId, withBuyerPurchaseUnit: true, sellerInventoryQuantity: 1000m);
+        var contractId = await ProposeContractAsync(client, sellerToken, seeded);
+
+        var query = $"mutation($id: UUID!) {{ {mutationName}(id: $id) {{ success }} }}";
+        var foreign = await ExecuteGraphQlAsync(client, query, new { id = contractId }, outsiderToken);
+        var missing = await ExecuteGraphQlAsync(client, query, new { id = Guid.NewGuid() }, outsiderToken);
+
+        var foreignError = foreign.GetProperty("errors")[0];
+        var missingError = missing.GetProperty("errors")[0];
+        Assert.Equal("FORBIDDEN", foreignError.GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal(
+            foreignError.GetProperty("extensions").GetProperty("code").GetString(),
+            missingError.GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal(foreignError.GetProperty("message").GetString(), missingError.GetProperty("message").GetString());
+    }
+
     private sealed record SeededSupplyContext(Guid SellerCompanyId, Guid BuyerCompanyId, Guid SellerB2BUnitId, Guid ResourceTypeId);
 }

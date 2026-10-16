@@ -8983,7 +8983,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       }
 
       const company = player.companies.find((c) => c.id === companyId)
-      if (!company) return routeJsonError('Company not found or you do not own it.', 'COMPANY_NOT_FOUND')
+      if (!company) return routeJsonError("You don't have permission to perform this action.", 'FORBIDDEN')
       const allRows = state.bankStatementRows[companyId] ?? []
       const rows = allRows.slice(offset, offset + limit)
       const currentBalance = allRows.reduce((sum, r) => sum + r.amount, 0)
@@ -11567,7 +11567,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       if (bidPricePerUnit <= 0 || bidPricePerUnit > contract.budgetCap) return routeJsonError('Bid price must be positive and below contract budget cap.', 'BID_PRICE_INVALID')
 
       const company = state.players.flatMap((player) => player.companies).find((item) => item.id === companyId)
-      if (!company) return routeJsonError('Company not found.', 'COMPANY_NOT_FOUND')
+      if (!company) return routeJsonError("You don't have permission to perform this action.", 'FORBIDDEN')
 
       const existing = state.contractBids.find((bid) => bid.contractId === contractId && bid.companyId === companyId)
       const nextBid: MockContractBid = existing ?? {
@@ -11653,7 +11653,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
       const contractId = (body.variables?.id as string | undefined) ?? ''
       const contract = state.supplyContracts.find((item) => item.id === contractId)
-      if (!contract) return routeJsonError('Supply contract not found.', 'SUPPLY_CONTRACT_NOT_FOUND')
+      if (!contract) return routeJsonError("You don't have permission to perform this action.", 'FORBIDDEN')
       contract.status = 'ACTIVE'
       contract.startTick = state.gameState.currentTick + 1
       return route.fulfill({
@@ -11667,7 +11667,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
       const contractId = (body.variables?.id as string | undefined) ?? ''
       const contract = state.supplyContracts.find((item) => item.id === contractId)
-      if (!contract) return routeJsonError('Supply contract not found.', 'SUPPLY_CONTRACT_NOT_FOUND')
+      if (!contract) return routeJsonError("You don't have permission to perform this action.", 'FORBIDDEN')
       contract.status = 'CANCELLED'
       return route.fulfill({
         status: 200,
@@ -11680,7 +11680,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
       const contractId = (body.variables?.id as string | undefined) ?? ''
       const contract = state.supplyContracts.find((item) => item.id === contractId)
-      if (!contract) return routeJsonError('Supply contract not found.', 'SUPPLY_CONTRACT_NOT_FOUND')
+      if (!contract) return routeJsonError("You don't have permission to perform this action.", 'FORBIDDEN')
       contract.status = 'CANCELLED'
       return route.fulfill({
         status: 200,
