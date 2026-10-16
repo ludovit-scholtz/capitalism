@@ -188,6 +188,17 @@ public sealed partial class Mutation
                 ObjectAuthorizationService.NotFoundReason);
         }
 
+        var sellerCompany = offer.Building.Company;
+
+        if (sellerCompany.PlayerId != userId)
+        {
+            throw objectAuthorization.Deny(
+                userId,
+                "building_sale_offer",
+                input.OfferId,
+                ObjectAuthorizationService.NotOwnedReason);
+        }
+
         if (offer.Status != BuildingSaleOfferStatus.Pending)
         {
             await LogOfferVersionConflictAsync(
@@ -215,16 +226,6 @@ public sealed partial class Mutation
         }
 
         var building = offer.Building;
-        var sellerCompany = building.Company;
-
-        if (sellerCompany.PlayerId != userId)
-        {
-            throw objectAuthorization.Deny(
-                userId,
-                "building_sale_offer",
-                input.OfferId,
-                ObjectAuthorizationService.NotOwnedReason);
-        }
 
         if (!building.IsForSale)
         {
@@ -666,6 +667,15 @@ public sealed partial class Mutation
                 ObjectAuthorizationService.NotFoundReason);
         }
 
+        if (offer.Building.Company.PlayerId != userId)
+        {
+            throw objectAuthorization.Deny(
+                userId,
+                "building_sale_offer",
+                input.OfferId,
+                ObjectAuthorizationService.NotOwnedReason);
+        }
+
         if (offer.Status != BuildingSaleOfferStatus.Pending)
         {
             await LogOfferVersionConflictAsync(
@@ -690,15 +700,6 @@ public sealed partial class Mutation
                 expectedVersion: input.OfferVersion,
                 actualVersion: offer.OfferVersion);
             throw BuildOfferVersionConflictException();
-        }
-
-        if (offer.Building.Company.PlayerId != userId)
-        {
-            throw objectAuthorization.Deny(
-                userId,
-                "building_sale_offer",
-                input.OfferId,
-                ObjectAuthorizationService.NotOwnedReason);
         }
 
         var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync();
