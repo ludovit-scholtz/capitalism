@@ -24,7 +24,8 @@ public sealed partial class Mutation
     public async Task<BuyFromExchangeResult> BuyFromExchange(
         BuyFromExchangeInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         if (input.Quantity <= 0m)
         {
@@ -62,6 +63,11 @@ public sealed partial class Mutation
 
         if (targetUnit is null || targetUnit.Building.Company.PlayerId != userId)
         {
+            objectAuthorization.LogDenied(
+                userId,
+                "building_unit",
+                input.TargetBuildingUnitId,
+                targetUnit is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
             return BuyFromExchangeResult.Fail(
                 ObjectAuthorizationService.FriendlyMessage,
                 ObjectAuthorizationService.NotFoundOrNotOwnedCode);
@@ -97,6 +103,11 @@ public sealed partial class Mutation
 
         if (bankAccount is null || bankAccount.CompanyId != targetUnit.Building.CompanyId)
         {
+            objectAuthorization.LogDenied(
+                userId,
+                "bank_account",
+                input.BankAccountId,
+                bankAccount is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
             return BuyFromExchangeResult.Fail(
                 ObjectAuthorizationService.FriendlyMessage,
                 ObjectAuthorizationService.NotFoundOrNotOwnedCode);
@@ -225,7 +236,8 @@ public sealed partial class Mutation
     public async Task<SellToExchangeResult> SellToExchange(
         SellToExchangeInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         if (input.Quantity <= 0m)
         {
@@ -253,6 +265,11 @@ public sealed partial class Mutation
 
         if (sourceUnit is null || sourceUnit.Building.Company.PlayerId != userId)
         {
+            objectAuthorization.LogDenied(
+                userId,
+                "building_unit",
+                input.SourceBuildingUnitId,
+                sourceUnit is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
             return SellToExchangeResult.Fail(
                 ObjectAuthorizationService.FriendlyMessage,
                 ObjectAuthorizationService.NotFoundOrNotOwnedCode);
@@ -281,6 +298,11 @@ public sealed partial class Mutation
 
         if (bankAccount is null || bankAccount.CompanyId != sourceUnit.Building.CompanyId)
         {
+            objectAuthorization.LogDenied(
+                userId,
+                "bank_account",
+                input.BankAccountId,
+                bankAccount is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
             return SellToExchangeResult.Fail(
                 ObjectAuthorizationService.FriendlyMessage,
                 ObjectAuthorizationService.NotFoundOrNotOwnedCode);

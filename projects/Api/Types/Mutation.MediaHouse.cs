@@ -18,7 +18,8 @@ public sealed partial class Mutation
     public Task<Building> SetMediaHouseSpendingLevel(
         SetMediaHouseSpendingLevelInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         return SetMediaHouseContentBudget(
             new SetMediaHouseContentBudgetInput
@@ -27,7 +28,8 @@ public sealed partial class Mutation
                 ContentBudgetPerTick = input.SpendingLevelPerTick,
             },
             db,
-            httpContextAccessor);
+            httpContextAccessor,
+            objectAuthorization);
     }
 
     /// <summary>
@@ -41,7 +43,8 @@ public sealed partial class Mutation
     public async Task<Building> SetMediaHouseContentBudget(
         SetMediaHouseContentBudgetInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
@@ -51,11 +54,11 @@ public sealed partial class Mutation
 
         if (building is null || building.Company.PlayerId != userId)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
-                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
-                    .Build());
+            throw objectAuthorization.Deny(
+                userId,
+                "building",
+                input.BuildingId,
+                building is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
         }
 
         if (building.Type != BuildingType.MediaHouse)
@@ -103,7 +106,8 @@ public sealed partial class Mutation
     public async Task<Building> UpgradeMediaHouse(
         UpgradeMediaHouseInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
@@ -115,11 +119,11 @@ public sealed partial class Mutation
 
         if (building is null || building.Company.PlayerId != userId)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
-                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
-                    .Build());
+            throw objectAuthorization.Deny(
+                userId,
+                "building",
+                input.BuildingId,
+                building is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
         }
 
         if (building.Type != BuildingType.MediaHouse)
@@ -212,7 +216,8 @@ public sealed partial class Mutation
     public async Task<MediaHouseUnit> ConfigureMediaHouseUnit(
         ConfigureMediaHouseUnitInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
@@ -222,11 +227,11 @@ public sealed partial class Mutation
 
         if (building is null || building.Company.PlayerId != userId)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
-                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
-                    .Build());
+            throw objectAuthorization.Deny(
+                userId,
+                "building",
+                input.BuildingId,
+                building is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
         }
 
         if (building.Type != BuildingType.MediaHouse)

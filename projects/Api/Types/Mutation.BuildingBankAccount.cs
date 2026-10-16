@@ -22,7 +22,8 @@ public sealed partial class Mutation
     public async Task<FundBuildingBankAccountResult> FundBuildingBankAccount(
         FundBuildingBankAccountInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
@@ -39,15 +40,15 @@ public sealed partial class Mutation
             .Include(b => b.BankAccount)
             .Include(b => b.City)
             .Include(b => b.Company)
-            .FirstOrDefaultAsync(b => b.Id == input.BuildingId && b.Company.PlayerId == userId);
+            .FirstOrDefaultAsync(b => b.Id == input.BuildingId);
 
-        if (building is null)
+        if (building is null || building.Company.PlayerId != userId)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
-                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
-                    .Build());
+            throw objectAuthorization.Deny(
+                userId,
+                "building",
+                input.BuildingId,
+                building is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
         }
 
         var company = building.Company;
@@ -140,22 +141,23 @@ public sealed partial class Mutation
     public async Task<AssignBuildingBankAccountResult> AssignBuildingBankAccount(
         AssignBuildingBankAccountInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
         var building = await db.Buildings
             .Include(b => b.City)
             .Include(b => b.Company)
-            .FirstOrDefaultAsync(b => b.Id == input.BuildingId && b.Company.PlayerId == userId);
+            .FirstOrDefaultAsync(b => b.Id == input.BuildingId);
 
-        if (building is null)
+        if (building is null || building.Company.PlayerId != userId)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
-                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
-                    .Build());
+            throw objectAuthorization.Deny(
+                userId,
+                "building",
+                input.BuildingId,
+                building is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
         }
 
         var account = await db.BankAccounts

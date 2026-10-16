@@ -71,10 +71,11 @@ public sealed partial class Query
         Guid cityId,
         Guid? companyId,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var playerId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
-        var resolvedCompanyId = await ResolveOwnedCompanyIdAsync(db, playerId, companyId);
+        var resolvedCompanyId = await ResolveOwnedCompanyIdAsync(db, playerId, companyId, objectAuthorization);
         var status = await CityUnlockService.GetStatusForCityAsync(db, cityId, resolvedCompanyId);
         return status is null ? null : CityUnlockStatusResult.FromStatus(status);
     }
@@ -83,15 +84,20 @@ public sealed partial class Query
     public async Task<List<CityUnlockStatusResult>> CityUnlockStatuses(
         Guid? companyId,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var playerId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
-        var resolvedCompanyId = await ResolveOwnedCompanyIdAsync(db, playerId, companyId);
+        var resolvedCompanyId = await ResolveOwnedCompanyIdAsync(db, playerId, companyId, objectAuthorization);
         var statuses = await CityUnlockService.GetStatusesAsync(db, resolvedCompanyId);
         return statuses.Select(CityUnlockStatusResult.FromStatus).ToList();
     }
 
-    private static async Task<Guid?> ResolveOwnedCompanyIdAsync(AppDbContext db, Guid playerId, Guid? companyId)
+    private static async Task<Guid?> ResolveOwnedCompanyIdAsync(
+        AppDbContext db,
+        Guid playerId,
+        Guid? companyId,
+        ObjectAuthorizationService objectAuthorization)
     {
         if (!companyId.HasValue)
         {
@@ -103,11 +109,12 @@ public sealed partial class Query
             .AnyAsync(company => company.Id == companyId.Value && company.PlayerId == playerId);
         if (!ownsCompany)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage(ObjectAuthorizationService.FriendlyMessage)
-                    .SetCode(ObjectAuthorizationService.NotFoundOrNotOwnedCode)
-                    .Build());
+            var exists = await db.Companies.AsNoTracking().AnyAsync(company => company.Id == companyId.Value);
+            throw objectAuthorization.Deny(
+                playerId,
+                "company",
+                companyId.Value,
+                exists ? ObjectAuthorizationService.NotOwnedReason : ObjectAuthorizationService.NotFoundReason);
         }
 
         return companyId.Value;

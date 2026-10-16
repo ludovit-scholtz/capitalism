@@ -84,17 +84,21 @@ public sealed partial class Mutation
     public async Task<Company> UpdateCompanySettings(
         UpdateCompanySettingsInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
         var company = await db.Companies
             .Include(candidate => candidate.CitySalarySettings)
-            .FirstOrDefaultAsync(candidate => candidate.Id == input.CompanyId && candidate.PlayerId == userId)
-            ?? throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Company not found or you don't own it.")
-                    .SetCode("COMPANY_NOT_FOUND")
-                    .Build());
+            .FirstOrDefaultAsync(candidate => candidate.Id == input.CompanyId);
+        if (company is null || company.PlayerId != userId)
+        {
+            throw objectAuthorization.Deny(
+                userId,
+                "company",
+                input.CompanyId,
+                company is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
+        }
 
         var trimmedName = input.Name.Trim();
         if (string.IsNullOrEmpty(trimmedName))
@@ -220,21 +224,21 @@ public sealed partial class Mutation
     public async Task<Building> PlaceBuilding(
         PlaceBuildingInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
-        var company = await db.Companies.FirstOrDefaultAsync(
-            c => c.Id == input.CompanyId && c.PlayerId == userId);
+        var company = await db.Companies.FirstOrDefaultAsync(c => c.Id == input.CompanyId);
         var referralDiscountRate = await GetReferralDiscountRateIfRegisteredAsync(db, userId, httpContextAccessor.HttpContext!.RequestAborted);
 
-        if (company is null)
+        if (company is null || company.PlayerId != userId)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Company not found or you don't own it.")
-                    .SetCode("COMPANY_NOT_FOUND")
-                    .Build());
+            throw objectAuthorization.Deny(
+                userId,
+                "company",
+                input.CompanyId,
+                company is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
         }
 
         if (!BuildingType.All.Contains(input.Type))

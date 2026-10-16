@@ -3176,7 +3176,10 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
                     ]
                 },
                 db,
-                httpContextAccessor);
+                httpContextAccessor,
+                new ObjectAuthorizationService(
+                    Microsoft.Extensions.Logging.Abstractions.NullLogger<ObjectAuthorizationService>.Instance,
+                    httpContextAccessor));
 
             Assert.Equal("Renamed Company", updatedCompany.Name);
         }
@@ -3235,7 +3238,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         var error = result.GetProperty("errors")[0];
 
-        Assert.Equal("COMPANY_NOT_FOUND", error.GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal("FORBIDDEN", error.GetProperty("extensions").GetProperty("code").GetString());
     }
 
     [Fact]
