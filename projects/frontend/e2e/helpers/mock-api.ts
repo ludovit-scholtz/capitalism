@@ -10048,7 +10048,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       if (accessFailure) {
         return routeJsonError(accessFailure.message, accessFailure.code)
       }
-      return routeJson(getOperationsDiagnosticsData(query, state.gameState.currentTick)!)
+      return routeJson(getOperationsDiagnosticsData(query, state.gameState.currentTick))
     }
 
     if (query.includes('operationsStatistics')) {

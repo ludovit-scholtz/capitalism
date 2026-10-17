@@ -22,6 +22,7 @@ async function load() {
     const data = await gqlRequest<{ objectAccessDenials: ObjectAccessDenials }>(OBJECT_ACCESS_DENIALS_QUERY, { limit: 50 })
     report.value = data.objectAccessDenials
   } catch (caught) {
+    report.value = null
     error.value = caught instanceof Error ? caught.message : t('common.unknownError')
   } finally {
     loading.value = false
@@ -53,10 +54,10 @@ onMounted(load)
 
     <p v-if="error" class="object-denials-error">{{ error }}</p>
     <p v-if="loading && !report">{{ t('common.loading') }}</p>
-    <p v-else-if="!report || report.windowSize === 0" class="object-denials-empty">
+    <p v-else-if="!error && (!report || report.windowSize === 0)" class="object-denials-empty">
       {{ t('operations.objectDenials.empty') }}
     </p>
-    <template v-else>
+    <template v-else-if="report">
       <ul class="object-denials-counts" :aria-label="t('operations.objectDenials.byReason')">
         <li v-for="count in report.byReason" :key="count.key">
           {{ t(denialReasonLabelKey(count.key)) }}: <strong>{{ count.count }}</strong>

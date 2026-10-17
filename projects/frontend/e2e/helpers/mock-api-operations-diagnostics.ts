@@ -1,7 +1,8 @@
 /** Canned admin diagnostics for the Operations overview mock API (tick timings and blocked access attempts). */
-export function getOperationsDiagnosticsData(query: string, currentTick: number): Record<string, unknown> | null {
+export function getOperationsDiagnosticsData(query: string, currentTick: number): Record<string, unknown> {
+  const data: Record<string, unknown> = {}
   if (query.includes('tickPhaseTimings')) {
-    return {
+    Object.assign(data, {
       tickPhaseTimings: {
         sampledTicks: 12,
         lastTick: currentTick,
@@ -15,10 +16,10 @@ export function getOperationsDiagnosticsData(query: string, currentTick: number)
           { name: 'Manufacturing', lastMs: 40, averageMs: 35, maxMs: 90, aboveBudget: false },
         ],
       },
-    }
+    })
   }
   if (query.includes('objectAccessDenials')) {
-    return {
+    Object.assign(data, {
       objectAccessDenials: {
         totalRecorded: 7,
         windowSize: 2,
@@ -49,7 +50,7 @@ export function getOperationsDiagnosticsData(query: string, currentTick: number)
           },
         ],
       },
-    }
+    })
   }
-  return null
+  return data
 }

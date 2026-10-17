@@ -23,8 +23,10 @@ public sealed record ObjectDenialSummary(
 /// <summary>
 /// Thread-safe ring buffer of the most recent object-authorization denials (#392). The structured log remains the durable audit
 /// stream; this gives admins an in-process view of recent enumeration probes without touching the database. Registered as a singleton.
+/// The window is process-local (a restart or another replica starts empty) and each actor keeps at most <c>perActorCapacity</c> entries,
+/// so one noisy caller cannot push everybody else's probes out of the window.
 /// </summary>
-public sealed class ObjectDenialRecorder(int capacity = 500)
+public sealed class ObjectDenialRecorder(int capacity = 500, int perActorCapacity = 50)
 {
     private readonly object gate = new();
     private readonly LinkedList<ObjectDenialEvent> events = new();
@@ -49,8 +51,24 @@ public sealed class ObjectDenialRecorder(int capacity = 500)
     {
         lock (gate)
         {
-            events.AddFirst(denial);
             total++;
+            var sameActor = 0;
+            LinkedListNode<ObjectDenialEvent>? oldestOfActor = null;
+            for (var node = events.First; node is not null; node = node.Next)
+            {
+                if (node.Value.ActorUserId == denial.ActorUserId)
+                {
+                    sameActor++;
+                    oldestOfActor = node;
+                }
+            }
+
+            if (sameActor >= Math.Max(1, perActorCapacity) && oldestOfActor is not null)
+            {
+                events.Remove(oldestOfActor);
+            }
+
+            events.AddFirst(denial);
             while (events.Count > Math.Max(1, capacity))
             {
                 events.RemoveLast();
@@ -67,7 +85,10 @@ public sealed class ObjectDenialRecorder(int capacity = 500)
         }
     }
 
-    public ObjectDenialSummary Summarize()
+    public ObjectDenialSummary Summarize() => Snapshot(0).Summary;
+
+    /// <summary>The summary and the newest <paramref name="limit"/> events from one locked view, so their counts always agree.</summary>
+    public (ObjectDenialSummary Summary, IReadOnlyList<ObjectDenialEvent> Recent) Snapshot(int limit)
     {
         ObjectDenialEvent[] snapshot;
         long totalRecorded;
@@ -81,11 +102,12 @@ public sealed class ObjectDenialRecorder(int capacity = 500)
             => keys.GroupBy(k => k).Select(g => new ObjectDenialCount(g.Key, g.Count()))
                 .OrderByDescending(c => c.Count).ThenBy(c => c.Key, StringComparer.Ordinal).ToList();
 
-        return new ObjectDenialSummary(
+        var summary = new ObjectDenialSummary(
             totalRecorded,
             snapshot.Length,
             snapshot.Count(e => e.IsProbeSignal),
             Count(snapshot.Select(e => e.ObjectType)),
             Count(snapshot.Select(e => e.Reason)));
+        return (summary, snapshot.Take(Math.Max(0, limit)).ToList());
     }
 }

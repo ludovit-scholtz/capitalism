@@ -6,7 +6,7 @@ namespace Api.Security;
 public sealed class ObjectAuthorizationService(
     ILogger<ObjectAuthorizationService> logger,
     IHttpContextAccessor httpContextAccessor,
-    ObjectDenialRecorder? denialRecorder = null)
+    ObjectDenialRecorder denialRecorder)
 {
     private readonly ILogger<ObjectAuthorizationService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor ?? throw new ArgumentNullException(nameof(httpContextAccessor));
@@ -81,7 +81,7 @@ public sealed class ObjectAuthorizationService(
     {
         var apiKeyContext = _httpContextAccessor.HttpContext?.Items[ApiKeyRequestContext.HttpContextItemKey] as ApiKeyRequestContext;
         // Fail safe: every reason is a Warning (probe signal) unless it is explicitly known to be benign.
-        var level = actualFailureReason is WrongContextReason or NotAvailableReason ? LogLevel.Information : LogLevel.Warning;
+        var level = ObjectDenialRecorder.IsProbeSignal(actualFailureReason) ? LogLevel.Warning : LogLevel.Information;
         _logger.Log(
             level,
             "Object authorization denied {@SecurityAuditEvent}",
@@ -94,7 +94,7 @@ public sealed class ObjectAuthorizationService(
                 requestedObjectId,
                 actualFailureReason,
             });
-        denialRecorder?.Record(new ObjectDenialEvent(
+        denialRecorder.Record(new ObjectDenialEvent(
             DateTime.UtcNow,
             actorUserId,
             apiKeyContext?.KeyId,
