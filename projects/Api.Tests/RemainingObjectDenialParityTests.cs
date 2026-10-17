@@ -35,13 +35,14 @@ public sealed class RemainingObjectDenialParityTests
         var foreign = await ExecuteAsync(client, operation, world.ForeignDepositId, world.ForeignMediaHouseId, world.ForeignCompanyId, actorToken);
         var missing = await ExecuteAsync(client, operation, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), actorToken);
 
-        var foreignError = foreign.GetProperty("errors")[0];
-        var missingError = missing.GetProperty("errors")[0];
+        Assert.True(foreign.TryGetProperty("errors", out var foreignErrors), $"{operation}: foreign object returned no error: {foreign}");
+        Assert.True(missing.TryGetProperty("errors", out var missingErrors), $"{operation}: missing object returned no error: {missing}");
+        var foreignError = foreignErrors[0];
+        var missingError = missingErrors[0];
         Assert.Equal("FORBIDDEN", foreignError.GetProperty("extensions").GetProperty("code").GetString());
-        Assert.Equal(
-            foreignError.GetProperty("extensions").GetProperty("code").GetString(),
-            missingError.GetProperty("extensions").GetProperty("code").GetString());
+        // The whole error (message, code and every other extension) must be identical, so nothing else can tell the cases apart.
         Assert.Equal(foreignError.GetProperty("message").GetString(), missingError.GetProperty("message").GetString());
+        Assert.Equal(foreignError.GetProperty("extensions").GetRawText(), missingError.GetProperty("extensions").GetRawText());
     }
 
     [Theory]
@@ -55,7 +56,7 @@ public sealed class RemainingObjectDenialParityTests
 
         Assert.True(result.TryGetProperty("errors", out var errors));
         Assert.True(errors.GetArrayLength() > 0);
-        Assert.NotEqual("FORBIDDEN", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal("AUTH_NOT_AUTHENTICATED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
     [Fact]
@@ -67,13 +68,16 @@ public sealed class RemainingObjectDenialParityTests
         var ownerToken = await RegisterAsync(client, $"rem-ok-owner-{Guid.NewGuid():N}@example.com");
         var world = await SeedAsync(factory, await GetMeIdAsync(client, ownerToken), await GetMeIdAsync(client, actorToken));
 
-        var budget = await ExecuteAsync(client, "setMediaHouseContentBudget", Guid.NewGuid(), world.ActorMediaHouseId, Guid.NewGuid(), actorToken);
-        var unlocks = await ExecuteAsync(client, "cityUnlockStatuses", Guid.NewGuid(), Guid.NewGuid(), world.ActorCompanyId, actorToken);
-        var close = await ExecuteAsync(client, "closeBankAccount", world.ActorDepositId, Guid.NewGuid(), Guid.NewGuid(), actorToken);
-
-        Assert.False(IsForbidden(budget), $"owner was denied setMediaHouseContentBudget: {budget}");
-        Assert.False(IsForbidden(unlocks), $"owner was denied cityUnlockStatuses: {unlocks}");
-        Assert.False(IsForbidden(close), $"owner was denied closeBankAccount: {close}");
+        foreach (var operation in new[] { "setMediaHouseContentBudget", "upgradeMediaHouse", "cityUnlockStatuses", "closeBankAccount" })
+        {
+            var result = await ExecuteAsync(client, operation, world.ActorDepositId, world.ActorMediaHouseId, world.ActorCompanyId, actorToken);
+            Assert.False(IsForbidden(result), $"owner was denied {operation}: {result}");
+            // The ownership check passed; cityUnlockStatuses and the zero-balance close must succeed outright.
+            if (operation is "cityUnlockStatuses" or "closeBankAccount")
+            {
+                Assert.False(result.TryGetProperty("errors", out var errors), $"{operation} failed for the owner: {errors}");
+            }
+        }
     }
 
     private static bool IsForbidden(JsonElement result)
