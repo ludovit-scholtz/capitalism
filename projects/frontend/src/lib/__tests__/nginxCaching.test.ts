@@ -9,7 +9,20 @@ const nginx = readFileSync(resolve(__dirname, '../../../nginx.conf'), 'utf-8').r
 function locationBlock(path: string): string {
   const start = nginx.indexOf(`location = ${path} {`)
   expect(start, `nginx.conf must define an exact-match location for ${path}`).toBeGreaterThan(-1)
-  return nginx.slice(start, nginx.indexOf('\n        }\n', start))
+  const open = nginx.indexOf('{', start)
+  let depth = 0
+  for (let i = open; i < nginx.length; i += 1) {
+    if (nginx[i] === '{') depth += 1
+    if (nginx[i] === '}') depth -= 1
+    if (depth === 0) return nginx.slice(start, i + 1)
+  }
+  throw new Error(`unterminated location block for ${path}`)
+}
+
+function genericAssetRuleIndex(): number {
+  const match = /location ~\* \\.\(js\|css/.exec(nginx)
+  expect(match, 'generic static asset location not found').not.toBeNull()
+  return match?.index ?? -1
 }
 
 describe('nginx caching of non-hashed scripts', () => {
@@ -23,7 +36,7 @@ describe('nginx caching of non-hashed scripts', () => {
     })
 
     it(`defines the ${path} rule before the generic asset rule`, () => {
-      expect(nginx.indexOf(`location = ${path} {`)).toBeLessThan(nginx.indexOf('# Handle static assets'))
+      expect(nginx.indexOf(`location = ${path} {`)).toBeLessThan(genericAssetRuleIndex())
     })
   }
 })

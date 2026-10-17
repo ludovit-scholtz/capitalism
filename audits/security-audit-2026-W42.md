@@ -52,5 +52,5 @@ Can one player gain an unfair advantage over another player by executing an API 
 - **Severity:** Low (development only)
 - **Affected endpoint or mechanic:** `projects/frontend` and `projects/master-frontend` devDependencies (`@vue/eslint-config-typescript` -> `fast-glob` -> `micromatch` -> `braces`, GHSA-vfj7-8cjw-p6xm).
 - **Risk description:** Stack-exhaustion denial of service in a glob helper, reachable only when linting developer-controlled files. Nothing from this chain is in the production bundle or image. No patched release exists: `braces@3.0.3` is the latest published version and is inside the vulnerable range (`<=3.0.3`), and the only `npm audit fix` proposal is a semver-major downgrade of the lint config to 14.0.1.
-- **Recommended fix:** Accepted risk until upstream publishes a fixed `braces`; re-check `npm view braces version` in each weekly audit and do not apply `npm audit fix --force`. CI keeps gating production dependencies with `npm audit --omit=dev`.
-- **Status:** Open (accepted, no upstream fix available) <!-- issue: #611 -->
+- **Recommended fix:** Treated as an accepted risk (no upstream fix) until upstream publishes a fixed `braces`; re-check `npm view braces version` in each weekly audit and do not apply `npm audit fix --force`. CI keeps gating production dependencies with `npm audit --omit=dev`.
+- **Status:** Open <!-- issue: #611 -->
