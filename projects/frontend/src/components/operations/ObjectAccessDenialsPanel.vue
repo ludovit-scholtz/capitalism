@@ -63,7 +63,8 @@ onMounted(load)
           {{ t(denialReasonLabelKey(count.key)) }}: <strong>{{ count.count }}</strong>
         </li>
       </ul>
-      <table class="object-denials-table">
+      <div class="object-denials-scroll">
+        <table class="object-denials-table">
         <thead>
           <tr>
             <th scope="col">{{ t('operations.objectDenials.columns.time') }}</th>
@@ -91,6 +92,7 @@ onMounted(load)
           </tr>
         </tbody>
       </table>
+      </div>
     </template>
   </section>
 </template>
@@ -116,6 +118,10 @@ onMounted(load)
   padding: 0;
   margin: 0 0 16px;
   list-style: none;
+}
+
+.object-denials-scroll {
+  overflow-x: auto;
 }
 
 .object-denials-table {
