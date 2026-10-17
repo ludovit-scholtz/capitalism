@@ -166,6 +166,7 @@ public sealed class TickProcessor(
             .Include(setting => setting.City)
             .ToListAsync(ct);
         var cities = await db.Cities.ToListAsync(ct);
+        var laborMarkets = await db.CityLaborMarkets.ToListAsync(ct);
         var lots = await db.BuildingLots
             .Where(lot => lot.OwnerCompanyId.HasValue)
             .ToListAsync(ct);
@@ -379,6 +380,7 @@ public sealed class TickProcessor(
                 .GroupBy(setting => setting.CompanyId)
                 .ToDictionary(g => g.Key, g => g.ToList()),
             CitiesById = cities.ToDictionary(c => c.Id),
+            LaborMarketsByCity = laborMarkets.ToDictionary(m => m.CityId),
             LotsByCompany = lots
                 .GroupBy(lot => lot.OwnerCompanyId!.Value)
                 .ToDictionary(g => g.Key, g => g.ToList()),

@@ -89,7 +89,7 @@ public sealed class ResearchPhase : ITickPhase
         // Compute operating cost for this unit using the same formula as OperatingCostPhase.
         var salarySettings = context.CitySalarySettingsByCompany.GetValueOrDefault(company.Id, []);
         var salaryMultiplier = CompanyEconomyCalculator.GetSalaryMultiplier(salarySettings, city.Id);
-        var hourlyWage = CompanyEconomyCalculator.GetEffectiveHourlyWage(city, salaryMultiplier);
+        var hourlyWage = CompanyEconomyCalculator.GetEffectiveHourlyWage(city, salaryMultiplier, context.GetWageIndex(city.Id));
 
         var baseLaborHours = CompanyEconomyCalculator.GetBaseUnitLaborHours(unit.UnitType, unit.Level) * powerEfficiency;
         var baseEnergyMwh = CompanyEconomyCalculator.GetBaseUnitEnergyMwh(unit.UnitType, unit.Level) * powerEfficiency;

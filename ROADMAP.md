@@ -54,6 +54,7 @@ Ordered by expected player impact against effort. Each builds on systems that al
 ### Economic depth (Capitalism II feel)
 
 - [ ] **Labor market.** Per-city labor pool and unemployment affect salaries, public-sales demand and unit staffing; salary policy (already set per city) then has real trade-offs, and "Good employer" bounty becomes meaningful. Include optional strikes when pay trails the city average.
+  - Status (~35%, slice A of #603): `LaborMarketCalculator` (Shared), `CityLaborMarket` + migration, end-of-tick `LaborMarketPhase`, wage pressure (0.90x..1.50x by labor-pool utilization) applied to labor costs, read-only `cityLaborMarkets(companyId)` with pay ratio and strike-risk flag. Remaining: staffing fill rate and strikes (#616), city-panel UI and strike warnings (#617), public-sales demand effect, real PostgreSQL upgrade-path validation.
 - [ ] **Patents and licensing.** Let a company that leads a product's research license its quality to others for a per-unit royalty, creating a market for R&D and a way to monetize a won research race.
 - [ ] **Corporate bonds and futures.** Companies issue bonds on the stock exchange (alternative to bank loans); commodity forwards/futures on exchange resources let manufacturers hedge price swings that Global Events and economic cycles already create.
 - [ ] **Insurance.** Optional policies against global events, power outages and forced-sale risk, priced from city/event history and sold by player-owned insurers (a new building type reusing the bank model). Gives mid-game players a sink and a new profession.
