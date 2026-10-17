@@ -14,6 +14,7 @@ public sealed class CityLaborMarketsQueryTests
           cityLaborMarkets(companyId: $companyId) {
             cityId cityName population laborPool laborDemand utilization unemploymentRate wageIndex staffingFillRate
             averageSalaryMultiplier updatedAtTick yourSalaryMultiplier payRatio strikeProne
+            affectedBuildings { buildingId name staffingFactor onStrike strikeUntilTick }
           }
         }
         """;
@@ -145,5 +146,90 @@ public sealed class CityLaborMarketsQueryTests
         Assert.Equal("FORBIDDEN", foreignError.GetProperty("extensions").GetProperty("code").GetString());
         Assert.Equal(foreignError.GetProperty("extensions").GetProperty("code").GetString(), missingError.GetProperty("extensions").GetProperty("code").GetString());
         Assert.Equal(foreignError.GetProperty("message").GetString(), missingError.GetProperty("message").GetString());
+    }
+
+    [Fact]
+    public async Task Owner_SeesOnlyTheirStrikingOrUnderstaffedBuildingsPerCity()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+        var (token, playerId) = await RegisterAsync(client);
+        var cityId = await SeedMarketAsync(factory, averageSalary: 1m);
+        var companyId = await SeedCompanyAsync(factory, playerId, cityId, salaryMultiplier: 1m);
+        Guid strikingId, understaffedId, healthyId;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var city = await db.Cities.FirstAsync(c => c.Id == cityId);
+            Building NewBuilding(string name, decimal staffing, long? until) => new()
+            {
+                Id = Guid.NewGuid(), CompanyId = companyId, CityId = cityId, Type = BuildingType.Factory, Name = name,
+                Latitude = city.Latitude, Longitude = city.Longitude, BuiltAtUtc = DateTime.UtcNow,
+                StaffingFactor = staffing, StrikeStartedAtTick = until.HasValue ? 3 : null, StrikeUntilTick = until,
+            };
+            var striking = NewBuilding("Striking", 1m, 90);
+            var understaffed = NewBuilding("Understaffed", 0.4m, null);
+            var healthy = NewBuilding("Healthy", 1m, null);
+            db.Buildings.AddRange(striking, understaffed, healthy);
+            await db.SaveChangesAsync();
+            (strikingId, understaffedId, healthyId) = (striking.Id, understaffed.Id, healthy.Id);
+        }
+
+        var result = await TestHelpers.ExecuteGraphQlAsync(client, Query, new { companyId }, token);
+
+        var row = result.GetProperty("data").GetProperty("cityLaborMarkets").EnumerateArray()
+            .Single(r => r.GetProperty("cityId").GetString() == cityId.ToString());
+        var affected = row.GetProperty("affectedBuildings").EnumerateArray().ToList();
+        Assert.Equal(2, affected.Count);
+        var striker = affected.Single(a => a.GetProperty("buildingId").GetString() == strikingId.ToString());
+        Assert.True(striker.GetProperty("onStrike").GetBoolean());
+        Assert.Equal(90L, striker.GetProperty("strikeUntilTick").GetInt64());
+        var short_ = affected.Single(a => a.GetProperty("buildingId").GetString() == understaffedId.ToString());
+        Assert.False(short_.GetProperty("onStrike").GetBoolean());
+        Assert.Equal(0.4m, short_.GetProperty("staffingFactor").GetDecimal());
+        Assert.DoesNotContain(affected, a => a.GetProperty("buildingId").GetString() == healthyId.ToString());
+    }
+
+    [Fact]
+    public async Task WithoutACompany_AffectedBuildingsIsEmpty()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+        var (token, _) = await RegisterAsync(client);
+        await SeedMarketAsync(factory, averageSalary: 1m);
+
+        var result = await TestHelpers.ExecuteGraphQlAsync(client, Query, new { companyId = (Guid?)null }, token);
+
+        var rows = result.GetProperty("data").GetProperty("cityLaborMarkets").EnumerateArray().ToList();
+        Assert.All(rows, row => Assert.Equal(0, row.GetProperty("affectedBuildings").GetArrayLength()));
+    }
+
+    [Fact]
+    public async Task FullyStaffedBuildingWithAnExpiredStrikeMarker_IsNotListed()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+        var (token, playerId) = await RegisterAsync(client);
+        var cityId = await SeedMarketAsync(factory, averageSalary: 1m);
+        var companyId = await SeedCompanyAsync(factory, playerId, cityId, salaryMultiplier: 1m);
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            (await db.GameStates.FirstAsync()).CurrentTick = 100;
+            var city = await db.Cities.FirstAsync(c => c.Id == cityId);
+            db.Buildings.Add(new Building
+            {
+                Id = Guid.NewGuid(), CompanyId = companyId, CityId = cityId, Type = BuildingType.Factory, Name = "Settled",
+                Latitude = city.Latitude, Longitude = city.Longitude, BuiltAtUtc = DateTime.UtcNow,
+                StaffingFactor = 1m, StrikeStartedAtTick = 80, StrikeUntilTick = 90, // ended ten ticks ago, not yet cleared
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var result = await TestHelpers.ExecuteGraphQlAsync(client, Query, new { companyId }, token);
+
+        var row = result.GetProperty("data").GetProperty("cityLaborMarkets").EnumerateArray()
+            .Single(r => r.GetProperty("cityId").GetString() == cityId.ToString());
+        Assert.Equal(0, row.GetProperty("affectedBuildings").GetArrayLength());
     }
 }
