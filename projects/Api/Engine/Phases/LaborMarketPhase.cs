@@ -18,6 +18,7 @@ public sealed class LaborMarketPhase : ITickPhase
     {
         var demandByCity = new Dictionary<Guid, decimal>();
         var weightedSalaryByCity = new Dictionary<Guid, decimal>();
+        var employers = new List<(Building Building, decimal SalaryMultiplier)>();
 
         foreach (var building in context.BuildingsById.Values)
         {
@@ -50,6 +51,7 @@ public sealed class LaborMarketPhase : ITickPhase
                 continue;
             }
 
+            employers.Add((building, salaryMultiplier));
             demandByCity[building.CityId] = demandByCity.GetValueOrDefault(building.CityId) + hours;
             weightedSalaryByCity[building.CityId] = weightedSalaryByCity.GetValueOrDefault(building.CityId) + (hours * salaryMultiplier);
         }
@@ -79,6 +81,44 @@ public sealed class LaborMarketPhase : ITickPhase
             market.UpdatedAtTick = context.CurrentTick;
         }
 
+        foreach (var (building, salaryMultiplier) in employers)
+        {
+            if (!context.LaborMarketsByCity.TryGetValue(building.CityId, out var market))
+            {
+                continue;
+            }
+
+            var payRatio = LaborMarketCalculator.ComputePayRatio(salaryMultiplier, market.AverageSalaryMultiplier);
+            building.StaffingFactor = LaborMarketCalculator.ComputeCompanyStaffing(market.StaffingFillRate, market.Utilization, payRatio);
+            UpdateStrike(context.CurrentTick, building, payRatio);
+        }
+
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// A running strike ends when its time is up or the company has fixed its pay; otherwise a building whose pay trails the
+    /// city average may walk out, decided by a deterministic roll of (tick, building) so it is reproducible from game state.
+    /// </summary>
+    private static void UpdateStrike(long tick, Building building, decimal payRatio)
+    {
+        if (building.StrikeUntilTick.HasValue)
+        {
+            if (LaborMarketCalculator.ShouldStrikeEnd(tick, building.StrikeUntilTick.Value, payRatio))
+            {
+                building.StrikeStartedAtTick = null;
+                building.StrikeUntilTick = null;
+            }
+
+            return;
+        }
+
+        var probability = LaborMarketCalculator.ComputeStrikeProbability(payRatio);
+        if (probability > 0m && LaborMarketCalculator.Roll(tick, building.Id, salt: 1) < (double)probability)
+        {
+            var duration = LaborMarketCalculator.ComputeStrikeDurationTicks(LaborMarketCalculator.Roll(tick, building.Id, salt: 2));
+            building.StrikeStartedAtTick = tick;
+            building.StrikeUntilTick = tick + duration;
+        }
     }
 }

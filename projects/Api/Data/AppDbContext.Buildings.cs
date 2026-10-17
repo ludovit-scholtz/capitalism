@@ -13,6 +13,7 @@ public sealed partial class AppDbContext
             e.Property(b => b.Type).HasMaxLength(30);
             e.Property(b => b.Name).HasMaxLength(200);
             e.Property(b => b.PowerConsumption).HasPrecision(18, 2);
+            e.Property(b => b.StaffingFactor).HasPrecision(8, 4).HasDefaultValue(1m);
             e.Property(b => b.AskingPrice).HasPrecision(18, 2);
             e.Property(b => b.PricePerSqm).HasPrecision(18, 2);
             e.Property(b => b.OccupancyPercent).HasPrecision(5, 2);

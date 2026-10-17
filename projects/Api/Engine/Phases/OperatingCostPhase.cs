@@ -33,7 +33,7 @@ public sealed class OperatingCostPhase : ITickPhase
                 continue;
             }
 
-            var efficiency = TickContext.GetPowerEfficiency(building);
+            var efficiency = context.GetOperationalEfficiency(building);
             if (efficiency <= 0m)
             {
                 continue;

@@ -83,7 +83,7 @@ public sealed class ResearchPhase : ITickPhase
         if (!context.CompaniesById.TryGetValue(building.CompanyId, out var company)) return;
         if (!context.CitiesById.TryGetValue(building.CityId, out var city)) return;
 
-        var powerEfficiency = TickContext.GetPowerEfficiency(building);
+        var powerEfficiency = context.GetOperationalEfficiency(building);
         if (powerEfficiency <= 0m) return;
 
         // Compute operating cost for this unit using the same formula as OperatingCostPhase.

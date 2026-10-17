@@ -101,4 +101,70 @@ public static class LaborMarketCalculator
             : decimal.Round(companySalaryMultiplier / citySalaryAverage, 4, MidpointRounding.AwayFromZero);
 
     public static bool IsStrikeProne(decimal payRatio) => payRatio < StrikePayRatioThreshold;
+
+    /// <summary>Highest chance per tick that a strike-prone building walks out.</summary>
+    public const decimal MaxStrikeProbabilityPerTick = 0.15m;
+
+    /// <summary>Pay ratio at which a running strike is considered settled.</summary>
+    public const decimal StrikeSettledPayRatio = 0.95m;
+
+    public const int MinStrikeDurationTicks = 6;
+    public const int StrikeDurationSpanTicks = 6;
+
+    /// <summary>
+    /// Share of the required labor a company actually hires. A city shortage (<paramref name="cityFillRate"/>) hits
+    /// everyone; pay relative to the city average matters in proportion to how tight the market is: in a slack market low
+    /// pay barely costs staff, in a tight one it costs staff one-for-one, and paying above average wins a larger share of the
+    /// scarce workers.
+    /// </summary>
+    public static decimal ComputeCompanyStaffing(decimal cityFillRate, decimal utilization, decimal payRatio)
+    {
+        var tightness = Math.Clamp(utilization, 0m, 1m);
+        var payFactor = payRatio < 1m
+            ? 1m - ((1m - payRatio) * tightness)
+            : 1m + ((payRatio - 1m) * tightness);
+        return decimal.Round(Math.Clamp(Math.Clamp(cityFillRate, 0m, 1m) * payFactor, 0m, 1m), 4, MidpointRounding.AwayFromZero);
+    }
+
+    /// <summary>Chance per tick that a building whose pay trails the city average goes on strike (0 at or above the threshold).</summary>
+    public static decimal ComputeStrikeProbability(decimal payRatio)
+    {
+        if (payRatio >= StrikePayRatioThreshold)
+        {
+            return 0m;
+        }
+
+        var shortfall = (StrikePayRatioThreshold - Math.Max(0m, payRatio)) / StrikePayRatioThreshold;
+        return decimal.Round(Math.Min(MaxStrikeProbabilityPerTick, shortfall * 0.25m), 4, MidpointRounding.AwayFromZero);
+    }
+
+    /// <summary>
+    /// Deterministic pseudo-random number in [0, 1) derived from the tick, the building and a salt (FNV-1a with a final
+    /// avalanche), so strikes are reproducible from game state and need no stored seed.
+    /// </summary>
+    public static double Roll(long tick, Guid buildingId, int salt)
+    {
+        const ulong offset = 14695981039346656037UL;
+        const ulong prime = 1099511628211UL;
+        var hash = offset;
+        foreach (var b in BitConverter.GetBytes(tick).Concat(buildingId.ToByteArray()).Concat(BitConverter.GetBytes(salt)))
+        {
+            hash ^= b;
+            hash *= prime;
+        }
+
+        hash ^= hash >> 33;
+        hash *= 0xff51afd7ed558ccdUL;
+        hash ^= hash >> 33;
+        hash *= 0xc4ceb9fe1a85ec53UL;
+        hash ^= hash >> 33;
+        return (hash >> 11) / (double)(1UL << 53);
+    }
+
+    public static int ComputeStrikeDurationTicks(double roll)
+        => MinStrikeDurationTicks + (int)Math.Floor(Math.Clamp(roll, 0d, 0.999999d) * StrikeDurationSpanTicks);
+
+    /// <summary>A strike ends when its time is up or the company has fixed its pay.</summary>
+    public static bool ShouldStrikeEnd(long currentTick, long strikeUntilTick, decimal payRatio)
+        => currentTick >= strikeUntilTick || payRatio >= StrikeSettledPayRatio;
 }

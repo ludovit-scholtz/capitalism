@@ -60,7 +60,7 @@ public sealed class MiningPhase : ITickPhase
                 continue;
 
             // Skip buildings with no power.
-            var efficiency = TickContext.GetPowerEfficiency(building);
+            var efficiency = context.GetOperationalEfficiency(building);
             if (efficiency <= 0m) continue;
 
             // Skip buildings suspended for insufficient funds (evaluated by OperatingCostPhase).
