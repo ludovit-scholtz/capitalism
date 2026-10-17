@@ -143,6 +143,10 @@ public sealed partial class TickContext
         };
     }
 
+    /// <summary>
+    /// Asset value of one company, computed live. This scans every building, so it is O(buildings) per call: never call it in a
+    /// per-building or per-unit loop; take <see cref="ComputeAllCompanyAssetValues"/> once and read from that instead.
+    /// </summary>
     public decimal GetCompanyAssetValue(Guid companyId)
     {
         if (!CompaniesById.ContainsKey(companyId))
@@ -176,6 +180,10 @@ public sealed partial class TickContext
 
         return result;
     }
+
+    /// <summary>Reads a company from an asset-value snapshot, computing it live if the company is not in the snapshot.</summary>
+    public decimal AssetValueOrLive(IReadOnlyDictionary<Guid, decimal> snapshot, Guid companyId)
+        => snapshot.TryGetValue(companyId, out var value) ? value : GetCompanyAssetValue(companyId);
 
     private decimal ComputeAssetValue(Guid companyId, IReadOnlyCollection<Building> companyBuildings)
     {

@@ -108,4 +108,17 @@ public sealed class TickContextAssetValueTests(Xunit.Abstractions.ITestOutputHel
         Assert.True(checksum > 0m);
         Assert.Equal(1_000, batch.Count);
     }
+
+    [Fact]
+    public void AssetValueOrLive_ForACompanyMissingFromTheSnapshot_FallsBackToTheLiveCalculation()
+    {
+        var context = BuildContext(companies: 2, buildingsPerCompany: 2);
+        var snapshot = context.ComputeAllCompanyAssetValues();
+        var late = context.CompaniesById.Keys.First();
+        snapshot.Remove(late); // e.g. a company that appeared after the snapshot was taken
+
+        Assert.Equal(context.GetCompanyAssetValue(late), context.AssetValueOrLive(snapshot, late));
+        var other = context.CompaniesById.Keys.Last();
+        Assert.Equal(snapshot[other], context.AssetValueOrLive(snapshot, other));
+    }
 }

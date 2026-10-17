@@ -21,6 +21,9 @@ public sealed class TickPerformanceBenchmarkTests(ITestOutputHelper output)
     /// <summary>Budget for the CI slice. Roughly 4x the measured ~0.8 s baseline so shared CI runners do not flake; it catches large regressions only. Tighten alongside the optimisation work in #608.</summary>
     private const long CiBudgetMs = 3_000;
 
+    /// <summary>Budget for the opt-in 2,000-building scale on EF InMemory (~16 s measured; not representative of PostgreSQL).</summary>
+    private const long MediumBudgetMs = 30_000;
+
     private const double Tolerance = 0.25;
 
     [Fact]
@@ -31,9 +34,10 @@ public sealed class TickPerformanceBenchmarkTests(ITestOutputHelper output)
         var scale = full
             ? TickBenchmarkScale.Full
             : string.Equals(scaleName, "medium", StringComparison.OrdinalIgnoreCase) ? TickBenchmarkScale.Medium : TickBenchmarkScale.Ci;
+        var medium = scale == TickBenchmarkScale.Medium;
         var budgetMs = long.TryParse(Environment.GetEnvironmentVariable("TICK_BENCH_BUDGET_MS"), out var overridden)
             ? overridden
-            : full ? 1_000 : CiBudgetMs;
+            : full ? 1_000 : medium ? MediumBudgetMs : CiBudgetMs;
 
         await using var factory = new ApiWebApplicationFactory();
         using var _ = factory.CreateClient(); // boots the host and database seed data

@@ -214,7 +214,7 @@ public sealed class ManufacturingPhase : ITickPhase
             var hourlyWage = CompanyEconomyCalculator.GetEffectiveHourlyWage(city, salaryMultiplier, context.GetWageIndex(city.Id));
             var overheadRate = CompanyEconomyCalculator.ComputeAdministrationOverheadRate(
                 company,
-                assetValues.GetValueOrDefault(company.Id),
+                context.AssetValueOrLive(assetValues, company.Id),
                 maxCompanyAssetValue,
                 context.CurrentTick);
 
