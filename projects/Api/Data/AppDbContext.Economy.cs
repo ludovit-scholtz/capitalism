@@ -294,7 +294,8 @@ public sealed partial class AppDbContext
             e.Property(contract => contract.TotalUndeliveredQuantity).HasPrecision(18, 4);
             e.Property(contract => contract.TotalPenaltyAmount).HasPrecision(18, 4);
             e.Property(contract => contract.CurrencyCode).HasMaxLength(8);
-            e.Property(contract => contract.Status).HasMaxLength(20);
+            // The status doubles as the concurrency token: two requests that both read Active/Pending cannot both write a transition.
+            e.Property(contract => contract.Status).HasMaxLength(20).IsConcurrencyToken();
             e.HasOne(contract => contract.SellerCompany).WithMany().HasForeignKey(contract => contract.SellerCompanyId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(contract => contract.BuyerCompany).WithMany().HasForeignKey(contract => contract.BuyerCompanyId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(contract => contract.SellerBuildingUnit).WithMany().HasForeignKey(contract => contract.SellerBuildingUnitId).OnDelete(DeleteBehavior.Restrict);
