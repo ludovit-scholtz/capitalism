@@ -1448,6 +1448,8 @@ export type MockState = {
   } | null
   /** Mock marketOverview data returned by the marketOverview query. Keyed by cityId, or use '__all__' for all-city results. */
   marketOverviewByCityId: Record<string, MockMarketDemandSummary | null>
+  /** Overrides for the cityLaborMarkets query, keyed by city id (rows default to a calm, fully staffed market). */
+  cityLaborMarketOverrides: Record<string, Record<string, unknown>>
   /** Mock marketPriceHistory data, keyed by productTypeId. Returns an empty array when not set. */
   marketPriceHistoryByProductId: Record<string, MockMarketPriceHistoryPoint[]>
   /** Mock competitorQualityIntelligence data, keyed by `${cityId}:${productTypeId}`. Returns an empty array when not set. */
@@ -3362,6 +3364,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     marketReports: [],
     supplyChainData: {},
     marketOverviewByCityId: {},
+    cityLaborMarketOverrides: {},
     marketPriceHistoryByProductId: {},
     competitorIntelligenceByKey: {},
     npcCompanies: [],
@@ -10008,6 +10011,35 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         createdAtUtc: new Date().toISOString(),
       })
       return routeJson({ resumeNpcCompany: { ...npc } })
+    }
+
+    if (query.includes('cityLaborMarkets')) {
+      const companyId = body?.variables?.companyId ?? null
+      const company = companyId ? state.players.flatMap((p) => p.companies).find((c) => c.id === companyId) : null
+      if (companyId && !company) return routeJsonError("You don't have permission to perform this action.", 'FORBIDDEN')
+      return routeJson({
+        cityLaborMarkets: state.cities.map((city) => {
+          const row = {
+            cityId: city.id,
+            cityName: city.name,
+            population: city.population,
+            laborPool: 1000,
+            laborDemand: 400,
+            utilization: 0.4,
+            unemploymentRate: 0.6,
+            wageIndex: 1,
+            staffingFillRate: 1,
+            averageSalaryMultiplier: 1,
+            updatedAtTick: state.gameState.currentTick,
+            yourSalaryMultiplier: company ? 1 : null,
+            payRatio: company ? 1 : null,
+            strikeProne: company ? false : null,
+            affectedBuildings: [],
+            ...state.cityLaborMarketOverrides[city.id],
+          }
+          return company ? row : { ...row, yourSalaryMultiplier: null, payRatio: null, strikeProne: null, affectedBuildings: [] }
+        }),
+      })
     }
 
     if (query.includes('tickPhaseTimings')) {

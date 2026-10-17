@@ -25,6 +25,8 @@ public sealed partial class Query
         var ct = httpContextAccessor.HttpContext.RequestAborted;
 
         Dictionary<Guid, decimal>? salaryByCity = null;
+        Dictionary<Guid, List<AffectedBuildingItem>>? affectedByCity = null;
+        var currentTick = await db.GameStates.AsNoTracking().Select(state => state.CurrentTick).FirstOrDefaultAsync(ct);
         if (companyId.HasValue)
         {
             var ownerPlayerId = await db.Companies
@@ -40,6 +42,28 @@ public sealed partial class Query
                     companyId.Value,
                     ownerPlayerId is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
             }
+
+            affectedByCity = (await db.Buildings
+                    .AsNoTracking()
+                    .Where(building => building.CompanyId == companyId.Value
+                        && building.DestroyedAtUtc == null
+                        && (building.StaffingFactor < 1m || building.StrikeUntilTick != null))
+                    .Select(building => new { building.Id, building.CityId, building.Name, building.StaffingFactor, building.StrikeUntilTick })
+                    .ToListAsync(ct))
+                .GroupBy(building => building.CityId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group
+                        .OrderBy(building => building.Name)
+                        .Select(building => new AffectedBuildingItem
+                        {
+                            BuildingId = building.Id,
+                            Name = building.Name,
+                            StaffingFactor = building.StaffingFactor,
+                            OnStrike = building.StrikeUntilTick != null && currentTick <= building.StrikeUntilTick,
+                            StrikeUntilTick = building.StrikeUntilTick,
+                        })
+                        .ToList());
 
             salaryByCity = await db.CompanyCitySalarySettings
                 .AsNoTracking()
@@ -107,6 +131,7 @@ public sealed partial class Query
                     YourSalaryMultiplier = yourSalary,
                     PayRatio = payRatio,
                     StrikeProne = strikeProne,
+                    AffectedBuildings = affectedByCity?.GetValueOrDefault(row.CityId) ?? [],
                 };
             })
             .ToList();
@@ -130,4 +155,17 @@ public sealed class CityLaborMarketItem
     public decimal? YourSalaryMultiplier { get; set; }
     public decimal? PayRatio { get; set; }
     public bool? StrikeProne { get; set; }
+
+    /// <summary>The caller company's buildings in this city that are on strike or short of staff (empty without a company).</summary>
+    public List<AffectedBuildingItem> AffectedBuildings { get; set; } = [];
+}
+
+/// <summary>A building held back by the labor market.</summary>
+public sealed class AffectedBuildingItem
+{
+    public Guid BuildingId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public decimal StaffingFactor { get; set; }
+    public bool OnStrike { get; set; }
+    public long? StrikeUntilTick { get; set; }
 }

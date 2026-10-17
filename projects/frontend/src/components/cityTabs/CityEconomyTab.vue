@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import EconomyCycleWidget from '@/components/dashboard/EconomyCycleWidget.vue'
 import CityPowerPlanningSection from '@/components/cityMap/CityPowerPlanningSection.vue'
 import HealthIndicatorsPanel from '@/components/cityMap/HealthIndicatorsPanel.vue'
+import CityLaborMarketSection from '@/components/cityMap/CityLaborMarketSection.vue'
 import type { City, EconomicCycleView, MarketEventView, EconomicCycleHistoryPoint, CityWeatherForecast, CityPowerBalance, CityEconomicReportResult } from '@/types'
 
 const { t } = useI18n()
@@ -30,6 +31,8 @@ const cityHeading = computed(() => t('cityMap.tabs.economyHeading', { city: prop
     <EconomyCycleWidget :economic-cycle="economyCycle" :active-market-events="activeMarketEvents" :economic-history="economicHistory" />
 
     <CityPowerPlanningSection :city-weather="cityWeather" :city-power-balance="cityPowerBalance" />
+
+    <CityLaborMarketSection :city-id="city.id" :city-name="city.name" />
 
     <section class="city-economic-health-section">
       <h3 class="section-heading">{{ t('cityHealth.panelTitle') }}</h3>
