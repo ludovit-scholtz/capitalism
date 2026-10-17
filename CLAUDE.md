@@ -55,7 +55,7 @@ npm run test:e2e
 
 ## Real PostgreSQL validation (opt-in locally, on in CI)
 
-EF InMemory cannot judge migrations, defaults or concurrency tokens. `projects/Api.Tests/PostgresMigrationValidationTests.cs` upgrades a database from the schema before the labor-market work through the real `AppDbInitializer`, checks the new tables/columns/defaults and idempotent restarts, and proves the supply-contract concurrency token has a single winner. It is skipped unless `CAPITALISM_TEST_POSTGRES` holds a connection string without a database name; CI (`.github/workflows/postgres-validation.yml`) provides a PostgreSQL service. Locally: `docker run -d --name cap-pg -e POSTGRES_PASSWORD=capdev -p 15432:5432 postgres:16-alpine` (some Windows port ranges are reserved, e.g. 55432 fails to bind), then `CAPITALISM_TEST_POSTGRES="Host=localhost;Port=15432;Username=postgres;Password=capdev" dotnet test projects/Api.Tests --filter FullyQualifiedName~PostgresMigrationValidationTests`. Add a test there whenever a migration changes existing columns or adds defaults.
+EF InMemory cannot judge migrations, defaults or concurrency tokens, so `PostgresMigrationValidationTests` (upgrade from the previous schema through the real `AppDbInitializer`, idempotent restart, concurrency-token race) runs against real PostgreSQL in CI (`.github/workflows/postgres-validation.yml`). Locally it is skipped unless `CAPITALISM_TEST_POSTGRES` is set (see `PostgresFactAttribute`), e.g. `docker run -d --name cap-pg -e POSTGRES_PASSWORD=capdev -p 15432:5432 postgres:16-alpine`. Add a test there whenever a migration changes existing columns or adds defaults.
 
 ## 500-line file limit is enforced in CI
 

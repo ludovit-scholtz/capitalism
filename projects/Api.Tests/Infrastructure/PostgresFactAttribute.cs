@@ -9,13 +9,22 @@ public sealed class PostgresFactAttribute : FactAttribute
 {
     public const string EnvironmentVariable = "CAPITALISM_TEST_POSTGRES";
 
+    /// <summary>
+    /// When set to "true" (CI), a missing connection string is a failure instead of a skip, so a misspelled variable can never turn
+    /// the PostgreSQL job green without validating anything.
+    /// </summary>
+    public const string RequiredEnvironmentVariable = "CAPITALISM_TEST_POSTGRES_REQUIRED";
+
     public PostgresFactAttribute()
     {
-        if (string.IsNullOrWhiteSpace(ConnectionString))
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(EnvironmentVariable))
+            && !string.Equals(Environment.GetEnvironmentVariable(RequiredEnvironmentVariable), "true", StringComparison.OrdinalIgnoreCase))
         {
             Skip = $"Set {EnvironmentVariable} to a PostgreSQL connection string (no database name) to run PostgreSQL validation.";
         }
     }
 
-    public static string? ConnectionString => Environment.GetEnvironmentVariable(EnvironmentVariable);
+    public static string ConnectionString
+        => Environment.GetEnvironmentVariable(EnvironmentVariable)
+           ?? throw new InvalidOperationException($"{EnvironmentVariable} is required for the PostgreSQL validation tests but is not set.");
 }

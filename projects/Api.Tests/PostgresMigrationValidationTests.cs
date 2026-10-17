@@ -20,25 +20,21 @@ namespace Api.Tests;
 /// </summary>
 public sealed class PostgresMigrationValidationTests
 {
-    /// <summary>The last migration before the labor market work (#603).</summary>
-    private const string PreviousSchemaMigration = "20260516034805_AddSupplyContracts";
+    /// <summary>The first migration of the labor market work (#603); the schema before it is the "previous" schema.</summary>
+    private const string FirstLaborMarketMigrationSuffix = "_AddCityLaborMarket";
 
     private static string NewDatabaseName() => $"cap_migtest_{Guid.NewGuid():N}";
 
     private static string ConnectionStringFor(string database)
-        => new NpgsqlConnectionStringBuilder(PostgresFactAttribute.ConnectionString!) { Database = database, Pooling = false }.ConnectionString;
+        => new NpgsqlConnectionStringBuilder(PostgresFactAttribute.ConnectionString) { Database = database, Pooling = false }.ConnectionString;
 
     private static AppDbContext CreateContext(string database)
         => new(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(ConnectionStringFor(database)).Options);
 
     private static async Task DropDatabaseAsync(string database)
     {
-        await using var admin = new NpgsqlConnection(new NpgsqlConnectionStringBuilder(PostgresFactAttribute.ConnectionString!) { Database = "postgres", Pooling = false }.ConnectionString);
-        await admin.OpenAsync();
-        NpgsqlConnection.ClearAllPools();
-        await using var command = admin.CreateCommand();
-        command.CommandText = $"DROP DATABASE IF EXISTS \"{database}\" WITH (FORCE)";
-        await command.ExecuteNonQueryAsync();
+        await using var context = CreateContext(database);
+        await context.Database.EnsureDeletedAsync();
     }
 
     private static async Task<DataTable> ColumnsAsync(string database, string table)
@@ -66,8 +62,11 @@ public sealed class PostgresMigrationValidationTests
     private static async Task MigrateToPreviousSchemaAsync(string database)
     {
         await using var context = CreateContext(database);
+        var migrations = context.Database.GetMigrations().ToList();
+        var firstLaborMarket = migrations.FindIndex(id => id.EndsWith(FirstLaborMarketMigrationSuffix, StringComparison.Ordinal));
+        Assert.True(firstLaborMarket > 0, $"Migration *{FirstLaborMarketMigrationSuffix} not found; update the previous-schema lookup if migrations were renamed or squashed.");
         await context.GetService<IRelationalDatabaseCreator>().CreateAsync();
-        await context.GetService<IMigrator>().MigrateAsync(PreviousSchemaMigration);
+        await context.GetService<IMigrator>().MigrateAsync(migrations[firstLaborMarket - 1]);
     }
 
     private static async Task InitializeAsync(string database)
@@ -92,7 +91,8 @@ public sealed class PostgresMigrationValidationTests
             Assert.True(await TableExistsAsync(database, "CityLaborMarkets"));
             var columns = (await ColumnsAsync(database, "Buildings")).Rows.Cast<DataRow>().ToDictionary(r => (string)r["column_name"]);
             Assert.Equal("NO", columns["StaffingFactor"]["is_nullable"]);
-            Assert.StartsWith("1", (string)columns["StaffingFactor"]["column_default"]); // existing rows are backfilled with 1
+            // NOT NULL with default 1: PostgreSQL backfills every pre-existing building row with 1 when the column is added.
+            Assert.StartsWith("1", (string)columns["StaffingFactor"]["column_default"]);
             Assert.Equal("YES", columns["StrikeStartedAtTick"]["is_nullable"]);
             Assert.Equal("YES", columns["StrikeUntilTick"]["is_nullable"]);
 
@@ -105,7 +105,7 @@ public sealed class PostgresMigrationValidationTests
                 Assert.Null(building.StrikeUntilTick);
             });
 
-            var city = await verify.Cities.FirstAsync();
+            var city = await verify.Cities.OrderBy(c => c.Name).FirstAsync();
             verify.CityLaborMarkets.Add(new CityLaborMarket { CityId = city.Id, LaborPool = 10m, WageIndex = 1.2m, UpdatedAtTick = 3 });
             await verify.SaveChangesAsync();
             Assert.Equal(1.2m, (await verify.CityLaborMarkets.AsNoTracking().SingleAsync(m => m.CityId == city.Id)).WageIndex);
@@ -124,12 +124,16 @@ public sealed class PostgresMigrationValidationTests
         {
             await MigrateToPreviousSchemaAsync(database);
             await InitializeAsync(database);
-            var cityCount = await CountAsync(database, c => c.Cities.CountAsync());
+            int cityCount;
+            await using (var before = CreateContext(database))
+            {
+                cityCount = await before.Cities.CountAsync();
+            }
 
             await InitializeAsync(database); // "restart"
 
-            Assert.Equal(cityCount, await CountAsync(database, c => c.Cities.CountAsync()));
             await using var verify = CreateContext(database);
+            Assert.Equal(cityCount, await verify.Cities.CountAsync());
             Assert.Empty(await verify.Database.GetPendingMigrationsAsync());
         }
         finally
@@ -149,8 +153,8 @@ public sealed class PostgresMigrationValidationTests
             Guid contractId;
             await using (var seed = CreateContext(database))
             {
-                var city = await seed.Cities.FirstAsync();
-                var resource = await seed.ResourceTypes.FirstAsync();
+                var city = await seed.Cities.OrderBy(c => c.Name).FirstAsync();
+                var resource = await seed.ResourceTypes.OrderBy(r => r.Name).FirstAsync();
                 var sellerPlayer = new Player { Id = Guid.NewGuid(), Email = "seller@pg.test", DisplayName = "S", PasswordHash = "x" };
                 var buyerPlayer = new Player { Id = Guid.NewGuid(), Email = "buyer@pg.test", DisplayName = "B", PasswordHash = "x" };
                 var seller = new Company { Id = Guid.NewGuid(), PlayerId = sellerPlayer.Id, Name = "Seller" };
@@ -172,28 +176,46 @@ public sealed class PostgresMigrationValidationTests
                 contractId = contract.Id;
             }
 
-            await using var writerA = CreateContext(database);
-            await using var writerB = CreateContext(database);
-            var a = await writerA.SupplyContracts.FirstAsync(c => c.Id == contractId);
-            var b = await writerB.SupplyContracts.FirstAsync(c => c.Id == contractId);
-            a.Status = SupplyContractStatus.Active;
-            b.Status = SupplyContractStatus.Cancelled;
+            // Several rounds; in each, two writers that both read the contract as Pending are released at the same moment.
+            for (var round = 0; round < 5; round++)
+            {
+                await using var writerA = CreateContext(database);
+                await using var writerB = CreateContext(database);
+                var a = await writerA.SupplyContracts.FirstAsync(c => c.Id == contractId);
+                var b = await writerB.SupplyContracts.FirstAsync(c => c.Id == contractId);
+                a.Status = a.Status == SupplyContractStatus.Pending ? SupplyContractStatus.Active : SupplyContractStatus.Pending;
+                b.Status = SupplyContractStatus.Cancelled;
+                var gate = new TaskCompletionSource();
 
-            await writerA.SaveChangesAsync();
-            await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => writerB.SaveChangesAsync());
+                async Task<bool> SaveAsync(AppDbContext context)
+                {
+                    await gate.Task;
+                    try
+                    {
+                        await context.SaveChangesAsync();
+                        return true;
+                    }
+                    catch (DbUpdateConcurrencyException)
+                    {
+                        return false;
+                    }
+                }
 
-            await using var verify = CreateContext(database);
-            Assert.Equal(SupplyContractStatus.Active, (await verify.SupplyContracts.AsNoTracking().FirstAsync(c => c.Id == contractId)).Status);
+                var saves = new[] { SaveAsync(writerA), SaveAsync(writerB) };
+                gate.SetResult();
+                var results = await Task.WhenAll(saves);
+
+                Assert.Equal(1, results.Count(saved => saved));
+                // Put the contract back for the next round regardless of who won.
+                await using var reset = CreateContext(database);
+                var contract = await reset.SupplyContracts.FirstAsync(c => c.Id == contractId);
+                contract.Status = SupplyContractStatus.Pending;
+                await reset.SaveChangesAsync();
+            }
         }
         finally
         {
             await DropDatabaseAsync(database);
         }
-    }
-
-    private static async Task<T> CountAsync<T>(string database, Func<AppDbContext, Task<T>> query)
-    {
-        await using var context = CreateContext(database);
-        return await query(context);
     }
 }

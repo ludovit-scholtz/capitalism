@@ -19,6 +19,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: postgres-validation-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   postgres-validation:
     name: PostgreSQL migration and concurrency validation
@@ -37,6 +41,8 @@ jobs:
           --health-retries 12
     env:
       CAPITALISM_TEST_POSTGRES: Host=localhost;Port=5432;Username=postgres;Password=ci-only-password
+      # A missing connection string must fail the tests, never skip them.
+      CAPITALISM_TEST_POSTGRES_REQUIRED: 'true'
     steps:
       - uses: actions/checkout@v5
 
@@ -45,4 +51,8 @@ jobs:
           dotnet-version: 10.x
 
       - name: Run PostgreSQL validation tests (upgrade path, idempotent restart, concurrency token)
-        run: dotnet test projects/Api.Tests/Api.Tests.csproj --configuration Release --filter "FullyQualifiedName~PostgresMigrationValidationTests" --logger "console;verbosity=normal"
+        run: |
+          dotnet test projects/Api.Tests/Api.Tests.csproj --configuration Release --filter "FullyQualifiedName~PostgresMigrationValidationTests" --logger "console;verbosity=normal" | tee postgres-validation.log
+          # Guard against a green job that ran nothing (renamed class, filter matching zero tests, tests skipped).
+          grep -Eq "Passed!.*Passed:\s+[1-9]" postgres-validation.log
+          ! grep -Eq "Skipped:\s+[1-9]" postgres-validation.log
