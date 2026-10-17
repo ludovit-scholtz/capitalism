@@ -45,7 +45,7 @@ jobs:
             }
 
             const body = [
-              `Create \`/audits/${year}-W${paddedWeek}-security-audit.md\` and review the current exploit/fairness surface.`,
+              `Create \`audits/security-audit-${year}-W${paddedWeek}.md\` (see \`audits/README.md\` for the format) and review the current exploit/fairness surface.`,
               '',
               'Checklist:',
               '- Review new GraphQL queries and mutations for ownership and authorization gaps',
