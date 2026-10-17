@@ -102,7 +102,7 @@ async function mockOidcTokenExchange(page: Parameters<typeof test>[0]['page'], i
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ id_token: idToken, access_token: idToken, expires_in: 3600 }),
+      body: JSON.stringify({ idToken, accessToken: idToken, expiresIn: 3600 }),
     })
   })
 }
