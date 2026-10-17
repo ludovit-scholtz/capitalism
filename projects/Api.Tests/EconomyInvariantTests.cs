@@ -39,6 +39,7 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
         }
 
         var contracts = new List<(Guid Id, int SellerIdx, int BuyerIdx)>();
+        await ScriptedAcceptAndBuyerCancelAsync(client, world, rng);
         var applied = new Dictionary<string, int>();
         for (var step = 1; step <= Steps; step++)
         {
@@ -73,6 +74,22 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
         output.WriteLine($"Applied actions: {string.Join(", ", applied.Select(kv => $"{kv.Key}={kv.Value}"))}");
         Assert.True(applied.GetValueOrDefault("transfer") > 0, $"No transfer succeeded (seed={seed}).");
         Assert.True(applied.GetValueOrDefault("propose") > 0, $"No contract proposal succeeded (seed={seed}).");
+    }
+
+    /// <summary>
+    /// Deterministically exercises the buyer early-cancellation fee path (propose, accept, buyer cancels)
+    /// so the invariant run always covers money moved by a contract cancellation.
+    /// </summary>
+    private static async Task ScriptedAcceptAndBuyerCancelAsync(HttpClient client, World world, Random rng)
+    {
+        var contracts = new List<(Guid Id, int SellerIdx, int BuyerIdx)>();
+        Assert.True(await RandomProposeAsync(client, world, rng, contracts), "Scripted proposal failed.");
+        var (id, seller, buyer) = contracts[0];
+        var accept = await TestHelpers.ExecuteGraphQlAsync(client, "mutation($id: UUID!) { acceptSupplyContract(id: $id) { success } }", new { id }, world.Players[buyer].Token);
+        Assert.False(accept.TryGetProperty("errors", out var acceptErrors), $"Scripted accept failed: {acceptErrors}");
+        var cancel = await TestHelpers.ExecuteGraphQlAsync(client, "mutation($id: UUID!) { cancelSupplyContract(id: $id) { success } }", new { id }, world.Players[buyer].Token);
+        Assert.False(cancel.TryGetProperty("errors", out var cancelErrors), $"Scripted buyer cancel failed: {cancelErrors}");
+        Assert.NotEqual(seller, buyer);
     }
 
     [Fact]

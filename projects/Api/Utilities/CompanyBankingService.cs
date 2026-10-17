@@ -38,6 +38,12 @@ public static class CompanyBankingService
         return GetCandidateAccounts(accounts, null, excludeAccountId).FirstOrDefault();
     }
 
+    /// <summary>Accounts that can pay in the given currency, in the order <see cref="TryDebit"/> drains them.</summary>
+    public static IReadOnlyList<BankAccount> GetCandidateAccountsForPayment(
+        IEnumerable<BankAccount> accounts,
+        string currencyCode)
+        => GetCandidateAccounts(accounts, currencyCode, null).ToList();
+
     public static bool TryDebit(
         IEnumerable<BankAccount> accounts,
         decimal amount,

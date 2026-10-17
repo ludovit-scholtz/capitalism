@@ -102,6 +102,7 @@ public sealed class NpcCompanyPhase : ITickPhase
         }
 
         account.Balance -= matchingLot.Price;
+        account.ConcurrencyToken = Guid.NewGuid();
         var newBuilding = new Building
         {
             Id = Guid.NewGuid(),
