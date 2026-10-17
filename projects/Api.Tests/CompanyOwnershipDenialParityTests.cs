@@ -47,6 +47,45 @@ public sealed class CompanyOwnershipDenialParityTests
         Assert.Equal(foreignError.GetProperty("message").GetString(), missingError.GetProperty("message").GetString());
     }
 
+    [Fact]
+    public async Task Owner_CanStillCreateAccountAndReadStatementForOwnCompany()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+        var actorToken = await RegisterAsync(client, $"own-ok-actor-{Guid.NewGuid():N}@example.com");
+        var ownerToken = await RegisterAsync(client, $"own-ok-owner-{Guid.NewGuid():N}@example.com");
+        var world = await SeedAsync(factory, await GetMeIdAsync(client, ownerToken), await GetMeIdAsync(client, actorToken));
+
+        var created = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            "mutation($input: CreateCompanyBankAccountInput!) { createCompanyBankAccount(input: $input) { __typename } }",
+            new { input = new { companyId = world.ActorCompanyId, currencyCode = "EUR" } },
+            actorToken);
+        var statement = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            "query($companyId: UUID) { bankStatement(companyId: $companyId) { __typename } }",
+            new { companyId = world.ActorCompanyId },
+            actorToken);
+
+        Assert.False(created.TryGetProperty("errors", out var createErrors), $"createCompanyBankAccount failed: {createErrors}");
+        Assert.False(statement.TryGetProperty("errors", out var statementErrors), $"bankStatement failed: {statementErrors}");
+    }
+
+    [Fact]
+    public async Task Unauthenticated_IsRejected()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var result = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            "mutation($input: CreateCompanyBankAccountInput!) { createCompanyBankAccount(input: $input) { __typename } }",
+            new { input = new { companyId = Guid.NewGuid(), currencyCode = "EUR" } });
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.True(errors.GetArrayLength() > 0);
+    }
+
     private static Task<JsonElement> Execute(HttpClient client, string operation, World w, bool foreignCompany, string token)
     {
         var companyId = foreignCompany ? w.ForeignCompanyId : Guid.NewGuid();
@@ -128,8 +167,8 @@ public sealed class CompanyOwnershipDenialParityTests
         };
         db.Buildings.AddRange(listed, actorBuilding);
         await db.SaveChangesAsync();
-        return new World(foreignCompany.Id, foreignAccount.Id, listed.Id, actorBuilding.Id);
+        return new World(foreignCompany.Id, foreignAccount.Id, listed.Id, actorBuilding.Id, actorCompany.Id);
     }
 
-    private sealed record World(Guid ForeignCompanyId, Guid ForeignAccountId, Guid ListedBuildingId, Guid ActorBuildingId);
+    private sealed record World(Guid ForeignCompanyId, Guid ForeignAccountId, Guid ListedBuildingId, Guid ActorBuildingId, Guid ActorCompanyId);
 }

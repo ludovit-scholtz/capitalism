@@ -169,7 +169,7 @@ public sealed partial class Mutation
                 userId,
                 "bank_account",
                 input.BankAccountId,
-                account is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
+                await BankAccountDenialClassifier.ClassifyAsync(db, input.BankAccountId, userId));
         }
 
         var cityCurrency = building.City?.CurrencyCode ?? "EUR";

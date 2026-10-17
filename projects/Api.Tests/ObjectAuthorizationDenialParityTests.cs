@@ -55,6 +55,16 @@ public sealed class ObjectAuthorizationDenialParityTests
     }
 
     [Fact]
+    public void Deny_UnknownReason_FailsSafeToWarning()
+    {
+        var (service, logger) = Create();
+
+        service.Deny(Guid.NewGuid(), "building", Guid.NewGuid(), "some_future_reason");
+
+        Assert.Equal(LogLevel.Warning, Assert.Single(logger.Entries).Level);
+    }
+
+    [Fact]
     public async Task RequireOwnedAsync_MissingAndForeignObjectsYieldSameClientError()
     {
         var (service, logger) = Create();

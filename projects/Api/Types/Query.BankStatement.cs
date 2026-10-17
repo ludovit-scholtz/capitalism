@@ -57,7 +57,13 @@ public sealed partial class Query
 
         if (!companyId.HasValue)
         {
-            throw objectAuthorization.Deny(userId, "company", Guid.Empty, ObjectAuthorizationService.NotFoundReason);
+            throw accountId.HasValue
+                ? objectAuthorization.Deny(
+                    userId,
+                    "bank_account",
+                    accountId.Value,
+                    await BankAccountDenialClassifier.ClassifyAsync(db, accountId.Value, userId))
+                : objectAuthorization.Deny(userId, "company", Guid.Empty, ObjectAuthorizationService.NotFoundReason);
         }
 
         var company = await db.Companies
