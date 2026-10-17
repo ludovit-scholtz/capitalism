@@ -79,7 +79,9 @@ async function chooseOnboardingRouteChoices(page: Page, { industry, product, cit
       .or(page.getByRole('heading', { name: 'Choose Your First Product' }))
       .or(page.getByRole('heading', { name: 'Choose Your IPO Plan' }))
       .or(page.getByRole('heading', { name: 'Choose Your City' }))
-      .or(page.getByRole('heading', { name: 'Choose Your Industry' })),
+      .or(page.getByRole('heading', { name: 'Choose Your Industry' }))
+      .or(page.getByRole('heading', { name: 'Choose Your First Shop Lot' }))
+      .first(),
   ).toBeVisible()
   if (await factoryLotHeading.isVisible()) {
     return
