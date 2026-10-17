@@ -66,7 +66,7 @@ public sealed class TickPerformanceBenchmarkTests(ITestOutputHelper output)
         Assert.True(
             TickBudget.IsWithinBudget((long)summary.AverageTotalMs, budgetMs, Tolerance),
             $"Average tick {summary.AverageTotalMs:F0} ms exceeds budget {budgetMs} ms (+{Tolerance:P0}). Slowest phases: "
-            + TickBudget.DescribeOffenders(summary.Phases.ToDictionary(p => p.Name, p => (long)p.AverageMs), budgetMs / 10));
+            + TickBudget.DescribeOffenders(summary.Phases.Where(p => !TickProcessor.IsInfrastructureEntry(p.Name)).ToDictionary(p => p.Name, p => (long)p.AverageMs), budgetMs / 10));
     }
 
     private static async Task RunTickAsync(ApiWebApplicationFactory factory, TickTimingRecorder recorder)

@@ -62,7 +62,7 @@ public sealed class TickTimingRecorder(int capacity = 60, long phaseBudgetMs = T
                     last.PhaseMs.GetValueOrDefault(name),
                     average,
                     values.Max(),
-                    average > phaseBudgetMs);
+                    average > phaseBudgetMs && !TickProcessor.IsInfrastructureEntry(name));
             })
             .OrderByDescending(p => p.AverageMs)
             .ThenBy(p => p.Name, StringComparer.Ordinal)
