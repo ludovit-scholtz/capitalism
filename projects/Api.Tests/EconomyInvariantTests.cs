@@ -15,7 +15,7 @@ namespace Api.Tests;
 /// and asserts money conservation, no negative balances, matched ledger entries and single building owners.
 /// Reproduce a failure by re-running the Theory with the logged seed (see README-economy-invariants.md).
 /// </summary>
-public sealed class EconomyInvariantTests(ITestOutputHelper output)
+public sealed partial class EconomyInvariantTests(ITestOutputHelper output)
 {
     private const int PlayerCount = 4;
     private const int Steps = 40;
@@ -45,10 +45,12 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
         Assert.True(scriptedSaleError is null, $"Scripted building sale failed (seed={seed}): {scriptedSaleError}");
         var scriptedLoanError = await RandomLoanAsync(client, world, rng);
         Assert.True(scriptedLoanError is null, $"Scripted loan failed (seed={seed}): {scriptedLoanError}");
+        var scriptedStockError = await RandomStockTradeAsync(client, world, rng, forceBuyThenSell: true);
+        Assert.True(scriptedStockError is null, $"Scripted stock trade failed (seed={seed}): {scriptedStockError}");
         var applied = new Dictionary<string, int>();
         for (var step = 1; step <= Steps; step++)
         {
-            switch (rng.Next(8))
+            switch (rng.Next(9))
             {
                 case 0:
                 case 1:
@@ -72,6 +74,11 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
                     break;
                 case 6:
                     if (await RandomLoanAsync(client, world, rng) is null) applied["loan"] = applied.GetValueOrDefault("loan") + 1;
+                    break;
+                case 7:
+                    var stockError = await RandomStockTradeAsync(client, world, rng, forceBuyThenSell: false);
+                    Assert.True(stockError is null || stockError.StartsWith("INSUFFICIENT_", StringComparison.Ordinal), $"Unexpected stock failure (seed={seed}, step={step}): {stockError}");
+                    if (stockError is null) applied["stock"] = applied.GetValueOrDefault("stock") + 1;
                     break;
                 default:
                     await TickAsync(factory);
@@ -452,6 +459,7 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
             var accountA = NewAccount(company.Id, city.CurrencyCode, 1_000_000m);
             var accountB = NewAccount(company.Id, city.CurrencyCode, 500_000m);
             var accountC = NewAccount(company.Id, foreignCurrency, 0m);
+            var accountUsd = NewAccount(company.Id, "USD", 200_000m); // stock trades settle in USD only
             db.Companies.Add(company);
             var player = await db.Players.FirstAsync(pl => pl.Id == tokens[i].PlayerId);
             player.ActiveAccountType = AccountContextType.Company;
@@ -463,8 +471,8 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
                 Id = Guid.NewGuid(), BuildingId = building.Id, BuildingUnitId = sales.Id, ResourceTypeId = resource.Id,
                 Quantity = 2000m, Quality = 0.7m, SourcingCostTotal = 6000m
             });
-            db.BankAccounts.AddRange(accountA, accountB, accountC);
-            players.Add(new PlayerSlot(tokens[i].Token, company.Id, sales.Id, accountA.Id, accountB.Id, accountC.Id, [building.Id]));
+            db.BankAccounts.AddRange(accountA, accountB, accountC, accountUsd);
+            players.Add(new PlayerSlot(tokens[i].Token, company.Id, sales.Id, accountA.Id, accountB.Id, accountC.Id, [building.Id], accountUsd.Id));
         }
 
         await db.SaveChangesAsync();
@@ -480,7 +488,7 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
         return new World(players, resource.Id, city.CurrencyCode, foreignCurrency, bank.Id);
     }
 
-    private sealed record PlayerSlot(string Token, Guid CompanyId, Guid SalesUnitId, Guid AccountA, Guid AccountB, Guid AccountC, List<Guid> Buildings);
+    private sealed record PlayerSlot(string Token, Guid CompanyId, Guid SalesUnitId, Guid AccountA, Guid AccountB, Guid AccountC, List<Guid> Buildings, Guid AccountUsd);
 
     private sealed record World(List<PlayerSlot> Players, Guid ResourceTypeId, string CityCurrency, string ForeignCurrency, Guid BankBuildingId);
 }
