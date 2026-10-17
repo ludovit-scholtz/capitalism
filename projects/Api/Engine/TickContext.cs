@@ -177,6 +177,10 @@ public sealed partial class TickContext
 
     // ── Helpers ──
 
+    /// <summary>Wage pressure of the city's labor market as computed at the end of the previous tick (1 when none yet).</summary>
+    public decimal GetWageIndex(Guid cityId)
+        => LaborMarketsByCity.TryGetValue(cityId, out var market) ? market.WageIndex : 1m;
+
     /// <summary>
     /// Returns the operational efficiency factor for a building based on its PowerStatus.
     /// <list type="bullet">
@@ -185,10 +189,6 @@ public sealed partial class TickContext
     /// <item>OFFLINE → 0.0 (completely stopped)</item>
     /// </list>
     /// </summary>
-    /// <summary>Wage pressure of the city's labor market as computed at the end of the previous tick (1 when none yet).</summary>
-    public decimal GetWageIndex(Guid cityId)
-        => LaborMarketsByCity.TryGetValue(cityId, out var market) ? market.WageIndex : 1m;
-
     public static decimal GetPowerEfficiency(Building building) => building.PowerStatus switch
     {
         Data.Entities.PowerStatus.Constrained => GameConstants.ConstrainedEfficiencyFactor,

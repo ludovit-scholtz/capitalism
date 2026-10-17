@@ -21,9 +21,9 @@ public sealed class LaborMarketPhase : ITickPhase
 
         foreach (var building in context.BuildingsById.Values)
         {
-            if (building.IsSuspendedForFunds
-                || !context.UnitsByBuilding.TryGetValue(building.Id, out var units)
-                || units.Count == 0)
+            // Buildings suspended for funds still want workers: dropping them would lower wages and let them resume,
+            // which would raise wages again next tick.
+            if (!context.UnitsByBuilding.TryGetValue(building.Id, out var units) || units.Count == 0)
             {
                 continue;
             }
@@ -40,7 +40,9 @@ public sealed class LaborMarketPhase : ITickPhase
             var hours = 0m;
             foreach (var unit in units)
             {
-                hours += CompanyEconomyCalculator.GetBaseUnitLaborHours(unit.UnitType, unit.Level) * efficiency;
+                // Same discount OperatingCostPhase applies to units under upgrade, so demand matches billed hours.
+                var upgradeMultiplier = context.UnitsUnderUpgrade.Contains(unit.Id) ? 0.5m : 1m;
+                hours += CompanyEconomyCalculator.GetBaseUnitLaborHours(unit.UnitType, unit.Level) * efficiency * upgradeMultiplier;
             }
 
             if (hours <= 0m)

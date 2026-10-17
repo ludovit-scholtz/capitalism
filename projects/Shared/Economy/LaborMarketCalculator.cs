@@ -36,6 +36,9 @@ public static class LaborMarketCalculator
     /// <summary>Above this utilization employers compete for scarce workers and wages rise.</summary>
     public const decimal TightUtilization = 0.85m;
 
+    /// <summary>Upper bound for stored utilization so absurd demand/pool ratios cannot overflow the database column.</summary>
+    public const decimal MaxUtilization = 100m;
+
     public const decimal MinWageIndex = 0.90m;
     public const decimal MaxWageIndex = 1.50m;
 
@@ -60,7 +63,7 @@ public static class LaborMarketCalculator
                 : new LaborMarketState(0m, demand, 2m, 0m, MaxWageIndex, 0m);
         }
 
-        var utilization = decimal.Round(demand / pool, 4, MidpointRounding.AwayFromZero);
+        var utilization = decimal.Round(Math.Min(demand / pool, MaxUtilization), 4, MidpointRounding.AwayFromZero);
         var unemployment = decimal.Round(Math.Max(0m, 1m - utilization), 4, MidpointRounding.AwayFromZero);
         var fillRate = demand <= pool ? 1m : decimal.Round(pool / demand, 4, MidpointRounding.AwayFromZero);
 

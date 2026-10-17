@@ -37,6 +37,18 @@ public sealed class LaborMarketCalculatorTests
     }
 
     [Fact]
+    public void Compute_TinyPoolWithHugeDemand_CapsUtilizationSoItFitsTheColumn()
+    {
+        // 3 people -> pool of 0.00675 worker-hours; 500 hours of demand would give a utilization in the millions.
+        var state = LaborMarketCalculator.Compute(population: 3, laborDemand: 500m);
+
+        Assert.Equal(LaborMarketCalculator.MaxUtilization, state.Utilization);
+        Assert.True(state.Utilization < 999_999m);
+        Assert.Equal(LaborMarketCalculator.MaxWageIndex, state.WageIndex);
+        Assert.InRange(state.StaffingFillRate, 0m, 0.0001m);
+    }
+
+    [Fact]
     public void Compute_IdleCity_HasHighUnemploymentAndSlightlyLowerWages()
     {
         var pool = LaborMarketCalculator.ComputeLaborPool(1_000_000);

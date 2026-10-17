@@ -29,9 +29,6 @@ public static class CompanyEconomyCalculator
         return ClampSalaryMultiplier(configured?.SalaryMultiplier ?? DefaultSalaryMultiplier);
     }
 
-    public static decimal GetEffectiveHourlyWage(City city, decimal salaryMultiplier)
-        => GetEffectiveHourlyWage(city, salaryMultiplier, 1m);
-
     /// <summary>
     /// Hourly wage including the city's labor market wage pressure (<paramref name="wageIndex"/>, 1 = neutral).
     /// </summary>

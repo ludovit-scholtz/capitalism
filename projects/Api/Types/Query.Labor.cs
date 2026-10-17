@@ -47,24 +47,35 @@ public sealed partial class Query
                 .ToDictionaryAsync(setting => setting.CityId, setting => setting.SalaryMultiplier, ct);
         }
 
-        var rows = await db.CityLaborMarkets
+        var markets = await db.CityLaborMarkets
             .AsNoTracking()
-            .Select(market => new
-            {
-                market.CityId,
-                CityName = market.City.Name,
-                market.City.Population,
-                market.LaborPool,
-                market.LaborDemand,
-                market.Utilization,
-                market.UnemploymentRate,
-                market.WageIndex,
-                market.StaffingFillRate,
-                market.AverageSalaryMultiplier,
-                market.UpdatedAtTick,
-            })
-            .OrderBy(row => row.CityName)
+            .ToDictionaryAsync(market => market.CityId, ct);
+        var cityRows = await db.Cities
+            .AsNoTracking()
+            .OrderBy(city => city.Name)
+            .Select(city => new { city.Id, city.Name, city.Population })
             .ToListAsync(ct);
+        // Every city is listed; a city the tick has not reached yet is neutral rather than missing.
+        var rows = cityRows
+            .Select(city =>
+            {
+                markets.TryGetValue(city.Id, out var market);
+                return new
+                {
+                    CityId = city.Id,
+                    CityName = city.Name,
+                    city.Population,
+                    LaborPool = market?.LaborPool ?? Shared.Economy.LaborMarketCalculator.ComputeLaborPool(city.Population),
+                    LaborDemand = market?.LaborDemand ?? 0m,
+                    Utilization = market?.Utilization ?? 0m,
+                    UnemploymentRate = market?.UnemploymentRate ?? 0m,
+                    WageIndex = market?.WageIndex ?? 1m,
+                    StaffingFillRate = market?.StaffingFillRate ?? 1m,
+                    AverageSalaryMultiplier = market?.AverageSalaryMultiplier ?? 1m,
+                    UpdatedAtTick = market?.UpdatedAtTick ?? 0L,
+                };
+            })
+            .ToList();
 
         return rows
             .Select(row =>

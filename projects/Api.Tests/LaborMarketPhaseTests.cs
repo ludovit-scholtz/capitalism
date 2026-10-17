@@ -193,6 +193,27 @@ public sealed class LaborMarketPhaseTests
     }
 
     [Fact]
+    public async Task BuildingSuspendedForFunds_StillCountsAsLaborDemand_SoWagesDoNotOscillate()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+        var seeded = await SeedAsync(factory, manufacturingUnits: 4, population: 1_000_000);
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            // Empty account: OperatingCostPhase suspends the building for insufficient funds this tick.
+            (await db.BankAccounts.FirstAsync(a => a.Id == seeded.AccountId)).Balance = 0m;
+            await db.SaveChangesAsync();
+        }
+
+        await TickAsync(factory);
+
+        var market = await GetMarketAsync(factory, seeded.CityId);
+        Assert.NotNull(market);
+        Assert.Equal(4 * CompanyEconomyCalculator.GetBaseUnitLaborHours(UnitType.Manufacturing, 1), market.LaborDemand);
+    }
+
+    [Fact]
     public async Task WageIndexFromPreviousTick_ScalesLaborCostsWhileLedgerStaysBalanced()
     {
         await using var factory = new ApiWebApplicationFactory();

@@ -89,6 +89,27 @@ public sealed class CityLaborMarketsQueryTests
     }
 
     [Fact]
+    public async Task CitiesWithoutAStoredRow_AreStillListedWithNeutralValues()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+        var (token, _) = await RegisterAsync(client);
+
+        var result = await TestHelpers.ExecuteGraphQlAsync(client, Query, new { companyId = (Guid?)null }, token);
+
+        var rows = result.GetProperty("data").GetProperty("cityLaborMarkets").EnumerateArray().ToList();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(await db.Cities.CountAsync(), rows.Count);
+        Assert.All(rows, row =>
+        {
+            Assert.Equal(1m, row.GetProperty("wageIndex").GetDecimal());
+            Assert.Equal(1m, row.GetProperty("staffingFillRate").GetDecimal());
+            Assert.Equal(0L, row.GetProperty("updatedAtTick").GetInt64());
+        });
+    }
+
+    [Fact]
     public async Task Owner_SeesPayRatioAndStrikeRiskForOwnCompany()
     {
         await using var factory = new ApiWebApplicationFactory();
