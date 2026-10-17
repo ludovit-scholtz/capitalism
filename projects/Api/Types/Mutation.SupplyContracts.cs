@@ -337,34 +337,59 @@ public sealed partial class Mutation
 
         if (wasActive && actorCompany.Id == contract.BuyerCompanyId)
         {
-            var earlyTerminationPenalty = decimal.Round(contract.QuantityPerTick * contract.PricePerUnit * 0.1m, 4, MidpointRounding.AwayFromZero);
+            var requestedPenalty = decimal.Round(contract.QuantityPerTick * contract.PricePerUnit * 0.1m, 2, MidpointRounding.AwayFromZero);
             var sellerCompanyId = contract.SellerCompanyId;
             var buyerCompanyId = contract.BuyerCompanyId;
 
-            db.LedgerEntries.Add(new LedgerEntry
+            var buyerAccounts = await db.BankAccounts
+                .Where(account => account.CompanyId == buyerCompanyId)
+                .ToListAsync(cancellationToken);
+            var sellerAccounts = await db.BankAccounts
+                .Where(account => account.CompanyId == sellerCompanyId)
+                .ToListAsync(cancellationToken);
+
+            // The fee is real money: clamp it to what the buyer can pay and only record what actually moved.
+            var earlyTerminationPenalty = Math.Min(
+                requestedPenalty,
+                CompanyBankingService.GetAvailableBalance(buyerAccounts, contract.CurrencyCode));
+            var sellerAccount = CompanyBankingService.FindPreferredAccount(sellerAccounts, contract.CurrencyCode);
+            var buyerAccount = CompanyBankingService.FindPreferredAccount(buyerAccounts, contract.CurrencyCode);
+            if (earlyTerminationPenalty > 0m
+                && sellerAccount is not null
+                && buyerAccount is not null
+                && CompanyBankingService.TryDebit(buyerAccounts, earlyTerminationPenalty, contract.CurrencyCode)
+                && CompanyBankingService.TryCredit(sellerAccounts, earlyTerminationPenalty, contract.CurrencyCode, out _))
             {
-                Id = Guid.NewGuid(),
-                CompanyId = sellerCompanyId,
-                Category = LedgerCategory.SupplyContractPenalty,
-                Description = "Early cancellation fee received",
-                Amount = earlyTerminationPenalty,
-                RecordedAtTick = currentTick,
-                RecordedAtUtc = DateTime.UtcNow,
-                ResourceTypeId = contract.ResourceTypeId,
-                ProductTypeId = contract.ProductTypeId,
-            });
-            db.LedgerEntries.Add(new LedgerEntry
-            {
-                Id = Guid.NewGuid(),
-                CompanyId = buyerCompanyId,
-                Category = LedgerCategory.SupplyContractPenalty,
-                Description = "Early cancellation fee paid",
-                Amount = -earlyTerminationPenalty,
-                RecordedAtTick = currentTick,
-                RecordedAtUtc = DateTime.UtcNow,
-                ResourceTypeId = contract.ResourceTypeId,
-                ProductTypeId = contract.ProductTypeId,
-            });
+                contract.TotalPenaltyAmount += earlyTerminationPenalty;
+                contract.PenaltyCount++;
+
+                db.LedgerEntries.Add(new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = sellerCompanyId,
+                    BankAccountId = sellerAccount.Id,
+                    Category = LedgerCategory.SupplyContractPenalty,
+                    Description = "Early cancellation fee received",
+                    Amount = earlyTerminationPenalty,
+                    RecordedAtTick = currentTick,
+                    RecordedAtUtc = DateTime.UtcNow,
+                    ResourceTypeId = contract.ResourceTypeId,
+                    ProductTypeId = contract.ProductTypeId,
+                });
+                db.LedgerEntries.Add(new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = buyerCompanyId,
+                    BankAccountId = buyerAccount.Id,
+                    Category = LedgerCategory.SupplyContractPenalty,
+                    Description = "Early cancellation fee paid",
+                    Amount = -earlyTerminationPenalty,
+                    RecordedAtTick = currentTick,
+                    RecordedAtUtc = DateTime.UtcNow,
+                    ResourceTypeId = contract.ResourceTypeId,
+                    ProductTypeId = contract.ProductTypeId,
+                });
+            }
         }
 
         await db.SaveChangesAsync(cancellationToken);

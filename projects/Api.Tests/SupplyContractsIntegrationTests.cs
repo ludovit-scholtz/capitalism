@@ -313,6 +313,31 @@ public sealed class SupplyContractsIntegrationTests
         await processor.ProcessTickAsync();
     }
 
+    [Fact]
+    public async Task CancelSupplyContract_ByBuyerOfActiveContract_MovesEarlyCancellationFeeBetweenBankAccounts()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var sellerToken = await RegisterAndGetTokenAsync(client, $"supply-fee-seller-{Guid.NewGuid():N}@example.com");
+        var buyerToken = await RegisterAndGetTokenAsync(client, $"supply-fee-buyer-{Guid.NewGuid():N}@example.com");
+        var sellerPlayerId = await GetMeIdAsync(client, sellerToken);
+        var buyerPlayerId = await GetMeIdAsync(client, buyerToken);
+        var seeded = await SeedSupplyContextAsync(factory, sellerPlayerId, buyerPlayerId, withBuyerPurchaseUnit: true, sellerInventoryQuantity: 1000m);
+        var contractId = await ProposeContractAsync(client, sellerToken, seeded);
+        await ExecuteGraphQlAsync(client, "mutation($id: UUID!) { acceptSupplyContract(id: $id) { success } }", new { id = contractId }, buyerToken);
+
+        await ExecuteGraphQlAsync(client, "mutation($id: UUID!) { cancelSupplyContract(id: $id) { success } }", new { id = contractId }, buyerToken);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var sellerBalance = await db.BankAccounts.Where(a => a.CompanyId == seeded.SellerCompanyId).SumAsync(a => a.Balance);
+        var buyerBalance = await db.BankAccounts.Where(a => a.CompanyId == seeded.BuyerCompanyId).SumAsync(a => a.Balance);
+        // quantityPerTick 100 x price 12 x 10% = 120
+        Assert.Equal(1_000_000m + 120m, sellerBalance);
+        Assert.Equal(1_000_000m - 120m, buyerBalance);
+    }
+
     [Theory]
     [InlineData("cancelSupplyContract")]
     [InlineData("rejectSupplyContract")]

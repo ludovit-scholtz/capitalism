@@ -128,6 +128,7 @@ public sealed class NpcCompanyPhase : ITickPhase
             Id = Guid.NewGuid(),
             CompanyId = npc.CompanyId,
             BuildingId = newBuilding.Id,
+            BankAccountId = account.Id,
             Category = LedgerCategory.PropertyPurchase,
             Description = $"NPC lot purchase ({preferredType})",
             Amount = -matchingLot.Price,
