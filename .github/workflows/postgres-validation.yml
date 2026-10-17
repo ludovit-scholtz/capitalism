@@ -54,5 +54,5 @@ jobs:
         run: |
           dotnet test projects/Api.Tests/Api.Tests.csproj --configuration Release --filter "FullyQualifiedName~PostgresMigrationValidationTests" --logger "console;verbosity=normal" | tee postgres-validation.log
           # Guard against a green job that ran nothing (renamed class, filter matching zero tests, tests skipped).
-          grep -Eq "Passed!.*Passed:\s+[1-9]" postgres-validation.log
-          ! grep -Eq "Skipped:\s+[1-9]" postgres-validation.log
+          grep -Eq "^\s*Passed:\s+[1-9]" postgres-validation.log
+          ! grep -Eq "^\s*Skipped:\s+[1-9]" postgres-validation.log
