@@ -4,7 +4,8 @@ using Microsoft.EntityFrameworkCore;
 namespace Api.Tests.Infrastructure;
 
 /// <summary>
-/// Point-in-time view of total money per currency, used to check conservation between checkpoints.
+/// Point-in-time view of each company's total bank balance and the ledger rows that already existed,
+/// used to check conservation between checkpoints.
 /// </summary>
 internal sealed record EconomySnapshot(
     IReadOnlyDictionary<Guid, decimal> CompanyBalances,
@@ -60,10 +61,19 @@ internal static class EconomyInvariantChecker
             .Where(b => !companyIds.Contains(b.CompanyId))
             .Select(b => $"ORPHAN_BUILDING building={b.Id} company={b.CompanyId}")
             .ToList();
-        violations.AddRange(buildings
-            .GroupBy(b => b.Id)
-            .Where(g => g.Select(b => b.CompanyId).Distinct().Count() > 1)
-            .Select(g => $"MULTI_OWNER_BUILDING building={g.Key}"));
+        // The owning company recorded on the lot must be the building's company, and no building may sit on two lots.
+        var buildingOwners = buildings.ToDictionary(b => b.Id, b => b.CompanyId);
+        var lots = await db.BuildingLots.AsNoTracking()
+            .Where(l => l.BuildingId != null)
+            .Select(l => new { l.Id, BuildingId = l.BuildingId!.Value, l.OwnerCompanyId })
+            .ToListAsync();
+        violations.AddRange(lots
+            .Where(l => buildingOwners.TryGetValue(l.BuildingId, out var owner) && l.OwnerCompanyId != owner)
+            .Select(l => $"MULTI_OWNER_BUILDING building={l.BuildingId} lot={l.Id} lotOwner={l.OwnerCompanyId} buildingOwner={buildingOwners[l.BuildingId]}"));
+        violations.AddRange(lots
+            .GroupBy(l => l.BuildingId)
+            .Where(g => g.Count() > 1)
+            .Select(g => $"MULTI_OWNER_BUILDING building={g.Key} sits on {g.Count()} lots"));
         return violations;
     }
 
@@ -96,7 +106,7 @@ internal static class EconomyInvariantChecker
     /// <summary>
     /// For every company, the change in the total of its bank balances since <paramref name="baseline"/>
     /// equals the sum of its ledger entries recorded since then: no company gains or loses money
-    /// without a visible bank-statement row. (Companies are all in a single currency in this suite.)
+    /// without a visible bank-statement row. Only company-owned accounts are covered: player-owned and government accounts have no ledger and are not part of this check.
     /// </summary>
     public static async Task<List<string>> CheckMoneyConservationAsync(AppDbContext db, EconomySnapshot baseline)
     {
