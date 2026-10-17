@@ -18,6 +18,8 @@ public sealed class LaborMarketPhase : ITickPhase
     {
         var demandByCity = new Dictionary<Guid, decimal>();
         var weightedSalaryByCity = new Dictionary<Guid, decimal>();
+        var employers = new List<(Building Building, decimal SalaryMultiplier)>();
+        var idleBuildings = new List<Building>();
 
         foreach (var building in context.BuildingsById.Values)
         {
@@ -25,12 +27,14 @@ public sealed class LaborMarketPhase : ITickPhase
             // which would raise wages again next tick.
             if (!context.UnitsByBuilding.TryGetValue(building.Id, out var units) || units.Count == 0)
             {
+                idleBuildings.Add(building);
                 continue;
             }
 
             var efficiency = TickContext.GetPowerEfficiency(building);
             if (efficiency <= 0m)
             {
+                idleBuildings.Add(building);
                 continue;
             }
 
@@ -46,6 +50,15 @@ public sealed class LaborMarketPhase : ITickPhase
             }
 
             if (hours <= 0m)
+            {
+                idleBuildings.Add(building);
+                continue;
+            }
+
+            employers.Add((building, salaryMultiplier));
+
+            // A striking workforce is not hired and not paid, so it neither demands labor nor shapes the city's average pay.
+            if (context.IsOnStrike(building))
             {
                 continue;
             }
@@ -79,6 +92,55 @@ public sealed class LaborMarketPhase : ITickPhase
             market.UpdatedAtTick = context.CurrentTick;
         }
 
+        foreach (var (building, salaryMultiplier) in employers)
+        {
+            if (!context.LaborMarketsByCity.TryGetValue(building.CityId, out var market))
+            {
+                continue;
+            }
+
+            var payRatio = LaborMarketCalculator.ComputePayRatio(salaryMultiplier, market.AverageSalaryMultiplier);
+            building.StaffingFactor = LaborMarketCalculator.ComputeCompanyStaffing(market.StaffingFillRate, market.Utilization, payRatio);
+            UpdateStrike(context.CurrentTick, building, payRatio);
+        }
+
+        // Buildings that do not hire this tick (no units, no power) get a clean slate; a running strike still ends on time.
+        foreach (var building in idleBuildings)
+        {
+            building.StaffingFactor = 1m;
+            if (building.StrikeUntilTick.HasValue && context.CurrentTick >= building.StrikeUntilTick.Value)
+            {
+                building.StrikeStartedAtTick = null;
+                building.StrikeUntilTick = null;
+            }
+        }
+
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// A running strike ends when its time is up or the company has fixed its pay; otherwise a building whose pay trails the
+    /// city average may walk out, decided by a deterministic roll of (tick, building) so it is reproducible from game state.
+    /// </summary>
+    private static void UpdateStrike(long tick, Building building, decimal payRatio)
+    {
+        if (building.StrikeUntilTick.HasValue)
+        {
+            if (LaborMarketCalculator.ShouldStrikeEnd(tick, building.StrikeUntilTick.Value, payRatio))
+            {
+                building.StrikeStartedAtTick = null;
+                building.StrikeUntilTick = null;
+            }
+
+            return;
+        }
+
+        var probability = LaborMarketCalculator.ComputeStrikeProbability(payRatio);
+        if (probability > 0m && LaborMarketCalculator.Roll(tick, building.Id, salt: 1) < (double)probability)
+        {
+            var duration = LaborMarketCalculator.ComputeStrikeDurationTicks(LaborMarketCalculator.Roll(tick, building.Id, salt: 2));
+            building.StrikeStartedAtTick = tick;
+            building.StrikeUntilTick = tick + duration;
+        }
     }
 }

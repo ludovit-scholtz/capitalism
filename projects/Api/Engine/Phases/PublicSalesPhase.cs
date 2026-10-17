@@ -43,7 +43,7 @@ public sealed partial class PublicSalesPhase : ITickPhase
             if (!context.CompaniesById.TryGetValue(building.CompanyId, out var company))
                 continue;
 
-            var efficiency = TickContext.GetPowerEfficiency(building);
+            var efficiency = context.GetOperationalEfficiency(building);
             if (efficiency <= 0m) continue;
 
             // Skip buildings suspended for insufficient funds (evaluated by OperatingCostPhase).
@@ -269,7 +269,7 @@ public sealed partial class PublicSalesPhase : ITickPhase
                 if (!unitCapacityCache.TryGetValue(offer.Unit.Id, out var salesCapacity))
                 {
                     salesCapacity = GameConstants.SalesCapacity(offer.Unit.Level)
-                        * TickContext.GetPowerEfficiency(offer.Building);
+                        * context.GetOperationalEfficiency(offer.Building);
                     unitCapacityCache[offer.Unit.Id] = salesCapacity;
                 }
 

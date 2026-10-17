@@ -205,6 +205,18 @@ public sealed class Building
     public bool IsSuspendedForFunds { get; set; }
 
     /// <summary>
+    /// Share (0..1) of the building's required labor that its company managed to hire in the city labor market, set by the
+    /// labor market phase at the end of each tick and applied as an efficiency factor by the next tick's phases.
+    /// </summary>
+    public decimal StaffingFactor { get; set; } = 1m;
+
+    /// <summary>Tick at which the current strike started; null when the building is not on strike.</summary>
+    public long? StrikeStartedAtTick { get; set; }
+
+    /// <summary>The building is on strike (no production, no wages) up to and including this tick.</summary>
+    public long? StrikeUntilTick { get; set; }
+
+    /// <summary>
     /// Human-readable reason the building is suspended, set alongside <see cref="IsSuspendedForFunds"/>.
     /// Null when the building is not suspended.
     /// Values: "MISSING_BANK_ACCOUNT" | "INSUFFICIENT_FUNDS:&lt;amount&gt;" | null.

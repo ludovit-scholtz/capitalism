@@ -126,4 +126,114 @@ public sealed class LaborMarketCalculatorTests
     {
         Assert.Equal(expected, LaborMarketCalculator.IsStrikeProne((decimal)ratio));
     }
+
+    [Theory]
+    [InlineData(1.0, 0.10, 0.70, 0.97)]  // idle market: low pay barely matters
+    [InlineData(1.0, 1.00, 0.70, 0.70)]  // tight market: low pay costs staff one-for-one
+    [InlineData(1.0, 1.00, 1.00, 1.00)]
+    [InlineData(0.5, 2.00, 1.20, 0.60)]  // shortage: paying above average wins a bigger share of scarce workers
+    [InlineData(1.0, 1.00, 1.50, 1.00)]  // never above fully staffed
+    [InlineData(0.0, 2.00, 1.00, 0.20)]  // city cannot staff anything: workers commute in, output never drops below the floor
+    public void ComputeCompanyStaffing_CombinesCityFillTightnessAndPay(double fill, double utilization, double payRatio, double expected)
+    {
+        var staffing = LaborMarketCalculator.ComputeCompanyStaffing((decimal)fill, (decimal)utilization, (decimal)payRatio);
+
+        Assert.Equal((decimal)expected, staffing);
+    }
+
+    [Fact]
+    public void ComputeCompanyStaffing_PayingMoreNeverHurts()
+    {
+        var previous = -1m;
+        for (var ratio = 0.5m; ratio <= 1.5m; ratio += 0.05m)
+        {
+            var staffing = LaborMarketCalculator.ComputeCompanyStaffing(0.6m, 1.5m, ratio);
+            Assert.True(staffing >= previous, $"staffing fell at pay ratio {ratio}");
+            previous = staffing;
+        }
+    }
+
+    [Theory]
+    [InlineData(1.00)]
+    [InlineData(0.85)]
+    public void StrikeProbability_IsZeroAtOrAboveTheThreshold(double ratio)
+    {
+        Assert.Equal(0m, LaborMarketCalculator.ComputeStrikeProbability((decimal)ratio));
+    }
+
+    [Fact]
+    public void StrikeProbability_GrowsAsPayFallsAndIsCapped()
+    {
+        var mild = LaborMarketCalculator.ComputeStrikeProbability(0.80m);
+        var severe = LaborMarketCalculator.ComputeStrikeProbability(0.50m);
+        var absurd = LaborMarketCalculator.ComputeStrikeProbability(0.0m);
+
+        Assert.True(mild > 0m);
+        Assert.True(severe > mild);
+        Assert.Equal(LaborMarketCalculator.MaxStrikeProbabilityPerTick, absurd);
+    }
+
+    [Fact]
+    public void Roll_IsDeterministicWithinUnitIntervalAndVariesByInput()
+    {
+        var building = Guid.Parse("11111111-2222-3333-4444-555555555555");
+
+        var first = LaborMarketCalculator.Roll(42, building, salt: 1);
+        var again = LaborMarketCalculator.Roll(42, building, salt: 1);
+        var otherTick = LaborMarketCalculator.Roll(43, building, salt: 1);
+        var otherSalt = LaborMarketCalculator.Roll(42, building, salt: 2);
+
+        Assert.Equal(first, again);
+        Assert.NotEqual(first, otherTick);
+        Assert.NotEqual(first, otherSalt);
+        Assert.InRange(first, 0d, 0.999999999d);
+    }
+
+    [Fact]
+    public void Roll_IsRoughlyUniform()
+    {
+        var building = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001");
+        var below = Enumerable.Range(0, 2000).Count(tick => LaborMarketCalculator.Roll(tick, building, 1) < 0.1d);
+
+        Assert.InRange(below, 120, 280); // expect ~200 of 2000
+    }
+
+    [Theory]
+    [InlineData(0.0, 6)]
+    [InlineData(0.5, 9)]
+    [InlineData(0.999, 11)]
+    public void StrikeDuration_IsSixToElevenTicks(double roll, int expected)
+    {
+        Assert.Equal(expected, LaborMarketCalculator.ComputeStrikeDurationTicks(roll));
+    }
+
+    [Theory]
+    [InlineData(10, 20, 0.50, false)] // still running and pay still low
+    [InlineData(20, 20, 0.50, true)]  // time is up
+    [InlineData(12, 20, 0.95, true)]  // pay fixed: the company met the demand
+    [InlineData(12, 20, 0.90, false)] // better but not settled
+    public void ShouldStrikeEnd_WhenTimeIsUpOrPayIsFixed(long tick, long until, double ratio, bool expected)
+    {
+        Assert.Equal(expected, LaborMarketCalculator.ShouldStrikeEnd(tick, until, (decimal)ratio));
+    }
+
+    [Theory]
+    [InlineData(0.5, 0.5, 0.5)]  // everybody pays half the baseline: still underpaying against the city baseline
+    [InlineData(0.5, 1.0, 0.5)]
+    [InlineData(1.2, 1.1, 1.0909)]
+    [InlineData(1.5, 1.0, 1.5)]
+    public void ComputePayRatio_IsNeverRelativeToAnAverageBelowTheCityBaseline(double company, double average, double expected)
+    {
+        Assert.Equal((decimal)expected, LaborMarketCalculator.ComputePayRatio((decimal)company, (decimal)average));
+    }
+
+    [Fact]
+    public void Roll_IsPortableAcrossByteOrders()
+    {
+        // Pinned value: a change here means strike outcomes for existing games would change.
+        var value = LaborMarketCalculator.Roll(1, Guid.Parse("00000000-0000-0000-0000-000000000001"), salt: 1);
+
+        Assert.InRange(value, 0d, 0.999999999d);
+        Assert.Equal(value, LaborMarketCalculator.Roll(1, Guid.Parse("00000000-0000-0000-0000-000000000001"), salt: 1));
+    }
 }

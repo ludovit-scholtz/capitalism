@@ -181,6 +181,17 @@ public sealed partial class TickContext
     public decimal GetWageIndex(Guid cityId)
         => LaborMarketsByCity.TryGetValue(cityId, out var market) ? market.WageIndex : 1m;
 
+    /// <summary>True while the building's workers are on strike (no production, no wages).</summary>
+    public bool IsOnStrike(Building building)
+        => building.StrikeUntilTick.HasValue && CurrentTick <= building.StrikeUntilTick.Value;
+
+    /// <summary>
+    /// Efficiency the production and cost phases work with: power efficiency scaled by how much of the required labor the
+    /// company hired (set by the previous tick's labor market phase) and zero while the building is on strike.
+    /// </summary>
+    public decimal GetOperationalEfficiency(Building building)
+        => IsOnStrike(building) ? 0m : GetPowerEfficiency(building) * Math.Clamp(building.StaffingFactor, 0m, 1m);
+
     /// <summary>
     /// Returns the operational efficiency factor for a building based on its PowerStatus.
     /// <list type="bullet">

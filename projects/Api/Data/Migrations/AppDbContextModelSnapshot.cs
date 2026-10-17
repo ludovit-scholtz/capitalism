@@ -483,6 +483,17 @@ namespace Api.Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<decimal>("StaffingFactor")
+                        .HasPrecision(8, 4)
+                        .HasColumnType("numeric(8,4)")
+                        .HasDefaultValue(1m);
+
+                    b.Property<long?>("StrikeStartedAtTick")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("StrikeUntilTick")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("SuspendedReason")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
