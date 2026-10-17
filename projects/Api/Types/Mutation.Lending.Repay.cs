@@ -9,8 +9,8 @@ using Microsoft.EntityFrameworkCore;
 namespace Api.Types;
 
 public sealed partial class Mutation
-    /// <summary>
 {
+    /// <summary>
     /// Repays the full remaining debt of an overdue/defaulted loan immediately.
     /// The authenticated borrower must own the loan's borrower company.
     /// API-key callers can target only loans owned by the authenticated principal.
