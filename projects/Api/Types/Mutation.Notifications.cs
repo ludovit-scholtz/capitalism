@@ -87,7 +87,8 @@ public sealed partial class Mutation
     public async Task<BankAccountAlertThresholdResult> SetBankAccountAlertThreshold(
         SetBankAccountAlertThresholdInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var playerId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
         var account = await db.BankAccounts
@@ -98,11 +99,11 @@ public sealed partial class Mutation
 
         if (account is null)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Bank account not found.")
-                    .SetCode("BANK_ACCOUNT_NOT_FOUND")
-                    .Build());
+            throw objectAuthorization.Deny(
+                playerId,
+                "bank_account",
+                input.BankAccountId,
+                await BankAccountDenialClassifier.ClassifyAsync(db, input.BankAccountId, playerId));
         }
 
         if (input.MinBalanceThreshold.HasValue && input.MinBalanceThreshold.Value < 0m)
