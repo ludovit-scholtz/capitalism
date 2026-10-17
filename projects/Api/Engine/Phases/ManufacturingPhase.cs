@@ -59,7 +59,13 @@ public sealed class ManufacturingPhase : ITickPhase
         if (!context.RecipesByProduct.TryGetValue(productType.Id, out var recipes) || recipes.Count == 0)
             return;
 
-        var maxBatches = (int)Math.Floor(GameConstants.ManufacturingBatches(unit.Level) * efficiency);
+        // Power limits whole batches as before. Staffing scales on top of that with stochastic rounding (deterministic from
+        // tick and unit), so a small shortfall cannot floor a one-batch unit to zero while the expected output stays proportional.
+        var powerBatches = (int)Math.Floor(GameConstants.ManufacturingBatches(unit.Level) * TickContext.GetPowerEfficiency(building));
+        var staffing = Math.Clamp(building.StaffingFactor, 0m, 1m);
+        var maxBatches = staffing >= 1m
+            ? powerBatches
+            : (int)Math.Floor((powerBatches * staffing) + (decimal)Shared.Economy.LaborMarketCalculator.Roll(context.CurrentTick, unit.Id, salt: 3));
 
         // Collect available inputs from the manufacturing unit's own inventory
         // (filled by resource movement) AND from incoming-linked units.

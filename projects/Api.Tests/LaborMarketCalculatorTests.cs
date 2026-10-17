@@ -133,7 +133,7 @@ public sealed class LaborMarketCalculatorTests
     [InlineData(1.0, 1.00, 1.00, 1.00)]
     [InlineData(0.5, 2.00, 1.20, 0.60)]  // shortage: paying above average wins a bigger share of scarce workers
     [InlineData(1.0, 1.00, 1.50, 1.00)]  // never above fully staffed
-    [InlineData(0.0, 2.00, 1.00, 0.00)]  // city cannot staff anything
+    [InlineData(0.0, 2.00, 1.00, 0.20)]  // city cannot staff anything: workers commute in, output never drops below the floor
     public void ComputeCompanyStaffing_CombinesCityFillTightnessAndPay(double fill, double utilization, double payRatio, double expected)
     {
         var staffing = LaborMarketCalculator.ComputeCompanyStaffing((decimal)fill, (decimal)utilization, (decimal)payRatio);
@@ -215,5 +215,25 @@ public sealed class LaborMarketCalculatorTests
     public void ShouldStrikeEnd_WhenTimeIsUpOrPayIsFixed(long tick, long until, double ratio, bool expected)
     {
         Assert.Equal(expected, LaborMarketCalculator.ShouldStrikeEnd(tick, until, (decimal)ratio));
+    }
+
+    [Theory]
+    [InlineData(0.5, 0.5, 0.5)]  // everybody pays half the baseline: still underpaying against the city baseline
+    [InlineData(0.5, 1.0, 0.5)]
+    [InlineData(1.2, 1.1, 1.0909)]
+    [InlineData(1.5, 1.0, 1.5)]
+    public void ComputePayRatio_IsNeverRelativeToAnAverageBelowTheCityBaseline(double company, double average, double expected)
+    {
+        Assert.Equal((decimal)expected, LaborMarketCalculator.ComputePayRatio((decimal)company, (decimal)average));
+    }
+
+    [Fact]
+    public void Roll_IsPortableAcrossByteOrders()
+    {
+        // Pinned value: a change here means strike outcomes for existing games would change.
+        var value = LaborMarketCalculator.Roll(1, Guid.Parse("00000000-0000-0000-0000-000000000001"), salt: 1);
+
+        Assert.InRange(value, 0d, 0.999999999d);
+        Assert.Equal(value, LaborMarketCalculator.Roll(1, Guid.Parse("00000000-0000-0000-0000-000000000001"), salt: 1));
     }
 }

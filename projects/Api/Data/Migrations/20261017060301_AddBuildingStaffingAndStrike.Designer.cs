@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Api.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20261017052916_AddBuildingStaffingAndStrike")]
+    [Migration("20261017060301_AddBuildingStaffingAndStrike")]
     partial class AddBuildingStaffingAndStrike
     {
         /// <inheritdoc />
@@ -487,7 +487,6 @@ namespace Api.Data.Migrations
                         .HasColumnType("numeric(18,2)");
 
                     b.Property<decimal>("StaffingFactor")
-                        .ValueGeneratedOnAdd()
                         .HasPrecision(8, 4)
                         .HasColumnType("numeric(8,4)")
                         .HasDefaultValue(1m);

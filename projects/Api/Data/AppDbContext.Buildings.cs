@@ -13,7 +13,8 @@ public sealed partial class AppDbContext
             e.Property(b => b.Type).HasMaxLength(30);
             e.Property(b => b.Name).HasMaxLength(200);
             e.Property(b => b.PowerConsumption).HasPrecision(18, 2);
-            e.Property(b => b.StaffingFactor).HasPrecision(8, 4).HasDefaultValue(1m);
+            // ValueGeneratedNever: an explicit 0 must be stored as 0 rather than replaced by the database default of 1.
+            e.Property(b => b.StaffingFactor).HasPrecision(8, 4).HasDefaultValue(1m).ValueGeneratedNever();
             e.Property(b => b.AskingPrice).HasPrecision(18, 2);
             e.Property(b => b.PricePerSqm).HasPrecision(18, 2);
             e.Property(b => b.OccupancyPercent).HasPrecision(5, 2);

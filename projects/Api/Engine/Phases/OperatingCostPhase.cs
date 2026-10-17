@@ -34,6 +34,7 @@ public sealed class OperatingCostPhase : ITickPhase
             }
 
             var efficiency = context.GetOperationalEfficiency(building);
+            var powerEfficiency = TickContext.GetPowerEfficiency(building);
             if (efficiency <= 0m)
             {
                 continue;
@@ -62,7 +63,8 @@ public sealed class OperatingCostPhase : ITickPhase
             foreach (var unit in units)
             {
                 var baseLaborHours = CompanyEconomyCalculator.GetBaseUnitLaborHours(unit.UnitType, unit.Level) * efficiency;
-                var baseEnergyMwh = CompanyEconomyCalculator.GetBaseUnitEnergyMwh(unit.UnitType, unit.Level) * efficiency;
+                // Machines draw power whether or not they are fully staffed (a strike shuts the building down entirely above).
+                var baseEnergyMwh = CompanyEconomyCalculator.GetBaseUnitEnergyMwh(unit.UnitType, unit.Level) * powerEfficiency;
 
                 if (baseLaborHours <= 0m && baseEnergyMwh <= 0m)
                 {

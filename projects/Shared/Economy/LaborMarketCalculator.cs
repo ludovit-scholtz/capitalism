@@ -94,11 +94,13 @@ public static class LaborMarketCalculator
         return decimal.Round(Math.Clamp(index, MinWageIndex, MaxWageIndex), 4, MidpointRounding.AwayFromZero);
     }
 
-    /// <summary>Company pay relative to the demand-weighted city average; 1 when no average exists yet.</summary>
+    /// <summary>
+    /// Company pay relative to the city reference, which is the demand-weighted average salary but never below the city's
+    /// baseline wage (multiplier 1): otherwise a sole employer, or a city where everybody underpays, could pay almost nothing
+    /// and still look "average".
+    /// </summary>
     public static decimal ComputePayRatio(decimal companySalaryMultiplier, decimal citySalaryAverage)
-        => citySalaryAverage <= 0m
-            ? 1m
-            : decimal.Round(companySalaryMultiplier / citySalaryAverage, 4, MidpointRounding.AwayFromZero);
+        => decimal.Round(companySalaryMultiplier / Math.Max(citySalaryAverage, 1m), 4, MidpointRounding.AwayFromZero);
 
     public static bool IsStrikeProne(decimal payRatio) => payRatio < StrikePayRatioThreshold;
 
@@ -107,6 +109,12 @@ public static class LaborMarketCalculator
 
     /// <summary>Pay ratio at which a running strike is considered settled.</summary>
     public const decimal StrikeSettledPayRatio = 0.95m;
+
+    /// <summary>
+    /// Output never drops below this share because of labor alone: workers also commute in from the surrounding region, so
+    /// a tiny or empty city cannot lock its employers out for good.
+    /// </summary>
+    public const decimal MinStaffingFactor = 0.20m;
 
     public const int MinStrikeDurationTicks = 6;
     public const int StrikeDurationSpanTicks = 6;
@@ -123,7 +131,7 @@ public static class LaborMarketCalculator
         var payFactor = payRatio < 1m
             ? 1m - ((1m - payRatio) * tightness)
             : 1m + ((payRatio - 1m) * tightness);
-        return decimal.Round(Math.Clamp(Math.Clamp(cityFillRate, 0m, 1m) * payFactor, 0m, 1m), 4, MidpointRounding.AwayFromZero);
+        return decimal.Round(Math.Clamp(Math.Clamp(cityFillRate, 0m, 1m) * payFactor, MinStaffingFactor, 1m), 4, MidpointRounding.AwayFromZero);
     }
 
     /// <summary>Chance per tick that a building whose pay trails the city average goes on strike (0 at or above the threshold).</summary>
@@ -144,10 +152,16 @@ public static class LaborMarketCalculator
     /// </summary>
     public static double Roll(long tick, Guid buildingId, int salt)
     {
+        // Explicit little-endian layout so the roll is identical on every host.
+        Span<byte> bytes = stackalloc byte[8 + 16 + 4];
+        System.Buffers.Binary.BinaryPrimitives.WriteInt64LittleEndian(bytes[..8], tick);
+        buildingId.TryWriteBytes(bytes.Slice(8, 16), bigEndian: false, out _);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(bytes.Slice(24, 4), salt);
+
         const ulong offset = 14695981039346656037UL;
         const ulong prime = 1099511628211UL;
         var hash = offset;
-        foreach (var b in BitConverter.GetBytes(tick).Concat(buildingId.ToByteArray()).Concat(BitConverter.GetBytes(salt)))
+        foreach (var b in bytes)
         {
             hash ^= b;
             hash *= prime;

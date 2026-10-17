@@ -213,7 +213,7 @@ public sealed class Building
     /// <summary>Tick at which the current strike started; null when the building is not on strike.</summary>
     public long? StrikeStartedAtTick { get; set; }
 
-    /// <summary>The building is on strike (no production, no wages) while the current tick is before this tick.</summary>
+    /// <summary>The building is on strike (no production, no wages) up to and including this tick.</summary>
     public long? StrikeUntilTick { get; set; }
 
     /// <summary>

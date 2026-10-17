@@ -484,7 +484,6 @@ namespace Api.Data.Migrations
                         .HasColumnType("numeric(18,2)");
 
                     b.Property<decimal>("StaffingFactor")
-                        .ValueGeneratedOnAdd()
                         .HasPrecision(8, 4)
                         .HasColumnType("numeric(8,4)")
                         .HasDefaultValue(1m);

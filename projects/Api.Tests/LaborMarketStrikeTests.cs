@@ -269,4 +269,89 @@ public sealed class LaborMarketStrikeTests
 
         Assert.Null((await GetBuildingAsync(factory, employers[0].BuildingId)).StrikeUntilTick);
     }
+
+    [Fact]
+    public async Task Understaffing_ReducesLaborCostButNotEnergyCost()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+        var employers = await SeedEmployersAsync(factory, [(1.0m, 4, null)], population: 5_000_000);
+        await TickAsync(factory);
+        decimal fullEnergy;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            fullEnergy = -await db.LedgerEntries.Where(e => e.CompanyId == employers[0].CompanyId && e.Category == LedgerCategory.EnergyCost).SumAsync(e => e.Amount);
+            db.LedgerEntries.RemoveRange(db.LedgerEntries.Where(e => e.CompanyId == employers[0].CompanyId));
+            (await db.Buildings.FirstAsync(b => b.Id == employers[0].BuildingId)).StaffingFactor = 0.3m;
+            await db.SaveChangesAsync();
+        }
+
+        await TickAsync(factory);
+
+        await using var verify = factory.Services.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<AppDbContext>();
+        var energy = -await verifyDb.LedgerEntries.Where(e => e.CompanyId == employers[0].CompanyId && e.Category == LedgerCategory.EnergyCost).SumAsync(e => e.Amount);
+        Assert.True(fullEnergy > 0m);
+        Assert.Equal(fullEnergy, energy);
+    }
+
+    [Fact]
+    public async Task StrikingBuilding_DoesNotCountAsLaborDemand()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+        var employers = await SeedEmployersAsync(factory, [(1.0m, 4, null), (1.0m, 4, null)], population: 5_000_000);
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var building = await db.Buildings.FirstAsync(b => b.Id == employers[0].BuildingId);
+            building.StrikeStartedAtTick = 0;
+            building.StrikeUntilTick = 40;
+            await db.SaveChangesAsync();
+        }
+
+        await TickAsync(factory);
+
+        await using var verify = factory.Services.CreateAsyncScope();
+        var market = await verify.ServiceProvider.GetRequiredService<AppDbContext>().CityLaborMarkets.AsNoTracking().FirstAsync(m => m.CityId == employers[0].CityId);
+        Assert.Equal(4 * Api.Utilities.CompanyEconomyCalculator.GetBaseUnitLaborHours(UnitType.Manufacturing, 1), market.LaborDemand);
+    }
+
+    [Fact]
+    public async Task StrikeOnABuildingThatLostPower_IsStillEndedWhenItsTimeIsUp()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+        var employers = await SeedEmployersAsync(factory, [(1.0m, 4, null)], population: 5_000_000);
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var building = await db.Buildings.FirstAsync(b => b.Id == employers[0].BuildingId);
+            building.PowerStatus = PowerStatus.Offline;
+            building.StaffingFactor = 0.3m;
+            building.StrikeStartedAtTick = 0;
+            building.StrikeUntilTick = 1;
+            await db.SaveChangesAsync();
+        }
+
+        await TickAsync(factory);
+
+        var after = await GetBuildingAsync(factory, employers[0].BuildingId);
+        Assert.Null(after.StrikeUntilTick);
+    }
+
+    [Fact]
+    public async Task SoleEmployerPayingFarBelowTheCityBaseline_StillRisksAStrike()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+        // Only employer, multiplier 0.5: relative to its own average it would look fair; against the baseline it does not.
+        var strikingId = FindIdThatStrikesAtTick(1, LaborMarketCalculator.ComputeStrikeProbability(0.5m), shouldStrike: true);
+        var employers = await SeedEmployersAsync(factory, [(0.5m, 6, strikingId)], population: 5_000_000);
+
+        await TickAsync(factory);
+
+        Assert.NotNull((await GetBuildingAsync(factory, employers[0].BuildingId)).StrikeUntilTick);
+    }
 }

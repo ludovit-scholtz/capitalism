@@ -19,6 +19,7 @@ public sealed class LaborMarketPhase : ITickPhase
         var demandByCity = new Dictionary<Guid, decimal>();
         var weightedSalaryByCity = new Dictionary<Guid, decimal>();
         var employers = new List<(Building Building, decimal SalaryMultiplier)>();
+        var idleBuildings = new List<Building>();
 
         foreach (var building in context.BuildingsById.Values)
         {
@@ -26,12 +27,14 @@ public sealed class LaborMarketPhase : ITickPhase
             // which would raise wages again next tick.
             if (!context.UnitsByBuilding.TryGetValue(building.Id, out var units) || units.Count == 0)
             {
+                idleBuildings.Add(building);
                 continue;
             }
 
             var efficiency = TickContext.GetPowerEfficiency(building);
             if (efficiency <= 0m)
             {
+                idleBuildings.Add(building);
                 continue;
             }
 
@@ -48,10 +51,18 @@ public sealed class LaborMarketPhase : ITickPhase
 
             if (hours <= 0m)
             {
+                idleBuildings.Add(building);
                 continue;
             }
 
             employers.Add((building, salaryMultiplier));
+
+            // A striking workforce is not hired and not paid, so it neither demands labor nor shapes the city's average pay.
+            if (context.IsOnStrike(building))
+            {
+                continue;
+            }
+
             demandByCity[building.CityId] = demandByCity.GetValueOrDefault(building.CityId) + hours;
             weightedSalaryByCity[building.CityId] = weightedSalaryByCity.GetValueOrDefault(building.CityId) + (hours * salaryMultiplier);
         }
@@ -91,6 +102,17 @@ public sealed class LaborMarketPhase : ITickPhase
             var payRatio = LaborMarketCalculator.ComputePayRatio(salaryMultiplier, market.AverageSalaryMultiplier);
             building.StaffingFactor = LaborMarketCalculator.ComputeCompanyStaffing(market.StaffingFillRate, market.Utilization, payRatio);
             UpdateStrike(context.CurrentTick, building, payRatio);
+        }
+
+        // Buildings that do not hire this tick (no units, no power) get a clean slate; a running strike still ends on time.
+        foreach (var building in idleBuildings)
+        {
+            building.StaffingFactor = 1m;
+            if (building.StrikeUntilTick.HasValue && context.CurrentTick >= building.StrikeUntilTick.Value)
+            {
+                building.StrikeStartedAtTick = null;
+                building.StrikeUntilTick = null;
+            }
         }
 
         return Task.CompletedTask;
