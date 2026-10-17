@@ -85,4 +85,21 @@ public sealed class TickTimingRecorderTests
         Assert.Contains("C=150ms", message);
         Assert.DoesNotContain("A=", message);
     }
+
+    [Fact]
+    public async Task ProcessTick_RecordsContextLoadAndSaveAsOwnEntries_SoTheDashboardShowsWhereTheTimeGoes()
+    {
+        await using var factory = new Api.Tests.Infrastructure.ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+        await using var scope = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.CreateAsyncScope(factory.Services);
+        var db = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<Api.Data.AppDbContext>(scope.ServiceProvider);
+        var phases = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<IEnumerable<ITickPhase>>(scope.ServiceProvider);
+        var recorder = new TickTimingRecorder();
+
+        await new TickProcessor(db, phases, Microsoft.Extensions.Logging.Abstractions.NullLogger<TickProcessor>.Instance, recorder).ProcessTickAsync();
+
+        var names = recorder.Summarize().Phases.Select(p => p.Name).ToList();
+        Assert.Contains(TickProcessor.ContextLoadEntryName, names);
+        Assert.Contains(TickProcessor.SaveEntryName, names);
+    }
 }

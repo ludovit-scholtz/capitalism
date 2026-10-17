@@ -18,6 +18,15 @@ public sealed class TickProcessor(
     ILogger<TickProcessor> logger,
     TickTimingRecorder? timingRecorder = null)
 {
+    /// <summary>Timing entry for loading the tick context from the database (reported next to the phases).</summary>
+    public const string ContextLoadEntryName = "(context load)";
+
+    /// <summary>Timing entry for persisting the tick's changes (reported next to the phases).</summary>
+    public const string SaveEntryName = "(save changes)";
+
+    /// <summary>True for the context-load/save entries, which are costs of the tick but not phases with a phase budget.</summary>
+    public static bool IsInfrastructureEntry(string name) => name is ContextLoadEntryName or SaveEntryName;
+
     private readonly IReadOnlyList<ITickPhase> orderedPhases = phases.OrderBy(p => p.Order).ToList();
 
     /// <summary>
@@ -60,7 +69,10 @@ public sealed class TickProcessor(
 
         var sw = Stopwatch.StartNew();
         var phaseSw = new Stopwatch();
-        var phaseMs = new Dictionary<string, long>(orderedPhases.Count);
+        var phaseMs = new Dictionary<string, long>(orderedPhases.Count + 2)
+        {
+            [ContextLoadEntryName] = ctxSw.ElapsedMilliseconds,
+        };
 
         foreach (var phase in orderedPhases)
         {
@@ -109,7 +121,16 @@ public sealed class TickProcessor(
             db.Inventories.RemoveRange(depleted);
         }
 
-        await db.SaveChangesAsync(ct);
+        var saveSw = Stopwatch.StartNew();
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        finally
+        {
+            saveSw.Stop();
+            phaseMs[SaveEntryName] = saveSw.ElapsedMilliseconds;
+        }
 
         sw.Stop();
         timingRecorder?.Record(gameState.CurrentTick, ctxSw.ElapsedMilliseconds + sw.ElapsedMilliseconds, phaseMs);
@@ -117,7 +138,7 @@ public sealed class TickProcessor(
         // Log per-phase breakdown when any phase exceeded the slow-phase threshold,
         // or when the total tick time is unexpectedly long.
         const long SlowPhaseThresholdMs = TickBudget.DefaultPhaseBudgetMs;
-        var slowPhases = phaseMs.Where(kv => kv.Value >= SlowPhaseThresholdMs).OrderByDescending(kv => kv.Value).ToList();
+        var slowPhases = phaseMs.Where(kv => kv.Value >= SlowPhaseThresholdMs && !IsInfrastructureEntry(kv.Key)).OrderByDescending(kv => kv.Value).ToList();
         if (slowPhases.Count > 0 || sw.ElapsedMilliseconds > 500)
         {
             var breakdown = string.Join(", ", phaseMs.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Key}={kv.Value}ms"));

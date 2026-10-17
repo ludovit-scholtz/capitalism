@@ -56,3 +56,12 @@ jobs:
           # Guard against a green job that ran nothing (renamed class, filter matching zero tests, tests skipped).
           grep -Eq "^\s*Passed:\s+[1-9]" postgres-validation.log
           ! grep -Eq "^\s*Skipped:\s+[1-9]" postgres-validation.log
+
+      - name: Tick benchmark on PostgreSQL (CI scale, report plus a generous regression budget)
+        env:
+          TICK_BENCH_SCALE: ci
+          TICK_BENCH_BUDGET_MS: '10000'
+        run: |
+          dotnet test projects/Api.Tests/Api.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~TickPerformancePostgresBenchmarkTests" --logger "console;verbosity=detailed" | tee tick-benchmark.log
+          grep -Eq "^\s*Passed:\s+[1-9]" tick-benchmark.log
+          ! grep -Eq "^\s*Skipped:\s+[1-9]" tick-benchmark.log
