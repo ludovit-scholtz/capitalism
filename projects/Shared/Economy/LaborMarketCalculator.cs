@@ -181,4 +181,15 @@ public static class LaborMarketCalculator
     /// <summary>A strike ends when its time is up or the company has fixed its pay.</summary>
     public static bool ShouldStrikeEnd(long currentTick, long strikeUntilTick, decimal payRatio)
         => currentTick >= strikeUntilTick || payRatio >= StrikeSettledPayRatio;
+
+    /// <summary>A "good employer" pays at least this much more than the reference (rivals or baseline wage, whichever is higher).</summary>
+    public const decimal GoodEmployerPayRatio = 1.05m;
+
+    /// <summary>
+    /// True when <paramref name="salaryMultiplier"/> beats the reference by <see cref="GoodEmployerPayRatio"/>. The reference is
+    /// the average pay of the company's rivals in the city, never below the baseline wage (multiplier 1), so a sole employer
+    /// qualifies by clearly out-paying the baseline and cannot dilute the bar by being part of the average itself.
+    /// </summary>
+    public static bool IsGoodEmployer(decimal salaryMultiplier, decimal rivalsAverageMultiplier)
+        => salaryMultiplier >= Math.Max(rivalsAverageMultiplier, 1m) * GoodEmployerPayRatio;
 }

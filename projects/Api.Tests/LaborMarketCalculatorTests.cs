@@ -236,4 +236,17 @@ public sealed class LaborMarketCalculatorTests
         Assert.InRange(value, 0d, 0.999999999d);
         Assert.Equal(value, LaborMarketCalculator.Roll(1, Guid.Parse("00000000-0000-0000-0000-000000000001"), salt: 1));
     }
+
+    [Theory]
+    [InlineData(1.05, 1.0, true)]   // exactly at the bar
+    [InlineData(1.04, 1.0, false)]
+    [InlineData(2.0, 1.0, true)]    // sole employer, no rivals: the reference is the baseline wage
+    [InlineData(1.40, 1.35, false)] // only slightly above the rivals
+    [InlineData(1.42, 1.35, true)]
+    [InlineData(1.2, 0.5, true)]    // rivals below baseline never lower the bar under the baseline
+    [InlineData(1.0, 0.5, false)]
+    public void IsGoodEmployer_NeedsAClearLeadOverTheReference(double multiplier, double rivalsAverage, bool expected)
+    {
+        Assert.Equal(expected, LaborMarketCalculator.IsGoodEmployer((decimal)multiplier, (decimal)rivalsAverage));
+    }
 }
