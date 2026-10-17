@@ -104,17 +104,18 @@ public sealed partial class Query
             return await CityUnlockService.ResolvePlayerActiveCompanyIdAsync(db, playerId);
         }
 
-        var ownsCompany = await db.Companies
+        var ownerPlayerId = await db.Companies
             .AsNoTracking()
-            .AnyAsync(company => company.Id == companyId.Value && company.PlayerId == playerId);
-        if (!ownsCompany)
+            .Where(company => company.Id == companyId.Value)
+            .Select(company => (Guid?)company.PlayerId)
+            .FirstOrDefaultAsync();
+        if (ownerPlayerId != playerId)
         {
-            var exists = await db.Companies.AsNoTracking().AnyAsync(company => company.Id == companyId.Value);
             throw objectAuthorization.Deny(
                 playerId,
                 "company",
                 companyId.Value,
-                exists ? ObjectAuthorizationService.NotOwnedReason : ObjectAuthorizationService.NotFoundReason);
+                ownerPlayerId is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
         }
 
         return companyId.Value;

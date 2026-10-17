@@ -42,6 +42,29 @@ public sealed class ObjectAuthorizationDenialParityTests
     }
 
     [Fact]
+    public void Deny_BenignStateReason_LogsInformationInsteadOfSecurityWarning()
+    {
+        var (service, logger) = Create();
+
+        var ex = service.Deny(Guid.NewGuid(), "building", Guid.NewGuid(), ObjectAuthorizationService.NotAvailableReason);
+
+        Assert.Equal(ObjectAuthorizationService.NotFoundOrNotOwnedCode, Assert.Single(ex.Errors).Code);
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Information, entry.Level);
+        Assert.Contains(ObjectAuthorizationService.NotAvailableReason, entry.Message);
+    }
+
+    [Fact]
+    public void Deny_UnknownReason_FailsSafeToWarning()
+    {
+        var (service, logger) = Create();
+
+        service.Deny(Guid.NewGuid(), "building", Guid.NewGuid(), "some_future_reason");
+
+        Assert.Equal(LogLevel.Warning, Assert.Single(logger.Entries).Level);
+    }
+
+    [Fact]
     public async Task RequireOwnedAsync_MissingAndForeignObjectsYieldSameClientError()
     {
         var (service, logger) = Create();

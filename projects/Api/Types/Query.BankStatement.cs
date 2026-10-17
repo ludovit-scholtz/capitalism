@@ -29,7 +29,8 @@ public sealed partial class Query
         long? fromTick,
         long? toTick,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
         var pageSize = Math.Clamp(limit ?? BankStatementDefaultLimit, 1, BankStatementMaxLimit);
@@ -56,14 +57,27 @@ public sealed partial class Query
 
         if (!companyId.HasValue)
         {
-            throw new GraphQLException(ErrorBuilder.New().SetMessage("Company not found or you do not own it.").SetCode("COMPANY_NOT_FOUND").Build());
+            throw accountId.HasValue
+                ? objectAuthorization.Deny(
+                    userId,
+                    "bank_account",
+                    accountId.Value,
+                    await BankAccountDenialClassifier.ClassifyAsync(db, accountId.Value, userId))
+                : objectAuthorization.Deny(userId, "company", Guid.Empty, ObjectAuthorizationService.NotFoundReason);
         }
 
         var company = await db.Companies
             .AsNoTracking()
             .Include(c => c.Buildings).ThenInclude(b => b.City)
-            .FirstOrDefaultAsync(c => c.Id == companyId.Value && c.PlayerId == userId)
-            ?? throw new GraphQLException(ErrorBuilder.New().SetMessage("Company not found or you do not own it.").SetCode("COMPANY_NOT_FOUND").Build());
+            .FirstOrDefaultAsync(c => c.Id == companyId.Value);
+        if (company is null || company.PlayerId != userId)
+        {
+            throw objectAuthorization.Deny(
+                userId,
+                "company",
+                companyId.Value,
+                company is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
+        }
 
         string? filterCurrencyCode = null;
         BankAccount? selectedAccount = null;
