@@ -1,0 +1,81 @@
+name: tick-benchmark
+
+# Nightly and on-demand tick benchmark against real PostgreSQL (InMemory timings are not representative). The per-phase breakdown,
+# including "(context load)" and "(save changes)", is published in the job summary. The full scale (1,000 players / 20,000 buildings /
+# 500,000 units) is on-demand only: workflow_dispatch with scale=full.
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+    inputs:
+      scale:
+        description: 'Benchmark scale: ci | medium | full'
+        required: false
+        default: 'medium'
+      budget_ms:
+        description: 'Fail when the average tick exceeds this many milliseconds (empty = report only)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tick-benchmark
+  cancel-in-progress: false
+
+jobs:
+  tick-benchmark:
+    name: Tick benchmark on PostgreSQL
+    # Scheduled runs only in the upstream repository (forks would burn runner time every night).
+    if: github.event_name != 'schedule' || github.repository == 'ludovit-scholtz/capitalism'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash # adds pipefail, so a failing dotnet test is not hidden by tee
+    timeout-minutes: 120
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      CAPITALISM_TEST_POSTGRES: Host=localhost;Port=5432;Username=postgres;Password=ci-only-password
+      CAPITALISM_TEST_POSTGRES_REQUIRED: 'true'
+      TICK_BENCH_SCALE: ${{ github.event.inputs.scale || 'medium' }}
+      # Scheduled runs get a regression budget (a generous multiple of the measured medium-scale average); manual runs may pass their own or none.
+      TICK_BENCH_BUDGET_MS: ${{ github.event_name == 'schedule' && '12000' || github.event.inputs.budget_ms || '' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.x
+
+      - name: Validate inputs
+        run: |
+          case "${TICK_BENCH_SCALE}" in ci|medium|full) ;; *) echo "scale must be ci, medium or full, got '${TICK_BENCH_SCALE}'"; exit 1 ;; esac
+          if [ -n "${TICK_BENCH_BUDGET_MS}" ] && ! [[ "${TICK_BENCH_BUDGET_MS}" =~ ^[0-9]+$ ]]; then echo "budget_ms must be a whole number of milliseconds"; exit 1; fi
+
+      - name: Run the benchmark
+        run: |
+          dotnet test projects/Api.Tests/Api.Tests.csproj --configuration Release --filter "FullyQualifiedName~TickPerformancePostgresBenchmarkTests" --logger "console;verbosity=detailed" | tee tick-benchmark.log
+          grep -Eq "^\s*Passed:\s+[1-9]" tick-benchmark.log
+          ! grep -Eq "^\s*Skipped:\s+[1-9]" tick-benchmark.log
+
+      - name: Publish the per-phase report
+        if: always()
+        run: |
+          {
+            echo "## Tick benchmark (scale: ${TICK_BENCH_SCALE})"
+            echo '```'
+            grep -E "PostgreSQL scale|Measured|  avg |Average tick|exceeds" tick-benchmark.log || echo "no report produced"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
