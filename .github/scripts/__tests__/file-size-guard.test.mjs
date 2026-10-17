@@ -78,10 +78,18 @@ describe('evaluateFileSizes', () => {
     assert.equal(result.violations[0].kind, 'GREW')
   })
 
-  it('passes an allow-listed file that shrank and reports it as tightenable', () => {
+  it('fails an allow-listed file that shrank until its entry is tightened, so the list is a real ratchet', () => {
     const result = evaluateFileSizes([{ path: 'big.cs', lines: 700 }], { 'big.cs': 900 })
-    assert.deepEqual(result.violations, [])
-    assert.deepEqual(result.shrunk, [{ path: 'big.cs', lines: 700, allowed: 900 }])
+    assert.equal(result.violations.length, 1)
+    assert.equal(result.violations[0].kind, 'SHRUNK_TIGHTEN_ALLOWLIST')
+    assert.match(result.violations[0].message, /--update/)
+  })
+
+  it('tells the author how to handle a renamed oversized file', () => {
+    const result = evaluateFileSizes([{ path: 'renamed/Big.cs', lines: 900 }], { 'old/Big.cs': 900 })
+    assert.equal(result.violations[0].kind, 'NEW_OVER_LIMIT')
+    assert.match(result.violations[0].message, /renam/i)
+    assert.deepEqual(result.missing, ['old/Big.cs'])
   })
 
   it('fails an allow-listed file that is now under the limit so the entry gets removed', () => {
@@ -94,6 +102,20 @@ describe('evaluateFileSizes', () => {
     const result = evaluateFileSizes([], { 'deleted.cs': 900 })
     assert.deepEqual(result.violations, [])
     assert.deepEqual(result.missing, ['deleted.cs'])
+  })
+})
+
+describe('allow-list ordering', () => {
+  it('sorts by code point so the file is identical on every machine', () => {
+    const next = tightenAllowList(
+      [
+        { path: 'projects/Api.Tests/B.cs', lines: 600 },
+        { path: 'projects/Api/A.cs', lines: 600 },
+        { path: 'projects/api/z.cs', lines: 600 },
+      ],
+      { 'projects/Api.Tests/B.cs': 600, 'projects/Api/A.cs': 600, 'projects/api/z.cs': 600 },
+    )
+    assert.deepEqual(Object.keys(next), ['projects/Api.Tests/B.cs', 'projects/Api/A.cs', 'projects/api/z.cs'])
   })
 })
 

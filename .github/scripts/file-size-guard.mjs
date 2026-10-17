@@ -5,7 +5,8 @@
  * Existing offenders are listed in .github/file-size-allowlist.json with their current line count. The check fails when
  *   - a file that is not on the list exceeds the limit (NEW_OVER_LIMIT),
  *   - a listed file grows (GREW),
- *   - a listed file dropped under the limit but is still listed (STALE_ALLOWLIST_ENTRY).
+ *   - a listed file dropped under the limit but is still listed (STALE_ALLOWLIST_ENTRY),
+ *   - a listed file shrank but its entry was not tightened (SHRUNK_TIGHTEN_ALLOWLIST), so freed headroom can never be reused.
  * The list can therefore only shrink. `--update` lowers entries for shrunk files and removes entries for files that are now
  * within the limit or deleted; it never adds a file.
  *
@@ -29,7 +30,7 @@ const EXCLUDED_PATTERNS = [
   /\.g\.dart$/,
   /\.generated\./,
   /(^|\/)i18n\/locales\//,
-  /(^|\/)(bin|obj|dist|node_modules|\.dart_tool|build)\//,
+  /(^|\/)(bin|obj|dist|node_modules|\.dart_tool)\//,
 ]
 
 /** Number of lines like `wc -l`: a trailing newline does not add an empty line, CRLF counts once. */
@@ -52,26 +53,33 @@ export function isCheckedSourceFile(path) {
  */
 export function evaluateFileSizes(files, allowList, limit = LINE_LIMIT) {
   const violations = []
-  const shrunk = []
   const byPath = new Map(files.map((file) => [file.path, file.lines]))
 
   for (const { path, lines } of files) {
     const allowed = allowList[path]
     if (allowed === undefined) {
       if (lines > limit) {
-        violations.push({ kind: 'NEW_OVER_LIMIT', path, lines, allowed: limit, message: `${path} has ${lines} lines (limit ${limit}). Split it instead of adding it to the allow-list.` })
+        violations.push({ kind: 'NEW_OVER_LIMIT', path, lines, allowed: limit, message: `${path} has ${lines} lines (limit ${limit}). Split it instead of adding it to the allow-list. If you renamed or moved an allow-listed file, move its entry in .github/file-size-allowlist.json to the new path (same or lower line count).` })
       }
     } else if (lines <= limit) {
       violations.push({ kind: 'STALE_ALLOWLIST_ENTRY', path, lines, allowed, message: `${path} is down to ${lines} lines: remove it from the allow-list (node .github/scripts/file-size-guard.mjs --update).` })
     } else if (lines > allowed) {
       violations.push({ kind: 'GREW', path, lines, allowed, message: `${path} grew from ${allowed} to ${lines} lines. Extract code instead of growing an oversized file.` })
     } else if (lines < allowed) {
-      shrunk.push({ path, lines, allowed })
+      violations.push({ kind: 'SHRUNK_TIGHTEN_ALLOWLIST', path, lines, allowed, message: `${path} shrank from ${allowed} to ${lines} lines: lock in the gain with node .github/scripts/file-size-guard.mjs --update (the allow-list may only shrink, so freed headroom cannot be reused).` })
     }
   }
 
   const missing = Object.keys(allowList).filter((path) => !byPath.has(path)).sort()
-  return { violations, shrunk, missing }
+  return { violations, missing }
+}
+
+function compareCodePoints(a, b) {
+  return a < b ? -1 : a > b ? 1 : 0
+}
+
+function sortedByPath(map) {
+  return Object.fromEntries(Object.entries(map).sort(([a], [b]) => compareCodePoints(a, b)))
 }
 
 /** Lowers shrunk entries and drops entries for removed or now-compliant files. Never adds new files. */
@@ -83,7 +91,7 @@ export function tightenAllowList(files, allowList, limit = LINE_LIMIT) {
       next[path] = Math.min(allowed, lines)
     }
   }
-  return Object.fromEntries(Object.entries(next).sort(([a], [b]) => a.localeCompare(b)))
+  return sortedByPath(next)
 }
 
 function repoRoot() {
@@ -115,7 +123,7 @@ function main() {
       console.error('Allow-list already exists. Use --update to tighten it; it must never gain entries.')
       process.exit(1)
     }
-    const initial = Object.fromEntries(files.filter((file) => file.lines > LINE_LIMIT).sort((a, b) => a.path.localeCompare(b.path)).map((file) => [file.path, file.lines]))
+    const initial = sortedByPath(Object.fromEntries(files.filter((file) => file.lines > LINE_LIMIT).map((file) => [file.path, file.lines])))
     writeFileSync(allowListPath, `${JSON.stringify(initial, null, 2)}
 `)
     console.log(`Allow-list created with ${Object.keys(initial).length} entries.`)
@@ -129,12 +137,9 @@ function main() {
     return
   }
 
-  const { violations, shrunk, missing } = evaluateFileSizes(files, allowList)
-  for (const entry of shrunk) {
-    console.log(`note: ${entry.path} shrank from ${entry.allowed} to ${entry.lines} lines - run with --update to lock in the gain.`)
-  }
+  const { violations, missing } = evaluateFileSizes(files, allowList)
   for (const path of missing) {
-    console.log(`note: ${path} no longer exists - run with --update to drop it from the allow-list.`)
+    console.log(`note: ${path} no longer exists - run with --update to drop it from the allow-list (or move the entry if the file was renamed).`)
   }
   if (violations.length > 0) {
     for (const violation of violations) console.error(`::error file=${violation.path}::${violation.message}`)
