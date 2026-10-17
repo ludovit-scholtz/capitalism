@@ -27,7 +27,12 @@ concurrency:
 jobs:
   tick-benchmark:
     name: Tick benchmark on PostgreSQL
+    # Scheduled runs only in the upstream repository (forks would burn runner time every night).
+    if: github.event_name != 'schedule' || github.repository == 'ludovit-scholtz/capitalism'
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash # adds pipefail, so a failing dotnet test is not hidden by tee
     timeout-minutes: 120
     services:
       postgres:
@@ -45,13 +50,19 @@ jobs:
       CAPITALISM_TEST_POSTGRES: Host=localhost;Port=5432;Username=postgres;Password=ci-only-password
       CAPITALISM_TEST_POSTGRES_REQUIRED: 'true'
       TICK_BENCH_SCALE: ${{ github.event.inputs.scale || 'medium' }}
-      TICK_BENCH_BUDGET_MS: ${{ github.event.inputs.budget_ms || '' }}
+      # Scheduled runs get a regression budget (a generous multiple of the measured medium-scale average); manual runs may pass their own or none.
+      TICK_BENCH_BUDGET_MS: ${{ github.event_name == 'schedule' && '12000' || github.event.inputs.budget_ms || '' }}
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.x
+
+      - name: Validate inputs
+        run: |
+          case "${TICK_BENCH_SCALE}" in ci|medium|full) ;; *) echo "scale must be ci, medium or full, got '${TICK_BENCH_SCALE}'"; exit 1 ;; esac
+          if [ -n "${TICK_BENCH_BUDGET_MS}" ] && ! [[ "${TICK_BENCH_BUDGET_MS}" =~ ^[0-9]+$ ]]; then echo "budget_ms must be a whole number of milliseconds"; exit 1; fi
 
       - name: Run the benchmark
         run: |
@@ -65,6 +76,6 @@ jobs:
           {
             echo "## Tick benchmark (scale: ${TICK_BENCH_SCALE})"
             echo '```'
-            grep -E "PostgreSQL scale|Measured|avg " tick-benchmark.log || echo "no report produced"
+            grep -E "PostgreSQL scale|Measured|  avg |Average tick|exceeds" tick-benchmark.log || echo "no report produced"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
