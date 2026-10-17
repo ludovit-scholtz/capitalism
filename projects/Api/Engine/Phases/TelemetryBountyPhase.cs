@@ -20,9 +20,6 @@ public sealed class TelemetryBountyPhase(
 {
     private static readonly TimeSpan MaxTelemetryDispatchWait = TimeSpan.FromMilliseconds(250);
 
-    /// <summary>Pay must be at least this share of the city reference wage to count as a good employer.</summary>
-    private const decimal GoodEmployerPayRatio = 1.05m;
-
     public string Name => "TelemetryBounty";
     public int Order => 1050; // After DividendPhase (1010) and before MarketReportPhase
 
@@ -307,15 +304,22 @@ public sealed class TelemetryBountyPhase(
         }
 
         // ── GOOD_EMPLOYER ───────────────────────────────────────────────────────
-        // The best-paying real employer of each city (one winner per city). "Real" means the company has a building with
-        // units there whose workforce is not on strike; a salary setting alone proves nothing. "Good" means the pay is
-        // meaningfully above the city reference (the demand-weighted average, never below the baseline wage).
-        var employingCompanyIdsByCity = context.BuildingsById.Values
-            .Where(building => !context.IsOnStrike(building)
-                && context.UnitsByBuilding.TryGetValue(building.Id, out var units)
-                && units.Count > 0)
-            .GroupBy(building => building.CityId)
-            .ToDictionary(group => group.Key, group => group.Select(building => building.CompanyId).ToHashSet());
+        // The best-paying real employer of each city (one winner per city). "Real" means a building that actually hires there
+        // (units plus power) and no strike in the company's buildings in that city; a salary setting alone proves nothing.
+        // "Good" means the pay clearly beats the company's rivals and the baseline wage (LaborMarketCalculator.IsGoodEmployer).
+        var cityBuildings = context.BuildingsById.Values.GroupBy(building => building.CityId).ToList();
+        var employingCompanyIdsByCity = cityBuildings.ToDictionary(
+            group => group.Key,
+            group =>
+            {
+                // A company counts as an employer in a city when at least one building really hires there and none of its
+                // buildings in that city is on strike.
+                var striking = group.Where(context.IsOnStrike).Select(building => building.CompanyId).ToHashSet();
+                return group
+                    .Where(building => context.EmploysWorkers(building) && !striking.Contains(building.CompanyId))
+                    .Select(building => building.CompanyId)
+                    .ToHashSet();
+            });
 
         var salaryByCityCompany = context.CitySalarySettingsByCompany
             .SelectMany(kv => kv.Value.Select(s => (CompanyId: kv.Key, Setting: s)))
@@ -334,16 +338,17 @@ public sealed class TelemetryBountyPhase(
                 continue;
             }
 
+            // Highest pay wins; ties break on company id so the winner never depends on enumeration order.
             var bestEntry = competitiveEntries
-                .MaxBy(x => x.Setting.SalaryMultiplier);
+                .OrderByDescending(x => x.Setting.SalaryMultiplier)
+                .ThenBy(x => x.CompanyId)
+                .First();
 
-            var cityAverage = context.LaborMarketsByCity.TryGetValue(cityGroup.Key, out var laborMarket)
-                ? laborMarket.AverageSalaryMultiplier
-                : 1m;
-            var payRatio = LaborMarketCalculator.ComputePayRatio(bestEntry.Setting.SalaryMultiplier, cityAverage);
+            // The bar is set by the winner's real rivals, not by an average that includes the winner itself.
+            var rivals = competitiveEntries.Where(x => x.CompanyId != bestEntry.CompanyId).ToList();
+            var rivalsAverage = rivals.Count == 0 ? 1m : rivals.Average(x => x.Setting.SalaryMultiplier);
 
-            if (bestEntry.Setting.SalaryMultiplier > 1m
-                && payRatio >= GoodEmployerPayRatio
+            if (LaborMarketCalculator.IsGoodEmployer(bestEntry.Setting.SalaryMultiplier, rivalsAverage)
                 && playerIdByCompanyId.TryGetValue(bestEntry.CompanyId, out var playerId)
                 && playerEmailByCompanyId.TryGetValue(bestEntry.CompanyId, out var email)
                 && email is not null)

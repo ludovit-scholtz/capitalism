@@ -181,6 +181,15 @@ public sealed partial class TickContext
     public decimal GetWageIndex(Guid cityId)
         => LaborMarketsByCity.TryGetValue(cityId, out var market) ? market.WageIndex : 1m;
 
+    /// <summary>
+    /// True when the building actually hires people this tick: it has units that need labor and power to run them. This is the
+    /// same rule the labor market uses to count demand, so "employer" means the same thing everywhere.
+    /// </summary>
+    public bool EmploysWorkers(Building building)
+        => GetPowerEfficiency(building) > 0m
+           && UnitsByBuilding.TryGetValue(building.Id, out var units)
+           && units.Any(unit => Utilities.CompanyEconomyCalculator.GetBaseUnitLaborHours(unit.UnitType, unit.Level) > 0m);
+
     /// <summary>True while the building's workers are on strike (no production, no wages).</summary>
     public bool IsOnStrike(Building building)
         => building.StrikeUntilTick.HasValue && CurrentTick <= building.StrikeUntilTick.Value;
