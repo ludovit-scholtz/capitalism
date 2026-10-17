@@ -18,6 +18,12 @@ public sealed class TickProcessor(
     ILogger<TickProcessor> logger,
     TickTimingRecorder? timingRecorder = null)
 {
+    /// <summary>Timing entry for loading the tick context from the database (reported next to the phases).</summary>
+    public const string ContextLoadEntryName = "(context load)";
+
+    /// <summary>Timing entry for persisting the tick's changes (reported next to the phases).</summary>
+    public const string SaveEntryName = "(save changes)";
+
     private readonly IReadOnlyList<ITickPhase> orderedPhases = phases.OrderBy(p => p.Order).ToList();
 
     /// <summary>
@@ -60,7 +66,10 @@ public sealed class TickProcessor(
 
         var sw = Stopwatch.StartNew();
         var phaseSw = new Stopwatch();
-        var phaseMs = new Dictionary<string, long>(orderedPhases.Count);
+        var phaseMs = new Dictionary<string, long>(orderedPhases.Count + 2)
+        {
+            [ContextLoadEntryName] = ctxSw.ElapsedMilliseconds,
+        };
 
         foreach (var phase in orderedPhases)
         {
@@ -109,7 +118,10 @@ public sealed class TickProcessor(
             db.Inventories.RemoveRange(depleted);
         }
 
+        var saveSw = Stopwatch.StartNew();
         await db.SaveChangesAsync(ct);
+        saveSw.Stop();
+        phaseMs[SaveEntryName] = saveSw.ElapsedMilliseconds;
 
         sw.Stop();
         timingRecorder?.Record(gameState.CurrentTick, ctxSw.ElapsedMilliseconds + sw.ElapsedMilliseconds, phaseMs);
