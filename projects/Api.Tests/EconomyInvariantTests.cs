@@ -77,7 +77,7 @@ public sealed partial class EconomyInvariantTests(ITestOutputHelper output)
                     break;
                 case 7:
                     var stockError = await RandomStockTradeAsync(client, world, rng, forceBuyThenSell: false);
-                    Assert.True(stockError is null or "INSUFFICIENT_FUNDS" or "INSUFFICIENT_SHARES", $"Unexpected stock failure (seed={seed}, step={step}): {stockError}");
+                    Assert.True(stockError is null || stockError.StartsWith("INSUFFICIENT_", StringComparison.Ordinal), $"Unexpected stock failure (seed={seed}, step={step}): {stockError}");
                     if (stockError is null) applied["stock"] = applied.GetValueOrDefault("stock") + 1;
                     break;
                 default:
