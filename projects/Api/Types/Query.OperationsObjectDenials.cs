@@ -12,7 +12,7 @@ public sealed partial class Query
     /// Returns the most recent object-authorization denials of this server process with the real failure reason
     /// (not_found / not_owned / wrong_account_context / not_available), newest first, plus counts by object type and reason.
     /// Callers never see the reason; only admins do, so enumeration probes become visible without leaking existence.
-    /// Read-only and served from memory; requires admin dashboard access.
+    /// Read-only and served from memory of this server process (a restart, or another replica, has its own window); requires admin dashboard access.
     /// </summary>
     [Authorize]
     public async Task<ObjectAccessDenialsResult> GetObjectAccessDenials(
@@ -26,7 +26,7 @@ public sealed partial class Query
             ?? throw new InvalidOperationException("HTTP context is required for object access denials.");
         await gameAdminAuthorizationService.RequireAdminDashboardAccessAsync(db, httpContext.User, httpContext.RequestAborted);
 
-        var summary = denialRecorder.Summarize();
+        var (summary, recent) = denialRecorder.Snapshot(Math.Clamp(limit ?? 100, 0, MaxObjectAccessDenialsLimit));
         return new ObjectAccessDenialsResult
         {
             TotalRecorded = summary.TotalRecorded,
@@ -34,7 +34,7 @@ public sealed partial class Query
             ProbeSignals = summary.ProbeSignals,
             ByObjectType = summary.ByObjectType.Select(c => new ObjectDenialCountItem { Key = c.Key, Count = c.Count }).ToList(),
             ByReason = summary.ByReason.Select(c => new ObjectDenialCountItem { Key = c.Key, Count = c.Count }).ToList(),
-            Recent = denialRecorder.Recent(Math.Clamp(limit ?? 100, 0, MaxObjectAccessDenialsLimit))
+            Recent = recent
                 .Select(e => new ObjectAccessDenialItem
                 {
                     OccurredAtUtc = e.OccurredAtUtc,

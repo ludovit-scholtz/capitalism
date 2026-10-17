@@ -12,7 +12,7 @@ public sealed class ObjectAuthorizationServiceTests
     {
         var logger = new CapturingLogger<ObjectAuthorizationService>();
         var accessor = new HttpContextAccessor { HttpContext = new DefaultHttpContext() };
-        var service = new ObjectAuthorizationService(logger, accessor);
+        var service = new ObjectAuthorizationService(logger, accessor, new ObjectDenialRecorder());
         var objectId = Guid.NewGuid();
         var actorId = Guid.NewGuid();
 
@@ -43,7 +43,7 @@ public sealed class ObjectAuthorizationServiceTests
         var apiKeyId = Guid.NewGuid();
         accessor.HttpContext.Items[ApiKeyRequestContext.HttpContextItemKey] = new ApiKeyRequestContext(apiKeyId, Guid.NewGuid(), [], []);
 
-        var service = new ObjectAuthorizationService(logger, accessor);
+        var service = new ObjectAuthorizationService(logger, accessor, new ObjectDenialRecorder());
         var objectId = Guid.NewGuid();
         var actorId = Guid.NewGuid();
 
@@ -67,7 +67,7 @@ public sealed class ObjectAuthorizationServiceTests
     {
         var logger = new CapturingLogger<ObjectAuthorizationService>();
         var accessor = new HttpContextAccessor { HttpContext = new DefaultHttpContext() };
-        var service = new ObjectAuthorizationService(logger, accessor);
+        var service = new ObjectAuthorizationService(logger, accessor, new ObjectDenialRecorder());
         var actorId = Guid.NewGuid();
         var objectId = Guid.NewGuid();
 

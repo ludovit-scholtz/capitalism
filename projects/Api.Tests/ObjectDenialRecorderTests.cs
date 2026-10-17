@@ -82,4 +82,40 @@ public sealed class ObjectDenialRecorderTests
         Assert.Equal(("company", ObjectAuthorizationService.NotFoundReason), (recent[0].ObjectType, recent[0].Reason));
         Assert.Equal((actor, objectId, "building", ObjectAuthorizationService.NotOwnedReason), (recent[1].ActorUserId, recent[1].ObjectId, recent[1].ObjectType, recent[1].Reason));
     }
+
+    [Fact]
+    public void ANoisyActor_CannotPushOtherActorsEventsOutOfTheWindow()
+    {
+        var recorder = new ObjectDenialRecorder(capacity: 10, perActorCapacity: 3);
+        var quiet = Guid.NewGuid();
+        var noisy = Guid.NewGuid();
+        var at = DateTime.UtcNow;
+        recorder.Record(new ObjectDenialEvent(at, quiet, null, "company", Guid.NewGuid(), ObjectAuthorizationService.NotOwnedReason, true));
+        for (var i = 0; i < 50; i++)
+        {
+            recorder.Record(new ObjectDenialEvent(at.AddSeconds(i + 1), noisy, null, "building", Guid.NewGuid(), ObjectAuthorizationService.NotFoundReason, true));
+        }
+
+        var recent = recorder.Recent(100);
+
+        Assert.Contains(recent, e => e.ActorUserId == quiet); // the quiet probe is still visible
+        Assert.Equal(3, recent.Count(e => e.ActorUserId == noisy)); // the noisy actor keeps only its newest three
+        Assert.Equal(51, recorder.TotalRecorded); // but every denial is still counted
+        Assert.Equal(at.AddSeconds(50), recent.Where(e => e.ActorUserId == noisy).Max(e => e.OccurredAtUtc));
+    }
+
+    [Fact]
+    public void Snapshot_ReturnsTheSummaryAndTheEventsFromTheSameView()
+    {
+        var recorder = new ObjectDenialRecorder();
+        for (var i = 0; i < 4; i++)
+        {
+            recorder.Record(Event());
+        }
+
+        var (summary, recent) = recorder.Snapshot(2);
+
+        Assert.Equal(4, summary.WindowSize);
+        Assert.Equal(2, recent.Count);
+    }
 }

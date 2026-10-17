@@ -19,7 +19,7 @@ public sealed class ObjectAuthorizationDenialParityTests
     private static (ObjectAuthorizationService Service, ParityLogger Logger) Create()
     {
         var logger = new ParityLogger();
-        return (new ObjectAuthorizationService(logger, new HttpContextAccessor()), logger);
+        return (new ObjectAuthorizationService(logger, new HttpContextAccessor(), new ObjectDenialRecorder()), logger);
     }
 
     [Theory]
