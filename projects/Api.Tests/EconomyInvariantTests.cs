@@ -40,8 +40,9 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
 
         var contracts = new List<(Guid Id, int SellerIdx, int BuyerIdx)>();
         await ScriptedAcceptAndBuyerCancelAsync(client, world, rng);
-        Assert.True(await RandomForexSwapAsync(client, world, rng), "Scripted forex swap failed.");
-        Assert.Null(await BuildingSaleAsync(client, world, rng));
+        Assert.Null(await RandomForexSwapAsync(client, world, rng));
+        var scriptedSaleError = await BuildingSaleAsync(client, world, rng);
+        Assert.True(scriptedSaleError is null, $"Scripted building sale failed (seed={seed}): {scriptedSaleError}");
         var applied = new Dictionary<string, int>();
         for (var step = 1; step <= Steps; step++)
         {
@@ -59,7 +60,10 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
                     if (done is not null) applied[done] = applied.GetValueOrDefault(done) + 1;
                     break;
                 case 4:
-                    if (await RandomForexSwapAsync(client, world, rng)) applied["forex"] = applied.GetValueOrDefault("forex") + 1;
+                    var forexError = await RandomForexSwapAsync(client, world, rng);
+                    // Running out of funds is a legitimate outcome of random play; any other failure is a defect.
+                    Assert.True(forexError is null or "INSUFFICIENT_FUNDS", $"Unexpected forex failure (seed={seed}, step={step}): {forexError}");
+                    if (forexError is null) applied["forex"] = applied.GetValueOrDefault("forex") + 1;
                     break;
                 case 5:
                     if (await BuildingSaleAsync(client, world, rng) is null) applied["buildingSale"] = applied.GetValueOrDefault("buildingSale") + 1;
@@ -279,11 +283,8 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
         return result.TryGetProperty("errors", out _) ? null : action;
     }
 
-    private static string? ErrorCodeOf(JsonElement response)
-        => response.TryGetProperty("errors", out var errors) ? errors[0].GetProperty("extensions").GetProperty("code").GetString() : null;
-
-    /// <summary>Swaps part of a company's main balance into its second-currency account (a real, ledgered money flow).</summary>
-    private static async Task<bool> RandomForexSwapAsync(HttpClient client, World world, Random rng)
+    /// <summary>Swaps part of a company's main balance into its second-currency account. Returns null on success, else the error code.</summary>
+    private static async Task<string?> RandomForexSwapAsync(HttpClient client, World world, Random rng)
     {
         var p = world.Players[rng.Next(world.Players.Count)];
         var amount = Math.Round((decimal)rng.NextDouble() * 20_000m, 2) + 100m;
@@ -302,31 +303,44 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
                 },
             },
             p.Token);
-        return !result.TryGetProperty("errors", out _);
+        return DescribeError(result);
+    }
+
+    private static string? DescribeError(JsonElement response)
+    {
+        if (!response.TryGetProperty("errors", out var errors))
+        {
+            return null;
+        }
+
+        var first = errors[0];
+        var code = first.TryGetProperty("extensions", out var ext) && ext.TryGetProperty("code", out var c) ? c.GetString() : null;
+        return code ?? first.GetProperty("message").GetString() ?? "UNKNOWN";
     }
 
     /// <summary>Lists a building, lets another company bid and the owner accept: the company-to-company sale flow.</summary>
     private static async Task<string?> BuildingSaleAsync(HttpClient client, World world, Random rng)
     {
-        var s = rng.Next(world.Players.Count);
-        var b = (s + 1 + rng.Next(world.Players.Count - 1)) % world.Players.Count;
+        var sellers = world.Players.Where(p => p.Buildings.Count > 0).ToList();
+        if (sellers.Count == 0) return "NO_SELLER_WITH_A_BUILDING";
+        var seller = sellers[rng.Next(sellers.Count)];
+        var buyer = world.Players.Where(p => p != seller).ElementAt(rng.Next(world.Players.Count - 1));
+        var buildingId = seller.Buildings[rng.Next(seller.Buildings.Count)];
         var price = 900_000m + rng.Next(0, 100) * 1_000m;
-        var seller = world.Players[s];
-        var buyer = world.Players[b];
 
         var listed = await TestHelpers.ExecuteGraphQlAsync(
             client,
             "mutation($input: SetBuildingForSaleInput!) { setBuildingForSale(input: $input) { id } }",
-            new { input = new { buildingId = seller.BuildingId, isForSale = true, askingPrice = price } },
+            new { input = new { buildingId, isForSale = true, askingPrice = price } },
             seller.Token);
-        if (listed.TryGetProperty("errors", out _)) return $"list: {listed.GetProperty("errors")[0]}";
+        if (DescribeError(listed) is { } listError) return $"list: {listError}";
 
         var offer = await TestHelpers.ExecuteGraphQlAsync(
             client,
             "mutation($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id offerVersion } }",
-            new { input = new { buildingId = seller.BuildingId, buyerCompanyId = buyer.CompanyId, offeredPrice = price } },
+            new { input = new { buildingId, buyerCompanyId = buyer.CompanyId, offeredPrice = price } },
             buyer.Token);
-        if (offer.TryGetProperty("errors", out _)) return $"offer: {offer.GetProperty("errors")[0]}";
+        if (DescribeError(offer) is { } offerError) return $"offer: {offerError}";
         var offerData = offer.GetProperty("data").GetProperty("makeOfferOnBuilding");
 
         var accepted = await TestHelpers.ExecuteGraphQlAsync(
@@ -334,8 +348,11 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
             "mutation($input: AcceptBuildingOfferInput!) { acceptBuildingOffer(input: $input) { __typename } }",
             new { input = new { offerId = offerData.GetProperty("id").GetString(), offerVersion = offerData.GetProperty("offerVersion").GetString() } },
             seller.Token);
-        if (accepted.TryGetProperty("errors", out _)) return $"accept: {accepted.GetProperty("errors")[0]}";
+        if (DescribeError(accepted) is { } acceptError) return $"accept: {acceptError}";
 
+        // The building changed hands: only its new owner can sell it again.
+        seller.Buildings.Remove(buildingId);
+        buyer.Buildings.Add(buildingId);
         return null;
     }
 
@@ -394,14 +411,14 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
                 Quantity = 2000m, Quality = 0.7m, SourcingCostTotal = 6000m
             });
             db.BankAccounts.AddRange(accountA, accountB, accountC);
-            players.Add(new PlayerSlot(tokens[i].Token, company.Id, sales.Id, accountA.Id, accountB.Id, accountC.Id, building.Id));
+            players.Add(new PlayerSlot(tokens[i].Token, company.Id, sales.Id, accountA.Id, accountB.Id, accountC.Id, [building.Id]));
         }
 
         await db.SaveChangesAsync();
         return new World(players, resource.Id, city.CurrencyCode, foreignCurrency);
     }
 
-    private sealed record PlayerSlot(string Token, Guid CompanyId, Guid SalesUnitId, Guid AccountA, Guid AccountB, Guid AccountC, Guid BuildingId);
+    private sealed record PlayerSlot(string Token, Guid CompanyId, Guid SalesUnitId, Guid AccountA, Guid AccountB, Guid AccountC, List<Guid> Buildings);
 
     private sealed record World(List<PlayerSlot> Players, Guid ResourceTypeId, string CityCurrency, string ForeignCurrency);
 }
