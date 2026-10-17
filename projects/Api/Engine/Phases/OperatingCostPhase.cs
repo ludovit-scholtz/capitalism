@@ -86,8 +86,11 @@ public sealed class OperatingCostPhase : ITickPhase
                 energyCost = decimal.Round(energyCost * upgradeMultiplier, 2, MidpointRounding.AwayFromZero);
 
                 // The global economic shock applies per unit, so the booked rows always sum to exactly what the account is debited.
-                laborCost = decimal.Round(laborCost * context.GlobalEventOperatingCostMultiplier, 2, MidpointRounding.AwayFromZero);
-                energyCost = decimal.Round(energyCost * context.GlobalEventOperatingCostMultiplier, 2, MidpointRounding.AwayFromZero);
+                if (context.GlobalEventOperatingCostMultiplier != 1m)
+                {
+                    laborCost = decimal.Round(laborCost * context.GlobalEventOperatingCostMultiplier, 2, MidpointRounding.AwayFromZero);
+                    energyCost = decimal.Round(energyCost * context.GlobalEventOperatingCostMultiplier, 2, MidpointRounding.AwayFromZero);
+                }
 
                 totalBuildingCost += laborCost + energyCost;
                 unitCosts.Add((unit, laborCost, energyCost));

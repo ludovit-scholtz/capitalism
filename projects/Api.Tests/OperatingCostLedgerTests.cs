@@ -26,7 +26,7 @@ public sealed class OperatingCostLedgerTests
         await new TickProcessor(db, phases, new NullLogger<TickProcessor>()).ProcessTickAsync();
     }
 
-    private static async Task<Seeded> SeedAsync(ApiWebApplicationFactory factory, decimal? costMultiplier = null)
+    private static async Task<Seeded> SeedAsync(ApiWebApplicationFactory factory, decimal? costMultiplier = null, decimal startBalance = StartBalance)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -47,7 +47,7 @@ public sealed class OperatingCostLedgerTests
         var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "OpCost Co", FoundedAtUtc = DateTime.UtcNow, FoundedAtTick = 1 };
         var account = new BankAccount
         {
-            Id = Guid.NewGuid(), CompanyId = company.Id, CurrencyCode = city.CurrencyCode, Balance = StartBalance,
+            Id = Guid.NewGuid(), CompanyId = company.Id, CurrencyCode = city.CurrencyCode, Balance = startBalance,
             AccountNumber = "1234567890123499", CreatedAtUtc = DateTime.UtcNow,
         };
         var building = new Building
@@ -130,5 +130,23 @@ public sealed class OperatingCostLedgerTests
 
         Assert.NotEmpty(entries);
         Assert.Equal(balanceDelta, entries.Sum(e => e.Amount));
+    }
+
+    [Fact]
+    public async Task UnfundedBuilding_IsSuspended_WithNoCostRowsAndNoDebit()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+        var seeded = await SeedAsync(factory, startBalance: 0m);
+
+        await TickAsync(factory);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(0m, (await db.BankAccounts.AsNoTracking().SingleAsync(a => a.Id == seeded.AccountId)).Balance);
+        Assert.True((await db.Buildings.AsNoTracking().SingleAsync(b => b.Id == seeded.BuildingId)).IsSuspendedForFunds);
+        Assert.Empty(await db.LedgerEntries.AsNoTracking()
+            .Where(e => e.CompanyId == seeded.CompanyId && (e.Category == LedgerCategory.LaborCost || e.Category == LedgerCategory.EnergyCost))
+            .ToListAsync());
     }
 }
