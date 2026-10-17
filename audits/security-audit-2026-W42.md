@@ -12,7 +12,7 @@ Can one player gain an unfair advantage over another player by executing an API 
 ## Summary
 
 - No High or Critical findings.
-- `npm audit` on a clean install: `projects/frontend` reports 0 vulnerabilities; `projects/master-frontend` reports 0 for production dependencies and 4 high advisories (`braces` -> `micromatch` -> `fast-glob` -> `@vue/eslint-config-typescript`) that live only in the lint toolchain and never ship.
+- `npm audit --omit=dev` (what CI enforces) reports 0 vulnerabilities in both frontends. A full `npm audit` reports 4 high advisories in each (`braces` -> `micromatch` -> `fast-glob` -> `@vue/eslint-config-typescript`) that live only in the lint toolchain and never ship.
 - `npm ls esbuild` is empty in both frontends (Vite 8 does not install it), so GHSA-g7r4-m6w7-qqqr (finding 3 of the 2026-07-07 audit) no longer applies.
 - `dotnet list package --vulnerable --include-transitive` reports no vulnerable packages for `projects/Api`.
 - A real defect was found and fixed: the master portal's inline analytics bootstrap was blocked by its own CSP (finding 1).
@@ -47,10 +47,10 @@ Can one player gain an unfair advantage over another player by executing an API 
 - **Recommended fix:** Convert the remaining sites to `ObjectAuthorizationService.Deny`, add missing-versus-foreign parity tests per resolver, and update the e2e mocks together with the real codes.
 - **Status:** Open <!-- issue: #605 -->
 
-### 3) Lint-toolchain advisories in master-frontend
+### 3) Lint-toolchain advisories in both frontends
 
 - **Severity:** Low (development only)
-- **Affected endpoint or mechanic:** `projects/master-frontend` devDependencies (`@vue/eslint-config-typescript` -> `fast-glob` -> `micromatch` -> `braces`, GHSA-vfj7-8cjw-p6xm).
-- **Risk description:** Stack-exhaustion denial of service in a glob helper reachable only when linting developer-controlled files. Nothing from this chain is in the production bundle or image.
-- **Recommended fix:** Clear at the next dependency cycle when `@vue/eslint-config-typescript` publishes a release that lifts `fast-glob`; do not apply `npm audit fix --force`, which downgrades the config.
-- **Status:** Open <!-- issue: #611 -->
+- **Affected endpoint or mechanic:** `projects/frontend` and `projects/master-frontend` devDependencies (`@vue/eslint-config-typescript` -> `fast-glob` -> `micromatch` -> `braces`, GHSA-vfj7-8cjw-p6xm).
+- **Risk description:** Stack-exhaustion denial of service in a glob helper, reachable only when linting developer-controlled files. Nothing from this chain is in the production bundle or image. No patched release exists: `braces@3.0.3` is the latest published version and is inside the vulnerable range (`<=3.0.3`), and the only `npm audit fix` proposal is a semver-major downgrade of the lint config to 14.0.1.
+- **Recommended fix:** Accepted risk until upstream publishes a fixed `braces`; re-check `npm view braces version` in each weekly audit and do not apply `npm audit fix --force`. CI keeps gating production dependencies with `npm audit --omit=dev`.
+- **Status:** Open (accepted, no upstream fix available) <!-- issue: #611 -->
