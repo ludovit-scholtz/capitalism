@@ -153,6 +153,32 @@ public sealed partial class TickContext
         var companyBuildings = BuildingsById.Values
             .Where(building => building.CompanyId == companyId)
             .ToList();
+        return ComputeAssetValue(companyId, companyBuildings);
+    }
+
+    /// <summary>
+    /// Asset value of every company in one pass over the buildings. <see cref="GetCompanyAssetValue"/> scans all buildings
+    /// per call, so calling it per building (or per company) is quadratic; phases that need the values of many companies
+    /// take this snapshot once instead. Each entry equals what <see cref="GetCompanyAssetValue"/> returns at the same moment.
+    /// </summary>
+    public Dictionary<Guid, decimal> ComputeAllCompanyAssetValues()
+    {
+        var buildingsByCompany = BuildingsById.Values
+            .GroupBy(building => building.CompanyId)
+            .ToDictionary(group => group.Key, group => group.ToList());
+        var result = new Dictionary<Guid, decimal>(CompaniesById.Count);
+        foreach (var companyId in CompaniesById.Keys)
+        {
+            result[companyId] = ComputeAssetValue(
+                companyId,
+                buildingsByCompany.TryGetValue(companyId, out var companyBuildings) ? companyBuildings : []);
+        }
+
+        return result;
+    }
+
+    private decimal ComputeAssetValue(Guid companyId, IReadOnlyCollection<Building> companyBuildings)
+    {
         var buildingValue = companyBuildings.Sum(Api.Utilities.WealthCalculator.GetBuildingValue);
         var inventoryValue = companyBuildings.Sum(building =>
             InventoryByBuilding.TryGetValue(building.Id, out var inventories)

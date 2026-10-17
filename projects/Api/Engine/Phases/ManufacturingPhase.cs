@@ -18,10 +18,9 @@ public sealed class ManufacturingPhase : ITickPhase
         if (!context.BuildingsByType.TryGetValue(BuildingType.Factory, out var factories))
             return Task.CompletedTask;
 
-        var maxCompanyAssetValue = context.CompaniesById.Keys
-            .Select(context.GetCompanyAssetValue)
-            .DefaultIfEmpty(0m)
-            .Max();
+        // One pass over the buildings instead of one scan per company (and per unit) below.
+        var assetValues = context.ComputeAllCompanyAssetValues();
+        var maxCompanyAssetValue = assetValues.Values.DefaultIfEmpty(0m).Max();
 
         foreach (var building in factories)
         {
@@ -39,7 +38,7 @@ public sealed class ManufacturingPhase : ITickPhase
             {
                 if (unit.UnitType != UnitType.Manufacturing) continue;
                 if (context.UnitsUnderUpgrade.Contains(unit.Id)) continue;
-                ProcessManufacturingUnit(context, building, unit, efficiency, maxCompanyAssetValue);
+                ProcessManufacturingUnit(context, building, unit, efficiency, assetValues, maxCompanyAssetValue);
             }
         }
 
@@ -51,6 +50,7 @@ public sealed class ManufacturingPhase : ITickPhase
         Building building,
         BuildingUnit unit,
         decimal efficiency,
+        IReadOnlyDictionary<Guid, decimal> assetValues,
         decimal maxCompanyAssetValue)
     {
         if (!unit.ProductTypeId.HasValue) return;
@@ -214,7 +214,7 @@ public sealed class ManufacturingPhase : ITickPhase
             var hourlyWage = CompanyEconomyCalculator.GetEffectiveHourlyWage(city, salaryMultiplier, context.GetWageIndex(city.Id));
             var overheadRate = CompanyEconomyCalculator.ComputeAdministrationOverheadRate(
                 company,
-                context.GetCompanyAssetValue(company.Id),
+                assetValues.GetValueOrDefault(company.Id),
                 maxCompanyAssetValue,
                 context.CurrentTick);
 

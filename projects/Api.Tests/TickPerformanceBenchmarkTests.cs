@@ -10,7 +10,7 @@ namespace Api.Tests;
 
 /// <summary>
 /// Tick performance gate. Seeds a deterministic world, processes ticks through the real pipeline and fails when the
-/// measured tick exceeds the budget. Runs a 1/50 slice by default; set TICK_BENCH_SCALE=full to benchmark the
+/// measured tick exceeds the budget. Runs a 1/50 slice by default; set TICK_BENCH_SCALE=medium (2,000 buildings) or full to benchmark the
 /// product requirement (1,000 players, 20,000 buildings, 500,000 units) and TICK_BENCH_BUDGET_MS to override the budget.
 /// </summary>
 public sealed class TickPerformanceBenchmarkTests(ITestOutputHelper output)
@@ -26,8 +26,11 @@ public sealed class TickPerformanceBenchmarkTests(ITestOutputHelper output)
     [Fact]
     public async Task FullTick_OnSeededWorld_StaysWithinBudget()
     {
-        var full = string.Equals(Environment.GetEnvironmentVariable("TICK_BENCH_SCALE"), "full", StringComparison.OrdinalIgnoreCase);
-        var scale = full ? TickBenchmarkScale.Full : TickBenchmarkScale.Ci;
+        var scaleName = Environment.GetEnvironmentVariable("TICK_BENCH_SCALE");
+        var full = string.Equals(scaleName, "full", StringComparison.OrdinalIgnoreCase);
+        var scale = full
+            ? TickBenchmarkScale.Full
+            : string.Equals(scaleName, "medium", StringComparison.OrdinalIgnoreCase) ? TickBenchmarkScale.Medium : TickBenchmarkScale.Ci;
         var budgetMs = long.TryParse(Environment.GetEnvironmentVariable("TICK_BENCH_BUDGET_MS"), out var overridden)
             ? overridden
             : full ? 1_000 : CiBudgetMs;

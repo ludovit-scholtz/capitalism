@@ -14,6 +14,9 @@ internal sealed record TickBenchmarkScale(int Players, int BuildingsPerPlayer, i
     /// <summary>The product requirement: 1,000 users, 20,000 buildings, 500,000 units.</summary>
     public static TickBenchmarkScale Full { get; } = new(1_000, 20, 25);
 
+    /// <summary>A tenth of <see cref="Full"/> (2,000 buildings): large enough to expose quadratic behaviour, still seedable in seconds.</summary>
+    public static TickBenchmarkScale Medium { get; } = new(100, 20, 25);
+
     /// <summary>A 1/50 slice of <see cref="Full"/> that is cheap enough to run on every CI build.</summary>
     public static TickBenchmarkScale Ci { get; } = new(20, 20, 25);
 }
