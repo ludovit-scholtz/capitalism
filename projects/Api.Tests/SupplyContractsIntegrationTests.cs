@@ -313,6 +313,69 @@ public sealed class SupplyContractsIntegrationTests
         await processor.ProcessTickAsync();
     }
 
+    [Fact]
+    public async Task CancelSupplyContract_ByBuyerOfActiveContract_MovesEarlyCancellationFeeBetweenBankAccounts()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var sellerToken = await RegisterAndGetTokenAsync(client, $"supply-fee-seller-{Guid.NewGuid():N}@example.com");
+        var buyerToken = await RegisterAndGetTokenAsync(client, $"supply-fee-buyer-{Guid.NewGuid():N}@example.com");
+        var sellerPlayerId = await GetMeIdAsync(client, sellerToken);
+        var buyerPlayerId = await GetMeIdAsync(client, buyerToken);
+        var seeded = await SeedSupplyContextAsync(factory, sellerPlayerId, buyerPlayerId, withBuyerPurchaseUnit: true, sellerInventoryQuantity: 1000m);
+        var contractId = await ProposeContractAsync(client, sellerToken, seeded);
+        await ExecuteGraphQlAsync(client, "mutation($id: UUID!) { acceptSupplyContract(id: $id) { success } }", new { id = contractId }, buyerToken);
+
+        await ExecuteGraphQlAsync(client, "mutation($id: UUID!) { cancelSupplyContract(id: $id) { success } }", new { id = contractId }, buyerToken);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var sellerBalance = await db.BankAccounts.Where(a => a.CompanyId == seeded.SellerCompanyId).SumAsync(a => a.Balance);
+        var buyerBalance = await db.BankAccounts.Where(a => a.CompanyId == seeded.BuyerCompanyId).SumAsync(a => a.Balance);
+        // quantityPerTick 100 x price 12 x 10% = 120
+        Assert.Equal(1_000_000m + 120m, sellerBalance);
+        Assert.Equal(1_000_000m - 120m, buyerBalance);
+        var contract = await db.SupplyContracts.AsNoTracking().FirstAsync(c => c.Id == contractId);
+        Assert.Equal(0, contract.PenaltyCount); // under-delivery tally only; the cancellation fee is not a delivery penalty
+    }
+
+    [Fact]
+    public async Task CancelSupplyContract_ByBuyerWhoCannotPayFee_IsRejectedAndContractStaysActive()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var sellerToken = await RegisterAndGetTokenAsync(client, $"supply-nofee-seller-{Guid.NewGuid():N}@example.com");
+        var buyerToken = await RegisterAndGetTokenAsync(client, $"supply-nofee-buyer-{Guid.NewGuid():N}@example.com");
+        var sellerPlayerId = await GetMeIdAsync(client, sellerToken);
+        var buyerPlayerId = await GetMeIdAsync(client, buyerToken);
+        var seeded = await SeedSupplyContextAsync(factory, sellerPlayerId, buyerPlayerId, withBuyerPurchaseUnit: true, sellerInventoryQuantity: 1000m);
+        var contractId = await ProposeContractAsync(client, sellerToken, seeded);
+        await ExecuteGraphQlAsync(client, "mutation($id: UUID!) { acceptSupplyContract(id: $id) { success } }", new { id = contractId }, buyerToken);
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            foreach (var account in await db.BankAccounts.Where(a => a.CompanyId == seeded.BuyerCompanyId).ToListAsync())
+            {
+                account.Balance = 0m;
+            }
+
+            await db.SaveChangesAsync();
+        }
+
+        var result = await ExecuteGraphQlAsync(client, "mutation($id: UUID!) { cancelSupplyContract(id: $id) { success } }", new { id = contractId }, buyerToken);
+
+        Assert.Equal(
+            "SUPPLY_CONTRACT_CANCELLATION_FEE_UNPAYABLE",
+            result.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
+        await using var verify = factory.Services.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<AppDbContext>();
+        var contract = await verifyDb.SupplyContracts.AsNoTracking().FirstAsync(c => c.Id == contractId);
+        Assert.Equal(SupplyContractStatus.Active, contract.Status);
+        Assert.Equal(0, contract.PenaltyCount);
+    }
+
     [Theory]
     [InlineData("cancelSupplyContract")]
     [InlineData("rejectSupplyContract")]

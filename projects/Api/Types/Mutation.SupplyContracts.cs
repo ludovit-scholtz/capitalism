@@ -331,35 +331,93 @@ public sealed partial class Mutation
 
         var currentTick = await GetCurrentTickAsync(db);
         var wasActive = contract.Status == SupplyContractStatus.Active;
+        var buyerPaysFee = wasActive && actorCompany.Id == contract.BuyerCompanyId;
+
+        // An early cancellation by the buyer costs real money. Settle it before closing the contract so a
+        // buyer who cannot pay is rejected instead of walking away for free.
+        var feeDebits = new List<(BankAccount Account, decimal Amount)>();
+        BankAccount? feeReceiverAccount = null;
+        var cancellationFee = 0m;
+        if (buyerPaysFee)
+        {
+            cancellationFee = decimal.Round(contract.QuantityPerTick * contract.PricePerUnit * 0.1m, 4, MidpointRounding.AwayFromZero);
+            var accounts = await db.BankAccounts
+                .Where(account => account.CompanyId == contract.BuyerCompanyId || account.CompanyId == contract.SellerCompanyId)
+                .ToListAsync(cancellationToken);
+            var buyerAccounts = accounts.Where(account => account.CompanyId == contract.BuyerCompanyId).ToList();
+            var sellerAccounts = accounts.Where(account => account.CompanyId == contract.SellerCompanyId).ToList();
+            feeReceiverAccount = CompanyBankingService.FindPreferredAccount(sellerAccounts, contract.CurrencyCode);
+            if (cancellationFee > 0m && feeReceiverAccount is null)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("The seller cannot currently receive the early cancellation fee. Please contact the seller or try again later.")
+                        .SetCode("SUPPLY_CONTRACT_FEE_RECEIVER_UNAVAILABLE")
+                        .Build());
+            }
+
+            // Pay across the buyer accounts in the contract currency, in the order TryDebit drains them.
+            var remaining = cancellationFee;
+            foreach (var account in CompanyBankingService.GetCandidateAccountsForPayment(buyerAccounts, contract.CurrencyCode))
+            {
+                if (remaining <= 0m)
+                {
+                    break;
+                }
+
+                var take = Math.Min(account.Balance, remaining);
+                if (take > 0m)
+                {
+                    feeDebits.Add((account, take));
+                    remaining -= take;
+                }
+            }
+
+            if (remaining > 0m)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage($"Your {contract.CurrencyCode} accounts cannot cover the {cancellationFee:N2} early cancellation fee.")
+                        .SetCode("SUPPLY_CONTRACT_CANCELLATION_FEE_UNPAYABLE")
+                        .Build());
+            }
+        }
+
         contract.Status = SupplyContractStatus.Cancelled;
         contract.CancelledAtTick = currentTick;
         contract.CancelledAtUtc = DateTime.UtcNow;
 
-        if (wasActive && actorCompany.Id == contract.BuyerCompanyId)
+        if (feeDebits.Count > 0 && feeReceiverAccount is not null)
         {
-            var earlyTerminationPenalty = decimal.Round(contract.QuantityPerTick * contract.PricePerUnit * 0.1m, 4, MidpointRounding.AwayFromZero);
-            var sellerCompanyId = contract.SellerCompanyId;
-            var buyerCompanyId = contract.BuyerCompanyId;
+            foreach (var (account, amount) in feeDebits)
+            {
+                account.Balance -= amount;
+                account.ConcurrencyToken = Guid.NewGuid();
+                db.LedgerEntries.Add(new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = contract.BuyerCompanyId,
+                    BankAccountId = account.Id,
+                    Category = LedgerCategory.SupplyContractPenalty,
+                    Description = "Early cancellation fee paid",
+                    Amount = -amount,
+                    RecordedAtTick = currentTick,
+                    RecordedAtUtc = DateTime.UtcNow,
+                    ResourceTypeId = contract.ResourceTypeId,
+                    ProductTypeId = contract.ProductTypeId,
+                });
+            }
 
+            feeReceiverAccount.Balance += cancellationFee;
+            feeReceiverAccount.ConcurrencyToken = Guid.NewGuid();
             db.LedgerEntries.Add(new LedgerEntry
             {
                 Id = Guid.NewGuid(),
-                CompanyId = sellerCompanyId,
+                CompanyId = contract.SellerCompanyId,
+                BankAccountId = feeReceiverAccount.Id,
                 Category = LedgerCategory.SupplyContractPenalty,
                 Description = "Early cancellation fee received",
-                Amount = earlyTerminationPenalty,
-                RecordedAtTick = currentTick,
-                RecordedAtUtc = DateTime.UtcNow,
-                ResourceTypeId = contract.ResourceTypeId,
-                ProductTypeId = contract.ProductTypeId,
-            });
-            db.LedgerEntries.Add(new LedgerEntry
-            {
-                Id = Guid.NewGuid(),
-                CompanyId = buyerCompanyId,
-                Category = LedgerCategory.SupplyContractPenalty,
-                Description = "Early cancellation fee paid",
-                Amount = -earlyTerminationPenalty,
+                Amount = cancellationFee,
                 RecordedAtTick = currentTick,
                 RecordedAtUtc = DateTime.UtcNow,
                 ResourceTypeId = contract.ResourceTypeId,
@@ -367,7 +425,19 @@ public sealed partial class Mutation
             });
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("The contract or your accounts changed while cancelling. Please try again.")
+                    .SetCode("CONCURRENT_MODIFICATION")
+                    .Build());
+        }
+
         var populated = await LoadSupplyContractAsync(db, contract.Id, cancellationToken);
         return new SupplyContractActionResult
         {
