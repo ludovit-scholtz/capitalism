@@ -310,6 +310,13 @@ public sealed partial class Mutation
 
         if (acceptedRows != 1)
         {
+            // Lost the race: discard the tracked money movements and roll back so they can never be persisted by the audit-log save.
+            if (tx is not null)
+            {
+                await tx.RollbackAsync();
+            }
+
+            db.ChangeTracker.Clear();
             var latest = await db.BuildingSaleOffers
                 .AsNoTracking()
                 .Where(o => o.Id == input.OfferId)
@@ -323,10 +330,6 @@ public sealed partial class Mutation
                 buyerPlayerId: latest?.BuyerPlayerId ?? offer.BuyerPlayerId,
                 expectedVersion: input.OfferVersion,
                 actualVersion: latest?.OfferVersion);
-            if (tx is not null)
-            {
-                await tx.CommitAsync();
-            }
             throw BuildOfferVersionConflictException();
         }
 
