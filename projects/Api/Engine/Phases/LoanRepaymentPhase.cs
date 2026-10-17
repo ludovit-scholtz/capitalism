@@ -241,7 +241,9 @@ public sealed class LoanRepaymentPhase : ITickPhase
             // Charge borrower whatever cash they have as partial payment (optional, simple model: skip full payment).
             // For first pass: record missed payment only (no partial payment collection).
 
-            // Record penalty in ledger for borrower.
+            // The penalty is added to the loan balance (a debt); no cash leaves the borrower now and it is paid later as part of
+            // the repayment. The ledger is a record of cash movements that reconciles with bank balances, so the accrual is
+            // shown as an informational zero-amount row instead of a phantom debit (found by the economy invariant suite).
             if (penalty > 0m)
             {
                 context.Db.LedgerEntries.Add(new LedgerEntry
@@ -250,8 +252,8 @@ public sealed class LoanRepaymentPhase : ITickPhase
                     CompanyId = borrower.Id,
                     BankAccountId = borrowerSettlementAccount?.Id,
                     Category = LedgerCategory.LoanPenalty,
-                    Description = $"Missed loan payment penalty (missed payment #{loan.MissedPayments})",
-                    Amount = -penalty,
+                    Description = $"Missed loan payment #{loan.MissedPayments}: penalty of {penalty.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)} added to the loan balance",
+                    Amount = 0m,
                     RecordedAtTick = context.CurrentTick,
                     RecordedAtUtc = DateTime.UtcNow
                 });

@@ -42,11 +42,13 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
         await ScriptedAcceptAndBuyerCancelAsync(client, world, rng);
         Assert.Null(await RandomForexSwapAsync(client, world, rng));
         var scriptedSaleError = await BuildingSaleAsync(client, world, rng);
+        var scriptedLoanError = await RandomLoanAsync(client, world, rng);
+        Assert.True(scriptedLoanError is null, $"Scripted loan failed (seed={seed}): {scriptedLoanError}");
         Assert.True(scriptedSaleError is null, $"Scripted building sale failed (seed={seed}): {scriptedSaleError}");
         var applied = new Dictionary<string, int>();
         for (var step = 1; step <= Steps; step++)
         {
-            switch (rng.Next(7))
+            switch (rng.Next(8))
             {
                 case 0:
                 case 1:
@@ -68,6 +70,9 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
                 case 5:
                     if (await BuildingSaleAsync(client, world, rng) is null) applied["buildingSale"] = applied.GetValueOrDefault("buildingSale") + 1;
                     break;
+                case 6:
+                    if (await RandomLoanAsync(client, world, rng) is null) applied["loan"] = applied.GetValueOrDefault("loan") + 1;
+                    break;
                 default:
                     await TickAsync(factory);
                     break;
@@ -79,8 +84,20 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
             }
         }
 
-        await TickAsync(factory);
-        await AssertInvariantsAsync(factory, baseline, seed, Steps + 1);
+        // Let the short loans reach their payment and due ticks (repayments, interest, defaults) and re-check after every tick.
+        for (var extra = 0; extra < 14; extra++)
+        {
+            await TickAsync(factory);
+            await AssertInvariantsAsync(factory, baseline, seed, Steps + 1 + extra);
+        }
+
+        await using (var loanScope = factory.Services.CreateAsyncScope())
+        {
+            var loanDb = loanScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var loans = await loanDb.Loans.AsNoTracking().ToListAsync();
+            output.WriteLine($"Loans: {loans.Count} ({string.Join(", ", loans.GroupBy(l => l.Status).Select(g => $"{g.Key}={g.Count()}"))}), payments made: {loans.Sum(l => l.PaymentsMade)}");
+            Assert.NotEmpty(loans);
+        }
 
         // Guard against a vacuous run: the random generator must have actually moved money.
         output.WriteLine($"Applied actions: {string.Join(", ", applied.Select(kv => $"{kv.Key}={kv.Value}"))}");
@@ -356,6 +373,36 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
         return null;
     }
 
+    /// <summary>
+    /// A company borrows directly from the bank owned by player 0, pledging one of its buildings, with a short duration so that
+    /// repayments and the due date fall inside the simulated run. Returns null on success, else the error description.
+    /// </summary>
+    private static async Task<string?> RandomLoanAsync(HttpClient client, World world, Random rng)
+    {
+        var borrowers = world.Players.Skip(1).Where(p => p.Buildings.Count > 0).ToList();
+        if (borrowers.Count == 0) return "NO_BORROWER_WITH_A_BUILDING";
+        var borrower = borrowers[rng.Next(borrowers.Count)];
+        var principal = 5_000m + rng.Next(0, 10) * 1_000m;
+
+        var result = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            "mutation($input: AcceptLoanInput!) { acceptLoan(input: $input) { id } }",
+            new
+            {
+                input = new
+                {
+                    loanOfferId = world.BankBuildingId,
+                    borrowerCompanyId = borrower.CompanyId,
+                    principalAmount = principal,
+                    durationTicks = 6L,
+                    collateralBuildingId = borrower.Buildings[rng.Next(borrower.Buildings.Count)],
+                    bankAccountId = borrower.AccountA,
+                },
+            },
+            borrower.Token);
+        return DescribeError(result);
+    }
+
     private static BankAccount NewAccount(Guid? companyId, string currency, decimal balance) => new()
     {
         Id = Guid.NewGuid(),
@@ -415,10 +462,19 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
         }
 
         await db.SaveChangesAsync();
-        return new World(players, resource.Id, city.CurrencyCode, foreignCurrency);
+        // Player 0 also owns a bank that lends directly to the other companies.
+        var bank = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = players[0].CompanyId, CityId = city.Id, Type = BuildingType.Bank, Name = "Invariant Bank",
+            BaseCapitalDeposited = true, TotalDeposits = 5_000_000m, LendingInterestRatePercent = 10m,
+            Latitude = city.Latitude, Longitude = city.Longitude, BuiltAtUtc = DateTime.UtcNow,
+        };
+        db.Buildings.Add(bank);
+        await db.SaveChangesAsync();
+        return new World(players, resource.Id, city.CurrencyCode, foreignCurrency, bank.Id);
     }
 
     private sealed record PlayerSlot(string Token, Guid CompanyId, Guid SalesUnitId, Guid AccountA, Guid AccountB, Guid AccountC, List<Guid> Buildings);
 
-    private sealed record World(List<PlayerSlot> Players, Guid ResourceTypeId, string CityCurrency, string ForeignCurrency);
+    private sealed record World(List<PlayerSlot> Players, Guid ResourceTypeId, string CityCurrency, string ForeignCurrency, Guid BankBuildingId);
 }
