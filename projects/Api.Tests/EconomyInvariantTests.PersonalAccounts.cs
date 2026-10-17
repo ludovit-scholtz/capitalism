@@ -29,5 +29,13 @@ public sealed partial class EconomyInvariantTests
         var violations = await EconomyInvariantChecker.CheckPersonalAccountsUntouchedAsync(db, baseline);
         Assert.Contains(violations, v => v.StartsWith("PERSONAL_ACCOUNT_CHANGED") && v.Contains(personal.Id.ToString()));
         Assert.Contains(violations, v => v.StartsWith("PERSONAL_ACCOUNT_REMOVED") && v.Contains(gone.Id.ToString()));
+
+        var created = NewAccount(null, "EUR", 5m);
+        created.PlayerId = Guid.NewGuid();
+        db.BankAccounts.Add(created);
+        await db.SaveChangesAsync();
+        // The full invariant run (not only the single check) reports it.
+        var all = await EconomyInvariantChecker.CheckAllAsync(db, baseline);
+        Assert.Contains(all, v => v.StartsWith("PERSONAL_ACCOUNT_CREATED") && v.Contains(created.Id.ToString()));
     }
 }
