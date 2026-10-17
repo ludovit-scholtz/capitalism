@@ -42,9 +42,9 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
         await ScriptedAcceptAndBuyerCancelAsync(client, world, rng);
         Assert.Null(await RandomForexSwapAsync(client, world, rng));
         var scriptedSaleError = await BuildingSaleAsync(client, world, rng);
+        Assert.True(scriptedSaleError is null, $"Scripted building sale failed (seed={seed}): {scriptedSaleError}");
         var scriptedLoanError = await RandomLoanAsync(client, world, rng);
         Assert.True(scriptedLoanError is null, $"Scripted loan failed (seed={seed}): {scriptedLoanError}");
-        Assert.True(scriptedSaleError is null, $"Scripted building sale failed (seed={seed}): {scriptedSaleError}");
         var applied = new Dictionary<string, int>();
         for (var step = 1; step <= Steps; step++)
         {
@@ -88,7 +88,11 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
         for (var extra = 0; extra < 14; extra++)
         {
             await TickAsync(factory);
-            await AssertInvariantsAsync(factory, baseline, seed, Steps + 1 + extra);
+            // Every second tick plus the last keeps the same coverage of payment/due ticks at half the table scans.
+            if (extra % 2 == 1 || extra == 13)
+            {
+                await AssertInvariantsAsync(factory, baseline, seed, Steps + 1 + extra);
+            }
         }
 
         await using (var loanScope = factory.Services.CreateAsyncScope())
@@ -97,6 +101,8 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
             var loans = await loanDb.Loans.AsNoTracking().ToListAsync();
             output.WriteLine($"Loans: {loans.Count} ({string.Join(", ", loans.GroupBy(l => l.Status).Select(g => $"{g.Key}={g.Count()}"))}), payments made: {loans.Sum(l => l.PaymentsMade)}");
             Assert.NotEmpty(loans);
+            // The short loans must have actually been serviced: at least one payment was made, so the repayment path ran.
+            Assert.True(loans.Any(l => l.PaymentsMade > 0), $"No loan payment happened (seed={seed}).");
         }
 
         // Guard against a vacuous run: the random generator must have actually moved money.

@@ -102,6 +102,21 @@ public sealed class LoanRepaymentPhase : ITickPhase
         return Math.Min(principal, loan.RemainingPrincipal);
     }
 
+    /// <summary>
+    /// The part of a principal repayment that settles accrued missed-payment penalty: the penalty is part of the remaining
+    /// principal, so each repayment settles the same proportion of both.
+    /// </summary>
+    internal static decimal ComputePenaltyShare(Loan loan, decimal principalPayment)
+    {
+        if (loan.AccumulatedPenalty <= 0m || loan.RemainingPrincipal <= 0m || principalPayment <= 0m)
+        {
+            return 0m;
+        }
+
+        var ratio = Math.Min(1m, principalPayment / loan.RemainingPrincipal);
+        return decimal.Round(Math.Min(loan.AccumulatedPenalty, loan.AccumulatedPenalty * ratio), 4, MidpointRounding.AwayFromZero);
+    }
+
     private static void ProcessSinglePayment(
         TickContext context,
         Loan loan,
@@ -141,6 +156,13 @@ public sealed class LoanRepaymentPhase : ITickPhase
             borrowerSettlementAccount.Balance -= totalPayment;
 
             CompanyBankingService.TryCredit(context.GetCompanyBankAccounts(lender.Id), totalPayment, loanCurrencyCode, out var lenderCreditedAccount);
+
+            // The principal repaid includes a proportional share of any accrued missed-payment penalty. That share is settled now:
+            // it becomes a real expense for the borrower and income for the lender, and the rest stays plain principal. The cash
+            // moved (principalPayment) is unchanged.
+            var penaltyShare = ComputePenaltyShare(loan, principalPayment);
+            var pureprincipal = principalPayment - penaltyShare;
+            loan.AccumulatedPenalty = Math.Max(0m, loan.AccumulatedPenalty - penaltyShare);
             loan.RemainingPrincipal = Math.Max(0m, loan.RemainingPrincipal - principalPayment);
             loan.PaymentsMade++;
             loan.PaymentAmount = totalPayment;
@@ -163,13 +185,39 @@ public sealed class LoanRepaymentPhase : ITickPhase
                 BankAccountId = borrowerSettlementAccount?.Id,
                 Category = LedgerCategory.LoanRepaymentPrincipal,
                 Description = $"Loan repayment (principal) – payment {loan.PaymentsMade}/{loan.TotalPayments}",
-                Amount = -principalPayment,
+                Amount = -pureprincipal,
                 RecordedAtTick = context.CurrentTick,
                 RecordedAtUtc = DateTime.UtcNow
             });
 
+            if (penaltyShare > 0m)
+            {
+                context.Db.LedgerEntries.Add(new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = borrower.Id,
+                    BankAccountId = borrowerSettlementAccount?.Id,
+                    Category = LedgerCategory.LoanPenalty,
+                    Description = $"Missed-payment penalty paid with payment {loan.PaymentsMade}/{loan.TotalPayments}",
+                    Amount = -penaltyShare,
+                    RecordedAtTick = context.CurrentTick,
+                    RecordedAtUtc = DateTime.UtcNow
+                });
+                context.Db.LedgerEntries.Add(new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = lender.Id,
+                    BankAccountId = lenderCreditedAccount?.Id,
+                    Category = LedgerCategory.LoanInterestIncome,
+                    Description = $"Late-payment penalty income from {borrower.Name} – payment {loan.PaymentsMade}/{loan.TotalPayments}",
+                    Amount = penaltyShare,
+                    RecordedAtTick = context.CurrentTick,
+                    RecordedAtUtc = DateTime.UtcNow
+                });
+            }
+
             // Lender ledger: principal income.
-            if (principalPayment > 0m)
+            if (pureprincipal > 0m)
             {
                 context.Db.LedgerEntries.Add(new LedgerEntry
                 {
@@ -178,7 +226,7 @@ public sealed class LoanRepaymentPhase : ITickPhase
                     BankAccountId = lenderCreditedAccount?.Id,
                     Category = LedgerCategory.LoanRepaymentPrincipal,
                     Description = $"Loan repayment (principal) from {borrower.Name} – payment {loan.PaymentsMade}/{loan.TotalPayments}",
-                    Amount = principalPayment,
+                    Amount = pureprincipal,
                     RecordedAtTick = context.CurrentTick,
                     RecordedAtUtc = DateTime.UtcNow
                 });
