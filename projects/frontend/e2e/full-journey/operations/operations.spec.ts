@@ -214,3 +214,22 @@ test('Operations overview shows a sortable tick phase table and flags phases ove
   await panel.getByRole('button', { name: /^phase$/i }).click()
   await expect(rows.first()).toContainText('Manufacturing')
 })
+
+test('Operations overview lists blocked access attempts with their real reason', async ({ page }) => {
+  const admin = makeAdminPlayer()
+  admin.onboardingCompletedAtUtc = '2026-01-01T00:00:00Z'
+  const state = setupMockApi(page, { players: [admin] })
+  buildAdminSession(state, admin)
+
+  await goToOperationsAsAdmin(page, state, admin, '/statistics')
+
+  const panel = page.getByTestId('object-access-denials')
+  await expect(panel.getByRole('heading', { name: /blocked access attempts/i })).toBeVisible()
+  await expect(panel).toContainText(/1 look like probing/i)
+  const rows = panel.locator('tbody tr')
+  await expect(rows).toHaveCount(2)
+  await expect(rows.first()).toContainText(/object does not exist/i)
+  await expect(rows.first()).toContainText('22222222')
+  await expect(rows.nth(1)).toContainText(/wrong account context/i)
+  await expect(rows.nth(1)).toContainText(/api key/i)
+})

@@ -4198,6 +4198,27 @@ export default {
       globalAdminsEmpty: 'Noch keine globalen Admin-Berechtigungen.',
       rootOnly: 'Nur Root-Administratoren dürfen globale Berechtigungen verwalten.',
     },
+    objectDenials: {
+      title: 'Blockierte Zugriffsversuche',
+      summary: 'Letzte {window} blockierte Versuche ({probes} wirken wie Ausspähen), {total} seit dem Serverstart.',
+      refresh: 'Aktualisieren',
+      empty: 'Seit dem Serverstart wurden keine Zugriffsversuche blockiert.',
+      byReason: 'Blockierte Versuche nach Grund',
+      apiKey: 'API-Schlüssel',
+      columns: {
+        time: 'Zeit',
+        object: 'Objekt',
+        reason: 'Grund',
+        actor: 'Spieler',
+      },
+      reasons: {
+        not_found: 'Objekt existiert nicht',
+        not_owned: 'Objekt gehört jemand anderem',
+        wrong_account_context: 'Falscher Kontokontext',
+        not_available: 'Im aktuellen Zustand nicht verfügbar',
+        other: 'Sonstiges',
+      },
+    },
     tickTimings: {
       title: 'Tick-Leistung',
       summary: 'Letzte {ticks} Ticks: Durchschnitt {average}, langsamster {max}. Phasen mit einem Durchschnitt über {budget} sind markiert.',

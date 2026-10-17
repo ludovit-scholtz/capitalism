@@ -5,7 +5,8 @@ namespace Api.Security;
 
 public sealed class ObjectAuthorizationService(
     ILogger<ObjectAuthorizationService> logger,
-    IHttpContextAccessor httpContextAccessor)
+    IHttpContextAccessor httpContextAccessor,
+    ObjectDenialRecorder? denialRecorder = null)
 {
     private readonly ILogger<ObjectAuthorizationService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor ?? throw new ArgumentNullException(nameof(httpContextAccessor));
@@ -93,6 +94,14 @@ public sealed class ObjectAuthorizationService(
                 requestedObjectId,
                 actualFailureReason,
             });
+        denialRecorder?.Record(new ObjectDenialEvent(
+            DateTime.UtcNow,
+            actorUserId,
+            apiKeyContext?.KeyId,
+            requestedObjectType,
+            requestedObjectId,
+            actualFailureReason,
+            ObjectDenialRecorder.IsProbeSignal(actualFailureReason)));
     }
 
     private static GraphQLException BuildDeniedException() =>

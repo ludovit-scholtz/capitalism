@@ -1,12 +1,12 @@
 {
-  "generatedAtUtc": "2026-10-17T12:07:31.2856603Z",
+  "generatedAtUtc": "2026-10-17T22:07:57.9189688Z",
   "operations": [
     {
       "kind": "mutation",
       "methodName": "AcceptBuildingOffer",
       "graphQlName": "acceptBuildingOffer",
       "domain": "other",
-      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.BuildingMarket.cs",
+      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.BuildingMarket.Accept.cs",
       "hasExplicitAuthorize": true,
       "coverage": {
         "hasNegativeCoverage": true,
@@ -246,7 +246,7 @@
       "methodName": "CancelBuildingOffer",
       "graphQlName": "cancelBuildingOffer",
       "domain": "other",
-      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.BuildingMarket.cs",
+      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.BuildingMarket.Cancel.cs",
       "hasExplicitAuthorize": true,
       "coverage": {
         "hasNegativeCoverage": true,
@@ -304,7 +304,7 @@
       "methodName": "CancelSupplyContract",
       "graphQlName": "cancelSupplyContract",
       "domain": "other",
-      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.SupplyContracts.cs",
+      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.SupplyContracts.Cancel.cs",
       "hasExplicitAuthorize": true,
       "coverage": {
         "hasNegativeCoverage": false,
@@ -368,7 +368,7 @@
       "methodName": "CompleteFirstSaleMilestone",
       "graphQlName": "completeFirstSaleMilestone",
       "domain": "other",
-      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.RealEstate.cs",
+      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.RealEstate.Rent.cs",
       "hasExplicitAuthorize": true,
       "coverage": {
         "hasNegativeCoverage": true,
@@ -1273,7 +1273,7 @@
       "methodName": "PurchaseLot",
       "graphQlName": "purchaseLot",
       "domain": "other",
-      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.RealEstate.cs",
+      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.RealEstate.Rent.cs",
       "hasExplicitAuthorize": true,
       "coverage": {
         "hasNegativeCoverage": true,
@@ -1375,7 +1375,7 @@
       "methodName": "RejectBuildingOffer",
       "graphQlName": "rejectBuildingOffer",
       "domain": "other",
-      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.BuildingMarket.cs",
+      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.BuildingMarket.Cancel.cs",
       "hasExplicitAuthorize": true,
       "coverage": {
         "hasNegativeCoverage": false,
@@ -1405,7 +1405,7 @@
       "methodName": "RemoveDestroyedBuilding",
       "graphQlName": "removeDestroyedBuilding",
       "domain": "other",
-      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.RealEstate.cs",
+      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.RealEstate.Rent.cs",
       "hasExplicitAuthorize": true,
       "coverage": {
         "hasNegativeCoverage": true,
@@ -1459,7 +1459,7 @@
       "methodName": "RepayLoanDebt",
       "graphQlName": "repayLoanDebt",
       "domain": "lending",
-      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.Lending.cs",
+      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.Lending.Repay.cs",
       "hasExplicitAuthorize": true,
       "coverage": {
         "hasNegativeCoverage": true,
@@ -1496,7 +1496,7 @@
       "methodName": "ResetOnboardingProgress",
       "graphQlName": "resetOnboardingProgress",
       "domain": "other",
-      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.Onboarding.cs",
+      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.Onboarding.Reset.cs",
       "hasExplicitAuthorize": true,
       "coverage": {
         "hasNegativeCoverage": true,
@@ -1941,7 +1941,7 @@
       "methodName": "SetRentPerSqm",
       "graphQlName": "setRentPerSqm",
       "domain": "other",
-      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.RealEstate.cs",
+      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.RealEstate.Rent.cs",
       "hasExplicitAuthorize": true,
       "coverage": {
         "hasNegativeCoverage": true,
@@ -2004,7 +2004,7 @@
       "methodName": "StartOnboardingCompany",
       "graphQlName": "startOnboardingCompany",
       "domain": "other",
-      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.Onboarding.cs",
+      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.Onboarding.Reset.cs",
       "hasExplicitAuthorize": true,
       "coverage": {
         "hasNegativeCoverage": true,
@@ -2531,7 +2531,7 @@
       "methodName": "VoteDividend",
       "graphQlName": "voteDividend",
       "domain": "shareholder",
-      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.StockExchange.DividendGovernance.cs",
+      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.StockExchange.DividendGovernance.Vote.cs",
       "hasExplicitAuthorize": true,
       "coverage": {
         "hasNegativeCoverage": true,
@@ -4576,7 +4576,7 @@
       "methodName": "GetLedgerDrillDown",
       "graphQlName": "ledgerDrillDown",
       "domain": "finance",
-      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Query.Ledger.cs",
+      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Query.Ledger.DrillDown.cs",
       "hasExplicitAuthorize": true,
       "coverage": {
         "hasNegativeCoverage": true,
@@ -5117,6 +5117,9 @@
           "Strike_EndsWhenItsTimeIsUp",
           "StrikeOnABuildingThatLostPower_IsStillEndedWhenItsTimeIsUp",
           "CloseCompanyBankAccount_DefaultedLoanRepaymentAccount_ReturnsError",
+          "MissedPayment_AddsThePenaltyToTheLoanWithoutAnyCashMovementInTheLedger",
+          "ScheduledPaymentAfterAMiss_BooksThePenaltyShareAsExpenseAndIncomeWithoutChangingCash",
+          "ManualPayoff_BooksThePenaltyAsExpenseAndIncomeAndPrincipalForTheRest",
           "Register_DuplicateEmail_ReturnsNeutralMessage",
           "MarketIntelligence_ReturnsRankedSellersWithBrandQualityAndWeeklyVolume",
           "MarketPrice_Healthcare_ReturnsMedicineClearingPrice",
@@ -5214,6 +5217,8 @@
           "ResourceMovementPhase_DiagonalLinkUpLeft_MovesInventoryToUpperLeftNeighbor",
           "ResourceMovementPhase_DiagonalLinkDownLeft_MovesInventoryToBottomLeftNeighbor",
           "ResourceMovementPhase_SourceUnderUpgrade_DoesNotPushInventory",
+          "FullTick_OnPostgres_ReportsWhereTheTimeGoes",
+          "ProcessTick_RecordsContextLoadAndSaveAsOwnEntries_SoTheDashboardShowsWhereTheTimeGoes",
           "GetGameAdministrationAccessAsync",
           "AssignGlobalGameAdminAsync",
           "RemoveGlobalGameAdminAsync",
@@ -5340,7 +5345,7 @@
       "methodName": "GetMyCollateralBuildings",
       "graphQlName": "myCollateralBuildings",
       "domain": "lending",
-      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Query.Lending.cs",
+      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Query.Lending.Collateral.cs",
       "hasExplicitAuthorize": true,
       "coverage": {
         "hasNegativeCoverage": false,
@@ -5677,6 +5682,26 @@
     },
     {
       "kind": "query",
+      "methodName": "GetObjectAccessDenials",
+      "graphQlName": "objectAccessDenials",
+      "domain": "other",
+      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Query.OperationsObjectDenials.cs",
+      "hasExplicitAuthorize": true,
+      "coverage": {
+        "hasNegativeCoverage": true,
+        "hasPositiveCoverage": true,
+        "negativeTests": [
+          "ObjectAccessDenials_Unauthenticated_IsRejected"
+        ],
+        "positiveTests": [
+          "ObjectAccessDenials_NonAdmin_IsRejected",
+          "ObjectAccessDenials_Admin_SeesAProbeWithItsRealReason",
+          "ObjectAccessDenials_LimitIsClamped"
+        ]
+      }
+    },
+    {
+      "kind": "query",
       "methodName": "OpenContractOffers",
       "graphQlName": "openContractOffers",
       "domain": "other",
@@ -5884,7 +5909,7 @@
       "methodName": "GetProcurementPreview",
       "graphQlName": "procurementPreview",
       "domain": "lending",
-      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Query.Lending.cs",
+      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Query.Lending.Collateral.cs",
       "hasExplicitAuthorize": true,
       "coverage": {
         "hasNegativeCoverage": true,
@@ -6242,7 +6267,7 @@
       "methodName": "GetSourcingCandidates",
       "graphQlName": "sourcingCandidates",
       "domain": "lending",
-      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Query.Lending.cs",
+      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Query.Lending.Collateral.cs",
       "hasExplicitAuthorize": true,
       "coverage": {
         "hasNegativeCoverage": true,
@@ -6469,7 +6494,7 @@
       "methodName": "GetUnitUpgradeInfo",
       "graphQlName": "unitUpgradeInfo",
       "domain": "lending",
-      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Query.Lending.cs",
+      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Query.Lending.Collateral.cs",
       "hasExplicitAuthorize": true,
       "coverage": {
         "hasNegativeCoverage": false,

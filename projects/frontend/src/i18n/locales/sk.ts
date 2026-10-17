@@ -4182,6 +4182,27 @@ export default {
       globalAdminsEmpty: 'Zatiaľ neexistujú žiadne globálne granty.',
       rootOnly: 'Globálne granty môže spravovať len root administrátor.',
     },
+    objectDenials: {
+      title: 'Zablokované pokusy o prístup',
+      summary: 'Posledných {window} zablokovaných pokusov ({probes} vyzerá ako testovanie), {total} od spustenia servera.',
+      refresh: 'Obnoviť',
+      empty: 'Od spustenia servera neboli zablokované žiadne pokusy o prístup.',
+      byReason: 'Zablokované pokusy podľa dôvodu',
+      apiKey: 'API kľúč',
+      columns: {
+        time: 'Čas',
+        object: 'Objekt',
+        reason: 'Dôvod',
+        actor: 'Hráč',
+      },
+      reasons: {
+        not_found: 'Objekt neexistuje',
+        not_owned: 'Objekt patrí niekomu inému',
+        wrong_account_context: 'Nesprávny kontext účtu',
+        not_available: 'V aktuálnom stave nie je dostupný',
+        other: 'Iné',
+      },
+    },
     tickTimings: {
       title: 'Výkon ticku',
       summary: 'Posledných {ticks} tickov: priemer {average}, najpomalší {max}. Fázy s priemerom nad {budget} sú označené.',

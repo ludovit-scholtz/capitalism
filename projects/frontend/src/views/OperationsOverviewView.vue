@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useGameAdminStore } from '@/stores/gameAdmin'
 import { gqlRequest } from '@/lib/graphql'
-import TickPhaseTimingsPanel from '@/components/operations/TickPhaseTimingsPanel.vue'
+import OperationsDiagnosticsPanels from '@/components/operations/OperationsDiagnosticsPanels.vue'
 import type { NpcCompanySummary } from '@/types'
 
 const { t, locale } = useI18n()
@@ -465,7 +465,7 @@ onMounted(loadOverview)
       </section>
     </template>
 
-    <TickPhaseTimingsPanel />
+    <OperationsDiagnosticsPanels />
   </div>
 </template>
 

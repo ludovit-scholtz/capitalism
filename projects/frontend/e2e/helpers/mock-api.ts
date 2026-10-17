@@ -10,6 +10,7 @@
  */
 
 import type { Page } from '@playwright/test'
+import { getOperationsDiagnosticsData } from './mock-api-operations-diagnostics'
 
 export const GOVERNMENT_PLAYER_EMAIL = 'government@capitalism.game'
 const MOCK_BUILDING_BASE_VALUE = 75_000
@@ -10042,26 +10043,12 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
-    if (query.includes('tickPhaseTimings')) {
+    if (query.includes('tickPhaseTimings') || query.includes('objectAccessDenials')) {
       const accessFailure = getAdminAccessFailure(false)
       if (accessFailure) {
         return routeJsonError(accessFailure.message, accessFailure.code)
       }
-      return routeJson({
-        tickPhaseTimings: {
-          sampledTicks: 12,
-          lastTick: state.gameState.currentTick,
-          lastTotalMs: 210,
-          averageTotalMs: 190,
-          maxTotalMs: 260,
-          phaseBudgetMs: 100,
-          phases: [
-            { name: 'Tax', lastMs: 4, averageMs: 5, maxMs: 9, aboveBudget: false },
-            { name: 'PublicSales', lastMs: 150, averageMs: 140, maxMs: 200, aboveBudget: true },
-            { name: 'Manufacturing', lastMs: 40, averageMs: 35, maxMs: 90, aboveBudget: false },
-          ],
-        },
-      })
+      return routeJson(getOperationsDiagnosticsData(query, state.gameState.currentTick)!)
     }
 
     if (query.includes('operationsStatistics')) {

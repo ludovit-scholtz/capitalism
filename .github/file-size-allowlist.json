@@ -91,7 +91,7 @@
   "projects/frontend/e2e/full-journey/onboarding/onboarding-deposit.spec.ts": 569,
   "projects/frontend/e2e/full-journey/onboarding/onboarding.spec.ts": 5861,
   "projects/frontend/e2e/helpers/mock-api-game.ts": 543,
-  "projects/frontend/e2e/helpers/mock-api.ts": 12300,
+  "projects/frontend/e2e/helpers/mock-api.ts": 12287,
   "projects/frontend/src/components/admin/AdminDashboardContent.vue": 616,
   "projects/frontend/src/components/bank/BankCustomerView.vue": 665,
   "projects/frontend/src/components/buildings/BuildingMarketContent.vue": 505,

@@ -4193,6 +4193,27 @@ export default {
       globalAdminsEmpty: 'No global admin grants yet.',
       rootOnly: 'Only root administrators can manage global grants.',
     },
+    objectDenials: {
+      title: 'Blocked access attempts',
+      summary: 'Last {window} blocked attempts ({probes} look like probing), {total} since this server started.',
+      refresh: 'Refresh',
+      empty: 'No blocked access attempts since this server started.',
+      byReason: 'Blocked attempts by reason',
+      apiKey: 'API key',
+      columns: {
+        time: 'Time',
+        object: 'Object',
+        reason: 'Reason',
+        actor: 'Player',
+      },
+      reasons: {
+        not_found: 'Object does not exist',
+        not_owned: 'Object belongs to someone else',
+        wrong_account_context: 'Wrong account context',
+        not_available: 'Not available in its current state',
+        other: 'Other',
+      },
+    },
     tickTimings: {
       title: 'Tick performance',
       summary: 'Last {ticks} ticks: average {average}, slowest {max}. Phases above {budget} on average are flagged.',
