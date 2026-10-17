@@ -1,0 +1,58 @@
+name: postgres-validation
+
+on:
+  pull_request:
+    paths:
+      - 'projects/Api/**'
+      - 'projects/Api.Tests/**'
+      - 'projects/Shared/**'
+      - '.github/workflows/postgres-validation.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'projects/Api/**'
+      - 'projects/Api.Tests/**'
+      - 'projects/Shared/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: postgres-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres-validation:
+    name: PostgreSQL migration and concurrency validation
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      CAPITALISM_TEST_POSTGRES: Host=localhost;Port=5432;Username=postgres;Password=ci-only-password
+      # A missing connection string must fail the tests, never skip them.
+      CAPITALISM_TEST_POSTGRES_REQUIRED: 'true'
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.x
+
+      - name: Run PostgreSQL validation tests (upgrade path, idempotent restart, concurrency token)
+        run: |
+          dotnet test projects/Api.Tests/Api.Tests.csproj --configuration Release --filter "FullyQualifiedName~PostgresMigrationValidationTests" --logger "console;verbosity=normal" | tee postgres-validation.log
+          # Guard against a green job that ran nothing (renamed class, filter matching zero tests, tests skipped).
+          grep -Eq "^\s*Passed:\s+[1-9]" postgres-validation.log
+          ! grep -Eq "^\s*Skipped:\s+[1-9]" postgres-validation.log

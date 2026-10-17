@@ -53,6 +53,10 @@ npm run build
 npm run test:e2e
 ```
 
+## Real PostgreSQL validation (opt-in locally, on in CI)
+
+EF InMemory cannot judge migrations, defaults or concurrency tokens, so `PostgresMigrationValidationTests` (upgrade from the previous schema through the real `AppDbInitializer`, idempotent restart, concurrency-token race) runs against real PostgreSQL in CI (`.github/workflows/postgres-validation.yml`). Locally it is skipped unless `CAPITALISM_TEST_POSTGRES` is set (see `PostgresFactAttribute`), e.g. `docker run -d --name cap-pg -e POSTGRES_PASSWORD=capdev -p 15432:5432 postgres:16-alpine`. Add a test there whenever a migration changes existing columns or adds defaults.
+
 ## 500-line file limit is enforced in CI
 
 `.github/workflows/file-size-guard.yml` runs `node .github/scripts/file-size-guard.mjs` on every PR. Tracked `.cs`/`.ts`/`.vue`/`.dart` files (not migrations, generated code, locales or build output) may not exceed 500 lines. Existing offenders are listed with their line counts in `.github/file-size-allowlist.json`; **the list may only shrink**: a listed file that grows fails, a new file over 500 lines fails, and a listed file that dropped under 500 must be removed. After splitting a file, run `node .github/scripts/file-size-guard.mjs --update` to lock in the gain (it lowers/removes entries and never adds one). Do not add a file to the allow-list to get a PR through; split it.
