@@ -1,6 +1,6 @@
 # GraphQL Surface Inventory Report
 
-> Generated at `2026-10-17T12:03:49.2382723Z`
+> Generated at `2026-10-17T12:07:31.2856603Z`
 
 - Total operations: **287**
 - Sensitive operations: **102**

@@ -16,14 +16,14 @@ public sealed class AdminAndAccountAuthorizationTests
 {
     public static IEnumerable<object[]> AdminMutations() =>
     [
-        ["setPlayerInvisibleInChat", "SetPlayerInvisibleInChatInput!", "{ __typename }", "{ \"playerId\": \"{PLAYER}\", \"isInvisibleInChat\": true }"],
-        ["setLocalGameAdminRole", "SetLocalGameAdminRoleInput!", "{ __typename }", "{ \"playerId\": \"{PLAYER}\", \"isAdmin\": true }"],
-        ["assignGlobalGameAdminRole", "ManageGlobalGameAdminRoleInput!", "{ __typename }", "{ \"email\": \"{EMAIL}\" }"],
-        ["removeGlobalGameAdminRole", "ManageGlobalGameAdminRoleInput!", "", "{ \"email\": \"{EMAIL}\" }"],
-        ["updateRealWorldBillionaire", "UpdateRealWorldBillionaireInput!", "{ __typename }", "{ \"id\": \"{PLAYER}\", \"rank\": 1, \"name\": \"X\", \"wealthUsd\": 1 }"],
-        ["upsertGameNewsEntry", "UpsertGameNewsEntryInput!", "{ __typename }", "{ \"entryType\": \"NEWS\", \"status\": \"DRAFT\", \"localizations\": [{ \"locale\": \"en\", \"title\": \"T\", \"summary\": \"S\", \"htmlContent\": \"<p>x</p>\" }] }"],
-        ["startAdminImpersonation", "StartAdminImpersonationInput!", "{ __typename }", "{ \"targetPlayerId\": \"{PLAYER}\", \"accountType\": \"PERSON\" }"],
-        ["adminSetPlayerGoldBalance", "AdminSetPlayerGoldBalanceInput!", "{ __typename }", "{ \"playerEmail\": \"{EMAIL}\", \"balance\": 1000000, \"note\": \"grant\" }"],
+        ["setPlayerInvisibleInChat", "SetPlayerInvisibleInChatInput!", "{ __typename }", "{ \"playerId\": \"{PLAYER}\", \"isInvisibleInChat\": true }", "ADMIN_ACCESS_REQUIRED"],
+        ["setLocalGameAdminRole", "SetLocalGameAdminRoleInput!", "{ __typename }", "{ \"playerId\": \"{PLAYER}\", \"isAdmin\": true }", "ROOT_ADMIN_REQUIRED"],
+        ["assignGlobalGameAdminRole", "ManageGlobalGameAdminRoleInput!", "{ __typename }", "{ \"email\": \"{EMAIL}\" }", "ROOT_ADMIN_REQUIRED"],
+        ["removeGlobalGameAdminRole", "ManageGlobalGameAdminRoleInput!", "", "{ \"email\": \"{EMAIL}\" }", "ROOT_ADMIN_REQUIRED"],
+        ["updateRealWorldBillionaire", "UpdateRealWorldBillionaireInput!", "{ __typename }", "{ \"id\": \"{PLAYER}\", \"rank\": 1, \"name\": \"X\", \"wealthUsd\": 1 }", "ADMIN_ACCESS_REQUIRED"],
+        ["upsertGameNewsEntry", "UpsertGameNewsEntryInput!", "{ __typename }", "{ \"entryType\": \"NEWS\", \"status\": \"DRAFT\", \"localizations\": [{ \"locale\": \"en\", \"title\": \"T\", \"summary\": \"S\", \"htmlContent\": \"<p>x</p>\" }] }", "ADMIN_ACCESS_REQUIRED"],
+        ["startAdminImpersonation", "StartAdminImpersonationInput!", "{ __typename }", "{ \"targetPlayerId\": \"{PLAYER}\", \"accountType\": \"PERSON\" }", "ADMIN_ACCESS_REQUIRED"],
+        ["adminSetPlayerGoldBalance", "AdminSetPlayerGoldBalanceInput!", "{ __typename }", "{ \"playerEmail\": \"{EMAIL}\", \"balance\": 1000000, \"note\": \"grant\" }", "ADMIN_REQUIRED"],
     ];
 
     private static async Task<(string Token, Guid PlayerId, string Email)> RegisterAsync(HttpClient client)
@@ -47,7 +47,7 @@ public sealed class AdminAndAccountAuthorizationTests
 
     [Theory]
     [MemberData(nameof(AdminMutations))]
-    public async Task AdminMutation_Unauthenticated_IsRejected(string mutation, string inputType, string selection, string inputJson)
+    public async Task AdminMutation_Unauthenticated_IsRejected(string mutation, string inputType, string selection, string inputJson, string playerErrorCode)
     {
         await using var factory = new ApiWebApplicationFactory();
         using var client = factory.CreateClient();
@@ -55,12 +55,14 @@ public sealed class AdminAndAccountAuthorizationTests
 
         var result = await Run(client, mutation, inputType, selection, inputJson, playerId, email, token: null);
 
+        // The specific authentication code proves the guard ran (a schema/validation error would carry a different code).
         Assert.True(result.TryGetProperty("errors", out var errors) && errors.GetArrayLength() > 0, $"{mutation} accepted an anonymous caller");
+        Assert.Equal("AUTH_NOT_AUTHENTICATED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
     [Theory]
     [MemberData(nameof(AdminMutations))]
-    public async Task AdminMutation_OrdinaryPlayer_IsRejectedWithoutSideEffects(string mutation, string inputType, string selection, string inputJson)
+    public async Task AdminMutation_OrdinaryPlayer_IsRejectedWithoutSideEffects(string mutation, string inputType, string selection, string inputJson, string playerErrorCode)
     {
         await using var factory = new ApiWebApplicationFactory();
         using var client = factory.CreateClient();
@@ -69,6 +71,7 @@ public sealed class AdminAndAccountAuthorizationTests
         var result = await Run(client, mutation, inputType, selection, inputJson, playerId, email, token);
 
         Assert.True(result.TryGetProperty("errors", out var errors) && errors.GetArrayLength() > 0, $"{mutation} accepted an ordinary player");
+        Assert.Equal(playerErrorCode, errors[0].GetProperty("extensions").GetProperty("code").GetString());
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var player = await db.Players.AsNoTracking().FirstAsync(p => p.Id == playerId);
@@ -101,20 +104,29 @@ public sealed class AdminAndAccountAuthorizationTests
         Assert.True(result.TryGetProperty("errors", out var errors) && errors.GetArrayLength() > 0);
     }
 
+    private const string TopUpQuery = "mutation($input: TopUpDepositInput!) { topUpDeposit(input: $input) { __typename } }";
+
     [Fact]
-    public async Task TopUpDeposit_Unauthenticated_IsRejected_AndAuthenticatedGetsTheForexHint()
+    public async Task TopUpDeposit_Unauthenticated_IsRejected()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var result = await TestHelpers.ExecuteGraphQlAsync(client, TopUpQuery, new { input = new { depositId = Guid.NewGuid(), amount = 10m } });
+
+        Assert.Equal("AUTH_NOT_AUTHENTICATED", result.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task TopUpDeposit_IsADisabledStub_ForAuthenticatedPlayers()
     {
         await using var factory = new ApiWebApplicationFactory();
         using var client = factory.CreateClient();
         var (token, _, _) = await RegisterAsync(client);
-        const string query = "mutation($input: TopUpDepositInput!) { topUpDeposit(input: $input) { __typename } }";
-        var variables = new { input = new { depositId = Guid.NewGuid(), amount = 10m } };
 
-        var anonymous = await TestHelpers.ExecuteGraphQlAsync(client, query, variables);
-        var authenticated = await TestHelpers.ExecuteGraphQlAsync(client, query, variables, token);
+        var result = await TestHelpers.ExecuteGraphQlAsync(client, TopUpQuery, new { input = new { depositId = Guid.NewGuid(), amount = 10m } }, token);
 
-        Assert.True(anonymous.TryGetProperty("errors", out var anonymousErrors) && anonymousErrors.GetArrayLength() > 0);
-        Assert.Equal("USE_FOREX_TRANSFER", authenticated.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
+        Assert.Equal("USE_FOREX_TRANSFER", result.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
     [Fact]
@@ -131,7 +143,7 @@ public sealed class AdminAndAccountAuthorizationTests
             var foreign = new BankAccount
             {
                 Id = Guid.NewGuid(), PlayerId = ownerId, CurrencyCode = "EUR", Balance = 10m,
-                AccountNumber = "2000000000000001", CreatedAtUtc = DateTime.UtcNow,
+                AccountNumber = Guid.NewGuid().ToString("N")[..16], CreatedAtUtc = DateTime.UtcNow,
             };
             db.BankAccounts.Add(foreign);
             await db.SaveChangesAsync();
@@ -165,7 +177,7 @@ public sealed class AdminAndAccountAuthorizationTests
             var own = new BankAccount
             {
                 Id = Guid.NewGuid(), PlayerId = playerId, CurrencyCode = "EUR", Balance = 10m,
-                AccountNumber = "2000000000000002", CreatedAtUtc = DateTime.UtcNow,
+                AccountNumber = Guid.NewGuid().ToString("N")[..16], CreatedAtUtc = DateTime.UtcNow,
             };
             db.BankAccounts.Add(own);
             await db.SaveChangesAsync();

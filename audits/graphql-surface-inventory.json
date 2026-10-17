@@ -1,5 +1,5 @@
 {
-  "generatedAtUtc": "2026-10-17T12:03:49.2382723Z",
+  "generatedAtUtc": "2026-10-17T12:07:31.2856603Z",
   "operations": [
     {
       "kind": "mutation",
@@ -2235,9 +2235,10 @@
         "hasNegativeCoverage": true,
         "hasPositiveCoverage": true,
         "negativeTests": [
-          "TopUpDeposit_Unauthenticated_IsRejected_AndAuthenticatedGetsTheForexHint"
+          "TopUpDeposit_Unauthenticated_IsRejected"
         ],
         "positiveTests": [
+          "TopUpDeposit_IsADisabledStub_ForAuthenticatedPlayers",
           "TopUpDeposit_ReturnsUseForexTransferError",
           "TopUpDeposit_InterestAccruesFromTopUpTickOnly_NotRetroactively"
         ]
