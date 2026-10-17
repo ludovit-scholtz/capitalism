@@ -477,6 +477,7 @@ public class Program
         builder.Services.AddScoped<IJwtSessionRevocationService, JwtSessionRevocationService>();
 
         // ── Game tick engine ──
+        builder.Services.AddSingleton<TickTimingRecorder>();
         builder.Services.AddScoped<TickProcessor>();
         builder.Services.AddScoped<ITickPhase, WeatherUpdatePhase>();
         builder.Services.AddScoped<ITickPhase, FuelProcurementPhase>();

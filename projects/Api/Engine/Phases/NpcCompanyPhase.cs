@@ -28,11 +28,30 @@ public sealed class NpcCompanyPhase : ITickPhase
             return;
         }
 
+        // Load building counts and cash for all active NPCs in two queries instead of two per NPC.
+        var npcCompanyIds = activeNpcs.Select(npc => npc.CompanyId).Distinct().ToList();
+        var buildingCounts = (await context.Db.Buildings
+                .Where(building => npcCompanyIds.Contains(building.CompanyId) && building.DestroyedAtUtc == null)
+                .Select(building => building.CompanyId)
+                .ToListAsync())
+            .GroupBy(companyId => companyId)
+            .ToDictionary(group => group.Key, group => group.Count());
+        var cashByCompany = (await context.Db.BankAccounts
+                .Where(account => account.CompanyId != null && npcCompanyIds.Contains(account.CompanyId.Value) && account.ClosedAtUtc == null)
+                .Select(account => new { CompanyId = account.CompanyId!.Value, account.Balance })
+                .ToListAsync())
+            .GroupBy(account => account.CompanyId)
+            .ToDictionary(group => group.Key, group => group.Sum(account => account.Balance));
+
         foreach (var npc in activeNpcs)
         {
             try
             {
-                await ProcessNpcAsync(context, npc);
+                await ProcessNpcAsync(
+                    context,
+                    npc,
+                    buildingCounts.GetValueOrDefault(npc.CompanyId),
+                    cashByCompany.GetValueOrDefault(npc.CompanyId));
             }
             catch (Exception ex)
             {
@@ -49,20 +68,11 @@ public sealed class NpcCompanyPhase : ITickPhase
         }
     }
 
-    private static async Task ProcessNpcAsync(TickContext context, NpcCompany npc)
+    private static async Task ProcessNpcAsync(TickContext context, NpcCompany npc, int buildingCount, decimal totalCash)
     {
-        var companyId = npc.CompanyId;
-        var companyBuildings = await context.Db.Buildings
-            .Where(building => building.CompanyId == companyId && building.DestroyedAtUtc == null)
-            .ToListAsync();
-
-        var totalCash = await context.Db.BankAccounts
-            .Where(account => account.CompanyId == companyId && account.ClosedAtUtc == null)
-            .SumAsync(account => account.Balance);
-
-        if (companyBuildings.Count < MaxBuildingsPerNpcCompany && totalCash >= ExpandCashThreshold)
+        if (buildingCount < MaxBuildingsPerNpcCompany && totalCash >= ExpandCashThreshold)
         {
-            await TryExpandAsync(context, npc, companyBuildings.Count);
+            await TryExpandAsync(context, npc, buildingCount);
         }
 
         await EnsureShopConfigurationAsync(context, npc);

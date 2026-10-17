@@ -15,7 +15,8 @@ namespace Api.Engine;
 public sealed class TickProcessor(
     AppDbContext db,
     IEnumerable<ITickPhase> phases,
-    ILogger<TickProcessor> logger)
+    ILogger<TickProcessor> logger,
+    TickTimingRecorder? timingRecorder = null)
 {
     private readonly IReadOnlyList<ITickPhase> orderedPhases = phases.OrderBy(p => p.Order).ToList();
 
@@ -111,10 +112,11 @@ public sealed class TickProcessor(
         await db.SaveChangesAsync(ct);
 
         sw.Stop();
+        timingRecorder?.Record(gameState.CurrentTick, ctxSw.ElapsedMilliseconds + sw.ElapsedMilliseconds, phaseMs);
 
         // Log per-phase breakdown when any phase exceeded the slow-phase threshold,
         // or when the total tick time is unexpectedly long.
-        const long SlowPhaseThresholdMs = 100;
+        const long SlowPhaseThresholdMs = TickBudget.DefaultPhaseBudgetMs;
         var slowPhases = phaseMs.Where(kv => kv.Value >= SlowPhaseThresholdMs).OrderByDescending(kv => kv.Value).ToList();
         if (slowPhases.Count > 0 || sw.ElapsedMilliseconds > 500)
         {
