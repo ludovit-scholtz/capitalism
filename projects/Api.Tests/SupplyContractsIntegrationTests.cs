@@ -178,7 +178,7 @@ public sealed class SupplyContractsIntegrationTests
         Assert.NotEmpty(penaltyRows);
     }
 
-    private static async Task<Guid> ProposeContractAsync(HttpClient client, string sellerToken, SeededSupplyContext seeded)
+    private static async Task<Guid> ProposeContractAsync(HttpClient client, string sellerToken, SeededSupplyContext seeded, decimal penaltyRatePercent = 10m)
     {
         var result = await ExecuteGraphQlAsync(
             client,
@@ -194,7 +194,7 @@ public sealed class SupplyContractsIntegrationTests
                     quantityPerTick = 100m,
                     pricePerUnit = 12m,
                     durationTicks = 25,
-                    penaltyRatePercent = 10m
+                    penaltyRatePercent
                 }
             },
             sellerToken);
@@ -374,6 +374,80 @@ public sealed class SupplyContractsIntegrationTests
         var contract = await verifyDb.SupplyContracts.AsNoTracking().FirstAsync(c => c.Id == contractId);
         Assert.Equal(SupplyContractStatus.Active, contract.Status);
         Assert.Equal(0, contract.PenaltyCount);
+    }
+
+    [Fact]
+    public async Task CancelSupplyContract_FeeFollowsTheContractsOwnPenaltyRate()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+        var sellerToken = await RegisterAndGetTokenAsync(client, $"supply-rate-seller-{Guid.NewGuid():N}@example.com");
+        var buyerToken = await RegisterAndGetTokenAsync(client, $"supply-rate-buyer-{Guid.NewGuid():N}@example.com");
+        var sellerPlayerId = await GetMeIdAsync(client, sellerToken);
+        var buyerPlayerId = await GetMeIdAsync(client, buyerToken);
+        var seeded = await SeedSupplyContextAsync(factory, sellerPlayerId, buyerPlayerId, withBuyerPurchaseUnit: true, sellerInventoryQuantity: 1000m);
+        var contractId = await ProposeContractAsync(client, sellerToken, seeded, penaltyRatePercent: 25m);
+        await ExecuteGraphQlAsync(client, "mutation($id: UUID!) { acceptSupplyContract(id: $id) { success } }", new { id = contractId }, buyerToken);
+
+        await ExecuteGraphQlAsync(client, "mutation($id: UUID!) { cancelSupplyContract(id: $id) { success } }", new { id = contractId }, buyerToken);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var buyerBalance = await db.BankAccounts.Where(a => a.CompanyId == seeded.BuyerCompanyId).SumAsync(a => a.Balance);
+        // quantityPerTick 100 x price 12 x 25% = 300 (not the former hard-coded 10% = 120)
+        Assert.Equal(1_000_000m - 300m, buyerBalance);
+    }
+
+    [Fact]
+    public async Task CancelSupplyContract_WhenOnePlayerOwnsBothSides_ActsAsBuyerSoTheRoleIsDeterministic()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, $"supply-both-{Guid.NewGuid():N}@example.com");
+        var playerId = await GetMeIdAsync(client, token);
+        var seeded = await SeedSupplyContextAsync(factory, playerId, playerId, withBuyerPurchaseUnit: true, sellerInventoryQuantity: 1000m);
+        var contractId = await ProposeContractAsync(client, token, seeded);
+        await ExecuteGraphQlAsync(client, "mutation($id: UUID!) { acceptSupplyContract(id: $id) { success } }", new { id = contractId }, token);
+
+        await ExecuteGraphQlAsync(client, "mutation($id: UUID!) { cancelSupplyContract(id: $id) { success } }", new { id = contractId }, token);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var sellerBalance = await db.BankAccounts.Where(a => a.CompanyId == seeded.SellerCompanyId).SumAsync(a => a.Balance);
+        var buyerBalance = await db.BankAccounts.Where(a => a.CompanyId == seeded.BuyerCompanyId).SumAsync(a => a.Balance);
+        Assert.Equal(1_000_000m + 120m, sellerBalance);
+        Assert.Equal(1_000_000m - 120m, buyerBalance);
+    }
+
+    [Fact]
+    public async Task CancelSupplyContract_SimultaneousRequests_ChargeTheFeeExactlyOnce()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+        var sellerToken = await RegisterAndGetTokenAsync(client, $"supply-race-seller-{Guid.NewGuid():N}@example.com");
+        var buyerToken = await RegisterAndGetTokenAsync(client, $"supply-race-buyer-{Guid.NewGuid():N}@example.com");
+        var sellerPlayerId = await GetMeIdAsync(client, sellerToken);
+        var buyerPlayerId = await GetMeIdAsync(client, buyerToken);
+        var seeded = await SeedSupplyContextAsync(factory, sellerPlayerId, buyerPlayerId, withBuyerPurchaseUnit: true, sellerInventoryQuantity: 1000m);
+        var contractId = await ProposeContractAsync(client, sellerToken, seeded);
+        await ExecuteGraphQlAsync(client, "mutation($id: UUID!) { acceptSupplyContract(id: $id) { success } }", new { id = contractId }, buyerToken);
+
+        var attempts = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ => ExecuteGraphQlAsync(
+            client,
+            "mutation($id: UUID!) { cancelSupplyContract(id: $id) { success } }",
+            new { id = contractId },
+            buyerToken)));
+
+        var successes = attempts.Count(a => !a.TryGetProperty("errors", out _) && a.GetProperty("data").GetProperty("cancelSupplyContract").GetProperty("success").GetBoolean());
+        Assert.Equal(1, successes);
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var buyerBalance = await db.BankAccounts.Where(a => a.CompanyId == seeded.BuyerCompanyId).SumAsync(a => a.Balance);
+        var sellerBalance = await db.BankAccounts.Where(a => a.CompanyId == seeded.SellerCompanyId).SumAsync(a => a.Balance);
+        Assert.Equal(1_000_000m - 120m, buyerBalance);
+        Assert.Equal(1_000_000m + 120m, sellerBalance);
+        // Ledger rows are not counted on purpose: the EF InMemory provider has no transactional rollback, so losing requests can leave
+        // inserted rows behind that PostgreSQL would roll back with the rejected SaveChanges. Money and the single winner are the guarantee.
     }
 
     [Theory]

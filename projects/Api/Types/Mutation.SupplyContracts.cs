@@ -111,7 +111,7 @@ public sealed partial class Mutation
             relatedEntityType: "SUPPLY_CONTRACT",
             relatedEntityId: contract.Id);
 
-        await db.SaveChangesAsync(cancellationToken);
+        await SaveContractChangesAsync(db, cancellationToken);
 
         var populated = await LoadSupplyContractAsync(db, contract.Id, cancellationToken);
         return new SupplyContractActionResult
@@ -184,7 +184,7 @@ public sealed partial class Mutation
             relatedEntityType: "SUPPLY_CONTRACT",
             relatedEntityId: contract.Id);
 
-        await db.SaveChangesAsync(cancellationToken);
+        await SaveContractChangesAsync(db, cancellationToken);
         var populated = await LoadSupplyContractAsync(db, contract.Id, cancellationToken);
         return new SupplyContractActionResult
         {
@@ -255,7 +255,7 @@ public sealed partial class Mutation
             relatedEntityType: "SUPPLY_CONTRACT",
             relatedEntityId: contract.Id);
 
-        await db.SaveChangesAsync(cancellationToken);
+        await SaveContractChangesAsync(db, cancellationToken);
         var populated = await LoadSupplyContractAsync(db, contract.Id, cancellationToken);
         return new SupplyContractActionResult
         {
@@ -294,7 +294,7 @@ public sealed partial class Mutation
             relatedEntityType: "SUPPLY_CONTRACT",
             relatedEntityId: contract.Id);
 
-        await db.SaveChangesAsync(cancellationToken);
+        await SaveContractChangesAsync(db, cancellationToken);
         var populated = await LoadSupplyContractAsync(db, contract.Id, cancellationToken);
         return new SupplyContractActionResult
         {
@@ -317,9 +317,11 @@ public sealed partial class Mutation
             .FirstOrDefaultAsync(item => item.Id == id, cancellationToken)
             ?? throw objectAuthorization.Deny(userId, "supply_contract", id, ObjectAuthorizationService.NotFoundReason);
 
+        // A player who owns both sides acts as the buyer, so the role (and whether a fee applies) never depends on row order.
         var actorCompany = await db.Companies
             .AsNoTracking()
             .Where(company => company.PlayerId == userId && (company.Id == contract.SellerCompanyId || company.Id == contract.BuyerCompanyId))
+            .OrderBy(company => company.Id == contract.BuyerCompanyId ? 0 : 1)
             .Select(company => new { company.Id, company.PlayerId })
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw objectAuthorization.Deny(userId, "supply_contract", id, ObjectAuthorizationService.NotOwnedReason);
@@ -340,7 +342,7 @@ public sealed partial class Mutation
         var cancellationFee = 0m;
         if (buyerPaysFee)
         {
-            cancellationFee = decimal.Round(contract.QuantityPerTick * contract.PricePerUnit * 0.1m, 4, MidpointRounding.AwayFromZero);
+            cancellationFee = decimal.Round(contract.QuantityPerTick * contract.PricePerUnit * (contract.PenaltyRatePercent / 100m), 4, MidpointRounding.AwayFromZero);
             var accounts = await db.BankAccounts
                 .Where(account => account.CompanyId == contract.BuyerCompanyId || account.CompanyId == contract.SellerCompanyId)
                 .ToListAsync(cancellationToken);
@@ -425,18 +427,7 @@ public sealed partial class Mutation
             });
         }
 
-        try
-        {
-            await db.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("The contract or your accounts changed while cancelling. Please try again.")
-                    .SetCode("CONCURRENT_MODIFICATION")
-                    .Build());
-        }
+        await SaveContractChangesAsync(db, cancellationToken);
 
         var populated = await LoadSupplyContractAsync(db, contract.Id, cancellationToken);
         return new SupplyContractActionResult
@@ -485,5 +476,25 @@ public sealed partial class Mutation
             .Include(contract => contract.ResourceType)
             .Include(contract => contract.ProductType)
             .FirstAsync(contract => contract.Id == contractId, cancellationToken);
+    }
+
+    /// <summary>
+    /// Saves a contract status transition. The status is a concurrency token, so when two requests race (for example a double
+    /// click on cancel) exactly one wins and the loser gets a retryable error instead of a second fee or a second transition.
+    /// </summary>
+    private static async Task SaveContractChangesAsync(AppDbContext db, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("The contract changed while you were acting on it. Please reload and try again.")
+                    .SetCode("CONCURRENT_MODIFICATION")
+                    .Build());
+        }
     }
 }
