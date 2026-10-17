@@ -9,6 +9,9 @@ namespace Api.Types;
 
 public sealed partial class Mutation
 {
+    /// <summary>Floor for the early-cancellation fee rate so a contract written with a 0% penalty cannot be exited for free.</summary>
+    internal const decimal MinEarlyCancellationFeePercent = 5m;
+
     [Authorize]
     public async Task<SupplyContractActionResult> ProposeSupplyContract(
         ProposeSupplyContractInput input,
@@ -342,7 +345,17 @@ public sealed partial class Mutation
         var cancellationFee = 0m;
         if (buyerPaysFee)
         {
-            cancellationFee = decimal.Round(contract.QuantityPerTick * contract.PricePerUnit * (contract.PenaltyRatePercent / 100m), 4, MidpointRounding.AwayFromZero);
+            // A player who owns both sides has no counterparty to compensate, so no fee moves between their own companies.
+            var sameOwner = await db.Companies
+                .AsNoTracking()
+                .Where(company => company.Id == contract.BuyerCompanyId || company.Id == contract.SellerCompanyId)
+                .Select(company => company.PlayerId)
+                .Distinct()
+                .CountAsync(cancellationToken) == 1;
+            var feeRatePercent = Math.Max(contract.PenaltyRatePercent, MinEarlyCancellationFeePercent);
+            cancellationFee = sameOwner
+                ? 0m
+                : decimal.Round(contract.QuantityPerTick * contract.PricePerUnit * (feeRatePercent / 100m), 4, MidpointRounding.AwayFromZero);
             var accounts = await db.BankAccounts
                 .Where(account => account.CompanyId == contract.BuyerCompanyId || account.CompanyId == contract.SellerCompanyId)
                 .ToListAsync(cancellationToken);
@@ -492,7 +505,7 @@ public sealed partial class Mutation
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("The contract changed while you were acting on it. Please reload and try again.")
+                    .SetMessage("The contract or your accounts changed while you were acting on it. Please reload and try again.")
                     .SetCode("CONCURRENT_MODIFICATION")
                     .Build());
         }

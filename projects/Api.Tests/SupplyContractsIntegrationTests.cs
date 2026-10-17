@@ -399,7 +399,7 @@ public sealed class SupplyContractsIntegrationTests
     }
 
     [Fact]
-    public async Task CancelSupplyContract_WhenOnePlayerOwnsBothSides_ActsAsBuyerSoTheRoleIsDeterministic()
+    public async Task CancelSupplyContract_WhenOnePlayerOwnsBothSides_WaivesTheFeeBecauseThereIsNoCounterparty()
     {
         await using var factory = new ApiWebApplicationFactory();
         using var client = factory.CreateClient();
@@ -415,9 +415,66 @@ public sealed class SupplyContractsIntegrationTests
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var sellerBalance = await db.BankAccounts.Where(a => a.CompanyId == seeded.SellerCompanyId).SumAsync(a => a.Balance);
         var buyerBalance = await db.BankAccounts.Where(a => a.CompanyId == seeded.BuyerCompanyId).SumAsync(a => a.Balance);
-        Assert.Equal(1_000_000m + 120m, sellerBalance);
-        Assert.Equal(1_000_000m - 120m, buyerBalance);
+        Assert.Equal(1_000_000m, sellerBalance);
+        Assert.Equal(1_000_000m, buyerBalance);
+        Assert.Equal(SupplyContractStatus.Cancelled, (await db.SupplyContracts.AsNoTracking().FirstAsync(c => c.Id == contractId)).Status);
     }
+
+    [Fact]
+    public async Task CancelSupplyContract_WithZeroPenaltyRate_StillChargesTheMinimumExitFee()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+        var sellerToken = await RegisterAndGetTokenAsync(client, $"supply-zero-seller-{Guid.NewGuid():N}@example.com");
+        var buyerToken = await RegisterAndGetTokenAsync(client, $"supply-zero-buyer-{Guid.NewGuid():N}@example.com");
+        var sellerPlayerId = await GetMeIdAsync(client, sellerToken);
+        var buyerPlayerId = await GetMeIdAsync(client, buyerToken);
+        var seeded = await SeedSupplyContextAsync(factory, sellerPlayerId, buyerPlayerId, withBuyerPurchaseUnit: true, sellerInventoryQuantity: 1000m);
+        var contractId = await ProposeContractAsync(client, sellerToken, seeded, penaltyRatePercent: 0m);
+        await ExecuteGraphQlAsync(client, "mutation($id: UUID!) { acceptSupplyContract(id: $id) { success } }", new { id = contractId }, buyerToken);
+
+        await ExecuteGraphQlAsync(client, "mutation($id: UUID!) { cancelSupplyContract(id: $id) { success } }", new { id = contractId }, buyerToken);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var buyerBalance = await db.BankAccounts.Where(a => a.CompanyId == seeded.BuyerCompanyId).SumAsync(a => a.Balance);
+        // 100 x 12 x 5% minimum exit fee = 60
+        Assert.Equal(1_000_000m - 60m, buyerBalance);
+    }
+
+    [Fact]
+    public async Task AcceptSupplyContract_SimultaneousRequests_ActivateExactlyOnce()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+        var sellerToken = await RegisterAndGetTokenAsync(client, $"supply-acc-race-seller-{Guid.NewGuid():N}@example.com");
+        var buyerToken = await RegisterAndGetTokenAsync(client, $"supply-acc-race-buyer-{Guid.NewGuid():N}@example.com");
+        var sellerPlayerId = await GetMeIdAsync(client, sellerToken);
+        var buyerPlayerId = await GetMeIdAsync(client, buyerToken);
+        var seeded = await SeedSupplyContextAsync(factory, sellerPlayerId, buyerPlayerId, withBuyerPurchaseUnit: true, sellerInventoryQuantity: 1000m);
+        var contractId = await ProposeContractAsync(client, sellerToken, seeded);
+
+        var attempts = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ => ExecuteGraphQlAsync(
+            client,
+            "mutation($id: UUID!) { acceptSupplyContract(id: $id) { success } }",
+            new { id = contractId },
+            buyerToken)));
+
+        Assert.Equal(1, attempts.Count(IsSuccess));
+        Assert.All(attempts.Where(a => !IsSuccess(a)), a => Assert.Contains(ErrorCode(a), AcceptableLoserCodes));
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(SupplyContractStatus.Active, (await db.SupplyContracts.AsNoTracking().FirstAsync(c => c.Id == contractId)).Status);
+    }
+
+    private static readonly string[] AcceptableLoserCodes = ["CONCURRENT_MODIFICATION", "SUPPLY_CONTRACT_CLOSED", "SUPPLY_CONTRACT_NOT_PENDING"];
+
+    private static bool IsSuccess(JsonElement response)
+        => !response.TryGetProperty("errors", out _)
+           && response.GetProperty("data").EnumerateObject().First().Value.GetProperty("success").GetBoolean();
+
+    private static string? ErrorCode(JsonElement response)
+        => response.TryGetProperty("errors", out var errors) ? errors[0].GetProperty("extensions").GetProperty("code").GetString() : null;
 
     [Fact]
     public async Task CancelSupplyContract_SimultaneousRequests_ChargeTheFeeExactlyOnce()
@@ -438,8 +495,8 @@ public sealed class SupplyContractsIntegrationTests
             new { id = contractId },
             buyerToken)));
 
-        var successes = attempts.Count(a => !a.TryGetProperty("errors", out _) && a.GetProperty("data").GetProperty("cancelSupplyContract").GetProperty("success").GetBoolean());
-        Assert.Equal(1, successes);
+        Assert.Equal(1, attempts.Count(IsSuccess));
+        Assert.All(attempts.Where(a => !IsSuccess(a)), a => Assert.Contains(ErrorCode(a), AcceptableLoserCodes));
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var buyerBalance = await db.BankAccounts.Where(a => a.CompanyId == seeded.BuyerCompanyId).SumAsync(a => a.Balance);
