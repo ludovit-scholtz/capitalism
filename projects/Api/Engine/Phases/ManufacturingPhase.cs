@@ -205,7 +205,7 @@ public sealed class ManufacturingPhase : ITickPhase
             var fundingAccount = context.GetBuildingFundingAccount(building);
             var salarySettings = context.CitySalarySettingsByCompany.GetValueOrDefault(company.Id, []);
             var salaryMultiplier = CompanyEconomyCalculator.GetSalaryMultiplier(salarySettings, city.Id);
-            var hourlyWage = CompanyEconomyCalculator.GetEffectiveHourlyWage(city, salaryMultiplier);
+            var hourlyWage = CompanyEconomyCalculator.GetEffectiveHourlyWage(city, salaryMultiplier, context.GetWageIndex(city.Id));
             var overheadRate = CompanyEconomyCalculator.ComputeAdministrationOverheadRate(
                 company,
                 context.GetCompanyAssetValue(company.Id),

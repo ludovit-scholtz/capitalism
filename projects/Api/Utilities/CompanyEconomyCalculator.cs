@@ -29,10 +29,13 @@ public static class CompanyEconomyCalculator
         return ClampSalaryMultiplier(configured?.SalaryMultiplier ?? DefaultSalaryMultiplier);
     }
 
-    public static decimal GetEffectiveHourlyWage(City city, decimal salaryMultiplier)
+    /// <summary>
+    /// Hourly wage including the city's labor market wage pressure (<paramref name="wageIndex"/>, 1 = neutral).
+    /// </summary>
+    public static decimal GetEffectiveHourlyWage(City city, decimal salaryMultiplier, decimal wageIndex)
     {
         return decimal.Round(
-            city.BaseSalaryPerManhour * ClampSalaryMultiplier(salaryMultiplier),
+            city.BaseSalaryPerManhour * ClampSalaryMultiplier(salaryMultiplier) * wageIndex,
             4,
             MidpointRounding.AwayFromZero);
     }

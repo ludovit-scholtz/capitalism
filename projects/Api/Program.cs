@@ -480,6 +480,7 @@ public class Program
         builder.Services.AddSingleton<TickTimingRecorder>();
         builder.Services.AddScoped<TickProcessor>();
         builder.Services.AddScoped<ITickPhase, WeatherUpdatePhase>();
+        builder.Services.AddScoped<ITickPhase, LaborMarketPhase>();
         builder.Services.AddScoped<ITickPhase, FuelProcurementPhase>();
         builder.Services.AddScoped<ITickPhase, PowerDistributionPhase>();
         builder.Services.AddScoped<ITickPhase, EnergySpotMarketPhase>();

@@ -226,6 +226,9 @@ public sealed partial class Query
         var cities = await db.Cities
             .OrderBy(city => city.Name)
             .ToListAsync();
+        var wageIndexByCity = await db.CityLaborMarkets
+            .AsNoTracking()
+            .ToDictionaryAsync(market => market.CityId, market => market.WageIndex);
         var allCompanies = await db.Companies
             .Include(candidate => candidate.BankAccounts)
             .Include(candidate => candidate.Buildings)
@@ -316,7 +319,7 @@ public sealed partial class Query
                         CurrencyCode = city.CurrencyCode,
                         BaseSalaryPerManhour = city.BaseSalaryPerManhour,
                         SalaryMultiplier = multiplier,
-                        EffectiveSalaryPerManhour = CompanyEconomyCalculator.GetEffectiveHourlyWage(city, multiplier),
+                        EffectiveSalaryPerManhour = CompanyEconomyCalculator.GetEffectiveHourlyWage(city, multiplier, wageIndexByCity.GetValueOrDefault(city.Id, 1m)),
                     };
                 })
                 .ToList(),

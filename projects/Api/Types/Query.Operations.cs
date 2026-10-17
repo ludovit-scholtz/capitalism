@@ -119,8 +119,13 @@ public sealed partial class Query
             .FirstOrDefaultAsync(s => s.CompanyId == building.CompanyId && s.CityId == building.CityId);
         var salaryMultiplier = CompanyEconomyCalculator.ClampSalaryMultiplier(
             salarySetting?.SalaryMultiplier ?? CompanyEconomyCalculator.DefaultSalaryMultiplier);
+        var wageIndex = await db.CityLaborMarkets
+            .AsNoTracking()
+            .Where(m => m.CityId == building.CityId)
+            .Select(m => (decimal?)m.WageIndex)
+            .FirstOrDefaultAsync() ?? 1m;
         var hourlyWage = city is not null
-            ? CompanyEconomyCalculator.GetEffectiveHourlyWage(city, salaryMultiplier)
+            ? CompanyEconomyCalculator.GetEffectiveHourlyWage(city, salaryMultiplier, wageIndex)
             : 0m;
 
         var result = new List<BuildingUnitOperationalStatus>();

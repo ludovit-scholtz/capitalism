@@ -49,6 +49,7 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
 
     /// <summary>Per-city salary settings selected by company owners.</summary>
     public DbSet<CompanyCitySalarySetting> CompanyCitySalarySettings => Set<CompanyCitySalarySetting>();
+    public DbSet<CityLaborMarket> CityLaborMarkets => Set<CityLaborMarket>();
 
     /// <summary>Buildings placed on the game map.</summary>
     public DbSet<Building> Buildings => Set<Building>();

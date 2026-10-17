@@ -267,6 +267,22 @@ public sealed partial class AppDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<CityLaborMarket>(e =>
+        {
+            e.HasKey(market => market.CityId);
+            e.Property(market => market.LaborPool).HasPrecision(18, 4);
+            e.Property(market => market.LaborDemand).HasPrecision(18, 4);
+            e.Property(market => market.Utilization).HasPrecision(10, 4);
+            e.Property(market => market.UnemploymentRate).HasPrecision(8, 4);
+            e.Property(market => market.WageIndex).HasPrecision(8, 4);
+            e.Property(market => market.StaffingFillRate).HasPrecision(8, 4);
+            e.Property(market => market.AverageSalaryMultiplier).HasPrecision(8, 4);
+            e.HasOne(market => market.City)
+                .WithMany()
+                .HasForeignKey(market => market.CityId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<TutorialProgress>(e =>
         {
             e.HasKey(tp => tp.Id);

@@ -47,7 +47,7 @@ public sealed class OperatingCostPhase : ITickPhase
 
             var salarySettings = context.CitySalarySettingsByCompany.GetValueOrDefault(company.Id, []);
             var salaryMultiplier = CompanyEconomyCalculator.GetSalaryMultiplier(salarySettings, city.Id);
-            var hourlyWage = CompanyEconomyCalculator.GetEffectiveHourlyWage(city, salaryMultiplier);
+            var hourlyWage = CompanyEconomyCalculator.GetEffectiveHourlyWage(city, salaryMultiplier, context.GetWageIndex(city.Id));
             var companyAssetValue = context.GetCompanyAssetValue(company.Id);
             var overheadRate = CompanyEconomyCalculator.ComputeAdministrationOverheadRate(
                 company,

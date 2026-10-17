@@ -17,7 +17,7 @@ namespace Api.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.7")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -1213,6 +1213,47 @@ namespace Api.Data.Migrations
                     b.HasIndex("CityId", "TaxCycleEnd");
 
                     b.ToTable("CityEconomicReports");
+                });
+
+            modelBuilder.Entity("Api.Data.Entities.CityLaborMarket", b =>
+                {
+                    b.Property<Guid>("CityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("AverageSalaryMultiplier")
+                        .HasPrecision(8, 4)
+                        .HasColumnType("numeric(8,4)");
+
+                    b.Property<decimal>("LaborDemand")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal>("LaborPool")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal>("StaffingFillRate")
+                        .HasPrecision(8, 4)
+                        .HasColumnType("numeric(8,4)");
+
+                    b.Property<decimal>("UnemploymentRate")
+                        .HasPrecision(8, 4)
+                        .HasColumnType("numeric(8,4)");
+
+                    b.Property<long>("UpdatedAtTick")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal>("Utilization")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("numeric(10,4)");
+
+                    b.Property<decimal>("WageIndex")
+                        .HasPrecision(8, 4)
+                        .HasColumnType("numeric(8,4)");
+
+                    b.HasKey("CityId");
+
+                    b.ToTable("CityLaborMarkets");
                 });
 
             modelBuilder.Entity("Api.Data.Entities.CityMarketReport", b =>
@@ -4609,6 +4650,17 @@ namespace Api.Data.Migrations
                 });
 
             modelBuilder.Entity("Api.Data.Entities.CityEconomicReport", b =>
+                {
+                    b.HasOne("Api.Data.Entities.City", "City")
+                        .WithMany()
+                        .HasForeignKey("CityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("City");
+                });
+
+            modelBuilder.Entity("Api.Data.Entities.CityLaborMarket", b =>
                 {
                     b.HasOne("Api.Data.Entities.City", "City")
                         .WithMany()

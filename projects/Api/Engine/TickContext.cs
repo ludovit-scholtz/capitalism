@@ -31,6 +31,7 @@ public sealed partial class TickContext
     public Dictionary<Guid, Company> CompaniesById { get; init; } = [];
     public Dictionary<Guid, List<CompanyCitySalarySetting>> CitySalarySettingsByCompany { get; init; } = [];
     public Dictionary<Guid, City> CitiesById { get; init; } = [];
+    public Dictionary<Guid, CityLaborMarket> LaborMarketsByCity { get; init; } = [];
     public Dictionary<Guid, List<BuildingLot>> LotsByCompany { get; init; } = [];
     public Dictionary<Guid, BuildingLot> LotsByBuildingId { get; init; } = [];
     public Dictionary<Guid, List<CityResource>> ResourcesByCity { get; init; } = [];
@@ -175,6 +176,10 @@ public sealed partial class TickContext
     public Dictionary<Guid, decimal> PlantEffectiveOutputMwById { get; } = [];
 
     // ── Helpers ──
+
+    /// <summary>Wage pressure of the city's labor market as computed at the end of the previous tick (1 when none yet).</summary>
+    public decimal GetWageIndex(Guid cityId)
+        => LaborMarketsByCity.TryGetValue(cityId, out var market) ? market.WageIndex : 1m;
 
     /// <summary>
     /// Returns the operational efficiency factor for a building based on its PowerStatus.
