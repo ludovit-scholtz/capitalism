@@ -25,26 +25,37 @@ public sealed partial class EconomyInvariantTests
             baseline = await EconomyInvariantChecker.TakeSnapshotAsync(scope.ServiceProvider.GetRequiredService<AppDbContext>());
         }
 
-        var lenderCompany = world.Players[0].CompanyId;
-        var borrower = world.Players[1];
+        PlayerSlot borrower;
         var loanError = await RandomLoanAsync(client, world, rng);
         Assert.True(loanError is null, $"Loan failed: {loanError}");
 
         Guid collateralBuildingId;
+        Guid loanId;
+        Guid lenderCompany;
         decimal debt;
         await using (var scope = factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var loan = await db.Loans.OrderBy(l => l.StartTick).FirstAsync(l => l.BorrowerCompanyId != lenderCompany);
-            loan.Status = LoanStatus.Defaulted; // an Active/Overdue lien locks the building; only a defaulted lien is settled from the sale
+            var loan = await db.Loans.SingleAsync(); // only the scripted loan exists in this world
+            Assert.NotNull(loan.CollateralBuildingId);
+            // An Active/Overdue lien locks the building; only a defaulted lien is settled from the sale.
+            loan.Status = LoanStatus.Defaulted;
             await db.SaveChangesAsync();
+            loanId = loan.Id;
+            lenderCompany = loan.LenderCompanyId;
             collateralBuildingId = loan.CollateralBuildingId!.Value;
             debt = loan.RemainingPrincipal;
             borrower = world.Players.Single(p => p.CompanyId == loan.BorrowerCompanyId);
         }
 
         var buyer = world.Players.First(p => p != borrower && p.CompanyId != lenderCompany);
-        var price = 900_000m;
+        var price = 900_000m + debt; // above the sale floor and the debt, so the lien is fully settled with a remainder for the seller
+        EconomySnapshot beforeSale;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            beforeSale = await EconomyInvariantChecker.TakeSnapshotAsync(scope.ServiceProvider.GetRequiredService<AppDbContext>());
+        }
+
         var listed = await TestHelpers.ExecuteGraphQlAsync(
             client,
             "mutation($input: SetBuildingForSaleInput!) { setBuildingForSale(input: $input) { id } }",
@@ -67,7 +78,12 @@ public sealed partial class EconomyInvariantTests
 
         await using var verifyScope = factory.Services.CreateAsyncScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var settled = await verifyDb.Loans.AsNoTracking().FirstAsync(l => l.BorrowerCompanyId == borrower.CompanyId);
+        var afterSale = await EconomyInvariantChecker.TakeSnapshotAsync(verifyDb);
+        decimal Delta(Guid company) => afterSale.CompanyBalances.GetValueOrDefault(company) - beforeSale.CompanyBalances.GetValueOrDefault(company);
+        Assert.Equal(debt, Delta(lenderCompany));            // the lender is repaid in full from the proceeds
+        Assert.Equal(price - debt, Delta(borrower.CompanyId)); // the seller keeps only the remainder
+        Assert.Equal(-price, Delta(buyer.CompanyId));
+        var settled = await verifyDb.Loans.AsNoTracking().SingleAsync(l => l.Id == loanId);
         output.WriteLine($"Debt {debt}, loan status after sale: {settled.Status}");
         Assert.Equal(LoanStatus.Repaid, settled.Status);
         Assert.Equal(0m, settled.RemainingPrincipal);
