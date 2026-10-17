@@ -4,6 +4,7 @@ using Api.Data.Entities;
 using Api.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Shared.Economy;
 
 namespace Api.Engine.Phases;
 
@@ -18,6 +19,9 @@ public sealed class TelemetryBountyPhase(
     IOptions<MasterServerRegistrationOptions> masterOptions) : ITickPhase
 {
     private static readonly TimeSpan MaxTelemetryDispatchWait = TimeSpan.FromMilliseconds(250);
+
+    /// <summary>Pay must be at least this share of the city reference wage to count as a good employer.</summary>
+    private const decimal GoodEmployerPayRatio = 1.05m;
 
     public string Name => "TelemetryBounty";
     public int Order => 1050; // After DividendPhase (1010) and before MarketReportPhase
@@ -303,7 +307,16 @@ public sealed class TelemetryBountyPhase(
         }
 
         // ── GOOD_EMPLOYER ───────────────────────────────────────────────────────
-        // Company with the highest average wage per city (one winner per city).
+        // The best-paying real employer of each city (one winner per city). "Real" means the company has a building with
+        // units there whose workforce is not on strike; a salary setting alone proves nothing. "Good" means the pay is
+        // meaningfully above the city reference (the demand-weighted average, never below the baseline wage).
+        var employingCompanyIdsByCity = context.BuildingsById.Values
+            .Where(building => !context.IsOnStrike(building)
+                && context.UnitsByBuilding.TryGetValue(building.Id, out var units)
+                && units.Count > 0)
+            .GroupBy(building => building.CityId)
+            .ToDictionary(group => group.Key, group => group.Select(building => building.CompanyId).ToHashSet());
+
         var salaryByCityCompany = context.CitySalarySettingsByCompany
             .SelectMany(kv => kv.Value.Select(s => (CompanyId: kv.Key, Setting: s)))
             .GroupBy(x => x.Setting.CityId)
@@ -311,8 +324,9 @@ public sealed class TelemetryBountyPhase(
 
         foreach (var cityGroup in salaryByCityCompany)
         {
+            employingCompanyIdsByCity.TryGetValue(cityGroup.Key, out var employingCompanyIds);
             var competitiveEntries = cityGroup
-                .Where(x => IsCompetitiveCompany(x.CompanyId))
+                .Where(x => IsCompetitiveCompany(x.CompanyId) && employingCompanyIds?.Contains(x.CompanyId) == true)
                 .ToList();
 
             if (competitiveEntries.Count == 0)
@@ -323,7 +337,13 @@ public sealed class TelemetryBountyPhase(
             var bestEntry = competitiveEntries
                 .MaxBy(x => x.Setting.SalaryMultiplier);
 
+            var cityAverage = context.LaborMarketsByCity.TryGetValue(cityGroup.Key, out var laborMarket)
+                ? laborMarket.AverageSalaryMultiplier
+                : 1m;
+            var payRatio = LaborMarketCalculator.ComputePayRatio(bestEntry.Setting.SalaryMultiplier, cityAverage);
+
             if (bestEntry.Setting.SalaryMultiplier > 1m
+                && payRatio >= GoodEmployerPayRatio
                 && playerIdByCompanyId.TryGetValue(bestEntry.CompanyId, out var playerId)
                 && playerEmailByCompanyId.TryGetValue(bestEntry.CompanyId, out var email)
                 && email is not null)

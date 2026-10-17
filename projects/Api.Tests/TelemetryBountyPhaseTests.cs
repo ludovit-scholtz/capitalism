@@ -226,6 +226,97 @@ public sealed class TelemetryBountyPhaseTests
         await telemetry.Canceled.WaitAsync(TimeSpan.FromSeconds(1));
     }
 
+    /// <summary>Runs the bounty phase for one company that has a salary setting in Bratislava.</summary>
+    private static async Task<CapturingTelemetryService> RunGoodEmployerAsync(
+        decimal salaryMultiplier,
+        bool hasBuildingWithUnits,
+        bool onStrike = false,
+        decimal citySalaryAverage = 1m)
+    {
+        var telemetry = new CapturingTelemetryService();
+        await using var factory = new ApiWebApplicationFactory();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+        var gameState = await db.GameStates.FirstAsync();
+        gameState.CurrentTick = 100;
+
+        var player = new Player
+        {
+            Id = Guid.NewGuid(), Email = $"employer-{Guid.NewGuid():N}@example.com",
+            DisplayName = "Employer", PasswordHash = "hashed", Role = PlayerRole.Player,
+        };
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Employer Co" };
+        var setting = new CompanyCitySalarySetting { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id, SalaryMultiplier = salaryMultiplier };
+        var building = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id, Type = BuildingType.Factory, Name = "Plant", Level = 1,
+            StrikeStartedAtTick = onStrike ? 90 : null, StrikeUntilTick = onStrike ? 120 : null,
+        };
+        db.Players.Add(player);
+        db.Companies.Add(company);
+        db.Buildings.Add(building);
+        await db.SaveChangesAsync();
+
+        var context = new TickContext
+        {
+            Db = db,
+            GameState = gameState,
+            BuildingsById = new Dictionary<Guid, Building> { [building.Id] = building },
+            BuildingsByType = new Dictionary<string, List<Building>> { [BuildingType.Factory] = [building] },
+            CompaniesById = new Dictionary<Guid, Company> { [company.Id] = company },
+            CitiesById = new Dictionary<Guid, City> { [city.Id] = city },
+            CitySalarySettingsByCompany = new Dictionary<Guid, List<CompanyCitySalarySetting>> { [company.Id] = [setting] },
+            UnitsByBuilding = new Dictionary<Guid, List<BuildingUnit>>
+            {
+                [building.Id] = hasBuildingWithUnits
+                    ? [new BuildingUnit { Id = Guid.NewGuid(), BuildingId = building.Id, UnitType = UnitType.Manufacturing, Level = 1 }]
+                    : [],
+            },
+            LaborMarketsByCity = new Dictionary<Guid, CityLaborMarket>
+            {
+                [city.Id] = new CityLaborMarket { CityId = city.Id, AverageSalaryMultiplier = citySalaryAverage },
+            },
+        };
+
+        await CreatePhase(telemetry, scope.ServiceProvider).ProcessAsync(context);
+        return telemetry;
+    }
+
+    [Fact]
+    public async Task GoodEmployer_AboveTheCityReferenceWithRealEmployees_FiresTheBounty()
+    {
+        var telemetry = await RunGoodEmployerAsync(salaryMultiplier: 1.4m, hasBuildingWithUnits: true);
+
+        Assert.Contains(telemetry.Calls, c => c.EventType == MasterRankingBountyCodes.GoodEmployer);
+    }
+
+    [Fact]
+    public async Task GoodEmployer_SalarySettingInACityWithoutEmployees_DoesNotFireTheBounty()
+    {
+        // A company cannot farm the bounty by typing a high multiplier for a city where it employs nobody.
+        var telemetry = await RunGoodEmployerAsync(salaryMultiplier: 2.0m, hasBuildingWithUnits: false);
+
+        Assert.DoesNotContain(telemetry.Calls, c => c.EventType == MasterRankingBountyCodes.GoodEmployer);
+    }
+
+    [Fact]
+    public async Task GoodEmployer_WhileTheWorkforceIsOnStrike_DoesNotFireTheBounty()
+    {
+        var telemetry = await RunGoodEmployerAsync(salaryMultiplier: 1.5m, hasBuildingWithUnits: true, onStrike: true);
+
+        Assert.DoesNotContain(telemetry.Calls, c => c.EventType == MasterRankingBountyCodes.GoodEmployer);
+    }
+
+    [Fact]
+    public async Task GoodEmployer_OnlyMarginallyAboveTheReference_DoesNotFireTheBounty()
+    {
+        // City average 1.3: paying 1.32 is just average, not a good employer.
+        var telemetry = await RunGoodEmployerAsync(salaryMultiplier: 1.32m, hasBuildingWithUnits: true, citySalaryAverage: 1.3m);
+
+        Assert.DoesNotContain(telemetry.Calls, c => c.EventType == MasterRankingBountyCodes.GoodEmployer);
+    }
+
     private static TelemetryBountyPhase CreatePhase(
         IMasterRankingTelemetryService telemetry,
         IServiceProvider serviceProvider)
