@@ -2268,7 +2268,7 @@ export default {
       unemployment: 'Nezamestnanosť',
       wagePressure: 'Tlak na mzdy',
       averagePay: 'Priemerná mzda v meste',
-      staffing: 'Obsadené pozície',
+      staffing: 'Obsadené pozície v meste',
       yourPay: 'Vaša mzda',
       payRatio: 'Mzda voči mestu',
       pay: {
@@ -2284,7 +2284,7 @@ export default {
       hint: 'Vaša mzda je {ratio} referencie mesta. Zvýšte násobok mzdy v nastaveniach firmy, aby ste si udržali pracovníkov.',
       openSettings: 'Otvoriť nastavenia firmy',
       affectedTitle: 'Budovy so zníženým výkonom',
-      onStrike: 'Štrajk do ticku {tick}',
+      onStrike: 'Štrajk do {time}',
       understaffed: 'Obsadenosť {percent} %',
       noCompany: 'Prepnite sa na firemný účet, aby ste mohli porovnať svoju mzdu s mestom.',
     },

@@ -10013,7 +10013,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       return routeJson({ resumeNpcCompany: { ...npc } })
     }
 
-    if (query.includes('cityLaborMarkets')) {
+    if (query.includes('cityLaborMarkets(companyId')) {
       const companyId = body?.variables?.companyId ?? null
       const company = companyId ? state.players.flatMap((p) => p.companies).find((c) => c.id === companyId) : null
       if (companyId && !company) return routeJsonError("You don't have permission to perform this action.", 'FORBIDDEN')

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { makePlayer, setupMockApi } from '../../helpers/mock-api'
+import { loginAs, makePlayer, setupMockApi } from '../../helpers/mock-api'
 
 function companyPlayer() {
   return makePlayer({
@@ -19,20 +19,11 @@ function companyPlayer() {
   })
 }
 
-async function login(page: Parameters<typeof setupMockApi>[0], token: string) {
-  await page.addInitScript((value) => {
-    localStorage.setItem('auth_token', value)
-    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
-  }, token)
-}
-
 test('city economy tab shows unemployment, wage pressure and a fair-pay state', async ({ page }) => {
   const player = companyPlayer()
   const state = setupMockApi(page, { players: [player] })
-  state.currentUserId = player.id
-  state.currentToken = `token-${player.id}`
   state.cityLaborMarketOverrides['city-ba'] = { unemploymentRate: 0.6, wageIndex: 1.2, averageSalaryMultiplier: 1.1, yourSalaryMultiplier: 1.1, payRatio: 1 }
-  await login(page, `token-${player.id}`)
+  await loginAs(page, state, player)
 
   await page.goto('/city/city-ba/economy')
 
@@ -47,8 +38,6 @@ test('city economy tab shows unemployment, wage pressure and a fair-pay state', 
 test('underpaying company sees strike risk, a settings hint and the buildings held back', async ({ page }) => {
   const player = companyPlayer()
   const state = setupMockApi(page, { players: [player] })
-  state.currentUserId = player.id
-  state.currentToken = `token-${player.id}`
   state.cityLaborMarketOverrides['city-ba'] = {
     averageSalaryMultiplier: 1.2,
     yourSalaryMultiplier: 0.6,
@@ -59,7 +48,7 @@ test('underpaying company sees strike risk, a settings hint and the buildings he
       { buildingId: 'b-short', name: 'Small Plant', staffingFactor: 0.4, onStrike: false, strikeUntilTick: null },
     ],
   }
-  await login(page, `token-${player.id}`)
+  await loginAs(page, state, player)
 
   await page.goto('/city/city-ba/economy')
 
@@ -68,17 +57,15 @@ test('underpaying company sees strike risk, a settings hint and the buildings he
   await expect(section.getByTestId('labor-hint')).toContainText('60%')
   await expect(section.getByRole('link', { name: 'Open company settings' })).toHaveAttribute('href', '/company/comp-labor/settings')
   const affected = section.getByTestId('labor-affected-buildings')
-  await expect(affected.getByRole('link', { name: 'Old Plant' })).toBeVisible()
-  await expect(affected).toContainText('On strike until tick 9001')
+  await expect(affected.getByRole('link', { name: 'Old Plant' })).toHaveAttribute('href', '/building/b-strike')
+  await expect(affected).toContainText(/On strike until .*2001/)
   await expect(affected).toContainText('Staffed at 40%')
 })
 
 test('person account sees market figures but no company comparison', async ({ page }) => {
   const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
   const state = setupMockApi(page, { players: [player] })
-  state.currentUserId = player.id
-  state.currentToken = `token-${player.id}`
-  await login(page, `token-${player.id}`)
+  await loginAs(page, state, player)
 
   await page.goto('/city/city-ba/economy')
 

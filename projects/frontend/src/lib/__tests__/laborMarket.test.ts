@@ -2,21 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   CITY_LABOR_MARKETS_QUERY,
   STRIKE_PAY_RATIO_THRESHOLD,
-  computePayRatio,
   formatWagePressure,
   payPosition,
   strikeRisk,
   unemploymentPercent,
 } from '../laborMarket'
-
-describe('computePayRatio', () => {
-  it('compares with the city average but never with an average below the baseline wage', () => {
-    expect(computePayRatio(0.8, 1.0)).toBe(0.8)
-    expect(computePayRatio(1.2, 1.1)).toBeCloseTo(1.0909, 4)
-    expect(computePayRatio(0.5, 0.5)).toBe(0.5)
-    expect(computePayRatio(1, 0)).toBe(1)
-  })
-})
 
 describe('strikeRisk', () => {
   it('mirrors the backend threshold of 0.85', () => {

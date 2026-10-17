@@ -26,9 +26,9 @@ public sealed partial class Query
 
         Dictionary<Guid, decimal>? salaryByCity = null;
         Dictionary<Guid, List<AffectedBuildingItem>>? affectedByCity = null;
-        var currentTick = await db.GameStates.AsNoTracking().Select(state => state.CurrentTick).FirstOrDefaultAsync(ct);
         if (companyId.HasValue)
         {
+            var currentTick = await db.GameStates.AsNoTracking().Select(state => state.CurrentTick).FirstOrDefaultAsync(ct);
             var ownerPlayerId = await db.Companies
                 .AsNoTracking()
                 .Where(company => company.Id == companyId.Value)
@@ -47,7 +47,7 @@ public sealed partial class Query
                     .AsNoTracking()
                     .Where(building => building.CompanyId == companyId.Value
                         && building.DestroyedAtUtc == null
-                        && (building.StaffingFactor < 1m || building.StrikeUntilTick != null))
+                        && (building.StaffingFactor < 1m || (building.StrikeUntilTick != null && building.StrikeUntilTick >= currentTick)))
                     .Select(building => new { building.Id, building.CityId, building.Name, building.StaffingFactor, building.StrikeUntilTick })
                     .ToListAsync(ct))
                 .GroupBy(building => building.CityId)
@@ -60,7 +60,7 @@ public sealed partial class Query
                             BuildingId = building.Id,
                             Name = building.Name,
                             StaffingFactor = building.StaffingFactor,
-                            OnStrike = building.StrikeUntilTick != null && currentTick <= building.StrikeUntilTick,
+                            OnStrike = building.StrikeUntilTick != null && building.StrikeUntilTick >= currentTick,
                             StrikeUntilTick = building.StrikeUntilTick,
                         })
                         .ToList());

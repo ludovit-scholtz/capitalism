@@ -203,4 +203,33 @@ public sealed class CityLaborMarketsQueryTests
         var rows = result.GetProperty("data").GetProperty("cityLaborMarkets").EnumerateArray().ToList();
         Assert.All(rows, row => Assert.Equal(0, row.GetProperty("affectedBuildings").GetArrayLength()));
     }
+
+    [Fact]
+    public async Task FullyStaffedBuildingWithAnExpiredStrikeMarker_IsNotListed()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+        var (token, playerId) = await RegisterAsync(client);
+        var cityId = await SeedMarketAsync(factory, averageSalary: 1m);
+        var companyId = await SeedCompanyAsync(factory, playerId, cityId, salaryMultiplier: 1m);
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            (await db.GameStates.FirstAsync()).CurrentTick = 100;
+            var city = await db.Cities.FirstAsync(c => c.Id == cityId);
+            db.Buildings.Add(new Building
+            {
+                Id = Guid.NewGuid(), CompanyId = companyId, CityId = cityId, Type = BuildingType.Factory, Name = "Settled",
+                Latitude = city.Latitude, Longitude = city.Longitude, BuiltAtUtc = DateTime.UtcNow,
+                StaffingFactor = 1m, StrikeStartedAtTick = 80, StrikeUntilTick = 90, // ended ten ticks ago, not yet cleared
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var result = await TestHelpers.ExecuteGraphQlAsync(client, Query, new { companyId }, token);
+
+        var row = result.GetProperty("data").GetProperty("cityLaborMarkets").EnumerateArray()
+            .Single(r => r.GetProperty("cityId").GetString() == cityId.ToString());
+        Assert.Equal(0, row.GetProperty("affectedBuildings").GetArrayLength());
+    }
 }

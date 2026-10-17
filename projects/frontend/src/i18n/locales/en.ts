@@ -2268,7 +2268,7 @@ export default {
       unemployment: 'Unemployment',
       wagePressure: 'Wage pressure',
       averagePay: 'City average pay',
-      staffing: 'Positions filled',
+      staffing: 'City positions filled',
       yourPay: 'Your pay',
       payRatio: 'Pay vs city',
       pay: {
@@ -2284,7 +2284,7 @@ export default {
       hint: 'Your pay is {ratio} of the city reference. Raise the salary multiplier in company settings to keep your workers.',
       openSettings: 'Open company settings',
       affectedTitle: 'Buildings held back',
-      onStrike: 'On strike until tick {tick}',
+      onStrike: 'On strike until {time}',
       understaffed: 'Staffed at {percent}%',
       noCompany: 'Switch to a company account to compare your pay with the city.',
     },

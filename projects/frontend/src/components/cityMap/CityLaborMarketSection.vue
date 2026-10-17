@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
+import { formatGameTickTime } from '@/lib/gameTime'
 import {
   CITY_LABOR_MARKETS_QUERY,
   formatWagePressure,
@@ -17,7 +18,7 @@ const props = defineProps<{
   cityName: string
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const auth = useAuthStore()
 
 const markets = ref<CityLaborMarket[]>([])
@@ -36,16 +37,22 @@ function formatMultiplier(value: number | null | undefined): string {
   return value == null ? '—' : `×${value.toFixed(2)}`
 }
 
+let latestRequest = 0
+
 async function load() {
+  // Only the most recent request may write state, so a slow earlier response cannot show another company's figures.
+  const requestId = ++latestRequest
   loading.value = true
   error.value = false
   try {
     const data = await gqlRequest<{ cityLaborMarkets: CityLaborMarket[] }>(CITY_LABOR_MARKETS_QUERY, { companyId: companyId.value })
+    if (requestId !== latestRequest) return
     markets.value = data.cityLaborMarkets
   } catch {
+    if (requestId !== latestRequest) return
     error.value = true
   } finally {
-    loading.value = false
+    if (requestId === latestRequest) loading.value = false
   }
 }
 
@@ -104,8 +111,10 @@ watch(() => [props.cityId, companyId.value], load, { immediate: true })
           <h4>{{ t('cityMap.labor.affectedTitle') }}</h4>
           <ul>
             <li v-for="building in market.affectedBuildings" :key="building.buildingId">
-              <RouterLink :to="`/buildings/${building.buildingId}`">{{ building.name }}</RouterLink>
-              <span v-if="building.onStrike" class="labor-risk labor-risk-high">{{ t('cityMap.labor.onStrike', { tick: building.strikeUntilTick }) }}</span>
+              <RouterLink :to="`/building/${building.buildingId}`">{{ building.name }}</RouterLink>
+              <span v-if="building.onStrike" class="labor-risk labor-risk-high" :title="`${building.strikeUntilTick}`">{{
+                t('cityMap.labor.onStrike', { time: formatGameTickTime(building.strikeUntilTick ?? 0, locale) })
+              }}</span>
               <span v-else class="labor-risk labor-risk-elevated">{{ t('cityMap.labor.understaffed', { percent: Math.round(building.staffingFactor * 100) }) }}</span>
             </li>
           </ul>

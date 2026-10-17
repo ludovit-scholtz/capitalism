@@ -2275,7 +2275,7 @@ export default {
       unemployment: 'Arbeitslosigkeit',
       wagePressure: 'Lohndruck',
       averagePay: 'Durchschnittslohn der Stadt',
-      staffing: 'Besetzte Stellen',
+      staffing: 'Besetzte Stellen in der Stadt',
       yourPay: 'Ihr Lohn',
       payRatio: 'Lohn im Vergleich zur Stadt',
       pay: {
@@ -2291,7 +2291,7 @@ export default {
       hint: 'Ihr Lohn liegt bei {ratio} des Stadtniveaus. Erhöhen Sie den Gehaltsmultiplikator in den Firmeneinstellungen, um Ihre Mitarbeiter zu halten.',
       openSettings: 'Firmeneinstellungen öffnen',
       affectedTitle: 'Gebäude mit eingeschränktem Betrieb',
-      onStrike: 'Streik bis Tick {tick}',
+      onStrike: 'Streik bis {time}',
       understaffed: 'Besetzt zu {percent} %',
       noCompany: 'Wechseln Sie zu einem Firmenkonto, um Ihren Lohn mit der Stadt zu vergleichen.',
     },

@@ -64,14 +64,6 @@ export const CITY_LABOR_MARKETS_QUERY = `query CityLaborMarkets($companyId: UUID
   }
 }`
 
-/**
- * Pay relative to the city reference wage: the demand-weighted average, but never below the baseline wage (multiplier 1),
- * so a sole employer cannot look "average" while paying almost nothing.
- */
-export function computePayRatio(companySalaryMultiplier: number, citySalaryAverage: number): number {
-  return companySalaryMultiplier / Math.max(citySalaryAverage, 1)
-}
-
 export function strikeRisk(payRatio: number): StrikeRisk {
   if (payRatio >= STRIKE_PAY_RATIO_THRESHOLD) return 'NONE'
   return payRatio >= HIGH_STRIKE_RISK_PAY_RATIO ? 'ELEVATED' : 'HIGH'
