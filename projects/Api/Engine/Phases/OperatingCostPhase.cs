@@ -21,10 +21,11 @@ public sealed class OperatingCostPhase : ITickPhase
 
     public Task ProcessAsync(TickContext context)
     {
-        var maxCompanyAssetValue = context.CompaniesById.Keys
-            .Select(context.GetCompanyAssetValue)
-            .DefaultIfEmpty(0m)
-            .Max();
+        // Snapshot of every company's asset value, computed in one pass. Recomputing it per building scans all buildings each
+        // time (quadratic in the number of buildings) and made the overhead of a building depend on which buildings were
+        // billed before it within the same phase.
+        var assetValues = context.ComputeAllCompanyAssetValues();
+        var maxCompanyAssetValue = assetValues.Values.DefaultIfEmpty(0m).Max();
 
         foreach (var building in context.BuildingsById.Values)
         {
@@ -49,7 +50,7 @@ public sealed class OperatingCostPhase : ITickPhase
             var salarySettings = context.CitySalarySettingsByCompany.GetValueOrDefault(company.Id, []);
             var salaryMultiplier = CompanyEconomyCalculator.GetSalaryMultiplier(salarySettings, city.Id);
             var hourlyWage = CompanyEconomyCalculator.GetEffectiveHourlyWage(city, salaryMultiplier, context.GetWageIndex(city.Id));
-            var companyAssetValue = context.GetCompanyAssetValue(company.Id);
+            var companyAssetValue = context.AssetValueOrLive(assetValues, company.Id);
             var overheadRate = CompanyEconomyCalculator.ComputeAdministrationOverheadRate(
                 company,
                 companyAssetValue,

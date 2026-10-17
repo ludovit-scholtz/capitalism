@@ -143,6 +143,10 @@ public sealed partial class TickContext
         };
     }
 
+    /// <summary>
+    /// Asset value of one company, computed live. This scans every building, so it is O(buildings) per call: never call it in a
+    /// per-building or per-unit loop; take <see cref="ComputeAllCompanyAssetValues"/> once and read from that instead.
+    /// </summary>
     public decimal GetCompanyAssetValue(Guid companyId)
     {
         if (!CompaniesById.ContainsKey(companyId))
@@ -153,6 +157,36 @@ public sealed partial class TickContext
         var companyBuildings = BuildingsById.Values
             .Where(building => building.CompanyId == companyId)
             .ToList();
+        return ComputeAssetValue(companyId, companyBuildings);
+    }
+
+    /// <summary>
+    /// Asset value of every company in one pass over the buildings. <see cref="GetCompanyAssetValue"/> scans all buildings
+    /// per call, so calling it per building (or per company) is quadratic; phases that need the values of many companies
+    /// take this snapshot once instead. Each entry equals what <see cref="GetCompanyAssetValue"/> returns at the same moment.
+    /// </summary>
+    public Dictionary<Guid, decimal> ComputeAllCompanyAssetValues()
+    {
+        var buildingsByCompany = BuildingsById.Values
+            .GroupBy(building => building.CompanyId)
+            .ToDictionary(group => group.Key, group => group.ToList());
+        var result = new Dictionary<Guid, decimal>(CompaniesById.Count);
+        foreach (var companyId in CompaniesById.Keys)
+        {
+            result[companyId] = ComputeAssetValue(
+                companyId,
+                buildingsByCompany.TryGetValue(companyId, out var companyBuildings) ? companyBuildings : []);
+        }
+
+        return result;
+    }
+
+    /// <summary>Reads a company from an asset-value snapshot, computing it live if the company is not in the snapshot.</summary>
+    public decimal AssetValueOrLive(IReadOnlyDictionary<Guid, decimal> snapshot, Guid companyId)
+        => snapshot.TryGetValue(companyId, out var value) ? value : GetCompanyAssetValue(companyId);
+
+    private decimal ComputeAssetValue(Guid companyId, IReadOnlyCollection<Building> companyBuildings)
+    {
         var buildingValue = companyBuildings.Sum(Api.Utilities.WealthCalculator.GetBuildingValue);
         var inventoryValue = companyBuildings.Sum(building =>
             InventoryByBuilding.TryGetValue(building.Id, out var inventories)

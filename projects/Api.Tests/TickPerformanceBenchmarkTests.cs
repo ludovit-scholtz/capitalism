@@ -10,7 +10,7 @@ namespace Api.Tests;
 
 /// <summary>
 /// Tick performance gate. Seeds a deterministic world, processes ticks through the real pipeline and fails when the
-/// measured tick exceeds the budget. Runs a 1/50 slice by default; set TICK_BENCH_SCALE=full to benchmark the
+/// measured tick exceeds the budget. Runs a 1/50 slice by default; set TICK_BENCH_SCALE=medium (2,000 buildings) or full to benchmark the
 /// product requirement (1,000 players, 20,000 buildings, 500,000 units) and TICK_BENCH_BUDGET_MS to override the budget.
 /// </summary>
 public sealed class TickPerformanceBenchmarkTests(ITestOutputHelper output)
@@ -21,16 +21,23 @@ public sealed class TickPerformanceBenchmarkTests(ITestOutputHelper output)
     /// <summary>Budget for the CI slice. Roughly 4x the measured ~0.8 s baseline so shared CI runners do not flake; it catches large regressions only. Tighten alongside the optimisation work in #608.</summary>
     private const long CiBudgetMs = 3_000;
 
+    /// <summary>Budget for the opt-in 2,000-building scale on EF InMemory (~16 s measured; not representative of PostgreSQL).</summary>
+    private const long MediumBudgetMs = 30_000;
+
     private const double Tolerance = 0.25;
 
     [Fact]
     public async Task FullTick_OnSeededWorld_StaysWithinBudget()
     {
-        var full = string.Equals(Environment.GetEnvironmentVariable("TICK_BENCH_SCALE"), "full", StringComparison.OrdinalIgnoreCase);
-        var scale = full ? TickBenchmarkScale.Full : TickBenchmarkScale.Ci;
+        var scaleName = Environment.GetEnvironmentVariable("TICK_BENCH_SCALE");
+        var full = string.Equals(scaleName, "full", StringComparison.OrdinalIgnoreCase);
+        var scale = full
+            ? TickBenchmarkScale.Full
+            : string.Equals(scaleName, "medium", StringComparison.OrdinalIgnoreCase) ? TickBenchmarkScale.Medium : TickBenchmarkScale.Ci;
+        var medium = scale == TickBenchmarkScale.Medium;
         var budgetMs = long.TryParse(Environment.GetEnvironmentVariable("TICK_BENCH_BUDGET_MS"), out var overridden)
             ? overridden
-            : full ? 1_000 : CiBudgetMs;
+            : full ? 1_000 : medium ? MediumBudgetMs : CiBudgetMs;
 
         await using var factory = new ApiWebApplicationFactory();
         using var _ = factory.CreateClient(); // boots the host and database seed data
