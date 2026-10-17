@@ -40,10 +40,12 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
 
         var contracts = new List<(Guid Id, int SellerIdx, int BuyerIdx)>();
         await ScriptedAcceptAndBuyerCancelAsync(client, world, rng);
+        Assert.True(await RandomForexSwapAsync(client, world, rng), "Scripted forex swap failed.");
+        Assert.Null(await BuildingSaleAsync(client, world, rng));
         var applied = new Dictionary<string, int>();
         for (var step = 1; step <= Steps; step++)
         {
-            switch (rng.Next(5))
+            switch (rng.Next(7))
             {
                 case 0:
                 case 1:
@@ -55,6 +57,12 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
                 case 3:
                     var done = await RandomContractActionAsync(client, world, rng, contracts);
                     if (done is not null) applied[done] = applied.GetValueOrDefault(done) + 1;
+                    break;
+                case 4:
+                    if (await RandomForexSwapAsync(client, world, rng)) applied["forex"] = applied.GetValueOrDefault("forex") + 1;
+                    break;
+                case 5:
+                    if (await BuildingSaleAsync(client, world, rng) is null) applied["buildingSale"] = applied.GetValueOrDefault("buildingSale") + 1;
                     break;
                 default:
                     await TickAsync(factory);
@@ -70,10 +78,10 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
         await TickAsync(factory);
         await AssertInvariantsAsync(factory, baseline, seed, Steps + 1);
 
-        // Guard against a vacuous run: the generator must have actually moved money and created contracts.
+        // Guard against a vacuous run: the random generator must have actually moved money.
         output.WriteLine($"Applied actions: {string.Join(", ", applied.Select(kv => $"{kv.Key}={kv.Value}"))}");
         Assert.True(applied.GetValueOrDefault("transfer") > 0, $"No transfer succeeded (seed={seed}).");
-        Assert.True(applied.GetValueOrDefault("propose") > 0, $"No contract proposal succeeded (seed={seed}).");
+        // Contracts, forex swaps and a building sale are guaranteed by the scripted flows at the start (they assert success).
     }
 
     /// <summary>
@@ -271,6 +279,66 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
         return result.TryGetProperty("errors", out _) ? null : action;
     }
 
+    private static string? ErrorCodeOf(JsonElement response)
+        => response.TryGetProperty("errors", out var errors) ? errors[0].GetProperty("extensions").GetProperty("code").GetString() : null;
+
+    /// <summary>Swaps part of a company's main balance into its second-currency account (a real, ledgered money flow).</summary>
+    private static async Task<bool> RandomForexSwapAsync(HttpClient client, World world, Random rng)
+    {
+        var p = world.Players[rng.Next(world.Players.Count)];
+        var amount = Math.Round((decimal)rng.NextDouble() * 20_000m, 2) + 100m;
+        var result = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            "mutation($input: ExecuteForexSwapInput!) { executeForexSwap(input: $input) { __typename } }",
+            new
+            {
+                input = new
+                {
+                    fromCurrencyCode = world.CityCurrency,
+                    toCurrencyCode = world.ForeignCurrency,
+                    amount,
+                    fromBankAccountId = p.AccountA,
+                    toBankAccountId = p.AccountC,
+                },
+            },
+            p.Token);
+        return !result.TryGetProperty("errors", out _);
+    }
+
+    /// <summary>Lists a building, lets another company bid and the owner accept: the company-to-company sale flow.</summary>
+    private static async Task<string?> BuildingSaleAsync(HttpClient client, World world, Random rng)
+    {
+        var s = rng.Next(world.Players.Count);
+        var b = (s + 1 + rng.Next(world.Players.Count - 1)) % world.Players.Count;
+        var price = 900_000m + rng.Next(0, 100) * 1_000m;
+        var seller = world.Players[s];
+        var buyer = world.Players[b];
+
+        var listed = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            "mutation($input: SetBuildingForSaleInput!) { setBuildingForSale(input: $input) { id } }",
+            new { input = new { buildingId = seller.BuildingId, isForSale = true, askingPrice = price } },
+            seller.Token);
+        if (listed.TryGetProperty("errors", out _)) return $"list: {listed.GetProperty("errors")[0]}";
+
+        var offer = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            "mutation($input: MakeOfferOnBuildingInput!) { makeOfferOnBuilding(input: $input) { id offerVersion } }",
+            new { input = new { buildingId = seller.BuildingId, buyerCompanyId = buyer.CompanyId, offeredPrice = price } },
+            buyer.Token);
+        if (offer.TryGetProperty("errors", out _)) return $"offer: {offer.GetProperty("errors")[0]}";
+        var offerData = offer.GetProperty("data").GetProperty("makeOfferOnBuilding");
+
+        var accepted = await TestHelpers.ExecuteGraphQlAsync(
+            client,
+            "mutation($input: AcceptBuildingOfferInput!) { acceptBuildingOffer(input: $input) { __typename } }",
+            new { input = new { offerId = offerData.GetProperty("id").GetString(), offerVersion = offerData.GetProperty("offerVersion").GetString() } },
+            seller.Token);
+        if (accepted.TryGetProperty("errors", out _)) return $"accept: {accepted.GetProperty("errors")[0]}";
+
+        return null;
+    }
+
     private static BankAccount NewAccount(Guid? companyId, string currency, decimal balance) => new()
     {
         Id = Guid.NewGuid(),
@@ -299,6 +367,7 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var city = await db.Cities.OrderBy(c => c.Name).FirstAsync();
         var resource = await db.ResourceTypes.OrderBy(r => r.Name).FirstAsync();
+        var foreignCurrency = string.Equals(city.CurrencyCode, "USD", StringComparison.OrdinalIgnoreCase) ? "EUR" : "USD";
         var players = new List<PlayerSlot>();
         for (var i = 0; i < PlayerCount; i++)
         {
@@ -312,6 +381,7 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
             var purchase = new BuildingUnit { Id = Guid.NewGuid(), BuildingId = building.Id, UnitType = UnitType.Purchase, GridX = 1, GridY = 0, ResourceTypeId = resource.Id, Level = 1 };
             var accountA = NewAccount(company.Id, city.CurrencyCode, 1_000_000m);
             var accountB = NewAccount(company.Id, city.CurrencyCode, 500_000m);
+            var accountC = NewAccount(company.Id, foreignCurrency, 0m);
             db.Companies.Add(company);
             var player = await db.Players.FirstAsync(pl => pl.Id == tokens[i].PlayerId);
             player.ActiveAccountType = AccountContextType.Company;
@@ -323,15 +393,15 @@ public sealed class EconomyInvariantTests(ITestOutputHelper output)
                 Id = Guid.NewGuid(), BuildingId = building.Id, BuildingUnitId = sales.Id, ResourceTypeId = resource.Id,
                 Quantity = 2000m, Quality = 0.7m, SourcingCostTotal = 6000m
             });
-            db.BankAccounts.AddRange(accountA, accountB);
-            players.Add(new PlayerSlot(tokens[i].Token, company.Id, sales.Id, accountA.Id, accountB.Id));
+            db.BankAccounts.AddRange(accountA, accountB, accountC);
+            players.Add(new PlayerSlot(tokens[i].Token, company.Id, sales.Id, accountA.Id, accountB.Id, accountC.Id, building.Id));
         }
 
         await db.SaveChangesAsync();
-        return new World(players, resource.Id);
+        return new World(players, resource.Id, city.CurrencyCode, foreignCurrency);
     }
 
-    private sealed record PlayerSlot(string Token, Guid CompanyId, Guid SalesUnitId, Guid AccountA, Guid AccountB);
+    private sealed record PlayerSlot(string Token, Guid CompanyId, Guid SalesUnitId, Guid AccountA, Guid AccountB, Guid AccountC, Guid BuildingId);
 
-    private sealed record World(List<PlayerSlot> Players, Guid ResourceTypeId);
+    private sealed record World(List<PlayerSlot> Players, Guid ResourceTypeId, string CityCurrency, string ForeignCurrency);
 }
