@@ -9,7 +9,8 @@ namespace Api.Tests.Infrastructure;
 /// </summary>
 internal sealed record EconomySnapshot(
     IReadOnlyDictionary<Guid, decimal> CompanyBalances,
-    HashSet<Guid> KnownLedgerEntryIds);
+    HashSet<Guid> KnownLedgerEntryIds,
+    IReadOnlyDictionary<Guid, decimal>? PersonalAccountBalances = null);
 
 /// <summary>
 /// Economy-wide invariants asserted by <see cref="EconomyInvariantTests"/>. Each check returns
@@ -25,7 +26,11 @@ internal static class EconomyInvariantChecker
             .Select(g => new { g.Key, Total = g.Sum(a => a.Balance) })
             .ToListAsync();
         var ledgerIds = await db.LedgerEntries.AsNoTracking().Select(e => e.Id).ToListAsync();
-        return new EconomySnapshot(balances.ToDictionary(t => t.Key, t => t.Total), ledgerIds.ToHashSet());
+        var personal = await db.BankAccounts.AsNoTracking()
+            .Where(a => a.CompanyId == null && !a.IsGovernmentAccount)
+            .Select(a => new { a.Id, a.Balance })
+            .ToListAsync();
+        return new EconomySnapshot(balances.ToDictionary(t => t.Key, t => t.Total), ledgerIds.ToHashSet(), personal.ToDictionary(a => a.Id, a => a.Balance));
     }
 
     /// <summary>Runs every invariant; <paramref name="baseline"/> enables the conservation check.</summary>
@@ -38,6 +43,7 @@ internal static class EconomyInvariantChecker
         if (baseline is not null)
         {
             violations.AddRange(await CheckMoneyConservationAsync(db, baseline));
+            violations.AddRange(await CheckPersonalAccountsUntouchedAsync(db, baseline));
         }
 
         return violations;
@@ -108,6 +114,35 @@ internal static class EconomyInvariantChecker
     /// equals the sum of its ledger entries recorded since then: no company gains or loses money
     /// without a visible bank-statement row. Only company-owned accounts are covered: player-owned and government accounts have no ledger and are not part of this check.
     /// </summary>
+    /// <summary>
+    /// Global leak detector for the money the per-company ledger check cannot see: personal (player-owned, non-government) accounts.
+    /// The generated actions only move company money, so no personal account may change; a change means a company flow minted or
+    /// burned money into a player's pocket, or an account was created or removed behind the ledger.
+    /// </summary>
+    public static async Task<List<string>> CheckPersonalAccountsUntouchedAsync(AppDbContext db, EconomySnapshot baseline)
+    {
+        if (baseline.PersonalAccountBalances is null)
+        {
+            return [];
+        }
+
+        var current = (await TakeSnapshotAsync(db)).PersonalAccountBalances!;
+        var violations = new List<string>();
+        foreach (var (accountId, balanceBefore) in baseline.PersonalAccountBalances)
+        {
+            if (!current.TryGetValue(accountId, out var balanceNow))
+            {
+                violations.Add($"PERSONAL_ACCOUNT_REMOVED account={accountId} balanceBefore={balanceBefore}");
+            }
+            else if (balanceNow != balanceBefore)
+            {
+                violations.Add($"PERSONAL_ACCOUNT_CHANGED account={accountId} before={balanceBefore} after={balanceNow}");
+            }
+        }
+
+        return violations;
+    }
+
     public static async Task<List<string>> CheckMoneyConservationAsync(AppDbContext db, EconomySnapshot baseline)
     {
         var current = await TakeSnapshotAsync(db);

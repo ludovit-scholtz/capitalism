@@ -16,3 +16,5 @@ entity ids; re-run that single seed to reproduce. The action sequence is fully d
 The `Checker_Detects*` tests prove each invariant fails on a deliberately corrupted state.
 
 `SellingADefaultedLoansCollateral_SettlesTheLienAndKeepsInvariants` covers the collateral-sale interaction (#607): a borrower sells the pledged building of a defaulted loan, the lien is settled from the proceeds and the invariants are checked. An Active or Overdue lien blocks the sale with `BUILDING_LOCKED_AS_COLLATERAL` before settlement runs, so only a defaulted lien reaches the settlement code.
+
+`CheckPersonalAccountsUntouchedAsync` is the global leak detector (#607): the generated actions only move company money, so no personal (player-owned, non-government) account may change or disappear during a run. Company and government money are covered by the per-company ledger conservation check; a full cross-currency mint/burn ledger is not defined, because forex swaps and the public stock market legitimately change totals per currency.
