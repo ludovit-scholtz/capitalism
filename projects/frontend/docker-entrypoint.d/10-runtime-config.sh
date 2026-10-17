@@ -1,7 +1,9 @@
 #!/bin/sh
 set -eu
 
-cat > /usr/share/nginx/html/runtime-config.js <<EOF
+HTML_DIR="${HTML_DIR:-/usr/share/nginx/html}"
+
+cat > "$HTML_DIR/runtime-config.js" <<EOF
 window.__capitalismRuntimeConfig__ = {
   graphqlUrl: "${APP_GRAPHQL_URL:-}",
   masterGraphqlUrl: "${APP_MASTER_GRAPHQL_URL:-}",
@@ -18,3 +20,8 @@ window.__capitalismRuntimeConfig__ = {
   googleAnalyticsId: "${APP_GOOGLE_ANALYTICS_ID:-}",
 }
 EOF
+
+# Browsers that cached runtime-config.js under the old one-year rule would never revalidate it, so version the URL
+# by content: the script tag in index.html changes whenever the generated settings change (idempotent across restarts).
+version="$(cksum < "$HTML_DIR/runtime-config.js" | cut -d' ' -f1)"
+sed -i -E "s#/runtime-config\.js(\?v=[0-9]+)?#/runtime-config.js?v=${version}#" "$HTML_DIR/index.html"
