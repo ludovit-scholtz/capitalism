@@ -53,6 +53,10 @@ npm run build
 npm run test:e2e
 ```
 
+## 500-line file limit is enforced in CI
+
+`.github/workflows/file-size-guard.yml` runs `node .github/scripts/file-size-guard.mjs` on every PR. Tracked `.cs`/`.ts`/`.vue`/`.dart` files (not migrations, generated code, locales or build output) may not exceed 500 lines. Existing offenders are listed with their line counts in `.github/file-size-allowlist.json`; **the list may only shrink**: a listed file that grows fails, a new file over 500 lines fails, and a listed file that dropped under 500 must be removed. After splitting a file, run `node .github/scripts/file-size-guard.mjs --update` to lock in the gain (it lowers/removes entries and never adds one). Do not add a file to the allow-list to get a PR through; split it.
+
 ## Before reporting a change complete
 
 - **Backend**: run the Release pipeline, not just Debug tests: `cd projects/Api && dotnet restore Api.slnx && dotnet build Api.slnx -c Release --no-restore && dotnet test Api.slnx -c Release --no-build`.

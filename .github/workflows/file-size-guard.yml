@@ -1,0 +1,30 @@
+name: file-size-guard
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  file-size-guard:
+    name: 500-line source file limit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Test the file-size checker
+        run: node --test .github/scripts/__tests__/file-size-guard.test.mjs
+
+      - name: Enforce the 500-line limit (allow-list may only shrink)
+        run: node .github/scripts/file-size-guard.mjs
