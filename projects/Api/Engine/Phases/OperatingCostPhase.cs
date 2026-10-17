@@ -85,6 +85,13 @@ public sealed class OperatingCostPhase : ITickPhase
                 laborCost = decimal.Round(laborCost * upgradeMultiplier, 2, MidpointRounding.AwayFromZero);
                 energyCost = decimal.Round(energyCost * upgradeMultiplier, 2, MidpointRounding.AwayFromZero);
 
+                // The global economic shock applies per unit, so the booked rows always sum to exactly what the account is debited.
+                if (context.GlobalEventOperatingCostMultiplier != 1m)
+                {
+                    laborCost = decimal.Round(laborCost * context.GlobalEventOperatingCostMultiplier, 2, MidpointRounding.AwayFromZero);
+                    energyCost = decimal.Round(energyCost * context.GlobalEventOperatingCostMultiplier, 2, MidpointRounding.AwayFromZero);
+                }
+
                 totalBuildingCost += laborCost + energyCost;
                 unitCosts.Add((unit, laborCost, energyCost));
             }
@@ -93,11 +100,6 @@ public sealed class OperatingCostPhase : ITickPhase
             {
                 continue;
             }
-
-            // Apply global economic shock multiplier to the building's total operating cost.
-            totalBuildingCost = decimal.Round(
-                totalBuildingCost * context.GlobalEventOperatingCostMultiplier,
-                2, MidpointRounding.AwayFromZero);
 
             // ── Bank account check ──
             var hasAssignedAccount = building.BankAccountId.HasValue;
@@ -140,59 +142,65 @@ public sealed class OperatingCostPhase : ITickPhase
                 continue;
             }
 
-            // ── Debit individual unit costs and record ledger entries ──
+            // ── Record the costs: one labor and one energy row per building (a tick writes thousands of units' worth of
+            // rows otherwise, and SaveChanges dominated the tick, #630). R&D units keep their own labelled per-unit rows. ──
+            var operatingLabor = 0m;
+            var operatingEnergy = 0m;
+            var operatingUnits = 0;
             foreach (var (unit, laborCost, energyCost) in unitCosts)
             {
-                var laborDescription = unit.UnitType switch
+                if (unit.UnitType is UnitType.ProductQuality or UnitType.BrandQuality)
                 {
-                    UnitType.ProductQuality => "R&D Salary: Product Quality Research",
-                    UnitType.BrandQuality => "R&D Salary: Brand Quality Research",
-                    _ => $"Operating labor for {unit.UnitType}",
-                };
-
-                var energyDescription = unit.UnitType switch
-                {
-                    UnitType.ProductQuality => "R&D Energy: Product Quality Lab",
-                    UnitType.BrandQuality => "R&D Energy: Brand Quality Lab",
-                    _ => $"Operating energy for {unit.UnitType}",
-                };
-
-                if (laborCost > 0m)
-                {
-                    context.Db.LedgerEntries.Add(new LedgerEntry
-                    {
-                        Id = Guid.NewGuid(),
-                        CompanyId = company.Id,
-                        BuildingId = building.Id,
-                        BuildingUnitId = unit.Id,
-                        BankAccountId = bankAccount.Id,
-                        Category = LedgerCategory.LaborCost,
-                        Description = laborDescription,
-                        Amount = -laborCost,
-                        RecordedAtTick = context.CurrentTick,
-                        RecordedAtUtc = DateTime.UtcNow,
-                    });
+                    var isProduct = unit.UnitType == UnitType.ProductQuality;
+                    AddLedgerEntry(context, company, building, bankAccount, unit.Id, LedgerCategory.LaborCost, laborCost,
+                        isProduct ? "R&D Salary: Product Quality Research" : "R&D Salary: Brand Quality Research");
+                    AddLedgerEntry(context, company, building, bankAccount, unit.Id, LedgerCategory.EnergyCost, energyCost,
+                        isProduct ? "R&D Energy: Product Quality Lab" : "R&D Energy: Brand Quality Lab");
+                    continue;
                 }
 
-                if (energyCost > 0m)
-                {
-                    context.Db.LedgerEntries.Add(new LedgerEntry
-                    {
-                        Id = Guid.NewGuid(),
-                        CompanyId = company.Id,
-                        BuildingId = building.Id,
-                        BuildingUnitId = unit.Id,
-                        BankAccountId = bankAccount.Id,
-                        Category = LedgerCategory.EnergyCost,
-                        Description = energyDescription,
-                        Amount = -energyCost,
-                        RecordedAtTick = context.CurrentTick,
-                        RecordedAtUtc = DateTime.UtcNow,
-                    });
-                }
+                operatingLabor += laborCost;
+                operatingEnergy += energyCost;
+                operatingUnits++;
+            }
+
+            if (operatingUnits > 0)
+            {
+                AddLedgerEntry(context, company, building, bankAccount, null, LedgerCategory.LaborCost, operatingLabor, $"Operating labor ({operatingUnits} units)");
+                AddLedgerEntry(context, company, building, bankAccount, null, LedgerCategory.EnergyCost, operatingEnergy, $"Operating energy ({operatingUnits} units)");
             }
         }
 
         return Task.CompletedTask;
+    }
+
+    private static void AddLedgerEntry(
+        TickContext context,
+        Company company,
+        Building building,
+        BankAccount? bankAccount,
+        Guid? unitId,
+        string category,
+        decimal cost,
+        string description)
+    {
+        if (cost <= 0m)
+        {
+            return;
+        }
+
+        context.Db.LedgerEntries.Add(new LedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            BuildingId = building.Id,
+            BuildingUnitId = unitId,
+            BankAccountId = bankAccount?.Id,
+            Category = category,
+            Description = description,
+            Amount = -cost,
+            RecordedAtTick = context.CurrentTick,
+            RecordedAtUtc = DateTime.UtcNow,
+        });
     }
 }
