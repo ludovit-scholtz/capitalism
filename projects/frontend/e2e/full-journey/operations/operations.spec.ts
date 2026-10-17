@@ -196,3 +196,21 @@ test('Product analytics page filters and exports CSV', async ({ page }) => {
   const download = await downloadPromise
   expect(download.suggestedFilename()).toContain('operations-product-analytics-')
 })
+
+test('Operations overview shows a sortable tick phase table and flags phases over budget', async ({ page }) => {
+  const admin = makeAdminPlayer()
+  admin.onboardingCompletedAtUtc = '2026-01-01T00:00:00Z'
+  const state = setupMockApi(page, { players: [admin] })
+  buildAdminSession(state, admin)
+
+  await goToOperationsAsAdmin(page, state, admin, '/statistics')
+
+  const panel = page.getByTestId('tick-phase-timings')
+  await expect(panel.getByRole('heading', { name: /tick performance/i })).toBeVisible()
+  const rows = panel.locator('tbody tr')
+  await expect(rows.first()).toContainText('PublicSales')
+  await expect(rows.first()).toContainText(/over budget/i)
+
+  await panel.getByRole('button', { name: /^phase$/i }).click()
+  await expect(rows.first()).toContainText('Manufacturing')
+})

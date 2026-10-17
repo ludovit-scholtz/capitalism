@@ -4154,6 +4154,19 @@ export default {
       globalAdminsEmpty: 'Zatiaľ neexistujú žiadne globálne granty.',
       rootOnly: 'Globálne granty môže spravovať len root administrátor.',
     },
+    tickTimings: {
+      title: 'Výkon ticku',
+      summary: 'Posledných {ticks} tickov: priemer {average}, najpomalší {max}. Fázy s priemerom nad {budget} sú označené.',
+      refresh: 'Obnoviť',
+      empty: 'Od spustenia servera sa nespracoval žiadny tick.',
+      overBudget: 'Nad limitom',
+      columns: {
+        phase: 'Fáza',
+        last: 'Posledný tick',
+        average: 'Priemer',
+        max: 'Najpomalší',
+      },
+    },
     moneyFlow: {
       title: 'Peňažný tok',
       subtitle: 'Živé sumáre príjmov a výdavkov za obdobie {range}.',

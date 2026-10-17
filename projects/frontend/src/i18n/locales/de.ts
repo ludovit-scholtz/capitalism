@@ -4170,6 +4170,19 @@ export default {
       globalAdminsEmpty: 'Noch keine globalen Admin-Berechtigungen.',
       rootOnly: 'Nur Root-Administratoren dürfen globale Berechtigungen verwalten.',
     },
+    tickTimings: {
+      title: 'Tick-Leistung',
+      summary: 'Letzte {ticks} Ticks: Durchschnitt {average}, langsamster {max}. Phasen mit einem Durchschnitt über {budget} sind markiert.',
+      refresh: 'Aktualisieren',
+      empty: 'Seit dem Serverstart wurde noch kein Tick verarbeitet.',
+      overBudget: 'Über dem Limit',
+      columns: {
+        phase: 'Phase',
+        last: 'Letzter Tick',
+        average: 'Durchschnitt',
+        max: 'Langsamster',
+      },
+    },
     moneyFlow: {
       title: 'Geldfluss',
       subtitle: 'Live-Zu- und Abflüsse für {range}.',

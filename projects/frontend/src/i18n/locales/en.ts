@@ -4165,6 +4165,19 @@ export default {
       globalAdminsEmpty: 'No global admin grants yet.',
       rootOnly: 'Only root administrators can manage global grants.',
     },
+    tickTimings: {
+      title: 'Tick performance',
+      summary: 'Last {ticks} ticks: average {average}, slowest {max}. Phases above {budget} on average are flagged.',
+      refresh: 'Refresh',
+      empty: 'No ticks have been processed since this server started.',
+      overBudget: 'Over budget',
+      columns: {
+        phase: 'Phase',
+        last: 'Last tick',
+        average: 'Average',
+        max: 'Slowest',
+      },
+    },
     moneyFlow: {
       title: 'Money Flow',
       subtitle: 'Live inflow and outflow totals for {range}.',

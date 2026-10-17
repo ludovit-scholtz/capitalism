@@ -10010,6 +10010,28 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       return routeJson({ resumeNpcCompany: { ...npc } })
     }
 
+    if (query.includes('tickPhaseTimings')) {
+      const accessFailure = getAdminAccessFailure(false)
+      if (accessFailure) {
+        return routeJsonError(accessFailure.message, accessFailure.code)
+      }
+      return routeJson({
+        tickPhaseTimings: {
+          sampledTicks: 12,
+          lastTick: state.gameState.currentTick,
+          lastTotalMs: 210,
+          averageTotalMs: 190,
+          maxTotalMs: 260,
+          phaseBudgetMs: 100,
+          phases: [
+            { name: 'Tax', lastMs: 4, averageMs: 5, maxMs: 9, aboveBudget: false },
+            { name: 'PublicSales', lastMs: 150, averageMs: 140, maxMs: 200, aboveBudget: true },
+            { name: 'Manufacturing', lastMs: 40, averageMs: 35, maxMs: 90, aboveBudget: false },
+          ],
+        },
+      })
+    }
+
     if (query.includes('operationsStatistics')) {
       const accessFailure = getAdminAccessFailure(false)
       if (accessFailure) {
