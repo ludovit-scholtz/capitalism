@@ -56,9 +56,7 @@ public sealed partial class Query
                     playerId,
                     "bank_account",
                     input.FromBankAccountId.Value,
-                    await db.BankAccounts.AsNoTracking().AnyAsync(a => a.Id == input.FromBankAccountId.Value)
-                        ? ObjectAuthorizationService.NotOwnedReason
-                        : ObjectAuthorizationService.NotFoundReason);
+                    await BankAccountDenialClassifier.ClassifyAsync(db, input.FromBankAccountId.Value, playerId));
             if (!string.Equals(account.CurrencyCode, fromCode, StringComparison.OrdinalIgnoreCase))
                 throw new GraphQLException(ErrorBuilder.New().SetMessage($"Source bank account currency ({account.CurrencyCode}) does not match the requested from-currency ({fromCode}).").SetCode("CURRENCY_MISMATCH").Build());
             availableBalance = account.Balance;
@@ -82,9 +80,7 @@ public sealed partial class Query
                     playerId,
                     "bank_account",
                     input.ToBankAccountId.Value,
-                    await db.BankAccounts.AsNoTracking().AnyAsync(a => a.Id == input.ToBankAccountId.Value)
-                        ? ObjectAuthorizationService.NotOwnedReason
-                        : ObjectAuthorizationService.NotFoundReason);
+                    await BankAccountDenialClassifier.ClassifyAsync(db, input.ToBankAccountId.Value, playerId));
             if (!string.Equals(toAccount.CurrencyCode, toCode, StringComparison.OrdinalIgnoreCase))
                 throw new GraphQLException(ErrorBuilder.New().SetMessage($"Destination bank account currency ({toAccount.CurrencyCode}) does not match the requested to-currency ({toCode}).").SetCode("CURRENCY_MISMATCH").Build());
         }

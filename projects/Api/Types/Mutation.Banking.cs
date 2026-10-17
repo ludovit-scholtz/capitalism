@@ -59,7 +59,8 @@ public sealed partial class Mutation
     public async Task<BankDepositSummary> OpenBankAccount(
         OpenBankAccountInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
         var depositorCompany = default(Company);
@@ -69,15 +70,15 @@ public sealed partial class Mutation
         if (isCompanyDepositor)
         {
             depositorCompany = await db.Companies
-                .FirstOrDefaultAsync(c => c.Id == input.DepositorCompanyId!.Value && c.PlayerId == userId);
+                .FirstOrDefaultAsync(c => c.Id == input.DepositorCompanyId!.Value);
 
-            if (depositorCompany is null)
+            if (depositorCompany is null || depositorCompany.PlayerId != userId)
             {
-                throw new GraphQLException(
-                    ErrorBuilder.New()
-                        .SetMessage("Depositor company not found or you do not own it.")
-                        .SetCode("COMPANY_NOT_FOUND")
-                        .Build());
+                throw objectAuthorization.Deny(
+                    userId,
+                    "company",
+                    input.DepositorCompanyId!.Value,
+                    depositorCompany is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
             }
         }
         else

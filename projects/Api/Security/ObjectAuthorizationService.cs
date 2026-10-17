@@ -13,6 +13,12 @@ public sealed class ObjectAuthorizationService(
     public const string NotFoundOrNotOwnedCode = "FORBIDDEN";
     public const string NotFoundReason = "not_found";
     public const string NotOwnedReason = "not_owned";
+
+    /// <summary>The object exists and is visible but is in a state that forbids the action (for example a delisted building). Benign: audited at Information level, not as a probe.</summary>
+    /// <summary>The caller owns the object but not in the account context the request runs in (personal vs company). Benign: audited at Information level.</summary>
+    public const string WrongContextReason = "wrong_account_context";
+
+    public const string NotAvailableReason = "not_available";
     public const string FriendlyMessage = "You don't have permission to perform this action.";
 
     public async Task<TEntity> RequireOwnedAsync<TEntity>(
@@ -72,7 +78,9 @@ public sealed class ObjectAuthorizationService(
         string actualFailureReason)
     {
         var apiKeyContext = _httpContextAccessor.HttpContext?.Items[ApiKeyRequestContext.HttpContextItemKey] as ApiKeyRequestContext;
-        _logger.LogWarning(
+        var level = actualFailureReason is NotFoundReason or NotOwnedReason ? LogLevel.Warning : LogLevel.Information;
+        _logger.Log(
+            level,
             "Object authorization denied {@SecurityAuditEvent}",
             new
             {

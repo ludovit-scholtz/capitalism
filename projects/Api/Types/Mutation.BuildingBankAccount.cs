@@ -161,15 +161,15 @@ public sealed partial class Mutation
         }
 
         var account = await db.BankAccounts
-            .FirstOrDefaultAsync(a => a.Id == input.BankAccountId && a.CompanyId == building.CompanyId);
+            .FirstOrDefaultAsync(a => a.Id == input.BankAccountId);
 
-        if (account is null)
+        if (account is null || account.CompanyId != building.CompanyId)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Bank account not found or it does not belong to this building's company.")
-                    .SetCode("BANK_ACCOUNT_NOT_FOUND")
-                    .Build());
+            throw objectAuthorization.Deny(
+                userId,
+                "bank_account",
+                input.BankAccountId,
+                account is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
         }
 
         var cityCurrency = building.City?.CurrencyCode ?? "EUR";
@@ -202,20 +202,21 @@ public sealed partial class Mutation
     public async Task<CreateCompanyBankAccountResult> CreateCompanyBankAccount(
         CreateCompanyBankAccountInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
         var company = await db.Companies
-            .FirstOrDefaultAsync(c => c.Id == input.CompanyId && c.PlayerId == userId);
+            .FirstOrDefaultAsync(c => c.Id == input.CompanyId);
 
-        if (company is null)
+        if (company is null || company.PlayerId != userId)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Company not found or you do not own it.")
-                    .SetCode("COMPANY_NOT_FOUND")
-                    .Build());
+            throw objectAuthorization.Deny(
+                userId,
+                "company",
+                input.CompanyId,
+                company is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
         }
 
         // Validate currency is available in this game server.

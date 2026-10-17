@@ -8982,7 +8982,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         })
       }
 
-      const company = player.companies.find((c) => c.id === companyId)
+      if (!company) return routeJsonError("You don't have permission to perform this action.", 'FORBIDDEN')
       if (!company) return routeJsonError('Company not found or you do not own it.', 'COMPANY_NOT_FOUND')
       const allRows = state.bankStatementRows[companyId] ?? []
       const rows = allRows.slice(offset, offset + limit)

@@ -37,7 +37,7 @@ public sealed partial class Mutation
                 userId,
                 "building",
                 input.BuildingId,
-                building is null ? ObjectAuthorizationService.NotFoundReason : "not_available");
+                building is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotAvailableReason);
         }
 
         if (building.Company.PlayerId == userId)
@@ -60,15 +60,15 @@ public sealed partial class Mutation
 
         var buyerCompany = await db.Companies
             .Include(c => c.BankAccounts)
-            .FirstOrDefaultAsync(c => c.Id == input.BuyerCompanyId && c.PlayerId == userId);
+            .FirstOrDefaultAsync(c => c.Id == input.BuyerCompanyId);
 
-        if (buyerCompany is null)
+        if (buyerCompany is null || buyerCompany.PlayerId != userId)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Company not found or you don't own it.")
-                    .SetCode("COMPANY_NOT_FOUND")
-                    .Build());
+            throw objectAuthorization.Deny(
+                userId,
+                "company",
+                input.BuyerCompanyId,
+                buyerCompany is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
         }
 
         var currencyCode = building.City.CurrencyCode;

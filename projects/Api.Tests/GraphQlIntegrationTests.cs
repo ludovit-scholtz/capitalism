@@ -38832,7 +38832,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     }
 
     [Fact]
-    public async Task BankStatement_WrongCompany_ReturnsCompanyNotFoundError()
+    public async Task BankStatement_WrongCompany_ReturnsUniformForbiddenError()
     {
         await using var isolated = new ApiWebApplicationFactory();
         var client = isolated.CreateClient();
@@ -38843,9 +38843,9 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             new { companyId = Guid.NewGuid(), limit = (int?)50, offset = (int?)null }, token);
 
         var errors = result.GetProperty("errors");
-        Assert.True(errors.GetArrayLength() > 0, "Expected COMPANY_NOT_FOUND error.");
+        Assert.True(errors.GetArrayLength() > 0, "Expected FORBIDDEN error.");
         var errorCode = errors[0].GetProperty("extensions").GetProperty("code").GetString();
-        Assert.Equal("COMPANY_NOT_FOUND", errorCode);
+        Assert.Equal("FORBIDDEN", errorCode);
     }
 
     [Fact]

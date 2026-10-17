@@ -36,15 +36,15 @@ public sealed partial class Mutation
 
         // Verify borrower owns the company.
         var borrower = await db.Companies
-            .FirstOrDefaultAsync(c => c.Id == input.BorrowerCompanyId && c.PlayerId == userId);
+            .FirstOrDefaultAsync(c => c.Id == input.BorrowerCompanyId);
 
-        if (borrower is null)
+        if (borrower is null || borrower.PlayerId != userId)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Borrower company not found or you do not own it.")
-                    .SetCode("COMPANY_NOT_FOUND")
-                    .Build());
+            throw objectAuthorization.Deny(
+                userId,
+                "company",
+                input.BorrowerCompanyId,
+                borrower is null ? ObjectAuthorizationService.NotFoundReason : ObjectAuthorizationService.NotOwnedReason);
         }
 
         return await AcceptLoanFromBankDirectAsync(input, borrower, db, userId, httpContextAccessor, objectAuthorization);
