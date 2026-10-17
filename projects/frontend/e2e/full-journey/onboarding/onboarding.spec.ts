@@ -73,6 +73,16 @@ async function chooseOnboardingCity(page: Page, city = 'Bratislava') {
 
 async function chooseOnboardingRouteChoices(page: Page, { industry, product, city = 'Bratislava', ipoPlan = 'Starter IPO' }: OnboardingRouteChoiceOptions) {
   const factoryLotHeading = page.getByRole('heading', { name: 'Choose Your First Factory Lot' })
+  // isVisible() does not wait: make sure the wizard has rendered one of its steps before branching on which one.
+  await expect(
+    factoryLotHeading
+      .or(page.getByRole('heading', { name: 'Choose Your First Product' }))
+      .or(page.getByRole('heading', { name: 'Choose Your IPO Plan' }))
+      .or(page.getByRole('heading', { name: 'Choose Your City' }))
+      .or(page.getByRole('heading', { name: 'Choose Your Industry' }))
+      .or(page.getByRole('heading', { name: 'Choose Your First Shop Lot' }))
+      .first(),
+  ).toBeVisible()
   if (await factoryLotHeading.isVisible()) {
     return
   }
