@@ -1,0 +1,70 @@
+name: tick-benchmark
+
+# Nightly and on-demand tick benchmark against real PostgreSQL (InMemory timings are not representative). The per-phase breakdown,
+# including "(context load)" and "(save changes)", is published in the job summary. The full scale (1,000 players / 20,000 buildings /
+# 500,000 units) is on-demand only: workflow_dispatch with scale=full.
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+    inputs:
+      scale:
+        description: 'Benchmark scale: ci | medium | full'
+        required: false
+        default: 'medium'
+      budget_ms:
+        description: 'Fail when the average tick exceeds this many milliseconds (empty = report only)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tick-benchmark
+  cancel-in-progress: false
+
+jobs:
+  tick-benchmark:
+    name: Tick benchmark on PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      CAPITALISM_TEST_POSTGRES: Host=localhost;Port=5432;Username=postgres;Password=ci-only-password
+      CAPITALISM_TEST_POSTGRES_REQUIRED: 'true'
+      TICK_BENCH_SCALE: ${{ github.event.inputs.scale || 'medium' }}
+      TICK_BENCH_BUDGET_MS: ${{ github.event.inputs.budget_ms || '' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.x
+
+      - name: Run the benchmark
+        run: |
+          dotnet test projects/Api.Tests/Api.Tests.csproj --configuration Release --filter "FullyQualifiedName~TickPerformancePostgresBenchmarkTests" --logger "console;verbosity=detailed" | tee tick-benchmark.log
+          grep -Eq "^\s*Passed:\s+[1-9]" tick-benchmark.log
+          ! grep -Eq "^\s*Skipped:\s+[1-9]" tick-benchmark.log
+
+      - name: Publish the per-phase report
+        if: always()
+        run: |
+          {
+            echo "## Tick benchmark (scale: ${TICK_BENCH_SCALE})"
+            echo '```'
+            grep -E "PostgreSQL scale|Measured|avg " tick-benchmark.log || echo "no report produced"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
