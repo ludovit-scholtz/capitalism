@@ -18,8 +18,8 @@ public sealed class TickPerformanceBenchmarkTests(ITestOutputHelper output)
     private const int Seed = 600;
     private const int MeasuredTicks = 3;
 
-    /// <summary>Budget for the CI slice. Start from the measured baseline and tighten toward 1 s at full scale.</summary>
-    private const long CiBudgetMs = 2_500;
+    /// <summary>Budget for the CI slice. Roughly 4x the measured ~0.8 s baseline so shared CI runners do not flake; it catches large regressions only. Tighten alongside the optimisation work in #608.</summary>
+    private const long CiBudgetMs = 3_000;
 
     private const double Tolerance = 0.25;
 

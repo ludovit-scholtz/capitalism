@@ -464,9 +464,9 @@ onMounted(loadOverview)
         </article>
       </section>
     </template>
-  </div>
 
-  <TickPhaseTimingsPanel />
+    <TickPhaseTimingsPanel />
+  </div>
 </template>
 
 <style scoped>

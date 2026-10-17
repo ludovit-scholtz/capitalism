@@ -85,7 +85,7 @@ onMounted(load)
     </header>
 
     <p v-if="error" class="tick-timings-error">{{ error }}</p>
-    <p v-else-if="loading && !timings">{{ t('common.loading') }}</p>
+    <p v-if="loading && !timings">{{ t('common.loading') }}</p>
     <p v-else-if="!timings || timings.sampledTicks === 0" class="tick-timings-empty">
       {{ t('operations.tickTimings.empty') }}
     </p>

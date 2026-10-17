@@ -17,7 +17,7 @@ public sealed record TickTimingSummary(
 /// Thread-safe ring buffer of the most recent tick timings (total and per phase). Registered as a singleton so the
 /// tick engine can record and the read-only operations query can summarize without touching the database.
 /// </summary>
-public sealed class TickTimingRecorder(int capacity = 60, long phaseBudgetMs = 100)
+public sealed class TickTimingRecorder(int capacity = 60, long phaseBudgetMs = TickBudget.DefaultPhaseBudgetMs)
 {
     private readonly object gate = new();
     private readonly Queue<Sample> samples = new();
@@ -82,6 +82,9 @@ public sealed class TickTimingRecorder(int capacity = 60, long phaseBudgetMs = 1
 /// <summary>Budget comparison helpers shared by the tick performance benchmark and diagnostics.</summary>
 public static class TickBudget
 {
+    /// <summary>Phases slower than this are logged as slow by the tick engine and flagged in the operations dashboard.</summary>
+    public const long DefaultPhaseBudgetMs = 100;
+
     /// <summary>True when <paramref name="measuredMs"/> is within <paramref name="budgetMs"/> plus the relative tolerance.</summary>
     public static bool IsWithinBudget(long measuredMs, long budgetMs, double tolerance)
         => measuredMs <= budgetMs * (1d + tolerance);

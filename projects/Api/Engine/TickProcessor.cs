@@ -116,7 +116,7 @@ public sealed class TickProcessor(
 
         // Log per-phase breakdown when any phase exceeded the slow-phase threshold,
         // or when the total tick time is unexpectedly long.
-        const long SlowPhaseThresholdMs = 100;
+        const long SlowPhaseThresholdMs = TickBudget.DefaultPhaseBudgetMs;
         var slowPhases = phaseMs.Where(kv => kv.Value >= SlowPhaseThresholdMs).OrderByDescending(kv => kv.Value).ToList();
         if (slowPhases.Count > 0 || sw.ElapsedMilliseconds > 500)
         {
