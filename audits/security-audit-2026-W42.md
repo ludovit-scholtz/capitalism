@@ -53,4 +53,4 @@ Can one player gain an unfair advantage over another player by executing an API 
 - **Affected endpoint or mechanic:** `projects/master-frontend` devDependencies (`@vue/eslint-config-typescript` -> `fast-glob` -> `micromatch` -> `braces`, GHSA-vfj7-8cjw-p6xm).
 - **Risk description:** Stack-exhaustion denial of service in a glob helper reachable only when linting developer-controlled files. Nothing from this chain is in the production bundle or image.
 - **Recommended fix:** Clear at the next dependency cycle when `@vue/eslint-config-typescript` publishes a release that lifts `fast-glob`; do not apply `npm audit fix --force`, which downgrades the config.
-- **Status:** Open
+- **Status:** Open <!-- issue: #611 -->

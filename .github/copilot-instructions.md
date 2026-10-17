@@ -1682,7 +1682,7 @@ Root-cause of a CI gate failure (May 2026, PR #391 security board):
 - The script logic: `status !== 'Resolved' && issues.length === 0` → gate fails.
 
 **Rules to prevent recurrence:**
-1. **When a new audit file is added (e.g., `audits/YYYY-WNN-security-audit.md`), annotate every High/Critical finding's Status line with `<!-- issue: #NNN -->` before merging.** The annotation format is: `- **Status:** Open <!-- issue: #391 -->`.
+1. **When a new audit file is added (e.g., `audits/security-audit-YYYY-Www.md`), annotate every High/Critical finding's Status line with `<!-- issue: #NNN -->` before merging.** The annotation format is: `- **Status:** Open <!-- issue: #391 -->`.
 2. **`In-Progress` is NOT sufficient to pass the gate.** Only `Resolved` bypasses the issue-link requirement. An `In-Progress` finding without an issue link will still fail CI.
 3. **Use the relevant PR or issue number that tracks the fix implementation.** PR numbers and issue numbers share the same GitHub number pool, so both are valid.
 4. **Multiple issues on one finding are supported:** `- **Status:** Open <!-- issues: #389, #391 -->`.

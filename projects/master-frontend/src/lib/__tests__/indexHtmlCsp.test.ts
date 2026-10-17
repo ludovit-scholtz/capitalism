@@ -14,7 +14,11 @@ describe('master-frontend index.html and CSP', () => {
       .map((match) => match[1] ?? '')
       .filter((body) => body.trim().length > 0)
     expect(inlineBodies, 'inline scripts are blocked by the CSP; move them to /public').toEqual([])
-    expect(nginx).toMatch(/script-src 'self'(?! 'unsafe-inline')/)
+    const cspLines = nginx.split(/\r?\n/).filter((line) => line.includes('Content-Security-Policy'))
+    expect(cspLines.length).toBeGreaterThan(0)
+    for (const line of cspLines) {
+      expect(line).toContain("script-src 'self' https://www.googletagmanager.com;")
+    }
   })
 
   it('serves the analytics bootstrap from a same-origin file', () => {
