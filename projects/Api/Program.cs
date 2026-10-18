@@ -75,7 +75,6 @@ public class Program
         }
         var biatecOidcOptions = builder.Configuration.GetSection(BiatecOidcOptions.SectionName).Get<BiatecOidcOptions>()
             ?? new BiatecOidcOptions();
-        static string NormalizeIssuer(string issuer) => issuer.Trim().TrimEnd('/');
         var biatecKnownIssuers = new[]
         {
             biatecOidcOptions.Issuer,
@@ -85,7 +84,7 @@ public class Program
             .Select(issuer => issuer!)
             .SelectMany(issuer =>
             {
-                var normalized = NormalizeIssuer(issuer);
+                var normalized = ApiAuthenticationExtensions.NormalizeIssuer(issuer);
                 return new[] { normalized, normalized + "/" };
             })
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -240,203 +239,7 @@ public class Program
             new WebPush.WebPushClient(
                 serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("push")));
 
-        builder.Services
-            .AddAuthentication(options =>
-            {
-                options.DefaultAuthenticateScheme = "dynamic-jwt";
-                options.DefaultChallengeScheme = "dynamic-jwt";
-            })
-            .AddPolicyScheme("dynamic-jwt", "Local or Biatec JWT", options =>
-            {
-                options.ForwardDefaultSelector = context =>
-                {
-                    if (!TryReadRequestToken(context, out var token))
-                    {
-                        return "local-jwt";
-                    }
-
-                    try
-                    {
-                        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
-                        if (biatecOidcOptions.Enabled
-                            && biatecKnownIssuers.Any(issuer =>
-                                string.Equals(NormalizeIssuer(jwt.Issuer), NormalizeIssuer(issuer), StringComparison.OrdinalIgnoreCase)))
-                        {
-                            return "biatec-oidc";
-                        }
-                    }
-                    catch
-                    {
-                        // Keep defaulting to local JWT to preserve existing behavior on malformed tokens.
-                    }
-
-                    return "local-jwt";
-                };
-            })
-            .AddJwtBearer("local-jwt", options =>
-            {
-                var localJwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
-                    ?? new JwtOptions();
-
-                options.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuer = true,
-                    ValidateAudience = true,
-                    ValidateIssuerSigningKey = true,
-                    ValidateLifetime = true,
-                    ValidIssuer = localJwtOptions.Issuer,
-                    ValidAudience = localJwtOptions.Audience,
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(localJwtOptions.SigningKey)),
-                    ClockSkew = TimeSpan.FromMinutes(1),
-                };
-                options.Events = new JwtBearerEvents
-                {
-                    OnMessageReceived = context =>
-                    {
-                        if (TryReadRequestToken(context.HttpContext, out var token))
-                        {
-                            context.Token = token;
-                        }
-                        return Task.CompletedTask;
-                    },
-                    OnTokenValidated = async context =>
-                    {
-                        if (context.Principal?.Identity is ClaimsIdentity identity && identity.IsAuthenticated)
-                        {
-                            var synchronizer = context.HttpContext.RequestServices.GetRequiredService<AuthenticatedPlayerClaimsSyncService>();
-                            await synchronizer.SyncAsync(context.Principal, identity, context.HttpContext.RequestAborted);
-
-                            if (context.Principal.IsImpersonating() && !TokenBoundaryClaims.HasImpersonationGrant(context.Principal))
-                            {
-                                context.Fail("Impersonation token is missing an explicit grant.");
-                                return;
-                            }
-
-                            if (TryResolveJwtSecurityToken(context.SecurityToken, out var jwt))
-                            {
-                                var revocationService = context.HttpContext.RequestServices.GetRequiredService<IJwtSessionRevocationService>();
-                                var isValid = await revocationService.ValidateAndTrackAsync(
-                                    context.Principal,
-                                    jwt,
-                                    context.HttpContext,
-                                    context.HttpContext.RequestAborted);
-                                if (!isValid)
-                                {
-                                    context.HttpContext.Items["auth_error_code"] = "session_revoked";
-                                    context.Fail("session_revoked");
-                                }
-                            }
-                        }
-                    },
-                    OnChallenge = async context =>
-                    {
-                        if (!string.Equals(context.HttpContext.Items["auth_error_code"] as string, "session_revoked", StringComparison.Ordinal))
-                        {
-                            return;
-                        }
-
-                        context.HandleResponse();
-                        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                        context.Response.ContentType = "application/json";
-                        await context.Response.WriteAsync(JsonSerializer.Serialize(new
-                        {
-                            error = "session_revoked",
-                            message = "Your session has been terminated. Please log in again."
-                        }));
-                    },
-                };
-            })
-            .AddJwtBearer("biatec-oidc", options =>
-            {
-                options.Authority = biatecOidcOptions.Authority;
-                options.RequireHttpsMetadata = biatecOidcOptions.RequireHttpsMetadata;
-                options.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuer = true,
-                    ValidIssuers = biatecKnownIssuers,
-                    ValidateAudience = true,
-                    ValidAudience = biatecOidcOptions.Audience,
-                    ValidateLifetime = true,
-                    ClockSkew = TimeSpan.FromMinutes(1),
-                };
-                options.MapInboundClaims = false;
-                options.Events = new JwtBearerEvents
-                {
-                    OnMessageReceived = context =>
-                    {
-                        if (TryReadRequestToken(context.HttpContext, out var token))
-                        {
-                            context.Token = token;
-                        }
-                        return Task.CompletedTask;
-                    },
-                    OnTokenValidated = async context =>
-                    {
-                        if (context.Principal?.Identity is not ClaimsIdentity identity || !identity.IsAuthenticated)
-                        {
-                            return;
-                        }
-
-                        var emailClaim = identity.FindFirst("email")?.Value;
-                        if (!string.IsNullOrWhiteSpace(emailClaim) && !identity.HasClaim(claim => claim.Type == ClaimTypes.Email))
-                        {
-                            identity.AddClaim(new Claim(ClaimTypes.Email, emailClaim));
-                        }
-
-                        var displayNameClaim = identity.FindFirst("preferred_username")?.Value
-                            ?? identity.FindFirst("name")?.Value
-                            ?? emailClaim;
-                        if (!string.IsNullOrWhiteSpace(displayNameClaim) && !identity.HasClaim(claim => claim.Type == ClaimTypes.Name))
-                        {
-                            identity.AddClaim(new Claim(ClaimTypes.Name, displayNameClaim));
-                        }
-
-                        var subClaim = identity.FindFirst("sub")?.Value;
-                        if (!string.IsNullOrWhiteSpace(subClaim) && !identity.HasClaim(claim => claim.Type == ClaimTypes.NameIdentifier))
-                        {
-                            identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, subClaim));
-                        }
-
-                        var synchronizer = context.HttpContext.RequestServices.GetRequiredService<AuthenticatedPlayerClaimsSyncService>();
-                        await synchronizer.SyncAsync(context.Principal, identity, context.HttpContext.RequestAborted);
-
-                        if (TryResolveJwtSecurityToken(context.SecurityToken, out var jwt))
-                        {
-                            var revocationService = context.HttpContext.RequestServices.GetRequiredService<IJwtSessionRevocationService>();
-                            var isValid = await revocationService.ValidateAndTrackAsync(
-                                context.Principal,
-                                jwt,
-                                context.HttpContext,
-                                context.HttpContext.RequestAborted);
-                            if (!isValid)
-                            {
-                                context.HttpContext.Items["auth_error_code"] = "session_revoked";
-                                context.Fail("session_revoked");
-                            }
-                        }
-                    }
-                    ,
-                    OnChallenge = async context =>
-                    {
-                        if (!string.Equals(context.HttpContext.Items["auth_error_code"] as string, "session_revoked", StringComparison.Ordinal))
-                        {
-                            return;
-                        }
-
-                        context.HandleResponse();
-                        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                        context.Response.ContentType = "application/json";
-                        await context.Response.WriteAsync(JsonSerializer.Serialize(new
-                        {
-                            error = "session_revoked",
-                            message = "Your session has been terminated. Please log in again."
-                        }));
-                    }
-                };
-            });
-
-        builder.Services.AddAuthorizationBuilder()
-            .AddPolicy(Policies.Admin, policy => policy.RequireClaim(ClaimTypes.Role, PlayerRole.Admin));
+        builder.Services.AddApiAuthentication(builder.Configuration, biatecOidcOptions, biatecKnownIssuers);
 
         builder.Services
             .AddGraphQLServer()
@@ -476,59 +279,7 @@ public class Program
         builder.Services.AddSingleton<IChatRateLimitService, ChatRateLimitService>();
         builder.Services.AddScoped<IJwtSessionRevocationService, JwtSessionRevocationService>();
 
-        // ── Game tick engine ──
-        builder.Services.AddSingleton<TickTimingRecorder>();
-        builder.Services.AddScoped<TickProcessor>();
-        builder.Services.AddScoped<ITickPhase, WeatherUpdatePhase>();
-        builder.Services.AddScoped<ITickPhase, LaborMarketPhase>();
-        builder.Services.AddScoped<ITickPhase, FuelProcurementPhase>();
-        builder.Services.AddScoped<ITickPhase, PowerDistributionPhase>();
-        builder.Services.AddScoped<ITickPhase, EnergySpotMarketPhase>();
-        builder.Services.AddScoped<ITickPhase, PowerGridEconomicsPhase>();
-        builder.Services.AddScoped<ITickPhase, ConstructionPhase>();
-        builder.Services.AddScoped<ITickPhase, BuildingUpgradePhase>();
-        builder.Services.AddScoped<ITickPhase, LandMarketPhase>();
-        builder.Services.AddScoped<ITickPhase, GlobalEventPhase>();
-        builder.Services.AddScoped<ITickPhase, MediaHousePhase>();
-        builder.Services.AddScoped<ITickPhase, Api.Engine.Phases.EconomicCyclePhase>();
-        builder.Services.AddScoped<ITickPhase, GovernmentContractPhase>();
-        builder.Services.AddScoped<ITickPhase, PublicSalesPhase>();
-        builder.Services.AddScoped<ITickPhase, ResourceMovementPhase>();
-        builder.Services.AddScoped<ITickPhase, ManufacturingPhase>();
-        builder.Services.AddScoped<ITickPhase, OperatingCostPhase>();
-        builder.Services.AddScoped<ITickPhase, MiningPhase>();
-        builder.Services.AddScoped<ITickPhase, ResourceReplenishmentPhase>();
-        builder.Services.AddScoped<ITickPhase, PurchasingPhase>();
-        builder.Services.AddScoped<ITickPhase, SupplyContractFulfillmentPhase>();
-        builder.Services.AddScoped<ITickPhase, TradeRoutePhase>();
-        builder.Services.AddScoped<ITickPhase, MediaHouseContentPhase>();
-        builder.Services.AddScoped<ITickPhase, MarketingPhase>();
-        builder.Services.AddScoped<ITickPhase, ResearchPhase>();
-        builder.Services.AddScoped<ITickPhase, QualityDecayPhase>();
-        builder.Services.AddScoped<ITickPhase, RentPhase>();
-        builder.Services.AddScoped<ITickPhase, NpcCompanyPhase>();
-        builder.Services.AddScoped<ITickPhase, StockLimitOrderMatchingPhase>();
-        builder.Services.AddScoped<ITickPhase, LoanRepaymentPhase>();
-        builder.Services.AddScoped<ITickPhase, BuildingDestructionPhase>();
-        builder.Services.AddScoped<ITickPhase, PlayerAlertPhase>();
-        builder.Services.AddScoped<ITickPhase, BankInterestPhase>();
-        builder.Services.AddScoped<ITickPhase, TaxPhase>();
-        builder.Services.AddScoped<ITickPhase, DividendGovernanceSettlementPhase>();
-        builder.Services.AddScoped<ITickPhase, DividendPhase>();
-        builder.Services.AddScoped<ITickPhase, TelemetryBountyPhase>();
-        builder.Services.AddScoped<ITickPhase, EconomicReportPhase>();
-        builder.Services.AddScoped<ITickPhase, MarketReportPhase>();
-        builder.Services.AddScoped<ITickPhase, CityExpansionUnlockPhase>();
-        builder.Services.AddScoped<ITickPhase, RankHistoryPhase>();
-        builder.Services.AddScoped<ITickPhase, EndgamePhase>();
-        builder.Services.AddScoped<ITickPhase, VictoryCheckPhase>();
-        builder.Services.AddScoped<ITickPhase, FxRateHistoryPhase>();
-        builder.Services.AddHostedService<GameTickHostedService>();
-        builder.Services.AddHostedService<MasterServerRegistrationHostedService>();
-        builder.Services.AddHostedService<MarketReportPublisherHostedService>();
-        builder.Services.AddHostedService<JwtSessionCleanupHostedService>();
-        builder.Services.AddSingleton<BridgedChatMessageTracker>();
-        builder.Services.AddHostedService<IngameChatToDiscordForwarderHostedService>();
+        builder.Services.AddGameTickEngine();
 
         var app = builder.Build();
         var appCorsAllowedOrigins = CorsPolicyHelper.ResolveAllowedOrigins(app.Configuration);
@@ -577,83 +328,7 @@ public class Program
         app.UseMiddleware<AdminAuditLoggingMiddleware>();
         app.UseMiddleware<GraphQlRequestSecurityMiddleware>();
 
-        app.MapGet("/", () => Results.Ok(new
-        {
-            name = "Capitalism 5 Game API",
-            graphql = "/graphql",
-            health = "/healthz"
-        }));
-
-        app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
-        app.MapGet("/auth/sessions", async (HttpContext httpContext, IJwtSessionRevocationService revocationService) =>
-        {
-            if (!Guid.TryParse(httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier), out var playerId))
-            {
-                return Results.Unauthorized();
-            }
-
-            var currentJti = httpContext.User.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Jti);
-            var sessions = await revocationService.GetActiveSessionsAsync(playerId, currentJti, httpContext.RequestAborted);
-            return Results.Ok(new { sessions });
-        }).RequireAuthorization();
-
-        app.MapPost("/auth/logout", async (HttpContext httpContext, IJwtSessionRevocationService revocationService) =>
-        {
-            if (!TryReadRequestJwt(httpContext, out var jwt))
-            {
-                return Results.Unauthorized();
-            }
-
-            await revocationService.RevokeCurrentAsync(httpContext.User, jwt, httpContext.RequestAborted);
-            var hostEnvironment = httpContext.RequestServices.GetRequiredService<IHostEnvironment>();
-            AuthSessionCookieService.ClearSessionCookies(httpContext, hostEnvironment);
-            return Results.NoContent();
-        }).RequireAuthorization();
-
-        app.MapPost("/auth/logout-all", async (HttpContext httpContext, IJwtSessionRevocationService revocationService) =>
-        {
-            if (!Guid.TryParse(httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier), out var playerId))
-            {
-                return Results.Unauthorized();
-            }
-
-            if (!TryReadRequestJwt(httpContext, out var jwt))
-            {
-                return Results.Unauthorized();
-            }
-
-            var currentJti = jwt.Claims.FirstOrDefault(claim => claim.Type == System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Jti)?.Value ?? jwt.Id;
-            if (string.IsNullOrWhiteSpace(currentJti))
-            {
-                return Results.Unauthorized();
-            }
-
-            await revocationService.RevokeOtherSessionsForPlayerAsync(playerId, currentJti, "PLAYER_LOGOUT_ALL", httpContext.RequestAborted);
-            var hostEnvironment = httpContext.RequestServices.GetRequiredService<IHostEnvironment>();
-            AuthSessionCookieService.ClearSessionCookies(httpContext, hostEnvironment);
-            return Results.NoContent();
-        }).RequireAuthorization();
-
-        app.MapPost("/auth/session", (HttpContext httpContext) =>
-        {
-            if (!TryReadRequestJwt(httpContext, out var jwt))
-            {
-                return Results.Unauthorized();
-            }
-
-            var hostEnvironment = httpContext.RequestServices.GetRequiredService<IHostEnvironment>();
-            AuthSessionCookieService.SetSessionCookies(httpContext, hostEnvironment, jwt.RawData, jwt.ValidTo);
-            return Results.NoContent();
-        }).RequireAuthorization();
-
-        app.MapPost("/admin/sessions/{playerId:guid}/revoke-all", async (
-            Guid playerId,
-            HttpContext httpContext,
-            IJwtSessionRevocationService revocationService) =>
-        {
-            await revocationService.RevokeAllForPlayerAsync(playerId, "ADMIN_REVOKE_ALL", httpContext.RequestAborted);
-            return Results.NoContent();
-        }).RequireAuthorization(Policies.Admin);
+        app.MapSessionEndpoints();
 
         app.MapGraphQL().WithOptions(options =>
         {
@@ -675,67 +350,5 @@ public class Program
         }
 
         await app.RunAsync();
-
-        static bool TryReadRequestJwt(HttpContext httpContext, out JwtSecurityToken token)
-        {
-            token = null!;
-            if (!TryReadRequestToken(httpContext, out var rawToken))
-            {
-                return false;
-            }
-
-            try
-            {
-                token = new JwtSecurityTokenHandler().ReadJwtToken(rawToken);
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        static bool TryReadRequestToken(HttpContext httpContext, out string token)
-        {
-            token = string.Empty;
-
-            var authorization = httpContext.Request.Headers.Authorization.ToString();
-            if (authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
-            {
-                var rawToken = authorization["Bearer ".Length..].Trim();
-                if (!string.IsNullOrWhiteSpace(rawToken))
-                {
-                    token = rawToken;
-                    return true;
-                }
-            }
-
-            if (httpContext.Request.Cookies.TryGetValue(AuthSessionCookieService.AccessTokenCookieName, out var cookieToken)
-                && !string.IsNullOrWhiteSpace(cookieToken))
-            {
-                token = cookieToken.Trim();
-                return true;
-            }
-
-            return false;
-        }
-
-        static bool TryResolveJwtSecurityToken(SecurityToken? token, out JwtSecurityToken jwt)
-        {
-            jwt = null!;
-            if (token is JwtSecurityToken concreteJwt)
-            {
-                jwt = concreteJwt;
-                return true;
-            }
-
-            if (token is JsonWebToken jsonWebToken)
-            {
-                jwt = new JwtSecurityToken(jsonWebToken.EncodedToken);
-                return true;
-            }
-
-            return false;
-        }
     }
 }
