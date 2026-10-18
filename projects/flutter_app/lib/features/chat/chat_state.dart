@@ -9,7 +9,10 @@ import 'chat_service.dart';
 
 /// App-wide chat state: the loaded history of the active channel, the unread count (for the drawer badge) and polling.
 /// Mirrors `useChat.ts` + `stores/chat.ts` on the web: the server has no push channel for the web client either, so
-/// new messages arrive by polling (fast while the chat is open, slow in the background to keep the badge fresh).
+/// new messages arrive by polling (fast while a chat view is visible, slow in the background to keep the badge fresh).
+///
+/// The unread count and the read marker always describe the global channel: the city channel is only browsed while a
+/// chat view is visible, and the channel resets to global when the last view closes.
 class ChatState extends ChangeNotifier {
   ChatState({
     required ChatService service,
@@ -31,45 +34,61 @@ class ChatState extends ChangeNotifier {
   List<ChatMessage> messages = const [];
   bool loading = false;
   bool sending = false;
-  String? error;
+
+  /// `true` when the last visible (non-background) load failed and there is nothing to show yet.
+  bool loadFailed = false;
   int unreadCount = 0;
-  bool panelOpen = false;
 
   /// `null` is the global channel; a city id selects that city's channel.
   String? channelCityId;
 
   String? _lastSeenMessageId;
   AuthState? _auth;
+  bool _wasAuthenticated = false;
   Timer? _timer;
   bool _disposed = false;
   int _loadGeneration = 0;
 
+  /// Number of chat views currently visible (the bottom sheet and the dashboard tab can both exist).
+  int _visibleViews = 0;
+
+  bool get panelOpen => _visibleViews > 0;
   bool get hasUnread => unreadCount > 0;
 
   /// Starts and stops background polling with the session: signed out means no calls and no badge.
   void bindAuth(AuthState auth) {
     _auth?.removeListener(_onAuthChanged);
     _auth = auth;
+    _wasAuthenticated = false;
     auth.addListener(_onAuthChanged);
     _onAuthChanged();
   }
 
   void _onAuthChanged() {
     final authenticated = _auth?.isAuthenticated ?? false;
+    if (authenticated == _wasAuthenticated) return; // other auth notifications (token refresh, profile) are not a session change
+    _wasAuthenticated = authenticated;
     if (authenticated) {
       unawaited(_activate());
-    } else {
-      _timer?.cancel();
-      _timer = null;
-      messages = const [];
-      unreadCount = 0;
-      error = null;
-      _notify();
+      return;
     }
+    // Signed out: drop everything, ignore any request still in flight and forget the read marker (the next account on this device starts fresh).
+    _loadGeneration++;
+    _timer?.cancel();
+    _timer = null;
+    messages = const [];
+    unreadCount = 0;
+    loading = false;
+    loadFailed = false;
+    channelCityId = null;
+    _lastSeenMessageId = null;
+    unawaited(_storage.clear());
+    _notify();
   }
 
   Future<void> _activate() async {
     _lastSeenMessageId ??= await _storage.read();
+    if (_disposed || !_wasAuthenticated) return;
     await refresh(silent: true);
     _restartTimer();
   }
@@ -77,20 +96,30 @@ class ChatState extends ChangeNotifier {
   void _restartTimer() {
     _timer?.cancel();
     _timer = null;
-    if (!pollingEnabled || !(_auth?.isAuthenticated ?? false)) return;
+    if (!pollingEnabled || !_wasAuthenticatedOrUnbound) return;
     _timer = Timer.periodic(panelOpen ? openInterval : backgroundInterval, (_) => unawaited(refresh(silent: true)));
   }
 
-  /// The chat panel (or the dashboard's Chat tab) became visible: everything loaded counts as read.
+  bool get _wasAuthenticatedOrUnbound => _auth == null || _wasAuthenticated;
+
+  /// A chat view became visible: everything loaded counts as read and polling speeds up.
   Future<void> openPanel() async {
-    panelOpen = true;
+    _visibleViews++;
     _restartTimer();
     await refresh(silent: messages.isNotEmpty);
     await _markAllRead();
   }
 
+  /// A chat view was hidden. When the last one closes the channel resets to global so the badge keeps tracking it.
   Future<void> closePanel() async {
-    panelOpen = false;
+    if (_visibleViews > 0) _visibleViews--;
+    if (!panelOpen) {
+      if (channelCityId != null) {
+        channelCityId = null;
+        messages = const [];
+        unawaited(refresh(silent: true));
+      }
+    }
     _restartTimer();
     _notify();
   }
@@ -100,34 +129,40 @@ class ChatState extends ChangeNotifier {
     channelCityId = cityId;
     messages = const [];
     await refresh();
-    if (panelOpen) await _markAllRead();
+    await _markAllRead();
   }
 
   /// Loads the newest messages. [silent] keeps the current list on screen (background polling); a failed silent refresh never replaces it with an error.
   Future<void> refresh({bool silent = false}) async {
-    if (!(_auth?.isAuthenticated ?? true)) return;
+    if (!_wasAuthenticatedOrUnbound) return;
     final generation = ++_loadGeneration;
     if (!silent) {
       loading = true;
-      error = null;
+      loadFailed = false;
       _notify();
     }
+    var fetchedOk = false;
     try {
       final fetched = await _service.fetchMessages(cityId: channelCityId);
-      if (_disposed || generation != _loadGeneration) return; // a newer load (channel switch) won
+      if (_disposed || generation != _loadGeneration) return; // a newer load (channel switch, sign-out) won
       if (!_sameMessages(messages, fetched)) messages = fetched;
-      error = null;
+      loadFailed = false;
+      fetchedOk = true;
+    } catch (_) {
+      if (_disposed || generation != _loadGeneration) return;
+      if (!silent) loadFailed = true;
+    } finally {
+      if (!_disposed && generation == _loadGeneration) {
+        loading = false;
+        _notify();
+      }
+    }
+    // Bookkeeping stays outside the fetch's try block: a storage failure must not look like a failed load.
+    if (fetchedOk && generation == _loadGeneration && !_disposed) {
       if (panelOpen) {
         await _markAllRead();
       } else {
         _updateUnread();
-      }
-    } catch (e) {
-      if (_disposed || generation != _loadGeneration) return;
-      if (!silent) error = e.toString().replaceFirst('Exception: ', '');
-    } finally {
-      if (!_disposed && generation == _loadGeneration) {
-        loading = false;
         _notify();
       }
     }
@@ -158,16 +193,22 @@ class ChatState extends ChangeNotifier {
     return ChatSendOutcome.sent;
   }
 
+  /// Marks the loaded global history as read. City channel messages never move the global read marker.
   Future<void> _markAllRead() async {
-    if (messages.isNotEmpty && _lastSeenMessageId != messages.last.id) {
+    if (channelCityId == null && messages.isNotEmpty && _lastSeenMessageId != messages.last.id) {
       _lastSeenMessageId = messages.last.id;
-      await _storage.write(_lastSeenMessageId!);
+      try {
+        await _storage.write(_lastSeenMessageId!);
+      } catch (_) {
+        // The marker is a convenience; failing to persist it must not break the chat.
+      }
     }
     unreadCount = 0;
     _notify();
   }
 
   void _updateUnread() {
+    if (channelCityId != null) return;
     unreadCount = computeUnreadCount(
       messageIds: messages.map((m) => m.id).toList(),
       lastSeenMessageId: _lastSeenMessageId,

@@ -98,7 +98,7 @@ void main() {
       await state.refresh(silent: true);
 
       expect(state.messages, hasLength(1));
-      expect(state.error, isNull);
+      expect(state.loadFailed, isFalse);
     });
 
     test('a failed visible refresh reports the error, a later success clears it', () async {
@@ -106,13 +106,13 @@ void main() {
       final state = await _chatState(service);
 
       await state.refresh();
-      expect(state.error, 'offline');
+      expect(state.loadFailed, isTrue);
       expect(state.loading, isFalse);
 
       service.fetchError = null;
       service.messages = [chatMessage('1')];
       await state.refresh();
-      expect(state.error, isNull);
+      expect(state.loadFailed, isFalse);
       expect(state.messages, hasLength(1));
     });
 
@@ -196,6 +196,89 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 150));
 
       expect(service.fetchCount, greaterThan(2));
+    });
+
+    test('a request still in flight when the player signs out is ignored', () async {
+      final service = FakeChatService(messages: [chatMessage('1')]);
+      final auth = await _signedIn();
+      final state = ChatState(service: service, storage: InMemoryChatReadStorage(), pollingEnabled: false)..bindAuth(auth);
+      addTearDown(state.dispose);
+      await Future<void>.delayed(Duration.zero);
+      service.messages = [chatMessage('1'), chatMessage('2')];
+
+      final pending = state.refresh(silent: true); // started while signed in...
+      await auth.logout(); // ...and the player signs out before it completes
+      await pending;
+
+      expect(state.messages, isEmpty);
+      expect(state.unreadCount, 0);
+    });
+
+    test('signing out forgets the read marker so the next account starts fresh', () async {
+      final storage = InMemoryChatReadStorage('old-marker');
+      final auth = await _signedIn();
+      final state = ChatState(service: FakeChatService(messages: [chatMessage('1')]), storage: storage, pollingEnabled: false)
+        ..bindAuth(auth);
+      addTearDown(state.dispose);
+      await Future<void>.delayed(Duration.zero);
+
+      await auth.logout();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(storage.value, isNull);
+    });
+
+    test('auth notifications that are not a session change do not trigger chat calls', () async {
+      final service = FakeChatService(messages: [chatMessage('1')]);
+      final auth = await _signedIn();
+      final state = ChatState(service: service, storage: InMemoryChatReadStorage(), pollingEnabled: false)..bindAuth(auth);
+      addTearDown(state.dispose);
+      await Future<void>.delayed(Duration.zero);
+      final before = service.fetchCount;
+
+      auth.setIsAdmin(true); // notifies listeners but the player is still the same signed-in session
+      await Future<void>.delayed(Duration.zero);
+
+      expect(service.fetchCount, before);
+    });
+
+    test('the city channel never moves the global read marker or the badge', () async {
+      final storage = InMemoryChatReadStorage('g1');
+      final service = FakeChatService(messages: [chatMessage('g1'), chatMessage('g2'), chatMessage('g3')]);
+      service.byCity['c'] = [chatMessage('c1', cityId: 'c'), chatMessage('c2', cityId: 'c')];
+      final auth = await _signedIn();
+      final state = ChatState(service: service, storage: storage, pollingEnabled: false)..bindAuth(auth);
+      addTearDown(state.dispose);
+      await Future<void>.delayed(Duration.zero);
+      expect(state.unreadCount, 2);
+
+      await state.openPanel();
+      await state.selectChannel('c');
+      expect(storage.value, 'g3'); // the city's ids did not overwrite the global marker
+      await state.closePanel(); // last view closed: back to the global channel
+      await Future<void>.delayed(Duration.zero);
+
+      expect(state.channelCityId, isNull);
+      service.messages = [...service.messages, chatMessage('g4')];
+      await state.refresh(silent: true);
+      expect(state.unreadCount, 1); // the badge tracks the global channel again
+    });
+
+    test('closing one of two visible chat views keeps the chat open', () async {
+      final service = FakeChatService(messages: [chatMessage('1')]);
+      final state = await _chatState(service);
+
+      await state.openPanel(); // e.g. the dashboard Chat tab
+      await state.openPanel(); // and the bottom sheet on top of it
+      await state.closePanel();
+      expect(state.panelOpen, isTrue);
+
+      service.messages = [...service.messages, chatMessage('2')];
+      await state.refresh(silent: true);
+      expect(state.unreadCount, 0); // still reading: no badge
+
+      await state.closePanel();
+      expect(state.panelOpen, isFalse);
     });
   });
 }

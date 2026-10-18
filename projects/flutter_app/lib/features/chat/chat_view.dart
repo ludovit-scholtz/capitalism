@@ -30,7 +30,7 @@ class _ChatViewState extends State<ChatView> {
   final _scroll = ScrollController();
   late final ChatState _chat;
   String? _sendError;
-  int _lastCount = 0;
+  String? _lastNewestId;
 
   @override
   void initState() {
@@ -72,9 +72,14 @@ class _ChatViewState extends State<ChatView> {
     });
   }
 
-  void _scrollToEndOnNewMessages(int count) {
-    if (count == _lastCount) return;
-    _lastCount = count;
+  /// Follows the conversation when a new newest message arrives (keyed on its id: the history is capped, so the length stays constant),
+  /// but leaves the reader alone when they scrolled up to read older messages.
+  void _scrollToEndOnNewMessages(String? newestId) {
+    if (newestId == _lastNewestId) return;
+    final firstLoad = _lastNewestId == null;
+    _lastNewestId = newestId;
+    final wasNearBottom = !_scroll.hasClients || _scroll.position.maxScrollExtent - _scroll.offset < 120;
+    if (!firstLoad && !wasNearBottom) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) _scroll.jumpTo(_scroll.position.maxScrollExtent);
     });
@@ -94,7 +99,7 @@ class _ChatViewState extends State<ChatView> {
     if (!auth.isAuthenticated) {
       return Center(child: Text(l10n.chatSignInRequired));
     }
-    _scrollToEndOnNewMessages(chat.messages.length);
+    _scrollToEndOnNewMessages(chat.messages.isEmpty ? null : chat.messages.last.id);
 
     final timeFormat = DateFormat.yMd(languageCode).add_Hm();
     return Column(
@@ -129,7 +134,7 @@ class _ChatViewState extends State<ChatView> {
     if (chat.loading && chat.messages.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (chat.error != null && chat.messages.isEmpty) {
+    if (chat.loadFailed && chat.messages.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
