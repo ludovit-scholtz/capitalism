@@ -13,6 +13,7 @@ import 'package:capitalism_app/core/game_state/game_state_state.dart';
 import 'package:capitalism_app/core/i18n/locale_state.dart';
 import 'package:capitalism_app/core/router/app_router.dart';
 import 'package:capitalism_app/core/services/url_opener.dart';
+import 'package:capitalism_app/features/chat/chat_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -21,6 +22,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
 import 'fake_account_context_service.dart';
+import 'fake_chat_service.dart';
 import 'fake_game_state_service.dart';
 import 'fake_graphql_client.dart';
 import 'in_memory_selected_building_storage.dart';
@@ -71,6 +73,7 @@ Future<AuthState> pumpCapitalismApp(
   AccountContextService? accountContextService,
   GameStateService? gameStateService,
   GoRouter? router,
+  FakeChatService? chatService,
   Size surfaceSize = const Size(800, 2400),
 }) async {
   await tester.binding.setSurfaceSize(surfaceSize);
@@ -102,6 +105,10 @@ Future<AuthState> pumpCapitalismApp(
   final gameStateState = GameStateState();
   addTearDown(gameStateState.dispose);
   final localeState = LocaleState(storage: InMemorySelectedLocaleStorage());
+  // Polling stays off so no timers are left pending; tests drive refreshes explicitly.
+  final chatState = ChatState(service: chatService ?? FakeChatService(), storage: InMemoryChatReadStorage(), pollingEnabled: false)
+    ..bindAuth(auth);
+  addTearDown(chatState.dispose);
 
   await tester.pumpWidget(
     MultiProvider(
@@ -113,6 +120,7 @@ Future<AuthState> pumpCapitalismApp(
         ChangeNotifierProvider<RecentBuildingState>.value(value: recentBuildingState),
         ChangeNotifierProvider<GameStateState>.value(value: gameStateState),
         ChangeNotifierProvider<LocaleState>.value(value: localeState),
+        ChangeNotifierProvider<ChatState>.value(value: chatState),
       ],
       child: CapitalismApp(
         router:

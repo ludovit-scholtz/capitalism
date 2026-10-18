@@ -1,7 +1,9 @@
 {
   "@@locale": "en",
   "appTitle": "Capitalism",
-  "@appTitle": {"description": "Application title shown in the app bar and OS task switcher"},
+  "@appTitle": {
+    "description": "Application title shown in the app bar and OS task switcher"
+  },
   "commonLoading": "Loading…",
   "commonComingSoon": "Not implemented yet",
   "authLoginTitle": "Sign In",
@@ -35,5 +37,54 @@
   "navEncyclopedia": "Encyclopedia",
   "navChat": "Chat",
   "navDiscord": "Discord",
-  "navOperations": "Operations"
+  "navOperations": "Operations",
+  "chatTitle": "Chat",
+  "chatClose": "Close",
+  "chatChannelGlobal": "Global",
+  "chatChannelCity": "This city",
+  "chatPlaceholderGlobal": "Message everyone…",
+  "chatPlaceholderCity": "Message {city}…",
+  "@chatPlaceholderCity": {
+    "placeholders": {
+      "city": {
+        "type": "String"
+      }
+    }
+  },
+  "chatEmpty": "No messages yet. Say hello!",
+  "chatLoadFailed": "Could not load the chat.",
+  "chatRetry": "Retry",
+  "chatSend": "Send",
+  "chatSendFailed": "The message could not be sent.",
+  "chatRateLimited": "You are sending messages too quickly. Please wait a moment.",
+  "chatTooLong": "Message is too long (maximum {max} characters).",
+  "@chatTooLong": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "chatMessageRemoved": "Message removed",
+  "chatHiddenFromOthers": "Only you can see this message",
+  "chatCharCounter": "{count}/{max}",
+  "@chatCharCounter": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "chatSignInRequired": "Sign in to chat.",
+  "chatUnreadBadge": "{count} unread chat messages",
+  "@chatUnreadBadge": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

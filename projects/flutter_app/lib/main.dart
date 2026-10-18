@@ -13,6 +13,8 @@ import 'core/game_state/game_state_state.dart';
 import 'core/graphql/graphql_service.dart';
 import 'core/i18n/locale_state.dart';
 import 'core/services/app_logger.dart';
+import 'features/chat/chat_service.dart';
+import 'features/chat/chat_state.dart';
 import 'features/servers/game_server_service.dart';
 
 Future<void> main() async {
@@ -70,6 +72,8 @@ Future<void> main() async {
   // build-time default that may not even exist in this environment.
   await gameServerState.autoSelectFirstAvailable(GameServerService(GraphQlService(authState)));
 
+  final chatState = ChatState(service: ChatService(GraphQlService(authState)))..bindAuth(authState);
+
   runApp(
     MultiProvider(
       providers: [
@@ -80,6 +84,7 @@ Future<void> main() async {
         ChangeNotifierProvider<RecentBuildingState>.value(value: recentBuildingState),
         ChangeNotifierProvider<GameStateState>.value(value: gameStateState),
         ChangeNotifierProvider<LocaleState>.value(value: localeState),
+        ChangeNotifierProvider<ChatState>.value(value: chatState),
       ],
       child: CapitalismApp(),
     ),
