@@ -1,0 +1,48 @@
+name: flutter-ci
+
+on:
+  pull_request:
+    paths:
+      - 'projects/flutter_app/**'
+      - '.github/workflows/flutter-ci.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'projects/flutter_app/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flutter-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flutter-ci:
+    name: Flutter analyze and test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: projects/flutter_app
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.8'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies (also generates the localization classes)
+        run: flutter pub get
+
+      - name: Static analysis
+        run: flutter analyze
+
+      - name: Tests
+        run: |
+          flutter test 2>&1 | tee flutter-test.log
+          # Guard against a green job that ran nothing.
+          grep -Eq "All tests passed" flutter-test.log
