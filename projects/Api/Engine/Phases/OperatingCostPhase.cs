@@ -112,10 +112,18 @@ public sealed class OperatingCostPhase : ITickPhase
             {
                 if (bankAccount.Balance < totalBuildingCost)
                 {
+                    // Record an audit ledger entry so players can see why the building stopped, once per transition into
+                    // suspension (not every tick while it stays suspended: that wrote a row per dry building per tick).
+                    var alreadySuspendedForFunds = building.IsSuspendedForFunds
+                        && building.SuspendedReason?.StartsWith("INSUFFICIENT_FUNDS", StringComparison.Ordinal) == true;
                     building.IsSuspendedForFunds = true;
                     building.SuspendedReason = $"INSUFFICIENT_FUNDS:{totalBuildingCost:F2}";
 
-                    // Record an audit ledger entry so players can see why the building stopped.
+                    if (alreadySuspendedForFunds)
+                    {
+                        continue;
+                    }
+
                     context.Db.LedgerEntries.Add(new LedgerEntry
                     {
                         Id = Guid.NewGuid(),

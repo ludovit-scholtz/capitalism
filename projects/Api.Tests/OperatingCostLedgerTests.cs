@@ -149,4 +149,57 @@ public sealed class OperatingCostLedgerTests
             .Where(e => e.CompanyId == seeded.CompanyId && (e.Category == LedgerCategory.LaborCost || e.Category == LedgerCategory.EnergyCost))
             .ToListAsync());
     }
+
+    [Fact]
+    public async Task AStillUnfundedBuilding_WritesTheSuspensionAuditRowOnce_NotEveryTick()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+        var seeded = await SeedAsync(factory, startBalance: 0m);
+
+        await TickAsync(factory);
+        await TickAsync(factory);
+        await TickAsync(factory);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var audit = await db.LedgerEntries.AsNoTracking()
+            .Where(e => e.BuildingId == seeded.BuildingId && e.Category == LedgerCategory.Other && e.Amount == 0m)
+            .ToListAsync();
+        Assert.Single(audit); // the transition into suspension is recorded; staying suspended is not repeated every tick
+        Assert.True((await db.Buildings.AsNoTracking().SingleAsync(b => b.Id == seeded.BuildingId)).IsSuspendedForFunds);
+    }
+
+    [Fact]
+    public async Task ABuildingThatIsFundedAgainAndRunsDryAgain_RecordsANewSuspensionRow()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+        var seeded = await SeedAsync(factory, startBalance: 0m);
+        await TickAsync(factory); // suspended: first row
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            (await db.BankAccounts.SingleAsync(a => a.Id == seeded.AccountId)).Balance = StartBalance;
+            await db.SaveChangesAsync();
+        }
+
+        await TickAsync(factory); // funded: resumes and pays
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.False((await db.Buildings.AsNoTracking().SingleAsync(b => b.Id == seeded.BuildingId)).IsSuspendedForFunds);
+            (await db.BankAccounts.SingleAsync(a => a.Id == seeded.AccountId)).Balance = 0m;
+            await db.SaveChangesAsync();
+        }
+
+        await TickAsync(factory); // dry again: a new transition, a new row
+
+        await using var verifyScope = factory.Services.CreateAsyncScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var audit = await verifyDb.LedgerEntries.AsNoTracking()
+            .Where(e => e.BuildingId == seeded.BuildingId && e.Category == LedgerCategory.Other && e.Amount == 0m)
+            .ToListAsync();
+        Assert.Equal(2, audit.Count);
+    }
 }
