@@ -83,7 +83,7 @@ public sealed class TickPerformancePostgresBenchmarkTests(ITestOutputHelper outp
             await using (var reportScope = factory.Services.CreateAsyncScope())
             {
                 var reportDb = reportScope.ServiceProvider.GetRequiredService<AppDbContext>();
-                var lastTick = await reportDb.GameStates.AsNoTracking().Select(g => g.CurrentTick).FirstAsync();
+                var lastTick = await reportDb.GameStates.AsNoTracking().OrderBy(g => g.Id).Select(g => g.CurrentTick).FirstAsync();
                 var rows = await reportDb.LedgerEntries.AsNoTracking().Where(e => e.RecordedAtTick == lastTick)
                     .GroupBy(e => e.Category).Select(g => new { Category = g.Key, Count = g.Count() }).ToListAsync();
                 output.WriteLine($"Ledger rows written in tick {lastTick}: {rows.Sum(r => r.Count)} ({string.Join(", ", rows.OrderByDescending(r => r.Count).Take(8).Select(r => $"{r.Category}={r.Count}"))})");

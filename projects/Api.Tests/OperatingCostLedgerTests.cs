@@ -164,7 +164,7 @@ public sealed class OperatingCostLedgerTests
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var audit = await db.LedgerEntries.AsNoTracking()
-            .Where(e => e.BuildingId == seeded.BuildingId && e.Category == LedgerCategory.Other && e.Amount == 0m)
+            .Where(e => e.BuildingId == seeded.BuildingId && e.Category == LedgerCategory.Other && e.Amount == 0m && e.Description.StartsWith("Building suspended"))
             .ToListAsync();
         Assert.Single(audit); // the transition into suspension is recorded; staying suspended is not repeated every tick
         Assert.True((await db.Buildings.AsNoTracking().SingleAsync(b => b.Id == seeded.BuildingId)).IsSuspendedForFunds);
@@ -198,7 +198,7 @@ public sealed class OperatingCostLedgerTests
         await using var verifyScope = factory.Services.CreateAsyncScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
         var audit = await verifyDb.LedgerEntries.AsNoTracking()
-            .Where(e => e.BuildingId == seeded.BuildingId && e.Category == LedgerCategory.Other && e.Amount == 0m)
+            .Where(e => e.BuildingId == seeded.BuildingId && e.Category == LedgerCategory.Other && e.Amount == 0m && e.Description.StartsWith("Building suspended"))
             .ToListAsync();
         Assert.Equal(2, audit.Count);
     }
