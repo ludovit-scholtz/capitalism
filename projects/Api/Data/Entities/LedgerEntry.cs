@@ -114,4 +114,5 @@ public static class LedgerCategory
     public const string SupplyContractRevenue = "SUPPLY_CONTRACT_REVENUE";
     public const string SupplyContractPayment = "SUPPLY_CONTRACT_PAYMENT";
     public const string SupplyContractPenalty = "SUPPLY_CONTRACT_PENALTY";
+    public const string CampaignReward = "CAMPAIGN_REWARD";
 }

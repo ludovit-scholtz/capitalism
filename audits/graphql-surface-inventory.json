@@ -1,5 +1,5 @@
 {
-  "generatedAtUtc": "2026-10-17T22:07:57.9189688Z",
+  "generatedAtUtc": "2026-10-18T17:02:54.1107836Z",
   "operations": [
     {
       "kind": "mutation",
@@ -318,6 +318,20 @@
           "CancelSupplyContract_WithZeroPenaltyRate_StillChargesTheMinimumExitFee",
           "CancelSupplyContract_SimultaneousRequests_ChargeTheFeeExactlyOnce"
         ]
+      }
+    },
+    {
+      "kind": "mutation",
+      "methodName": "ClaimCampaignReward",
+      "graphQlName": "claimCampaignReward",
+      "domain": "other",
+      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.FirstWeekCampaign.cs",
+      "hasExplicitAuthorize": true,
+      "coverage": {
+        "hasNegativeCoverage": false,
+        "hasPositiveCoverage": false,
+        "negativeTests": [],
+        "positiveTests": []
       }
     },
     {
@@ -3340,7 +3354,10 @@
           "ResearchPhase_InrCityBudget_StoredInUsdNotInflated",
           "PublicSalesPhase_TwoProductsSameCity_HaveIndependentTrendStates",
           "PurchasingPhase_LockedCityId_OnlyBuysFromLockedCity",
-          "PurchasingPhase_LockedCityId_NonExistentCity_SkipsPurchase"
+          "PurchasingPhase_LockedCityId_NonExistentCity_SkipsPurchase",
+          "AdvanceForecasts_SeedsAWindowForEveryCityOnTheFirstCall",
+          "AdvanceForecasts_AddsAWindowOnlyForACityThatHasNoRows",
+          "OnPostgres_ACityWhoseRowsAllExpired_IsReseededFromTheCurrentTick"
         ]
       }
     },
@@ -4092,6 +4109,20 @@
           "FirstSaleMission_Healthcare_ReturnsFirstSaleRecorded_AfterRealSale",
           "FirstSaleMission_ReturnsAlreadyCompleted_AfterMilestoneAcknowledged"
         ]
+      }
+    },
+    {
+      "kind": "query",
+      "methodName": "GetFirstWeekCampaign",
+      "graphQlName": "firstWeekCampaign",
+      "domain": "other",
+      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Query.FirstWeekCampaign.cs",
+      "hasExplicitAuthorize": true,
+      "coverage": {
+        "hasNegativeCoverage": false,
+        "hasPositiveCoverage": false,
+        "negativeTests": [],
+        "positiveTests": []
       }
     },
     {
@@ -4848,6 +4879,7 @@
           "SendChatMessage_Unauthenticated_ReturnsAuthError",
           "AcceptBuildingOffer_ForeignAndMissingOffer_ReturnSameNotFoundOrNotOwned",
           "CancelBuildingOffer_ForeignAndMissingOffer_ReturnSameNotFoundOrNotOwned",
+          "Claim_ForAForeignOrMissingCompany_IsTheSameUniformForbidden_AndNeverPays",
           "BuyFromExchange_Unauthenticated_ReturnsAuthError",
           "BuyFromExchange_ForeignBuildingUnit_ReturnsNotFoundOrNotOwned",
           "Me_Unauthenticated_ReturnsAuthError",
@@ -4935,6 +4967,7 @@
           "EndgameStatus_IsAccessibleWithoutAuthentication",
           "EndShardManually_AfterGameAlreadyEnded_MutationsAreBlocked",
           "TransferFunds_InsufficientFunds_MustNotExposeBalanceInErrorMessage",
+          "SimultaneousClaimsOfTheSameGoal_HaveOneWinner_AndPayExactlyOnce",
           "GetForexQuote_ReturnsQuoteNonceAndTimestamp",
           "FxRates_AreSeeded_WithAllGameCurrencies",
           "NbsService_FallbackRates_ContainAllGameCurrencies",
