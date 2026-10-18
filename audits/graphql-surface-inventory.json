@@ -1,5 +1,5 @@
 {
-  "generatedAtUtc": "2026-10-17T22:07:57.9189688Z",
+  "generatedAtUtc": "2026-10-18T17:07:22.7442451Z",
   "operations": [
     {
       "kind": "mutation",
@@ -317,6 +317,28 @@
           "CancelSupplyContract_WhenOnePlayerOwnsBothSides_WaivesTheFeeBecauseThereIsNoCounterparty",
           "CancelSupplyContract_WithZeroPenaltyRate_StillChargesTheMinimumExitFee",
           "CancelSupplyContract_SimultaneousRequests_ChargeTheFeeExactlyOnce"
+        ]
+      }
+    },
+    {
+      "kind": "mutation",
+      "methodName": "ClaimCampaignReward",
+      "graphQlName": "claimCampaignReward",
+      "domain": "other",
+      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Mutation.FirstWeekCampaign.cs",
+      "hasExplicitAuthorize": true,
+      "coverage": {
+        "hasNegativeCoverage": true,
+        "hasPositiveCoverage": true,
+        "negativeTests": [
+          "FirstWeekCampaign_And_ClaimCampaignReward_Unauthenticated_IsRejected",
+          "ClaimCampaignReward_ForAForeignOrMissingCompany_IsTheSameUniformForbidden_AndNeverPays"
+        ],
+        "positiveTests": [
+          "ClaimCampaignReward_PaysTheRewardOnce_WithALedgerEntry_AndIsIdempotent",
+          "ClaimCampaignReward_RejectsUnknownLockedAndIncompleteGoals_WithoutPaying",
+          "ClaimCampaignReward_BeforeOnboardingIsFinished_IsRejected",
+          "ClaimCampaignReward_CreatesTheUsdAccountWhenTheCompanyHasNone"
         ]
       }
     },
@@ -3340,7 +3362,10 @@
           "ResearchPhase_InrCityBudget_StoredInUsdNotInflated",
           "PublicSalesPhase_TwoProductsSameCity_HaveIndependentTrendStates",
           "PurchasingPhase_LockedCityId_OnlyBuysFromLockedCity",
-          "PurchasingPhase_LockedCityId_NonExistentCity_SkipsPurchase"
+          "PurchasingPhase_LockedCityId_NonExistentCity_SkipsPurchase",
+          "AdvanceForecasts_SeedsAWindowForEveryCityOnTheFirstCall",
+          "AdvanceForecasts_AddsAWindowOnlyForACityThatHasNoRows",
+          "OnPostgres_ACityWhoseRowsAllExpired_IsReseededFromTheCurrentTick"
         ]
       }
     },
@@ -4091,6 +4116,25 @@
           "FirstSaleMission_FoodProcessing_ReturnsFirstSaleRecorded_AfterRealSale",
           "FirstSaleMission_Healthcare_ReturnsFirstSaleRecorded_AfterRealSale",
           "FirstSaleMission_ReturnsAlreadyCompleted_AfterMilestoneAcknowledged"
+        ]
+      }
+    },
+    {
+      "kind": "query",
+      "methodName": "GetFirstWeekCampaign",
+      "graphQlName": "firstWeekCampaign",
+      "domain": "other",
+      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Query.FirstWeekCampaign.cs",
+      "hasExplicitAuthorize": true,
+      "coverage": {
+        "hasNegativeCoverage": true,
+        "hasPositiveCoverage": true,
+        "negativeTests": [
+          "FirstWeekCampaign_And_ClaimCampaignReward_Unauthenticated_IsRejected"
+        ],
+        "positiveTests": [
+          "FirstWeekCampaign_ForAPlayerWhoHasNotFinishedOnboarding_HasNotStarted",
+          "FirstWeekCampaign_OnDayOne_UnlocksOnlyTheFirstGoal_AndReportsProgressFromRealData"
         ]
       }
     },
@@ -4848,6 +4892,7 @@
           "SendChatMessage_Unauthenticated_ReturnsAuthError",
           "AcceptBuildingOffer_ForeignAndMissingOffer_ReturnSameNotFoundOrNotOwned",
           "CancelBuildingOffer_ForeignAndMissingOffer_ReturnSameNotFoundOrNotOwned",
+          "ClaimCampaignReward_ForAForeignOrMissingCompany_IsTheSameUniformForbidden_AndNeverPays",
           "BuyFromExchange_Unauthenticated_ReturnsAuthError",
           "BuyFromExchange_ForeignBuildingUnit_ReturnsNotFoundOrNotOwned",
           "Me_Unauthenticated_ReturnsAuthError",
@@ -4935,6 +4980,8 @@
           "EndgameStatus_IsAccessibleWithoutAuthentication",
           "EndShardManually_AfterGameAlreadyEnded_MutationsAreBlocked",
           "TransferFunds_InsufficientFunds_MustNotExposeBalanceInErrorMessage",
+          "SimultaneousClaimsOfTheSameGoal_HaveOneWinner_AndPayExactlyOnce",
+          "SimultaneousClaimsOfDifferentGoalsOnTheSameAccount_AllPay",
           "GetForexQuote_ReturnsQuoteNonceAndTimestamp",
           "FxRates_AreSeeded_WithAllGameCurrencies",
           "NbsService_FallbackRates_ContainAllGameCurrencies",

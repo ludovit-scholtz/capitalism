@@ -252,5 +252,6 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
         ConfigureEconomyEntities(modelBuilder);
         ConfigureWeatherEntities(modelBuilder);
         ConfigureNpcEntities(modelBuilder);
+        ConfigureCampaignEntities(modelBuilder);
     }
 }

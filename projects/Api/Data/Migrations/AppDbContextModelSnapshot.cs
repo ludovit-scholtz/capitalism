@@ -3521,6 +3521,46 @@ namespace Api.Data.Migrations
                     b.ToTable("PlayerApiKeyAuditLogs");
                 });
 
+            modelBuilder.Entity("Api.Data.Entities.PlayerCampaignClaim", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<long>("ClaimedAtTick")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("ClaimedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<string>("GoalCode")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<Guid>("PlayerId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PlayerId", "GoalCode")
+                        .IsUnique();
+
+                    b.ToTable("PlayerCampaignClaims");
+                });
+
             modelBuilder.Entity("Api.Data.Entities.PlayerGoldBalance", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5419,6 +5459,17 @@ namespace Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("PlayerApiKey");
+                });
+
+            modelBuilder.Entity("Api.Data.Entities.PlayerCampaignClaim", b =>
+                {
+                    b.HasOne("Api.Data.Entities.Player", "Player")
+                        .WithMany()
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Player");
                 });
 
             modelBuilder.Entity("Api.Data.Entities.PlayerGoldBalance", b =>

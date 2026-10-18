@@ -52,7 +52,7 @@ jobs:
 
       - name: Run PostgreSQL validation tests (upgrade path, idempotent restart, concurrency token)
         run: |
-          dotnet test projects/Api.Tests/Api.Tests.csproj --configuration Release --filter "FullyQualifiedName~PostgresMigrationValidationTests|FullyQualifiedName~WeatherServiceTests" --logger "console;verbosity=normal" | tee postgres-validation.log
+          dotnet test projects/Api.Tests/Api.Tests.csproj --configuration Release --filter "FullyQualifiedName~PostgresMigrationValidationTests|FullyQualifiedName~WeatherServiceTests|FullyQualifiedName~FirstWeekCampaignConcurrencyPostgresTests" --logger "console;verbosity=normal" | tee postgres-validation.log
           # Guard against a green job that ran nothing (renamed class, filter matching zero tests, tests skipped).
           grep -Eq "^\s*Passed:\s+[1-9]" postgres-validation.log
           ! grep -Eq "^\s*Skipped:\s+[1-9]" postgres-validation.log
