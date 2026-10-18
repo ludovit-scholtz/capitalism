@@ -88,47 +88,39 @@ public static class WeatherService
             }
         }
 
-        // Determine which cities already have rows in the window.
-        var existingCityIds = await db.CityWeatherForecasts
+        // One read of the (city, tick, wind) triples replaces the per-city lookups: the latest row of each city is the base for
+        // its next wind value, and a city without rows is seeded below.
+        var existing = await db.CityWeatherForecasts
+            .AsNoTracking()
             .Where(f => cityIds.Contains(f.CityId))
-            .Select(f => f.CityId)
-            .Distinct()
+            .Select(f => new { f.CityId, f.Tick, f.WindPercent })
             .ToListAsync(ct);
 
-        var existingSet = new HashSet<Guid>(existingCityIds);
+        var latestByCity = existing
+            .GroupBy(f => f.CityId)
+            .ToDictionary(g => g.Key, g => g.MaxBy(f => f.Tick)!);
 
-        // For cities that already have rows: find the max tick per city and extend by one row.
-        if (existingSet.Count > 0)
+        // For cities that already have rows: extend by one row after the latest tick.
+        var newRows = new List<CityWeatherForecast>(latestByCity.Count);
+        foreach (var (cityId, latest) in latestByCity)
         {
-            var maxTicks = await db.CityWeatherForecasts
-                .Where(f => existingSet.Contains(f.CityId))
-                .GroupBy(f => f.CityId)
-                .Select(g => new { CityId = g.Key, MaxTick = g.Max(f => f.Tick) })
-                .ToListAsync(ct);
-
-            var newRows = new List<CityWeatherForecast>();
-            foreach (var mt in maxTicks)
+            var nextTick = latest.Tick + 1;
+            newRows.Add(new CityWeatherForecast
             {
-                var nextTick = mt.MaxTick + 1;
-                // Find the row just before nextTick to derive the next wind value.
-                var prevWind = await db.CityWeatherForecasts
-                    .Where(f => f.CityId == mt.CityId && f.Tick == mt.MaxTick)
-                    .Select(f => (decimal?)f.WindPercent)
-                    .FirstOrDefaultAsync(ct) ?? 50m;
+                CityId = cityId,
+                Tick = nextTick,
+                WindPercent = ComputeNextWind(latest.WindPercent, cityId, nextTick),
+                SolarPercent = ComputeSolar(nextTick),
+            });
+        }
 
-                newRows.Add(new CityWeatherForecast
-                {
-                    CityId = mt.CityId,
-                    Tick = nextTick,
-                    WindPercent = ComputeNextWind(prevWind, mt.CityId, nextTick),
-                    SolarPercent = ComputeSolar(nextTick),
-                });
-            }
+        if (newRows.Count > 0)
+        {
             db.CityWeatherForecasts.AddRange(newRows);
         }
 
         // Seed fresh 50-tick window for any cities with no rows.
-        var needsSeed = cityIds.Where(id => !existingSet.Contains(id)).ToList();
+        var needsSeed = cityIds.Where(id => !latestByCity.ContainsKey(id)).ToList();
         foreach (var cityId in needsSeed)
         {
             var seeded = SeedForecast(cityId, currentTick, ForecastWindow);
