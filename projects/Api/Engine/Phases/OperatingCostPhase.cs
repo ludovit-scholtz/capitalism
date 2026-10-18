@@ -16,6 +16,8 @@ namespace Api.Engine.Phases;
 /// </summary>
 public sealed class OperatingCostPhase : ITickPhase
 {
+    private const string InsufficientFundsReasonPrefix = "INSUFFICIENT_FUNDS";
+
     public string Name => "OperatingCosts";
     public int Order => 50;
 
@@ -112,10 +114,18 @@ public sealed class OperatingCostPhase : ITickPhase
             {
                 if (bankAccount.Balance < totalBuildingCost)
                 {
+                    // Record an audit ledger entry so players can see why the building stopped, once per transition into
+                    // suspension (not every tick while it stays suspended: that wrote a row per dry building per tick).
+                    var alreadySuspendedForFunds = building.IsSuspendedForFunds
+                        && building.SuspendedReason?.StartsWith(InsufficientFundsReasonPrefix, StringComparison.Ordinal) == true;
                     building.IsSuspendedForFunds = true;
-                    building.SuspendedReason = $"INSUFFICIENT_FUNDS:{totalBuildingCost:F2}";
+                    building.SuspendedReason = $"{InsufficientFundsReasonPrefix}:{totalBuildingCost:F2}";
 
-                    // Record an audit ledger entry so players can see why the building stopped.
+                    if (alreadySuspendedForFunds)
+                    {
+                        continue;
+                    }
+
                     context.Db.LedgerEntries.Add(new LedgerEntry
                     {
                         Id = Guid.NewGuid(),

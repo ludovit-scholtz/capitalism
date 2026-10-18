@@ -80,6 +80,15 @@ public sealed class TickPerformancePostgresBenchmarkTests(ITestOutputHelper outp
                 output.WriteLine($"  {phase.Name,-32} avg {phase.AverageMs,8:F0} ms   max {phase.MaxMs,6} ms");
             }
 
+            await using (var reportScope = factory.Services.CreateAsyncScope())
+            {
+                var reportDb = reportScope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var lastTick = await reportDb.GameStates.AsNoTracking().OrderBy(g => g.Id).Select(g => g.CurrentTick).FirstAsync();
+                var rows = await reportDb.LedgerEntries.AsNoTracking().Where(e => e.RecordedAtTick == lastTick)
+                    .GroupBy(e => e.Category).Select(g => new { Category = g.Key, Count = g.Count() }).ToListAsync();
+                output.WriteLine($"Ledger rows written in tick {lastTick}: {rows.Sum(r => r.Count)} ({string.Join(", ", rows.OrderByDescending(r => r.Count).Take(8).Select(r => $"{r.Category}={r.Count}"))})");
+            }
+
             if (long.TryParse(Environment.GetEnvironmentVariable("TICK_BENCH_BUDGET_MS"), out var budgetMs))
             {
                 Assert.True(summary.AverageTotalMs <= budgetMs, $"Average tick {summary.AverageTotalMs:F0} ms exceeds {budgetMs} ms on PostgreSQL.");
