@@ -1,6 +1,6 @@
 # Capitalism Game
 
-> Verified against the code on 2026-10-18: gold prices, tutorial milestones, seasonal quarters, the unit price section and the status of deposit-rate management were re-checked in this pass. The guard `.github/scripts/check-product-definition-prices.mjs` fails CI when the gold prices here drift from `projects/MasterApi/Types/Mutation.cs`.
+> Last full read-through against the code: 2026-10-18 (gold prices, tutorial milestones, seasonal quarters, unit price section, deposit-rate management). CI (`.github/scripts/check-product-definition-prices.mjs`) continuously guards only the gold prices, the stale price wording and the tutorial milestone count against `projects/MasterApi/Types/Mutation.cs` and `projects/Shared/Tutorial/TutorialMilestoneCodes.cs`; other sections are as current as that date.
 
 Create a fun game in the style of Capitalism II. This game is an economic simulation where players can experience price elasticity, resource scarcity, resource oversupply, different competition types, marketing, product quality, and difficulties with scaling up companies.
 
@@ -265,6 +265,7 @@ Every unit with resources shows a chart of historic resource movement. The manuf
 Each unit costs money to build it. The price is shown before a building configuration is applied and is charged when the configuration is applied on the backend.
 
 Also each unit employs labor depending on the unit level. Labor and energy costs are paid every tick from the building's bank account (or the company's funding account when the building has none). The ledger books them as one labor entry and one energy entry per building per tick; research units keep their own entries. When the account cannot cover a tick's costs the building is suspended and the ledger records the suspension once.
+
 ## Ledger
 
 Accounting ledger allows viewing the income statement, cash flow statement, and balance sheet. Statement items can be opened to show exact details. For example, opening long-term tangible assets from the balance sheet shows the list of all buildings. Clicking income shows each sales item from each unit and allows navigation to the building. Clicking costs shows property purchases, unit upgrades, purchase-unit purchases, marketing costs, and other items with drilldown.

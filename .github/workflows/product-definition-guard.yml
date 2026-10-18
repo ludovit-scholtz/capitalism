@@ -5,6 +5,7 @@ on:
     paths:
       - 'PRODUCT-DEFINITION.md'
       - 'projects/MasterApi/Types/Mutation.cs'
+      - 'projects/Shared/Tutorial/TutorialMilestoneCodes.cs'
       - '.github/scripts/check-product-definition-prices.mjs'
       - '.github/scripts/__tests__/check-product-definition-prices.test.mjs'
       - '.github/workflows/product-definition-guard.yml'
@@ -14,6 +15,7 @@ on:
     paths:
       - 'PRODUCT-DEFINITION.md'
       - 'projects/MasterApi/Types/Mutation.cs'
+      - 'projects/Shared/Tutorial/TutorialMilestoneCodes.cs'
   workflow_dispatch:
 
 permissions:
