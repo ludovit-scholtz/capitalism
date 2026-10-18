@@ -1,28 +1,15 @@
+using System.Text.Json;
+using Api.Configuration;
+using Api.Data.Entities;
+using Api.Utilities;
+using Capitalism.Shared.Security;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using System.Text.Json;
-using Api.Configuration;
-using Api.Data;
-using Api.Data.Entities;
-using Api.Engine;
-using Api.Engine.Phases;
-using Api.Security;
-using Api.Utilities;
-using Api.Types;
-using Capitalism.Shared.Security;
-using HotChocolate.AspNetCore;
-using HotChocolate.CostAnalysis;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.IdentityModel.JsonWebTokens;
-using Microsoft.IdentityModel.Tokens;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using static Api.Security.RequestTokenReader;
 
 namespace Api.Security;
@@ -30,7 +17,7 @@ namespace Api.Security;
 /// <summary>Registers local-JWT, Biatec OIDC and the policy scheme that chooses between them, plus the admin authorization policy.</summary>
 internal static class ApiAuthenticationExtensions
 {
-    private static string NormalizeIssuer(string issuer) => issuer.Trim().TrimEnd('/');
+    internal static string NormalizeIssuer(string issuer) => issuer.Trim().TrimEnd('/');
 
     internal static IServiceCollection AddApiAuthentication(
         this IServiceCollection services,

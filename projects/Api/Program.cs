@@ -10,7 +10,6 @@ using Api.Data.Entities;
 using Api.Engine;
 using Api.Engine.Phases;
 using Api.Security;
-using static Api.Security.RequestTokenReader;
 using Api.Utilities;
 using Api.Types;
 using Capitalism.Shared.Security;
@@ -76,7 +75,6 @@ public class Program
         }
         var biatecOidcOptions = builder.Configuration.GetSection(BiatecOidcOptions.SectionName).Get<BiatecOidcOptions>()
             ?? new BiatecOidcOptions();
-        static string NormalizeIssuer(string issuer) => issuer.Trim().TrimEnd('/');
         var biatecKnownIssuers = new[]
         {
             biatecOidcOptions.Issuer,
@@ -86,7 +84,7 @@ public class Program
             .Select(issuer => issuer!)
             .SelectMany(issuer =>
             {
-                var normalized = NormalizeIssuer(issuer);
+                var normalized = ApiAuthenticationExtensions.NormalizeIssuer(issuer);
                 return new[] { normalized, normalized + "/" };
             })
             .Distinct(StringComparer.OrdinalIgnoreCase)
