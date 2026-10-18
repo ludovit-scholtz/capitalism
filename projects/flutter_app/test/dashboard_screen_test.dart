@@ -8,21 +8,16 @@ import 'package:capitalism_app/core/auth/auth_state.dart';
 import 'package:capitalism_app/core/game_state/game_state_model.dart';
 import 'package:capitalism_app/core/game_state/game_state_state.dart';
 import 'package:capitalism_app/core/graphql/graphql_service.dart';
-import 'package:capitalism_app/core/i18n/locale_state.dart';
-import 'package:capitalism_app/core/services/url_opener.dart';
 import 'package:capitalism_app/features/buildings/building_analytics_models.dart';
 import 'package:capitalism_app/features/buildings/building_panel_models.dart';
 import 'package:capitalism_app/features/company/company_models.dart';
 import 'package:capitalism_app/features/dashboard/dashboard_models.dart';
-import 'package:capitalism_app/features/dashboard/dashboard_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 
 import 'support/fake_dashboard_service.dart';
+import 'support/pump_dashboard.dart';
 import 'support/fake_url_opener.dart';
-import 'support/in_memory_selected_locale_storage.dart';
 import 'support/in_memory_token_storage.dart';
 
 const _destroyedBuilding = DashboardBuilding(
@@ -121,57 +116,7 @@ const _companyTwoBuildingsSameCity = DashboardCompany(
   buildings: [_buildingSameCityA, _buildingSameCityB],
 );
 
-Future<GoRouter> _pumpDashboard(
-  WidgetTester tester, {
-  required AuthState auth,
-  required FakeDashboardService service,
-  GameStateState? gameStateState,
-  UrlOpener? urlOpener,
-  bool settle = true,
-}) async {
-  final router = GoRouter(
-    initialLocation: '/',
-    routes: [
-      GoRoute(
-        path: '/',
-        builder: (context, state) =>
-            Scaffold(body: DashboardScreen(dashboardService: service, urlOpener: urlOpener ?? FakeUrlOpener())),
-      ),
-      GoRoute(path: '/login', builder: (context, state) => const Scaffold(body: Center(child: Text('Login Screen')))),
-      GoRoute(
-        path: '/onboarding',
-        builder: (context, state) => const Scaffold(body: Center(child: Text('Onboarding Screen'))),
-      ),
-      GoRoute(
-        path: '/building/:id',
-        builder: (context, state) =>
-            Scaffold(body: Center(child: Text('Building Detail ${state.pathParameters['id']}'))),
-      ),
-      GoRoute(
-        path: '/bank/:id',
-        builder: (context, state) => Scaffold(body: Center(child: Text('Bank Detail ${state.pathParameters['id']}'))),
-      ),
-      GoRoute(
-        path: '/buy-building/:companyId',
-        builder: (context, state) =>
-            Scaffold(body: Center(child: Text('Buy Building ${state.pathParameters['companyId']}'))),
-      ),
-    ],
-  );
-
-  await tester.pumpWidget(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider<AuthState>.value(value: auth),
-        ChangeNotifierProvider<GameStateState>.value(value: gameStateState ?? GameStateState()),
-        ChangeNotifierProvider<LocaleState>.value(value: LocaleState(storage: InMemorySelectedLocaleStorage())),
-      ],
-      child: MaterialApp.router(routerConfig: router),
-    ),
-  );
-  if (settle) await tester.pumpAndSettle();
-  return router;
-}
+const _pumpDashboard = pumpDashboard;
 
 /// Taps a tab by its label and settles the resulting `TabBarView` animation.
 Future<void> _selectTab(WidgetTester tester, String label) async {
@@ -775,7 +720,7 @@ void main() {
       await _pumpDashboard(tester, auth: auth, service: service);
       await _selectTab(tester, 'Chat');
 
-      expect(find.text('Not implemented yet. Mirrors the chat side panel in AppHeader.vue.'), findsOneWidget);
+      expect(find.text('No messages yet. Say hello!'), findsOneWidget);
     });
 
     testWidgets('Pro tab shows Inactive when there is no subscription', (tester) async {

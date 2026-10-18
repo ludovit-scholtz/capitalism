@@ -14,8 +14,7 @@
 // power-grid balance chip — all best-effort/error-isolated per
 // building/city, matching web's `Promise.allSettled` pattern. Activity is
 // the existing pending-actions list, relocated into its own tab. Chat is
-// the existing placeholder content (`chat_panel.dart`) embedded inline —
-// still no real chat feature. Pro shows an active/inactive badge derived
+// the real chat (`chat_view.dart`) embedded inline. Pro shows an active/inactive badge derived
 // from `me.proSubscriptionEndsAtUtc`, benefit cards, and a link out to the
 // separate master web portal (`AppConfig.masterWebUrl`) — this app doesn't
 // sell Pro itself, same as web.
@@ -37,6 +36,7 @@ import '../../core/widgets/icon_badge.dart';
 import '../../core/widgets/state_view.dart';
 import '../buildings/building_analytics_models.dart';
 import '../buildings/building_panel_models.dart';
+import '../chat/chat_view.dart';
 import 'dashboard_ledger_loader.dart';
 import 'dashboard_models.dart';
 import 'dashboard_new_company_card.dart';
@@ -411,23 +411,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   children: [DashboardPendingActionsSection(actions: data.pendingActions)],
                 ),
               ),
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const IconBadge(icon: AppIcons.chat, size: 48, iconSize: 20),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Not implemented yet. Mirrors the chat side panel in AppHeader.vue.',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              const Padding(padding: EdgeInsets.all(16), child: ChatView()),
               DashboardProPanel(proSubscriptionEndsAtUtc: _proSubscriptionEndsAtUtc, urlOpener: widget.urlOpener),
             ],
           ),

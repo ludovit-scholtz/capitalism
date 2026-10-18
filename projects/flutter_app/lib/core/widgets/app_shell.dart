@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../features/chat/chat_panel.dart';
+import '../../features/chat/chat_unread_badge.dart';
 import '../auth/auth_state.dart';
 import '../context/account_context_service.dart';
 import '../context/recent_building_state.dart';
@@ -147,6 +148,7 @@ class AppShell extends StatelessWidget {
                       ListTile(
                         leading: FaIcon(item.icon, size: 18),
                         title: Text(item.label),
+                        trailing: item.opensChatPanel ? const ChatUnreadBadge() : null,
                         onTap: () => _handleTap(context, item),
                       ),
                   ],

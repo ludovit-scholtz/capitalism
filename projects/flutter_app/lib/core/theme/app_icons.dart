@@ -39,6 +39,7 @@ class AppIcons {
 
   // Social nav
   static const chat = FontAwesomeIcons.comments;
+  static const send = FontAwesomeIcons.paperPlane;
   static const discord = FontAwesomeIcons.discord;
 
   // Administration nav
