@@ -45,4 +45,4 @@ jobs:
         run: |
           flutter test 2>&1 | tee flutter-test.log
           # Guard against a green job that ran nothing.
-          grep -Eq "All tests passed" flutter-test.log
+          grep -Eq "[1-9][0-9]* tests? passed|All tests passed" flutter-test.log
