@@ -78,7 +78,7 @@ public sealed class FirstWeekCampaignGraphQlTests
             .Single(g => g.GetProperty("code").GetString() == code);
 
     [Fact]
-    public async Task Campaign_Unauthenticated_IsRejected()
+    public async Task FirstWeekCampaign_And_ClaimCampaignReward_Unauthenticated_IsRejected()
     {
         await using var factory = new ApiWebApplicationFactory();
         using var client = factory.CreateClient();
@@ -91,7 +91,7 @@ public sealed class FirstWeekCampaignGraphQlTests
     }
 
     [Fact]
-    public async Task Campaign_ForAPlayerWhoHasNotFinishedOnboarding_HasNotStarted()
+    public async Task FirstWeekCampaign_ForAPlayerWhoHasNotFinishedOnboarding_HasNotStarted()
     {
         await using var factory = new ApiWebApplicationFactory();
         using var client = factory.CreateClient();
@@ -105,7 +105,7 @@ public sealed class FirstWeekCampaignGraphQlTests
     }
 
     [Fact]
-    public async Task Campaign_OnDayOne_UnlocksOnlyTheFirstGoal_AndReportsProgressFromRealData()
+    public async Task FirstWeekCampaign_OnDayOne_UnlocksOnlyTheFirstGoal_AndReportsProgressFromRealData()
     {
         await using var factory = new ApiWebApplicationFactory();
         using var client = factory.CreateClient();
@@ -124,7 +124,7 @@ public sealed class FirstWeekCampaignGraphQlTests
     }
 
     [Fact]
-    public async Task Claim_PaysTheRewardOnce_WithALedgerEntry_AndIsIdempotent()
+    public async Task ClaimCampaignReward_PaysTheRewardOnce_WithALedgerEntry_AndIsIdempotent()
     {
         await using var factory = new ApiWebApplicationFactory();
         using var client = factory.CreateClient();
@@ -148,7 +148,7 @@ public sealed class FirstWeekCampaignGraphQlTests
     [InlineData("NOT_A_GOAL", "CAMPAIGN_GOAL_UNKNOWN")]
     [InlineData(FirstWeekCampaignCatalog.SecondBuilding, "CAMPAIGN_GOAL_LOCKED")]      // day 2 goal on day 1
     [InlineData(FirstWeekCampaignCatalog.FirstSale, "CAMPAIGN_GOAL_NOT_COMPLETE")]     // unlocked but the milestone is missing
-    public async Task Claim_RejectsUnknownLockedAndIncompleteGoals_WithoutPaying(string goalCode, string expectedCode)
+    public async Task ClaimCampaignReward_RejectsUnknownLockedAndIncompleteGoals_WithoutPaying(string goalCode, string expectedCode)
     {
         await using var factory = new ApiWebApplicationFactory();
         using var client = factory.CreateClient();
@@ -164,7 +164,7 @@ public sealed class FirstWeekCampaignGraphQlTests
     }
 
     [Fact]
-    public async Task Claim_BeforeOnboardingIsFinished_IsRejected()
+    public async Task ClaimCampaignReward_BeforeOnboardingIsFinished_IsRejected()
     {
         await using var factory = new ApiWebApplicationFactory();
         using var client = factory.CreateClient();
@@ -176,7 +176,7 @@ public sealed class FirstWeekCampaignGraphQlTests
     }
 
     [Fact]
-    public async Task Claim_ForAForeignOrMissingCompany_IsTheSameUniformForbidden_AndNeverPays()
+    public async Task ClaimCampaignReward_ForAForeignOrMissingCompany_IsTheSameUniformForbidden_AndNeverPays()
     {
         await using var factory = new ApiWebApplicationFactory();
         using var client = factory.CreateClient();
@@ -199,7 +199,7 @@ public sealed class FirstWeekCampaignGraphQlTests
     }
 
     [Fact]
-    public async Task Claim_CreatesTheUsdAccountWhenTheCompanyHasNone()
+    public async Task ClaimCampaignReward_CreatesTheUsdAccountWhenTheCompanyHasNone()
     {
         await using var factory = new ApiWebApplicationFactory();
         using var client = factory.CreateClient();

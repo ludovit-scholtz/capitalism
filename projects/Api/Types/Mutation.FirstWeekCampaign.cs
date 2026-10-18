@@ -42,12 +42,13 @@ public sealed partial class Mutation
         }
         else
         {
-            company = await db.Companies
+            var ownCompanies = await db.Companies.AsNoTracking()
                 .Where(c => c.PlayerId == userId)
-                .OrderByDescending(c => c.Id == player.ActiveCompanyId)
-                .ThenBy(c => c.FoundedAtUtc)
-                .FirstOrDefaultAsync(ct)
+                .OrderBy(c => c.FoundedAtUtc).ThenBy(c => c.Id)
+                .ToListAsync(ct);
+            var defaultCompanyId = (ownCompanies.FirstOrDefault(c => c.Id == player.ActiveCompanyId) ?? ownCompanies.FirstOrDefault())?.Id
                 ?? throw CampaignError("You need a company to receive the reward.", "CAMPAIGN_NO_COMPANY");
+            company = await db.Companies.FirstAsync(c => c.Id == defaultCompanyId, ct);
         }
 
         var state = await FirstWeekCampaignLoader.LoadAsync(db, player, DateTime.UtcNow, ct);
@@ -62,50 +63,56 @@ public sealed partial class Mutation
         if (!goalState.IsComplete) throw CampaignError("Finish the goal before claiming its reward.", "CAMPAIGN_GOAL_NOT_COMPLETE");
 
         var currentTick = (await db.GameStates.FirstOrDefaultDeterministicAsync(ct))?.CurrentTick ?? 0;
-        var account = await CompanyBankingService.EnsurePreferredAccountAsync(db, company.Id, FirstWeekCampaignCatalog.RewardCurrency, ct);
-        account.Balance += goal.RewardAmount;
-        account.ConcurrencyToken = Guid.NewGuid();
-        db.PlayerCampaignClaims.Add(new PlayerCampaignClaim
-        {
-            Id = Guid.NewGuid(),
-            PlayerId = userId,
-            CompanyId = company.Id,
-            GoalCode = goal.Code,
-            Amount = goal.RewardAmount,
-            CurrencyCode = FirstWeekCampaignCatalog.RewardCurrency,
-            ClaimedAtTick = currentTick,
-            ClaimedAtUtc = DateTime.UtcNow,
-        });
-        db.LedgerEntries.Add(new LedgerEntry
-        {
-            Id = Guid.NewGuid(),
-            CompanyId = company.Id,
-            BankAccountId = account.Id,
-            Category = LedgerCategory.CampaignReward,
-            Description = $"First-week campaign reward: {goal.Code}",
-            Amount = goal.RewardAmount,
-            RecordedAtTick = currentTick,
-            RecordedAtUtc = DateTime.UtcNow,
-        });
 
-        try
+        // The credit races with ticks, sales and other claims on the same account (its concurrency token), so a token conflict is
+        // retried against fresh state; losing the unique (player, goal) index means a simultaneous claim of this goal already paid.
+        const int maxAttempts = 4;
+        for (var attempt = 1; ; attempt++)
         {
-            // One SaveChanges: the claim row, the credit and the ledger entry commit together or not at all.
-            await db.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateException)
-        {
-            // A simultaneous claim of the same goal won the unique (player, goal) index; its transaction paid, ours rolled back.
-            db.ChangeTracker.Clear();
-            if (await db.PlayerCampaignClaims.AsNoTracking().AnyAsync(c => c.PlayerId == userId && c.GoalCode == goal.Code, ct))
+            var account = await CompanyBankingService.EnsurePreferredAccountAsync(db, company.Id, FirstWeekCampaignCatalog.RewardCurrency, ct);
+            account.Balance += goal.RewardAmount;
+            account.ConcurrencyToken = Guid.NewGuid();
+            db.PlayerCampaignClaims.Add(new PlayerCampaignClaim
             {
-                return new ClaimCampaignRewardResult { Claimed = false, GoalCode = goal.Code, Amount = goal.RewardAmount, CurrencyCode = FirstWeekCampaignCatalog.RewardCurrency };
+                Id = Guid.NewGuid(),
+                PlayerId = userId,
+                CompanyId = company.Id,
+                GoalCode = goal.Code,
+                Amount = goal.RewardAmount,
+                CurrencyCode = FirstWeekCampaignCatalog.RewardCurrency,
+                ClaimedAtTick = currentTick,
+                ClaimedAtUtc = DateTime.UtcNow,
+            });
+            db.LedgerEntries.Add(new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                BankAccountId = account.Id,
+                Category = LedgerCategory.CampaignReward,
+                Description = $"First-week campaign reward: {goal.Code}",
+                Amount = goal.RewardAmount,
+                RecordedAtTick = currentTick,
+                RecordedAtUtc = DateTime.UtcNow,
+            });
+
+            try
+            {
+                // One SaveChanges: the claim row, the credit and the ledger entry commit together or not at all.
+                await db.SaveChangesAsync(ct);
+                return new ClaimCampaignRewardResult { Claimed = true, GoalCode = goal.Code, Amount = goal.RewardAmount, CurrencyCode = FirstWeekCampaignCatalog.RewardCurrency };
             }
+            catch (DbUpdateException ex)
+            {
+                db.ChangeTracker.Clear();
+                if (await db.PlayerCampaignClaims.AsNoTracking().AnyAsync(c => c.PlayerId == userId && c.GoalCode == goal.Code, ct))
+                {
+                    return new ClaimCampaignRewardResult { Claimed = false, GoalCode = goal.Code, Amount = goal.RewardAmount, CurrencyCode = FirstWeekCampaignCatalog.RewardCurrency };
+                }
 
-            throw;
+                if (ex is not DbUpdateConcurrencyException || attempt >= maxAttempts) throw;
+                company = await db.Companies.FirstAsync(c => c.Id == company.Id, ct); // re-attach after the tracker was cleared
+            }
         }
-
-        return new ClaimCampaignRewardResult { Claimed = true, GoalCode = goal.Code, Amount = goal.RewardAmount, CurrencyCode = FirstWeekCampaignCatalog.RewardCurrency };
     }
 
     private static GraphQLException CampaignError(string message, string code)
