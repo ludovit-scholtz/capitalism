@@ -1,0 +1,39 @@
+name: product-definition-guard
+
+on:
+  pull_request:
+    paths:
+      - 'PRODUCT-DEFINITION.md'
+      - 'projects/MasterApi/Types/Mutation.cs'
+      - 'projects/Shared/Tutorial/TutorialMilestoneCodes.cs'
+      - '.github/scripts/check-product-definition-prices.mjs'
+      - '.github/scripts/__tests__/check-product-definition-prices.test.mjs'
+      - '.github/workflows/product-definition-guard.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'PRODUCT-DEFINITION.md'
+      - 'projects/MasterApi/Types/Mutation.cs'
+      - 'projects/Shared/Tutorial/TutorialMilestoneCodes.cs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  product-definition-guard:
+    name: Product definition prices match the code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Test the price guard
+        run: node --test .github/scripts/__tests__/check-product-definition-prices.test.mjs
+
+      - name: Check the document against Mutation.cs
+        run: node .github/scripts/check-product-definition-prices.mjs

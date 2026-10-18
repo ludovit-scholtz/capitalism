@@ -1,5 +1,7 @@
 # Capitalism Game
 
+> Last full read-through against the code: 2026-10-18 (gold prices, tutorial milestones, seasonal quarters, unit price section, deposit-rate management). CI (`.github/scripts/check-product-definition-prices.mjs`) continuously guards only the gold prices, the stale price wording and the tutorial milestone count against `projects/MasterApi/Types/Mutation.cs` and `projects/Shared/Tutorial/TutorialMilestoneCodes.cs`; other sections are as current as that date.
+
 Create a fun game in the style of Capitalism II. This game is an economic simulation where players can experience price elasticity, resource scarcity, resource oversupply, different competition types, marketing, product quality, and difficulties with scaling up companies.
 
 It will use a real-world map. The game starts in a single city and later expands to more cities.
@@ -260,9 +262,9 @@ Every unit with resources shows a chart of historic resource movement. The manuf
 
 ## Unit price
 
-Each unit costs money to build it. 
+Each unit costs money to build it. The price is shown before a building configuration is applied and is charged when the configuration is applied on the backend.
 
-Also each unit employs labor depending on the unit level. Labor costs are paid 
+Also each unit employs labor depending on the unit level. Labor and energy costs are paid every tick from the building's bank account (or the company's funding account when the building has none). The ledger books them as one labor entry and one energy entry per building per tick; research units keep their own entries. When the account cannot cover a tick's costs the building is suspended and the ledger records the suspension once.
 
 ## Ledger
 
@@ -469,13 +471,13 @@ When media house building upgrade is in progress, marketing units must remain co
 
 ## Monetization
 
-Startup pack is available after user finishes onboarding. It is a time-limited offer and costs $20 in real money.
+Pro and the Startup pack are paid only in tokenized gold on the master server (see **Gold token** above for the exact amounts, which follow `projects/MasterApi/Types/Mutation.cs`):
 
-Startup pack includes 3 months of Pro subscription and in-game currency.
+- Monthly Pro costs `$20` equivalent, charged as `0.137` grams of tokenized gold.
+- The Startup pack costs `$40` equivalent, charged as `0.274` grams of tokenized gold. It can be claimed once per account on the master portal and grants 3 months of Pro, stacked onto any active Pro time. It does not grant in-game currency.
+- Referral-active accounts get a 10% discount on both purchases.
 
 In pro subscription the players will have more products to manufacture and sell.
-
-Pro subscription will cost $10/month.
 
 ## Research & Development
 
@@ -889,7 +891,7 @@ Mining buildings consume resource deposits over time. Each mine lot has a define
 
 Public sales volumes are modified by seasonal demand multipliers. Each product belongs to a demand seasonality category.
 
-- Seasonal multipliers are defined per product category per quarter (Q1 Jan–Mar, Q2 Apr–Jun, Q3 Jul–Sep, Q4 Oct–Nov).
+- Seasonal multipliers are defined per product category per quarter (Q1 Jan–Mar, Q2 Apr–Jun, Q3 Jul–Sep, Q4 Oct–Dec).
 - Example: winter products (heating, food staples) peak in Q1/Q4; summer products (furniture, outdoor) peak in Q2/Q3.
 - The multiplier is applied in `PublicSalesPhase` on top of the base demand calculation.
 - The public sales unit detail panel shows the current season multiplier and a quarterly demand forecast chart so players can plan inventory.
@@ -898,7 +900,7 @@ Public sales volumes are modified by seasonal demand multipliers. Each product b
 
 A guided tutorial system helps new players navigate key game mechanics after onboarding.
 
-- The **TutorialProgress** entity records completion of five canonical milestones: first resource sold, first B2B trade, first loan taken, first competitor observed in market intelligence, first brand established.
+- The **TutorialProgress** entity records completion of eight milestones (`projects/Shared/Tutorial/TutorialMilestoneCodes.cs`): five canonical ones (first resource sold, first B2B trade, first loan taken, first competitor observed in market intelligence, first brand established) and three guidance ones (first building detail visit, first grid editor open, dashboard tooltip dismissed). `FIRST_MILLION` is not a tutorial milestone; it is an achievement badge.
 - The **/tutorial** view shows checklist progress, completion timestamps, and deep links for unfinished milestones.
 - **TutorialTooltip** component is the standard contextual overlay and supports dismiss, escape, and auto-dismiss behavior.
 - Contextual overlays for first dashboard visit and first building-detail/grid-editor visit are required integration points for next increment.
@@ -1008,7 +1010,7 @@ See **Building lifecycle → Building destruction** above for canonical behavior
 
 News and changelog feed includes a **Mark all as read** action for authenticated players. Read receipts are tracked server-side and unread counter in navbar must clear immediately after successful action.
 
-## Banking deposit rate management (planned)
+## Banking deposit rate management
 
 Bank owners can change the deposit interest rate they pay to depositors. The new rate applies with a 24-tick delay so depositors have time to withdraw before the rate change takes effect. The rate change applies uniformly to all deposit accounts held in that bank.
 
