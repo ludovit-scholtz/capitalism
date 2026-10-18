@@ -99,7 +99,6 @@ public static class WeatherService
         var latestByCity = existing
             .GroupBy(f => f.CityId)
             .ToDictionary(g => g.Key, g => g.MaxBy(f => f.Tick)!);
-        var existingSet = new HashSet<Guid>(latestByCity.Keys);
 
         // For cities that already have rows: extend by one row after the latest tick.
         var newRows = new List<CityWeatherForecast>(latestByCity.Count);
@@ -115,10 +114,13 @@ public static class WeatherService
             });
         }
 
-        db.CityWeatherForecasts.AddRange(newRows);
+        if (newRows.Count > 0)
+        {
+            db.CityWeatherForecasts.AddRange(newRows);
+        }
 
         // Seed fresh 50-tick window for any cities with no rows.
-        var needsSeed = cityIds.Where(id => !existingSet.Contains(id)).ToList();
+        var needsSeed = cityIds.Where(id => !latestByCity.ContainsKey(id)).ToList();
         foreach (var cityId in needsSeed)
         {
             var seeded = SeedForecast(cityId, currentTick, ForecastWindow);
