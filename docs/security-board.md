@@ -1,6 +1,6 @@
 # Security Action Board
 
-> Auto-generated from `/audits/*.md` on 2026-10-12.  
+> Auto-generated from `/audits/*.md` on 2026-10-19.  
 > Add `<!-- issue: #NNN -->` in a finding's **Status** line to link an implementation issue.
 
 ✅ **All clear** — No unlinked High/Critical open findings.
@@ -59,6 +59,7 @@
 | Medium | Loan Origination and Repayment Still Contain Currency-Blind Company Account Paths | Open | — | — | [security-audit-2026-W23-2026-05-14T003753](../../audits/security-audit-2026-W23-2026-05-14T003753.md#loan-origination-and-repayment-still-contain-currency-blind-company-account-paths) |
 | Medium | Defaulted Loans Do Not Protect the Scheduled Repayment Account From Closure | Open | — | — | [security-audit-2026-W23-2026-05-14T003753](../../audits/security-audit-2026-W23-2026-05-14T003753.md#defaulted-loans-do-not-protect-the-scheduled-repayment-account-from-closure) |
 | Medium | MasterApi Auth Rate Limiting Still Misses Named-Operation and Batched Login/Register Requests | Open | — | — | [security-audit-2026-W23-2026-05-16T115624](../../audits/security-audit-2026-W23-2026-05-16T115624.md#masterapi-auth-rate-limiting-still-misses-named-operation-and-batched-loginregister-requests) |
+| Medium | Object-authorization responses not yet uniform everywhere | Open | — | [#605](https://github.com/ludovit-scholtz/capitalism/issues/605) | [security-audit-2026-W42](../../audits/security-audit-2026-W42.md#object-authorization-responses-not-yet-uniform-everywhere) |
 | Low | MasterApi Custom GraphQL Request-Security Middleware Only Inspects Single JSON-Object Bodies | Open (carried over from 2026-05-16) | — | — | [security-audit-2026-05-30T211354](../../audits/security-audit-2026-05-30T211354.md#masterapi-custom-graphql-request-security-middleware-only-inspects-single-json-object-bodies) |
 | Low | Game Frontend Still Persists Raw JWTs in `localStorage` After Cookie-Session Bootstrap | Open (carried over from 2026-05-16) | — | — | [security-audit-2026-05-30T211354](../../audits/security-audit-2026-05-30T211354.md#game-frontend-still-persists-raw-jwts-in-localstorage-after-cookie-session-bootstrap) |
 | Low | nginx `add_header` Inheritance Drops Security Headers on Asset Responses (Both Frontends) | Open (pre-existing; first flagged this audit) | — | — | [security-audit-2026-07-07T201327](../../audits/security-audit-2026-07-07T201327.md#nginx-add_header-inheritance-drops-security-headers-on-asset-responses-both-frontends) |
@@ -90,3 +91,5 @@
 | High (`minimatch` ReDoS), Moderate (`ajv` ReDoS) | npm Frontend Dependency Vulnerabilities (FIXED THIS SESSION) | Resolved (fixed in this session) | — | — | [security-audit-2026-W21](../../audits/security-audit-2026-W21.md#npm-frontend-dependency-vulnerabilities-fixed-this-session) |
 | Low (development defaults — should not reach production) | Placeholder JWT Signing Keys and Default DB Password Committed to Source | Open | — | [#417](https://github.com/ludovit-scholtz/capitalism/issues/417) | [security-audit-2026-W21](../../audits/security-audit-2026-W21.md#placeholder-jwt-signing-keys-and-default-db-password-committed-to-source) |
 | Low (partially mitigated by startup guards) | Root Admin Email, Default DB Password, and Seed Admin Password in Committed Source | Open | — | [#438](https://github.com/ludovit-scholtz/capitalism/issues/438) | [security-audit-2026-W22](../../audits/security-audit-2026-W22.md#root-admin-email-default-db-password-and-seed-admin-password-in-committed-source) |
+| Medium (availability of telemetry; no confidentiality or integrity impact) | Master portal inline analytics script blocked by the CSP | Fixed in #597 (`public/gtag-init.js`, `indexHtmlCsp.test.ts`). | — | — | [security-audit-2026-W42](../../audits/security-audit-2026-W42.md#master-portal-inline-analytics-script-blocked-by-the-csp) |
+| Low (development only) | Lint-toolchain advisories in both frontends | Open | — | [#611](https://github.com/ludovit-scholtz/capitalism/issues/611) | [security-audit-2026-W42](../../audits/security-audit-2026-W42.md#lint-toolchain-advisories-in-both-frontends) |

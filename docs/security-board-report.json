@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-12T08:26:14.725Z",
-  "totalFindings": 81,
+  "generatedAt": "2026-10-19T08:16:01.468Z",
+  "totalFindings": 84,
   "gateStatus": "pass",
   "failingCount": 0,
   "findings": [
@@ -961,6 +961,43 @@
       "severity": "Low",
       "status": "Open",
       "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W42/master-portal-inline-analytics-script-blocked-by-the-csp",
+      "fileStem": "security-audit-2026-W42",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W42.md",
+      "number": 1,
+      "title": "Master portal inline analytics script blocked by the CSP",
+      "severity": "Medium (availability of telemetry; no confidentiality or integrity impact)",
+      "status": "Fixed in #597 (`public/gtag-init.js`, `indexHtmlCsp.test.ts`).",
+      "issues": [],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W42/object-authorization-responses-not-yet-uniform-everywhere",
+      "fileStem": "security-audit-2026-W42",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W42.md",
+      "number": 2,
+      "title": "Object-authorization responses not yet uniform everywhere",
+      "severity": "Medium",
+      "status": "Open",
+      "issues": [
+        605
+      ],
+      "owner": ""
+    },
+    {
+      "slug": "security-audit-2026-W42/lint-toolchain-advisories-in-both-frontends",
+      "fileStem": "security-audit-2026-W42",
+      "filePath": "/home/runner/work/capitalism/capitalism/audits/security-audit-2026-W42.md",
+      "number": 3,
+      "title": "Lint-toolchain advisories in both frontends",
+      "severity": "Low (development only)",
+      "status": "Open",
+      "issues": [
+        611
+      ],
       "owner": ""
     }
   ]
