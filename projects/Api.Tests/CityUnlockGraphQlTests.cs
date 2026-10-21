@@ -5,6 +5,7 @@ using System.Text.Json;
 using Api.Data;
 using Api.Data.Entities;
 using Api.Engine;
+using Api.Engine.Phases;
 using Api.Tests.Infrastructure;
 using Api.Utilities;
 using Microsoft.EntityFrameworkCore;
@@ -178,6 +179,16 @@ public sealed class CityUnlockGraphQlTests
             && notification.Type == PlayerNotificationType.CityExpansionUnlocked
             && notification.RelatedEntityId == berlinId));
 
+        // Unlock detection runs on a cadence (#646): an off-cadence tick must not do the full-world scan...
+        var gameState = await db.GameStates.SingleAsync();
+        gameState.CurrentTick = 0; // processor increments to 1
+        await db.SaveChangesAsync();
+        await tickProcessor.ProcessTickAsync();
+        Assert.False(await db.CompanyCityUnlocks.AnyAsync(unlock => unlock.CompanyId == companyId && unlock.CityId == berlinId));
+
+        // ...and the next cadence tick performs it.
+        gameState.CurrentTick = CityExpansionUnlockPhase.CadenceTicks - 1;
+        await db.SaveChangesAsync();
         await tickProcessor.ProcessTickAsync();
 
         Assert.True(await db.CompanyCityUnlocks.AnyAsync(unlock => unlock.CompanyId == companyId && unlock.CityId == berlinId));

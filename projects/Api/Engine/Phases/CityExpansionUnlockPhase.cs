@@ -12,8 +12,19 @@ public sealed class CityExpansionUnlockPhase : ITickPhase
     public string Name => "CityExpansionUnlock";
     public int Order => 1125;
 
+    /// <summary>
+    /// The unlock scan loads every company, lot and inventory, so it runs every few ticks (in-game hours) instead of every tick (#646).
+    /// A threshold crossing is detected up to CadenceTicks - 1 ticks late; a skipped or failed scan is retried on the next cadence tick; unlocks are permanent, so nothing is lost.
+    /// </summary>
+    public const int CadenceTicks = 6;
+
     public async Task ProcessAsync(TickContext context)
     {
+        if (context.CurrentTick % CadenceTicks != 0)
+        {
+            return;
+        }
+
         var cities = context.CitiesById.Values.ToList();
         if (cities.Count == 0)
         {
@@ -36,6 +47,7 @@ public sealed class CityExpansionUnlockPhase : ITickPhase
             .Include(company => company.Buildings)
                 .ThenInclude(building => building.City)
             .Include(company => company.BankAccounts)
+            .AsSplitQuery()
             .ToListAsync();
 
         if (companies.Count == 0)
