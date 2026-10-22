@@ -158,7 +158,13 @@ public static class CityUnlockService
                 .Append(primaryCurrencyCode)
                 .Append("USD"));
 
-        var currentNetWorthUsd = ComputeCompanyNetWorthUsd(company, ownedLots, inventories, eurRates, primaryCurrencyCode);
+        var activeLoans = await db.Loans
+            .AsNoTracking()
+            .Include(loan => loan.BorrowerBankAccount)
+            .Where(loan => loan.BorrowerCompanyId == company.Id
+                && (loan.Status == LoanStatus.Active || loan.Status == LoanStatus.Overdue))
+            .ToListAsync(ct);
+        var currentNetWorthUsd = ComputeCompanyNetWorthUsd(company, ownedLots, inventories, activeLoans, eurRates, primaryCurrencyCode);
         var growthPerTickUsd = await ComputeRecentGrowthPerTickUsdAsync(db, company.Id, primaryCurrencyCode, eurRates, ct);
         var unlockedCityIds = await db.CompanyCityUnlocks
             .AsNoTracking()
@@ -216,6 +222,7 @@ public static class CityUnlockService
         Company company,
         IReadOnlyCollection<BuildingLot> ownedLots,
         IReadOnlyCollection<Inventory> inventories,
+        IReadOnlyCollection<Loan> activeLoans,
         IReadOnlyDictionary<string, decimal> eurRates,
         string primaryCurrencyCode)
     {
@@ -241,8 +248,14 @@ public static class CityUnlockService
             .Sum(inventory => inventory.Quantity * WealthCalculator.GetItemBasePrice(inventory));
         var inventoryValueUsd = FxRateHelper.ConvertToUsd(inventoryValueLocal, primaryCurrencyCode, eurRates);
 
+        // Borrowed cash sits in the bank balance, so the outstanding principal must come off or borrowing would buy city access (#654).
+        var loanLiabilityUsd = activeLoans.Sum(loan => FxRateHelper.ConvertToUsd(
+            loan.RemainingPrincipal,
+            loan.BorrowerBankAccount?.CurrencyCode ?? primaryCurrencyCode,
+            eurRates));
+
         return decimal.Round(
-            bankBalanceUsd + buildingValueUsd + lotValueUsd + inventoryValueUsd,
+            bankBalanceUsd + buildingValueUsd + lotValueUsd + inventoryValueUsd - loanLiabilityUsd,
             2,
             MidpointRounding.AwayFromZero);
     }
