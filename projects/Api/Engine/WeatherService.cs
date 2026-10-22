@@ -59,13 +59,19 @@ public static class WeatherService
     /// <summary>
     /// Advances the rolling forecast window for all supplied cities:
     /// removes rows whose tick is strictly less than <paramref name="currentTick"/> and
-    /// appends one new row at <c>currentTick + <see cref="ForecastWindow"/></c>.
+    /// appends the rows that bring each city's forecast to <c>currentTick + <see cref="ForecastWindow"/> - 1 + (cadenceTicks - 1)</c>.
     /// Also seeds a fresh window for cities that have no rows yet.
     /// </summary>
+    /// <param name="cadenceTicks">
+    /// Ticks between runs (1 = every tick, one row per run). The extra rows keep the forecast at least <see cref="ForecastWindow"/> ticks
+    /// ahead on every tick between two runs, and the wind random walk is the same as when it advanced every tick, so a cadence changes
+    /// when the table is touched and not what any tick sees.
+    /// </param>
     public static async Task AdvanceForecastsAsync(
         AppDbContext db,
         IList<Guid> cityIds,
         long currentTick,
+        int cadenceTicks = 1,
         CancellationToken ct = default)
     {
         if (cityIds.Count == 0) return;
@@ -100,18 +106,25 @@ public static class WeatherService
             .GroupBy(f => f.CityId)
             .ToDictionary(g => g.Key, g => g.MaxBy(f => f.Tick)!);
 
-        // For cities that already have rows: extend by one row after the latest tick.
-        var newRows = new List<CityWeatherForecast>(latestByCity.Count);
+        // For cities that already have rows: extend the walk after the latest tick up to the target horizon (at least one row).
+        var extraTicks = Math.Max(1, cadenceTicks) - 1;
+        var targetTick = currentTick + ForecastWindow - 1 + extraTicks;
+        var newRows = new List<CityWeatherForecast>(latestByCity.Count * (extraTicks + 1));
         foreach (var (cityId, latest) in latestByCity)
         {
-            var nextTick = latest.Tick + 1;
-            newRows.Add(new CityWeatherForecast
+            var wind = latest.WindPercent;
+            var rowCount = Math.Max(1L, targetTick - latest.Tick);
+            for (var nextTick = latest.Tick + 1; nextTick <= latest.Tick + rowCount; nextTick++)
             {
-                CityId = cityId,
-                Tick = nextTick,
-                WindPercent = ComputeNextWind(latest.WindPercent, cityId, nextTick),
-                SolarPercent = ComputeSolar(nextTick),
-            });
+                wind = ComputeNextWind(wind, cityId, nextTick);
+                newRows.Add(new CityWeatherForecast
+                {
+                    CityId = cityId,
+                    Tick = nextTick,
+                    WindPercent = wind,
+                    SolarPercent = ComputeSolar(nextTick),
+                });
+            }
         }
 
         if (newRows.Count > 0)
@@ -123,7 +136,7 @@ public static class WeatherService
         var needsSeed = cityIds.Where(id => !latestByCity.ContainsKey(id)).ToList();
         foreach (var cityId in needsSeed)
         {
-            var seeded = SeedForecast(cityId, currentTick, ForecastWindow);
+            var seeded = SeedForecast(cityId, currentTick, ForecastWindow + extraTicks);
             db.CityWeatherForecasts.AddRange(seeded);
         }
 

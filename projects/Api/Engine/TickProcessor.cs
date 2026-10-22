@@ -16,7 +16,8 @@ public sealed class TickProcessor(
     AppDbContext db,
     IEnumerable<ITickPhase> phases,
     ILogger<TickProcessor> logger,
-    TickTimingRecorder? timingRecorder = null)
+    TickTimingRecorder? timingRecorder = null,
+    TickTimingStore? timingStore = null)
 {
     /// <summary>Timing entry for loading the tick context from the database (reported next to the phases).</summary>
     public const string ContextLoadEntryName = "(context load)";
@@ -133,7 +134,9 @@ public sealed class TickProcessor(
         }
 
         sw.Stop();
-        timingRecorder?.Record(gameState.CurrentTick, ctxSw.ElapsedMilliseconds + sw.ElapsedMilliseconds, phaseMs);
+        var totalMs = ctxSw.ElapsedMilliseconds + sw.ElapsedMilliseconds;
+        timingRecorder?.Record(gameState.CurrentTick, totalMs, phaseMs);
+        await PersistTimingsAsync(gameState.CurrentTick, totalMs, phaseMs, ct);
 
         // Log per-phase breakdown when any phase exceeded the slow-phase threshold,
         // or when the total tick time is unexpectedly long.
@@ -162,6 +165,24 @@ public sealed class TickProcessor(
         }
 
         return gameState.TickIntervalSeconds;
+    }
+
+    /// <summary>Stores the tick's timings after the tick has committed; a failure here only loses history, so it never fails the tick.</summary>
+    private async Task PersistTimingsAsync(long tick, long totalMs, IReadOnlyDictionary<string, long> phaseMs, CancellationToken ct)
+    {
+        if (timingStore is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await timingStore.SaveAsync(tick, totalMs, phaseMs, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Tick {Tick} – could not persist the tick timings.", tick);
+        }
     }
 
     private async Task<TickContext> BuildContextAsync(GameState gameState, CancellationToken ct)

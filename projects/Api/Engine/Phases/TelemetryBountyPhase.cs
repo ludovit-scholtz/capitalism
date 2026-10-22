@@ -13,6 +13,12 @@ namespace Api.Engine.Phases;
 /// Detects player activity (manufacturing, sales, research, etc.) and reports events so
 /// players earn master ranking points for economic participation.
 /// This phase runs after DividendPhase so it can also detect dividend payouts.
+///
+/// Runs every <see cref="TickCadence.TelemetryBountyTicks"/> ticks (#646). Bounties are one per player per UTC day, so the delay is
+/// harmless, and the event-based checks (public sales, dividends) look back over the ticks since the previous run so an event on a skipped
+/// tick still counts. Checks of standing state (research budgets, occupied buildings, plants, banks, lenders, employers, rankings) read
+/// the current state, which does not depend on the cadence. Manufacturing is read from the current tick's output only: a factory that
+/// produces on any run tick of the day earns the bounty.
 /// </summary>
 public sealed class TelemetryBountyPhase(
     IMasterRankingTelemetryService telemetry,
@@ -25,6 +31,12 @@ public sealed class TelemetryBountyPhase(
 
     public async Task ProcessAsync(TickContext context)
     {
+        if (!TickCadence.IsDue(context.CurrentTick, TickCadence.TelemetryBountyTicks))
+        {
+            return;
+        }
+
+        var windowStartTick = context.CurrentTick - TickCadence.TelemetryBountyTicks; // exclusive
         var serverKey = masterOptions.Value.ServerKey ?? string.Empty;
         var today = DateTime.UtcNow.ToString("yyyyMMdd");
 
@@ -126,9 +138,9 @@ public sealed class TelemetryBountyPhase(
         }
 
         // ── WHOLESALER ──────────────────────────────────────────────────────────
-        // Companies that made any public retail sales this tick.
+        // Companies that made any public retail sales since the previous run.
         var wholesalerCompanyIds = context.Db.PublicSalesRecords
-            .Where(r => r.Tick == context.CurrentTick && r.QuantitySold > 0)
+            .Where(r => r.Tick > windowStartTick && r.Tick <= context.CurrentTick && r.QuantitySold > 0)
             .Select(r => r.CompanyId)
             .Distinct()
             .ToHashSet();
@@ -143,7 +155,7 @@ public sealed class TelemetryBountyPhase(
             }
 
             var record = entry.Entity;
-            if (record.Tick == context.CurrentTick && record.QuantitySold > 0)
+            if (record.Tick > windowStartTick && record.Tick <= context.CurrentTick && record.QuantitySold > 0)
             {
                 wholesalerCompanyIds.Add(record.CompanyId);
             }
@@ -358,9 +370,10 @@ public sealed class TelemetryBountyPhase(
         }
 
         // ── DIVIDENDS_MASTER ────────────────────────────────────────────────────
-        // Companies that paid dividends this tick.
+        // Companies that paid dividends since the previous run.
         var dividendCompanyIds = context.Db.LedgerEntries
-            .Where(e => e.RecordedAtTick == context.CurrentTick
+            .Where(e => e.RecordedAtTick > windowStartTick
+                && e.RecordedAtTick <= context.CurrentTick
                 && e.Category == LedgerCategory.Dividend
                 && e.Amount < 0) // Dividend distributions are debits on the company ledger
             .Select(e => e.CompanyId)

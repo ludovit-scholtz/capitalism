@@ -1,5 +1,5 @@
 using Api.Data;
-using Microsoft.EntityFrameworkCore;
+using Shared.Economy;
 
 namespace Api.Engine.Phases;
 
@@ -9,6 +9,10 @@ namespace Api.Engine.Phases;
 /// Runs at order 5, before <see cref="PowerDistributionPhase"/> (order 10),
 /// so that the updated <see cref="TickContext.WeatherByCity"/> snapshot is already in memory
 /// when effective power output is computed for SOLAR and WIND plants.
+///
+/// Runs every <see cref="TickCadence.WeatherUpdateTicks"/> ticks (#646) and appends the skipped rows in one go, so the forecast table and the
+/// horizon players see are the same as with a per-tick roll. <see cref="TickProcessor"/> already loads the current tick's snapshot before the
+/// phases, so power output on a skipped tick reads the right weather without this phase touching the database.
 /// </summary>
 public sealed class WeatherUpdatePhase : ITickPhase
 {
@@ -19,8 +23,13 @@ public sealed class WeatherUpdatePhase : ITickPhase
 
     public async Task ProcessAsync(TickContext context)
     {
+        if (!TickCadence.IsDue(context.CurrentTick, TickCadence.WeatherUpdateTicks))
+        {
+            return;
+        }
+
         var cityIds = context.CitiesById.Keys.ToList();
-        await WeatherService.AdvanceForecastsAsync(context.Db, cityIds, context.CurrentTick);
+        await WeatherService.AdvanceForecastsAsync(context.Db, cityIds, context.CurrentTick, TickCadence.WeatherUpdateTicks);
 
         // Refresh the in-memory snapshot after advancing so PowerDistributionPhase
         // uses the current tick's values.
