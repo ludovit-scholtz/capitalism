@@ -3302,6 +3302,15 @@ export default {
       action: 'Kúpiť budovu',
     },
   },
+  awaySummary: {
+    title: 'Počas vašej neprítomnosti',
+    period: 'Za posledných {duration}',
+    revenue: 'Tržby',
+    costs: 'Prevádzkové náklady',
+    net: 'Čistý výsledok',
+    loanPayments: 'Uhradené splátky pôžičiek',
+    continue: 'Pokračovať',
+  },
   advisor: {
     title: 'Poradca',
     dismiss: 'Skryť',

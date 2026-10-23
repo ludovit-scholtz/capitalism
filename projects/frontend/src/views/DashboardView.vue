@@ -17,6 +17,8 @@ import TutorialTooltip from '@/components/ui/TutorialTooltip.vue'
 import DashboardMainContent from '@/components/dashboard/DashboardMainContent.vue'
 import FirstWeekCampaignCard from '@/components/dashboard/FirstWeekCampaignCard.vue'
 import AdvisorCard from '@/components/dashboard/AdvisorCard.vue'
+import AwaySummaryModal from '@/components/dashboard/AwaySummaryModal.vue'
+import { useAwaySummary } from '@/composables/useAwaySummary'
 import type {
   Company,
   GameState,
@@ -55,6 +57,7 @@ const buildingFinancials = ref<Record<string, { totalSales: number; totalCosts: 
 const buildingFinancialsLoading = ref(false)
 
 const { tickCountdown, startTickCountdown, stopTickCountdown } = useTickCountdown(gameState)
+const awaySummary = useAwaySummary(computed(() => gameState.value?.currentTick ?? null))
 const { saveScrollPosition, restoreScrollPosition } = useScrollPreservation()
 
 // ── First-time user tutorial tooltip ────────────────────────────────────────
@@ -399,6 +402,7 @@ function handleCompanyLaunched() {
     </div>
 
     <FirstWeekCampaignCard v-if="!loading && !error" :company-id="getActiveCompany(auth.player, companies)?.id ?? null" />
+    <AwaySummaryModal :open="awaySummary.open.value" :summary="awaySummary.summary.value" @close="awaySummary.close" />
     <AdvisorCard v-if="!loading && !error" :buildings="getActiveCompany(auth.player, companies)?.buildings ?? []" :statuses="buildingUnitStatuses" />
 
     <div v-if="loading" class="text-center py-12 text-muted">{{ t('common.loading') }}</div>
