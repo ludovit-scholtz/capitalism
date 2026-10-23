@@ -43,6 +43,10 @@ public sealed class NpcCompanyPhase : ITickPhase
             .GroupBy(account => account.CompanyId)
             .ToDictionary(group => group.Key, group => group.Sum(account => account.Balance));
 
+        // Shops, units, stock and products come from the tick context, and the market data for every NPC shop is one aggregate query,
+        // so the cost no longer grows with the number of NPCs times the number of their shops (#646).
+        var shopData = await LoadShopDataAsync(context, npcCompanyIds);
+
         foreach (var npc in activeNpcs)
         {
             try
@@ -51,7 +55,8 @@ public sealed class NpcCompanyPhase : ITickPhase
                     context,
                     npc,
                     buildingCounts.GetValueOrDefault(npc.CompanyId),
-                    cashByCompany.GetValueOrDefault(npc.CompanyId));
+                    cashByCompany.GetValueOrDefault(npc.CompanyId),
+                    shopData);
             }
             catch (Exception ex)
             {
@@ -68,15 +73,81 @@ public sealed class NpcCompanyPhase : ITickPhase
         }
     }
 
-    private static async Task ProcessNpcAsync(TickContext context, NpcCompany npc, int buildingCount, decimal totalCash)
+    private static async Task ProcessNpcAsync(TickContext context, NpcCompany npc, int buildingCount, decimal totalCash, NpcShopData shopData)
     {
         if (buildingCount < MaxBuildingsPerNpcCompany && totalCash >= ExpandCashThreshold)
         {
             await TryExpandAsync(context, npc, buildingCount);
         }
 
-        await EnsureShopConfigurationAsync(context, npc);
-        await ApplyMarketFollowingPricingAsync(context, npc);
+        var shops = shopData.ShopsByCompany.GetValueOrDefault(npc.CompanyId) ?? [];
+        EnsureShopConfiguration(context, npc, shops, shopData.StarterProduct);
+        ApplyMarketFollowingPricing(context, npc, shops, shopData.MarketByCityAndProduct);
+    }
+
+    /// <summary>An NPC sales shop with the units it has so far, including starter units created earlier in this phase.</summary>
+    private sealed record NpcShop(Building Building, List<BuildingUnit> Units);
+
+    private sealed record MarketWindow(decimal QuantitySold, decimal Revenue);
+
+    private sealed record NpcShopData(
+        Dictionary<Guid, List<NpcShop>> ShopsByCompany,
+        ProductType? StarterProduct,
+        Dictionary<(Guid CityId, Guid ProductTypeId), MarketWindow> MarketByCityAndProduct);
+
+    private static async Task<NpcShopData> LoadShopDataAsync(TickContext context, List<Guid> npcCompanyIds)
+    {
+        var npcCompanyIdSet = npcCompanyIds.ToHashSet();
+        var shopsByCompany = new Dictionary<Guid, List<NpcShop>>();
+        if (context.BuildingsByType.TryGetValue(BuildingType.SalesShop, out var allShops))
+        {
+            foreach (var building in allShops.Where(building => npcCompanyIdSet.Contains(building.CompanyId) && building.DestroyedAtUtc == null))
+            {
+                var units = context.UnitsByBuilding.TryGetValue(building.Id, out var existing) ? [.. existing] : new List<BuildingUnit>();
+                if (!shopsByCompany.TryGetValue(building.CompanyId, out var list))
+                {
+                    shopsByCompany[building.CompanyId] = list = [];
+                }
+
+                list.Add(new NpcShop(building, units));
+            }
+        }
+
+        var starterProduct = await context.Db.ProductTypes
+            .AsNoTracking()
+            .OrderBy(product => product.Name)
+            .FirstOrDefaultAsync();
+
+        var shops = shopsByCompany.Values.SelectMany(list => list).ToList();
+        var cityIds = shops.Select(shop => shop.Building.CityId).Distinct().ToList();
+        var productIds = shops
+            .SelectMany(shop => shop.Units)
+            .Where(unit => unit.UnitType == UnitType.PublicSales && unit.ProductTypeId.HasValue)
+            .Select(unit => unit.ProductTypeId!.Value)
+            .Concat(starterProduct is null ? [] : [starterProduct.Id])
+            .Distinct()
+            .ToList();
+
+        var market = new Dictionary<(Guid CityId, Guid ProductTypeId), MarketWindow>();
+        if (cityIds.Count > 0 && productIds.Count > 0)
+        {
+            var fromTick = context.GameState.CurrentTick - 100;
+            var windows = await context.Db.PublicSalesRecords
+                .AsNoTracking()
+                .Where(record => record.Tick > fromTick
+                    && cityIds.Contains(record.CityId)
+                    && record.ProductTypeId != null
+                    && productIds.Contains(record.ProductTypeId.Value))
+                .GroupBy(record => new { record.CityId, record.ProductTypeId })
+                .Select(group => new { group.Key.CityId, group.Key.ProductTypeId, Quantity = group.Sum(record => record.QuantitySold), Revenue = group.Sum(record => record.Revenue) })
+                .ToListAsync();
+            foreach (var window in windows)
+            {
+                market[(window.CityId, window.ProductTypeId!.Value)] = new MarketWindow(window.Quantity, window.Revenue);
+            }
+        }
+
+        return new NpcShopData(shopsByCompany, starterProduct, market);
     }
 
     private static async Task TryExpandAsync(TickContext context, NpcCompany npc, int currentBuildingCount)
@@ -158,19 +229,8 @@ public sealed class NpcCompanyPhase : ITickPhase
         });
     }
 
-    private static async Task EnsureShopConfigurationAsync(TickContext context, NpcCompany npc)
+    private static void EnsureShopConfiguration(TickContext context, NpcCompany npc, List<NpcShop> shops, ProductType? starterProduct)
     {
-        var shops = await context.Db.Buildings
-            .Include(building => building.Units)
-            .Where(building => building.CompanyId == npc.CompanyId
-                && building.Type == BuildingType.SalesShop
-                && building.DestroyedAtUtc == null)
-            .ToListAsync();
-
-        var starterProduct = await context.Db.ProductTypes
-            .OrderBy(product => product.Name)
-            .FirstOrDefaultAsync();
-
         if (starterProduct is null)
         {
             return;
@@ -186,7 +246,7 @@ public sealed class NpcCompanyPhase : ITickPhase
                 purchase = new BuildingUnit
                 {
                     Id = Guid.NewGuid(),
-                    BuildingId = shop.Id,
+                    BuildingId = shop.Building.Id,
                     UnitType = UnitType.Purchase,
                     GridX = 0,
                     GridY = 0,
@@ -196,6 +256,7 @@ public sealed class NpcCompanyPhase : ITickPhase
                     PurchaseSource = "OPTIMAL",
                 };
                 context.Db.BuildingUnits.Add(purchase);
+                shop.Units.Add(purchase);
             }
 
             if (publicSales is null)
@@ -203,7 +264,7 @@ public sealed class NpcCompanyPhase : ITickPhase
                 publicSales = new BuildingUnit
                 {
                     Id = Guid.NewGuid(),
-                    BuildingId = shop.Id,
+                    BuildingId = shop.Building.Id,
                     UnitType = UnitType.PublicSales,
                     GridX = 1,
                     GridY = 0,
@@ -212,6 +273,7 @@ public sealed class NpcCompanyPhase : ITickPhase
                     MinPrice = starterProduct.BasePrice,
                 };
                 context.Db.BuildingUnits.Add(publicSales);
+                shop.Units.Add(publicSales);
             }
 
             if (!publicSales.ProductTypeId.HasValue)
@@ -219,14 +281,15 @@ public sealed class NpcCompanyPhase : ITickPhase
                 publicSales.ProductTypeId = starterProduct.Id;
             }
 
-            var inventory = await context.Db.Inventories
-                .FirstOrDefaultAsync(entry => entry.BuildingUnitId == publicSales.Id && entry.ProductTypeId == publicSales.ProductTypeId);
+            var inventory = context.InventoryByUnit.TryGetValue(publicSales.Id, out var stock)
+                ? stock.FirstOrDefault(entry => entry.ProductTypeId == publicSales.ProductTypeId)
+                : null;
             if (inventory is null)
             {
                 context.Db.Inventories.Add(new Inventory
                 {
                     Id = Guid.NewGuid(),
-                    BuildingId = shop.Id,
+                    BuildingId = shop.Building.Id,
                     BuildingUnitId = publicSales.Id,
                     ProductTypeId = publicSales.ProductTypeId,
                     Quantity = 80m,
@@ -240,34 +303,21 @@ public sealed class NpcCompanyPhase : ITickPhase
         }
     }
 
-    private static async Task ApplyMarketFollowingPricingAsync(TickContext context, NpcCompany npc)
+    private static void ApplyMarketFollowingPricing(
+        TickContext context,
+        NpcCompany npc,
+        List<NpcShop> shops,
+        Dictionary<(Guid CityId, Guid ProductTypeId), MarketWindow> marketByCityAndProduct)
     {
-        var shops = await context.Db.Buildings
-            .Include(building => building.Units)
-            .Where(building => building.CompanyId == npc.CompanyId
-                && building.Type == BuildingType.SalesShop
-                && building.DestroyedAtUtc == null)
-            .ToListAsync();
-
-        if (shops.Count == 0)
-        {
-            return;
-        }
-
         foreach (var shop in shops)
         {
             foreach (var unit in shop.Units.Where(unit => unit.UnitType == UnitType.PublicSales && unit.ProductTypeId.HasValue))
             {
-                var fromTick = context.GameState.CurrentTick - 100;
-                var salesWindow = await context.Db.PublicSalesRecords
-                    .Where(record => record.CityId == shop.CityId
-                        && record.ProductTypeId == unit.ProductTypeId
-                        && record.Tick > fromTick)
-                    .ToListAsync();
-
-                var product = await context.Db.ProductTypes.FirstOrDefaultAsync(item => item.Id == unit.ProductTypeId!.Value);
-                var marketAverage = salesWindow.Sum(record => record.QuantitySold) > 0m
-                    ? salesWindow.Sum(record => record.Revenue) / salesWindow.Sum(record => record.QuantitySold)
+                var productTypeId = unit.ProductTypeId!.Value;
+                marketByCityAndProduct.TryGetValue((shop.Building.CityId, productTypeId), out var window);
+                context.ProductTypesById.TryGetValue(productTypeId, out var product);
+                var marketAverage = window is { QuantitySold: > 0m }
+                    ? window.Revenue / window.QuantitySold
                     : (product?.BasePrice ?? 10m);
                 var target = marketAverage * (1m + ArchetypePriceModifier(npc.Archetype));
                 var clamped = decimal.Clamp(target, marketAverage * 0.8m, marketAverage * 1.2m);
