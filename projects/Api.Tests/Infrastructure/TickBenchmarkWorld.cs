@@ -70,16 +70,26 @@ internal static class TickBenchmarkWorld
 
             for (var b = 0; b < scale.BuildingsPerPlayer; b++)
             {
-                // One building in ten is an apartment block: rental buildings have no units but run the rent phase every tick, which a
-                // world of only factories and shops would never exercise.
-                var isApartment = b % 10 == 9;
-                var isShop = !isApartment && b % 4 == 3;
+                // Every kind of building that has a phase of its own is represented, because a phase the world never exercises cannot show
+                // up in the benchmark (the rent phase once cost 29 s per tick unnoticed): per player a mine, a solar plant and an R&D lab,
+                // an apartment block in every ten buildings, shops in every fourth, factories for the rest.
+                var kind = b switch
+                {
+                    0 => BenchKind.Mine,
+                    1 => BenchKind.PowerPlant,
+                    2 => BenchKind.Research,
+                    _ when b % 10 == 9 => BenchKind.Apartment,
+                    _ when b % 4 == 3 => BenchKind.Shop,
+                    _ => BenchKind.Factory,
+                };
+                var isShop = kind == BenchKind.Shop;
+                var isApartment = kind == BenchKind.Apartment;
                 var building = new Building
                 {
                     Id = DeterministicGuid(seed, "building", p * scale.BuildingsPerPlayer + b),
                     CompanyId = company.Id,
                     CityId = city.Id,
-                    Type = isApartment ? BuildingType.Apartment : isShop ? BuildingType.SalesShop : BuildingType.Factory,
+                    Type = BuildingTypeOf(kind),
                     Name = $"Bench {p}-{b}",
                     Latitude = city.Latitude,
                     Longitude = city.Longitude,
@@ -88,22 +98,49 @@ internal static class TickBenchmarkWorld
                     PricePerSqm = isApartment ? city.AverageRentPerSqm : null,
                     TotalAreaSqm = isApartment ? 400m : null,
                     OccupancyPercent = isApartment ? 70m : null,
+                    PowerPlantType = kind == BenchKind.PowerPlant ? PowerPlantType.Solar : null,
+                    PowerOutput = kind == BenchKind.PowerPlant ? 5m : null,
                 };
                 db.Buildings.Add(building);
 
-                for (var u = 0; u < (isApartment ? 0 : scale.UnitsPerBuilding); u++)
+                var mineResource = resources[rng.Next(resources.Count)];
+                if (kind == BenchKind.Mine)
                 {
-                    var resource = resources[rng.Next(resources.Count)];
+                    db.BuildingLots.Add(new BuildingLot
+                    {
+                        Id = DeterministicGuid(seed, "lot", p * scale.BuildingsPerPlayer + b),
+                        CityId = city.Id,
+                        Name = $"Bench lot {p}-{b}",
+                        Description = "Benchmark mine lot",
+                        District = "Industrial",
+                        Latitude = city.Latitude,
+                        Longitude = city.Longitude,
+                        PopulationIndex = 1m,
+                        BasePrice = 1_000m,
+                        Price = 1_000m,
+                        SuitableTypes = BuildingType.Mine,
+                        OwnerCompanyId = company.Id,
+                        BuildingId = building.Id,
+                        ResourceTypeId = mineResource.Id,
+                        MaterialQuality = 0.7m,
+                        MaterialQuantity = 1_000_000m,
+                        OriginalMaterialQuantity = 1_000_000m,
+                    });
+                }
+
+                for (var u = 0; u < UnitCountOf(kind, scale.UnitsPerBuilding); u++)
+                {
+                    var resource = kind == BenchKind.Mine ? mineResource : resources[rng.Next(resources.Count)];
                     db.BuildingUnits.Add(new BuildingUnit
                     {
                         Id = DeterministicGuid(seed, "unit", (p * scale.BuildingsPerPlayer + b) * scale.UnitsPerBuilding + u),
                         BuildingId = building.Id,
-                        UnitType = UnitTypeFor(isShop, u),
+                        UnitType = UnitTypeFor(kind, u),
                         GridX = u % 5,
                         GridY = u / 5,
                         Level = 1,
-                        ResourceTypeId = isShop ? null : resource.Id,
-                        ProductTypeId = isShop ? product.Id : null,
+                        ResourceTypeId = isShop || kind == BenchKind.Research ? null : resource.Id,
+                        ProductTypeId = isShop || kind == BenchKind.Research ? product.Id : null,
                     });
                 }
 
@@ -126,11 +163,35 @@ internal static class TickBenchmarkWorld
         db.ChangeTracker.Clear();
     }
 
-    private static string UnitTypeFor(bool isShop, int index)
+    private enum BenchKind { Factory, Shop, Apartment, Mine, PowerPlant, Research }
+
+    private static string BuildingTypeOf(BenchKind kind) => kind switch
+    {
+        BenchKind.Shop => BuildingType.SalesShop,
+        BenchKind.Apartment => BuildingType.Apartment,
+        BenchKind.Mine => BuildingType.Mine,
+        BenchKind.PowerPlant => BuildingType.PowerPlant,
+        BenchKind.Research => BuildingType.ResearchDevelopment,
+        _ => BuildingType.Factory,
+    };
+
+    /// <summary>Apartment blocks and power plants carry no grid units.</summary>
+    private static int UnitCountOf(BenchKind kind, int unitsPerBuilding)
+        => kind is BenchKind.Apartment or BenchKind.PowerPlant ? 0 : unitsPerBuilding;
+
+    private static string UnitTypeFor(BenchKind kind, int index)
     {
         string[] factory = [UnitType.Purchase, UnitType.Manufacturing, UnitType.Storage, UnitType.B2BSales, UnitType.Branding];
         string[] shop = [UnitType.Purchase, UnitType.PublicSales, UnitType.Marketing, UnitType.Storage];
-        var set = isShop ? shop : factory;
+        string[] mine = [UnitType.Mining, UnitType.Storage, UnitType.Mining, UnitType.B2BSales];
+        string[] research = [UnitType.ProductQuality, UnitType.BrandQuality, UnitType.Storage];
+        var set = kind switch
+        {
+            BenchKind.Shop => shop,
+            BenchKind.Mine => mine,
+            BenchKind.Research => research,
+            _ => factory,
+        };
         return set[index % set.Length];
     }
 
