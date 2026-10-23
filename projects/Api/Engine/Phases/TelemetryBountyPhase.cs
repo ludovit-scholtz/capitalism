@@ -107,7 +107,7 @@ public sealed class TelemetryBountyPhase(
             .ToHashSet();
 
         // Include tracked-but-not-yet-saved history entries from this tick.
-        foreach (var entry in context.Db.ChangeTracker.Entries<BuildingUnitResourceHistory>())
+        foreach (var entry in context.Db.ChangeTracker.TrackedEntriesWithoutDetection<BuildingUnitResourceHistory>())
         {
             var history = entry.Entity;
             if (history.ProducedQuantity <= 0 || history.Tick != context.CurrentTick)
@@ -147,7 +147,7 @@ public sealed class TelemetryBountyPhase(
 
         // PublicSalesPhase writes records in this tick before SaveChanges.
         // Include added/modified tracked entries so wholesaler bounty can trigger immediately.
-        foreach (var entry in context.Db.ChangeTracker.Entries<PublicSalesRecord>())
+        foreach (var entry in context.Db.ChangeTracker.TrackedEntriesWithoutDetection<PublicSalesRecord>())
         {
             if (entry.State is not (EntityState.Added or EntityState.Modified))
             {
