@@ -150,6 +150,9 @@ public sealed partial class PublicSalesPhase : ITickPhase
         // ── Phase 2: Distribute demand per (city, product) among competing sellers ──
         var grouped = offers.GroupBy(o => (o.CityId, o.ItemId));
 
+        // Previous-tick sales per (city, item) for the price-spike signal: one query for all groups instead of one per group (#646).
+        var previousTickMarket = await LoadPreviousTickMarketAsync(context, offers.Select(o => o.CityId).Distinct().ToList());
+
         // Track actual sales per unit to enforce sales capacity across products.
         var unitSoldTotals = new Dictionary<Guid, decimal>();
 
@@ -253,6 +256,8 @@ public sealed partial class PublicSalesPhase : ITickPhase
             // Track group-level totals for trend evolution after all offers are processed.
             decimal groupTotalSold = 0m;
             decimal groupTotalCapacity = 0m;
+            decimal groupRecordedQuantity = 0m;
+            decimal groupRecordedRevenue = 0m;
 
             foreach (var offer in groupList)
             {
@@ -344,6 +349,9 @@ public sealed partial class PublicSalesPhase : ITickPhase
                     TrendFactor = trendFactor,
                 });
 
+                groupRecordedQuantity += sold;
+                groupRecordedRevenue += sold * offer.Price;
+
                 context.RecordUnitResourceHistory(
                     offer.Building.Id,
                     offer.Unit.Id,
@@ -355,13 +363,15 @@ public sealed partial class PublicSalesPhase : ITickPhase
                 unitSoldTotals[offer.Unit.Id] = unitSoldSoFar + sold;
             }
 
-            await EmitMarketSignalNotificationsAsync(
+            EmitMarketSignalNotifications(
                 context,
                 city,
                 itemId,
                 groupList,
                 effectiveCityDemand,
-                groupTotalSold);
+                groupTotalSold,
+                new MarketWindow(groupRecordedQuantity, groupRecordedRevenue),
+                previousTickMarket);
 
             // ── Trend evolution ──────────────────────────────────────────────────
             // Update the trend factor based on how well this group performed.
