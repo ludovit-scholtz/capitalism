@@ -1,5 +1,5 @@
 {
-  "generatedAtUtc": "2026-10-18T17:07:22.7442451Z",
+  "generatedAtUtc": "2026-10-23T19:25:16.1436664Z",
   "operations": [
     {
       "kind": "mutation",
@@ -702,6 +702,7 @@
         "hasNegativeCoverage": true,
         "hasPositiveCoverage": true,
         "negativeTests": [
+          "FinishOnboarding_ForeignOrMissingOnboardingCompany_IsUniformAndAudited",
           "FinishOnboarding_Electronics_AsNonProUser_ProductAccessDenied",
           "FinishOnboarding_Construction_AsNonProUser_ProductAccessDenied",
           "FinishOnboarding_Pharmaceuticals_AsNonProUser_ProductAccessDenied",
@@ -867,11 +868,14 @@
         "hasNegativeCoverage": true,
         "hasPositiveCoverage": true,
         "negativeTests": [
-          "GenerateApiKey_Unauthenticated_ReturnsError"
+          "GenerateApiKey_Unauthenticated_ReturnsError",
+          "GenerateApiKey_ForeignAndMissingCompany_AreUniformAndAudited",
+          "GenerateApiKey_MixedOwnedAndForeignCompany_AuditsEachBadId"
         ],
         "positiveTests": [
           "GenerateApiKey_Authenticated_ReturnsPlaintextKeyAndRecord",
-          "GenerateApiKey_EmptyName_ReturnsValidationError"
+          "GenerateApiKey_EmptyName_ReturnsValidationError",
+          "GenerateApiKey_OwnCompany_StillSucceeds"
         ]
       }
     },
@@ -1250,9 +1254,14 @@
       "hasExplicitAuthorize": false,
       "coverage": {
         "hasNegativeCoverage": false,
-        "hasPositiveCoverage": false,
+        "hasPositiveCoverage": true,
         "negativeTests": [],
-        "positiveTests": []
+        "positiveTests": [
+          "PostBridgedChatMessage_WrongKey_IsRejectedWithItsOwnCode",
+          "PostBridgedChatMessage_CorrectKeys_DeliversTheMessage",
+          "PostBridgedChatMessage_OverTheChatRateLimit_IsRateLimited",
+          "PostBridgedChatMessage_RateLimitIsPerPlayer"
+        ]
       }
     },
     {
@@ -1302,6 +1311,7 @@
         "hasPositiveCoverage": true,
         "negativeTests": [
           "PurchaseLot_Unauthenticated_ReturnsAuthorizationError",
+          "PurchaseLot_ForeignAndMissingCompany_AreUniformAndAudited",
           "PurchaseLot_Unauthenticated_Fails"
         ],
         "positiveTests": [
@@ -2723,6 +2733,29 @@
     },
     {
       "kind": "query",
+      "methodName": "GetAwaySummary",
+      "graphQlName": "awaySummary",
+      "domain": "other",
+      "sourceFile": "C:/Users/ludovit.scholtz/source/repos/scholtz/capitalism/projects/Api/Types/Query.AwaySummary.cs",
+      "hasExplicitAuthorize": true,
+      "coverage": {
+        "hasNegativeCoverage": true,
+        "hasPositiveCoverage": true,
+        "negativeTests": [
+          "AwaySummary_Unauthenticated_IsRejected",
+          "AwaySummary_ConvertsForeignCurrencyEntriesToUsd"
+        ],
+        "positiveTests": [
+          "AwaySummary_CountsOnlyEntriesAfterTheSinceTickUpToNow",
+          "AwaySummary_NeverIncludesAnotherPlayersLedger",
+          "AwaySummary_WithASinceTickInTheFuture_ReportsNothing",
+          "AwaySummary_LooksBackAtMostTheMaximumWindow",
+          "AwaySummary_ForAPlayerWithoutCompanies_IsZero"
+        ]
+      }
+    },
+    {
+      "kind": "query",
       "methodName": "GetBankDepositRateHistory",
       "graphQlName": "bankDepositRateHistory",
       "domain": "finance",
@@ -3192,6 +3225,7 @@
           "CityUnlockStatus_ReturnsLocked_WhenCompanyNetWorthIsBelowThreshold",
           "CityUnlockStatus_ReturnsUnlocked_WhenCompanyNetWorthMeetsThreshold",
           "PurchaseLot_Berlin_ReturnsCityLocked_ForNewCompanyBelowThreshold",
+          "CityUnlockStatus_SubtractsOutstandingLoanPrincipalFromNetWorth",
           "AppDbInitializer_CityUnlockRequirementsRemainIdempotent",
           "StartOnboardingCompany_Warsaw_IsAcceptedAsStartingCity",
           "CompanyCityFinancialBreakdown_ReturnsPerCityRevenueCostsAndProfit",
@@ -3635,7 +3669,8 @@
         "negativeTests": [],
         "positiveTests": [
           "CityUnlockStatus_ReturnsLocked_WhenCompanyNetWorthIsBelowThreshold",
-          "CityUnlockStatus_ReturnsUnlocked_WhenCompanyNetWorthMeetsThreshold"
+          "CityUnlockStatus_ReturnsUnlocked_WhenCompanyNetWorthMeetsThreshold",
+          "CityUnlockStatus_SubtractsOutstandingLoanPrincipalFromNetWorth"
         ]
       }
     },
@@ -4688,6 +4723,7 @@
         "hasPositiveCoverage": true,
         "negativeTests": [
           "PurchaseLot_Unauthenticated_ReturnsAuthorizationError",
+          "PurchaseLot_ForeignAndMissingCompany_AreUniformAndAudited",
           "PurchaseLot_Unauthenticated_Fails"
         ],
         "positiveTests": [
@@ -4930,6 +4966,10 @@
           "InitiateBaseDeposit_EurCity_Requires10mEur",
           "BankInterestTick_CreatesDedicatedBankStatementRowsPerTick",
           "PersonAccount_IncludesDepositInterestPaymentsWithTickAndCurrency",
+          "PostBridgedChatMessage_WrongKey_IsRejectedWithItsOwnCode",
+          "PostBridgedChatMessage_CorrectKeys_DeliversTheMessage",
+          "PostBridgedChatMessage_OverTheChatRateLimit_IsRateLimited",
+          "PostBridgedChatMessage_RateLimitIsPerPlayer",
           "SuspendedBuilding_AfterFunding_ManufacturingResumes",
           "LoanMissedPayment_WithCollateral_AutoListsBuildingForSale_AndNotifiesBorrower",
           "LoanMissedPayment_WithCrossCurrencyCollateral_AutoListUsesBuildingCurrencyPrice",
@@ -5243,6 +5283,10 @@
           "TelemetryBountyPhase_BankerOwnDeposit_DoesNotCountAsExternalDeposit",
           "TelemetryBountyPhase_DoesNotWaitForTelemetryDispatch",
           "GoodEmployer_TwoEmployersPayingTheSame_NobodyHasAClearLead",
+          "TelemetryBountyPhase_OnASkippedTick_ReportsNothing",
+          "TelemetryBountyPhase_OnARunTick_SeesASaleFromASkippedTickInTheWindow",
+          "TelemetryBountyPhase_IgnoresASaleThatAnEarlierRunAlreadyCovered",
+          "TickTimingStore_SavingTheSameTickTwice_UpdatesTheRow",
           "ProcessTick_IncrementsTick",
           "ResourceMovement_PushesToLinkedStorage",
           "UnitResourceHistory_TracksManufacturingAndStorageMovement",
