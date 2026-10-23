@@ -1,4 +1,5 @@
 using Api.Data.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace Api.Engine.Phases;
 
@@ -20,11 +21,40 @@ public sealed class RentPhase : ITickPhase
     public string Name => "Rent";
     public int Order => 900;
 
-    public Task ProcessAsync(TickContext context)
+    /// <summary>Rows of the income history kept per building (the sparkline reads the last 100 ticks).</summary>
+    public const int HistoryRetentionTicks = 100;
+
+    /// <summary>History older than <see cref="HistoryRetentionTicks"/> is deleted once per in-game day.</summary>
+    public const int HistoryPruneIntervalTicks = 24;
+
+    public async Task ProcessAsync(TickContext context)
     {
         ProcessBuildingType(context, BuildingType.Apartment);
         ProcessBuildingType(context, BuildingType.Commercial);
-        return Task.CompletedTask;
+        await PruneOldHistoryAsync(context);
+    }
+
+    /// <summary>
+    /// One delete for all buildings instead of a <c>DbSet.Local</c> lookup per building: every <c>Local</c> access runs a full
+    /// change-detection pass over all tracked entities, and <c>Local</c> only ever held the rows added in this very tick, so the old
+    /// per-building prune never deleted anything (#646).
+    /// </summary>
+    private static async Task PruneOldHistoryAsync(TickContext context)
+    {
+        if (context.CurrentTick % HistoryPruneIntervalTicks != 0)
+        {
+            return;
+        }
+
+        var threshold = context.CurrentTick - HistoryRetentionTicks;
+        if (context.Db.Database.IsRelational())
+        {
+            await context.Db.RentalIncomeRecords.Where(record => record.Tick < threshold).ExecuteDeleteAsync();
+        }
+        else
+        {
+            context.Db.RentalIncomeRecords.RemoveRange(await context.Db.RentalIncomeRecords.Where(record => record.Tick < threshold).ToListAsync());
+        }
     }
 
     private static void ProcessBuildingType(TickContext context, string buildingType)
@@ -135,13 +165,6 @@ public sealed class RentPhase : ITickPhase
                 RentPerSqm = building.PricePerSqm.Value,
                 CurrencyCode = currencyCode
             });
-
-            // Prune old records — keep only the last 100 ticks per building.
-            var pruneThreshold = context.CurrentTick - 100;
-            var old = context.Db.RentalIncomeRecords.Local
-                .Where(r => r.BuildingId == building.Id && r.Tick < pruneThreshold)
-                .ToList();
-            foreach (var rec in old) context.Db.RentalIncomeRecords.Remove(rec);
 
             // ── Occupancy adjustment ────────────────────────────────────────────────
             var priceRatio = building.PricePerSqm.Value / adjustedMarketRate;
