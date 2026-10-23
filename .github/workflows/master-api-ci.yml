@@ -5,6 +5,8 @@ on:
     paths:
       - 'projects/MasterApi/**'
       - 'projects/MasterApi.Tests/**'
+      # The master server imports CHANGELOG.csv into its news feed and tests read it, so a changelog row can break them (it did at 500 rows).
+      - 'CHANGELOG.csv'
       - '.github/workflows/master-api-ci.yml'
   push:
     branches:
@@ -12,6 +14,8 @@ on:
     paths:
       - 'projects/MasterApi/**'
       - 'projects/MasterApi.Tests/**'
+      # The master server imports CHANGELOG.csv into its news feed and tests read it, so a changelog row can break them (it did at 500 rows).
+      - 'CHANGELOG.csv'
       - '.github/workflows/master-api-ci.yml'
 
 env:
