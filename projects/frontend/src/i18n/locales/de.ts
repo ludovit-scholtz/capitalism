@@ -3314,6 +3314,15 @@ export default {
       action: 'Gebäude kaufen',
     },
   },
+  awaySummary: {
+    title: 'Während Ihrer Abwesenheit',
+    period: 'In den letzten {duration}',
+    revenue: 'Umsatz',
+    costs: 'Laufende Kosten',
+    net: 'Nettoergebnis',
+    loanPayments: 'Geleistete Kreditraten',
+    continue: 'Weiter',
+  },
   advisor: {
     title: 'Berater',
     dismiss: 'Ausblenden',

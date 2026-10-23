@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import AppHeader from '@/components/layout/AppHeader.vue'
@@ -8,6 +8,7 @@ import ChatSidePanel from '@/components/layout/ChatSidePanel.vue'
 import { usePwa } from '@/composables/usePwa'
 import { useAuthStore } from '@/stores/auth'
 import { useGameStateStore } from '@/stores/gameState'
+import { useLastSeenTickRecorder } from '@/composables/useAwaySummary'
 import { usesStore } from '@/stores/news'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useGameAdminStore } from '@/stores/gameAdmin'
@@ -33,6 +34,7 @@ const signedOutNoticeVisible = ref(false)
 const cityUnlockToast = ref<{ id: string; title: string; message: string } | null>(null)
 const SIGNED_OUT_TOAST_DURATION_MS = 4_000
 gameStateStore.start()
+useLastSeenTickRecorder(computed(() => gameState.value?.currentTick ?? null))
 let citySwitchToastTimer: ReturnType<typeof setTimeout> | null = null
 let signedOutToastTimer: ReturnType<typeof setTimeout> | null = null
 let cityUnlockToastTimer: ReturnType<typeof setTimeout> | null = null

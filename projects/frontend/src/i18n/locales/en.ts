@@ -3308,6 +3308,15 @@ export default {
       action: 'Buy building',
     },
   },
+  awaySummary: {
+    title: 'While you were away',
+    period: 'Over the last {duration}',
+    revenue: 'Revenue',
+    costs: 'Running costs',
+    net: 'Net result',
+    loanPayments: 'Loan payments made',
+    continue: 'Continue',
+  },
   advisor: {
     title: 'Advisor',
     dismiss: 'Dismiss',
