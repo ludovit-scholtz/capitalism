@@ -1389,79 +1389,37 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
         #region Game administration service
 
                 [Fact]
-                public async Task GameNewsFeed_IncludesSeededGlobalChangelogEntry()
-                {
-                        var result = await GraphQlAsync("""
-                                query Feed($input: GetGameNewsFeedInput!) {
-                                    gameNewsFeed(input: $input) {
-                                        items {
-                                            entryType
-                                            status
-                                            localizations {
-                                                locale
-                                                title
-                                            }
-                                        }
-                                    }
-                                }
-                                """,
-                                new
-                                {
-                                        input = new
-                                        {
-                                                registrationKey = "test-registration-key",
-                                                serverKey = "capitalism-local",
-                                                includeDrafts = false,
-                                                limit = 500,
-                                        }
-                                });
+        public async Task GameNewsFeed_IncludesSeededGlobalChangelogEntry()
+        {
+            // The feed returns at most the newest 500 entries per type and CHANGELOG.csv has outgrown that, so older imported entries
+            // are checked in the database (which is what this guards: the CSV import) instead of through the capped feed.
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
 
-                        Assert.False(result.TryGetProperty("errors", out _));
-                        var items = result.GetProperty("data").GetProperty("gameNewsFeed").GetProperty("items").EnumerateArray().ToList();
-        Assert.Contains(
-                items,
-                item => item.GetProperty("entryType").GetString() == "CHANGELOG"
-                        && item.GetProperty("status").GetString() == "PUBLISHED"
-                        && item.GetProperty("localizations").EnumerateArray().Any(localization =>
-                                localization.GetProperty("locale").GetString() == "en"
-                                && localization.GetProperty("title").GetString() == "Game administration and newsroom launched"));
-                }
+            var found = await db.GameNewsEntries
+                .AsNoTracking()
+                .Where(entry => entry.EntryType == GameNewsEntryType.Changelog && entry.Status == GameNewsEntryStatus.Published)
+                .SelectMany(entry => entry.Localizations)
+                .AnyAsync(localization => localization.Locale == "en" && localization.Title == "Game administration and newsroom launched");
+
+            Assert.True(found, "Expected the imported changelog to contain an English entry matching 'Game administration and newsroom launched'.");
+        }
 
         [Fact]
         public async Task GameNewsFeed_IncludesDirectionalLinksChangelogEntry()
         {
-            var result = await GraphQlAsync("""
-                query Feed($input: GetGameNewsFeedInput!) {
-                    gameNewsFeed(input: $input) {
-                        items {
-                            entryType
-                            status
-                            localizations { locale title }
-                        }
-                    }
-                }
-                """,
-                new
-                {
-                    input = new
-                    {
-                        registrationKey = "test-registration-key",
-                        serverKey = "capitalism-local",
-                        includeDrafts = false,
-                        limit = 500,
-                    }
-                });
+            // The feed returns at most the newest 500 entries per type and CHANGELOG.csv has outgrown that, so older imported entries
+            // are checked in the database (which is what this guards: the CSV import) instead of through the capped feed.
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
 
-            Assert.False(result.TryGetProperty("errors", out _));
-            var items = result.GetProperty("data").GetProperty("gameNewsFeed").GetProperty("items").EnumerateArray().ToList();
-            Assert.Contains(
-                items,
-                item => item.GetProperty("entryType").GetString() == "CHANGELOG"
-                    && item.GetProperty("status").GetString() == "PUBLISHED"
-                    && item.GetProperty("localizations").EnumerateArray().Any(localization =>
-                        localization.GetProperty("locale").GetString() == "en"
-                        && (localization.GetProperty("title").GetString() ?? string.Empty)
-                               .Contains("directional links", StringComparison.OrdinalIgnoreCase)));
+            var found = await db.GameNewsEntries
+                .AsNoTracking()
+                .Where(entry => entry.EntryType == GameNewsEntryType.Changelog && entry.Status == GameNewsEntryStatus.Published)
+                .SelectMany(entry => entry.Localizations)
+                .AnyAsync(localization => localization.Locale == "en" && localization.Title.Contains("directional links", StringComparison.OrdinalIgnoreCase));
+
+            Assert.True(found, "Expected the imported changelog to contain an English entry matching 'directional links'.");
         }
 
         [Fact]
@@ -1504,38 +1462,18 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
         [Fact]
         public async Task GameNewsFeed_IncludesNewspaperChangelogRestoredEntry()
         {
-            var result = await GraphQlAsync("""
-                query Feed($input: GetGameNewsFeedInput!) {
-                    gameNewsFeed(input: $input) {
-                        items {
-                            entryType
-                            status
-                            localizations { locale title }
-                        }
-                    }
-                }
-                """,
-                new
-                {
-                    input = new
-                    {
-                        registrationKey = "test-registration-key",
-                        serverKey = "capitalism-local",
-                        includeDrafts = false,
-                        limit = 500,
-                    }
-                });
+            // The feed returns at most the newest 500 entries per type and CHANGELOG.csv has outgrown that, so older imported entries
+            // are checked in the database (which is what this guards: the CSV import) instead of through the capped feed.
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
 
-            Assert.False(result.TryGetProperty("errors", out _));
-            var items = result.GetProperty("data").GetProperty("gameNewsFeed").GetProperty("items").EnumerateArray().ToList();
-            Assert.Contains(
-                items,
-                item => item.GetProperty("entryType").GetString() == "CHANGELOG"
-                    && item.GetProperty("status").GetString() == "PUBLISHED"
-                    && item.GetProperty("localizations").EnumerateArray().Any(localization =>
-                        localization.GetProperty("locale").GetString() == "en"
-                        && (localization.GetProperty("title").GetString() ?? string.Empty)
-                               .Contains("Newspaper and changelog", StringComparison.OrdinalIgnoreCase)));
+            var found = await db.GameNewsEntries
+                .AsNoTracking()
+                .Where(entry => entry.EntryType == GameNewsEntryType.Changelog && entry.Status == GameNewsEntryStatus.Published)
+                .SelectMany(entry => entry.Localizations)
+                .AnyAsync(localization => localization.Locale == "en" && localization.Title.Contains("Newspaper and changelog", StringComparison.OrdinalIgnoreCase));
+
+            Assert.True(found, "Expected the imported changelog to contain an English entry matching 'Newspaper and changelog'.");
         }
 
         [Fact]
