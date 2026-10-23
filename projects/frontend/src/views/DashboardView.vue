@@ -15,6 +15,7 @@ import { getActiveCompany } from '@/lib/accountContext'
 import { formatInGameTime } from '@/lib/gameTime'
 import TutorialTooltip from '@/components/ui/TutorialTooltip.vue'
 import DashboardMainContent from '@/components/dashboard/DashboardMainContent.vue'
+import FirstWeekCampaignCard from '@/components/dashboard/FirstWeekCampaignCard.vue'
 import type {
   Company,
   GameState,
@@ -395,6 +396,8 @@ function handleCompanyLaunched() {
         <span v-if="tickCountdown" class="tick-clock-countdown text-[0.9375rem] font-bold text-brand tabular-nums" role="timer">{{ tickCountdown }}</span>
       </div>
     </div>
+
+    <FirstWeekCampaignCard v-if="!loading && !error" :company-id="getActiveCompany(auth.player, companies)?.id ?? null" />
 
     <div v-if="loading" class="text-center py-12 text-muted">{{ t('common.loading') }}</div>
 

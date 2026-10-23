@@ -3308,6 +3308,57 @@ export default {
       action: 'Buy building',
     },
   },
+  firstWeekCampaign: {
+    title: 'Your first week',
+    subtitle: 'Day {day} of {total}',
+    stripLabel: 'First week progress',
+    dayLabel: 'Day {day}',
+    dayState: {
+      claimed: 'reward claimed',
+      claimable: 'reward ready',
+      open: 'in progress',
+      locked: 'locked',
+    },
+    progress: '{progress} of {target} done',
+    reward: 'Reward: {amount}',
+    claim: 'Claim reward',
+    claiming: 'Claiming…',
+    claimed: 'Reward of {amount} added to your company account.',
+    claimFailed: 'The reward could not be claimed. Try again in a moment.',
+    goThere: 'Go there',
+    comeBack: 'All current goals are done. The goal for day {day} unlocks tomorrow.',
+    allDone: 'All goals are done.',
+    goals: {
+      FIRST_SALE: {
+        title: 'Make your first sale',
+        description: 'Get a customer to buy one of your products from a sales shop.',
+      },
+      SECOND_BUILDING: {
+        title: 'Own two buildings',
+        description: 'Buy a second building so your supply chain can grow.',
+      },
+      TAKE_A_LOAN: {
+        title: 'Take your first loan',
+        description: 'Borrow from a bank to fund growth, and repay it on time to keep your credit healthy.',
+      },
+      FIRST_B2B_TRADE: {
+        title: 'Trade with another company',
+        description: 'Buy or sell goods with another company through a contract or the exchange.',
+      },
+      BUILD_A_BRAND: {
+        title: 'Build a brand',
+        description: 'Establish a brand for one of your products so customers learn to recognise it.',
+      },
+      SCOUT_COMPETITORS: {
+        title: 'Scout a competitor',
+        description: 'Look at what a competitor sells in a city to see how you compare.',
+      },
+      GROW_TO_THREE_BUILDINGS: {
+        title: 'Grow to three buildings',
+        description: 'Expand your company to three buildings to finish the first week.',
+      },
+    },
+  },
   bank: {
     title: 'Bank',
     banks: 'Banks',
