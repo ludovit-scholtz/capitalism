@@ -290,8 +290,7 @@ public sealed class ManufacturingPhase : ITickPhase
             return;
         }
 
-        if (PlayerNotificationService.HasUnreadDuplicate(
-            context.Db,
+        if (context.HasUnreadNotification(
             company.PlayerId,
             PlayerNotificationType.ProductionHalted,
             relatedEntityId: unit.Id,

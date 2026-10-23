@@ -146,8 +146,7 @@ public sealed class CityExpansionUnlockPhase : ITickPhase
 
                 existingUnlockSet.Add((company.Id, city.Id));
 
-                if (!PlayerNotificationService.HasUnreadDuplicate(
-                        context.Db,
+                if (!context.HasUnreadNotification(
                         company.PlayerId,
                         PlayerNotificationType.CityExpansionUnlocked,
                         relatedEntityId: city.Id,

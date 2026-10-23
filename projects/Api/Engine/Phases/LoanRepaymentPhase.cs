@@ -386,8 +386,7 @@ public sealed class LoanRepaymentPhase : ITickPhase
 
             if (loan.Status == LoanStatus.Defaulted
                 && previousStatus != LoanStatus.Defaulted
-                && !PlayerNotificationService.HasUnreadDuplicate(
-                    context.Db,
+                && !context.HasUnreadNotification(
                     borrower.PlayerId,
                     PlayerNotificationType.LoanDefault,
                     relatedEntityId: loan.Id,
