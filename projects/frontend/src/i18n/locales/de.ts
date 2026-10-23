@@ -3314,6 +3314,30 @@ export default {
       action: 'Gebäude kaufen',
     },
   },
+  advisor: {
+    title: 'Berater',
+    dismiss: 'Ausblenden',
+    openBuilding: 'Gebäude öffnen',
+    rules: {
+      OUT_OF_STOCK_SHOP: {
+        title: '{building} ist ausverkauft',
+        bodyNoPurchase: 'Seit {duration} gibt es nichts zu verkaufen. Fügen Sie eine Einkaufseinheit hinzu, damit das Geschäft wieder beliefert wird.',
+        bodyWithPurchase: 'Seit {duration} gibt es nichts zu verkaufen. Prüfen Sie, ob die Einkaufseinheit verbunden und konfiguriert ist und einen Lieferanten hat.',
+      },
+      FACTORY_NO_INPUTS: {
+        title: '{building} hat keine Rohstoffe',
+        body: 'Die Produktion ist seit {duration} blockiert. Verbinden Sie eine Einkaufseinheit mit der Fertigungseinheit und prüfen Sie die Lieferantenpreise.',
+      },
+      SHOP_NO_DEMAND: {
+        title: '{building} verkauft nichts',
+        body: 'Ware ist vorhanden, aber seit {duration} wurde nichts verkauft. Versuchen Sie einen niedrigeren Preis oder ein anderes Produkt.',
+      },
+      UNCONFIGURED_UNIT: {
+        title: '{building} hat eine nicht konfigurierte Einheit',
+        body: 'Eine Einheit wartet seit {duration} auf ein Produkt oder einen Rohstoff. Konfigurieren Sie sie, damit sie arbeiten kann.',
+      },
+    },
+  },
   firstWeekCampaign: {
     title: 'Ihre erste Woche',
     subtitle: 'Tag {day} von {total}',

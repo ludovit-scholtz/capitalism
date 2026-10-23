@@ -3302,6 +3302,30 @@ export default {
       action: 'Kúpiť budovu',
     },
   },
+  advisor: {
+    title: 'Poradca',
+    dismiss: 'Skryť',
+    openBuilding: 'Otvoriť budovu',
+    rules: {
+      OUT_OF_STOCK_SHOP: {
+        title: '{building} nemá tovar',
+        bodyNoPurchase: 'Už {duration} nemá čo predávať. Pridajte nákupnú jednotku, aby sa predajňa mohla zásobiť.',
+        bodyWithPurchase: 'Už {duration} nemá čo predávať. Skontrolujte, či je jej nákupná jednotka prepojená, nastavená a má dodávateľa.',
+      },
+      FACTORY_NO_INPUTS: {
+        title: '{building} nemá suroviny',
+        body: 'Výroba je zablokovaná už {duration}. Prepojte nákupnú jednotku s výrobnou jednotkou a skontrolujte ceny dodávateľov.',
+      },
+      SHOP_NO_DEMAND: {
+        title: '{building} nepredáva',
+        body: 'Tovar je k dispozícii, ale {duration} sa nič nepredalo. Skúste nižšiu cenu alebo iný produkt.',
+      },
+      UNCONFIGURED_UNIT: {
+        title: '{building} má nenastavenú jednotku',
+        body: 'Jednotka čaká na produkt alebo surovinu už {duration}. Nastavte ju, aby mohla začať pracovať.',
+      },
+    },
+  },
   firstWeekCampaign: {
     title: 'Váš prvý týždeň',
     subtitle: 'Deň {day} zo {total}',

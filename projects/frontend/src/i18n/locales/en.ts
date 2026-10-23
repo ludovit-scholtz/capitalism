@@ -3308,6 +3308,30 @@ export default {
       action: 'Buy building',
     },
   },
+  advisor: {
+    title: 'Advisor',
+    dismiss: 'Dismiss',
+    openBuilding: 'Open building',
+    rules: {
+      OUT_OF_STOCK_SHOP: {
+        title: '{building} is out of stock',
+        bodyNoPurchase: 'It has had nothing to sell for {duration}. Add a purchase unit so the shop can restock.',
+        bodyWithPurchase: 'It has had nothing to sell for {duration}. Check that its purchase unit is linked, configured and has a supplier.',
+      },
+      FACTORY_NO_INPUTS: {
+        title: '{building} has no raw materials',
+        body: 'Production has been blocked for {duration}. Link a purchase unit to the manufacturing unit and check the supplier prices.',
+      },
+      SHOP_NO_DEMAND: {
+        title: '{building} is not selling',
+        body: 'Stock is available but nothing has sold for {duration}. Try a lower price or a different product.',
+      },
+      UNCONFIGURED_UNIT: {
+        title: '{building} has an unconfigured unit',
+        body: 'A unit has been waiting for a product or resource for {duration}. Configure it so it can start working.',
+      },
+    },
+  },
   firstWeekCampaign: {
     title: 'Your first week',
     subtitle: 'Day {day} of {total}',

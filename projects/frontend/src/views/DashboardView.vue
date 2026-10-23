@@ -16,6 +16,7 @@ import { formatInGameTime } from '@/lib/gameTime'
 import TutorialTooltip from '@/components/ui/TutorialTooltip.vue'
 import DashboardMainContent from '@/components/dashboard/DashboardMainContent.vue'
 import FirstWeekCampaignCard from '@/components/dashboard/FirstWeekCampaignCard.vue'
+import AdvisorCard from '@/components/dashboard/AdvisorCard.vue'
 import type {
   Company,
   GameState,
@@ -398,6 +399,7 @@ function handleCompanyLaunched() {
     </div>
 
     <FirstWeekCampaignCard v-if="!loading && !error" :company-id="getActiveCompany(auth.player, companies)?.id ?? null" />
+    <AdvisorCard v-if="!loading && !error" :buildings="getActiveCompany(auth.player, companies)?.buildings ?? []" :statuses="buildingUnitStatuses" />
 
     <div v-if="loading" class="text-center py-12 text-muted">{{ t('common.loading') }}</div>
 
