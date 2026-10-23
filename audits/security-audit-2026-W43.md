@@ -42,7 +42,7 @@ Can one player gain an unfair advantage over another player by executing an API 
 - **Affected endpoint or mechanic:** `CityUnlockService.ComputeCompanyNetWorthUsd`, used by the live gate in `GetStatusForCityAsync` (lot purchase, onboarding helpers, `cityUnlockStatus`) and by `CityExpansionUnlockPhase`.
 - **Risk description:** Net worth is bank balances plus building, lot and inventory value, with no deduction for outstanding loans, while collateral lending credits the borrower's account in full. A company just under a city's threshold can borrow against a building, pass the live check and buy a lot there. Owning that lot adds the city to the owned-city set, which counts as unlocked, so the access outlives the loan. A player who stays honest about net worth is therefore at a disadvantage to one who borrows to cross the line.
 - **Recommended fix:** Subtract the remaining principal of active loans (in USD) in a shared helper used by both callers, and stop treating a lot bought after the change as proof of unlock. Tests: just-below-threshold company that takes a loan is rejected on `buyLot`; repaying changes nothing; already-unlocked companies keep access.
-- **Status:** Open <!-- issue: #654 -->
+- **Status:** Fixed in #657 (outstanding loan principal is now subtracted from net worth) <!-- issue: #654 -->
 
 ### 2) First-week campaign rewards scale with account count
 
