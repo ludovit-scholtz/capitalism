@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using System.Security.Cryptography;
+using System.Text;
 using Api.Configuration;
 using Api.Data;
 using Api.Data.Entities;
@@ -24,11 +26,12 @@ public sealed partial class Mutation
         [Service] AppDbContext db,
         [Service] IOptions<MasterServerRegistrationOptions> options,
         [Service] BridgedChatMessageTracker bridgedTracker,
-        [Service] ITopicEventSender topicEventSender)
+        [Service] ITopicEventSender topicEventSender,
+        [Service] IChatRateLimitService rateLimitService)
     {
         var expectedRegistrationKey = options.Value.RegistrationKey.Trim();
         if (string.IsNullOrWhiteSpace(expectedRegistrationKey)
-            || !string.Equals(expectedRegistrationKey, input.RegistrationKey?.Trim(), StringComparison.Ordinal))
+            || !KeysMatch(expectedRegistrationKey, input.RegistrationKey))
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -39,7 +42,7 @@ public sealed partial class Mutation
 
         var expectedServerKey = options.Value.ServerKey.Trim();
         if (string.IsNullOrWhiteSpace(expectedServerKey)
-            || !string.Equals(expectedServerKey, input.ServerKey?.Trim(), StringComparison.Ordinal))
+            || !KeysMatch(expectedServerKey, input.ServerKey))
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -75,6 +78,18 @@ public sealed partial class Mutation
         {
             // The player has no presence on this shard; nothing to post here.
             return new PostBridgedChatMessagePayload { Delivered = false };
+        }
+
+        // Same per-player limit as sendChatMessage, so a leaked bridge key cannot flood the chat (#658).
+        var (isAllowed, retryAfterSeconds) = rateLimitService.TryRecord(player.Id);
+        if (!isAllowed)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("This player is sending messages too fast. Please wait a moment.")
+                    .SetCode("RATE_LIMITED")
+                    .SetExtension("retryAfter", retryAfterSeconds)
+                    .Build());
         }
 
         var chatMessage = new ChatMessage
@@ -114,6 +129,12 @@ public sealed partial class Mutation
 
         return new PostBridgedChatMessagePayload { Delivered = true };
     }
+
+    /// <summary>Constant-time comparison of a shared secret so response timing does not reveal how much of a guessed key matched (#658).</summary>
+    private static bool KeysMatch(string expected, string? provided)
+        => CryptographicOperations.FixedTimeEquals(
+            Encoding.UTF8.GetBytes(expected),
+            Encoding.UTF8.GetBytes(provided?.Trim() ?? string.Empty));
 }
 
 public sealed class PostBridgedChatMessageInput
