@@ -9,8 +9,20 @@ public sealed partial class AppDbContext
 {
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
-        EnsureLedgerEntryBankAccountIdsAsync(CancellationToken.None).GetAwaiter().GetResult();
-        return base.SaveChanges(acceptAllChangesOnSuccess);
+        var autoDetectChanges = BeginSingleChangeDetection();
+        try
+        {
+            if (EnsureLedgerEntryBankAccountIdsAsync(CancellationToken.None).GetAwaiter().GetResult())
+            {
+                ChangeTracker.DetectChanges();
+            }
+
+            return base.SaveChanges(acceptAllChangesOnSuccess);
+        }
+        finally
+        {
+            ChangeTracker.AutoDetectChangesEnabled = autoDetectChanges;
+        }
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
@@ -18,15 +30,45 @@ public sealed partial class AppDbContext
 
     public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
-        await EnsureLedgerEntryBankAccountIdsAsync(cancellationToken);
-        return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        var autoDetectChanges = BeginSingleChangeDetection();
+        try
+        {
+            if (await EnsureLedgerEntryBankAccountIdsAsync(cancellationToken))
+            {
+                ChangeTracker.DetectChanges();
+            }
+
+            return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+        finally
+        {
+            ChangeTracker.AutoDetectChangesEnabled = autoDetectChanges;
+        }
     }
 
-    private async Task EnsureLedgerEntryBankAccountIdsAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Every <c>ChangeTracker.Entries</c> call and the save itself would each walk all tracked entities (about 0.2 s for the ~78,000 of a
+    /// large tick). On a relational provider this detects changes once, then turns automatic detection off for the rest of the save and
+    /// returns the previous setting for the caller to restore (#646).
+    /// </summary>
+    private bool BeginSingleChangeDetection()
+    {
+        var autoDetectChanges = ChangeTracker.AutoDetectChangesEnabled;
+        if (autoDetectChanges && Database.IsRelational())
+        {
+            ChangeTracker.DetectChanges();
+            ChangeTracker.AutoDetectChangesEnabled = false;
+        }
+
+        return autoDetectChanges;
+    }
+
+    /// <returns>True when the hook changed a ledger row that was already tracked as unchanged or modified, so the save must detect that change.</returns>
+    private async Task<bool> EnsureLedgerEntryBankAccountIdsAsync(CancellationToken cancellationToken)
     {
         if (!Database.IsRelational())
         {
-            return;
+            return false;
         }
 
         var pendingEntries = ChangeTracker
@@ -36,8 +78,10 @@ public sealed partial class AppDbContext
 
         if (pendingEntries.Count == 0)
         {
-            return;
+            return false;
         }
+
+        var modifiedExistingRows = pendingEntries.Any(entry => entry.State == EntityState.Modified);
 
         // First pass: fill from the building's assigned bank account when available,
         // but only if the account is owned by the same company as the ledger entry.
@@ -152,7 +196,7 @@ public sealed partial class AppDbContext
 
         if (assignedAccountIds.Count == 0)
         {
-            return;
+            return modifiedExistingRows;
         }
 
         var accountCompanyLookup = await BankAccounts
@@ -184,5 +228,7 @@ public sealed partial class AppDbContext
                     $"LedgerEntry {entry.Entity.Id} has BankAccountId {entry.Entity.BankAccountId} not owned by CompanyId {entry.Entity.CompanyId}.");
             }
         }
+
+        return modifiedExistingRows;
     }
 }
