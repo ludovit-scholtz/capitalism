@@ -76,22 +76,19 @@ public sealed partial class Mutation
         PurchaseLotInput input,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor,
-        [Service] IServiceScopeFactory scopeFactory)
+        [Service] IServiceScopeFactory scopeFactory,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
-        var company = await db.Companies.FirstOrDefaultAsync(
-            c => c.Id == input.CompanyId && c.PlayerId == userId);
+        // Missing and foreign companies are indistinguishable to the caller and both leave a denial audit event (#659).
+        var company = await objectAuthorization.RequireOwnedAsync(
+            userId,
+            "company",
+            input.CompanyId,
+            token => db.Companies.FirstOrDefaultAsync(c => c.Id == input.CompanyId, token),
+            c => c.PlayerId == userId);
         var referralDiscountRate = await GetReferralDiscountRateIfRegisteredAsync(db, userId, httpContextAccessor.HttpContext!.RequestAborted);
-
-        if (company is null)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Company not found or you don't own it.")
-                    .SetCode("COMPANY_NOT_FOUND")
-                    .Build());
-        }
 
         var lotPricingPreview = await db.BuildingLots
             .AsNoTracking()

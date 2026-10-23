@@ -18,7 +18,8 @@ public sealed partial class Mutation
     public async Task<OnboardingResult> FinishOnboarding(
         FinishOnboardingInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
         var nowUtc = DateTime.UtcNow;
@@ -42,13 +43,13 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        var company = await db.Companies.FirstOrDefaultAsync(
-            candidate => candidate.Id == player.OnboardingCompanyId && candidate.PlayerId == userId)
-            ?? throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Company not found or you don't own it.")
-                    .SetCode("COMPANY_NOT_FOUND")
-                    .Build());
+        var onboardingCompanyId = player.OnboardingCompanyId.Value;
+        var company = await objectAuthorization.RequireOwnedAsync(
+            userId,
+            "company",
+            onboardingCompanyId,
+            token => db.Companies.FirstOrDefaultAsync(candidate => candidate.Id == onboardingCompanyId, token),
+            candidate => candidate.PlayerId == userId);
 
         var factoryLot = await db.BuildingLots.FirstOrDefaultAsync(lot => lot.Id == player.OnboardingFactoryLotId)
             ?? throw new GraphQLException(
