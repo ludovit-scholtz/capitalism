@@ -58,7 +58,7 @@ Can one player gain an unfair advantage over another player by executing an API 
 - **Affected endpoint or mechanic:** `postBridgedChatMessage` (`Mutation.ChatBridge.cs`).
 - **Risk description:** The registration and server keys are compared with `string.Equals(..., Ordinal)`, which is not constant time, and the mutation has no rate limit. Both keys are long random server secrets and the endpoint is reachable only with them, so practical impact is low; a leaked key would allow chat spam as any player resolved by email.
 - **Recommended fix:** Use `CryptographicOperations.FixedTimeEquals` on the UTF-8 bytes and reuse `IChatRateLimitService` keyed by the resolved player.
-- **Status:** Open
+- **Status:** Fixed in #658 (constant-time key comparison and the shared chat rate limit)
 
 ### 4) Denial audit events missing for three owner-filtered lookups
 
