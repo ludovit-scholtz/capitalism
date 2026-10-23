@@ -70,22 +70,28 @@ internal static class TickBenchmarkWorld
 
             for (var b = 0; b < scale.BuildingsPerPlayer; b++)
             {
-                var isShop = b % 4 == 3;
+                // One building in ten is an apartment block: rental buildings have no units but run the rent phase every tick, which a
+                // world of only factories and shops would never exercise.
+                var isApartment = b % 10 == 9;
+                var isShop = !isApartment && b % 4 == 3;
                 var building = new Building
                 {
                     Id = DeterministicGuid(seed, "building", p * scale.BuildingsPerPlayer + b),
                     CompanyId = company.Id,
                     CityId = city.Id,
-                    Type = isShop ? BuildingType.SalesShop : BuildingType.Factory,
+                    Type = isApartment ? BuildingType.Apartment : isShop ? BuildingType.SalesShop : BuildingType.Factory,
                     Name = $"Bench {p}-{b}",
                     Latitude = city.Latitude,
                     Longitude = city.Longitude,
                     Level = 1,
                     BuiltAtUtc = DateTime.UtcNow,
+                    PricePerSqm = isApartment ? city.AverageRentPerSqm : null,
+                    TotalAreaSqm = isApartment ? 400m : null,
+                    OccupancyPercent = isApartment ? 70m : null,
                 };
                 db.Buildings.Add(building);
 
-                for (var u = 0; u < scale.UnitsPerBuilding; u++)
+                for (var u = 0; u < (isApartment ? 0 : scale.UnitsPerBuilding); u++)
                 {
                     var resource = resources[rng.Next(resources.Count)];
                     db.BuildingUnits.Add(new BuildingUnit
