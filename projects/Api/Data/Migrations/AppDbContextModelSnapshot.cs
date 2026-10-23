@@ -4357,6 +4357,26 @@ namespace Api.Data.Migrations
                     b.ToTable("SupplyContracts");
                 });
 
+            modelBuilder.Entity("Api.Data.Entities.TickTimingRecord", b =>
+                {
+                    b.Property<long>("Tick")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("PhaseMsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("RecordedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("TotalMs")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Tick");
+
+                    b.ToTable("TickTimingRecords");
+                });
+
             modelBuilder.Entity("Api.Data.Entities.TutorialProgress", b =>
                 {
                     b.Property<Guid>("Id")

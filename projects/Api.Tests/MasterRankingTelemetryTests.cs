@@ -246,7 +246,7 @@ public sealed class MasterRankingTelemetryTests
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
-        var gameState = await db.GameStates.FirstAsync();
+        var gameState = await db.AlignedToTelemetryCadenceAsync();
 
         var player = new Player
         {
@@ -302,7 +302,7 @@ public sealed class MasterRankingTelemetryTests
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
-        var gameState = await db.GameStates.FirstAsync();
+        var gameState = await db.AlignedToTelemetryCadenceAsync();
 
         var player = new Player
         {
@@ -362,7 +362,7 @@ public sealed class MasterRankingTelemetryTests
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
-        var gameState = await db.GameStates.FirstAsync();
+        var gameState = await db.AlignedToTelemetryCadenceAsync();
 
         var player = new Player
         {
@@ -432,7 +432,7 @@ public sealed class MasterRankingTelemetryTests
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
-        var gameState = await db.GameStates.FirstAsync();
+        var gameState = await db.AlignedToTelemetryCadenceAsync();
 
         var player = new Player
         {

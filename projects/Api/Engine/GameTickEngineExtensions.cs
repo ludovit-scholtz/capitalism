@@ -12,6 +12,7 @@ internal static class GameTickEngineExtensions
     internal static IServiceCollection AddGameTickEngine(this IServiceCollection services)
     {
         services.AddSingleton<TickTimingRecorder>();
+        services.AddScoped<TickTimingStore>();
         services.AddScoped<TickProcessor>();
         services.AddScoped<ITickPhase, WeatherUpdatePhase>();
         services.AddScoped<ITickPhase, LaborMarketPhase>();

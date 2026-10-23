@@ -1,6 +1,7 @@
 using Api.Data.Entities;
 using Api.Utilities;
 using Microsoft.EntityFrameworkCore;
+using Shared.Economy;
 
 namespace Api.Engine.Phases;
 
@@ -16,11 +17,11 @@ public sealed class CityExpansionUnlockPhase : ITickPhase
     /// The unlock scan loads every company, lot and inventory, so it runs every few ticks (in-game hours) instead of every tick (#646).
     /// A threshold crossing is detected up to CadenceTicks - 1 ticks late; a skipped or failed scan is retried on the next cadence tick; unlocks are permanent, so nothing is lost.
     /// </summary>
-    public const int CadenceTicks = 6;
+    public const int CadenceTicks = TickCadence.CityExpansionUnlockTicks;
 
     public async Task ProcessAsync(TickContext context)
     {
-        if (context.CurrentTick % CadenceTicks != 0)
+        if (!TickCadence.IsDue(context.CurrentTick, CadenceTicks))
         {
             return;
         }

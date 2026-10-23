@@ -65,7 +65,7 @@ public sealed class TelemetryBountyPhaseTests
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var gameState = await db.GameStates.FirstAsync();
+        var gameState = await db.AlignedToTelemetryCadenceAsync();
         var governmentCompanyId = (await GovernmentCompanyQueries.GetGovernmentCompanyIdsAsync(db)).Single();
         var governmentCompany = await db.Companies
             .AsNoTracking()
@@ -101,7 +101,7 @@ public sealed class TelemetryBountyPhaseTests
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
-        var gameState = await db.GameStates.FirstAsync();
+        var gameState = await db.AlignedToTelemetryCadenceAsync();
 
         var player = new Player
         {
@@ -170,7 +170,7 @@ public sealed class TelemetryBountyPhaseTests
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
-        var gameState = await db.GameStates.FirstAsync();
+        var gameState = await db.AlignedToTelemetryCadenceAsync();
 
         var player = new Player
         {
@@ -241,8 +241,8 @@ public sealed class TelemetryBountyPhaseTests
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
-        var gameState = await db.GameStates.FirstAsync();
-        gameState.CurrentTick = 100;
+        var gameState = await db.AlignedToTelemetryCadenceAsync();
+        gameState.CurrentTick = 102; // a telemetry run tick (multiple of the cadence)
 
         var player = new Player
         {

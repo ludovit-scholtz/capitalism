@@ -26,6 +26,8 @@ public sealed class GameTickHostedService(
 
         logger.LogInformation("Game tick engine started.");
 
+        await RestoreTimingHistoryAsync(stoppingToken);
+
         // Small initial delay to let the host finish startup.
         await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
 
@@ -58,5 +60,20 @@ public sealed class GameTickHostedService(
         }
 
         logger.LogInformation("Game tick engine stopped.");
+    }
+
+    /// <summary>Seeds the in-memory timing window from the persisted history so a restart keeps what the dashboard shows (#646).</summary>
+    private async Task RestoreTimingHistoryAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var history = await scope.ServiceProvider.GetRequiredService<TickTimingStore>().LoadRecentAsync(stoppingToken);
+            scope.ServiceProvider.GetRequiredService<TickTimingRecorder>().Restore(history);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Could not restore the persisted tick timings; the dashboard history starts empty.");
+        }
     }
 }

@@ -36,6 +36,31 @@ public sealed class TickTimingRecorder(int capacity = 60, long phaseBudgetMs = T
         }
     }
 
+    /// <summary>Seeds the window with persisted history (oldest first) at startup; ticks recorded since take precedence by order.</summary>
+    public void Restore(IEnumerable<(long Tick, long TotalMs, IReadOnlyDictionary<string, long> PhaseMs)> history)
+    {
+        lock (gate)
+        {
+            var live = samples.ToArray();
+            samples.Clear();
+            var liveFirstTick = live.Length == 0 ? long.MaxValue : live.Min(s => s.Tick);
+            foreach (var (tick, totalMs, phaseMs) in history.Where(h => h.Tick < liveFirstTick).OrderBy(h => h.Tick))
+            {
+                samples.Enqueue(new Sample(tick, totalMs, new Dictionary<string, long>(phaseMs)));
+            }
+
+            foreach (var sample in live)
+            {
+                samples.Enqueue(sample);
+            }
+
+            while (samples.Count > Math.Max(1, capacity))
+            {
+                samples.Dequeue();
+            }
+        }
+    }
+
     public TickTimingSummary Summarize()
     {
         Sample[] snapshot;
