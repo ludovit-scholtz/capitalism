@@ -18,7 +18,8 @@ public sealed partial class Mutation
     public async Task<GenerateApiKeyPayload> GenerateApiKey(
         GenerateApiKeyInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ObjectAuthorizationService objectAuthorization)
     {
         var playerId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
         var ct = httpContextAccessor.HttpContext.RequestAborted;
@@ -86,17 +87,23 @@ public sealed partial class Mutation
 
         if (normalizedCompanyIds.Length > 0)
         {
-            var ownedCompanyCount = await db.Companies
-                .CountAsync(
-                    company => company.PlayerId == playerId && normalizedCompanyIds.Contains(company.Id),
-                    ct);
-            if (ownedCompanyCount != normalizedCompanyIds.Length)
+            var ownerByCompanyId = await db.Companies
+                .AsNoTracking()
+                .Where(company => normalizedCompanyIds.Contains(company.Id))
+                .ToDictionaryAsync(company => company.Id, company => company.PlayerId, ct);
+            var deniedCompanyIds = normalizedCompanyIds
+                .Where(companyId => !ownerByCompanyId.TryGetValue(companyId, out var ownerId) || ownerId != playerId)
+                .ToList();
+            if (deniedCompanyIds.Count > 0)
             {
-                throw new GraphQLException(
-                    ErrorBuilder.New()
-                        .SetMessage("One or more allowed company IDs do not belong to you.")
-                        .SetCode("COMPANY_NOT_FOUND")
-                        .Build());
+                // One uniform error for missing and foreign ids; every bad id is still audited with its real reason (#659).
+                foreach (var companyId in deniedCompanyIds.Take(deniedCompanyIds.Count - 1))
+                {
+                    objectAuthorization.LogDenied(playerId, "company", companyId, DenialReason(ownerByCompanyId, companyId));
+                }
+
+                var lastDenied = deniedCompanyIds[^1];
+                throw objectAuthorization.Deny(playerId, "company", lastDenied, DenialReason(ownerByCompanyId, lastDenied));
             }
         }
 
@@ -206,6 +213,9 @@ public sealed partial class Mutation
                 ct);
         return affectedRows;
     }
+
+    private static string DenialReason(IReadOnlyDictionary<Guid, Guid> ownerByCompanyId, Guid companyId)
+        => ownerByCompanyId.ContainsKey(companyId) ? ObjectAuthorizationService.NotOwnedReason : ObjectAuthorizationService.NotFoundReason;
 
     private static List<string> NormalizeScopes(IReadOnlyCollection<string>? scopes)
     {

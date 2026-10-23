@@ -66,7 +66,7 @@ Can one player gain an unfair advantage over another player by executing an API 
 - **Affected endpoint or mechanic:** `Mutation.RealEstate.Rent.cs`, `Mutation.Onboarding.Finish.cs`, `Mutation.ApiKey.cs` (allowed company ids).
 - **Risk description:** Responses are uniform, so there is no enumeration, but a probing player does not show up in `objectAccessDenials` for these three paths.
 - **Recommended fix:** Route them through `ObjectAuthorizationService.RequireOwnedAsync` with parity tests, as in #604 and #605.
-- **Status:** Open
+- **Status:** Fixed in #659 (the three lookups go through `ObjectAuthorizationService`; the error code is now the uniform `FORBIDDEN`)
 
 ### 5) Lint-toolchain advisories in both frontends
 
