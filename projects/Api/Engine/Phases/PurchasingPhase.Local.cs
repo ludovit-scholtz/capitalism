@@ -19,48 +19,38 @@ public sealed partial class PurchasingPhase
     {
         var matchingSupplies = new List<(Building Building, BuildingUnit Unit, Inventory Inventory, decimal PricePerUnit, decimal TransitCostPerUnit, decimal DeliveredPricePerUnit)>();
 
-        foreach (var (buildingId, units) in context.UnitsByBuilding)
+        // Suppliers are the B2B units of one company in the destination's city: the vendor-locked company, or else the buyer's own.
+        // Looked up in an index instead of scanning every unit of the world per purchase unit (#646).
+        var supplierCompanyId = purchaseUnit.VendorLockCompanyId ?? destinationBuilding.CompanyId;
+
+        foreach (var (building, unit) in context.GetB2BSellerUnits(destinationBuilding.CityId, supplierCompanyId))
         {
-            if (!context.BuildingsById.TryGetValue(buildingId, out var building))
+            if (building.Id == destinationBuilding.Id)
                 continue;
-            if (building.Id == destinationBuilding.Id || building.CityId != destinationBuilding.CityId)
+            if (!context.InventoryByUnit.TryGetValue(unit.Id, out var inventories))
                 continue;
 
-            foreach (var unit in units)
+            foreach (var inventory in inventories)
             {
-                if (unit.UnitType != UnitType.B2BSales)
+                if (inventory.Quantity <= 0m)
                     continue;
-                if (context.UnitsUnderUpgrade.Contains(unit.Id))
+                if (resourceId.HasValue && inventory.ResourceTypeId != resourceId)
                     continue;
-                if (purchaseUnit.VendorLockCompanyId.HasValue && building.CompanyId != purchaseUnit.VendorLockCompanyId.Value)
+                if (productId.HasValue && inventory.ProductTypeId != productId)
                     continue;
-                if (!purchaseUnit.VendorLockCompanyId.HasValue && building.CompanyId != destinationBuilding.CompanyId)
+                if (resourceId is null && productId is null)
                     continue;
-                if (!context.InventoryByUnit.TryGetValue(unit.Id, out var inventories))
+                if (inventory.Quality < minQuality)
                     continue;
 
-                foreach (var inventory in inventories)
-                {
-                    if (inventory.Quantity <= 0m)
-                        continue;
-                    if (resourceId.HasValue && inventory.ResourceTypeId != resourceId)
-                        continue;
-                    if (productId.HasValue && inventory.ProductTypeId != productId)
-                        continue;
-                    if (resourceId is null && productId is null)
-                        continue;
-                    if (inventory.Quality < minQuality)
-                        continue;
+                var basePrice = unit.MinPrice ?? GetBasePrice(context, inventory.ResourceTypeId, inventory.ProductTypeId);
+                var price = resourceId.HasValue ? basePrice * commodityShockMultiplier : basePrice;
+                var transitCostPerUnit = ComputeBuildingTransitCostPerUnit(building, destinationBuilding, itemWeightPerUnit, fuelPriceIndex);
+                var deliveredPricePerUnit = price + transitCostPerUnit;
+                if (price <= 0m || deliveredPricePerUnit > maxPrice)
+                    continue;
 
-                    var basePrice = unit.MinPrice ?? GetBasePrice(context, inventory.ResourceTypeId, inventory.ProductTypeId);
-                    var price = resourceId.HasValue ? basePrice * commodityShockMultiplier : basePrice;
-                    var transitCostPerUnit = ComputeBuildingTransitCostPerUnit(building, destinationBuilding, itemWeightPerUnit, fuelPriceIndex);
-                    var deliveredPricePerUnit = price + transitCostPerUnit;
-                    if (price <= 0m || deliveredPricePerUnit > maxPrice)
-                        continue;
-
-                    matchingSupplies.Add((building, unit, inventory, price, transitCostPerUnit, deliveredPricePerUnit));
-                }
+                matchingSupplies.Add((building, unit, inventory, price, transitCostPerUnit, deliveredPricePerUnit));
             }
         }
 

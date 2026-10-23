@@ -88,7 +88,7 @@ public sealed partial class PurchasingPhase : ITickPhase
         // Phase 1: Player-placed exchange orders (LOCAL or OPTIMAL source).
         if (purchaseSource is "LOCAL" or "OPTIMAL")
         {
-            var matchingOrders = context.ActiveExchangeOrders
+            var matchingOrders = context.GetSellOrderCandidates(resourceId, productId)
                 .Where(o => o.Side == "SELL"
                             && o.IsActive
                             && o.RemainingQuantity > 0m
