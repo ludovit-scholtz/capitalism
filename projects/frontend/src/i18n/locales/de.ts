@@ -3314,6 +3314,57 @@ export default {
       action: 'Gebäude kaufen',
     },
   },
+  firstWeekCampaign: {
+    title: 'Ihre erste Woche',
+    subtitle: 'Tag {day} von {total}',
+    stripLabel: 'Fortschritt der ersten Woche',
+    dayLabel: 'Tag {day}',
+    dayState: {
+      claimed: 'Belohnung abgeholt',
+      claimable: 'Belohnung bereit',
+      open: 'in Arbeit',
+      locked: 'gesperrt',
+    },
+    progress: '{progress} von {target} erledigt',
+    reward: 'Belohnung: {amount}',
+    claim: 'Belohnung abholen',
+    claiming: 'Wird abgeholt…',
+    claimed: 'Die Belohnung von {amount} wurde Ihrem Firmenkonto gutgeschrieben.',
+    claimFailed: 'Die Belohnung konnte nicht abgeholt werden. Versuchen Sie es gleich noch einmal.',
+    goThere: 'Dorthin',
+    comeBack: 'Alle aktuellen Ziele sind erledigt. Das Ziel für Tag {day} wird morgen freigeschaltet.',
+    allDone: 'Alle Ziele sind erledigt.',
+    goals: {
+      FIRST_SALE: {
+        title: 'Machen Sie Ihren ersten Verkauf',
+        description: 'Lassen Sie einen Kunden eines Ihrer Produkte in einem Verkaufsgeschäft kaufen.',
+      },
+      SECOND_BUILDING: {
+        title: 'Besitzen Sie zwei Gebäude',
+        description: 'Kaufen Sie ein zweites Gebäude, damit Ihre Lieferkette wachsen kann.',
+      },
+      TAKE_A_LOAN: {
+        title: 'Nehmen Sie Ihren ersten Kredit auf',
+        description: 'Leihen Sie sich bei einer Bank Geld für Wachstum und zahlen Sie pünktlich zurück, damit Ihre Bonität gut bleibt.',
+      },
+      FIRST_B2B_TRADE: {
+        title: 'Handeln Sie mit einer anderen Firma',
+        description: 'Kaufen oder verkaufen Sie Waren an eine andere Firma über einen Vertrag oder die Börse.',
+      },
+      BUILD_A_BRAND: {
+        title: 'Bauen Sie eine Marke auf',
+        description: 'Etablieren Sie eine Marke für eines Ihrer Produkte, damit Kunden es wiedererkennen.',
+      },
+      SCOUT_COMPETITORS: {
+        title: 'Beobachten Sie einen Wettbewerber',
+        description: 'Sehen Sie sich an, was ein Wettbewerber in einer Stadt verkauft, und vergleichen Sie sich.',
+      },
+      GROW_TO_THREE_BUILDINGS: {
+        title: 'Wachsen Sie auf drei Gebäude',
+        description: 'Erweitern Sie Ihre Firma auf drei Gebäude, um die erste Woche abzuschließen.',
+      },
+    },
+  },
   bank: {
     title: 'Bankhaus',
     banks: 'Banken',

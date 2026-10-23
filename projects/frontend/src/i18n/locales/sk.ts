@@ -3302,6 +3302,57 @@ export default {
       action: 'Kúpiť budovu',
     },
   },
+  firstWeekCampaign: {
+    title: 'Váš prvý týždeň',
+    subtitle: 'Deň {day} zo {total}',
+    stripLabel: 'Postup prvého týždňa',
+    dayLabel: 'Deň {day}',
+    dayState: {
+      claimed: 'odmena prevzatá',
+      claimable: 'odmena pripravená',
+      open: 'rozpracované',
+      locked: 'zamknuté',
+    },
+    progress: 'Splnené {progress} z {target}',
+    reward: 'Odmena: {amount}',
+    claim: 'Prevziať odmenu',
+    claiming: 'Preberá sa…',
+    claimed: 'Odmena {amount} bola pripísaná na účet vašej firmy.',
+    claimFailed: 'Odmenu sa nepodarilo prevziať. Skúste to o chvíľu znova.',
+    goThere: 'Prejsť tam',
+    comeBack: 'Všetky aktuálne ciele sú splnené. Cieľ na deň {day} sa odomkne zajtra.',
+    allDone: 'Všetky ciele sú splnené.',
+    goals: {
+      FIRST_SALE: {
+        title: 'Uskutočnite prvý predaj',
+        description: 'Nechajte zákazníka kúpiť jeden z vašich produktov v predajni.',
+      },
+      SECOND_BUILDING: {
+        title: 'Vlastnite dve budovy',
+        description: 'Kúpte druhú budovu, aby mohol váš dodávateľský reťazec rásť.',
+      },
+      TAKE_A_LOAN: {
+        title: 'Vezmite si prvú pôžičku',
+        description: 'Požičajte si v banke na rast a splácajte včas, aby bola vaša bonita v poriadku.',
+      },
+      FIRST_B2B_TRADE: {
+        title: 'Obchodujte s inou firmou',
+        description: 'Nakúpte alebo predajte tovar inej firme prostredníctvom zmluvy alebo burzy.',
+      },
+      BUILD_A_BRAND: {
+        title: 'Vybudujte značku',
+        description: 'Založte značku pre jeden zo svojich produktov, aby si ho zákazníci zapamätali.',
+      },
+      SCOUT_COMPETITORS: {
+        title: 'Preskúmajte konkurenta',
+        description: 'Pozrite sa, čo konkurent predáva v meste, a porovnajte sa s ním.',
+      },
+      GROW_TO_THREE_BUILDINGS: {
+        title: 'Rozrastite sa na tri budovy',
+        description: 'Rozšírte firmu na tri budovy a dokončite prvý týždeň.',
+      },
+    },
+  },
   bank: {
     title: 'Banka',
     banks: 'Banky',
