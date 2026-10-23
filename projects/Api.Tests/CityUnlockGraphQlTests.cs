@@ -203,6 +203,40 @@ public sealed class CityUnlockGraphQlTests
         Assert.Contains("Berlin", notification!.Title);
     }
 
+    [Theory]
+    [InlineData(LoanStatus.Active, false)]
+    [InlineData(LoanStatus.Overdue, false)]
+    [InlineData(LoanStatus.Repaid, true)]
+    public async Task CityUnlockStatus_SubtractsOutstandingLoanPrincipalFromNetWorth(string loanStatus, bool expectedUnlocked)
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var (_, playerId) = await RegisterAsync(client, $"unlock-loan-{Guid.NewGuid():N}@test.com");
+        // 650k of cash clears the 500k Berlin threshold, but 300k of it is borrowed.
+        var companyId = await SeedCompanyAsync(factory, playerId, companyName: "Leveraged Expander", fundingBalance: 650_000m);
+        var berlinId = await GetCityIdAsync(factory, "Berlin");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var account = await db.BankAccounts.FirstAsync(candidate => candidate.CompanyId == companyId);
+        db.Loans.Add(new Loan
+        {
+            Id = Guid.NewGuid(),
+            BorrowerCompanyId = companyId,
+            BorrowerBankAccountId = account.Id,
+            RemainingPrincipal = loanStatus == LoanStatus.Repaid ? 0m : 300_000m,
+            OriginalPrincipal = 300_000m,
+            Status = loanStatus,
+        });
+        await db.SaveChangesAsync();
+
+        var status = await CityUnlockService.GetStatusForCityAsync(db, berlinId, companyId);
+
+        Assert.NotNull(status);
+        Assert.Equal(expectedUnlocked, status!.IsUnlocked);
+        Assert.Equal(loanStatus == LoanStatus.Repaid ? 650_000m : 350_000m, Math.Round(status.CurrentNetWorth, 0));
+    }
+
     [Fact]
     public async Task AppDbInitializer_CityUnlockRequirementsRemainIdempotent()
     {

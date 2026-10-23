@@ -78,6 +78,14 @@ public sealed class CityExpansionUnlockPhase : ITickPhase
                 .Concat(companies.SelectMany(company => company.BankAccounts).Select(account => account.CurrencyCode))
                 .Append("USD"));
 
+        var activeLoansByCompany = (await context.Db.Loans
+                .AsNoTracking()
+                .Include(loan => loan.BorrowerBankAccount)
+                .Where(loan => loan.Status == LoanStatus.Active || loan.Status == LoanStatus.Overdue)
+                .ToListAsync())
+            .GroupBy(loan => loan.BorrowerCompanyId)
+            .ToDictionary(group => group.Key, group => (IReadOnlyCollection<Loan>)group.ToList());
+
         var existingUnlocks = await context.Db.CompanyCityUnlocks
             .Where(unlock => companyIds.Contains(unlock.CompanyId))
             .Select(unlock => new { unlock.CompanyId, unlock.CityId })
@@ -101,6 +109,7 @@ public sealed class CityExpansionUnlockPhase : ITickPhase
                 company,
                 companyLots,
                 companyInventories,
+                activeLoansByCompany.GetValueOrDefault(company.Id) ?? [],
                 eurRates,
                 primaryCurrencyCode);
 
