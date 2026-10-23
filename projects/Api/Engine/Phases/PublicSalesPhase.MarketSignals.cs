@@ -85,8 +85,7 @@ public sealed partial class PublicSalesPhase
                 {
                     foreach (var companyOffer in distinctCompanies)
                     {
-                        if (PlayerNotificationService.HasUnreadDuplicate(
-                            context.Db,
+                        if (context.HasUnreadNotification(
                             companyOffer.Company.PlayerId,
                             PlayerNotificationType.PriceSpike,
                             relatedEntityId: itemId,
@@ -117,8 +116,7 @@ public sealed partial class PublicSalesPhase
         {
             foreach (var companyOffer in distinctCompanies)
             {
-                if (PlayerNotificationService.HasUnreadDuplicate(
-                    context.Db,
+                if (context.HasUnreadNotification(
                     companyOffer.Company.PlayerId,
                     PlayerNotificationType.OversupplyWarning,
                     relatedEntityId: itemId,

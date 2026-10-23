@@ -179,8 +179,7 @@ public sealed class MiningPhase : ITickPhase
         }
 
         if (MiningScarcityCalculator.CrossedDownThreshold(previousRatio, currentRatio, 0.15m)
-            && !PlayerNotificationService.HasUnreadDuplicate(
-                context.Db,
+            && !context.HasUnreadNotification(
                 company.PlayerId,
                 PlayerNotificationType.MineDepleting,
                 relatedEntityId: building.Id,
