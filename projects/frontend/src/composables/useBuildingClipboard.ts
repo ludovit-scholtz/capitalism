@@ -118,9 +118,8 @@ export function useBuildingClipboard(deps: {
       // Place a new unit of the correct type, then apply the copied config to it
       placeUnit(result.config.unitType)
       const newUnit = getDraftUnitAt(x, y)
-      if (newUnit) {
-        applyConfigToUnit(newUnit, result.config)
-      }
+      if (!newUnit) return // nothing could be placed here, so there is nothing to confirm
+      applyConfigToUnit(newUnit, result.config)
       showClipboardMessage(
         t('buildingDetail.clipboard.pasteEmptySuccess', {
           type: t(`buildingDetail.unitTypes.${result.config.unitType}`),

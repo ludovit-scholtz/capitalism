@@ -208,4 +208,20 @@ describe('useBuildingClipboard', () => {
     scope.stop()
     expect(vi.getTimerCount()).toBe(0)
   })
+
+  it('shows no success message when placing the unit on the empty cell did not work', async () => {
+    const { serializeUnitConfig } = await import('@/lib/unitClipboard')
+    stubClipboard(async () => serializeUnitConfig(unit()))
+    const units: EditableGridUnit[] = []
+    const api = useBuildingClipboard({
+      isEditing: ref(true),
+      selectedCell: ref({ x: 0, y: 0 }),
+      getDraftUnitAt: (x, y) => units.find((u) => u.gridX === x && u.gridY === y) ?? null,
+      allowedUnits: ref(['PUBLIC_SALES']),
+      placeUnit: vi.fn(), // declines to place anything
+      t: (key: string) => key,
+    })
+    await api.pasteToSelectedUnit()
+    expect(api.clipboardMessage.value).not.toBe('buildingDetail.clipboard.pasteEmptySuccess')
+  })
 })
