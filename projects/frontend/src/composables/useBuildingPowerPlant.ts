@@ -14,6 +14,7 @@ export function useBuildingPowerPlant(deps: { building: Ref<Building | null>; ge
   const cityPowerBalance = ref<CityPowerBalance | null>(null)
   const cityPowerBalanceLoading = ref(false)
   let activePowerPlantAnalyticsRequest = 0
+  let activeCityPowerBalanceRequest = 0
 
   async function loadPowerPlantAnalytics(buildingId: string, isRefresh = false) {
     if (!getToken()) {
@@ -234,6 +235,7 @@ export function useBuildingPowerPlant(deps: { building: Ref<Building | null>; ge
 
   async function loadCityPowerBalance(cityId: string, isRefresh = false) {
     if (!cityId) return
+    const requestId = ++activeCityPowerBalanceRequest
     if (!isRefresh || cityPowerBalance.value == null) {
       cityPowerBalanceLoading.value = true
     }
@@ -253,15 +255,42 @@ export function useBuildingPowerPlant(deps: { building: Ref<Building | null>; ge
         }`,
         { cityId },
       )
+      if (requestId !== activeCityPowerBalanceRequest) return
       cityPowerBalance.value = data.cityPowerBalance
     } catch {
+      if (requestId !== activeCityPowerBalanceRequest) return
       if (!isRefresh) cityPowerBalance.value = null
     } finally {
-      cityPowerBalanceLoading.value = false
+      if (requestId === activeCityPowerBalanceRequest) cityPowerBalanceLoading.value = false
     }
   }
 
+  /** Clears everything tied to one building; call when the route moves to another building. */
+  function resetState() {
+    activePowerPlantAnalyticsRequest++
+    activeCityPowerBalanceRequest++
+    powerPlantAnalytics.value = null
+    powerPlantAnalyticsLoading.value = false
+    cityPowerBalance.value = null
+    cityPowerBalanceLoading.value = false
+    dispatchSaving.value = false
+    dispatchError.value = null
+    dispatchSuccess.value = false
+    prioritySaving.value = false
+    priorityError.value = null
+    prioritySuccess.value = false
+    energyListingSaving.value = false
+    energyListingError.value = null
+    energyListingSuccess.value = false
+    energyCancelSaving.value = false
+    energyCancelError.value = null
+    maxBidSaving.value = false
+    maxBidError.value = null
+    maxBidSuccess.value = false
+  }
+
   return {
+    resetState,
     powerPlantAnalytics,
     powerPlantAnalyticsLoading,
     cityPowerBalance,

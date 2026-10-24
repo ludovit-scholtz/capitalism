@@ -98,4 +98,44 @@ describe('useBuildingPowerPlant', () => {
     expect(api.cityPowerBalance.value).toBeNull()
     expect(api.cityPowerBalanceLoading.value).toBe(false)
   })
+
+  it('only the latest overlapping city power balance request wins', async () => {
+    let resolveFirst!: (v: unknown) => void
+    gqlRequest.mockImplementationOnce(() => new Promise((r) => (resolveFirst = r)))
+    gqlRequest.mockResolvedValueOnce({ cityPowerBalance: { cityId: 'second' } })
+    const { api } = await setup()
+    const first = api.loadCityPowerBalance('c1')
+    await api.loadCityPowerBalance('c2')
+    resolveFirst({ cityPowerBalance: { cityId: 'first' } })
+    await first
+    expect(api.cityPowerBalance.value).toMatchObject({ cityId: 'second' })
+    expect(api.cityPowerBalanceLoading.value).toBe(false)
+  })
+
+  it('resetState clears per-building flags and results', async () => {
+    for (let i = 0; i < 5; i++) gqlRequest.mockRejectedValueOnce(new Error('boom'))
+    const { api } = await setup()
+    await api.setPlantDispatch('b1', 10)
+    await api.setPowerPriority('b1', 2)
+    await api.listEnergyForSale('b1', 1, 1)
+    await api.setMaxEnergyBidPrice('b1', 1)
+    await api.cancelEnergyListing('l1')
+    api.resetState()
+    for (const f of [api.dispatchError, api.priorityError, api.energyListingError, api.maxBidError, api.energyCancelError]) {
+      expect(f.value).toBeNull()
+    }
+    expect(api.powerPlantAnalytics.value).toBeNull()
+    expect(api.cityPowerBalance.value).toBeNull()
+  })
+
+  it('resetState invalidates in-flight requests', async () => {
+    let resolveFirst!: (v: unknown) => void
+    gqlRequest.mockImplementationOnce(() => new Promise((r) => (resolveFirst = r)))
+    const { api } = await setup()
+    const pending = api.loadPowerPlantAnalytics('b1')
+    api.resetState()
+    resolveFirst({ powerPlantAnalytics: { buildingId: 'old' } })
+    await pending
+    expect(api.powerPlantAnalytics.value).toBeNull()
+  })
 })

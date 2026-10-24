@@ -4836,6 +4836,7 @@ export function useBuildingDetail() {
   watch(
     () => buildingId.value,
     (bid) => {
+      powerPlant.resetState()
       if (bid) {
         loadPanelDismissalState(bid)
       }
