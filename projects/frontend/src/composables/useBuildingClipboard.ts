@@ -1,4 +1,4 @@
-import { ref, type Ref } from 'vue'
+import { getCurrentScope, onScopeDispose, ref, type Ref } from 'vue'
 import { deserializeUnitConfig, serializeUnitConfig, type UnitClipboardConfig } from '@/lib/unitClipboard'
 import type { EditableGridUnit } from '@/composables/useBuildingDetail'
 
@@ -22,6 +22,12 @@ export function useBuildingClipboard(deps: {
   // ---------------------------------------------------------------------------
   // Unit copy/paste (Ctrl+C / Ctrl+V)
   // ---------------------------------------------------------------------------
+
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      if (_clipboardMessageTimer !== null) clearTimeout(_clipboardMessageTimer)
+    })
+  }
 
   function showClipboardMessage(message: string, type: 'success' | 'error', durationMs = 3000) {
     if (_clipboardMessageTimer !== null) {
@@ -65,6 +71,7 @@ export function useBuildingClipboard(deps: {
    */
   async function pasteToSelectedUnit(): Promise<void> {
     if (!isEditing.value || !selectedCell.value) return
+    const { x, y } = selectedCell.value
 
     let text: string
     try {
@@ -74,7 +81,10 @@ export function useBuildingClipboard(deps: {
       return
     }
 
-    const targetUnit = getDraftUnitAt(selectedCell.value.x, selectedCell.value.y)
+    // The read can be slow (permission prompt); make sure the user is still on the same cell in edit mode.
+    if (!isEditing.value || selectedCell.value?.x !== x || selectedCell.value?.y !== y) return
+
+    const targetUnit = getDraftUnitAt(x, y)
 
     if (!targetUnit) {
       // Paste to empty slot: deserialize without type restriction, then place a new unit
@@ -107,7 +117,7 @@ export function useBuildingClipboard(deps: {
 
       // Place a new unit of the correct type, then apply the copied config to it
       placeUnit(result.config.unitType)
-      const newUnit = getDraftUnitAt(selectedCell.value.x, selectedCell.value.y)
+      const newUnit = getDraftUnitAt(x, y)
       if (newUnit) {
         applyConfigToUnit(newUnit, result.config)
       }

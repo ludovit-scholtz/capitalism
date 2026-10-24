@@ -411,11 +411,6 @@ export function useBuildingDetail() {
   const masterUserEmail = computed(() => auth.player?.email ?? '')
   const selectedHistoryItemKey = ref<string | null>(null)
 
-  // Unit copy/paste clipboard state
-
-
-
-
   const { saveScrollPosition, restoreScrollPosition } = useScrollPreservation()
   const rent = useBuildingRent({ building, t, buildingId: () => buildingId.value })
   const mediaHouse = useBuildingMediaHouse({ building, t, loadCityMediaHouses: () => loadCityMediaHouses(), buildingId: () => buildingId.value })

@@ -169,4 +169,43 @@ describe('useBuildingClipboard', () => {
     await api.pasteToSelectedUnit()
     expect(api.clipboardMessage.value).toBe('buildingDetail.clipboard.invalidFormat')
   })
+
+  it('does not paste when editing stops or the selection moves while the clipboard is being read', async () => {
+    const { serializeUnitConfig } = await import('@/lib/unitClipboard')
+    let release!: (text: string) => void
+    stubClipboard(() => new Promise<string>((r) => (release = r)))
+    const units = [unit({ productTypeId: 'old' }), unit({ id: 'u2', gridX: 1, productTypeId: 'other' })]
+    const isEditing = ref(true)
+    const selectedCell = ref<{ x: number; y: number } | null>({ x: 0, y: 0 })
+    const api = useBuildingClipboard({
+      isEditing,
+      selectedCell,
+      getDraftUnitAt: (x, y) => units.find((u) => u.gridX === x && u.gridY === y) ?? null,
+      allowedUnits: ref(['PUBLIC_SALES']),
+      placeUnit: vi.fn(),
+      t: (key: string) => key,
+    })
+    const pending = api.pasteToSelectedUnit()
+    selectedCell.value = { x: 1, y: 0 }
+    release(serializeUnitConfig(unit({ productTypeId: 'copied' })))
+    await pending
+    expect(units[0].productTypeId).toBe('old')
+    expect(units[1].productTypeId).toBe('other')
+
+    const second = api.pasteToSelectedUnit()
+    isEditing.value = false
+    release(serializeUnitConfig(unit({ productTypeId: 'copied' })))
+    await second
+    expect(units[1].productTypeId).toBe('other')
+  })
+
+  it('clears its message timer when the owning effect scope is disposed', async () => {
+    const { effectScope } = await import('vue')
+    stubClipboard(async () => '')
+    const scope = effectScope()
+    const api = scope.run(() => setup().api)!
+    await api.copySelectedUnit()
+    scope.stop()
+    expect(vi.getTimerCount()).toBe(0)
+  })
 })
