@@ -114,4 +114,52 @@ describe('useBuildingMediaHouse', () => {
     expect(api.mediaHouseUnitSuccess.value).toBe(true)
     expect(gqlRequest).toHaveBeenCalledTimes(2)
   })
+
+  it('upgradeMediaHouse ignores a second call while an upgrade is running', async () => {
+    let resolveUpgrade!: (v: unknown) => void
+    gqlRequest.mockImplementationOnce(() => new Promise((r) => (resolveUpgrade = r)))
+    gqlRequest.mockResolvedValue({ mediaHouseAnalytics: null })
+    const { api } = await setup()
+    const first = api.upgradeMediaHouse()
+    await api.upgradeMediaHouse()
+    expect(gqlRequest).toHaveBeenCalledTimes(1)
+    resolveUpgrade({ upgradeMediaHouse: { id: 'b1', level: 2 } })
+    await first
+  })
+
+  it('saveContentBudget still reports success when only the city media house refresh fails', async () => {
+    gqlRequest.mockResolvedValue({ setMediaHouseContentBudget: { id: 'b1', contentBudgetPerTick: 5, contentValue: 1 } })
+    const { useBuildingMediaHouse } = await import('../useBuildingMediaHouse')
+    const b = ref({ id: 'b1', type: 'MEDIA_HOUSE' } as unknown as Building)
+    const api = useBuildingMediaHouse({
+      building: b,
+      t: (key: string) => key,
+      loadCityMediaHouses: async () => {
+        throw new Error('refresh failed')
+      },
+    })
+    await api.saveContentBudget()
+    expect(api.contentBudgetSuccess.value).toBe(true)
+    expect(api.contentBudgetError.value).toBeNull()
+  })
+
+  it('clears messages and the unit form synchronously when the watched building id changes', async () => {
+    const { useBuildingMediaHouse } = await import('../useBuildingMediaHouse')
+    const buildingId = ref('b1')
+    const b = ref({ id: 'b1', type: 'MEDIA_HOUSE', companyId: 'c1' } as unknown as Building)
+    const api = useBuildingMediaHouse({
+      building: b,
+      t: (key: string) => key,
+      loadCityMediaHouses: async () => {},
+      buildingId: () => buildingId.value,
+    })
+    api.mediaHouseUnitId.value = 'u-of-b1'
+    api.contentBudgetSuccess.value = true
+    api.mediaHouseUnitError.value = 'x'
+    buildingId.value = 'b2'
+    expect(api.mediaHouseUnitId.value).toBeNull()
+    expect(api.contentBudgetSuccess.value).toBe(false)
+    expect(api.mediaHouseUnitError.value).toBeNull()
+    expect(api.mediaHouseStats.value).toBeNull()
+  })
 })

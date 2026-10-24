@@ -1,4 +1,4 @@
-import { ref, type Ref } from 'vue'
+import { ref, watch, type Ref } from 'vue'
 import { gqlRequest } from '@/lib/graphql'
 import type { Building, MediaHouseAnalyticsResult, MediaHouseStatsResult } from '@/types'
 
@@ -65,7 +65,7 @@ export function useBuildingMediaHouse(deps: { building: Ref<Building | null>; t:
       }
       contentBudgetSuccess.value = true
       // Also refresh the city media houses list to reflect updated content budget.
-      await loadCityMediaHouses()
+      await loadCityMediaHouses().catch(() => {})
       setTimeout(() => {
         contentBudgetSuccess.value = false
       }, 3000)
@@ -78,7 +78,7 @@ export function useBuildingMediaHouse(deps: { building: Ref<Building | null>; t:
 
   /** Upgrades the current MEDIA_HOUSE building to the next level. */
   async function upgradeMediaHouse() {
-    if (!building.value) return
+    if (!building.value || upgradingMediaHouse.value) return
     upgradingMediaHouse.value = true
     mediaHouseUpgradeError.value = null
     mediaHouseUpgradeSuccess.value = false
@@ -237,6 +237,31 @@ export function useBuildingMediaHouse(deps: { building: Ref<Building | null>; t:
       savingMediaHouseUnit.value = false
     }
   }
+
+  /** Clears everything tied to one media house; runs when the viewed building changes. */
+  function resetState() {
+    contentBudgetInput.value = null
+    savingContentBudget.value = false
+    contentBudgetError.value = null
+    contentBudgetSuccess.value = false
+    upgradingMediaHouse.value = false
+    mediaHouseUpgradeError.value = null
+    mediaHouseUpgradeSuccess.value = false
+    mediaHouseAnalytics.value = null
+    mediaHouseAnalyticsLoading.value = false
+    mediaHouseStats.value = null
+    mediaHouseStatsLoading.value = false
+    mediaHouseUnitId.value = null
+    mediaHouseTargetCompanyId.value = null
+    mediaHouseUnitMediaType.value = 'NEWSPAPER'
+    mediaHouseCampaignBudgetPerTick.value = 0
+    mediaHouseUnitActive.value = true
+    savingMediaHouseUnit.value = false
+    mediaHouseUnitError.value = null
+    mediaHouseUnitSuccess.value = false
+  }
+
+  if (deps.buildingId) watch(deps.buildingId, () => resetState(), { flush: 'sync' })
 
   return {
     contentBudgetInput,

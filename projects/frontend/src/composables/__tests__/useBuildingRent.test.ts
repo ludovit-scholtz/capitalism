@@ -76,4 +76,17 @@ describe('useBuildingRent', () => {
     await api.saveRentPerSqm()
     expect(api.rentSaveError.value).toBe('property.saveFailed')
   })
+
+  it('closes the dialog and clears the draft synchronously when the watched building id changes', async () => {
+    const { useBuildingRent } = await import('../useBuildingRent')
+    const buildingId = ref('b1')
+    const b = ref({ id: 'b1', pricePerSqm: 10 } as unknown as Building)
+    const api = useBuildingRent({ building: b, t: (key: string) => key, buildingId: () => buildingId.value })
+    api.openRentDialog()
+    api.rentSaveError.value = 'x'
+    buildingId.value = 'b2'
+    expect(api.showRentDialog.value).toBe(false)
+    expect(api.newRentPerSqm.value).toBeNull()
+    expect(api.rentSaveError.value).toBeNull()
+  })
 })

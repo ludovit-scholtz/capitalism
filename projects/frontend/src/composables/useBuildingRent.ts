@@ -1,9 +1,14 @@
-import { ref, type Ref } from 'vue'
+import { ref, watch, type Ref } from 'vue'
 import { gqlRequest } from '@/lib/graphql'
 import type { Building } from '@/types'
 
 /** Rent dialog for APARTMENT / COMMERCIAL buildings. Extracted from useBuildingDetail (#596). */
-export function useBuildingRent(deps: { building: Ref<Building | null>; t: (key: string) => string }) {
+export function useBuildingRent(deps: {
+  building: Ref<Building | null>
+  t: (key: string) => string
+  /** When given, the dialog state is reset synchronously when the id changes. */
+  buildingId?: () => string | null | undefined
+}) {
   const { building, t } = deps
   // Property management (APARTMENT / COMMERCIAL)
   const showRentDialog = ref(false)
@@ -53,6 +58,19 @@ export function useBuildingRent(deps: { building: Ref<Building | null>; t: (key:
     } finally {
       savingRent.value = false
     }
+  }
+
+  if (deps.buildingId) {
+    watch(
+      deps.buildingId,
+      () => {
+        showRentDialog.value = false
+        newRentPerSqm.value = null
+        savingRent.value = false
+        rentSaveError.value = null
+      },
+      { flush: 'sync' },
+    )
   }
 
   return {

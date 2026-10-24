@@ -439,8 +439,8 @@ export function useBuildingDetail() {
   let _clipboardMessageTimer: ReturnType<typeof setTimeout> | null = null
 
   const { saveScrollPosition, restoreScrollPosition } = useScrollPreservation()
-  const rent = useBuildingRent({ building, t })
-  const mediaHouse = useBuildingMediaHouse({ building, t, loadCityMediaHouses: () => loadCityMediaHouses() })
+  const rent = useBuildingRent({ building, t, buildingId: () => buildingId.value })
+  const mediaHouse = useBuildingMediaHouse({ building, t, loadCityMediaHouses: () => loadCityMediaHouses(), buildingId: () => buildingId.value })
   const { loadMediaHouseAnalytics, loadMediaHouseStats } = mediaHouse
 
   // Rental revenue sparkline (APARTMENT / COMMERCIAL)
