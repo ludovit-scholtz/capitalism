@@ -41,7 +41,7 @@
   "projects/Api.Tests/TickEngineIntegrationTests.cs": 7471,
   "projects/Api.Tests/TutorialProgressTests.cs": 525,
   "projects/Api.Tests/VictoryCheckPhaseTests.cs": 673,
-  "projects/MasterApi.Tests/MasterApiIntegrationTests.cs": 4698,
+  "projects/MasterApi.Tests/MasterApiIntegrationTests.cs": 4688,
   "projects/MasterApi.Tests/RankingIntegrationTests.cs": 2081,
   "projects/NPCBot.Tests/BotAgentLifecycleTests.cs": 646,
   "projects/NPCBot.Tests/BotEighthWaveCoverageTests.cs": 539,

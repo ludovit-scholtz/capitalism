@@ -1546,33 +1546,23 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
             Assert.False(result.TryGetProperty("errors", out _));
             var items = result.GetProperty("data").GetProperty("gameNewsFeed").GetProperty("items").EnumerateArray().ToList();
 
-            // CHANGELOG.csv grows over time; use limit=500 above to ensure all rows are returned.
+            // CHANGELOG.csv grows over time; limit=500 is the API maximum, so only the newest 500 rows are returned.
             var changelogItems = items.Where(item =>
                 item.GetProperty("entryType").GetString() == "CHANGELOG"
                 && item.GetProperty("status").GetString() == "PUBLISHED").ToList();
             Assert.True(changelogItems.Count >= 4, $"Expected at least 4 CHANGELOG entries, got {changelogItems.Count}");
 
-            // Verify one specific CSV-imported entry (Bank capitalization, GUID 4e587c8a-...) is present and well-formed.
-            // Use Any() + First() instead of FirstOrDefault() to avoid the value-type default(JsonElement)
-            // ambiguity where ValueKind could be Undefined on a valid empty array scenario.
-            bool hasBankCap = changelogItems.Any(item =>
-                item.GetProperty("localizations").EnumerateArray().Any(l =>
-                    l.GetProperty("locale").GetString() == "en"
-                    && (l.GetProperty("title").GetString() ?? string.Empty)
-                           .Contains("Bank capitalization", StringComparison.OrdinalIgnoreCase)));
-            Assert.True(hasBankCap, "Expected 'Bank capitalization' entry in the feed but it was not found.");
-
-            var bankCap = changelogItems.First(item =>
-                item.GetProperty("localizations").EnumerateArray().Any(l =>
-                    l.GetProperty("locale").GetString() == "en"
-                    && (l.GetProperty("title").GetString() ?? string.Empty)
-                           .Contains("Bank capitalization", StringComparison.OrdinalIgnoreCase)));
-            var bankCapLocales = bankCap.GetProperty("localizations").EnumerateArray()
-                .Select(l => l.GetProperty("locale").GetString())
-                .ToHashSet();
-            Assert.Contains("en", bankCapLocales);
-            Assert.Contains("sk", bankCapLocales);
-            Assert.Contains("de", bankCapLocales);
+            // The feed is capped at the newest 500 rows and CHANGELOG.csv keeps growing, so do not look for
+            // one specific old row. The shared fixture can also hold English-only entries published by other
+            // tests, so require that at least one imported entry is fully localized (en, sk and de, with titles).
+            bool hasFullyLocalizedEntry = changelogItems.Any(item =>
+            {
+                var localizations = item.GetProperty("localizations").EnumerateArray().ToList();
+                var locales = localizations.Select(l => l.GetProperty("locale").GetString()).ToHashSet();
+                return locales.Contains("en") && locales.Contains("sk") && locales.Contains("de")
+                    && localizations.All(l => !string.IsNullOrWhiteSpace(l.GetProperty("title").GetString()));
+            });
+            Assert.True(hasFullyLocalizedEntry, "Expected at least one fully localized (en/sk/de) CHANGELOG entry in the feed.");
         }
 
         #region Changelog CSV importer unit tests
