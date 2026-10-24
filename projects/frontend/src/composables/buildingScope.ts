@@ -38,5 +38,7 @@ export function createBuildingScope(buildingId?: () => string | null | undefined
       }
     },
     isStaleError: (error: unknown) => error === STALE,
+    /** False while the routed building differs from the given (possibly not yet reloaded) building. */
+    matches: (id: string) => !buildingId || (buildingId() ?? '').toLowerCase() === id.toLowerCase(),
   }
 }

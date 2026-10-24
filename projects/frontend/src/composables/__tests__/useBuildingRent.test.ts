@@ -107,4 +107,17 @@ describe('useBuildingRent', () => {
     expect((b.value as unknown as { pendingPricePerSqm?: number }).pendingPricePerSqm).toBeUndefined()
     expect(api.showRentDialog.value).toBe(false)
   })
+
+  it('does not save the rent of a building that is no longer the routed one', async () => {
+    const { useBuildingRent } = await import('../useBuildingRent')
+    const buildingId = ref('b1')
+    const b = ref({ id: 'b1', pricePerSqm: 10 } as unknown as Building)
+    const api = useBuildingRent({ building: b, t: (key: string) => key, buildingId: () => buildingId.value })
+    api.openRentDialog()
+    api.newRentPerSqm.value = 15
+    buildingId.value = 'b2'
+    api.newRentPerSqm.value = 15
+    await api.saveRentPerSqm()
+    expect(gqlRequest).not.toHaveBeenCalled()
+  })
 })

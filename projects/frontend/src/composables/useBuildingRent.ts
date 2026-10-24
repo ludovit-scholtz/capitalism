@@ -35,7 +35,7 @@ export function useBuildingRent(deps: {
   }
 
   async function saveRentPerSqm() {
-    if (!building.value || savingRent.value || newRentPerSqm.value === null) return
+    if (!building.value || !scope.matches(building.value.id) || savingRent.value || newRentPerSqm.value === null) return
     const gen = scope.token()
     savingRent.value = true
     rentSaveError.value = null

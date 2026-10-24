@@ -232,4 +232,17 @@ describe('useBuildingMediaHouse', () => {
     expect(api.mediaHouseUnitSuccess.value).toBe(false)
     expect(gqlRequest).toHaveBeenCalledTimes(1)
   })
+
+  it('does not send requests for a building that is no longer the routed one', async () => {
+    const { api, b, buildingId } = await setupScoped()
+    buildingId.value = 'b2' // the route moved, but building.value still holds b1 until the next load
+    await api.loadMediaHouseStats()
+    await api.loadMediaHouseAnalytics()
+    await api.upgradeMediaHouse()
+    await api.saveContentBudget()
+    api.mediaHouseTargetCompanyId.value = 'c1'
+    await api.saveMediaHouseUnitConfig()
+    expect(gqlRequest).not.toHaveBeenCalled()
+    expect((b.value as unknown as { id: string }).id).toBe('b1')
+  })
 })

@@ -43,4 +43,11 @@ describe('createBuildingScope', () => {
     id.value = 'b'
     await expect(late).rejects.toSatisfy((e: unknown) => scope.isStaleError(e))
   })
+
+  it('matches compares a building id with the watched route id (always true without one)', () => {
+    const id = ref('a')
+    expect(createBuildingScope(() => id.value).matches('a')).toBe(true)
+    expect(createBuildingScope(() => id.value).matches('b')).toBe(false)
+    expect(createBuildingScope().matches('anything')).toBe(true)
+  })
 })

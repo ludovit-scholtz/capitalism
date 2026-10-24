@@ -47,7 +47,7 @@ export function useBuildingMediaHouse(deps: {
   }
 
   async function saveContentBudget() {
-    if (!building.value || savingContentBudget.value) return
+    if (!building.value || !scope.matches(building.value.id) || savingContentBudget.value) return
     const gen = scope.token()
     savingContentBudget.value = true
     contentBudgetError.value = null
@@ -91,7 +91,7 @@ export function useBuildingMediaHouse(deps: {
 
   /** Upgrades the current MEDIA_HOUSE building to the next level. */
   async function upgradeMediaHouse() {
-    if (!building.value || upgradingMediaHouse.value) return
+    if (!building.value || !scope.matches(building.value.id) || upgradingMediaHouse.value) return
     const gen = scope.token()
     upgradingMediaHouse.value = true
     mediaHouseUpgradeError.value = null
@@ -129,7 +129,7 @@ export function useBuildingMediaHouse(deps: {
 
   /** Loads brand-impact analytics for the current MEDIA_HOUSE building. */
   async function loadMediaHouseAnalytics() {
-    if (!building.value || building.value.type !== 'MEDIA_HOUSE') return
+    if (!building.value || !scope.matches(building.value.id) || building.value.type !== 'MEDIA_HOUSE') return
     const gen = scope.token()
     mediaHouseAnalyticsLoading.value = true
     try {
@@ -181,7 +181,7 @@ export function useBuildingMediaHouse(deps: {
   }
 
   async function loadMediaHouseStats() {
-    if (!building.value || building.value.type !== 'MEDIA_HOUSE') return
+    if (!building.value || !scope.matches(building.value.id) || building.value.type !== 'MEDIA_HOUSE') return
     const gen = scope.token()
     mediaHouseStatsLoading.value = true
     try {
@@ -222,7 +222,7 @@ export function useBuildingMediaHouse(deps: {
   }
 
   async function saveMediaHouseUnitConfig() {
-    if (!building.value || building.value.type !== 'MEDIA_HOUSE' || savingMediaHouseUnit.value) return
+    if (!building.value || !scope.matches(building.value.id) || building.value.type !== 'MEDIA_HOUSE' || savingMediaHouseUnit.value) return
     if (!mediaHouseTargetCompanyId.value) {
       mediaHouseUnitError.value = t('mediaHouse.targetCompanyRequired')
       return
