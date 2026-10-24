@@ -68,6 +68,22 @@ internal static class TickBenchmarkWorld
                 CreatedAtUtc = DateTime.UtcNow,
             });
 
+            // A brand per company and two player exchange sell orders (the purchasing phase matches every purchase unit against them).
+            db.Brands.Add(new Brand
+            {
+                Id = DeterministicGuid(seed, "brand", p), CompanyId = company.Id, Name = $"Bench brand {p}", Scope = BrandScope.Product,
+                ProductTypeId = product.Id, Awareness = 0.2m, Quality = 0.5m,
+            });
+            for (var o = 0; o < 2; o++)
+            {
+                db.ExchangeOrders.Add(new ExchangeOrder
+                {
+                    Id = DeterministicGuid(seed, "order", p * 2 + o), ExchangeBuildingId = DeterministicGuid(seed, "building", p * scale.BuildingsPerPlayer),
+                    CompanyId = company.Id, Side = "SELL", ResourceTypeId = resources[(p + o) % resources.Count].Id, PricePerUnit = 3m + o, Quantity = 500m,
+                    RemainingQuantity = 500m, IsActive = true,
+                });
+            }
+
             for (var b = 0; b < scale.BuildingsPerPlayer; b++)
             {
                 // Every kind of building that has a phase of its own is represented, because a phase the world never exercises cannot show
