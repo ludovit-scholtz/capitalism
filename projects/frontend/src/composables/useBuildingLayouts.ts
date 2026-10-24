@@ -11,14 +11,22 @@ import {
   type LayoutUnit,
 } from '@/lib/masterLayoutApi'
 import type { Building } from '@/types'
+import { createBuildingScope } from '@/composables/buildingScope'
 import type { EditableGridUnit } from '@/composables/useBuildingDetail'
 
 /**
  * Layout templates (cloud and local) for the building edit grid: save the draft, list, apply and
  * delete. Extracted from useBuildingDetail (#596).
  */
-export function useBuildingLayouts(deps: { building: Ref<Building | null>; draftUnits: Ref<EditableGridUnit[]>; t: (key: string, params?: Record<string, unknown>) => string }) {
+export function useBuildingLayouts(deps: {
+  building: Ref<Building | null>
+  draftUnits: Ref<EditableGridUnit[]>
+  t: (key: string, params?: Record<string, unknown>) => string
+  /** When given, state is reset synchronously when the id changes and stale responses are dropped. */
+  buildingId?: () => string | null | undefined
+}) {
   const { building, draftUnits, t } = deps
+  const scope = createBuildingScope(deps.buildingId, () => resetState())
   const layoutName = ref('')
   const layoutDescription = ref('')
   // Master-API layout state
@@ -74,15 +82,17 @@ export function useBuildingLayouts(deps: { building: Ref<Building | null>; draft
       masterLayouts.value = []
       return
     }
+    const gen = scope.token()
     masterLayoutsLoading.value = true
     masterLayoutsError.value = null
     try {
-      const all = await fetchMasterLayouts()
+      const all = await scope.settle(gen, fetchMasterLayouts())
       masterLayouts.value = building.value ? all.filter((l) => l.buildingType === building.value!.type) : all
     } catch (err: unknown) {
+      if (scope.isStaleError(err)) return
       masterLayoutsError.value = err instanceof Error ? err.message : String(err)
     } finally {
-      masterLayoutsLoading.value = false
+      if (!scope.isStale(gen)) masterLayoutsLoading.value = false
     }
   }
 
@@ -94,6 +104,7 @@ export function useBuildingLayouts(deps: { building: Ref<Building | null>; draft
       return
     }
 
+    const gen = scope.token()
     layoutSaving.value = true
     layoutSaveError.value = null
     layoutSaveSuccess.value = false
@@ -124,7 +135,7 @@ export function useBuildingLayouts(deps: { building: Ref<Building | null>; draft
       layoutDescription.value = ''
       layoutSaveSuccess.value = true
       setTimeout(() => {
-        layoutSaveSuccess.value = false
+        if (!scope.isStale(gen)) layoutSaveSuccess.value = false
       }, 3000)
     } catch (err: unknown) {
       // If cloud failed, persist locally and surface a fallback warning
@@ -135,6 +146,7 @@ export function useBuildingLayouts(deps: { building: Ref<Building | null>; draft
           layoutSaveError.value = t('buildingDetail.layouts.masterError')
           layoutSaveSuccess.value = true
           setTimeout(() => {
+            if (scope.isStale(gen)) return
             layoutSaveSuccess.value = false
             layoutSaveError.value = null
           }, 4000)
@@ -145,7 +157,7 @@ export function useBuildingLayouts(deps: { building: Ref<Building | null>; draft
         layoutSaveError.value = err instanceof Error ? err.message : String(err)
       }
     } finally {
-      layoutSaving.value = false
+      if (!scope.isStale(gen)) layoutSaving.value = false
     }
   }
 
@@ -202,6 +214,19 @@ export function useBuildingLayouts(deps: { building: Ref<Building | null>; draft
     } catch (err: unknown) {
       layoutDeleteError.value = err instanceof Error ? err.message : String(err)
     }
+  }
+
+  /** Clears everything tied to one building; runs when the viewed building changes. */
+  function resetState() {
+    layoutSaving.value = false
+    layoutSaveError.value = null
+    layoutSaveSuccess.value = false
+    layoutDeleteError.value = null
+    overwriteConfirmPending.value = null
+    masterLayouts.value = []
+    masterLayoutsLoading.value = false
+    masterLayoutsError.value = null
+    localLayouts.value = []
   }
 
   return {

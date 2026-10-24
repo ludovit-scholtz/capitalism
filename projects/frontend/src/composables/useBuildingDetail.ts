@@ -420,7 +420,7 @@ export function useBuildingDetail() {
   const rent = useBuildingRent({ building, t, buildingId: () => buildingId.value })
   const mediaHouse = useBuildingMediaHouse({ building, t, loadCityMediaHouses: () => loadCityMediaHouses(), buildingId: () => buildingId.value })
   const { loadMediaHouseAnalytics, loadMediaHouseStats } = mediaHouse
-  const layouts = useBuildingLayouts({ building, draftUnits, t })
+  const layouts = useBuildingLayouts({ building, draftUnits, t, buildingId: () => buildingId.value })
   const { refreshLocalLayouts, refreshMasterLayouts } = layouts
 
   // Rental revenue sparkline (APARTMENT / COMMERCIAL)

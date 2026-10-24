@@ -49,9 +49,15 @@ function unit(overrides: Partial<EditableGridUnit> = {}): EditableGridUnit {
 async function setup(units: EditableGridUnit[] = [unit()]) {
   const { useBuildingLayouts } = await import('../useBuildingLayouts')
   const building = ref({ id: 'b1', type: 'FACTORY' } as unknown as Building)
+  const buildingId = ref('b1')
   const draftUnits = ref<EditableGridUnit[]>(units)
-  const layouts = useBuildingLayouts({ building, draftUnits, t: (key: string) => key })
-  return { layouts, building, draftUnits }
+  const layouts = useBuildingLayouts({
+    building,
+    draftUnits,
+    t: (key: string) => key,
+    buildingId: () => buildingId.value,
+  })
+  return { layouts, building, buildingId, draftUnits }
 }
 
 describe('useBuildingLayouts', () => {
@@ -186,5 +192,67 @@ describe('useBuildingLayouts', () => {
     const { layouts } = await setup()
     await layouts.deleteLayout({ id: 'c1', name: 'a', buildingType: 'FACTORY', isLocal: false } as never)
     expect(layouts.layoutDeleteError.value).toBe('nope')
+  })
+
+  it('resets messages, pending confirmation and lists when the building changes', async () => {
+    const { layouts, buildingId } = await setup()
+    layouts.layoutSaveError.value = 'x'
+    layouts.layoutSaveSuccess.value = true
+    layouts.layoutDeleteError.value = 'y'
+    layouts.overwriteConfirmPending.value = { name: 'p', buildingType: 'FACTORY', units: [] } as never
+    layouts.masterLayouts.value = [{ id: '1' } as never]
+    layouts.localLayouts.value = [{ name: 'l' } as never]
+    buildingId.value = 'b2'
+    expect(layouts.layoutSaveError.value).toBeNull()
+    expect(layouts.layoutSaveSuccess.value).toBe(false)
+    expect(layouts.layoutDeleteError.value).toBeNull()
+    expect(layouts.overwriteConfirmPending.value).toBeNull()
+    expect(layouts.masterLayouts.value).toEqual([])
+    expect(layouts.localLayouts.value).toEqual([])
+  })
+
+  it('a slow master layout fetch for the previous building is ignored', async () => {
+    api.isMasterConnected.mockReturnValue(true)
+    let resolveFetch!: (v: unknown) => void
+    api.fetchMasterLayouts.mockImplementationOnce(() => new Promise((r) => (resolveFetch = r)))
+    const { layouts, buildingId } = await setup()
+    const pending = layouts.refreshMasterLayouts()
+    buildingId.value = 'b2'
+    resolveFetch([{ id: '1', buildingType: 'FACTORY' }])
+    await pending
+    expect(layouts.masterLayouts.value).toEqual([])
+  })
+
+  it('the success banner clears itself after 3 seconds, but not for a different building', async () => {
+    vi.useFakeTimers()
+    try {
+      const { layouts, buildingId } = await setup()
+      layouts.layoutName.value = 'L'
+      await layouts.saveLayout()
+      expect(layouts.layoutSaveSuccess.value).toBe(true)
+      vi.advanceTimersByTime(3000)
+      expect(layouts.layoutSaveSuccess.value).toBe(false)
+      layouts.layoutName.value = 'L2'
+      await layouts.saveLayout()
+      buildingId.value = 'b2'
+      layouts.layoutSaveSuccess.value = true // a new banner on the next building
+      vi.advanceTimersByTime(3000)
+      expect(layouts.layoutSaveSuccess.value).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('reports the original cloud error when the local fallback also fails', async () => {
+    api.isMasterConnected.mockReturnValue(true)
+    api.saveMasterLayout.mockRejectedValueOnce(new Error('cloud down'))
+    api.saveLocalLayout.mockImplementationOnce(() => {
+      throw new Error('disk full')
+    })
+    const { layouts } = await setup()
+    layouts.layoutName.value = 'L'
+    await layouts.saveLayout()
+    expect(layouts.layoutSaveError.value).toBe('cloud down')
+    expect(layouts.layoutSaveSuccess.value).toBe(false)
   })
 })
