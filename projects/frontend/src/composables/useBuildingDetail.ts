@@ -4836,12 +4836,14 @@ export function useBuildingDetail() {
   watch(
     () => buildingId.value,
     (bid) => {
-      powerPlant.resetState()
       if (bid) {
         loadPanelDismissalState(bid)
       }
     },
   )
+
+  // Sync flush so the reset runs before any load for the new building can start.
+  watch(() => buildingId.value, () => powerPlant.resetState(), { flush: 'sync' })
 
   // Reset flush storage state when user navigates to a different unit
   watch(

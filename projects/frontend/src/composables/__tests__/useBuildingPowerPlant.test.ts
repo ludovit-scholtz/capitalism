@@ -138,4 +138,48 @@ describe('useBuildingPowerPlant', () => {
     await pending
     expect(api.powerPlantAnalytics.value).toBeNull()
   })
+
+  it('resetState keeps the per-city power balance (the panel only refetches when the city changes)', async () => {
+    gqlRequest.mockResolvedValueOnce({ cityPowerBalance: { cityId: 'c1' } })
+    const { api } = await setup()
+    await api.loadCityPowerBalance('c1')
+    api.resetState()
+    expect(api.cityPowerBalance.value).toMatchObject({ cityId: 'c1' })
+  })
+
+  it('a mutation that finishes after resetState does not touch the new building or its flags', async () => {
+    let resolveMutation!: (v: unknown) => void
+    gqlRequest.mockImplementationOnce(() => new Promise((r) => (resolveMutation = r)))
+    const { api, building } = await setup()
+    const pending = api.setPlantDispatch('b1', 40)
+    expect(api.dispatchSaving.value).toBe(true)
+    api.resetState()
+    expect(api.dispatchSaving.value).toBe(false)
+    api.dispatchSaving.value = true // a new mutation started on the next building
+    resolveMutation({ setPlantDispatch: { id: 'b1', dispatchTargetPercent: 40 } })
+    await pending
+    expect(api.dispatchSuccess.value).toBe(false)
+    expect(api.dispatchSaving.value).toBe(true)
+    expect((building.value as unknown as { dispatchTargetPercent?: number }).dispatchTargetPercent).toBeUndefined()
+    expect(gqlRequest).toHaveBeenCalledTimes(1)
+  })
+
+  it('a failing mutation that finishes after resetState does not set an error on the new building', async () => {
+    let rejectMutation!: (e: unknown) => void
+    gqlRequest.mockImplementationOnce(() => new Promise((_, rej) => (rejectMutation = rej)))
+    const { api } = await setup()
+    const pending = api.setPowerPriority('b1', 3)
+    api.resetState()
+    rejectMutation(new Error('late'))
+    await pending
+    expect(api.priorityError.value).toBeNull()
+  })
+
+  it('a successful mutation still sets the success flag when no reset happened', async () => {
+    gqlRequest.mockResolvedValue({})
+    const { api } = await setup()
+    await api.setMaxEnergyBidPrice('b1', 2)
+    expect(api.maxBidSuccess.value).toBe(true)
+    expect(api.maxBidSaving.value).toBe(false)
+  })
 })
