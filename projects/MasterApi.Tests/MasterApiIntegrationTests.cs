@@ -1552,27 +1552,18 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
                 && item.GetProperty("status").GetString() == "PUBLISHED").ToList();
             Assert.True(changelogItems.Count >= 4, $"Expected at least 4 CHANGELOG entries, got {changelogItems.Count}");
 
-            // Verify one specific CSV-imported entry (Bank capitalization, GUID 4e587c8a-...) is present and well-formed.
-            // Use Any() + First() instead of FirstOrDefault() to avoid the value-type default(JsonElement)
-            // ambiguity where ValueKind could be Undefined on a valid empty array scenario.
-            bool hasBankCap = changelogItems.Any(item =>
-                item.GetProperty("localizations").EnumerateArray().Any(l =>
-                    l.GetProperty("locale").GetString() == "en"
-                    && (l.GetProperty("title").GetString() ?? string.Empty)
-                           .Contains("Bank capitalization", StringComparison.OrdinalIgnoreCase)));
-            Assert.True(hasBankCap, "Expected 'Bank capitalization' entry in the feed but it was not found.");
-
-            var bankCap = changelogItems.First(item =>
-                item.GetProperty("localizations").EnumerateArray().Any(l =>
-                    l.GetProperty("locale").GetString() == "en"
-                    && (l.GetProperty("title").GetString() ?? string.Empty)
-                           .Contains("Bank capitalization", StringComparison.OrdinalIgnoreCase)));
-            var bankCapLocales = bankCap.GetProperty("localizations").EnumerateArray()
-                .Select(l => l.GetProperty("locale").GetString())
-                .ToHashSet();
-            Assert.Contains("en", bankCapLocales);
-            Assert.Contains("sk", bankCapLocales);
-            Assert.Contains("de", bankCapLocales);
+            // The feed is capped at the newest 500 rows and CHANGELOG.csv keeps growing, so do not look for
+            // one specific old row. Every imported entry must be well-formed: en, sk and de localizations
+            // with a non-empty title.
+            foreach (var item in changelogItems)
+            {
+                var localizations = item.GetProperty("localizations").EnumerateArray().ToList();
+                var locales = localizations.Select(l => l.GetProperty("locale").GetString()).ToHashSet();
+                Assert.Contains("en", locales);
+                Assert.Contains("sk", locales);
+                Assert.Contains("de", locales);
+                Assert.All(localizations, l => Assert.False(string.IsNullOrWhiteSpace(l.GetProperty("title").GetString())));
+            }
         }
 
         #region Changelog CSV importer unit tests
