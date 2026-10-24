@@ -28,7 +28,9 @@ import {
 } from '@/lib/catalogPresentation'
 import { PRODUCTION_PANEL_DISMISSED_KEY, SALES_PANEL_DISMISSED_KEY, isBuildingPanelDismissed, dismissBuildingPanel, shouldShowPanel } from '@/lib/panelDismissal'
 import { useTickRefresh } from '@/composables/useTickRefresh'
+import { useBuildingMediaHouse } from '@/composables/useBuildingMediaHouse'
 import { useBuildingPowerPlant } from '@/composables/useBuildingPowerPlant'
+import { useBuildingRent } from '@/composables/useBuildingRent'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { gqlRequest, GraphQLError } from '@/lib/graphql'
 import {
@@ -75,8 +77,6 @@ import type {
   ResearchBrandState,
   ResourceType,
   CityMediaHouseInfo,
-  MediaHouseAnalyticsResult,
-  MediaHouseStatsResult,
   SourcingCandidate,
   UnitProductAnalytics,
   ApartmentBuildingDetail,
@@ -439,40 +439,14 @@ export function useBuildingDetail() {
   let _clipboardMessageTimer: ReturnType<typeof setTimeout> | null = null
 
   const { saveScrollPosition, restoreScrollPosition } = useScrollPreservation()
+  const rent = useBuildingRent({ building, t, buildingId: () => buildingId.value })
+  const mediaHouse = useBuildingMediaHouse({ building, t, loadCityMediaHouses: () => loadCityMediaHouses(), buildingId: () => buildingId.value })
+  const { loadMediaHouseAnalytics, loadMediaHouseStats } = mediaHouse
 
-  // Property management (APARTMENT / COMMERCIAL)
-  const showRentDialog = ref(false)
-  const newRentPerSqm = ref<number | null>(null)
-  const savingRent = ref(false)
-  const rentSaveError = ref<string | null>(null)
   // Rental revenue sparkline (APARTMENT / COMMERCIAL)
   const rentalAnalytics = ref<ApartmentBuildingDetail | null>(null)
   const rentalAnalyticsLoading = ref(false)
 
-  // Media house content management (MEDIA_HOUSE)
-  const contentBudgetInput = ref<number | null>(null)
-  const savingContentBudget = ref(false)
-  const contentBudgetError = ref<string | null>(null)
-  const contentBudgetSuccess = ref(false)
-
-  // Media house upgrade (MEDIA_HOUSE)
-  const upgradingMediaHouse = ref(false)
-  const mediaHouseUpgradeError = ref<string | null>(null)
-  const mediaHouseUpgradeSuccess = ref(false)
-
-  // Media house analytics (MEDIA_HOUSE)
-  const mediaHouseAnalytics = ref<MediaHouseAnalyticsResult | null>(null)
-  const mediaHouseAnalyticsLoading = ref(false)
-  const mediaHouseStats = ref<MediaHouseStatsResult | null>(null)
-  const mediaHouseStatsLoading = ref(false)
-  const mediaHouseUnitId = ref<string | null>(null)
-  const mediaHouseTargetCompanyId = ref<string | null>(null)
-  const mediaHouseUnitMediaType = ref<'NEWSPAPER' | 'RADIO' | 'TV'>('NEWSPAPER')
-  const mediaHouseCampaignBudgetPerTick = ref<number>(0)
-  const mediaHouseUnitActive = ref(true)
-  const savingMediaHouseUnit = ref(false)
-  const mediaHouseUnitError = ref<string | null>(null)
-  const mediaHouseUnitSuccess = ref(false)
 
   // Flush storage
   const showFlushConfirmDialog = ref(false)
@@ -2200,260 +2174,6 @@ export function useBuildingDetail() {
     const locationMultiplier = 1 + (b.populationIndex ?? EMV_DEFAULT_POPULATION_INDEX) * 0.5
     return Math.round(((EMV_BASE_LOT_VALUE * levelMultiplier + unitValue) * locationMultiplier) / 1000) * 1000
   })
-
-  // ── Rent management (APARTMENT / COMMERCIAL) ──
-
-  function openRentDialog() {
-    newRentPerSqm.value = building.value?.pendingPricePerSqm ?? building.value?.pricePerSqm ?? null
-    rentSaveError.value = null
-    showRentDialog.value = true
-  }
-
-  function closeRentDialog() {
-    showRentDialog.value = false
-    rentSaveError.value = null
-  }
-
-  async function saveRentPerSqm() {
-    if (!building.value || savingRent.value || newRentPerSqm.value === null) return
-    savingRent.value = true
-    rentSaveError.value = null
-    try {
-      const result = await gqlRequest<{
-        setRentPerSqm: { id: string; pricePerSqm: number | null; pendingPricePerSqm: number | null; pendingPriceActivationTick: number | null }
-      }>(
-        `mutation SetRentPerSqm($input: SetRentPerSqmInput!) {
-          setRentPerSqm(input: $input) {
-            id pricePerSqm pendingPricePerSqm pendingPriceActivationTick
-          }
-        }`,
-        {
-          input: {
-            buildingId: building.value.id,
-            rentPerSqm: newRentPerSqm.value,
-          },
-        },
-      )
-      // Update local building state with returned values.
-      if (building.value) {
-        building.value.pendingPricePerSqm = result.setRentPerSqm.pendingPricePerSqm
-        building.value.pendingPriceActivationTick = result.setRentPerSqm.pendingPriceActivationTick
-      }
-      showRentDialog.value = false
-    } catch (reason: unknown) {
-      rentSaveError.value = reason instanceof Error ? reason.message : t('property.saveFailed')
-    } finally {
-      savingRent.value = false
-    }
-  }
-
-  // ── Media house content management ──
-
-  function initContentBudgetInput() {
-    contentBudgetInput.value = building.value?.contentBudgetPerTick ?? null
-    contentBudgetError.value = null
-    contentBudgetSuccess.value = false
-  }
-
-  async function saveContentBudget() {
-    if (!building.value || savingContentBudget.value) return
-    savingContentBudget.value = true
-    contentBudgetError.value = null
-    contentBudgetSuccess.value = false
-    try {
-      const result = await gqlRequest<{
-        setMediaHouseContentBudget: { id: string; contentBudgetPerTick: number | null; contentValue: number }
-      }>(
-        `mutation SetMediaHouseContentBudget($input: SetMediaHouseContentBudgetInput!) {
-          setMediaHouseContentBudget(input: $input) {
-            id contentBudgetPerTick contentValue
-          }
-        }`,
-        {
-          input: {
-            buildingId: building.value.id,
-            contentBudgetPerTick: contentBudgetInput.value ?? 0,
-          },
-        },
-      )
-      if (building.value) {
-        building.value.contentBudgetPerTick = result.setMediaHouseContentBudget.contentBudgetPerTick
-        building.value.contentValue = result.setMediaHouseContentBudget.contentValue
-      }
-      contentBudgetSuccess.value = true
-      // Also refresh the city media houses list to reflect updated content budget.
-      await loadCityMediaHouses()
-      setTimeout(() => {
-        contentBudgetSuccess.value = false
-      }, 3000)
-    } catch (reason: unknown) {
-      contentBudgetError.value = reason instanceof Error ? reason.message : t('mediaHouse.saveFailed')
-    } finally {
-      savingContentBudget.value = false
-    }
-  }
-
-  /** Upgrades the current MEDIA_HOUSE building to the next level. */
-  async function upgradeMediaHouse() {
-    if (!building.value) return
-    upgradingMediaHouse.value = true
-    mediaHouseUpgradeError.value = null
-    mediaHouseUpgradeSuccess.value = false
-    try {
-      const result = await gqlRequest<{
-        upgradeMediaHouse: { id: string; level: number }
-      }>(
-        `mutation UpgradeMediaHouse($input: UpgradeMediaHouseInput!) {
-          upgradeMediaHouse(input: $input) {
-            id level
-          }
-        }`,
-        { input: { buildingId: building.value.id } },
-      )
-      if (building.value) {
-        building.value.level = result.upgradeMediaHouse.level
-      }
-      mediaHouseUpgradeSuccess.value = true
-      // Refresh analytics after upgrade.
-      await loadMediaHouseAnalytics()
-      setTimeout(() => {
-        mediaHouseUpgradeSuccess.value = false
-      }, 4000)
-    } catch (reason: unknown) {
-      mediaHouseUpgradeError.value = reason instanceof Error ? reason.message : t('mediaHouse.upgradeFailed')
-    } finally {
-      upgradingMediaHouse.value = false
-    }
-  }
-
-  /** Loads brand-impact analytics for the current MEDIA_HOUSE building. */
-  async function loadMediaHouseAnalytics() {
-    if (!building.value || building.value.type !== 'MEDIA_HOUSE') return
-    mediaHouseAnalyticsLoading.value = true
-    try {
-      const data = await gqlRequest<{ mediaHouseAnalytics: MediaHouseAnalyticsResult | null }>(
-        `query MediaHouseAnalytics($buildingId: UUID!) {
-          mediaHouseAnalytics(buildingId: $buildingId) {
-            buildingId buildingName mediaType level contentValue contentRankingPct
-            channelMultiplier effectiveMultiplier currentEfficiencyPct nextLevelEfficiencyPct
-            isMaxLevel upgradeCostEur upgradeTimeTicks maxLevel
-            totalIncomeLast100Ticks avgIncomePerTick
-            advertiserCount strategyRating strategyTip
-            incomeHistory { tick amount description }
-            brandEffects {
-              companyId companyName brandScope productName
-              brandAwareness marketingQuality effectivenessMultiplierApplied
-            }
-          }
-        }`,
-        { buildingId: building.value.id },
-      )
-      mediaHouseAnalytics.value = data.mediaHouseAnalytics ?? null
-    } catch {
-      mediaHouseAnalytics.value = null
-    } finally {
-      mediaHouseAnalyticsLoading.value = false
-    }
-  }
-
-  function initMediaHouseUnitFromStats() {
-    const firstUnit = mediaHouseStats.value?.units?.[0]
-    if (firstUnit) {
-      mediaHouseUnitId.value = firstUnit.id
-      mediaHouseTargetCompanyId.value = firstUnit.targetCompanyId
-      mediaHouseUnitMediaType.value = (firstUnit.mediaType as 'NEWSPAPER' | 'RADIO' | 'TV') ?? 'NEWSPAPER'
-      mediaHouseCampaignBudgetPerTick.value = firstUnit.campaignBudgetPerTick ?? 0
-      mediaHouseUnitActive.value = firstUnit.isActive
-      return
-    }
-
-    mediaHouseUnitId.value = null
-    mediaHouseTargetCompanyId.value = building.value?.companyId ?? null
-    mediaHouseUnitMediaType.value = (building.value?.mediaType as 'NEWSPAPER' | 'RADIO' | 'TV') ?? 'NEWSPAPER'
-    mediaHouseCampaignBudgetPerTick.value = 0
-    mediaHouseUnitActive.value = true
-  }
-
-  async function loadMediaHouseStats() {
-    if (!building.value || building.value.type !== 'MEDIA_HOUSE') return
-    mediaHouseStatsLoading.value = true
-    try {
-      const data = await gqlRequest<{ mediaHouseStats: MediaHouseStatsResult | null }>(
-        `query MediaHouseStats($buildingId: UUID!) {
-          mediaHouseStats(buildingId: $buildingId) {
-            buildingId
-            currentBoostDelivered
-            campaignCostThisTaxCycle
-            estimatedSalesImpact
-            boostHistory { tick boost }
-            units {
-              id
-              targetCompanyId
-              targetCompanyName
-              mediaType
-              campaignBudgetPerTick
-              brandQualityBoostPerTick
-              isActive
-              laborCostPerTick
-              energyCostPerTick
-            }
-          }
-        }`,
-        { buildingId: building.value.id },
-      )
-      mediaHouseStats.value = data.mediaHouseStats ?? null
-      initMediaHouseUnitFromStats()
-    } catch {
-      mediaHouseStats.value = null
-    } finally {
-      mediaHouseStatsLoading.value = false
-    }
-  }
-
-  async function saveMediaHouseUnitConfig() {
-    if (!building.value || building.value.type !== 'MEDIA_HOUSE' || savingMediaHouseUnit.value) return
-    if (!mediaHouseTargetCompanyId.value) {
-      mediaHouseUnitError.value = t('mediaHouse.targetCompanyRequired')
-      return
-    }
-    if (mediaHouseCampaignBudgetPerTick.value < 0) {
-      mediaHouseUnitError.value = t('mediaHouse.budgetMustBeNonNegative')
-      return
-    }
-
-    savingMediaHouseUnit.value = true
-    mediaHouseUnitError.value = null
-    mediaHouseUnitSuccess.value = false
-
-    try {
-      await gqlRequest<{
-        configureMediaHouseUnit: { id: string }
-      }>(
-        `mutation ConfigureMediaHouseUnit($input: ConfigureMediaHouseUnitInput!) {
-          configureMediaHouseUnit(input: $input) { id }
-        }`,
-        {
-          input: {
-            buildingId: building.value.id,
-            unitId: mediaHouseUnitId.value,
-            targetCompanyId: mediaHouseTargetCompanyId.value,
-            mediaType: mediaHouseUnitMediaType.value,
-            campaignBudgetPerTick: mediaHouseCampaignBudgetPerTick.value,
-            isActive: mediaHouseUnitActive.value,
-          },
-        },
-      )
-      mediaHouseUnitSuccess.value = true
-      await loadMediaHouseStats()
-      setTimeout(() => {
-        mediaHouseUnitSuccess.value = false
-      }, 3000)
-    } catch (reason: unknown) {
-      mediaHouseUnitError.value = reason instanceof Error ? reason.message : t('mediaHouse.saveFailed')
-    } finally {
-      savingMediaHouseUnit.value = false
-    }
-  }
 
   /** Extract serialisable unit data from the draft list. */
   function getDraftLayoutUnits(): LayoutUnit[] {
@@ -4999,6 +4719,8 @@ export function useBuildingDetail() {
   }
 
   return {
+    ...rent,
+    ...mediaHouse,
     ...powerPlant,
     locale,
     building,
@@ -5072,31 +4794,8 @@ export function useBuildingDetail() {
     selectedHistoryItemKey,
     clipboardMessage,
     clipboardMessageType,
-    showRentDialog,
-    newRentPerSqm,
-    savingRent,
-    rentSaveError,
-    contentBudgetInput,
-    savingContentBudget,
-    contentBudgetError,
-    contentBudgetSuccess,
-    upgradingMediaHouse,
-    mediaHouseUpgradeError,
-    mediaHouseUpgradeSuccess,
-    mediaHouseAnalytics,
-    mediaHouseAnalyticsLoading,
-    mediaHouseStats,
-    mediaHouseStatsLoading,
-    mediaHouseUnitId,
-    mediaHouseTargetCompanyId,
-    mediaHouseUnitMediaType,
-    mediaHouseCampaignBudgetPerTick,
     rentalAnalytics,
     rentalAnalyticsLoading,
-    mediaHouseUnitActive,
-    savingMediaHouseUnit,
-    mediaHouseUnitError,
-    mediaHouseUnitSuccess,
     showFlushConfirmDialog,
     flushingStorage,
     flushStorageError,
@@ -5243,11 +4942,6 @@ export function useBuildingDetail() {
     isLoanDefaulted,
     defaultedCollateralLoan,
     ticksUntilDestruction,
-    openRentDialog,
-    closeRentDialog,
-    saveRentPerSqm,
-    initContentBudgetInput,
-    saveContentBudget,
     getDraftLayoutUnits,
     refreshLocalLayouts,
     refreshMasterLayouts,
@@ -5333,10 +5027,6 @@ export function useBuildingDetail() {
     loadResearchBrands,
     loadCityMediaHouses,
     loadPublicSalesAnalytics,
-    loadMediaHouseAnalytics,
-    loadMediaHouseStats,
-    saveMediaHouseUnitConfig,
-    upgradeMediaHouse,
     loadUnitProductAnalytics,
     submitQuickPriceUpdate,
     submitPublicSalesInventoryAlertThreshold,
