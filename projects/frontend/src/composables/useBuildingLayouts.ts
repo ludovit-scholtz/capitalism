@@ -118,7 +118,7 @@ export function useBuildingLayouts(deps: {
       if (masterConnected.value) {
         // Find if an existing cloud layout with the same name exists so we can update it
         const existing = masterLayouts.value.find((l) => l.name === name)
-        const saved = await saveMasterLayout(name, description, buildingType, units, existing?.id)
+        const saved = await scope.settle(gen, saveMasterLayout(name, description, buildingType, units, existing?.id))
         // Update local cache
         const idx = masterLayouts.value.findIndex((l) => l.id === saved.id)
         if (idx >= 0) {
@@ -138,6 +138,7 @@ export function useBuildingLayouts(deps: {
         if (!scope.isStale(gen)) layoutSaveSuccess.value = false
       }, 3000)
     } catch (err: unknown) {
+      if (scope.isStaleError(err)) return
       // If cloud failed, persist locally and surface a fallback warning
       if (masterConnected.value) {
         try {
@@ -202,22 +203,26 @@ export function useBuildingLayouts(deps: {
 
   /** Delete a layout template. */
   async function deleteLayout(layout: BuildingLayoutTemplate): Promise<void> {
+    const gen = scope.token()
     layoutDeleteError.value = null
     try {
       if (!layout.isLocal && layout.id) {
-        await deleteMasterLayout(layout.id)
+        await scope.settle(gen, deleteMasterLayout(layout.id))
         masterLayouts.value = masterLayouts.value.filter((l) => l.id !== layout.id)
       } else {
         deleteLocalLayout(layout.name, layout.buildingType)
         refreshLocalLayouts()
       }
     } catch (err: unknown) {
+      if (scope.isStaleError(err)) return
       layoutDeleteError.value = err instanceof Error ? err.message : String(err)
     }
   }
 
   /** Clears everything tied to one building; runs when the viewed building changes. */
   function resetState() {
+    layoutName.value = ''
+    layoutDescription.value = ''
     layoutSaving.value = false
     layoutSaveError.value = null
     layoutSaveSuccess.value = false

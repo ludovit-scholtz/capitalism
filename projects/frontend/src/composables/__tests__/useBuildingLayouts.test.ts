@@ -255,4 +255,52 @@ describe('useBuildingLayouts', () => {
     expect(layouts.layoutSaveError.value).toBe('cloud down')
     expect(layouts.layoutSaveSuccess.value).toBe(false)
   })
+
+  it('clears the layout name and description when the building changes', async () => {
+    const { layouts, buildingId } = await setup()
+    layouts.layoutName.value = 'A name'
+    layouts.layoutDescription.value = 'A description'
+    buildingId.value = 'b2'
+    expect(layouts.layoutName.value).toBe('')
+    expect(layouts.layoutDescription.value).toBe('')
+  })
+
+  it('a slow cloud save for the previous building does not write into the new one', async () => {
+    api.isMasterConnected.mockReturnValue(true)
+    let resolveSave!: (v: unknown) => void
+    api.saveMasterLayout.mockImplementationOnce(() => new Promise((r) => (resolveSave = r)))
+    const { layouts, buildingId } = await setup()
+    layouts.layoutName.value = 'L'
+    const pending = layouts.saveLayout()
+    buildingId.value = 'b2'
+    resolveSave({ id: 'x', name: 'L', buildingType: 'FACTORY', units: [] })
+    await pending
+    expect(layouts.masterLayouts.value).toEqual([])
+    expect(layouts.layoutSaveSuccess.value).toBe(false)
+  })
+
+  it('a failing cloud save for the previous building shows no banner on the new building', async () => {
+    api.isMasterConnected.mockReturnValue(true)
+    let rejectSave!: (e: unknown) => void
+    api.saveMasterLayout.mockImplementationOnce(() => new Promise((_, rej) => (rejectSave = rej)))
+    const { layouts, buildingId } = await setup()
+    layouts.layoutName.value = 'L'
+    const pending = layouts.saveLayout()
+    buildingId.value = 'b2'
+    rejectSave(new Error('late'))
+    await pending
+    expect(layouts.layoutSaveError.value).toBeNull()
+    expect(layouts.layoutSaveSuccess.value).toBe(false)
+  })
+
+  it('a slow cloud delete for the previous building does not touch the new building state', async () => {
+    let rejectDelete!: (e: unknown) => void
+    api.deleteMasterLayout.mockImplementationOnce(() => new Promise((_, rej) => (rejectDelete = rej)))
+    const { layouts, buildingId } = await setup()
+    const pending = layouts.deleteLayout({ id: 'c1', name: 'a', buildingType: 'FACTORY', isLocal: false } as never)
+    buildingId.value = 'b2'
+    rejectDelete(new Error('late'))
+    await pending
+    expect(layouts.layoutDeleteError.value).toBeNull()
+  })
 })
