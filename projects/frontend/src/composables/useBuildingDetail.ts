@@ -180,7 +180,7 @@ export function useBuildingDetail() {
 
   const buildingId = computed(() => route.params.id as string)
   const building = ref<Building | null>(null)
-  const powerPlant = useBuildingPowerPlant({ building, getToken: () => auth.token })
+  const powerPlant = useBuildingPowerPlant({ building, getToken: () => auth.token, buildingId: () => buildingId.value })
   const { loadPowerPlantAnalytics } = powerPlant
   const currentTick = ref(0)
   const loading = ref(true)
