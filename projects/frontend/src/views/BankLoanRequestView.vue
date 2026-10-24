@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/auth'
 import { getActiveCompany } from '@/lib/accountContext'
 import type { BankInfoSummary, CollateralEligibilitySummary, Company, CompanyBankAccountSummary } from '@/types'
 import { computePaymentAmount, computeTotalPayments, computeTotalRepayment, formatCurrency, formatLoanDuration, formatPercent } from '@/lib/loanHelpers'
+import { BANK_INFO_QUERY, MY_COMPANIES_QUERY, MY_COLLATERAL_BUILDINGS_QUERY, MY_COLLATERAL_BUILDINGS_LEGACY_QUERY, COMPANY_BANK_ACCOUNTS_QUERY, ACCEPT_LOAN_MUTATION } from '@/lib/bankLoanRequestView'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -31,106 +32,6 @@ const durationTicks = ref(8760)
 const selectedCollateralBuildingId = ref<string | null>(null)
 const selectedBankAccountId = ref<string | null>(null)
 const currentStep = ref(1)
-
-const BANK_INFO_QUERY = `
-  query BankInfo($id: UUID!) {
-    bankInfo(bankBuildingId: $id) {
-      bankBuildingId
-      bankBuildingName
-      cityId
-      cityName
-      cityCurrencyCode
-      cityCurrencySymbol
-      baseCapitalRequirement
-      lenderCompanyId
-      lenderCompanyName
-      depositInterestRatePercent
-      lendingInterestRatePercent
-      totalDeposits
-      lendableCapacity
-      outstandingLoanPrincipal
-      availableLendingCapacity
-      baseCapitalDeposited
-      centralBankDebt
-      centralBankInterestRatePercent
-      reserveRequirement
-      availableCash
-      reserveShortfall
-      liquidityStatus
-    }
-  }
-`
-
-const MY_COMPANIES_QUERY = `
-  {
-    me {
-      companies {
-        id
-        name
-        cash
-        playerId
-        buildings { id type }
-      }
-    }
-  }
-`
-
-const MY_COLLATERAL_BUILDINGS_QUERY = `
-  query MyCollateralBuildings($bankBuildingId: UUID) {
-    myCollateralBuildings(bankBuildingId: $bankBuildingId) {
-      buildingId
-      buildingName
-      buildingType
-      level
-      appraisedValue
-      maxBorrowable
-      existingSecuredExposure
-      remainingBorrowingCapacity
-      currencyCode
-      isEligible
-      ineligibilityReason
-    }
-  }
-`
-
-const MY_COLLATERAL_BUILDINGS_LEGACY_QUERY = `
-  {
-    myCollateralBuildings {
-      buildingId
-      buildingName
-      buildingType
-      level
-      appraisedValue
-      maxBorrowable
-      existingSecuredExposure
-      remainingBorrowingCapacity
-      currencyCode
-      isEligible
-      ineligibilityReason
-    }
-  }
-`
-
-const COMPANY_BANK_ACCOUNTS_QUERY = `
-  query CompanyBankAccounts($companyId: UUID!) {
-    companyBankAccounts(companyId: $companyId) {
-      id
-      accountNumber
-      currencyCode
-      balance
-    }
-  }
-`
-
-const ACCEPT_LOAN_MUTATION = `
-  mutation AcceptLoan($input: AcceptLoanInput!) {
-    acceptLoan(input: $input) {
-      id
-      status
-      originalPrincipal
-    }
-  }
-`
 
 const cityCurrency = computed(() => bankInfo.value?.cityCurrencyCode ?? 'EUR')
 const fmt = (amount: number) => formatCurrency(amount, cityCurrency.value)
