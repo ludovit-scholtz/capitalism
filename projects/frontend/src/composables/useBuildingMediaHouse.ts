@@ -1,5 +1,6 @@
-import { ref, watch, type Ref } from 'vue'
+import { ref, type Ref } from 'vue'
 import { gqlRequest } from '@/lib/graphql'
+import { createBuildingScope } from '@/composables/buildingScope'
 import type { Building, MediaHouseAnalyticsResult, MediaHouseStatsResult } from '@/types'
 
 /**
@@ -14,6 +15,7 @@ export function useBuildingMediaHouse(deps: {
   buildingId?: () => string | null | undefined
 }) {
   const { building, t, loadCityMediaHouses } = deps
+  const scope = createBuildingScope(deps.buildingId, () => resetState())
   const contentBudgetInput = ref<number | null>(null)
   const savingContentBudget = ref(false)
   const contentBudgetError = ref<string | null>(null)
@@ -46,24 +48,28 @@ export function useBuildingMediaHouse(deps: {
 
   async function saveContentBudget() {
     if (!building.value || savingContentBudget.value) return
+    const gen = scope.token()
     savingContentBudget.value = true
     contentBudgetError.value = null
     contentBudgetSuccess.value = false
     try {
-      const result = await gqlRequest<{
-        setMediaHouseContentBudget: { id: string; contentBudgetPerTick: number | null; contentValue: number }
-      }>(
-        `mutation SetMediaHouseContentBudget($input: SetMediaHouseContentBudgetInput!) {
+      const result = await scope.settle(
+        gen,
+        gqlRequest<{
+          setMediaHouseContentBudget: { id: string; contentBudgetPerTick: number | null; contentValue: number }
+        }>(
+          `mutation SetMediaHouseContentBudget($input: SetMediaHouseContentBudgetInput!) {
           setMediaHouseContentBudget(input: $input) {
             id contentBudgetPerTick contentValue
           }
         }`,
-        {
-          input: {
-            buildingId: building.value.id,
-            contentBudgetPerTick: contentBudgetInput.value ?? 0,
+          {
+            input: {
+              buildingId: building.value.id,
+              contentBudgetPerTick: contentBudgetInput.value ?? 0,
+            },
           },
-        },
+        ),
       )
       if (building.value) {
         building.value.contentBudgetPerTick = result.setMediaHouseContentBudget.contentBudgetPerTick
@@ -73,31 +79,36 @@ export function useBuildingMediaHouse(deps: {
       // Also refresh the city media houses list to reflect updated content budget.
       await loadCityMediaHouses().catch(() => {})
       setTimeout(() => {
-        contentBudgetSuccess.value = false
+        if (!scope.isStale(gen)) contentBudgetSuccess.value = false
       }, 3000)
     } catch (reason: unknown) {
+      if (scope.isStaleError(reason)) return
       contentBudgetError.value = reason instanceof Error ? reason.message : t('mediaHouse.saveFailed')
     } finally {
-      savingContentBudget.value = false
+      if (!scope.isStale(gen)) savingContentBudget.value = false
     }
   }
 
   /** Upgrades the current MEDIA_HOUSE building to the next level. */
   async function upgradeMediaHouse() {
     if (!building.value || upgradingMediaHouse.value) return
+    const gen = scope.token()
     upgradingMediaHouse.value = true
     mediaHouseUpgradeError.value = null
     mediaHouseUpgradeSuccess.value = false
     try {
-      const result = await gqlRequest<{
-        upgradeMediaHouse: { id: string; level: number }
-      }>(
-        `mutation UpgradeMediaHouse($input: UpgradeMediaHouseInput!) {
+      const result = await scope.settle(
+        gen,
+        gqlRequest<{
+          upgradeMediaHouse: { id: string; level: number }
+        }>(
+          `mutation UpgradeMediaHouse($input: UpgradeMediaHouseInput!) {
           upgradeMediaHouse(input: $input) {
             id level
           }
         }`,
-        { input: { buildingId: building.value.id } },
+          { input: { buildingId: building.value.id } },
+        ),
       )
       if (building.value) {
         building.value.level = result.upgradeMediaHouse.level
@@ -106,22 +117,26 @@ export function useBuildingMediaHouse(deps: {
       // Refresh analytics after upgrade.
       await loadMediaHouseAnalytics()
       setTimeout(() => {
-        mediaHouseUpgradeSuccess.value = false
+        if (!scope.isStale(gen)) mediaHouseUpgradeSuccess.value = false
       }, 4000)
     } catch (reason: unknown) {
+      if (scope.isStaleError(reason)) return
       mediaHouseUpgradeError.value = reason instanceof Error ? reason.message : t('mediaHouse.upgradeFailed')
     } finally {
-      upgradingMediaHouse.value = false
+      if (!scope.isStale(gen)) upgradingMediaHouse.value = false
     }
   }
 
   /** Loads brand-impact analytics for the current MEDIA_HOUSE building. */
   async function loadMediaHouseAnalytics() {
     if (!building.value || building.value.type !== 'MEDIA_HOUSE') return
+    const gen = scope.token()
     mediaHouseAnalyticsLoading.value = true
     try {
-      const data = await gqlRequest<{ mediaHouseAnalytics: MediaHouseAnalyticsResult | null }>(
-        `query MediaHouseAnalytics($buildingId: UUID!) {
+      const data = await scope.settle(
+        gen,
+        gqlRequest<{ mediaHouseAnalytics: MediaHouseAnalyticsResult | null }>(
+          `query MediaHouseAnalytics($buildingId: UUID!) {
           mediaHouseAnalytics(buildingId: $buildingId) {
             buildingId buildingName mediaType level contentValue contentRankingPct
             channelMultiplier effectiveMultiplier currentEfficiencyPct nextLevelEfficiencyPct
@@ -135,13 +150,15 @@ export function useBuildingMediaHouse(deps: {
             }
           }
         }`,
-        { buildingId: building.value.id },
+          { buildingId: building.value.id },
+        ),
       )
       mediaHouseAnalytics.value = data.mediaHouseAnalytics ?? null
-    } catch {
+    } catch (reason: unknown) {
+      if (scope.isStaleError(reason)) return
       mediaHouseAnalytics.value = null
     } finally {
-      mediaHouseAnalyticsLoading.value = false
+      if (!scope.isStale(gen)) mediaHouseAnalyticsLoading.value = false
     }
   }
 
@@ -165,10 +182,13 @@ export function useBuildingMediaHouse(deps: {
 
   async function loadMediaHouseStats() {
     if (!building.value || building.value.type !== 'MEDIA_HOUSE') return
+    const gen = scope.token()
     mediaHouseStatsLoading.value = true
     try {
-      const data = await gqlRequest<{ mediaHouseStats: MediaHouseStatsResult | null }>(
-        `query MediaHouseStats($buildingId: UUID!) {
+      const data = await scope.settle(
+        gen,
+        gqlRequest<{ mediaHouseStats: MediaHouseStatsResult | null }>(
+          `query MediaHouseStats($buildingId: UUID!) {
           mediaHouseStats(buildingId: $buildingId) {
             buildingId
             currentBoostDelivered
@@ -188,14 +208,16 @@ export function useBuildingMediaHouse(deps: {
             }
           }
         }`,
-        { buildingId: building.value.id },
+          { buildingId: building.value.id },
+        ),
       )
       mediaHouseStats.value = data.mediaHouseStats ?? null
       initMediaHouseUnitFromStats()
-    } catch {
+    } catch (reason: unknown) {
+      if (scope.isStaleError(reason)) return
       mediaHouseStats.value = null
     } finally {
-      mediaHouseStatsLoading.value = false
+      if (!scope.isStale(gen)) mediaHouseStatsLoading.value = false
     }
   }
 
@@ -210,37 +232,42 @@ export function useBuildingMediaHouse(deps: {
       return
     }
 
+    const gen = scope.token()
     savingMediaHouseUnit.value = true
     mediaHouseUnitError.value = null
     mediaHouseUnitSuccess.value = false
 
     try {
-      await gqlRequest<{
-        configureMediaHouseUnit: { id: string }
-      }>(
-        `mutation ConfigureMediaHouseUnit($input: ConfigureMediaHouseUnitInput!) {
+      await scope.settle(
+        gen,
+        gqlRequest<{
+          configureMediaHouseUnit: { id: string }
+        }>(
+          `mutation ConfigureMediaHouseUnit($input: ConfigureMediaHouseUnitInput!) {
           configureMediaHouseUnit(input: $input) { id }
         }`,
-        {
-          input: {
-            buildingId: building.value.id,
-            unitId: mediaHouseUnitId.value,
-            targetCompanyId: mediaHouseTargetCompanyId.value,
-            mediaType: mediaHouseUnitMediaType.value,
-            campaignBudgetPerTick: mediaHouseCampaignBudgetPerTick.value,
-            isActive: mediaHouseUnitActive.value,
+          {
+            input: {
+              buildingId: building.value.id,
+              unitId: mediaHouseUnitId.value,
+              targetCompanyId: mediaHouseTargetCompanyId.value,
+              mediaType: mediaHouseUnitMediaType.value,
+              campaignBudgetPerTick: mediaHouseCampaignBudgetPerTick.value,
+              isActive: mediaHouseUnitActive.value,
+            },
           },
-        },
+        ),
       )
       mediaHouseUnitSuccess.value = true
       await loadMediaHouseStats()
       setTimeout(() => {
-        mediaHouseUnitSuccess.value = false
+        if (!scope.isStale(gen)) mediaHouseUnitSuccess.value = false
       }, 3000)
     } catch (reason: unknown) {
+      if (scope.isStaleError(reason)) return
       mediaHouseUnitError.value = reason instanceof Error ? reason.message : t('mediaHouse.saveFailed')
     } finally {
-      savingMediaHouseUnit.value = false
+      if (!scope.isStale(gen)) savingMediaHouseUnit.value = false
     }
   }
 
@@ -266,8 +293,6 @@ export function useBuildingMediaHouse(deps: {
     mediaHouseUnitError.value = null
     mediaHouseUnitSuccess.value = false
   }
-
-  if (deps.buildingId) watch(deps.buildingId, () => resetState(), { flush: 'sync' })
 
   return {
     contentBudgetInput,

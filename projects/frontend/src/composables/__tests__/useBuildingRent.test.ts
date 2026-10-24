@@ -89,4 +89,22 @@ describe('useBuildingRent', () => {
     expect(api.newRentPerSqm.value).toBeNull()
     expect(api.rentSaveError.value).toBeNull()
   })
+
+  it('a slow rent save for the previous building does not write into the new one', async () => {
+    const { useBuildingRent } = await import('../useBuildingRent')
+    const buildingId = ref('b1')
+    const b = ref({ id: 'b1', pricePerSqm: 10 } as unknown as Building)
+    const api = useBuildingRent({ building: b, t: (key: string) => key, buildingId: () => buildingId.value })
+    let resolveSave!: (v: unknown) => void
+    gqlRequest.mockImplementationOnce(() => new Promise((r) => (resolveSave = r)))
+    api.openRentDialog()
+    api.newRentPerSqm.value = 15
+    const pending = api.saveRentPerSqm()
+    buildingId.value = 'b2'
+    b.value = { id: 'b2', pricePerSqm: 20 } as unknown as Building
+    resolveSave({ setRentPerSqm: { id: 'b1', pricePerSqm: 10, pendingPricePerSqm: 15, pendingPriceActivationTick: 7 } })
+    await pending
+    expect((b.value as unknown as { pendingPricePerSqm?: number }).pendingPricePerSqm).toBeUndefined()
+    expect(api.showRentDialog.value).toBe(false)
+  })
 })

@@ -162,4 +162,74 @@ describe('useBuildingMediaHouse', () => {
     expect(api.mediaHouseUnitError.value).toBeNull()
     expect(api.mediaHouseStats.value).toBeNull()
   })
+
+  async function setupScoped() {
+    const { useBuildingMediaHouse } = await import('../useBuildingMediaHouse')
+    const buildingId = ref('b1')
+    const b = ref({ id: 'b1', type: 'MEDIA_HOUSE', companyId: 'c1', level: 1 } as unknown as Building)
+    const api = useBuildingMediaHouse({
+      building: b,
+      t: (key: string) => key,
+      loadCityMediaHouses: async () => {},
+      buildingId: () => buildingId.value,
+    })
+    return { api, b, buildingId }
+  }
+
+  it('a slow upgrade for the previous building does not touch the new one', async () => {
+    let resolveUpgrade!: (v: unknown) => void
+    gqlRequest.mockImplementationOnce(() => new Promise((r) => (resolveUpgrade = r)))
+    const { api, b, buildingId } = await setupScoped()
+    const pending = api.upgradeMediaHouse()
+    buildingId.value = 'b2'
+    b.value = { id: 'b2', type: 'MEDIA_HOUSE', level: 4 } as unknown as Building
+    resolveUpgrade({ upgradeMediaHouse: { id: 'b1', level: 2 } })
+    await pending
+    expect((b.value as unknown as { level: number }).level).toBe(4)
+    expect(api.mediaHouseUpgradeSuccess.value).toBe(false)
+    expect(gqlRequest).toHaveBeenCalledTimes(1)
+  })
+
+  it('slow stats and analytics for the previous building are ignored', async () => {
+    let resolveStats!: (v: unknown) => void
+    let resolveAnalytics!: (v: unknown) => void
+    gqlRequest.mockImplementationOnce(() => new Promise((r) => (resolveStats = r)))
+    gqlRequest.mockImplementationOnce(() => new Promise((r) => (resolveAnalytics = r)))
+    const { api, buildingId } = await setupScoped()
+    const stats = api.loadMediaHouseStats()
+    const analytics = api.loadMediaHouseAnalytics()
+    buildingId.value = 'b2'
+    resolveStats({ mediaHouseStats: { buildingId: 'b1', units: [{ id: 'old', targetCompanyId: 'c9', isActive: true }] } })
+    resolveAnalytics({ mediaHouseAnalytics: { buildingId: 'b1' } })
+    await Promise.all([stats, analytics])
+    expect(api.mediaHouseStats.value).toBeNull()
+    expect(api.mediaHouseAnalytics.value).toBeNull()
+    expect(api.mediaHouseUnitId.value).toBeNull()
+  })
+
+  it('a slow content budget save for the previous building does not write into the new one', async () => {
+    let resolveSave!: (v: unknown) => void
+    gqlRequest.mockImplementationOnce(() => new Promise((r) => (resolveSave = r)))
+    const { api, b, buildingId } = await setupScoped()
+    const pending = api.saveContentBudget()
+    buildingId.value = 'b2'
+    b.value = { id: 'b2', type: 'MEDIA_HOUSE', contentBudgetPerTick: 1 } as unknown as Building
+    resolveSave({ setMediaHouseContentBudget: { id: 'b1', contentBudgetPerTick: 99, contentValue: 99 } })
+    await pending
+    expect((b.value as unknown as { contentBudgetPerTick: number }).contentBudgetPerTick).toBe(1)
+    expect(api.contentBudgetSuccess.value).toBe(false)
+  })
+
+  it('a slow unit configuration save for the previous building shows no banner and reloads nothing', async () => {
+    let resolveSave!: (v: unknown) => void
+    gqlRequest.mockImplementationOnce(() => new Promise((r) => (resolveSave = r)))
+    const { api, buildingId } = await setupScoped()
+    api.mediaHouseTargetCompanyId.value = 'c1'
+    const pending = api.saveMediaHouseUnitConfig()
+    buildingId.value = 'b2'
+    resolveSave({ configureMediaHouseUnit: { id: 'u1' } })
+    await pending
+    expect(api.mediaHouseUnitSuccess.value).toBe(false)
+    expect(gqlRequest).toHaveBeenCalledTimes(1)
+  })
 })

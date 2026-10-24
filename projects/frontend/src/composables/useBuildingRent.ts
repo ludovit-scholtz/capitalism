@@ -1,5 +1,6 @@
-import { ref, watch, type Ref } from 'vue'
+import { ref, type Ref } from 'vue'
 import { gqlRequest } from '@/lib/graphql'
+import { createBuildingScope } from '@/composables/buildingScope'
 import type { Building } from '@/types'
 
 /** Rent dialog for APARTMENT / COMMERCIAL buildings. Extracted from useBuildingDetail (#596). */
@@ -15,6 +16,12 @@ export function useBuildingRent(deps: {
   const newRentPerSqm = ref<number | null>(null)
   const savingRent = ref(false)
   const rentSaveError = ref<string | null>(null)
+  const scope = createBuildingScope(deps.buildingId, () => {
+    showRentDialog.value = false
+    newRentPerSqm.value = null
+    savingRent.value = false
+    rentSaveError.value = null
+  })
 
   function openRentDialog() {
     newRentPerSqm.value = building.value?.pendingPricePerSqm ?? building.value?.pricePerSqm ?? null
@@ -29,23 +36,27 @@ export function useBuildingRent(deps: {
 
   async function saveRentPerSqm() {
     if (!building.value || savingRent.value || newRentPerSqm.value === null) return
+    const gen = scope.token()
     savingRent.value = true
     rentSaveError.value = null
     try {
-      const result = await gqlRequest<{
-        setRentPerSqm: { id: string; pricePerSqm: number | null; pendingPricePerSqm: number | null; pendingPriceActivationTick: number | null }
-      }>(
-        `mutation SetRentPerSqm($input: SetRentPerSqmInput!) {
+      const result = await scope.settle(
+        gen,
+        gqlRequest<{
+          setRentPerSqm: { id: string; pricePerSqm: number | null; pendingPricePerSqm: number | null; pendingPriceActivationTick: number | null }
+        }>(
+          `mutation SetRentPerSqm($input: SetRentPerSqmInput!) {
           setRentPerSqm(input: $input) {
             id pricePerSqm pendingPricePerSqm pendingPriceActivationTick
           }
         }`,
-        {
-          input: {
-            buildingId: building.value.id,
-            rentPerSqm: newRentPerSqm.value,
+          {
+            input: {
+              buildingId: building.value.id,
+              rentPerSqm: newRentPerSqm.value,
+            },
           },
-        },
+        ),
       )
       // Update local building state with returned values.
       if (building.value) {
@@ -54,23 +65,11 @@ export function useBuildingRent(deps: {
       }
       showRentDialog.value = false
     } catch (reason: unknown) {
+      if (scope.isStaleError(reason)) return
       rentSaveError.value = reason instanceof Error ? reason.message : t('property.saveFailed')
     } finally {
-      savingRent.value = false
+      if (!scope.isStale(gen)) savingRent.value = false
     }
-  }
-
-  if (deps.buildingId) {
-    watch(
-      deps.buildingId,
-      () => {
-        showRentDialog.value = false
-        newRentPerSqm.value = null
-        savingRent.value = false
-        rentSaveError.value = null
-      },
-      { flush: 'sync' },
-    )
   }
 
   return {
