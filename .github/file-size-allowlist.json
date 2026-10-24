@@ -102,7 +102,7 @@
   "projects/frontend/src/components/onboarding/OnboardingLotSelector.vue": 580,
   "projects/frontend/src/components/profile/RankHistoryChart.vue": 585,
   "projects/frontend/src/components/stock/StockMarketListingRow.vue": 1339,
-  "projects/frontend/src/composables/useBuildingDetail.ts": 5053,
+  "projects/frontend/src/composables/useBuildingDetail.ts": 4842,
   "projects/frontend/src/composables/useStockExchange.ts": 620,
   "projects/frontend/src/lib/__tests__/globalExchange.test.ts": 875,
   "projects/frontend/src/lib/__tests__/linkHelpers.test.ts": 700,
