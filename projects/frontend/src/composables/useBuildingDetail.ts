@@ -180,7 +180,7 @@ export function useBuildingDetail() {
 
   const buildingId = computed(() => route.params.id as string)
   const building = ref<Building | null>(null)
-  const powerPlant = useBuildingPowerPlant({ building, getToken: () => auth.token })
+  const powerPlant = useBuildingPowerPlant({ building, getToken: () => auth.token, buildingId: () => buildingId.value })
   const { loadPowerPlantAnalytics } = powerPlant
   const currentTick = ref(0)
   const loading = ref(true)
@@ -4841,9 +4841,6 @@ export function useBuildingDetail() {
       }
     },
   )
-
-  // Sync flush so the reset runs before any load for the new building can start.
-  watch(() => buildingId.value, () => powerPlant.resetState(), { flush: 'sync' })
 
   // Reset flush storage state when user navigates to a different unit
   watch(

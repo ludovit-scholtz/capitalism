@@ -182,4 +182,16 @@ describe('useBuildingPowerPlant', () => {
     expect(api.maxBidSuccess.value).toBe(true)
     expect(api.maxBidSaving.value).toBe(false)
   })
+
+  it('resets itself synchronously when the watched building id changes', async () => {
+    const { useBuildingPowerPlant } = await import('../useBuildingPowerPlant')
+    const buildingId = ref('b1')
+    const building = ref({ id: 'b1' } as unknown as Building)
+    gqlRequest.mockRejectedValueOnce(new Error('boom'))
+    const api = useBuildingPowerPlant({ building, getToken: () => 'jwt', buildingId: () => buildingId.value })
+    await api.setPlantDispatch('b1', 10)
+    expect(api.dispatchError.value).toBe('boom')
+    buildingId.value = 'b2'
+    expect(api.dispatchError.value).toBeNull()
+  })
 })

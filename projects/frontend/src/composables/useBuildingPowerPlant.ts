@@ -1,4 +1,4 @@
-import { ref, type Ref } from 'vue'
+import { ref, watch, type Ref } from 'vue'
 import { gqlRequest } from '@/lib/graphql'
 import type { Building, CityPowerBalance, PowerPlantAnalytics } from '@/types'
 
@@ -7,7 +7,12 @@ import type { Building, CityPowerBalance, PowerPlantAnalytics } from '@/types'
  * city power balance for the building detail page. Extracted from useBuildingDetail (#596);
  * it only needs the shared building ref and the current auth token.
  */
-export function useBuildingPowerPlant(deps: { building: Ref<Building | null>; getToken: () => string | null | undefined }) {
+export function useBuildingPowerPlant(deps: {
+  building: Ref<Building | null>
+  getToken: () => string | null | undefined
+  /** When given, state is reset (synchronously, before any load for the new building) on change. */
+  buildingId?: () => string | null | undefined
+}) {
   const { building, getToken } = deps
   const powerPlantAnalytics = ref<PowerPlantAnalytics | null>(null)
   const powerPlantAnalyticsLoading = ref(false)
@@ -318,6 +323,8 @@ export function useBuildingPowerPlant(deps: { building: Ref<Building | null>; ge
     maxBidError.value = null
     maxBidSuccess.value = false
   }
+
+  if (deps.buildingId) watch(deps.buildingId, () => resetState(), { flush: 'sync' })
 
   return {
     resetState,
