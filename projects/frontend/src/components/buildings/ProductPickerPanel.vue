@@ -2,8 +2,9 @@
 import { computed, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { RankedProductResult } from '@/types'
-import { getProductImageUrl, getLocalizedProductName, getLocalizedIndustry } from '@/lib/catalogPresentation'
+import { getLocalizedProductName, getLocalizedIndustry } from '@/lib/catalogPresentation'
 import { onCatalogImageError } from '@/lib/catalogImageFallback'
+import { productImage, getAvailabilityMeta, availabilityReasonClass, isLocked } from '@/lib/productPickerPanel'
 
 const props = defineProps<{
   rankedProducts: RankedProductResult[]
@@ -37,10 +38,6 @@ function localIndustry(r: RankedProductResult): string {
   return getLocalizedIndustry(r.productType.industry, locale.value)
 }
 
-function productImage(r: RankedProductResult): string {
-  return getProductImageUrl(r.productType)
-}
-
 const filteredProducts = computed(() => {
   const q = props.searchQuery.trim().toLowerCase()
   if (!q) return props.rankedProducts
@@ -67,45 +64,10 @@ function rankingReasonLabel(reason: string): string {
   return ''
 }
 
-function rankingReasonClass(reason: string): string {
-  if (reason === 'connected') return 'badge-connected'
-  if (reason === 'manufacturing') return 'badge-active-production'
-  if (reason === 'used_by_company') return 'badge-used'
-  return ''
-}
-
-const availabilityReasonMeta = {
-  connected_upstream: {
-    labelKey: 'productPicker.reasonConnectedUpstream',
-    detailKey: 'productPicker.contextConnectedUpstream',
-    className: 'badge-connected',
-  },
-  current_stock: {
-    labelKey: 'productPicker.reasonCurrentStock',
-    detailKey: 'productPicker.contextCurrentStock',
-    className: 'badge-stock',
-  },
-  connected_and_stock: {
-    labelKey: 'productPicker.reasonConnectedAndStock',
-    detailKey: 'productPicker.contextConnectedAndStock',
-    className: 'badge-connected-stock',
-  },
-} as const
-
-function getAvailabilityMeta(entry: RankedProductResult) {
-  return entry.availabilityReason ? availabilityReasonMeta[entry.availabilityReason] : null
-}
-
 function availabilityReasonLabel(entry: RankedProductResult): string {
   const meta = getAvailabilityMeta(entry)
   if (meta) return t(meta.labelKey)
   return rankingReasonLabel(entry.rankingReason)
-}
-
-function availabilityReasonClass(entry: RankedProductResult): string {
-  const meta = getAvailabilityMeta(entry)
-  if (meta) return meta.className
-  return rankingReasonClass(entry.rankingReason)
 }
 
 function availabilityReasonDetail(entry: RankedProductResult): string {
@@ -116,10 +78,6 @@ function availabilityReasonDetail(entry: RankedProductResult): string {
     if (entry.rankingReason === 'used_by_company') return t('productPicker.contextInPortfolio')
   }
   return ''
-}
-
-function isLocked(entry: RankedProductResult): boolean {
-  return entry.productType.isProOnly && !entry.productType.isUnlockedForCurrentPlayer
 }
 
 function emitSelectIfAllowed(entry: RankedProductResult) {

@@ -7,15 +7,14 @@ import { gqlRequest } from '@/lib/graphql'
 import { gqlRequest as gqlMasterRequest } from '@/lib/graphqlMasterServer'
 import GenderPicker from '@/components/profile/GenderPicker.vue'
 import { generatePersonalAccountName, type PlayerGender } from '@/lib/personalAccountName'
-import { resolveApiBaseUrl, resolveGameGraphqlUrl } from '@/lib/runtimeGraphqlUrl'
 import PlayerProfileTabsContent from '@/components/profile/PlayerProfileTabsContent.vue'
 import type { PlayerProfile } from '@/components/profile/PlayerProfileTabsContent.vue'
+import { API_BASE_URL, passwordAuthEnabled, PLAYER_PROFILE_QUERY, UPDATE_BIO_MUTATION, UPDATE_DISPLAY_NAME_MUTATION, UPDATE_PERSONAL_ACCOUNT_NAME_MASTER_MUTATION, rankBadge, copyProfileUrl } from '@/lib/playerProfileView'
 
 const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
-const API_BASE_URL = resolveApiBaseUrl(resolveGameGraphqlUrl(import.meta.env.VITE_GRAPHQL_URL))
 
 // ── State ──────────────────────────────────────────────────────────────────────
 
@@ -58,68 +57,6 @@ const activeSessions = ref<
 
 const playerId = computed(() => route.params.id as string)
 const isOwnProfile = computed(() => auth.player?.id === playerId.value)
-const passwordAuthEnabled = import.meta.env.VITE_AUTH_PASSWORD_ENABLED === 'true'
-
-// ── Queries ────────────────────────────────────────────────────────────────────
-
-const PLAYER_PROFILE_QUERY = `
-  query GetPlayerProfile($playerId: UUID!) {
-    playerProfile(playerId: $playerId) {
-      playerId
-      displayName
-      gender
-      bio
-      createdAtUtc
-      joinGameYear
-      hasProSubscription
-      totalWealthUsd
-      totalCompanyEquityUsd
-      companyCount
-      leaderboardRank
-      activeBuildingTypes
-      citiesWithBuildings
-      totalProductsSold
-      hallOfFame {
-        highestSingleTickRevenue
-        highestSingleTickRevenueTick
-        largestBuildingAcquisitionPrice
-        largestBuildingAcquisitionName
-        highestBrandQuality
-        highestBrandQualityName
-        accountAgeTicks
-      }
-    }
-  }
-`
-
-const UPDATE_BIO_MUTATION = `
-  mutation UpdatePlayerBio($bio: String) {
-    updatePlayerBio(input: { bio: $bio }) {
-      playerId
-      bio
-    }
-  }
-`
-
-const UPDATE_DISPLAY_NAME_MUTATION = `
-  mutation UpdateDisplayName($displayName: String!, $gender: String) {
-    updateDisplayName(input: { displayName: $displayName, gender: $gender }) {
-      playerId
-      displayName
-      gender
-    }
-  }
-`
-
-const UPDATE_PERSONAL_ACCOUNT_NAME_MASTER_MUTATION = `
-  mutation UpdatePersonalAccountName($input: UpdatePersonalAccountNameInput!) {
-    updatePersonalAccountName(input: $input) {
-      playerId
-      personalAccountName
-      gender
-    }
-  }
-`
 
 // ── Functions ──────────────────────────────────────────────────────────────────
 
@@ -221,25 +158,11 @@ function regenerateDisplayName() {
   displayNameInput.value = generatePersonalAccountName(selectedGender.value)
 }
 
-function rankBadge(rank: number): string {
-  if (rank === 1) return '🥇'
-  if (rank === 2) return '🥈'
-  if (rank === 3) return '🥉'
-  return `#${rank}`
-}
-
 function formatJoinDate(createdAtUtc: string): string {
   return new Date(createdAtUtc).toLocaleDateString(
     locale.value === 'sk' ? 'sk-SK' : locale.value === 'de' ? 'de-DE' : 'en-US',
     { year: 'numeric', month: 'long', day: 'numeric' },
   )
-}
-
-function copyProfileUrl() {
-  const url = window.location.href
-  navigator.clipboard.writeText(url).catch(() => {
-    // Fallback: no-op
-  })
 }
 
 function formatSessionDate(value: string): string {

@@ -15,41 +15,9 @@ import { formatInGameTime } from '@/lib/gameTime'
 import GlobalExchangeResourcePanel from '@/components/globalExchange/GlobalExchangeResourcePanel.vue'
 import GlobalExchangeProductPanel from '@/components/globalExchange/GlobalExchangeProductPanel.vue'
 import GlobalExchangeBuyModal from '@/components/globalExchange/GlobalExchangeBuyModal.vue'
-import type { GlobalExchangeOffer, GlobalExchangeProductListing, GlobalExchangeProductQuote, ResourceType, ProductType } from '@/types'
-
-interface City {
-  id: string
-  name: string
-  countryCode: string
-  currencyCode: string
-  latitude: number
-  longitude: number
-}
-
-interface ExchangeRow {
-  resourceId: string
-  resourceName: string
-  resourceSlug: string
-  unitSymbol: string
-  category: string
-  offers: GlobalExchangeOffer[]
-  bestDeliveredPrice: number
-  bestCityId: string
-}
-
-interface ProductRow {
-  productId: string
-  productName: string
-  productSlug: string
-  productIndustry: string
-  unitSymbol: string
-  basePrice: number
-  marketQuote: GlobalExchangeProductQuote
-  listings: GlobalExchangeProductListing[]
-  bestPrice: number
-}
-
-type MarketMode = 'resources' | 'products'
+import type { GlobalExchangeOffer, GlobalExchangeProductListing, ResourceType, ProductType } from '@/types'
+import { CITIES_QUERY, RESOURCES_QUERY, PRODUCTS_QUERY, EXCHANGE_QUERY, PRODUCT_LISTINGS_QUERY, formatPercent, priceVsBase, priceVsBaseClass } from '@/lib/globalExchangeView'
+import type { City, ExchangeRow, ProductRow, MarketMode } from '@/lib/globalExchangeView'
 
 const { t, locale } = useI18n()
 const auth = useAuthStore()
@@ -94,97 +62,6 @@ function onBuySuccess(result: { resourceName: string; quantityPurchased: number;
   })
   void loadOffers(true)
 }
-
-const CITIES_QUERY = `
-  {
-    cities {
-      id
-      name
-      countryCode
-      currencyCode
-      latitude
-      longitude
-    }
-  }
-`
-
-const RESOURCES_QUERY = `
-  {
-    resourceTypes {
-      id
-      name
-      slug
-      category
-      basePrice
-      weightPerUnit
-      unitName
-      unitSymbol
-    }
-  }
-`
-
-const PRODUCTS_QUERY = `
-  {
-    productTypes {
-      id
-      name
-      slug
-      industry
-      basePrice
-      unitName
-      unitSymbol
-      isProOnly
-    }
-  }
-`
-
-const EXCHANGE_QUERY = `
-  query GlobalExchangeOffers($destinationCityId: UUID!) {
-    globalExchangeOffers(destinationCityId: $destinationCityId) {
-      cityId
-      cityName
-      resourceTypeId
-      resourceName
-      resourceSlug
-      unitSymbol
-      localAbundance
-      exchangePricePerUnit
-      estimatedQuality
-      qualityMin
-      qualityMax
-      transitCostPerUnit
-      deliveredPricePerUnit
-      distanceKm
-      fuelPriceIndex
-      askPriceHistory {
-        tick
-        askPricePerUnit
-      }
-    }
-  }
-`
-
-const PRODUCT_LISTINGS_QUERY = `
-  query GlobalExchangeProductListings($productTypeId: UUID) {
-    globalExchangeProductListings(productTypeId: $productTypeId) {
-      orderId
-      productTypeId
-      productName
-      productSlug
-      productIndustry
-      unitSymbol
-      unitName
-      basePrice
-      pricePerUnit
-      remainingQuantity
-      sellerCityId
-      sellerCityName
-      sellerCompanyId
-      sellerCompanyName
-      createdAtUtc
-    }
-  }
-`
 
 async function loadCitiesAndResources() {
   const [citiesData, resourcesData, productsData] = await Promise.all([
@@ -378,10 +255,6 @@ function formatPrice(value: number): string {
   return formatMoney(value, selectedCityCurrencyCode.value, locale.value)
 }
 
-function formatPercent(value: number): string {
-  return `${Math.round(value * 100)}%`
-}
-
 function localizedCategory(cat: string): string {
   const map: Record<string, string> = {
     RAW_MATERIAL: t('globalExchange.categoryRaw'),
@@ -400,19 +273,6 @@ function localizedIndustry(ind: string): string {
     CONSTRUCTION: t('globalExchange.industryConstruction'),
   }
   return map[ind] ?? ind
-}
-
-function priceVsBase(pricePerUnit: number, basePrice: number): string {
-  if (basePrice <= 0) return ''
-  const diff = pricePerUnit - basePrice
-  const pct = Math.round((diff / basePrice) * 100)
-  return pct >= 0 ? `+${pct}%` : `${pct}%`
-}
-
-function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
-  if (basePrice <= 0) return ''
-  const diff = pricePerUnit - basePrice
-  return diff > 0 ? 'price-above-base' : diff < 0 ? 'price-below-base' : 'price-at-base'
 }
 </script>
 
