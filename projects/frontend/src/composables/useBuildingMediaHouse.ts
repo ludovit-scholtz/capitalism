@@ -6,7 +6,13 @@ import type { Building, MediaHouseAnalyticsResult, MediaHouseStatsResult } from 
  * Content budget, upgrade, analytics and unit configuration for MEDIA_HOUSE buildings.
  * Extracted from useBuildingDetail (#596).
  */
-export function useBuildingMediaHouse(deps: { building: Ref<Building | null>; t: (key: string) => string; loadCityMediaHouses: () => Promise<void> }) {
+export function useBuildingMediaHouse(deps: {
+  building: Ref<Building | null>
+  t: (key: string) => string
+  loadCityMediaHouses: () => Promise<void>
+  /** When given, per-building state is reset synchronously when the id changes. */
+  buildingId?: () => string | null | undefined
+}) {
   const { building, t, loadCityMediaHouses } = deps
   const contentBudgetInput = ref<number | null>(null)
   const savingContentBudget = ref(false)
