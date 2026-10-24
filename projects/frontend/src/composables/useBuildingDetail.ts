@@ -28,6 +28,7 @@ import {
 } from '@/lib/catalogPresentation'
 import { PRODUCTION_PANEL_DISMISSED_KEY, SALES_PANEL_DISMISSED_KEY, isBuildingPanelDismissed, dismissBuildingPanel, shouldShowPanel } from '@/lib/panelDismissal'
 import { useTickRefresh } from '@/composables/useTickRefresh'
+import { useBuildingPowerPlant } from '@/composables/useBuildingPowerPlant'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { gqlRequest, GraphQLError } from '@/lib/graphql'
 import {
@@ -63,11 +64,9 @@ import type {
   BuildingUnitOperationalStatus,
   BuildingRecentActivityEvent,
   City,
-  CityPowerBalance,
   Company,
   EurFxRate,
   GlobalExchangeOffer,
-  PowerPlantAnalytics,
   ProcurementPreview,
   ProductType,
   PublicSalesAnalytics,
@@ -181,6 +180,8 @@ export function useBuildingDetail() {
 
   const buildingId = computed(() => route.params.id as string)
   const building = ref<Building | null>(null)
+  const powerPlant = useBuildingPowerPlant({ building, getToken: () => auth.token })
+  const { loadPowerPlantAnalytics } = powerPlant
   const currentTick = ref(0)
   const loading = ref(true)
   const saving = ref(false)
@@ -351,12 +352,6 @@ export function useBuildingDetail() {
   const recentActivityLoading = ref(false)
   const buildingFinancialTimeline = ref<BuildingFinancialTimeline | null>(null)
   const buildingFinancialTimelineLoading = ref(false)
-
-  // Power plant analytics state
-  const powerPlantAnalytics = ref<PowerPlantAnalytics | null>(null)
-  const powerPlantAnalyticsLoading = ref(false)
-  const cityPowerBalance = ref<CityPowerBalance | null>(null)
-  const cityPowerBalanceLoading = ref(false)
 
   // R&D research progress state
   const researchBrands = ref<ResearchBrandState[]>([])
@@ -1038,7 +1033,6 @@ export function useBuildingDetail() {
   )
 
   let activeBuildingFinancialTimelineRequest = 0
-  let activePowerPlantAnalyticsRequest = 0
 
   type ExchangeOfferItem = AnnotatedExchangeOffer
 
@@ -4358,252 +4352,6 @@ export function useBuildingDetail() {
     }
   }
 
-  async function loadPowerPlantAnalytics(buildingId: string, isRefresh = false) {
-    if (!auth.token) {
-      powerPlantAnalytics.value = null
-      powerPlantAnalyticsLoading.value = false
-      return
-    }
-
-    const requestId = ++activePowerPlantAnalyticsRequest
-    if (!isRefresh || powerPlantAnalytics.value == null) {
-      powerPlantAnalyticsLoading.value = true
-    }
-
-    try {
-      const data = await gqlRequest<{ powerPlantAnalytics: PowerPlantAnalytics }>(
-        `query PowerPlantAnalytics($buildingId: UUID!, $limit: Int) {
-          powerPlantAnalytics(buildingId: $buildingId, limit: $limit) {
-            buildingId
-            buildingName
-            plantType
-            currentOutputMw
-            dispatchTargetPercent
-            fuelReserveMwh
-            maxFuelReserveMwh
-            fuelReservePercent
-            fuelPurchaseCapacityMwhPerTick
-            energyProducingCapacityMw
-            fuelConstrainedOutputMw
-            fuelTypeLabel
-            fuelCostPerMwhEur
-            dataFromTick
-            dataToTick
-            totalSurplusIncome
-            totalGridFines
-            totalOperatingCosts
-            totalFuelCosts
-            totalSpotMarketRevenue
-            totalNetProfit
-            activeListing {
-              listingId
-              buildingId
-              buildingName
-              companyId
-              companyName
-              cityId
-              plantType
-              pricePerKwhLocal
-              capacityKw
-              availableKw
-              createdAtTick
-              createdAtUtc
-            }
-            timeline {
-              tick
-              surplusIncome
-              gridFine
-              operatingCosts
-              fuelCosts
-              spotMarketRevenue
-              netProfit
-            }
-          }
-        }`,
-        { buildingId, limit: 100 },
-      )
-      if (requestId !== activePowerPlantAnalyticsRequest) return
-      powerPlantAnalytics.value = data.powerPlantAnalytics
-    } catch {
-      if (requestId !== activePowerPlantAnalyticsRequest) return
-      if (!isRefresh) powerPlantAnalytics.value = null
-    } finally {
-      if (requestId === activePowerPlantAnalyticsRequest) {
-        powerPlantAnalyticsLoading.value = false
-      }
-    }
-  }
-
-  const dispatchSaving = ref(false)
-  const dispatchError = ref<string | null>(null)
-  const dispatchSuccess = ref(false)
-
-  async function setPlantDispatch(buildingId: string, dispatchTargetPercent: number) {
-    dispatchSaving.value = true
-    dispatchError.value = null
-    dispatchSuccess.value = false
-    try {
-      const data = await gqlRequest<{ setPlantDispatch: { id: string; dispatchTargetPercent: number } }>(
-        `mutation SetPlantDispatch($input: SetPlantDispatchInput!) {
-          setPlantDispatch(input: $input) {
-            id
-            dispatchTargetPercent
-          }
-        }`,
-        { input: { buildingId, dispatchTargetPercent } },
-      )
-      // Update the local building state immediately.
-      if (building.value && data.setPlantDispatch) {
-        building.value = { ...building.value, dispatchTargetPercent: data.setPlantDispatch.dispatchTargetPercent }
-      }
-      dispatchSuccess.value = true
-      // Reload analytics to reflect the new dispatch target.
-      void loadPowerPlantAnalytics(buildingId, true)
-    } catch (e) {
-      dispatchError.value = e instanceof Error ? e.message : 'Failed to update dispatch target.'
-    } finally {
-      dispatchSaving.value = false
-    }
-  }
-
-  // ─── Power priority ───────────────────────────────────────────────────────
-  const prioritySaving = ref(false)
-  const priorityError = ref<string | null>(null)
-  const prioritySuccess = ref(false)
-
-  async function setPowerPriority(buildingId: string, priority: number) {
-    prioritySaving.value = true
-    priorityError.value = null
-    prioritySuccess.value = false
-    try {
-      await gqlRequest<{ setPowerPriority: { id: string; powerPriority: number } }>(
-        `mutation SetPowerPriority($input: SetPowerPriorityInput!) {
-          setPowerPriority(input: $input) {
-            id
-            powerPriority
-          }
-        }`,
-        { input: { buildingId, priority } },
-      )
-      if (building.value) {
-        building.value = { ...building.value, powerPriority: priority }
-      }
-      prioritySuccess.value = true
-    } catch (e) {
-      priorityError.value = e instanceof Error ? e.message : 'Failed to update power priority.'
-    } finally {
-      prioritySaving.value = false
-    }
-  }
-
-  // ─── Energy spot-market listing (power plant buildings) ───────────────────
-  const energyListingSaving = ref(false)
-  const energyListingError = ref<string | null>(null)
-  const energyListingSuccess = ref(false)
-
-  async function listEnergyForSale(buildingId: string, pricePerKwhLocal: number, capacityKw: number) {
-    energyListingSaving.value = true
-    energyListingError.value = null
-    energyListingSuccess.value = false
-    try {
-      await gqlRequest<{ listEnergyForSale: { listingId: string } }>(
-        `mutation ListEnergyForSale($input: ListEnergyForSaleInput!) {
-          listEnergyForSale(input: $input) {
-            listingId
-          }
-        }`,
-        { input: { buildingId, pricePerKwhLocal, capacityKw } },
-      )
-      energyListingSuccess.value = true
-      void loadPowerPlantAnalytics(buildingId, true)
-    } catch (e) {
-      energyListingError.value = e instanceof Error ? e.message : 'Failed to create energy listing.'
-    } finally {
-      energyListingSaving.value = false
-    }
-  }
-
-  const energyCancelSaving = ref(false)
-  const energyCancelError = ref<string | null>(null)
-
-  async function cancelEnergyListing(listingId: string) {
-    energyCancelSaving.value = true
-    energyCancelError.value = null
-    const bid = building.value?.id ?? ''
-    try {
-      await gqlRequest<{ cancelEnergyListing: boolean }>(
-        `mutation CancelEnergyListing($input: CancelEnergyListingInput!) {
-          cancelEnergyListing(input: $input)
-        }`,
-        { input: { listingId } },
-      )
-      if (bid) void loadPowerPlantAnalytics(bid, true)
-    } catch (e) {
-      energyCancelError.value = e instanceof Error ? e.message : 'Failed to cancel energy listing.'
-    } finally {
-      energyCancelSaving.value = false
-    }
-  }
-
-  // ─── Max energy bid price (consumer buildings) ────────────────────────────
-  const maxBidSaving = ref(false)
-  const maxBidError = ref<string | null>(null)
-  const maxBidSuccess = ref(false)
-
-  async function setMaxEnergyBidPrice(buildingId: string, maxBidPricePerKwh: number | null) {
-    maxBidSaving.value = true
-    maxBidError.value = null
-    maxBidSuccess.value = false
-    try {
-      await gqlRequest<{ setMaxEnergyBidPrice: { id: string; maxEnergyBidPrice: number | null } }>(
-        `mutation SetMaxEnergyBidPrice($input: SetMaxEnergyBidPriceInput!) {
-          setMaxEnergyBidPrice(input: $input) {
-            id
-            maxEnergyBidPrice
-          }
-        }`,
-        { input: { buildingId, maxBidPricePerKwh } },
-      )
-      if (building.value) {
-        building.value = { ...building.value, maxEnergyBidPrice: maxBidPricePerKwh }
-      }
-      maxBidSuccess.value = true
-    } catch (e) {
-      maxBidError.value = e instanceof Error ? e.message : 'Failed to update max bid price.'
-    } finally {
-      maxBidSaving.value = false
-    }
-  }
-
-  async function loadCityPowerBalance(cityId: string, isRefresh = false) {
-    if (!cityId) return
-    if (!isRefresh || cityPowerBalance.value == null) {
-      cityPowerBalanceLoading.value = true
-    }
-    try {
-      const data = await gqlRequest<{ cityPowerBalance: CityPowerBalance }>(
-        `query CityPowerBalance($cityId: UUID!) {
-          cityPowerBalance(cityId: $cityId) {
-            cityId
-            totalSupplyMw
-            totalDemandMw
-            reserveMw
-            reservePercent
-            status
-            powerPlantCount
-            consumerBuildingCount
-          }
-        }`,
-        { cityId },
-      )
-      cityPowerBalance.value = data.cityPowerBalance
-    } catch {
-      if (!isRefresh) cityPowerBalance.value = null
-    } finally {
-      cityPowerBalanceLoading.value = false
-    }
-  }
-
   // ── Rental Income Analytics (APARTMENT / COMMERCIAL) ─────────────────────
 
   async function loadRentalAnalytics(bId: string, isRefresh = false) {
@@ -5251,6 +4999,7 @@ export function useBuildingDetail() {
   }
 
   return {
+    ...powerPlant,
     locale,
     building,
     currentTick,
@@ -5288,10 +5037,6 @@ export function useBuildingDetail() {
     recentActivityLoading,
     buildingFinancialTimeline,
     buildingFinancialTimelineLoading,
-    powerPlantAnalytics,
-    powerPlantAnalyticsLoading,
-    cityPowerBalance,
-    cityPowerBalanceLoading,
     researchBrands,
     researchBrandsLoading,
     cityMediaHouses,
@@ -5602,28 +5347,7 @@ export function useBuildingDetail() {
     loadRecentActivity,
     loadSupplyChain,
     loadBuildingFinancialTimeline,
-    loadPowerPlantAnalytics,
     loadRentalAnalytics,
-    loadCityPowerBalance,
-    setPlantDispatch,
-    dispatchSaving,
-    dispatchError,
-    dispatchSuccess,
-    setPowerPriority,
-    prioritySaving,
-    priorityError,
-    prioritySuccess,
-    listEnergyForSale,
-    energyListingSaving,
-    energyListingError,
-    energyListingSuccess,
-    cancelEnergyListing,
-    energyCancelSaving,
-    energyCancelError,
-    setMaxEnergyBidPrice,
-    maxBidSaving,
-    maxBidError,
-    maxBidSuccess,
     fetchRankedProducts,
     getB2BPriceSource,
     getB2BSuggestedPrice,
