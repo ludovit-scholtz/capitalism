@@ -17,7 +17,8 @@ public sealed class TickProcessor(
     IEnumerable<ITickPhase> phases,
     ILogger<TickProcessor> logger,
     TickTimingRecorder? timingRecorder = null,
-    TickTimingStore? timingStore = null)
+    TickTimingStore? timingStore = null,
+    bool trackBuildingUnits = false)
 {
     /// <summary>Timing entry for loading the tick context from the database (reported next to the phases).</summary>
     public const string ContextLoadEntryName = "(context load)";
@@ -122,6 +123,8 @@ public sealed class TickProcessor(
             db.Inventories.RemoveRange(depleted);
         }
 
+        context.UnitChanges?.MarkChangedUnits(db);
+
         var saveSw = Stopwatch.StartNew();
         try
         {
@@ -196,12 +199,33 @@ public sealed class TickProcessor(
         // PendingConfiguration.Removals).  Without it, the same BuildingUnit row can appear
         // multiple times in the result set, and the subsequent ToDictionary call for
         // UnitsByBuildingPosition throws "An item with the same key has already been added."
-        var buildings = await db.Buildings
-            .Include(b => b.Units)
+        IQueryable<Building> buildingsQuery = db.Buildings;
+        if (trackBuildingUnits)
+        {
+            buildingsQuery = buildingsQuery.Include(b => b.Units);
+        }
+
+        var buildings = await buildingsQuery
             .Include(b => b.PendingConfiguration)!.ThenInclude(p => p!.Units)
             .Include(b => b.PendingConfiguration)!.ThenInclude(p => p!.Removals)
             .AsSplitQuery()
             .ToListAsync(ct);
+
+        // Building units are the bulk of the rows (50,000 at 2,000 buildings). Tracked, they cost most of the context load and a pass of
+        // change detection; untracked, only the units a phase actually changed are saved (see UntrackedUnitChanges, #646).
+        UntrackedUnitChanges? unitChanges = null;
+        Dictionary<Guid, List<BuildingUnit>> unitsOfBuilding;
+        if (trackBuildingUnits)
+        {
+            unitsOfBuilding = buildings.ToDictionary(b => b.Id, b => b.Units.ToList());
+        }
+        else
+        {
+            var loadedUnits = await db.BuildingUnits.AsNoTracking().ToListAsync(ct);
+            unitChanges = UntrackedUnitChanges.Capture(loadedUnits);
+            var grouped = loadedUnits.GroupBy(u => u.BuildingId).ToDictionary(g => g.Key, g => g.ToList());
+            unitsOfBuilding = buildings.ToDictionary(b => b.Id, b => grouped.GetValueOrDefault(b.Id) ?? []);
+        }
 
         var companies = await db.Companies.ToListAsync(ct);
         var companySalarySettings = await db.CompanyCitySalarySettings
@@ -267,7 +291,7 @@ public sealed class TickProcessor(
         // purchasing, manufacturing, movement, mining, and sales in the same tick cycle).
         var unitsByBuildingPosition = buildings.ToDictionary(
             b => b.Id,
-            b => b.Units.DistinctBy(u => (u.GridX, u.GridY)).ToDictionary(u => (u.GridX, u.GridY)));
+            b => unitsOfBuilding[b.Id].DistinctBy(u => (u.GridX, u.GridY)).ToDictionary(u => (u.GridX, u.GridY)));
 
         var unitsUnderUpgrade = new HashSet<Guid>();
         foreach (var building in buildings)
@@ -405,7 +429,8 @@ public sealed class TickProcessor(
             BuildingsByType = buildings
                 .GroupBy(b => b.Type)
                 .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase),
-            UnitsByBuilding = buildings.ToDictionary(b => b.Id, b => b.Units.ToList()),
+            UnitsByBuilding = unitsOfBuilding,
+            UnitChanges = unitChanges,
             MediaHouseUnitsByBuilding = mediaHouseUnits
                 .GroupBy(unit => unit.BuildingId)
                 .ToDictionary(group => group.Key, group => group.ToList()),

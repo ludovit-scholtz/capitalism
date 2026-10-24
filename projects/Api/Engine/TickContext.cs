@@ -24,6 +24,12 @@ public sealed partial class TickContext
     public Dictionary<Guid, Building> BuildingsById { get; init; } = [];
     public Dictionary<string, List<Building>> BuildingsByType { get; init; } = [];
     public Dictionary<Guid, List<BuildingUnit>> UnitsByBuilding { get; init; } = [];
+
+    /// <summary>
+    /// Set when the units in <see cref="UnitsByBuilding"/> were loaded without change tracking; finds the ones phases changed so they
+    /// can be saved. Null when the units are tracked by the context.
+    /// </summary>
+    public UntrackedUnitChanges? UnitChanges { get; init; }
     public Dictionary<Guid, List<MediaHouseUnit>> MediaHouseUnitsByBuilding { get; init; } = [];
     public Dictionary<Guid, Dictionary<(int GridX, int GridY), BuildingUnit>> UnitsByBuildingPosition { get; init; } = [];
     public Dictionary<Guid, List<Inventory>> InventoryByUnit { get; init; } = [];
