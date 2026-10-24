@@ -109,7 +109,6 @@
   "projects/frontend/src/lib/__tests__/linkHelpers.test.ts": 700,
   "projects/frontend/src/lib/__tests__/onboardingHelpers.test.ts": 519,
   "projects/frontend/src/stores/__tests__/events.test.ts": 687,
-  "projects/frontend/src/stores/auth.ts": 840,
   "projects/frontend/src/views/BankLoanRequestView.vue": 516,
   "projects/frontend/src/views/BuildingDetailView.vue": 526,
   "projects/frontend/src/views/CityMapView.vue": 708,
