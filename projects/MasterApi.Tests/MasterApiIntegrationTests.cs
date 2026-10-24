@@ -1553,17 +1553,16 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
             Assert.True(changelogItems.Count >= 4, $"Expected at least 4 CHANGELOG entries, got {changelogItems.Count}");
 
             // The feed is capped at the newest 500 rows and CHANGELOG.csv keeps growing, so do not look for
-            // one specific old row. Every imported entry must be well-formed: en, sk and de localizations
-            // with a non-empty title.
-            foreach (var item in changelogItems)
+            // one specific old row. The shared fixture can also hold English-only entries published by other
+            // tests, so require that at least one imported entry is fully localized (en, sk and de, with titles).
+            bool hasFullyLocalizedEntry = changelogItems.Any(item =>
             {
                 var localizations = item.GetProperty("localizations").EnumerateArray().ToList();
                 var locales = localizations.Select(l => l.GetProperty("locale").GetString()).ToHashSet();
-                Assert.Contains("en", locales);
-                Assert.Contains("sk", locales);
-                Assert.Contains("de", locales);
-                Assert.All(localizations, l => Assert.False(string.IsNullOrWhiteSpace(l.GetProperty("title").GetString())));
-            }
+                return locales.Contains("en") && locales.Contains("sk") && locales.Contains("de")
+                    && localizations.All(l => !string.IsNullOrWhiteSpace(l.GetProperty("title").GetString()));
+            });
+            Assert.True(hasFullyLocalizedEntry, "Expected at least one fully localized (en/sk/de) CHANGELOG entry in the feed.");
         }
 
         #region Changelog CSV importer unit tests
