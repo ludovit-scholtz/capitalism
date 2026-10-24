@@ -1546,7 +1546,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
             Assert.False(result.TryGetProperty("errors", out _));
             var items = result.GetProperty("data").GetProperty("gameNewsFeed").GetProperty("items").EnumerateArray().ToList();
 
-            // CHANGELOG.csv grows over time; use limit=500 above to ensure all rows are returned.
+            // CHANGELOG.csv grows over time; limit=500 is the API maximum, so only the newest 500 rows are returned.
             var changelogItems = items.Where(item =>
                 item.GetProperty("entryType").GetString() == "CHANGELOG"
                 && item.GetProperty("status").GetString() == "PUBLISHED").ToList();
