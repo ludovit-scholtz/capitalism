@@ -207,8 +207,24 @@ describe('useBuildingLayouts', () => {
     expect(layouts.layoutSaveSuccess.value).toBe(false)
     expect(layouts.layoutDeleteError.value).toBeNull()
     expect(layouts.overwriteConfirmPending.value).toBeNull()
-    expect(layouts.masterLayouts.value).toEqual([])
-    expect(layouts.localLayouts.value).toEqual([])
+  })
+
+  it('keeps the loaded template lists on a building change (edit mode reloads them itself)', async () => {
+    const { layouts, buildingId } = await setup()
+    layouts.masterLayouts.value = [{ id: '1' } as never]
+    layouts.localLayouts.value = [{ name: 'l' } as never]
+    buildingId.value = 'b2'
+    expect(layouts.masterLayouts.value).toHaveLength(1)
+    expect(layouts.localLayouts.value).toHaveLength(1)
+  })
+
+  it('deleting the layout that awaits overwrite confirmation cancels the confirmation', async () => {
+    const { layouts } = await setup()
+    const layout = { id: 'c1', name: 'a', buildingType: 'FACTORY', isLocal: false, units: [unit()] } as never
+    layouts.requestLoadLayout(layout)
+    expect(layouts.overwriteConfirmPending.value).not.toBeNull()
+    await layouts.deleteLayout(layout)
+    expect(layouts.overwriteConfirmPending.value).toBeNull()
   })
 
   it('a slow master layout fetch for the previous building is ignored', async () => {

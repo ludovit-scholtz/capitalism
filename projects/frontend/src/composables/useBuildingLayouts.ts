@@ -205,6 +205,9 @@ export function useBuildingLayouts(deps: {
   async function deleteLayout(layout: BuildingLayoutTemplate): Promise<void> {
     const gen = scope.token()
     layoutDeleteError.value = null
+    if (overwriteConfirmPending.value && overwriteConfirmPending.value.name === layout.name && overwriteConfirmPending.value.buildingType === layout.buildingType) {
+      overwriteConfirmPending.value = null
+    }
     try {
       if (!layout.isLocal && layout.id) {
         await scope.settle(gen, deleteMasterLayout(layout.id))
@@ -228,10 +231,8 @@ export function useBuildingLayouts(deps: {
     layoutSaveSuccess.value = false
     layoutDeleteError.value = null
     overwriteConfirmPending.value = null
-    masterLayouts.value = []
     masterLayoutsLoading.value = false
     masterLayoutsError.value = null
-    localLayouts.value = []
   }
 
   return {
