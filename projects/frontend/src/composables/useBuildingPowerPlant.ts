@@ -37,6 +37,7 @@ export function useBuildingPowerPlant(deps: {
 
   async function loadPowerPlantAnalytics(buildingId: string, isRefresh = false) {
     if (!getToken()) {
+      activePowerPlantAnalyticsRequest++
       powerPlantAnalytics.value = null
       powerPlantAnalyticsLoading.value = false
       return

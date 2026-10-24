@@ -194,4 +194,18 @@ describe('useBuildingPowerPlant', () => {
     buildingId.value = 'b2'
     expect(api.dispatchError.value).toBeNull()
   })
+
+  it('a token-less load invalidates an in-flight analytics request', async () => {
+    const { useBuildingPowerPlant } = await import('../useBuildingPowerPlant')
+    let token: string | null = 'jwt'
+    let resolveFirst!: (v: unknown) => void
+    gqlRequest.mockImplementationOnce(() => new Promise((r) => (resolveFirst = r)))
+    const api = useBuildingPowerPlant({ building: ref(null), getToken: () => token })
+    const pending = api.loadPowerPlantAnalytics('b1')
+    token = null
+    await api.loadPowerPlantAnalytics('b1')
+    resolveFirst({ powerPlantAnalytics: { buildingId: 'old' } })
+    await pending
+    expect(api.powerPlantAnalytics.value).toBeNull()
+  })
 })
