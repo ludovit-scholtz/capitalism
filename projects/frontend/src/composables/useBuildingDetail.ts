@@ -353,7 +353,6 @@ export function useBuildingDetail() {
   const buildingFinancialTimeline = ref<BuildingFinancialTimeline | null>(null)
   const buildingFinancialTimelineLoading = ref(false)
 
-
   // R&D research progress state
   const researchBrands = ref<ResearchBrandState[]>([])
   const researchBrandsLoading = ref(false)
