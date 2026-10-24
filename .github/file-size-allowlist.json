@@ -126,7 +126,6 @@
   "projects/frontend/src/views/WorldMapView.vue": 513,
   "projects/master-frontend/e2e/helpers/mock-api.ts": 2380,
   "projects/master-frontend/src/components/layout/AppHeader.vue": 595,
-  "projects/master-frontend/src/stores/auth.ts": 675,
   "projects/master-frontend/src/views/AccountView.vue": 1021,
   "projects/master-frontend/src/views/GoldAdminView.vue": 831
 }
